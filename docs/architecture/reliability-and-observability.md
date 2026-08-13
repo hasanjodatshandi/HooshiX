@@ -47,11 +47,11 @@ Paging uses paired multi-window burn:
 - 6x: 30m + 6h -> page;
 - 3x: 2h + 24h -> reliability/release-risk action.
 
-Breaker opening follows current ADR-0062 criteria. Repeated OPEN timing and HALF_OPEN behavior follow ADR-0066: de-correlated bounded reopen backoff, at most one real `CheckPermission` probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, and no tenant-tier variation.
+Breaker opening follows current ADR-0032 criteria. Repeated OPEN timing and HALF_OPEN behavior follow ADR-0036: de-correlated bounded reopen backoff, at most one real `CheckPermission` probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, and no tenant-tier variation.
 
 ## 4. Semantic quota dependency
 
-ADR-0054 is the single current quota decision:
+ADR-0024 is the single current quota decision:
 
 ```text
 Redis budget: 75 ms
@@ -95,7 +95,7 @@ Security Redis uses one primary + two replicas + three Sentinel voters. Failover
 
 ## 8. SLO classes and error budgets
 
-ADR-0028 defines current generic classes:
+ADR-0005 defines current generic classes:
 
 ### Class A
 
@@ -159,7 +159,7 @@ platform RTO <=4h
 PostgreSQL PITR 35d
 ```
 
-Every backup cycle is verified; isolated restore is monthly per service; full cold DR is quarterly. ADR-0067 requires queryable recovery evidence and freezes ordinary affected-service promotion after a failed restore until replacement evidence passes.
+Every backup cycle is verified; isolated restore is monthly per service; full cold DR is quarterly. ADR-0037 requires queryable recovery evidence and freezes ordinary affected-service promotion after a failed restore until replacement evidence passes.
 
 ## 10. Observability
 

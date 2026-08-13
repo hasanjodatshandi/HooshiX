@@ -12,7 +12,7 @@ Evidence: NOT VERIFIED until executed/measured
 
 Production configuration MUST NOT bypass a failed gate.
 
-## 1. Kubernetes active-cluster HA — ADR-0051
+## 1. Kubernetes active-cluster HA — ADR-0022
 
 Required evidence:
 
@@ -26,7 +26,7 @@ Required evidence:
 
 Status until verified: **platform HA production blocker**.
 
-## 2. Semantic quotas — ADR-0054
+## 2. Semantic quotas — ADR-0024
 
 Required evidence:
 
@@ -42,7 +42,7 @@ Required evidence:
 
 Status until verified: **blocker for semantic-quota-protected production entry points**.
 
-## 3. Online Authorization — ADR-0039/0056/0062/0066
+## 3. Online Authorization — ADR-0013/0026/0032/0036
 
 Required evidence:
 
@@ -62,7 +62,7 @@ Required evidence:
 
 Status until verified: **protected-operation production blocker**.
 
-## 4. PostgreSQL isolation/HA/recovery — ADR-0048/0057/0064/0067
+## 4. PostgreSQL isolation/HA/recovery — ADR-0019/0027/0034/0037
 
 Required evidence per persistent service:
 
@@ -87,7 +87,7 @@ Required evidence per persistent service:
 
 Status until verified: **platform/data production blocker**.
 
-## 5. Kafka durability/rebuildable DR — ADR-0044
+## 5. Kafka durability/rebuildable DR — ADR-0015
 
 Required evidence:
 
@@ -102,7 +102,7 @@ Required evidence:
 
 Status until verified: **critical async-flow blocker**.
 
-## 6. Browser/BFF security — ADR-0045
+## 6. Browser/BFF security — ADR-0016
 
 Required evidence:
 
@@ -117,7 +117,7 @@ Required evidence:
 
 Status until verified: **public-internet blocker**.
 
-## 7. Supply chain + vulnerability response — ADR-0046/0065/0068
+## 7. Supply chain + vulnerability response — ADR-0017/0035/0038
 
 Required evidence:
 
@@ -139,7 +139,7 @@ Required evidence:
 
 Status until verified: **production deployment-security blocker**.
 
-## 8. Notification runtime — ADR-0029/0030/0043/0047/0049
+## 8. Notification runtime — ADR-0006/0007/0014/0018/0020
 
 Required evidence:
 
@@ -158,7 +158,7 @@ Required evidence:
 
 Status until verified: **Notification production blocker**.
 
-## 9. OpenBao recovery — ADR-0037
+## 9. OpenBao recovery — ADR-0011
 
 Required evidence:
 
@@ -172,7 +172,7 @@ Required evidence:
 
 Status until verified: **secret-platform blocker**.
 
-## 10. WAF + upstream DDoS — ADR-0024/0059
+## 10. WAF + upstream DDoS — ADR-0001/0029
 
 Required evidence:
 
@@ -187,7 +187,7 @@ Required evidence:
 
 Status until verified: **public-internet blocker**.
 
-## 11. Iran SMS / SMS MFA — ADR-0049
+## 11. Iran SMS / SMS MFA — ADR-0020
 
 Required evidence:
 
@@ -199,11 +199,11 @@ Required evidence:
 - timeout/connection loss/malformed/unproven acceptance -> `AMBIGUOUS`, never blind resend;
 - bounded report polling/backpressure;
 - local logging adapter cannot activate in production;
-- SMS MFA additionally passes ADR-0054 quotas and current Identity MFA/session gates.
+- SMS MFA additionally passes ADR-0024 quotas and current Identity MFA/session gates.
 
 Status until verified: **SMS-dependent feature blocker; unrelated Email-only capabilities may proceed independently**.
 
-## 12. Platform compatibility / CNI / immutable artifacts — ADR-0050
+## 12. Platform compatibility / CNI / immutable artifacts — ADR-0021
 
 Required evidence:
 
@@ -218,7 +218,7 @@ Required evidence:
 
 Status until verified: **platform release blocker**.
 
-## 13. JWT signing-key lifecycle — ADR-0052
+## 13. JWT signing-key lifecycle — ADR-0023
 
 Required evidence:
 
@@ -232,7 +232,7 @@ Required evidence:
 
 Status until verified: **authentication-trust blocker**.
 
-## 14. Java/source/build/CI — ADR-0069
+## 14. Java/source/build/CI — ADR-0039
 
 For each Java service:
 

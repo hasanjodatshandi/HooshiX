@@ -7,7 +7,7 @@
 
 This file is the exact approved production technology/version authority. Repository wrappers, lock files, image digests, Helm/Kustomize values, and CI verification metadata remain authoritative for the exact artifact digest actually deployed.
 
-A baseline pin is **not** proof that no unknown or newly disclosed vulnerability exists. Continuous SBOM/vulnerability/advisory correlation, exception-expiry enforcement, and release-time support/security revalidation remain mandatory under ADR-0065/ADR-0068.
+A baseline pin is **not** proof that no unknown or newly disclosed vulnerability exists. Continuous SBOM/vulnerability/advisory correlation, exception-expiry enforcement, and release-time support/security revalidation remain mandatory under ADR-0035/ADR-0038.
 
 Agents MUST NOT silently select newer versions merely because upstream has a newer release.
 
@@ -22,15 +22,15 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Build | Gradle Wrapper 9.6.1 + Kotlin DSL | wrapper per independently deployable service |
 | DI | Spring IoC + constructor injection | sole DI container |
 | Password hashing | Argon2id: m=19 MiB, t=2, p=1; 16-byte random salt; >=32-byte hash | versioned/self-describing storage; benchmark and bounded hash bulkhead required |
-| Access-token signing | RS256 / RSA-3072 / 90-day key rotation | ADR-0052; Identity private key local from OpenBao, public verifier bundle via GitOps |
+| Access-token signing | RS256 / RSA-3072 / 90-day key rotation | ADR-0023; Identity private key local from OpenBao, public verifier bundle via GitOps |
 | Internal synchronous API | gRPC + Protobuf | current architecture choice |
 | gRPC Java | 1.81.0 | dependency locks align runtime/stubs/codegen |
 | External/browser API | REST + OpenAPI through BFF | current architecture choice |
-| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0044 durability applies |
+| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0015 durability applies |
 | Event/API schema | Protobuf | Git + Buf governance |
-| Runtime Schema Registry | none in v1 | ADR-0026 |
-| Database | PostgreSQL 18.4 | ADR-0048/ADR-0057 |
-| PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0048/ADR-0064 |
+| Runtime Schema Registry | none in v1 | ADR-0003 |
+| Database | PostgreSQL 18.4 | ADR-0019/ADR-0027 |
+| PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0019/ADR-0034 |
 | PostgreSQL backup | Barman Cloud CNPG-I plugin 0.13.0 | current CloudNativePG backup model |
 | Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 baseline |
 | PostgreSQL JDBC | 42.7.13 | fixed line for CVE-2026-54291; dependency locks must not regress below 42.7.12 |
@@ -93,7 +93,7 @@ N+1 worker capacity for critical request paths
 6-hour encrypted off-node etcd snapshots
 ```
 
-ADR-0051 is authoritative. External etcd is not a v1 requirement.
+ADR-0022 is authoritative. External etcd is not a v1 requirement.
 
 ### PostgreSQL
 
@@ -110,7 +110,7 @@ per persistent production microservice:
   continuous WAL archive + daily base backup
 ```
 
-ADR-0057 defines service database/physical isolation and forced tenant RLS; ADR-0048/ADR-0064/ADR-0067 define HA, fleet, restore, and upgrade operations. Runtime tenant roles are non-owner `NOSUPERUSER NOBYPASSRLS`.
+ADR-0027 defines service database/physical isolation and forced tenant RLS; ADR-0019/ADR-0034/ADR-0037 define HA, fleet, restore, and upgrade operations. Runtime tenant roles are non-owner `NOSUPERUSER NOBYPASSRLS`.
 
 ### Kafka
 
@@ -144,7 +144,7 @@ noeviction
 - admission-policy authoring limited to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested;
 - upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF;
 - Calico NetworkPolicy standard dataplane;
-- service-owned semantic quotas under ADR-0054;
+- service-owned semantic quotas under ADR-0024;
 - one online fail-closed no-cache/no-retry `CheckPermission`;
 - IPPanel Webservice exact-content Iran SMS;
 - Teleport JIT privileged access;

@@ -35,7 +35,7 @@ Automatic retry: none
 
 Unknown outcomes are recovered by durable replay of the same `request_id`, not transport retry.
 
-Conflict detection uses `UNIQUE(caller_service, request_id)` plus the versioned HMAC-SHA-256 intent fingerprint from ADR-0029. Equal replay returns the original outcome; conflicting content returns `ALREADY_EXISTS / REQUEST_ID_CONFLICT`. Duplicate resolution occurs before current-time/expiry validation.
+Conflict detection uses `UNIQUE(caller_service, request_id)` plus the versioned HMAC-SHA-256 intent fingerprint from ADR-0006. Equal replay returns the original outcome; conflicting content returns `ALREADY_EXISTS / REQUEST_ID_CONFLICT`. Duplicate resolution occurs before current-time/expiry validation.
 
 ## 4. Lifecycle and provider outcomes
 
@@ -88,7 +88,7 @@ Operator replay of a terminal Notification is prohibited. A resend is a new call
 
 ## 7. PostgreSQL-authoritative time
 
-ADR-0047 contains the current Notification clock/deadline/dispatch safety model.
+ADR-0018 contains the current Notification clock/deadline/dispatch safety model.
 
 `accepted_at` and lifecycle transition time use PostgreSQL `clock_timestamp()`. Contract/persistence comparison precision is canonical UTC microseconds; finer Protobuf timestamps truncate downward, never round upward.
 
@@ -119,7 +119,7 @@ After `DISPATCHING`, worker crash, lease expiry, database failover, timeout, or 
 
 ## 9. PostgreSQL HA and persistence
 
-Notification owns database `notification` on its dedicated production CloudNativePG cluster. Notification-only runtime/migration roles have no privileges on another service database/cluster. ADR-0048, ADR-0057, ADR-0064, and ADR-0067 define current HA/isolation/fleet/restore behavior.
+Notification owns database `notification` on its dedicated production CloudNativePG cluster. Notification-only runtime/migration roles have no privileges on another service database/cluster. ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define current HA/isolation/fleet/restore behavior.
 
 The critical production cluster has three PostgreSQL instances with synchronous required durability and failover quorum. The `DISPATCHING` transaction is synchronously committed before provider I/O. Permitted automatic failover must retain acknowledged dispatch state; otherwise failover is refused in favor of durability.
 
@@ -142,7 +142,7 @@ A stale `DISPATCHING` attempt reconciles; it is not reclaimed as a new send.
 
 ## 10. Templates
 
-Notification PostgreSQL is authoritative for templates under ADR-0029/ADR-0036. Definitions, immutable versions, activation pointer, and append-only audit are database-owned.
+Notification PostgreSQL is authoritative for templates under ADR-0006/ADR-0010. Definitions, immutable versions, activation pointer, and append-only audit are database-owned.
 
 Version states are `DRAFT`, `PUBLISHED`, `RETIRED`; the activation pointer is the only active-version authority. Every edit creates a new version. Activation validates syntax, allow-listed placeholders, channel shape, and content limits before atomically changing the pointer.
 
@@ -152,7 +152,7 @@ Rendering is intentionally bounded: no general expression language, arbitrary fu
 
 ## 11. Sensitive escrow
 
-Sensitive recipient/exact rendered authentication content is encrypted with a purpose-specific local AES-256-GCM key ring under ADR-0043, sourced from OpenBao through External Secrets Operator and mounted read-only.
+Sensitive recipient/exact rendered authentication content is encrypted with a purpose-specific local AES-256-GCM key ring under ADR-0014, sourced from OpenBao through External Secrets Operator and mounted read-only.
 
 No OpenBao network call occurs during `SubmitNotification`, provider dispatch, retry, or reconciliation.
 
@@ -175,7 +175,7 @@ SPF, DKIM, and DMARC must pass before readiness. Final SMTP `2xx/250` is `DEFINI
 
 ## 13. SMS provider
 
-Production Iran SMS uses IPPanel Edge Webservice mode under ADR-0049. Notification renders exact versioned SMS content itself; provider-managed Pattern rendering is prohibited as semantic authority.
+Production Iran SMS uses IPPanel Edge Webservice mode under ADR-0020. Notification renders exact versioned SMS content itself; provider-managed Pattern rendering is prohibited as semantic authority.
 
 Provider HTTP uses 500ms connect / 1500ms total timeout and no automatic client retry. Timeout/connection loss/unproven acceptance is `AMBIGUOUS` and is never blindly resubmitted. `DEFINITIVE_ACCEPTED` requires the sandbox-pinned successful response with provider correlation identity.
 

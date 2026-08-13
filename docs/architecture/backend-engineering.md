@@ -1,6 +1,6 @@
 # Backend Engineering Architecture
 
-`../engineering/coding-standards.md` is the canonical implementation-level Java standard. `../engineering/build-and-ci-quality-enforcement.md` and ADR-0069 define executable enforcement/evidence. This document is the architecture-level summary.
+`../engineering/coding-standards.md` is the canonical implementation-level Java standard. `../engineering/build-and-ci-quality-enforcement.md` and ADR-0039 define executable enforcement/evidence. This document is the architecture-level summary.
 
 ## 1. Java and Spring model
 
@@ -137,6 +137,6 @@ Comments explain reasons/constraints/trade-offs/invariants, not code narration. 
 
 Applicable ArchUnit rules prove Domain/Application dependency direction, persistence package placement, forbidden runtime lookup/field injection, package naming/dumping-ground rules, and absence of cycles.
 
-ADR-0069 additionally requires Spotless, SpotBugs, repository Semgrep/static rules, Gradle dependency verification/locks, applicable test/contract/schema tasks, workload/deployment policy validation, and GitHub Actions required-check/release evidence.
+ADR-0039 additionally requires Spotless, SpotBugs, repository Semgrep/static rules, Gradle dependency verification/locks, applicable test/contract/schema tasks, workload/deployment policy validation, and GitHub Actions required-check/release evidence.
 
 Machine-checkable rules SHOULD be executable. Documentation alone is never source/runtime compliance evidence.

@@ -24,7 +24,7 @@ Logical deletion records `deleted_at`, `deleted_by`, and stable `deletion_reason
 
 Default retention is 360 days; expiry creates eligibility, not automatic destruction. Physical purge is unavailable from ordinary repositories/APIs and must be authorized, idempotent, observable, tenant-safe, and blocked by legal hold. Generated technical/security/event/audit IDs are never reused. Domain `ON DELETE CASCADE` is prohibited by default unless a current aggregate decision proves safety.
 
-ADR-0058 governs irreversible data-subject erasure. Identity coordinates a non-PII `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. Restore procedures replay erasure/legal-hold decisions before traffic. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
+ADR-0028 governs irreversible data-subject erasure. Identity coordinates a non-PII `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. Restore procedures replay erasure/legal-hold decisions before traffic. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
 
 ## 3. Browser/BFF/OIDC security
 
@@ -72,7 +72,7 @@ TOTP v1:
 - enroll/disable/replace/recovery requires authentication age <=5m;
 - no trusted-device bypass.
 
-Iran SMS MFA uses IPPanel Webservice mode only after ADR-0054 quota evidence, provider contract/credentials, Notification encrypted exact-content lifecycle, MFA/session controls, and delivery/ambiguity tests pass. Local logging SMS is never a production fallback.
+Iran SMS MFA uses IPPanel Webservice mode only after ADR-0024 quota evidence, provider contract/credentials, Notification encrypted exact-content lifecycle, MFA/session controls, and delivery/ambiguity tests pass. Local logging SMS is never a production fallback.
 
 ## 5. Authorization ownership and runtime
 
@@ -115,7 +115,7 @@ Production target:
 - Hikari acquisition p99<25ms under validated target load;
 - >=2x projected peak with >=30% validated resource/database headroom.
 
-Breaker opening follows ADR-0062; recovery follows ADR-0066: bounded de-correlated reopen backoff, one real half-open probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, no commercial-tier variation.
+Breaker opening follows ADR-0032; recovery follows ADR-0036: bounded de-correlated reopen backoff, one real half-open probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, no commercial-tier variation.
 
 ## 6. Token signing and local verification
 
@@ -125,7 +125,7 @@ Verifiers use a bounded non-secret GitOps public JWK bundle locally. Normal veri
 
 ## 7. Semantic security quotas
 
-ADR-0054 is the single current quota decision. The operation-owning service enforces its own quota in an ACL-isolated `security-redis` namespace; no quota microservice exists.
+ADR-0024 is the single current quota decision. The operation-owning service enforces its own quota in an ACL-isolated `security-redis` namespace; no quota microservice exists.
 
 ```text
 1 primary + 2 replicas + 3 Sentinel voters

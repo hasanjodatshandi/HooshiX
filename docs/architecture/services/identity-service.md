@@ -24,7 +24,7 @@ Locale is persisted immutably with each registration challenge. Resend accepts n
 
 ## 4. Registration runtime and Notification handoff
 
-ADR-0035 enables the current registration composition; ADR-0029 defines the durable Notification semantic contract.
+ADR-0009 enables the current registration composition; ADR-0006 defines the durable Notification semantic contract.
 
 - registration gRPC internal port configurable; local default 9090;
 - Notification result callback port 9091;
@@ -68,7 +68,7 @@ Production tenant-owned tables use forced RLS with non-owner `NOSUPERUSER NOBYPA
 
 ### Signing-key lifecycle
 
-ADR-0052 defines local RSA-3072/RS256 signing keys sourced through OpenBao/External Secrets and mounted read-only. Every signing key has immutable random `kid`; private signing material never enters Git, ordinary environment variables, events, databases, logs, traces, or metrics.
+ADR-0023 defines local RSA-3072/RS256 signing keys sourced through OpenBao/External Secrets and mounted read-only. Every signing key has immutable random `kid`; private signing material never enters Git, ordinary environment variables, events, databases, logs, traces, or metrics.
 
 BFF/resource services verify tokens from a bounded reviewed non-secret GitOps public JWK bundle. Normal verification performs no Identity/OpenBao/remote-JWKS call. Normal rotation is 90 days with next-key prepublication and >=24h previous-key overlap. Unknown `kid`, algorithm confusion, invalid signature/issuer/audience/time claims fail closed.
 
@@ -96,11 +96,11 @@ TOTP:
 - enroll/disable/replace/recover requires authentication age <=5m;
 - no trusted devices in v1.
 
-Production Iran SMS MFA follows ADR-0049 and is eligible only when current semantic quotas (ADR-0054), provider contract/credential readiness, Notification encrypted exact-content lifecycle, Identity MFA/session controls, and workload/policy/telemetry gates are verified. `LoggingSmsProviderAdapter` is local-only and never production readiness/fallback.
+Production Iran SMS MFA follows ADR-0020 and is eligible only when current semantic quotas (ADR-0024), provider contract/credential readiness, Notification encrypted exact-content lifecycle, Identity MFA/session controls, and workload/policy/telemetry gates are verified. `LoggingSmsProviderAdapter` is local-only and never production readiness/fallback.
 
 ## 10. Semantic quotas
 
-ADR-0054 is the single current semantic security-quota decision. Identity owns/enforces applicable operation quotas through its ACL-isolated `security-redis` namespace rather than a quota service/PostgreSQL.
+ADR-0024 is the single current semantic security-quota decision. Identity owns/enforces applicable operation quotas through its ACL-isolated `security-redis` namespace rather than a quota service/PostgreSQL.
 
 Covered operations include login, Google login/link, tenant create/invite, and MFA lifecycle/recovery according to the current policy table. Enforcement is one atomic 75ms/one-attempt/no-retry Redis operation with domain-separated pseudonymous keys, trusted application time + Redis `TIME`, <=2s skew, monotonic `effective_now=min(...)`, no security reset from TTL expiry, and fail-closed time/dependency behavior.
 
@@ -110,13 +110,13 @@ Production remains disabled for each gated entry point until quota atomicity, ti
 
 ## 11. Browser boundary
 
-Identity does not expose internal tokens to React. BFF owns browser session, OIDC transaction state, PKCE, CSRF, CORS, and secure cookie behavior per ADR-0045.
+Identity does not expose internal tokens to React. BFF owns browser session, OIDC transaction state, PKCE, CSRF, CORS, and secure cookie behavior per ADR-0016.
 
 ## 12. PostgreSQL and erasure
 
-Identity owns its dedicated PostgreSQL database on an independent production CloudNativePG cluster under ADR-0057. Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner; tenant tables use forced RLS plus application checks. Tenant context uses the canonical parameterized transaction-local setting from the SQL/Flyway standard, never a session-scoped pooled connection setting; absent/malformed context fails closed and cross-tenant pool reuse is a mandatory negative test. Flyway only; Domain/JPA separation; no remote I/O inside DB transactions.
+Identity owns its dedicated PostgreSQL database on an independent production CloudNativePG cluster under ADR-0027. Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner; tenant tables use forced RLS plus application checks. Tenant context uses the canonical parameterized transaction-local setting from the SQL/Flyway standard, never a session-scoped pooled connection setting; absent/malformed context fails closed and cross-tenant pool reuse is a mandatory negative test. Flyway only; Domain/JPA separation; no remote I/O inside DB transactions.
 
-ADR-0058 makes Identity coordinator of platform-global erasure requests while every bounded context owns irreversible erasure/anonymization and non-PII receipts for its own data.
+ADR-0028 makes Identity coordinator of platform-global erasure requests while every bounded context owns irreversible erasure/anonymization and non-PII receipts for its own data.
 
 ## 13. Verification
 

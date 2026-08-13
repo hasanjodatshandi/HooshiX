@@ -52,7 +52,7 @@ Playwright Test + TypeScript is the primary browser E2E tool. Use semantic locat
 
 ## 5. Java executable quality gates
 
-Every Java service is covered by `../engineering/build-and-ci-quality-enforcement.md` and ADR-0069:
+Every Java service is covered by `../engineering/build-and-ci-quality-enforcement.md` and ADR-0039:
 
 - independent Gradle Wrapper/build + dependency verification/locks;
 - Spotless;
@@ -90,7 +90,7 @@ Pre-build controls include applicable SAST, dependency vulnerability/license pol
 
 Final-image controls include signed CycloneDX SBOM, provenance, Cosign signature/attestations, container vulnerability correlation, and exact owned/expiring exceptions.
 
-Current continuous policy from ADR-0065/ADR-0068:
+Current continuous policy from ADR-0035/ADR-0038:
 
 - newly introduced Critical blocks merge/promotion absent exact unexpired exception;
 - High with available fix blocks production promotion absent exact unexpired exception;
@@ -118,41 +118,41 @@ Affected release candidates run applicable:
 
 ## 9. Production resilience/security evidence
 
-### Semantic quotas — ADR-0054
+### Semantic quotas — ADR-0024
 
 Prove atomic multi-dimension enforcement, HMAC pseudonymous keys, anti-lockout sequencing, dual trusted time/<=2s skew, no TTL security reset, 75ms one-attempt fail-closed semantics, Redis Sentinel failover/outage, and >=2x projected peak load.
 
-### Authorization — ADR-0039/0056/0062/0066
+### Authorization — ADR-0013/0026/0032/0036
 
 Prove exact one-call/no-cache/no-retry/fail-closed contract, safe local reject-only prechecks, fair overload shedding, current breaker opening/recovery, paired burn alerts, p95<=100ms/p99<=200ms, >=3 replicas/PDB/spread, Hikari p99<25ms, >=2x peak capacity, one replica/node loss, PostgreSQL failover, and absence of duplicate routine BFF checks.
 
-### Dependency registry — ADR-0063/0066
+### Dependency registry — ADR-0033/0036
 
 Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, one retry owner, no implicit fallback, and composite-edge semantics.
 
-### Notification — ADR-0029/0030/0043/0047/0049
+### Notification — ADR-0006/0007/0014/0018/0020
 
 Prove local key-ring rotation/refresh/corruption/erasure with no hot-path OpenBao RPC, request replay/conflict, exact-content lifecycle, PostgreSQL-authoritative deadlines, durable `DISPATCHING`, crash/failover no-blind-redispatch, Liara SMTP outcome classification, IPPanel accepted/report fixtures, ambiguity/no-blind-retry, and bounded polling.
 
-### PostgreSQL — ADR-0048/0057/0064/0067
+### PostgreSQL — ADR-0019/0027/0034/0037
 
 Prove per-service physical/database/credential/backup isolation, forced RLS/runtime-role restrictions, transaction-local parameterized tenant context with fail-closed missing/malformed behavior, pooled-connection reuse across different tenants after commit/rollback with no context leakage, synchronous required durability, pool budgets, planned/unplanned failover, WAL/PITR, monthly restore evidence, quarterly DR, failed-drill promotion freeze, one-cluster upgrade waves, and no unsafe downgrade.
 
-### Kafka — ADR-0044
+### Kafka — ADR-0015
 
 Prove KRaft broker/controller failure, RF/minISR/acks/idempotence, TLS/ACL/quotas, 35-day critical publication/dedup evidence, clean-cluster replay/reconstruction, and consumer duplicate/restart safety.
 
-### Browser — ADR-0045
+### Browser — ADR-0016
 
 Prove PKCE/state/nonce/exact redirects, session fixation/rotation, secure cookie, CSRF Origin/token, CORS, security headers, browser-token absence, service-worker/private-cache restrictions, and critical accessibility/RTL/browser flows where affected.
 
-### Edge/DDoS — ADR-0024/0059
+### Edge/DDoS — ADR-0001/0029
 
 Prove the mandatory upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> WAF -> Web BFF path, direct-bypass denial, controlled blocking/load behavior, no sensitive edge logging, provider capability/escalation, connection-pressure telemetry, and authorized saturation exercise.
 
 ### Secrets/access/logging
 
-Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, and ADR-0061 Semgrep + pipeline redaction + canary sink + runtime detector safety.
+Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, and ADR-0031 Semgrep + pipeline redaction + canary sink + runtime detector safety.
 
 ### Java 25 Virtual Threads
 

@@ -9,7 +9,7 @@ Every independently deployable microservice with relational persistence owns:
 - one distinct PostgreSQL database;
 - independent runtime/migration credentials and Flyway history;
 - its schemas, migrations, repositories/query adapters, connection/capacity budget, and backup identity;
-- in production, one dedicated CloudNativePG cluster under ADR-0057.
+- in production, one dedicated CloudNativePG cluster under ADR-0027.
 
 Non-production may consolidate physical database infrastructure only while database/credential/role/Flyway ownership remains isolated.
 
@@ -91,7 +91,7 @@ Current service-cluster baseline:
 - verification every backup cycle;
 - isolated restore monthly per service;
 - full cold-DR exercise quarterly;
-- queryable restore evidence under ADR-0067.
+- queryable restore evidence under ADR-0037.
 
 Restored environments MUST reconcile data integrity plus current logical-deletion/erasure/legal-hold requirements before traffic opens.
 
@@ -99,7 +99,7 @@ Restored environments MUST reconcile data integrity plus current logical-deletio
 
 Kafka is asynchronous integration transport, not ordinary request/reply and not business source of truth.
 
-Current production topology comes from ADR-0044:
+Current production topology comes from ADR-0015:
 
 ```text
 Kafka 4.2.x KRaft
@@ -148,7 +148,7 @@ TLS + independent ACL identities/key namespaces
 noeviction
 ```
 
-ADR-0054 owns semantic quota behavior: 75ms, one attempt, fail closed, dual trusted time with <=2s skew, monotonic effective time, and no security-budget reset from TTL expiry.
+ADR-0024 owns semantic quota behavior: 75ms, one attempt, fail closed, dual trusted time with <=2s skew, monotonic effective time, and no security-budget reset from TTL expiry.
 
 Redis is not a shared business cache or durable business source of truth. Raw PII/business identifiers are prohibited in security keys when pseudonymous HMAC keys are required. If session/quota workloads materially interfere, split physical Sentinel deployments before introducing Redis Cluster complexity.
 

@@ -33,7 +33,7 @@ controls.
 
 ## 3. OIDC
 
-ADR-0045 is current.
+ADR-0016 is current.
 
 Google/future browser login uses Authorization Code + PKCE S256. BFF creates
 single-use `state`, `nonce`, verifier/challenge; transaction state is server-side
@@ -83,7 +83,7 @@ The BFF does not create long-running workflows or deep synchronous call chains.
 
 Routine protected request flow does **not** pay two online Authorization calls.
 The resource-owning service performs the final online `CheckPermission` under
-the current ADR-0039/ADR-0056/ADR-0062/ADR-0066 authorization runtime. BFF only
+the current ADR-0013/ADR-0026/ADR-0032/ADR-0036 authorization runtime. BFF only
 checks authorization for BFF-owned resources or a separately justified
 UX/read-model need; such checks never replace final resource enforcement.
 
