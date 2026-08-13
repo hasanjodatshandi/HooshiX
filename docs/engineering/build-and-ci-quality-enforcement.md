@@ -118,7 +118,10 @@ Rules have positive/negative fixtures and are not blocking until false-positive 
 - secrets never printed and privileged secrets are unavailable to untrusted/fork PR execution;
 - PR checks execute against the reviewed head revision;
 - cache keys/trust boundaries prevent untrusted artifacts from poisoning privileged release state;
-- workflow/quality-policy files are themselves reviewed/protected.
+- workflow/quality-policy files are themselves reviewed/protected;
+- privileged event contexts such as `pull_request_target` or `workflow_run` MUST NOT checkout, source, execute, or otherwise trust unreviewed PR-controlled code/config while write tokens, protected environments, or secrets are available;
+- when a trusted follow-up workflow consumes artifacts/metadata from an untrusted build, it verifies the expected repository, event, immutable head/source SHA, artifact identity/integrity, and producer workflow before granting privilege; untrusted artifact contents are never executed merely because a prior workflow uploaded them;
+- jobs that need privileged release credentials are separated from untrusted-code execution and receive only the minimum environment/permissions after required review/gates.
 
 ### PR quality graph
 
@@ -174,6 +177,7 @@ For each Java service, implementation compliance requires actual evidence that:
 - applicable unit/integration/contract/schema/security tests pass;
 - no required check/suppression is weakened without approved narrow rationale;
 - GitHub required-check set passes on the reviewed commit;
+- privileged workflows never execute unreviewed PR-controlled code with privileged credentials and any cross-workflow artifact promotion proves source/integrity before privilege;
 - container output can be promoted as the same immutable signed digest staging -> production;
 - security/supply-chain output does not leak sensitive fixtures.
 
