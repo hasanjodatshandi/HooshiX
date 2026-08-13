@@ -11,7 +11,7 @@ This catalog defines architecture properties that should be continuously verifie
 | AFF-005 | API/event compatibility | OpenAPI/Buf/schema compatibility checks | PR | block |
 | AFF-006 | Transactional outbox/idempotent consumer semantics | integration duplicate/restart/outbox tests | PR/release | block |
 | AFF-007 | Query boundedness and critical query plans | static policy + integration/plan evidence | PR | block |
-| AFF-008 | Migration/RLS safety | Flyway validation + RLS/role negative tests + rolling compatibility | PR/release | block |
+| AFF-008 | Migration/RLS safety including pool-safe transaction-local tenant context | Flyway validation + forced-RLS/role negatives + cross-tenant pooled-connection reuse after commit/rollback + rolling compatibility | PR/release | block |
 | AFF-009 | Authorization current model | one-call/no-cache/no-retry/fail-closed/breaker tests | PR/release | block |
 | AFF-010 | Workload identity and east-west authorization | Istio/ServiceAccount positive + negative policy tests | release | block |
 | AFF-011 | Logging/PII safety | Semgrep + canary/redaction sink tests | PR/release/continuous | block/page per policy |
