@@ -64,7 +64,7 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0028](0028-define-production-slo-classes-and-error-budgets.md) | Production SLO classes, error budgets, release-freeze policy |
 | [ADR-0044](0044-define-kafka-production-durability-and-rebuildable-dr-v1.md) | Kafka KRaft durability and rebuildable DR |
 | [ADR-0048](0048-adopt-cloudnativepg-ha-and-barman-backups-v1.md) | CloudNativePG synchronous HA and Barman backup/PITR mechanics |
-| [ADR-0057](0057-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Complete current service database/cluster/role/Flyway/cross-service-SQL isolation + forced tenant RLS + backup isolation |
+| [ADR-0057](0057-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Complete current service database/cluster/role/Flyway/cross-service-SQL isolation + forced tenant RLS + pool-safe transaction-local tenant context + backup isolation |
 | [ADR-0064](0064-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable dedicated CloudNativePG fleet operations |
 | [ADR-0067](0067-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Restore evidence and DB upgrade/rollback safety |
 
