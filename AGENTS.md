@@ -4,253 +4,305 @@
 
 This file defines mandatory operating rules for AI coding agents working in this repository.
 
-It is intentionally concise. Detailed architecture, security, reliability, technology, testing, deployment, and bounded-context rules live in the canonical documents referenced under **Sources**.
+The repository is the source of truth. Agent memory, summaries, previous reads, and prior conversation context are not substitutes for current repository files.
 
-Agents MUST read the applicable current repository documents before planning, modifying, reviewing, generating, deleting, or reporting non-trivial work. Agent memory, prior conversation context, cached summaries, and previous reads are not substitutes for the current files.
+## 1. Mandatory source order
 
-## 1. Source of Truth
+Before non-trivial planning, implementation, deletion, review, or reporting, inspect the current applicable versions of:
 
-The repository is the source of truth.
-
-Before implementation, use the current versions of:
-
-1. this `AGENTS.md`;
-2. `docs/architecture/README.md`;
-3. `docs/architecture/SOURCES.md`;
-4. `docs/architecture/TASK-REVIEW-MATRIX.md` when choosing targeted scope;
-5. `docs/adr/decision-register.md`;
-6. applicable current-state architecture documents;
-7. applicable accepted ADRs;
-8. `docs/technology/technology-baseline.md`, `docs/technology/local-development-baseline.md`, and `docs/technology/production-compatibility-matrix.md` when exact production/local versions or compatibility matter;
-9. `docs/architecture/performance-and-bottlenecks.md` for critical-path/capacity changes;
-10. `docs/architecture/dependency-criticality.yaml` and `docs/architecture/dependency-criticality-matrix.md` for synchronous dependency/fallback changes;
-11. `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md` for release evidence;
-12. `docs/operations/incident-response-runbook.md` and `docs/operations/chaos-engineering-program.md` for incident/recovery/chaos work;
-13. `docs/engineering/coding-standards.md` and `docs/engineering/build-and-ci-quality-enforcement.md` for Java/source/build/CI changes;
-14. applicable engineering, operations, testing, security, and deployment documentation.
+1. `AGENTS.md`;
+2. `docs/engineering/current-only-documentation-policy.md`;
+3. `docs/engineering/repository-change-workflow.md`;
+4. `docs/architecture/README.md`;
+5. `docs/architecture/SOURCES.md`;
+6. `docs/architecture/TASK-REVIEW-MATRIX.md` when targeted routing is appropriate;
+7. `docs/adr/decision-register.md`;
+8. applicable current-state architecture/service documents;
+9. applicable retained current ADRs;
+10. `docs/technology/technology-baseline.md`, `local-development-baseline.md`, and `production-compatibility-matrix.md` when versions/compatibility matter;
+11. `docs/architecture/performance-and-bottlenecks.md` for performance/capacity/scaling changes;
+12. `docs/architecture/dependency-criticality.yaml` and its rendered matrix for synchronous dependency/fallback changes;
+13. `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md` for release evidence;
+14. applicable engineering, testing, security, operations, and runbook documents.
 
 Do not rely on remembered architecture when the current file can be inspected.
 
-## 2. Architecture Decision Precedence
+## 2. Current-only decision policy
 
-Accepted ADRs are immutable historical decisions. A changed decision is represented by a later ADR that explicitly supersedes all or part of an earlier ADR.
+The active repository-owner directive is `docs/engineering/current-only-documentation-policy.md`.
 
-Always inspect `docs/adr/decision-register.md` before relying on an older ADR.
+Until the owner explicitly withdraws it:
 
-A superseding ADR overrides only the scope it explicitly supersedes. Unrelated decisions in the older ADR remain valid.
+- the documentation set keeps current effective architecture rather than preserving obsolete decision history;
+- `docs/adr/decision-register.md` indexes only retained ADRs that still contain effective scope;
+- fully superseded ADRs/raw historical source material are removed after confirming no current invariant, contract, security requirement, SLO, failure semantic, migration rule, or operational requirement would be lost;
+- partially stale ADRs are normalized so obsolete alternatives/supersession narrative do not masquerade as current architecture;
+- current-state architecture documents are updated whenever the effective design changes;
+- deleted historical records MUST NOT be cited by new code, docs, tests, or runbooks.
 
-Do not silently resolve contradictions between current-state architecture documents and ADRs. When a contradiction is found:
+When two current sources conflict, do not reconstruct a deleted historical chain or silently guess. Inspect the Decision Register/current sources and correct the stale document in the same PR before implementation depends on it.
 
-1. inspect the Decision Register;
-2. inspect the relevant ADRs;
-3. determine whether explicit supersession resolves it;
-4. use the current accepted decision when unambiguous;
-5. update stale current-state documentation as part of the task when appropriate;
-6. do not make a material architectural assumption when the conflict remains unresolved.
+## 3. Architecture review mode
 
-## 3. Mandatory Architecture Review
+Every non-trivial task uses `full-read` or `targeted` review.
 
-Every non-trivial implementation task requires an architecture review mode of either `full-read` or `targeted`.
+Use `full-read` when the task creates/changes a service or bounded-context boundary, security architecture, infrastructure architecture, service-to-service communication, persistence/consistency, platform technology, or when context loss/uncertainty makes targeted scope unsafe.
 
-A targeted review is allowed only when the task is narrow and the relevant documents and ADRs can be identified with confidence.
+A targeted review is allowed only when scope is narrow and `TASK-REVIEW-MATRIX.md` plus the current Decision Register identify the complete applicable set with confidence.
 
-A full read of the applicable architecture set is required when the task:
+Every non-trivial review also inspects existing implementation/contracts/tests and the current Git/PR diff where available.
 
-- creates a service;
-- changes a bounded-context boundary;
-- changes service ownership;
-- changes architecture;
-- changes authentication, authorization, or security architecture;
-- changes infrastructure architecture;
-- introduces or changes service-to-service communication;
-- materially changes persistence or consistency;
-- introduces a new platform technology;
-- starts after material context loss; or
-- cannot prove that targeted review is sufficient.
+## 4. Core architecture rules
 
-## 4. Minimum Review for Every Non-Trivial Task
+Every microservice represents a real business capability/bounded context.
 
-Locate and review the current applicable versions of:
+Backend architecture is **DDD + Hexagonal Architecture**. Clean Architecture is used only to enforce inward dependency direction.
 
-- global architecture rules;
-- prohibited practices;
-- AI/code-generation rules;
-- logging and PII-redaction rules;
-- testing and quality gates;
-- Definition of Done;
-- Architecture Decision Register;
-- applicable ADRs.
+```text
+Infrastructure -> Application -> Domain
+Interfaces     -> Application -> Domain
+```
 
-Also inspect:
+Business logic belongs in Domain/Application. Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, or concrete adapters.
 
-- existing implementation;
-- existing contracts;
-- existing tests;
-- the current Git diff.
+Each independently deployable relational service owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Every persistent production microservice also owns a dedicated CloudNativePG cluster under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited.
 
-## 5. Task-Specific Minimum Review
+Tenant isolation uses trusted authenticated context plus persistence defense in depth. Production tenant-owned PostgreSQL tables use forced RLS and non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles.
 
-### Kafka or Event Changes
+## 5. Java/package/DI rules
 
-Review transport selection, event ownership, integration events, Protobuf compatibility, transactional outbox, inbox/idempotency, ordering, retries, DLQ, replay, observability, and tests.
+`docs/engineering/coding-standards.md` is the canonical implementation coding standard.
 
-### Database or Persistence Changes
+Key mandatory rules include:
 
-Review aggregate boundaries, transaction boundaries, PostgreSQL, JPA/Hibernate, jOOQ, Flyway, connection pools, locking, migrations, backup/PITR, rollback compatibility, batch/fetch/flush behavior for sensitive paths, persistence-model shape, and tests.
+- feature-first + nature-separated packages;
+- package segments match `[a-z][a-z0-9]*`;
+- business dumping grounds such as `common`, `util`, `helper`, `manager`, `misc`, `generic` are prohibited;
+- Domain and JPA/generated/query/provider/transport models are separate;
+- one meaningful public top-level type per file by default;
+- Spring IoC is the only DI container;
+- required dependencies use constructor injection;
+- field injection, circular dependencies, `@Lazy` cycle hiding, service locator, `ApplicationContext`/`BeanFactory` lookup inside Domain/Application, and direct adapter construction from use cases are prohibited;
+- singleton beans are stateless or explicitly thread-safe.
 
-### Java Code, Build, or CI Changes
+When package/module/layering rules change, update ArchUnit/architecture tests in the same task.
 
-Review `docs/engineering/coding-standards.md`, `docs/engineering/build-and-ci-quality-enforcement.md`, ADR-0001, ADR-0007, ADR-0061, and ADR-0069. Inspect the service `build.gradle.kts`, Wrapper/dependency verification, ArchUnit tests, Spotless/SpotBugs configuration, repository Semgrep rules, GitHub Actions required checks, and the actual source/tests. Documentation alone never proves code compliance.
+## 6. Persistence and transaction rules
 
-### REST, gRPC, or Service Communication Changes
+Review aggregate/transaction boundaries, JPA/jOOQ/Flyway/Hikari behavior, locking, query bounds/plans, backups/PITR, and rollback compatibility.
 
-Review contract ownership, versioning, compatibility, deadlines, cancellation, retries, idempotency, workload identity, Istio authorization, observability, tests, and the operation-level dependency criticality/fallback matrix.
+Mandatory rules:
 
-### Security Changes
+- Flyway is the only schema-change mechanism; executed/released migrations are immutable;
+- evolution follows expand -> migrate -> contract;
+- OSIV is prohibited;
+- N+1, broad EAGER loading, `SELECT *`, and unbounded production queries are prohibited;
+- transaction boundaries are short/explicit;
+- remote HTTP/gRPC/Kafka/Redis/provider I/O is prohibited inside DB transactions;
+- DB locks are never held across remote I/O;
+- retries execute outside failed transactions;
+- persistence models follow aggregate/query needs; one-table/one-model mapping is not mandatory;
+- sensitive/expensive queries require index and representative-plan evidence.
 
-Review authentication, authorization, tenancy, workload identity, mTLS, ServiceAccounts, WAF, secrets, semantic quotas, logging/PII redaction, and security tests.
+## 7. Synchronous dependencies
 
-### Kubernetes or Deployment Changes
+For every new/changed remote synchronous edge define:
 
-Review Kubernetes, Helm, GitOps, Argo CD, Traefik, Gateway API, WAF, Istio, NetworkPolicy, ServiceAccounts, probes, graceful shutdown, rollback, CI/CD, and smoke tests. For local kind/Ambient/edge work, also review `docs/technology/local-development-baseline.md`, `docs/runbooks/local-istio-ambient.md`, and `docs/runbooks/local-traefik-edge.md`.
+- source/destination workload identities;
+- operation-level criticality/failure action in `dependency-criticality.yaml`;
+- finite parent/child deadlines;
+- cancellation behavior;
+- retry owner and safe/idempotent retry conditions;
+- concurrency/bulkhead/queue bounds;
+- breaker/fallback behavior;
+- positive/negative authorization tests;
+- observability and contract tests.
 
-### Frontend or BFF Changes
+Retries are finite and owned by one layer only. Layered application + mesh/client retry for the same failure is prohibited.
 
-Review BFF responsibilities, REST/OpenAPI, OIDC PKCE, sessions, CSRF/CORS, authentication, authorization ownership, logging/PII, frontend tests, BDD, and Playwright.
+Authorization is especially strict: one authoritative online `CheckPermission`, one attempt, 300ms maximum caller deadline, no permission-result cache/Kafka invalidation/stale fallback/retry, and fail-closed behavior.
 
-### Performance, Scaling, or Reliability Changes
+## 8. Kafka/event rules
 
-Review `docs/architecture/performance-and-bottlenecks.md`, SLOs, dependency budgets, pool/connection budgets, existing load evidence, and documented scale/split triggers before introducing caches, brokers, proxies, new services, retries, or distributed coordination.
+Kafka is asynchronous integration transport, not ordinary request/reply and not business source of truth.
 
-## 6. Core Engineering Rules
+A state change that must publish an integration event as one business effect uses Transactional Outbox. Consumers assume at-least-once delivery and are idempotent; Inbox/dedup state is committed atomically with business effect where required.
 
-Every microservice represents a real business capability or bounded context.
+Review ordering, Protobuf compatibility, retry/DLQ/replay, retention/recovery evidence, ownership, observability, and tests. Kafka/event payloads MUST NOT carry secrets or unapproved PII.
 
-The backend architecture is **DDD + Hexagonal Architecture**. Clean Architecture is used only to enforce inward dependency direction.
+## 9. Security rules
 
-Business logic belongs in Domain/Application. Business logic MUST NOT depend on infrastructure technologies.
+Security work reviews authentication, tenancy, Authorization, MFA/sessions, workload identity, mTLS, NetworkPolicy, WAF/upstream DDoS, secrets, semantic quotas, supply chain, privileged access, and logging/PII.
 
-Domain code MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, or concrete adapters.
+Mandatory principles:
 
-Every independently deployable service with relational persistence owns a **distinct PostgreSQL database**, independent runtime/migration credentials, Flyway history, contracts, deployment, and release lifecycle. In production, every persistent microservice also owns a dedicated CloudNativePG cluster under ADR-0057/ADR-0064; physical sharing is permitted only in non-production when database/credential isolation is preserved.
+- safe local checks may reject invalid requests but never grant authority reserved for an authoritative service/domain decision;
+- external identities bind by stable issuer + subject, not email-only auto-linking;
+- raw passwords/OTP/recovery codes/tokens/cookies/API keys/private keys/secrets/provider credentials are never logged or durably exposed;
+- production secrets never enter Git, images, Helm/Kustomize values, logs, traces, metrics, or CI output;
+- production workloads use dedicated ServiceAccounts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization;
+- Kubernetes `default` ServiceAccount is prohibited for production application workloads;
+- browser/BFF security follows current OIDC PKCE/session/CSRF/CORS requirements;
+- supply-chain admission verifies immutable signed/provenanced artifacts/SBOM requirements;
+- vulnerability scanning/advisory correlation is continuous; no scanner/feed is proof of zero unknown vulnerabilities;
+- privileged human production access is JIT/short-lived/audited under the current Teleport policy.
 
-Service database roles MUST NOT have access to another service's database. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain or persistence models across bounded contexts are prohibited. ADR-0053 defines database ownership; ADR-0057 defines production physical isolation/RLS; ADR-0064/ADR-0067 define fleet and recovery operations.
+## 10. Logging and PII
 
-## 7. Dependency Injection
+Logging is allow-list based and structured. Do not log raw sensitive credentials, full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, unreviewed provider payloads, or unreviewed exception/cause text.
 
-Spring IoC is the only dependency injection container.
+Ordinary PII appears only for an approved purpose with masking/tokenization or managed-key HMAC pseudonymization when correlation is required. Protect input-derived log fields against CR/LF/log injection. Metric labels remain low-cardinality and contain no user/tenant/session/request/resource IDs, trace IDs, raw URLs, or free-form errors.
 
-Required dependencies use constructor injection. Field injection is prohibited. Circular dependencies are prohibited. `@Lazy` must not hide a dependency cycle.
+New/materially changed logging requires source tests/review plus pipeline/runtime leak controls where applicable.
 
-Domain models must not be Spring beans. Application use cases remain plain Java. Service locator, `ApplicationContext`, `BeanFactory`, and runtime bean lookup inside Domain/Application are prohibited.
+## 11. Kubernetes, container, Helm, and GitOps rules
 
-## 8. Change Discipline
+Production application workloads require:
 
-Before changing code:
+- immutable image digest; no `latest`;
+- source/provenance identity tied to the reviewed Git commit;
+- non-root execution;
+- `allowPrivilegeEscalation=false`;
+- Linux capabilities dropped by default;
+- `seccompProfile: RuntimeDefault`;
+- read-only root filesystem where compatible;
+- finite CPU/memory resources;
+- distinct startup/readiness/liveness probes;
+- liveness MUST NOT fail merely because a dependency is temporarily unavailable;
+- graceful shutdown;
+- dedicated ServiceAccount;
+- deny-by-default NetworkPolicy;
+- least-privilege mesh authorization.
 
-1. identify the bounded context and use-case owner;
-2. identify affected contracts;
-3. identify transaction boundaries;
-4. identify synchronous and asynchronous interactions;
-5. define deadlines/timeouts;
-6. define retry behavior;
-7. define idempotency behavior;
-8. evaluate authentication and authorization;
-9. evaluate workload identity and Istio policy impact;
-10. evaluate secrets and PII/logging impact;
-11. identify migration and rollback implications;
-12. review the applicable Definition of Done.
+Privileged containers, host networking, `hostPath`, added capabilities, or relaxed security context require an explicit current security decision.
 
-Prefer the smallest correct change. Do not perform unrelated refactoring. Do not change architecture silently. An intentional architectural deviation requires an ADR before implementation depends on the deviation.
+Shared deployment standards belong in reviewed organization Helm application/library charts rather than copied full charts. Secret values never enter values files. Complex migration hooks require explicit ownership, idempotency, timeout/retry, failure, rollback/fail-forward, and test evidence.
 
-### 8.1 Mandatory Code-Generation Checklist
+Staging and production promote the exact same signed immutable artifact digest. Production rebuild after staging validation is prohibited.
 
-Before changing or generating implementation code, the AI/engineer MUST complete the following checklist. `Not applicable` is allowed only when the item genuinely does not apply to the scoped change; it is not a shortcut for skipping review.
+## 12. Testing and executable enforcement
 
-1. Identify the bounded context and owner of the use case.
-2. Define the required inbound and outbound ports before choosing concrete adapters.
-3. Place business rules in Domain/Application and keep them independent of infrastructure frameworks.
-4. Implement transport, persistence, messaging, cache, and external-provider concerns only in the applicable `interfaces`/`infrastructure` adapters and configuration composition.
-5. Decide explicitly whether each interaction is synchronous or event-driven, using the approved transport rules and dependency-criticality policy.
-6. Use the transactional outbox for a state change that must publish an integration event as part of the same business effect; never rely on a direct post-commit Kafka send for atomicity.
-7. Define timeout/deadline, retry, idempotency, cancellation, concurrency/bulkhead, and transaction boundaries for every affected interaction.
-8. Add or update required database migrations, tests, metrics/logs/traces, dashboards/alerts, and operational evidence in the same change when applicable.
-9. Add or update ArchUnit/architecture tests whenever package/dependency/module boundaries or architectural rules are affected.
-10. Add no dependency, plugin, library, runtime, or build tool without justification, ownership, license/security review where applicable, and compatibility verification against the Technology Baseline.
-11. Keep the service `Dockerfile`, Helm/GitOps manifests, probes, resources, autoscaling/PDB settings when applicable, ServiceAccount, and NetworkPolicy aligned with runtime-impacting service changes.
-12. Review and update related Traefik/Gateway API routes, upstream DDoS/WAF policy, request limits, security headers, and public-surface tests whenever the external/public surface changes.
-13. Add or update BDD acceptance scenarios for critical business-behavior changes; do not use BDD for trivial CRUD or implementation detail.
-14. Add or update Playwright tests for critical user-flow changes; keep browser tests focused on critical journeys rather than duplicating lower-level coverage.
-15. Review and test every new or materially changed log statement for PII, secrets, credentials, tokens, cookies, payment data, unsafe exception text, CR/LF injection, and high-cardinality identifiers.
-16. Connect dependencies through constructor injection and application/domain ports; never instantiate real infrastructure adapters from a use case or use runtime service lookup.
-17. Add or update the workload ServiceAccount, Ambient Mesh enrollment, NetworkPolicy, and required Istio `AuthorizationPolicy` when workload identity or allowed communication changes.
-18. For every new or changed service-to-service interaction, register the source/destination identities and operation-level dependency policy, define the positive and negative authorization cases, and add the corresponding policy/contract/failure-path tests.
+Architecture compliance does not rely on documentation/agent memory.
 
-The checklist complements, rather than replaces, the task-specific review requirements above. If a checklist item conflicts with an accepted current ADR, the ADR/Decision Register wins and the stale checklist/documentation MUST be corrected in the same change.
+Use applicable automated enforcement including:
 
-### 8.2 File Granularity and Task-Output Contract
+- Spotless;
+- SpotBugs;
+- ArchUnit;
+- repository Semgrep/static rules;
+- Gradle dependency verification/locks;
+- unit/integration/security/authorization/migration tests;
+- Buf lint/breaking and OpenAPI compatibility;
+- schema/contract compatibility;
+- container/Kubernetes/Helm policy validation;
+- secret/render scans;
+- `istioctl analyze` and mesh authorization tests;
+- signed SBOM/advisory correlation and admission tests;
+- restore/DR/failover evidence gates;
+- logging/PII canary tests;
+- load/chaos/smoke/critical browser tests where applicable.
 
-Implementation files remain small and single-purpose under `docs/engineering/coding-standards.md` §15.1. At minimum, domain entities, value objects, domain events, DTOs, commands/queries, ports/interfaces, repository implementations, and distinct technical adapters are separated when they represent distinct responsibilities. Persistence models follow aggregate/query needs; one-table/one-model mapping is never mandatory.
+Do not disable tests, weaken a gate, broaden suppressions, or use `ignoreFailures` merely to make CI green.
 
-Every non-trivial implementation report MUST explicitly cover the changed module/context, contracts, database migration, transaction boundary, timeout/deadline behavior, Kafka/event and idempotency behavior when applicable, security impact, observability, tests, and rollback considerations. See §14 below for the canonical report fields.
+Never claim compilation/test/security/production-readiness success without actual evidence. Documentation alone never proves source/runtime compliance.
 
-## 9. Repository State
+## 13. Performance and reliability
 
-Inspect the current Git diff before modifying code. Distinguish user changes, unrelated existing changes, and changes created for the current task.
+Before changing scaling/retries/caches/brokers/proxies/pools/concurrency, review `performance-and-bottlenecks.md`, SLOs, dependency budgets, connection/resource budgets, and existing load evidence.
 
-Do not overwrite, revert, reformat, or absorb unrelated changes without justification.
+Virtual Threads do not create database connections/provider quota/CPU/memory. Constrained dependencies use bounded concurrency/queues. CPU-heavy work uses bounded workers. `Thread.sleep` is prohibited for coordination/polling/test synchronization. A blanket `synchronized` ban is also prohibited on Java 25; use evidence for contention/pinning issues.
 
-Search the repository for established patterns before inventing a new one. Follow sound current conventions, but do not copy a pattern that violates current architecture.
+Error budgets and burn-rate policy are release/operations controls. Do not hide SLO burn by simply increasing timeouts/retries.
 
-## 10. Verification
+## 14. Change discipline and PR-first workflow
 
-Never claim success without verification.
+All normal repository changes follow `docs/engineering/repository-change-workflow.md`:
 
-Run applicable checks when available, including compilation, unit tests, integration tests, architecture tests, contract tests, migration tests, security tests, authorization tests, logging/PII tests, schema compatibility, dependency verification, static analysis, Helm/Kubernetes validation, `istioctl analyze`, and smoke tests.
+1. branch from current `main`;
+2. open a Draft PR as early as GitHub permits;
+3. make all substantive task changes on the PR branch;
+4. review complete diff against latest `main` and account for base movement;
+5. run/record applicable checks;
+6. resolve material findings;
+7. mark ready only when scope/review is complete;
+8. merge only after required review/verification;
+9. verify resulting `main` merge/head SHA and final state.
 
-Report every required check that passed, failed, was skipped, or was unavailable.
+Direct normal writes to `main` are prohibited.
 
-A task is not `completed` when missing verification materially prevents confidence in correctness.
+Before changing code, identify bounded context/use-case owner, contracts, transaction boundaries, sync/async interactions, deadlines, retry/idempotency/cancellation/concurrency, authentication/authorization/workload identity, secrets/PII/logging, migrations, observability, deployment impact, rollback, and Definition of Done.
 
-## 11. Architecture Enforcement
+Prefer the smallest correct coherent change. Do not absorb unrelated refactoring.
 
-Architecture compliance must not rely only on documentation or agent memory.
+## 15. Mandatory code-generation preflight
 
-Use automated enforcement where applicable, including ADR-0069 Spotless formatting, SpotBugs, ArchUnit, repository Semgrep/static rules, contract compatibility checks, Buf compatibility checks, Gradle dependency verification, signed SBOM/advisory correlation plus continuous rescanning, migration/RLS validation, Authorization overload/burn/breaker-recovery tests, machine-readable dependency-policy schema/coverage/render checks, restore/DR evidence gates, logging/PII canary tests, Kubernetes policy validation, Helm validation, `istioctl analyze`, and GitHub Actions/CI quality gates.
+Before generating/modifying implementation code, explicitly review:
 
-Do not disable or weaken a quality gate merely to make the build pass.
+1. bounded context/capability/use-case owner;
+2. inbound/outbound ports before adapters;
+3. Domain/Application framework independence;
+4. transport/persistence/messaging/cache/provider placement only in Interfaces/Infrastructure;
+5. sync vs event-driven interaction semantics;
+6. transactional outbox need;
+7. timeout/deadline/retry/idempotency/cancellation/concurrency/breaker/transaction boundaries;
+8. migration/tests/metrics/logs/traces/dashboards/alerts/runbook evidence;
+9. ArchUnit/architecture tests for boundary changes;
+10. dependency/plugin/tool need, owner, compatibility, integrity, security/license review;
+11. Dockerfile/Helm/GitOps/probes/resources/HPA/PDB/ServiceAccount/NetworkPolicy/securityContext/shutdown alignment;
+12. public route/Gateway/Traefik/WAF/upstream-DDoS/security-header/CORS/CSRF impact;
+13. critical BDD scenario impact;
+14. critical Playwright journey impact;
+15. logging/error PII/secret/CRLF/cardinality safety;
+16. constructor injection/ports with no runtime service lookup;
+17. workload identity/Ambient/NetworkPolicy/Istio policy impact;
+18. operation-level dependency registry and positive/negative policy tests;
+19. immutable same-digest staging-to-production promotion tied to Git commit;
+20. Kubernetes security-context and migration-workflow compliance.
 
-## 12. Sub-Agent Rules
+`Not applicable` is valid only when genuinely inapplicable.
 
-The parent agent remains responsible for delegated work.
+## 16. Repository state and sub-agent rules
 
-Every sub-agent must receive:
+Inspect the current Git/PR diff before modification. Distinguish user/task changes from unrelated existing work. Do not overwrite/revert/reformat unrelated changes without justification.
 
-- canonical architecture paths;
-- applicable ADR paths;
-- relevant section names or search terms;
-- exact task boundary;
-- applicable Definition of Done.
+Search the repository for established current patterns before inventing a new one, but do not copy a pattern that violates current architecture.
 
-The sub-agent MUST independently verify current repository files. A summary supplied by the parent is not a substitute for reading authoritative sources when available.
+The parent agent remains responsible for delegated work. Sub-agents receive canonical paths, retained current ADRs, search terms/sections, exact task boundary, and applicable Definition of Done; they independently verify current repository files.
 
-Architecture design, service-boundary changes, security changes, infrastructure changes, service-communication changes, and work after context loss require the applicable full read.
+## 17. Communication and verification
 
-## 13. Communication
+`docs/engineering/agent-communication-and-reporting.md` is the detailed evidence/reporting contract.
 
-`docs/engineering/agent-communication-and-reporting.md` is the mandatory detailed communication/evidence contract.
+Lead with result, blocker, material risk, or important finding. Do not narrate routine tool operations or private reasoning. Preserve exact paths, symbols, commands/errors, versions/scopes/numeric constraints.
 
-Communicate clearly and briefly. Lead with the result, blocker, material risk, or important finding. Do not narrate routine tool calls or private internal reasoning. Preserve exact paths, symbols, commands, errors, versions, scopes, and numeric constraints.
+Separate verified facts from assumptions/inference/recommendations. Never claim completion, correctness, security, production readiness, build/test success, or architecture compliance without evidence.
 
-Separate verified facts from assumptions, inferences, unresolved questions, and recommendations. Never claim completion, correctness, build success, test success, security, production readiness, or architecture compliance without evidence.
+Report every required check as passed, failed, not run, or unavailable. A task is not `completed` when missing verification materially prevents confidence in the requested result.
 
-Explain security risks, destructive actions, breaking changes, data-loss risks, and architecture deviations fully. For non-trivial tasks, progress updates are limited to significant findings, blockers, risks, scope changes, or failed verification that affects the outcome.
-
-## 14. Implementation Report
+## 18. Final implementation report
 
 Every completed non-trivial implementation task reports:
 
 ```text
+Outcome:
+completed | partial | blocked | failed
+<one- or two-sentence result>
+
+Changes:
+- <path or component> — <change>
+
+Verification:
+- Passed: <checks actually executed>
+- Failed: <executed check and result>
+- Not run: <check and reason>
+
+Risks and limitations:
+- <items or "None identified within reviewed scope">
+
+Remaining work:
+- <required next action or "None">
+
+Architecture report:
 Architecture review mode: full-read/targeted
 Architecture document version/commit:
 Architecture sections reviewed:
@@ -273,51 +325,24 @@ Architecture deviations:
 Rollback considerations:
 ```
 
-Do not leave fields blank. Use `None`, `Not applicable`, or `Not verified` explicitly where accurate.
+Do not leave fields blank; use `None`, `Not applicable`, or `Not verified` when accurate.
 
-## 15. Final Response Format
+## 19. Canonical source groups
 
-```text
-Outcome:
-completed | partial | blocked | failed
-<one- or two-sentence result>
-
-Changes:
-- <path or component> — <change>
-
-Verification:
-- Passed: <checks actually executed>
-- Failed: <executed check and result>
-- Not run: <check and reason>
-
-Risks and limitations:
-- <items or "None identified within reviewed scope">
-
-Remaining work:
-- <required next action or "None">
-
-Architecture report:
-<required Implementation Report>
-```
-
-Keep the report concise. Do not paste full diffs or long logs unless requested. Follow the detailed semantics in `docs/engineering/agent-communication-and-reporting.md`.
-
-## 16. Sources
-
-### Canonical Architecture Index
+### Architecture/index
 
 - `docs/architecture/README.md`
 - `docs/architecture/SOURCES.md`
 - `docs/architecture/TASK-REVIEW-MATRIX.md`
 - `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md`
+- `docs/architecture/PRODUCTION-DECISION-SUMMARY.md`
+- `docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md`
 - `docs/architecture/performance-and-bottlenecks.md`
 - `docs/architecture/dependency-criticality.yaml`
 - `docs/architecture/dependency-criticality.schema.json`
 - `docs/architecture/dependency-criticality-matrix.md`
-- `docs/architecture/PRODUCTION-DECISION-SUMMARY.md`
-- `docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md`
 
-### Current-State Architecture
+### Current-state architecture
 
 - `docs/architecture/platform-architecture.md`
 - `docs/architecture/backend-engineering.md`
@@ -326,52 +351,41 @@ Keep the report concise. Do not paste full diffs or long logs unless requested. 
 - `docs/architecture/reliability-and-observability.md`
 - `docs/architecture/runtime-and-deployment.md`
 - `docs/architecture/testing-and-quality-gates.md`
+- `docs/architecture/services/*`
 
-### Service Architecture
-
-- `docs/architecture/services/identity-service.md`
-- `docs/architecture/services/authorization-service.md`
-- `docs/architecture/services/notification-service.md`
-- `docs/architecture/services/web-bff.md`
-
-### Architecture Decisions
+### Decisions
 
 - `docs/adr/decision-register.md`
-- `docs/adr/`
+- retained ADRs listed by that register
 
-The Decision Register is the entry point for ADR review. Review supersession before selecting an ADR.
-
-### Technology Baseline
+### Technology
 
 - `docs/technology/technology-baseline.md`
 - `docs/technology/local-development-baseline.md`
 - `docs/technology/production-compatibility-matrix.md`
 
-Use them for exact approved versions and supported production combinations. Do not guess patch versions or compatibility.
+### Engineering/operations
 
-### Engineering Workflow and Reporting
-
-- `docs/engineering/agent-communication-and-reporting.md`
+- `docs/engineering/current-only-documentation-policy.md`
+- `docs/engineering/repository-change-workflow.md`
 - `docs/engineering/developer-workflow.md`
 - `docs/engineering/coding-standards.md`
 - `docs/engineering/build-and-ci-quality-enforcement.md`
-
-### Operations and Local Runbooks
-
+- `docs/engineering/agent-communication-and-reporting.md`
 - `docs/operations/incident-response-runbook.md`
 - `docs/operations/chaos-engineering-program.md`
 - `docs/runbooks/local-istio-ambient.md`
 - `docs/runbooks/local-traefik-edge.md`
 
-## 17. Source Maintenance
+## 20. Source maintenance
 
-When an accepted architectural decision changes current architecture:
+When effective architecture changes:
 
-1. create a new ADR when required;
-2. update the Architecture Decision Register;
-3. update the applicable current-state architecture document;
-4. update the Technology Baseline if a version decision changed;
-5. update architecture tests or automated enforcement where applicable;
-6. update `docs/architecture/SOURCES.md` when a source is added, removed, renamed, or superseded.
-
-Do not rewrite historical accepted ADRs to make them look current. Keep historical decisions historical and current-state architecture current.
+1. update current-state architecture;
+2. create/update the retained current ADR when useful;
+3. remove/normalize obsolete decision/source text only after preserving all still-current semantics;
+4. update Decision Register/SOURCES/TASK-REVIEW-MATRIX as applicable;
+5. update Technology Baseline/compatibility documents when a version decision changes;
+6. update executable architecture/security/quality enforcement and tests;
+7. update production-readiness/operations evidence where applicable;
+8. deliver through the PR-first workflow and verify the final merged state.
