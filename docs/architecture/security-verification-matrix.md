@@ -12,7 +12,7 @@ Use versioned ASVS identifiers (`v5.0.0-...`) in test/evidence systems so future
 | SEC-002 | Injection prevention: parameterized SQL, safe command construction, contextual output encoding | SAST/Semgrep + negative integration tests |
 | SEC-003 | Boundary validation plus durable domain/database invariants | unit/application/integration constraint tests |
 | SEC-004 | Browser session security: BFF token custody, secure `__Host-` cookie, CSRF/origin validation, rotation/termination | browser security tests + BFF integration tests |
-| SEC-005 | Authorization: deny-by-default, authoritative resource-service enforcement, object/tenant/domain checks, fail-closed dependency semantics | authorization matrix + cross-tenant negative tests + outage/overload tests |
+| SEC-005 | Authorization and tenant isolation: deny-by-default, authoritative resource-service enforcement, object/tenant/domain checks, fail-closed dependency semantics, forced RLS, and transaction-local pool-safe tenant DB context | authorization matrix + cross-tenant/RLS negatives + pooled-connection context-reuse tests after commit/rollback + outage/overload tests |
 | SEC-006 | OAuth/OIDC: exact redirect allow-list, PKCE, state, nonce, issuer/audience/signature verification | protocol/browser replay and tampering tests |
 | SEC-007 | Cryptography/key lifecycle: approved algorithms, CSPRNG, purpose-separated keys, rotation/recovery | config/crypto tests + rotation evidence |
 | SEC-008 | Service communication: dedicated workload identity, strict mTLS, least-privilege Istio authorization and NetworkPolicy | positive/negative deployment policy tests |
