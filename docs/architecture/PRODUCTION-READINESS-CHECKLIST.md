@@ -124,6 +124,9 @@ Required evidence:
 - Kyverno stable image-validation policy with >=3 replicas/PDB/spread before fail-closed mode;
 - audit rollout before production deny enforcement;
 - unsigned/wrong-signer/wrong-provenance/mutable-tag-only/unapproved-registry negatives;
+- only tightly controlled GitOps/CI identities can create or modify cluster-scoped admission policy; application/service identities are denied;
+- Kyverno CEL HTTP context is disabled where unnecessary; any approved lookup has exact destination/purpose allow-list, bounded timeout/response/failure behavior, no arbitrary credential forwarding, and NetworkPolicy-constrained egress;
+- loopback, link-local/cloud-metadata, unreviewed private-network, and arbitrary caller-influenced SSRF destination negatives pass; external-context failure cannot silently become allow;
 - no unsigned emergency bypass;
 - advisory/KEV ingestion <=2h + targeted affected-digest rescan;
 - full deployed inventory rescan <=6h;
