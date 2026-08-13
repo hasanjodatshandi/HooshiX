@@ -29,7 +29,7 @@ Use versioned ASVS identifiers (`v5.0.0-...`) in test/evidence systems so future
 
 ## Security-gate rule
 
-A production-impacting change is not security-verified merely because this matrix is present. Every applicable row requires concrete automated or reviewed evidence tied to the PR/release artifact. A row marked not applicable requires a written scope reason; Critical/High findings and expired exceptions follow ADR-0065/ADR-0068.
+A production-impacting change is not security-verified merely because this matrix is present. Every applicable row requires concrete automated or reviewed evidence tied to the PR/release artifact. A row marked not applicable requires a written scope reason; Critical/High findings and expired exceptions follow ADR-0035/ADR-0038.
 
 ## Maintenance
 
