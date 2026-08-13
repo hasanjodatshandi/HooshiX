@@ -11,10 +11,10 @@ This register contains only ADRs that still carry effective scope. Obsolete pred
 | ADR | Current scope |
 | --- | --- |
 | [ADR-0008](0008-persist-registration-locale-and-reuse-it-for-resend.md) | Registration locale persistence/resend behavior and locale migration safety |
-| [ADR-0009](0009-enable-identity-registration-runtime.md) | Identity registration runtime/composition |
-| [ADR-0012](0012-define-identity-tenant-session-external-and-mfa-v1.md) | Current tenant lifecycle, token/refresh, external identity, TOTP/SMS MFA runtime |
+| [ADR-0009](0009-enable-identity-registration-runtime.md) | Identity registration runtime/composition plus profile/contact canonicalization and fixed verification-challenge invariants |
+| [ADR-0012](0012-define-identity-tenant-session-external-and-mfa-v1.md) | Identity feature-scoped gRPC ownership, tenant/invitation lifecycle, persistence boundaries, JWT/refresh contract, BFF-trusted external-identity evidence, TOTP/SMS MFA login/runtime, idempotency/audit |
 | [ADR-0023](0023-define-identity-jwt-signing-key-lifecycle-v1.md) | JWT signing/verifier key lifecycle |
-| [ADR-0028](0028-define-data-subject-erasure-execution-and-evidence-v1.md) | Cross-service irreversible erasure execution/evidence + logical-deletion/retention baseline |
+| [ADR-0028](0028-define-data-subject-erasure-execution-and-evidence-v1.md) | Cross-service irreversible erasure execution/evidence, server-owned participant registry, async outbox/Kafka coordination, legal-hold ledger, logical-deletion/retention baseline |
 
 Core global-user/tenant-membership, logical deletion/legal hold, credential, and package rules are represented directly in current-state architecture/coding documents rather than predecessor ADRs.
 
