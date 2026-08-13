@@ -68,16 +68,21 @@ For PostgreSQL incidents:
 - replay erasure/legal-hold requirements before re-enabling traffic where
   applicable.
 
+## Temporary architecture/security deviations
+
+An incident workaround that deviates from current architecture/security is never an undocumented new normal. It requires an incident/change record with exact scope, owner, risk, approval, expiry/rollback condition, and compensating controls. It is removed as soon as the incident permits.
+
+If the deviation must remain after incident recovery, the normal PR-first architecture process applies: update current-state documentation and executable evidence, and create/update a retained ADR only when the durable decision warrants one under the current-only policy. A temporary workaround is not kept as historical ADR material merely because it existed during an incident.
+
 ## Resolution
 
 Before resolving SEV-1/SEV-2:
 
 - user/security impact is bounded and verified;
 - temporary mitigations have explicit owner and expiry;
+- temporary architecture/security deviations are either removed or entered into the normal current-state review process;
 - affected SLO/error-budget state is recorded;
-- follow-up actions have owners and due dates;
-- any architecture deviation is represented by an ADR rather than left as an
-  undocumented incident workaround.
+- follow-up actions have owners and due dates.
 
 ## Post-incident review
 

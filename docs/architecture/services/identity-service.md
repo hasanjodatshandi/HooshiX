@@ -53,7 +53,7 @@ Tenant + creator membership + audit + stable owner-provisioning outbox commit in
 
 Owner provisioning command: one invocation per durable claim, 900ms deadline, wait-for-ready off, no immediate transport retry; durable delay 1s, 5s, 30s, 2m, 10m, then <=10m ±20%. Fifteen minutes pending warns; one hour pages.
 
-Production tenant-owned tables use forced RLS with non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles in addition to application tenant checks.
+Production tenant-owned tables use forced RLS with non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles in addition to application tenant checks. Tenant context comes only from validated authenticated context and is installed through the canonical parameterized transaction-local mechanism; session-scoped tenant state on pooled connections is prohibited. Missing/malformed context fails closed, and pooled-connection reuse across tenants after commit/rollback must prove no context leakage.
 
 ## 6. Sessions and tokens
 
@@ -114,10 +114,10 @@ Identity does not expose internal tokens to React. BFF owns browser session, OID
 
 ## 12. PostgreSQL and erasure
 
-Identity owns its dedicated PostgreSQL database on an independent production CloudNativePG cluster under ADR-0057. Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner; tenant tables use forced RLS plus application checks. Flyway only; Domain/JPA separation; no remote I/O inside DB transactions; cross-tenant negative tests mandatory.
+Identity owns its dedicated PostgreSQL database on an independent production CloudNativePG cluster under ADR-0057. Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner; tenant tables use forced RLS plus application checks. Tenant context uses the canonical parameterized transaction-local setting from the SQL/Flyway standard, never a session-scoped pooled connection setting; absent/malformed context fails closed and cross-tenant pool reuse is a mandatory negative test. Flyway only; Domain/JPA separation; no remote I/O inside DB transactions.
 
 ADR-0058 makes Identity coordinator of platform-global erasure requests while every bounded context owns irreversible erasure/anonymization and non-PII receipts for its own data.
 
 ## 13. Verification
 
-Applicable tests include tenant isolation/RLS, slug tombstones, last-owner protection, provisioning replay/conflict, JWT/refresh rotation/reuse, OIDC binding/no-auto-link, PKCE integration, TOTP drift/replay, key rotation, recovery-code use, recent-auth rules, semantic quota time/anti-lockout/failover, registration locale, Notification handoff/callback, PostgreSQL failover, audit, and PII-safe telemetry.
+Applicable tests include tenant isolation/RLS including pooled-connection context reuse after commit/rollback, slug tombstones, last-owner protection, provisioning replay/conflict, JWT/refresh rotation/reuse, OIDC binding/no-auto-link, PKCE integration, TOTP drift/replay, key rotation, recovery-code use, recent-auth rules, semantic quota time/anti-lockout/failover, registration locale, Notification handoff/callback, PostgreSQL failover, audit, and PII-safe telemetry.

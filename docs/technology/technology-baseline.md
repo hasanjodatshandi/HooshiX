@@ -70,7 +70,7 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Service mesh | Istio Ambient 1.30.3 | Kubernetes compatibility matrix mandatory |
 | Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
 | Secret authority | OpenBao 2.6.1 | exact current architecture pin |
-| Admission policy | Kyverno 1.18.2 | stable `policies.kyverno.io/v1` APIs |
+| Admission policy | Kyverno 1.18.2 | stable `policies.kyverno.io/v1` APIs; policy-authoring RBAC and bounded HTTP-context egress/SSRF controls apply |
 | Image signing | Cosign 3.0.6 | current supply-chain policy |
 | SBOM | CycloneDX JSON attestation; Syft pinned in CI tools lock | signed/indexed by image digest |
 | Vulnerability correlation | Grype pinned in CI tools lock | final-image SBOM; owned/expiring exceptions |
@@ -141,7 +141,8 @@ noeviction
 - `trustDomain = prod.sajtech.internal`;
 - OpenBao -> External Secrets -> read-only mounted local key/secret material;
 - signed/provenanced immutable production artifacts verified at admission;
-- upstream L3/L4 mitigation -> Traefik -> Caddy/Coraza WAF -> Web BFF;
+- admission-policy authoring limited to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested;
+- upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF;
 - Calico NetworkPolicy standard dataplane;
 - service-owned semantic quotas under ADR-0054;
 - one online fail-closed no-cache/no-retry `CheckPermission`;

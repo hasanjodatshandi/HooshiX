@@ -43,7 +43,7 @@ Current implementation rules include DDD + Hexagonal inward dependency direction
 - `services/web-bff.md`
 - ADR-0034, ADR-0035, ADR-0038, ADR-0052, ADR-0058
 
-Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, JWT signing/verifier lifecycle, and coordinated erasure evidence.
+Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS with pool-safe transaction-local tenant database context, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, JWT signing/verifier lifecycle, and coordinated erasure evidence.
 
 ### Authorization
 
@@ -95,7 +95,7 @@ Current runtime:
 - `../engineering/sql-and-flyway-coding-standards.md`
 - ADR-0048, ADR-0057, ADR-0064, ADR-0067
 
-ADR-0057 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, and forced tenant RLS where applicable. ADR-0048/0064/0067 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
+ADR-0057 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0048/0064/0067 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
 
 ### Kafka, events, contracts
 
@@ -126,7 +126,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `../technology/production-compatibility-matrix.md`
 - ADR-0024, ADR-0025, ADR-0037, ADR-0050, ADR-0051, ADR-0059
 
-Public path: upstream L3/L4 DDoS mitigation -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization.
+Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization.
 
 ### Frontend and BFF implementation
 
@@ -146,6 +146,8 @@ Frontend rules cover strict TypeScript, runtime validation of untrusted data, Re
 - `../engineering/build-and-ci-quality-enforcement.md`
 - `../operations/incident-response-runbook.md`
 - ADR-0046, ADR-0060, ADR-0061, ADR-0065, ADR-0068
+
+Current supply-chain controls include immutable signed artifacts, signed provenance/SBOM, least-privilege admission-policy authoring, bounded policy-engine external context/egress with SSRF negatives, and continuous deployed-digest vulnerability response.
 
 ## Technology/version authority
 

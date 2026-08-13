@@ -45,7 +45,10 @@ React + TypeScript
         |
         | HTTPS / REST / OpenAPI
         v
-CDN / External Load Balancer
+Upstream L3/L4 volumetric mitigation/scrubbing
+        |
+        v
+Redundant external L4 load balancing
         |
         v
 Traefik Gateway
@@ -66,7 +69,7 @@ Domain / Platform Microservices
         +--> service-owned PostgreSQL
 ```
 
-Only the BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed.
+Only the BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace mandatory upstream volumetric protection, redundant load balancing, Traefik, or the dedicated WAF path.
 
 ## 5. Protocol boundaries
 
@@ -153,8 +156,8 @@ Exact approved patch versions belong in `../technology/technology-baseline.md` a
 - **Authorization:** >=3 replicas/PDB/spread; one final online no-cache/no-retry `CheckPermission`, safe local prechecks, fail-closed overload/breaker isolation, >=99.95% availability, p95<=100ms/p99<=200ms SLO.
 - **OpenBao:** lean single-Raft authoritative secret source with encrypted snapshots; normal application hot paths use mounted/local validated key material rather than per-request OpenBao calls.
 - **Notification:** PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation; no bespoke clock/fence control plane.
-- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature verified by HA Kyverno, with continuous deployed-digest vulnerability/advisory correlation.
-- **Public edge:** upstream L3/L4 volumetric mitigation -> Traefik -> dedicated Caddy/Coraza WAF -> Web BFF.
+- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature verified by HA Kyverno, with continuous deployed-digest vulnerability/advisory correlation and bounded admission-policy authoring/egress controls.
+- **Public edge:** upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> dedicated Caddy/Coraza WAF -> Web BFF.
 - **Human access:** Teleport JIT SSO/WebAuthn access with approvals, short-lived privilege, and audit/session evidence.
 - **Telemetry:** PII/secret-safe structured telemetry with static rules, pipeline redaction, synthetic canaries, and runtime leak detection.
 

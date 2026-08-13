@@ -61,11 +61,11 @@ Compatibility CI/staging verifies the current matrix, including:
 - Istio Ambient plus `istioctl analyze`;
 - Calico NetworkPolicy positive/negative flows including HBONE/health paths;
 - CloudNativePG/PostgreSQL failover and compatibility;
-- Kyverno admission behavior;
+- Kyverno admission behavior, admission-policy authoring RBAC, and bounded CEL HTTP-context egress/SSRF positive/negative behavior from ADR-0046;
 - Argo CD reconciliation;
 - exact immutable artifact identities;
 - applicable load, backup/restore, rollback/fail-forward, and security tests for the changed component set.
 
 ## Rollback considerations
 
-Rollback uses the prior known-good compatibility set only when artifact/schema/data compatibility is proven. It MUST NOT restore an unsupported/EOL component, disable NetworkPolicy/mesh/security controls, rebuild artifacts, or perform an unsafe datastore downgrade merely to recover an older version.
+Rollback uses the prior known-good compatibility set only when artifact/schema/data compatibility is proven. It MUST NOT restore an unsupported/EOL component, disable NetworkPolicy/mesh/admission-security controls, rebuild artifacts, or perform an unsafe datastore downgrade merely to recover an older version.

@@ -4,14 +4,20 @@
   "type": "object",
   "required": ["version", "classes", "edges"],
   "properties": {
-    "version": {"type": "integer", "minimum": 1},
+    "version": {"const": 2},
     "classes": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {"type": "string"}
+      "const": [
+        "AUTHORITATIVE_SECURITY",
+        "AUTHORITATIVE_STATE",
+        "DURABLE_COMMAND",
+        "EXTERNAL_SIDE_EFFECT",
+        "OPTIONAL_READ",
+        "OBSERVABILITY"
+      ]
     },
     "edges": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": [

@@ -72,6 +72,8 @@ Required evidence per persistent service:
 - safe automatic failover; planned/unplanned failover evidence, ordinary target <=60s when durability is preserved;
 - negative cross-service `CONNECT`/object privilege tests;
 - forced tenant RLS; runtime roles `NOSUPERUSER NOBYPASSRLS` and non-owner;
+- tenant context comes only from validated authenticated context, is parameterized and transaction-local, and pooled-connection reuse across commit/rollback cannot leak a prior tenant into a later borrower;
+- missing/malformed tenant context and deliberately missing application tenant predicates fail closed in cross-tenant negative tests;
 - aggregate application Hikari maxima <=70% `max_connections`;
 - continuous WAL archive measured against RPO<=5m;
 - encrypted off-site daily physical base backup + 35-day PITR;
@@ -124,6 +126,9 @@ Required evidence:
 - Kyverno stable image-validation policy with >=3 replicas/PDB/spread before fail-closed mode;
 - audit rollout before production deny enforcement;
 - unsigned/wrong-signer/wrong-provenance/mutable-tag-only/unapproved-registry negatives;
+- only tightly controlled GitOps/CI identities can create or modify cluster-scoped admission policy; application/service identities are denied;
+- Kyverno CEL HTTP context is disabled where unnecessary; any approved lookup has exact destination/purpose allow-list, bounded timeout/response/failure behavior, no arbitrary credential forwarding, and NetworkPolicy-constrained egress;
+- loopback, link-local/cloud-metadata, unreviewed private-network, and arbitrary caller-influenced SSRF destination negatives pass; external-context failure cannot silently become allow;
 - no unsigned emergency bypass;
 - advisory/KEV ingestion <=2h + targeted affected-digest rescan;
 - full deployed inventory rescan <=6h;
@@ -171,7 +176,7 @@ Status until verified: **secret-platform blocker**.
 
 Required evidence:
 
-- only public application path is upstream/LB -> Traefik -> edge-waf -> Web BFF;
+- only public application path is upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> edge-waf -> Web BFF;
 - direct bypass negative tests;
 - replicated WAF/placement according to current HA target;
 - >=7 representative DetectionOnly days + reviewed narrow exceptions;

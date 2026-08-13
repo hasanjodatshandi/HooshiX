@@ -19,8 +19,8 @@ The design favors strong correctness/security with bounded operational complexit
 - Production Notification providers are Liara Transactional Email and IPPanel Webservice-mode Iran SMS. Provider ambiguity is explicit and never converted to fabricated success or blind resend.
 - Every persistent production microservice owns a distinct PostgreSQL database/credentials/Flyway history and dedicated CloudNativePG cluster; tenant-owned tables use forced RLS.
 - Kafka is replicated rebuildable transport, with transactional outbox/idempotent consumer semantics and 35-day critical recovery evidence.
-- Browser traffic follows upstream DDoS mitigation -> Traefik -> Caddy/Coraza WAF -> Web BFF; internal traffic uses Istio Ambient strict mTLS + workload identity + least-privilege authorization.
-- GitOps, signed/provenanced immutable artifacts, admission verification, continuous SBOM/advisory correlation, PII-safe telemetry, and JIT privileged access form the production security/operations baseline.
+- Browser traffic follows upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF; internal traffic uses Istio Ambient strict mTLS + workload identity + least-privilege authorization.
+- GitOps, signed/provenanced immutable artifacts, admission verification with least-privilege policy authoring and bounded policy-engine egress/SSRF controls, continuous SBOM/advisory correlation, PII-safe telemetry, and JIT privileged access form the production security/operations baseline.
 - Java/source quality uses the canonical coding standard plus executable Spotless, SpotBugs, ArchUnit, Semgrep, dependency verification, contract, test, and GitHub Actions gates where implementation exists.
 
 ## Main bottlenecks and failure domains
@@ -63,12 +63,14 @@ Current security boundaries are coherent only when enforced together:
 
 - trusted tenant/user/workload identity is derived/validated at the correct boundary;
 - internal services are not directly Internet-exposed;
+- upstream volumetric protection and redundant external load balancing precede Traefik/WAF; no public route bypasses the WAF;
 - WAF does not replace authentication/authorization/validation/semantic quotas;
 - Istio identity does not replace NetworkPolicy or native datastore authentication;
 - local reject-only Authorization prechecks cannot grant permission;
 - sensitive material never enters Kafka/logs/traces/metrics/raw provider telemetry;
 - production secrets are not committed to Git/Helm values/images;
 - production workloads use hardened security contexts and independent ServiceAccounts;
+- admission-policy authoring is least privilege and policy-engine external context cannot become unrestricted SSRF-capable egress;
 - signed artifact admission does not replace continuous vulnerability response;
 - no vulnerability feed/scanner is considered proof that unknown vulnerabilities do not exist.
 

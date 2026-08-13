@@ -68,7 +68,9 @@ Every tenant-owned production table has:
 - `WITH CHECK` for `INSERT/UPDATE`;
 - application-level tenant validation/predicates in addition to RLS.
 
-The application sets transaction-local tenant context only from validated authenticated context. Tenant-scoped repository operations fail closed when required tenant context is absent.
+The application sets tenant context only from validated authenticated context and only with transaction-local semantics. On pooled connections, session-scoped tenant `SET` is prohibited. The canonical implementation uses a parameterized transaction-local setting such as `SELECT set_config('app.tenant_id', ?, true)` or an equivalent reviewed mechanism proving the same no-pool-leakage property. Missing/malformed tenant context fails closed. Cross-tenant tests MUST reuse pooled connections across commit/rollback boundaries and prove context cannot survive into a later borrower.
+
+Tenant-scoped repository operations fail closed when required tenant context is absent. Raw string concatenation into tenant-context SQL is prohibited.
 
 Global platform tables are explicit reviewed exceptions; a table cannot silently omit tenant ownership merely for convenience.
 
@@ -92,7 +94,8 @@ Per-service application pool/HPA maxima remain inside the service cluster connec
 - runtime role is `NOSUPERUSER NOBYPASSRLS`, not owner, and cannot create roles;
 - every tenant-owned production table has forced RLS + `USING`/`WITH CHECK` coverage;
 - deliberately missing application tenant predicate still cannot cross tenant in integration tests;
-- missing tenant context fails closed;
+- missing/malformed tenant context fails closed;
+- pooled connections reused across tenants after commit/rollback do not retain prior tenant context;
 - migration role/owner credentials are absent from runtime pods;
 - no FK/FDW/dblink/view/grant/shared-model integration crosses service boundaries;
 - backup credentials cannot read another service backup namespace;
@@ -102,4 +105,4 @@ Per-service application pool/HPA maxima remain inside the service cluster connec
 
 ## Rollback considerations
 
-Rollback MUST NOT reconsolidate production service databases/clusters, restore shared credentials/cross-service SQL, remove forced tenant RLS, expose migration/owner roles to runtime pods, or weaken backup isolation. Physical/data migration remains forward and compatibility-aware with validation and no permanent cross-database bridge.
+Rollback MUST NOT reconsolidate production service databases/clusters, restore shared credentials/cross-service SQL, remove forced tenant RLS, restore session-scoped pooled tenant context, expose migration/owner roles to runtime pods, or weaken backup isolation. Physical/data migration remains forward and compatibility-aware with validation and no permanent cross-database bridge.

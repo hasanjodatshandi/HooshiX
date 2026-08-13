@@ -67,7 +67,7 @@ Business logic belongs in Domain/Application. Domain MUST NOT depend on Spring, 
 
 Each independently deployable relational service owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Every persistent production microservice also owns a dedicated CloudNativePG cluster under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited.
 
-Tenant isolation uses trusted authenticated context plus persistence defense in depth. Production tenant-owned PostgreSQL tables use forced RLS and non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles.
+Tenant isolation uses trusted authenticated context plus persistence defense in depth. Production tenant-owned PostgreSQL tables use forced RLS and non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles. Tenant database context comes only from validated authenticated context and uses the canonical parameterized transaction-local mechanism; session-scoped tenant state on pooled connections is prohibited and missing/malformed context fails closed.
 
 ## 5. Java/package/DI rules
 
@@ -144,6 +144,7 @@ Mandatory principles:
 - Kubernetes `default` ServiceAccount is prohibited for production application workloads;
 - browser/BFF security follows current OIDC PKCE/session/CSRF/CORS requirements;
 - supply-chain admission verifies immutable signed/provenanced artifacts/SBOM requirements;
+- admission-policy authoring is restricted to controlled GitOps/CI identities; Kyverno external HTTP context is disabled unless explicitly reviewed, and any approved external context uses bounded destination/egress/failure semantics with SSRF-negative verification;
 - vulnerability scanning/advisory correlation is continuous; no scanner/feed is proof of zero unknown vulnerabilities;
 - privileged human production access is JIT/short-lived/audited under the current Teleport policy.
 
@@ -152,6 +153,8 @@ Mandatory principles:
 Logging is allow-list based and structured. Do not log raw sensitive credentials, full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, unreviewed provider payloads, or unreviewed exception/cause text.
 
 Ordinary PII appears only for an approved purpose with masking/tokenization or managed-key HMAC pseudonymization when correlation is required. Protect input-derived log fields against CR/LF/log injection. Metric labels remain low-cardinality and contain no user/tenant/session/request/resource IDs, trace IDs, raw URLs, or free-form errors.
+
+Ordinary non-audit telemetry may use bounded buffering/drop according to its registered `OBSERVABILITY` semantics. Required security/audit evidence classified as authoritative state must be durably persisted/outboxed according to its operation contract and MUST NOT be silently dropped or reclassified as ordinary telemetry.
 
 New/materially changed logging requires source tests/review plus pipeline/runtime leak controls where applicable.
 
@@ -201,6 +204,8 @@ Use applicable automated enforcement including:
 - restore/DR/failover evidence gates;
 - logging/PII canary tests;
 - load/chaos/smoke/critical browser tests where applicable.
+
+Privileged GitHub Actions event contexts such as `pull_request_target` or `workflow_run` MUST NOT execute unreviewed PR-controlled code/config while secrets, write tokens, protected environments, or equivalent privilege are available. Trusted follow-up workflows that consume untrusted build artifacts/metadata must verify repository/event/source SHA, producer workflow, and artifact identity/integrity before granting privilege.
 
 Do not disable tests, weaken a gate, broaden suppressions, or use `ignoreFailures` merely to make CI green.
 

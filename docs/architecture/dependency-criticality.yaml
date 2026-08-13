@@ -79,6 +79,30 @@ edges:
     policy_refs:
       - ADR-0029
 
+  - operation_id: identity.authorization-owner-provisioning
+    caller_owner: identity-service
+    dependency_id: authorization.provision-tenant-owner
+    class: DURABLE_COMMAND
+    failure_action: keep_tenant_provisioning_and_local_outbox_pending
+    retry_owner: caller-durable-dispatcher
+    fallback: none
+    owner: identity
+    policy_refs:
+      - docs/architecture/services/identity-service.md#5-tenant-v1
+      - docs/architecture/services/authorization-service.md#7-provisioning
+
+  - operation_id: notification.result-callback-dispatch
+    caller_owner: notification-service
+    dependency_id: identity.report-notification-result
+    class: DURABLE_COMMAND
+    failure_action: keep_result_outbox_pending
+    retry_owner: notification-durable-callback-dispatcher
+    fallback: none
+    owner: notification
+    policy_refs:
+      - ADR-0029
+      - docs/architecture/services/notification-service.md#14-result-callback
+
   - operation_id: notification.provider-dispatch
     caller_owner: notification-service
     dependency_id: external-email-or-sms-provider
