@@ -1,49 +1,34 @@
-# ADR-0006: Define Identity Registration, External Identity, and MFA
+# ADR-0006: Identity Registration, External Identity, Credentials, and MFA
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-06
-
-## Context
-
-The Identity Service owns global users according to ADR-0002 and must support
-registration through verified local contact methods and Google OpenID Connect.
-A newly created user cannot be treated as active before the required identity
-evidence and profile data exist.
-
-The service must also support optional multi-factor authentication through SMS
-one-time passwords and authenticator applications using TOTP. These
-capabilities handle identity evidence, credentials, recovery material, and PII,
-so activation, linking, and persistence rules must be explicit before
-implementation.
-
-The backend architecture permits JPA/Hibernate for aggregate persistence and
-controlled CRUD operations while prohibiting framework dependencies in the
-Domain model. Flyway remains the only source of schema changes.
+2026-08-06; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Ownership and aggregate boundary
+### Identity aggregate ownership
 
-The Identity Service owns:
+Identity Service owns:
 
-- the global `User` aggregate;
-- user profile data;
-- email and mobile contact methods and verification state;
-- external identities linked to a user;
+- global `User` identity and profile;
+- Email/mobile contact methods and verification state;
+- local password credentials;
+- external identities;
 - MFA enrollments and recovery material;
-- registration and activation lifecycle state.
+- registration/activation lifecycle;
+- Tenant and TenantMembership lifecycle according to the current tenancy model.
 
-Tenant memberships, tenant roles, and permissions remain outside this
-aggregate and continue to follow ADR-0002, ADR-0004, and ADR-0005.
+Authorization roles, permission assignments/evaluation, and authorization audit remain Authorization Service concerns.
 
-### User lifecycle
+Domain objects remain plain Java. JPA/Hibernate, Spring Data, key-store adapters, provider clients, and transport DTOs remain Infrastructure/Interfaces concerns.
 
-`UserStatus` initially contains:
+### User lifecycle and profile
+
+`UserStatus`:
 
 ```text
 PENDING
@@ -51,147 +36,72 @@ ACTIVE
 DELETED
 ```
 
-A user is created as `PENDING`.
+A new local registration starts `PENDING`. Activation requires at least one approved verified primary identity/contact method, required profile completion, and no security/deletion block.
 
-A user becomes `ACTIVE` only when:
+Initial profile contains required `firstName`, required `lastName`, and optional `fatherName`. Email/mobile remain contact methods rather than duplicated profile fields.
 
-1. at least one accepted primary identity or contact method is verified;
-2. required profile fields are complete; and
-3. no security or deletion rule blocks activation.
+Logical deletion/retention/erasure/legal hold follow the current platform deletion model.
 
-Logical deletion changes the user to `DELETED` and follows ADR-0003. Normal
-queries exclude deleted users. Restoration, retention, erasure, purge, and
-legal-hold behavior are not redefined here.
+### Contact normalization
 
-### Profile and contact data
+Phone numbers are canonical E.164. Email lookup/uniqueness uses the repository-approved provider-neutral normalization; provider-specific Gmail dot removal/plus rewriting is prohibited.
 
-The initial `UserProfile` contains:
-
-- required `firstName`;
-- required `lastName`;
-- optional `fatherName`.
-
-Email addresses and mobile phone numbers are contact methods owned by the User
-aggregate. They are not duplicated as profile fields. Each contact method owns
-its normalized value, verification state, lifecycle, and usage rules.
-
-A phone number is optional for the base profile and becomes required only for a
-flow that depends on it, including mobile registration or SMS MFA.
-
-Phone numbers are normalized and stored in E.164 form. Email addresses are
-normalized for lookup and uniqueness by trimming and lowercasing with
-`Locale.ROOT`. Provider-specific rewriting, including Gmail dot removal or
-plus-address rewriting, is prohibited.
-
-Names, email addresses, and phone numbers are PII and follow the logging,
-retention, access, and erasure requirements in the backend architecture and
-ADR-0003.
+Names, emails, and phone numbers are PII and follow the current logging/access/retention/erasure policy.
 
 ### Local registration and verification
 
-Email registration creates a `PENDING` user and requires successful email
-verification before email can satisfy activation.
+Email/mobile registration creates a `PENDING` user. The corresponding contact method cannot satisfy activation until verified.
 
-Mobile registration creates a `PENDING` user and requires successful mobile
-verification before phone can satisfy activation.
+Verification challenges are short-lived, single-use, attempt-limited, semantically rate-limited, and delivered through the current durable Notification handoff. Raw OTP/code values are never logged, persisted as plaintext, emitted in events, or returned after generation.
 
-Verification challenges are short-lived, single-use, rate-limited, and limited
-by an attempt counter. Raw OTP values, passwords, tokens, and recovery codes
-must never be logged.
+### Password credentials
 
-### Local credentials
+Raw password exists only at the trusted boundary and one explicit hashing boundary. It is never persisted, logged, emitted, returned, or reversibly encrypted.
 
-Local email or mobile registration may create one local password credential
-linked to the user. A local credential is separate from `UserProfile`, contact
-methods, external identities, and MFA enrollments.
+Production password baseline is current Technology Baseline/security architecture:
 
-A raw password is accepted only at the trusted inbound boundary and crosses one
-explicit hashing boundary. It is never persisted, logged, included in events,
-returned by APIs, or encrypted for later recovery.
+- Argon2id;
+- memory 19 MiB;
+- iterations 2;
+- parallelism 1;
+- random 16-byte salt;
+- >=32-byte derived hash;
+- self-describing/versioned format and rehash-on-success when the approved baseline increases;
+- 15..128 Unicode code points with NFC normalization;
+- compromised-password screening on create/change/reset;
+- bounded hash/verification concurrency;
+- no arbitrary composition rules or periodic forced rotation without compromise evidence.
 
-Only a salted adaptive one-way password hash and the parameters needed to verify
-it are persisted. Reversible password encryption is prohibited.
+Password hashing is exposed through an Application outbound security port and implemented in Infrastructure. Successful password reset invalidates applicable session/token state according to the current session/revocation contract.
 
-Password hashing and verification are exposed to Application through an
-outbound security port and implemented in Infrastructure. Domain code does not
-depend on Spring Security or `PasswordEncoder`.
+### Google OpenID Connect and external identity linking
 
-The approved algorithm and work parameters are pinned in the Technology
-Baseline before credential implementation. The persisted format must support
-safe parameter upgrades and rehashing after successful authentication.
+Browser Google login/registration uses OIDC Authorization Code + PKCE S256 through Web BFF. Browser code does not store provider, access, refresh, or internal tokens in `localStorage`/`sessionStorage`.
 
-Password creation, change, and reset are high-risk operations. They are
-rate-limited and audited without sensitive values. A successful reset must
-invalidate applicable sessions and tokens through the accepted authentication
-revocation flow.
-
-### Google OpenID Connect
-
-Google registration and login use OpenID Connect Authorization Code Flow
-through the Web BFF.
-
-The Web BFF is the OpenID Connect relying party. It validates the provider
-response and ID token, including signature, issuer, audience, expiry, nonce, and
-request correlation, before calling the Identity Service through a trusted
-internal interface.
-
-React does not store Google, access, refresh, or identity tokens in
-`localStorage` or `sessionStorage`. The BFF owns the secure browser session.
-
-A Google identity is identified by:
+External identity stable key is:
 
 ```text
 issuer + subject
 ```
 
-The OpenID Connect `sub` claim is the provider subject. Email is not the stable
-external-identity key.
+Persistence enforces uniqueness on `(issuer, subject)`. Email is never the external identity key.
 
-External identities have a unique persistence constraint on:
+A validated external identity may provide verified Email evidence according to provider/current OIDC rules, but required profile/security state still gates activation.
 
-```text
-(issuer, subject)
-```
+Email equality alone MUST NOT auto-link an external identity to an existing local account. Linking requires an authenticated account-settings flow, explicitly verified recovery flow, or another current reviewed security flow with equivalent assurance. User + external identity creation/linking is atomic.
 
-A successfully validated Google identity with `email_verified=true` satisfies
-the email-verification requirement. The user remains `PENDING` until required
-profile data are complete. Google claims may prefill profile fields, but the
-Identity Service remains the source of truth.
+### MFA
 
-### External-identity linking
-
-An email match alone must not automatically link a Google identity to an
-existing local user.
-
-Linking is allowed only through:
-
-- an authenticated account-settings flow;
-- an explicitly verified account-recovery flow; or
-- a later accepted ADR defining equivalent security.
-
-Creating or linking the local user and external identity is atomic. Failure must
-not leave a partial identity record.
-
-The initial provider enumeration contains `GOOGLE`, but the model uses a
-provider-independent external-identity abstraction.
-
-### Multi-factor authentication
-
-The initial MFA methods are:
+Current methods:
 
 ```text
 SMS_OTP
 TOTP
 ```
 
-TOTP represents authenticator applications and does not depend on a specific
-vendor application.
+`SMS_OTP` and `TOTP` are distinct assurance methods; policy may require TOTP for higher-risk operations.
 
-`SMS_OTP` and `TOTP` are distinct assurance methods. Supporting both does not
-make them interchangeable. Security policy may require TOTP and reject SMS OTP
-for a high-risk operation.
-
-An MFA enrollment has these lifecycle states:
+Enrollment lifecycle:
 
 ```text
 PENDING
@@ -199,36 +109,26 @@ ACTIVE
 DISABLED
 ```
 
-An enrollment becomes `ACTIVE` only after successful proof of the new factor.
+Activation requires successful proof of the new factor.
 
-SMS OTP requirements:
+TOTP current baseline:
 
-- phone ownership is already verified;
-- challenges are short-lived, single-use, rate-limited, and attempt-limited;
-- raw OTP values are never persisted or logged;
-- provider communication occurs outside database transactions.
+- HMAC-SHA-256;
+- 6 digits;
+- 30-second step;
+- ±1 step;
+- issuer `SajTech`;
+- purpose-specific local AES-256-GCM key ring sourced through OpenBao/External Secrets;
+- recent authentication <=5 minutes for enroll/disable/replace/recovery;
+- no trusted-device bypass in v1.
 
-TOTP requirements:
+Recovery set contains 10 independent 80-bit codes, shown once and stored only as domain-separated HMAC-SHA-256 digests. Consumption is atomic/single-use.
 
-- the secret is encrypted at rest with a managed key;
-- the plaintext secret is never logged;
-- activation requires successful TOTP verification;
-- rotation and replacement are explicit operations.
-
-Recovery codes have sufficient entropy, are displayed once, and are stored only
-as secure hashes. Enabling, disabling, replacing, or recovering MFA is a
-high-risk operation and requires recent authentication.
-
-Production key management depends on the separate Secret Manager decision. The
-domain and persistence model may be implemented before provider integration,
-but production secret storage must not bypass that pending decision.
+SMS OTP requires a previously verified phone, current semantic quota controls, current Notification encrypted exact-content lifecycle, and production IPPanel Webservice readiness. Provider failure does not activate a local logging adapter or unreviewed fallback.
 
 ### Persistence
 
-Spring Data JPA/Hibernate is used for User aggregate persistence and controlled
-CRUD operations.
-
-Mandatory settings are:
+Spring Data JPA/Hibernate is approved for Identity aggregate persistence/control-oriented CRUD with:
 
 ```yaml
 spring:
@@ -238,115 +138,18 @@ spring:
       ddl-auto: validate
 ```
 
-Flyway is the only source of database schema changes.
-
-Domain aggregates, entities, value objects, events, and exceptions remain plain
-Java and do not depend on Spring or JPA.
-
-JPA entities, Spring Data repositories, mappings, and fetch plans remain inside
-the persistence adapter. Domain objects and JPA entities are separate and use
-explicit mappers.
-
-Associations are lazy by default. Aggregate boundaries, cascades, orphan
-removal, fetch plans, batching, and transaction boundaries require explicit
-review.
-
-Complex reporting, bulk operations, CTEs, window functions, and
-performance-sensitive queries use jOOQ when introduced and justified.
+Flyway is the only schema-change mechanism. Domain and JPA models remain separate with explicit mapping. Associations are LAZY by default. Cascades/orphan removal/fetch plans/batching/transaction boundaries require aggregate-specific review. jOOQ may be used for justified complex/reporting/performance-sensitive queries.
 
 ### Events and transactions
 
-Domain events are transport-independent and are not Kafka messages.
+Domain events are transport-independent. When state change + integration event are one business effect, persistence + Transactional Outbox record commit in one local DB transaction.
 
-When a state change requires an integration event, aggregate persistence and
-the outbox record occur in the same local database transaction. Publishing
-directly to Kafka after repository save is prohibited.
+Google/provider/Notification/Kafka/Redis/other service network I/O MUST NOT occur inside a database transaction.
 
-Network calls to Google, email, SMS, Kafka, Redis, or another service do not
-occur inside a database transaction.
+## Verification requirements
 
-## Consequences
+Tests cover activation gating, contact normalization/uniqueness, password boundary/rehash/compromised-password checks/bulkhead, OIDC issuer+subject binding, no email-only auto-link, atomic linking, TOTP drift/replay/key rotation/recovery-code single use, SMS MFA production gating, PII-safe telemetry, JPA/domain separation, tenant isolation, and no remote I/O inside DB transactions.
 
-- Registration has an explicit incomplete state.
-- Google identities use stable OpenID Connect identity instead of mutable email.
-- Automatic account linking by email is prohibited, reducing takeover risk.
-- Profile and contact methods have separate responsibilities and one source of
-  truth for each email address and phone number.
-- Profile, verification, local credentials, external identity, and MFA become
-  explicit Identity concepts.
-- Local credentials require a dedicated hashing port, upgradeable hash format,
-  and session/token invalidation on reset.
-- Persistence requires explicit mapping between Domain and JPA models.
-- MFA introduces encryption, recovery, rate limiting, and high-risk-operation
-  controls.
-- Google login requires coordinated BFF and Identity contracts while browser
-  tokens remain outside frontend storage.
-- Production SMS and TOTP secret handling remain blocked until provider and
-  secret-management decisions are approved.
+## Rollback considerations
 
-## Alternatives considered
-
-### Treat every persisted user as active
-
-Rejected because unverified or incomplete registrations would receive active
-status.
-
-### Use email as the Google identity key
-
-Rejected because email is mutable and is not the stable OpenID Connect subject.
-
-### Automatically link matching verified emails
-
-Rejected because email equality alone is insufficient authorization for
-account linking.
-
-### Put Google columns directly on users
-
-Rejected because it couples User to one provider and limits multiple linked
-identities.
-
-### Store mobile number in both profile and contact method
-
-Rejected because duplicated ownership creates conflicting verification,
-normalization, deletion, and update state. Mobile numbers remain contact
-methods; the profile does not duplicate them.
-
-### Store local passwords reversibly or in profile data
-
-Rejected because passwords are credentials, not profile attributes. Only an
-approved salted adaptive one-way hash may be persisted.
-
-### Store Domain objects as JPA entities
-
-Rejected because it violates dependency rules and couples business models to
-persistence technology.
-
-### Model MFA as one boolean on User
-
-Rejected because enrollment lifecycle, factor replacement, recovery, and
-multiple method types require explicit modeling.
-
-### Require phone and father name for every account
-
-Rejected initially. Phone is required only for dependent flows such as SMS MFA.
-Father name remains optional unless a later business or legal rule changes it.
-
-## Rollback or migration considerations
-
-This ADR precedes the first User schema migration, so no existing production
-user data require migration.
-
-If implementation is rolled back before release, migrations and code may be
-removed only while the migrations remain unexecuted outside disposable
-environments.
-
-After a migration is executed in a shared or production-like environment, it
-must not be edited or deleted. Reversal uses additive Flyway migrations and the
-expand-migrate-contract strategy.
-
-Removing Google or an MFA method later must preserve identity and recovery data
-until an explicit migration, user-notification, fallback-access, retention, and
-security plan is accepted.
-
-A later ADR may supersede activation, linking, or MFA rules but must not
-silently rewrite this historical decision.
+Rollback MUST preserve immutable user/external-identity IDs, issuer+subject bindings, credential-hash compatibility, MFA/recovery security, executed Flyway migrations, session/token invalidation semantics, and encrypted key-version compatibility. It cannot silently enable email-only linking, plaintext/reversible credentials, weaker MFA storage, or production local-SMS fallback.
