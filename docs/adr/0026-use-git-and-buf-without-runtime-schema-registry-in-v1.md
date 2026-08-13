@@ -1,110 +1,40 @@
-# ADR-0026: Use Git and Buf Without a Runtime Schema Registry in v1
+# ADR-0026: Git + Buf Contract Governance Without Runtime Schema Registry v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-09
-
-## Relationship to Earlier Decisions
-
-This ADR supersedes the canonical architecture's v1 requirement to deploy a
-runtime Schema Registry for Protobuf contracts. It does not change Protobuf as
-the internal gRPC contract format or permit incompatible field changes.
-
-A runtime Schema Registry may be introduced only through a later ADR when an
-actual runtime or dynamic schema-discovery consumer, such as multi-team Kafka
-event streaming, justifies it.
-
-## Context
-
-The current phase uses repository-versioned Protobuf contracts and generated
-code. gRPC alone does not require a runtime schema-discovery service. Deploying
-a registry without a runtime consumer would add topology, authentication,
-backup, availability, and upgrade responsibilities without serving the current
-contract workflow.
+2026-08-10; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### v1 registry topology
+Protobuf API/event schemas are owned in Git. v1 does not deploy a runtime Schema Registry.
 
-For v1:
+### Protobuf compatibility
 
-```text
-Runtime Schema Registry product  = none
-Runtime Schema Registry topology = none
-Runtime Schema Registry auth     = none
-```
-
-No runtime Schema Registry is deployed.
-
-### Contract source of truth and CI policy
-
-The Protobuf source of truth is the Git repository. Buf CLI runs in CI.
-
-The required policy is:
-
-```yaml
-lint:
-  use:
-    - STANDARD
-
-breaking:
-  use:
-    - FILE
-```
-
-Every pull request must run the equivalent of:
+CI enforces the repository-approved equivalent of:
 
 ```text
-buf lint
-buf breaking --against <main>
+buf lint       -> STANDARD
+buf breaking   -> FILE policy against main/current compatibility base
 ```
 
-Protobuf compatibility for this phase is therefore `Buf FILE`. Protobuf field
-numbers must never be reused, and generated-code structure protected by the
-selected policy must not be broken.
+Field numbers are never reused. Removed field names/numbers are reserved where required to prevent accidental reuse. Generated source is derived from the canonical contract; copied/manual duplicate schemas are prohibited.
 
-### Future runtime registry gate
+Service/version/package ownership remains explicit. Transport messages do not become shared Domain models.
 
-A future registry requires a new decision defining its real consumers,
-product, topology, availability, authentication, authorization, compatibility,
-schema ownership, migration, and rollback. The existence of gRPC contracts by
-itself is not sufficient justification.
+### Runtime behavior
 
-Production activation of event flows that require runtime or dynamic schema
-discovery remains gated until that decision is accepted.
+Consumers/producers use build/release-pinned generated contracts. Runtime schema discovery/registration is not a request-path dependency in v1.
 
-## Consequences
+Introducing a runtime Schema Registry, dynamic schema-discovery authority, or incompatible compatibility policy requires a new or revised current ADR with availability, security, migration, ownership, and rollback evidence.
 
-- v1 has no registry runtime, credential, or availability dependency.
-- Contract compatibility remains mandatory and is enforced against Git in CI.
-- Contract review and repository protection become the release boundary.
-- Runtime/dynamic discovery and multi-team event governance remain unavailable
-  until a justified registry ADR is accepted.
+## Verification requirements
 
-## Alternatives Considered
+Run Buf lint/breaking checks, generated-source consistency checks, field-number/reservation validation, service contract tests, and compatibility checks for every changed public/internal/event contract. CI MUST fail incompatible contract changes that violate the current policy.
 
-### Deploy a registry because Protobuf is used by gRPC
+## Rollback considerations
 
-Rejected because generated gRPC contracts are governed by Git and Buf and do
-not require runtime discovery.
-
-### Use a weaker compatibility category
-
-Rejected in favor of the approved `FILE` policy.
-
-### Leave compatibility checking optional
-
-Rejected because every pull request must prove lint and compatibility against
-the main-line contract baseline.
-
-## Rollback or Migration Considerations
-
-This ADR removes no deployed registry because v1 has none.
-
-Introducing a future registry is an additive migration and must not replace Git
-as the reviewed source of truth without another explicit decision. Rollback of
-CI changes must not remove `STANDARD` lint or `FILE` compatibility checks.
+Rollback uses a contract/application combination that remains wire compatible with deployed peers/events. It MUST NOT reuse removed field numbers, publish incompatible schemas, or introduce an unreviewed runtime schema dependency.

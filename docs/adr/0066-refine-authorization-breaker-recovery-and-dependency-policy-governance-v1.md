@@ -1,39 +1,24 @@
-# ADR-0066: Refine Authorization Breaker Recovery and Dependency-Policy Governance v1
+# ADR-0066: Authorization Breaker Recovery and Dependency-Policy Governance v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-11
-
-## Relationship to Earlier Decisions
-
-This ADR extends ADR-0055, ADR-0056, ADR-0062, and ADR-0063. It does not weaken
-ADR-0039's authoritative online `CheckPermission`, one-attempt, no-cache,
-no-stale-fallback, and fail-closed semantics.
-
-ADR-0062 remains authoritative for SLOs and burn-rate alerting. This ADR refines
-only breaker de-correlation/half-open behavior and makes the dependency
-criticality matrix machine-checkable.
+2026-08-11; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Authorization breaker scope
+### Breaker scope
 
-An Authorization client breaker is scoped to the caller workload/service and the
-`CheckPermission` dependency. It is **not** scoped by tenant tier, subscription
-plan, or commercial priority.
+An Authorization client breaker is scoped to the caller workload/service and the `CheckPermission` dependency. It is not scoped by tenant tier, subscription plan, or commercial priority. Commercial tier MUST NOT alter the security meaning of an unavailable authorization decision.
 
-Commercial tier must not alter the security meaning of an unavailable
-authorization decision. Tenant/workload fairness belongs in bounded concurrency
-and quota policy, not breaker recovery semantics.
+Tenant/workload fairness belongs in bounded server/client concurrency and quota policy, not in breaker recovery semantics.
 
-### De-correlated open duration
+### De-correlated OPEN duration
 
-The fixed `2s + <=1s` open interval from ADR-0062 is replaced by a bounded
-per-breaker reopen backoff:
+Repeated recovery attempts use bounded per-breaker backoff:
 
 ```text
 base open duration = min(30s, 2s * 2^reopen_streak)
@@ -41,115 +26,60 @@ actual open duration = random value in [0.5 * base, base]
 ```
 
 - `reopen_streak` starts at 0;
-- any failed half-open recovery increments it;
-- a continuously healthy CLOSED interval of at least 60 seconds resets it to 0;
+- failed HALF_OPEN recovery increments it;
+- >=60 seconds of continuously healthy CLOSED operation resets it to 0;
 - randomization is independent per caller instance/breaker;
-- the caller continues to fail closed while OPEN.
+- OPEN always fails closed with `AUTHORIZATION_UNAVAILABLE`.
 
-This avoids synchronized recovery storms across replicas while bounding the
-maximum outage-amplifying wait.
+### Serialized HALF_OPEN probes
 
-### Half-open probe serialization
-
-Half-open recovery uses **real incoming `CheckPermission` calls** exactly as
-ADR-0062 requires, but probes are serialized per caller breaker instance:
+Recovery uses real incoming `CheckPermission` operations under the unchanged one-attempt/300ms/no-cache/no-retry contract:
 
 - at most one half-open probe is in flight per breaker instance;
-- three consecutive infrastructure-successful probes close the breaker;
-- authoritative allow **or deny** counts as infrastructure success;
-- any timeout, `UNAVAILABLE`, transport failure, or
-  `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED` reopens immediately;
-- non-probe requests while a half-open probe is in flight fail fast through the
-  same `AUTHORIZATION_UNAVAILABLE` path;
-- there is no synthetic health probe and no automatic retry.
+- three consecutive infrastructure-successful probes close;
+- authoritative allow or deny counts as infrastructure success;
+- timeout, `UNAVAILABLE`, transport failure, or `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED` reopens immediately;
+- non-probe requests while the probe slot is occupied fail fast through `AUTHORIZATION_UNAVAILABLE`;
+- no synthetic health probe and no automatic retry.
 
-No fixed probe cooldown is required. Serialization plus the de-correlated OPEN
-interval is the anti-herd mechanism. A future cooldown may be introduced only
-from measured recovery instability.
+A separate readiness/health endpoint never authorizes breaker closure.
 
-### Machine-readable dependency policy registry
+### Canonical dependency registry
 
-The canonical operation/dependency policy is now:
+The canonical operation/dependency policy source is:
 
 ```text
 docs/architecture/dependency-criticality.yaml
 ```
 
-`dependency-criticality-matrix.md` is the human-readable rendered view.
+`dependency-criticality-matrix.md` is the generated human-readable view.
 
-Each registry edge includes at least:
+Each production synchronous edge records stable operation/dependency identity, caller owner, dependency class, failure action, retry owner, fallback, policy owner, and non-empty `policy_refs`.
 
-- stable `operation_id`;
-- caller owner;
-- dependency identifier;
-- dependency class;
-- failure action;
-- retry owner;
-- fallback policy;
-- deadline/reference ADR where applicable;
-- service/team owner.
+`policy_refs` may reference retained current ADRs and/or canonical current documents. They MUST point to the real current authority and MUST NOT point to deleted history or an unrelated ADR merely to satisfy schema validation.
 
-### Multiple dependencies in one operation
+### Composition
 
-Each operation/dependency edge is evaluated independently.
+Each operation/dependency edge is evaluated independently:
 
-- Failure of `AUTHORITATIVE_SECURITY` or `AUTHORITATIVE_STATE` blocks the
-  operation according to that edge's failure action.
-- `OPTIONAL_READ` may degrade only when its edge defines an explicit bounded
-  fallback.
-- `DURABLE_COMMAND` may defer remote execution only after the owning service has
-  durably committed the required local intent.
-- `EXTERNAL_SIDE_EFFECT` preserves ambiguous outcome semantics and never
-  fabricates success.
-- When practical, authoritative security checks execute before optional remote
-  enrichment so unauthorized requests do not consume optional downstream work
-  or expose unnecessary data.
+- `AUTHORITATIVE_SECURITY`/`AUTHORITATIVE_STATE` failure blocks according to the registered action;
+- `OPTIONAL_READ` degrades only through an explicit bounded fallback;
+- `DURABLE_COMMAND` defers remote execution only after required local intent is durably committed;
+- `EXTERNAL_SIDE_EFFECT` preserves ambiguous outcomes and never fabricates success;
+- authoritative security checks SHOULD run before optional remote enrichment when practical.
 
-An optional dependency does not make a mandatory dependency optional.
+An optional dependency never makes a mandatory dependency optional. Missing fallback means no fallback.
 
-### Matrix ownership and CI governance
+### Registry governance
 
-The caller/bounded-context owner owns each edge. Platform Architecture owns the
-schema and allowed classes. Security co-owns changes to
-`AUTHORITATIVE_SECURITY` edges.
+Caller/bounded-context owner owns each edge; Platform Architecture owns schema/classes; Security co-reviews `AUTHORITATIVE_SECURITY` changes.
 
-CI MUST:
+CI MUST validate schema/enums, reject duplicate edges/missing required fields/orphans, validate current `policy_refs`, regenerate/check the Markdown view, require coverage for production synchronous edges represented by current service architecture/contracts, and require architecture/security review when an authoritative edge becomes degradable or gains fallback.
 
-1. validate the YAML schema and enum values;
-2. reject duplicate `(operation_id, dependency_id)` edges;
-3. reject missing owner/failure/fallback fields;
-4. regenerate/check `dependency-criticality-matrix.md` from YAML;
-5. require every production synchronous remote edge represented by service
-   architecture/contract tests to have a registry entry;
-6. fail when a removed/renamed operation leaves an orphan policy edge;
-7. require architecture/security review when a change makes an authoritative
-   edge degradable or adds a fallback.
+## Verification requirements
 
-The exact CI task name is repository-defined; architecture compliance must not
-rely on a PR checkbox alone.
+Verify de-correlated multi-replica recovery, bounded reopen escalation/reset, one in-flight HALF_OPEN probe, three real successes to close, immediate reopen on infrastructure failure/overload, tenant-tier independence, health-endpoint non-authority, registry schema/duplicate/orphan/policy-ref/render/coverage checks, and composite-edge behavior.
 
-## Verification Requirements
+## Rollback considerations
 
-- multiple caller replicas do not enter HALF_OPEN in a synchronized burst under
-  deterministic outage/recovery tests;
-- repeated failed recovery increases bounded open duration and healthy CLOSED
-  operation resets it;
-- only one half-open probe is in flight per breaker instance;
-- three consecutive real contract successes close and any infrastructure
-  failure reopens;
-- tenant tier has no effect on Authorization breaker semantics;
-- YAML schema/duplicate/orphan/render checks fail CI correctly;
-- a composite operation with authoritative + optional dependencies fails only
-  according to each registered edge and never silently invents fallback.
-
-## Consequences
-
-Breaker recovery is less likely to create a thundering herd and dependency
-semantics become reviewable by both humans and CI. The platform avoids adding a
-commercial-tier distinction to security availability semantics.
-
-## Rollback Considerations
-
-Rollback must not return to synchronized fixed recovery across replicas, remove
-fail-closed behavior, or make the Markdown matrix an unchecked independent
-source of truth.
+Rollback MUST NOT restore synchronized fixed recovery, concurrent half-open probe bursts, tenant-tier-dependent authorization availability, synthetic health-probe recovery, unchecked Markdown authority, forced ADR-only policy references, implicit fallback, or removal of fail-closed semantics.

@@ -1,47 +1,35 @@
-# Agent Communication and Reporting Contract
+# Agent Communication and Reporting Contract — Current Standard
 
-> This document is mandatory companion reading for `AGENTS.md`, the applicable
-> architecture documents, and `docs/engineering/coding-standards.md`. An agent
-> working on architecture, implementation, infrastructure, review, migration,
-> security, or release evidence must follow it before planning, changing,
-> reviewing, or reporting non-trivial work.
-
-Communication quality is part of task correctness. A technically correct change
-with a vague, misleading, incomplete, or unverified report is not complete.
+This document is mandatory companion reading for `AGENTS.md`, applicable architecture/current ADRs, and engineering standards. Communication quality is part of task correctness; a technically correct change with misleading or unverified reporting is incomplete.
 
 ## 1. Core communication rules
 
-1. Lead with the result, decision, blocker, material risk, or most important finding.
-2. Do not begin with filler, generic praise, or a restatement of the task.
-3. Do not provide a chronological diary of routine searches, tool calls, file reads, or internal reasoning.
-4. Report verified outcomes rather than intentions.
-5. Preserve exact paths, symbols, commands, configuration keys, error messages, versions, test scopes, and numeric constraints.
-6. Clearly distinguish verified facts, assumptions, inferences, unresolved questions, and recommendations.
-7. Never claim that something works, passes, is secure, is complete, or is production-ready unless the relevant evidence was actually obtained.
-8. Never hide failures, skipped checks, reduced scope, uncertainty, or unresolved risks.
+1. Lead with result, blocker, material risk, or important finding.
+2. Do not begin with filler/praise/task restatement.
+3. Do not narrate routine tool calls, searches, file reads, or private reasoning.
+4. Report verified outcomes, not intentions.
+5. Preserve exact paths, symbols, commands, errors, versions, scopes, and numeric constraints.
+6. Separate verified facts from assumptions, inference, unresolved questions, and recommendations.
+7. Never claim something works/passes/is secure/complete/production-ready without relevant evidence.
+8. Never hide failures, skipped checks, reduced scope, uncertainty, or unresolved risk.
 9. Do not silently expand scope or perform unrelated refactoring.
-10. Preserve the user's language unless another language is requested. Keep code, commands, identifiers, API names, exact errors, and repository paths unchanged.
-11. Do not expose private chain-of-thought or internal reasoning. Report evidence, decisions, and concise rationale instead.
-12. Follow the complete Code-Generation Checklist in `AGENTS.md` §8.1 / `coding-standards.md` §15 for implementation work.
+10. Preserve the user's language unless another language is requested; code/commands/identifiers/errors stay exact.
+11. Do not expose private chain-of-thought/internal reasoning; report evidence and concise rationale.
+12. Implementation work follows the 20-item preflight in `AGENTS.md` §15 and `coding-standards.md` §16.
 
-## 2. Communication during work
+## 2. Progress updates
 
-For non-trivial work, provide brief progress updates only when they add useful
-information or let the user steer before a material decision becomes expensive.
+For non-trivial work, update the user only when the information can affect understanding or steering, such as:
 
-Useful updates include:
+- significant finding changing the plan;
+- unexpected bounded-context/security/dependency impact;
+- blocker requiring user input;
+- security/privacy/data-loss/compatibility/operational risk;
+- necessary scope change;
+- failed verification affecting outcome;
+- documentation/implementation drift that must be corrected.
 
-- a significant finding that changes the implementation plan;
-- an unexpected dependency or affected bounded-context/security boundary;
-- a blocker requiring user input;
-- a security, privacy, data-loss, compatibility, or operational risk;
-- a necessary scope expansion/reduction;
-- a failed verification step that changes the outcome;
-- a discovered documentation/implementation drift that must be resolved.
-
-Do not report every command, search query, routine file edit, or normal test run.
-
-When a structured update is useful, use:
+Do not report every routine command/search/edit/test. A concise structured update may use:
 
 ```text
 Status: <planning | investigating | implementing | verifying | blocked>
@@ -50,187 +38,126 @@ Impact: <why it matters>
 Next action: <next material step>
 ```
 
-Omit fields that do not add useful information.
+## 3. Questions and assumptions
 
-## 3. Questions, ambiguity, and assumptions
+Do not ask questions that current repository/docs/tests/configuration/current ADRs can answer.
 
-Do not ask questions that can be answered by inspecting the current repository,
-documentation, tests, configuration, Git history, baseline files, or applicable
-ADRs.
+Ask only when missing information materially affects behavior/acceptance criteria, public/event contract, security/access semantics, data/migration strategy, destructive action, bounded-context boundary, backward compatibility, or external ownership/credential approval.
 
-Ask the user only when missing information materially changes:
-
-- expected behavior or acceptance criteria;
-- public/event contract;
-- security posture or access-control semantics;
-- data model or migration strategy;
-- destructive/irreversible action;
-- bounded-context/architecture boundary;
-- backward compatibility;
-- ownership or externally controlled credentials/approvals.
-
-Ask one focused question at a time when a question is necessary.
-
-When a low-risk assumption permits progress, report it explicitly:
+A low-risk assumption may be reported as:
 
 ```text
 Assumption: <assumption>
-Reason: <why it is reasonable>
-Impact if incorrect: <what would need to change>
+Reason: <why reasonable>
+Impact if incorrect: <required change>
 ```
 
-Do not proceed on an assumption that could cause data loss, a security
-regression, incompatible contract change, or irreversible operation.
+Do not proceed on assumptions that can cause data loss, security regression, incompatible contract change, or irreversible action.
 
-## 4. Scope control
+## 4. Scope discipline
 
-Before implementation, establish the task boundary using the repository and the
-mandatory architecture review mode.
+Before implementation establish the task boundary through the required architecture review mode. During work:
 
-During implementation:
+- make the smallest complete coherent change;
+- avoid unrelated refactoring/cleanup;
+- report unrelated findings separately unless they block the scoped task;
+- never weaken quality/security gates to avoid fixing the real issue.
 
-- make the smallest complete change that satisfies the requirement;
-- avoid drive-by cleanup and unrelated refactoring;
-- report newly discovered unrelated issues separately;
-- do not fix unrelated issues unless they block the agreed task or the user expands scope;
-- do not weaken quality gates to avoid fixing the actual problem.
-
-If scope materially changes, report:
-
-```text
-Scope change: <change>
-Reason: <why>
-Files or components added: <scope>
-Risk: <material risk>
-User decision required: yes/no
-```
+If scope materially changes, report scope/reason/affected components/risk and whether user decision is required.
 
 ## 5. Evidence requirements
 
-Every important implementation claim must be supported by available evidence.
-Preferred evidence includes:
+Important claims should be backed by available exact evidence, including where applicable:
 
-- `path:line` references when stable;
-- changed symbols/configuration keys when line numbers are unstable;
-- exact test/check commands and result scope;
-- contract/schema comparisons;
-- Flyway/migration validation;
+- stable path/section/symbol references;
+- exact executed check/command and scope;
+- contract/schema comparison;
+- Flyway/migration verification;
 - ArchUnit/SpotBugs/Semgrep/dependency-verification output;
-- relevant logs or metrics;
-- rendered Helm/Kubernetes policy validation;
-- Git diff inspection;
-- applicable architecture sections, Technology Baseline, compatibility matrix, and ADRs.
+- logs/metrics when safe/relevant;
+- rendered Helm/Kubernetes/Istio policy validation;
+- Git/PR diff inspection;
+- architecture/Technology Baseline/compatibility/current ADR evidence.
 
-Use exact evidence. Do not say `tests passed` when only a focused subset ran, and
-do not say `all checks passed` when a required check was skipped or unavailable.
+Never say “tests passed” when only a subset ran or “all checks passed” when required checks were skipped/unavailable.
 
-## 6. Reporting code/configuration changes
+## 6. Change reporting
 
-Report changes as a compact receipt:
-
-```text
-- `<path>:<line-range>` — <what changed and why>
-- `<path>` — `<Class.method or configuration key>`: <change and reason>
-```
-
-Do not paste a complete diff unless the user requests it or the exact patch is
-required to explain a problem.
-
-For generated code, report the generator/source-of-truth and whether generated
-output was regenerated and verified.
-
-## 7. Reporting review findings
-
-For defects, risks, or review findings, use:
+Report code/config changes as compact receipts:
 
 ```text
-<severity> `<path>:<line>` — <problem>. <impact>. <recommended fix>.
+- `<path>` — <symbol/config/area>: <change and reason>
 ```
 
-Severity levels:
+Do not paste full diffs unless requested or required to explain a blocker. For generated code, identify generator/source-of-truth and whether output was regenerated/verified.
+
+## 7. Review finding format
+
+```text
+<severity> `<path>:<location>` — <problem>. <impact>. <recommended fix>.
+```
+
+Severity:
 
 - `BLOCKER` — unsafe to merge/deploy or likely destructive/security-critical failure;
-- `HIGH` — likely correctness, security, data-loss, availability, or contract failure;
-- `MEDIUM` — meaningful reliability, performance, maintainability, or operational risk;
-- `LOW` — limited impact or non-blocking improvement;
-- `QUESTION` — author intent or requirement must be clarified before a safe conclusion.
+- `HIGH` — likely correctness/security/data-loss/availability/contract failure;
+- `MEDIUM` — meaningful reliability/performance/maintainability/operational risk;
+- `LOW` — limited/non-blocking improvement;
+- `QUESTION` — author intent/requirement must be resolved before safe conclusion.
 
-Order findings by severity, then by file/path. Do not pad a review with praise or
-style observations that do not materially affect correctness or maintainability.
-
-If none exist, say:
-
-```text
-No findings within the reviewed scope.
-```
-
-Do not generalize a scoped review into a claim that the entire system is correct.
+Order by severity then path. If no findings: `No findings within the reviewed scope.` Do not generalize a scoped review to whole-system correctness.
 
 ## 8. Security and irreversible actions
 
-Use fuller, explicit communication for authentication/authorization, secrets,
-PII, destructive migrations, permanent deletion, public API compatibility,
-production infrastructure, privileged access, financial/legal impact, and
-security policy changes.
+Use fuller explicit reporting for authentication/authorization, secrets/PII, destructive migrations/deletion, public contract compatibility, production infrastructure, privileged access, and financial/legal impact.
 
-Before an irreversible/destructive action that requires confirmation, state:
+Before a confirmation-required irreversible action state:
 
 ```text
 Warning: <risk>
-Action: <exact operation>
-Affected data or system: <scope>
-Why it is irreversible or risky: <reason>
-Required backup or recovery path: <evidence/path>
+Action: <operation>
+Affected data/system: <scope>
+Why irreversible/risky: <reason>
+Required backup/recovery: <evidence/path>
 Confirmation required: yes
 ```
 
-Do not execute a confirmation-required destructive action without explicit user
-confirmation.
+Do not execute without explicit confirmation when confirmation is required.
 
-## 9. Failure and blocker reporting
+## 9. Failure/blocker reporting
 
-When work cannot be completed, do not return a generic failure.
-
-Use:
+When incomplete:
 
 ```text
 Status: blocked | partial | failed
-Completed: <what is verified complete>
+Completed: <verified complete scope>
 Blocked at: <step/component>
 Root cause: <cause>
 Evidence: <exact evidence>
 User input required: <input or None>
 Recommended next action: <next step>
-Safe rollback or recovery: <path or Not applicable>
+Safe rollback/recovery: <path or Not applicable>
 ```
 
-When a check fails, classify whether it:
+Classify failed checks as pre-existing, introduced by the change, unrelated-but-blocking, or inconclusive. Never silently ignore a required failure.
 
-- existed before the change;
-- was introduced by the change;
-- is unrelated but blocks verification;
-- could not be classified with available evidence.
+## 10. Verification vocabulary
 
-Never silently ignore a failing required check.
+Use precisely:
 
-## 10. Verification language
+- `Passed:` executed successfully for stated scope;
+- `Failed:` executed and failed;
+- `Not run:` not executed, with reason;
+- `Not applicable:` genuinely irrelevant, with reason;
+- `Partially verified:` only part tested;
+- `Inconclusive:` evidence insufficient;
+- `Not verified:` required implementation/evidence artifact absent or uninspected.
 
-Use these terms precisely:
-
-- `Passed:` executed successfully for the stated scope.
-- `Failed:` executed and failed.
-- `Not run:` not executed, with a reason.
-- `Not applicable:` does not apply, with a reason.
-- `Partially verified:` only part of the required behavior was tested.
-- `Inconclusive:` available evidence cannot prove the result.
-- `Not verified:` a required implementation/evidence artifact does not yet exist or was not inspected.
-
-Avoid unsupported statements such as `should work`, `probably fixed`, `fully
-secure`, `production-ready`, `all good`, or `nothing else is affected`.
+Avoid unsupported language such as “should work”, “fully secure”, “production-ready”, “all good”, or “nothing else is affected”.
 
 ## 11. Required implementation report
 
-Every completed or partially completed non-trivial implementation task includes:
+Every completed/partially completed non-trivial implementation task fills:
 
 ```text
 Architecture review mode: full-read/targeted
@@ -255,66 +182,39 @@ Architecture deviations:
 Rollback considerations:
 ```
 
-Every field is filled with evidence or `None`, `Not applicable`, or `Not verified`.
+Every field has evidence or `None`, `Not applicable`, or `Not verified`.
 
 ## 12. Final response order
 
-Unless a specialized task requires a stricter format, final responses use:
-
 ```text
 Outcome:
-<completed | partial | blocked | failed>
-<one- or two-sentence result>
+completed | partial | blocked | failed
+<one/two-sentence result>
 
 Changes:
-- `<path or component>` — <change and reason>
+- <path/component> — <change>
 
 Verification:
-- Passed: `<command/check>` — <result/scope>
-- Failed: `<command/check>` — <result>
-- Not run: `<check>` — <reason>
+- Passed: <executed check/scope>
+- Failed: <executed check/result>
+- Not run: <check/reason>
 
 Risks and limitations:
-- <remaining risk/limitation or "None identified within reviewed scope">
+- <remaining risk or None identified within reviewed scope>
 
 Remaining work:
-- <required next action or "None">
+- <required next action or None>
 
 Architecture report:
-<required implementation report>
+<required report fields>
 ```
-
-Keep the response concise. Do not paste full diffs or long logs unless requested
-or required to establish a blocker.
 
 ## 13. Completion criteria
 
-Report `completed` only when:
+Report `completed` only when requested behavior/artifact is implemented, affected files/contracts/configuration inspected, current Git/PR diff reviewed, applicable checks passed, current architecture/Definition of Done checked, limitations disclosed, and no known blocker remains within scope.
 
-- the requested behavior/artifact is implemented;
-- affected files/contracts/configuration have been inspected;
-- the current Git diff has been reviewed;
-- applicable tests/checks have passed;
-- architecture requirements and Definition of Done were checked;
-- remaining limitations/risks are disclosed;
-- no known blocker remains within the agreed scope.
+If a material required check could not run, report `partial` unless genuinely not applicable.
 
-If a material required check could not be completed, report `partial` unless the
-check is explicitly and correctly `Not applicable`.
+## 14. Prohibited reporting
 
-## 14. Prohibited reporting practices
-
-An agent must not:
-
-- claim completion before verification;
-- invent commands, test results, logs, metrics, or version evidence;
-- conceal skipped/failed checks;
-- describe planned work as completed work;
-- say `all tests passed` without identifying the executed scope;
-- provide vague summaries such as `updated the code`;
-- dump raw logs when a short decisive excerpt is sufficient;
-- expose private chain-of-thought/internal reasoning;
-- blame tools, agents, or the user without the technical cause;
-- hide security/data-loss implications behind brevity;
-- use excessive repetition, praise, filler, or unrelated improvement suggestions;
-- claim repository compliance from documentation alone when executable evidence is absent.
+Never invent commands/results/logs/version evidence; conceal skipped/failed checks; describe planned work as completed; dump unnecessary logs; expose private reasoning; hide security/data-loss implications; or claim repository/source/runtime compliance from documentation alone.

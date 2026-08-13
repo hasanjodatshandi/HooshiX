@@ -1,285 +1,144 @@
-# ADR-0029: Finalize the Notification v1 Handoff and Semantic Contract
+# ADR-0029: Notification v1 Semantic Contract
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-10
-
-## Relationship to Earlier Decisions
-
-This ADR closes the remaining request-conflict, RPC, caller-dispatch, callback,
-authorization, semantic-template, recipient, escrow, and retention decisions
-left open by ADR-0010 and ADR-0012 through ADR-0017. It does not change the
-canonical lifecycle, provider-outcome taxonomy, retry schedule, immutable
-deadlines, or terminal-state rules in ADR-0013 through ADR-0018.
-
-For Identity handoff escrow, this ADR selects the existing local AES-256-GCM
-key-ring boundary instead of adding an OpenBao Transit round trip. Notification
-continues to use the independent Transit key approved by ADR-0012.
+2026-08-10; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Request identity and conflict detection
+### Stable request identity and conflict detection
 
-`request_id` is stable for one caller-owned delivery intent. Notification
-stores a full 32-byte HMAC-SHA-256 intent fingerprint with
-`fingerprint_version`, `fingerprint_key_id`, and `fingerprint`.
+`request_id` is stable for one caller-owned delivery intent. Notification stores a 32-byte HMAC-SHA-256 intent fingerprint together with `fingerprint_version` and `fingerprint_key_id`.
 
-The fingerprint key is a dedicated random 256-bit key materialized from
-OpenBao and used locally. OpenBao Transit HMAC and decrypt-and-compare are
-prohibited on this path. Keys rotate every 90 days; an old key remains
-available for at least the 35-day dedup retention plus seven days.
+The fingerprint key is a dedicated random 256-bit local key sourced from OpenBao through the approved secret-delivery boundary. Fingerprint generation performs no OpenBao network call. Keys rotate every 90 days; retired verification keys remain available for at least the 35-day dedup window plus seven days.
 
-The `fingerprint-v1` input excludes `request_id` and includes:
-
-- authenticated caller identity;
-- channel;
-- semantic template type;
-- canonical recipient;
-- canonical locale;
-- `message_not_after` at canonical UTC microsecond precision when present;
-- every typed semantic parameter.
-
-Encoding is versioned, domain-separated, and length-prefixed binary. Protobuf
-deterministic serialization is not the canonical fingerprint format.
-Fingerprints are compared in constant time.
+`fingerprint-v1` is versioned, domain-separated, and length-prefixed. It includes authenticated caller identity, channel, semantic type, canonical recipient, canonical locale, canonical-microsecond `message_not_after` when present, and every typed semantic parameter. Protobuf deterministic serialization is not used as a canonical fingerprint format. Comparison is constant-time.
 
 After lookup by `UNIQUE(caller_service, request_id)`:
 
-- an equal fingerprint returns the original acceptance or stored result;
-- a different fingerprint returns gRPC `ALREADY_EXISTS` with stable code
-  `REQUEST_ID_CONFLICT`;
-- conflict never returns `FAILED_PRECONDITION` and never decrypts escrow.
+- equal fingerprint -> return original accepted/result outcome;
+- different fingerprint -> `ALREADY_EXISTS / REQUEST_ID_CONFLICT`;
+- duplicate resolution occurs before current-time/expiry validation and does not decrypt sensitive escrow.
 
-The duplicate lookup and fingerprint comparison occur before current-time,
-clock-health, or expiry validation.
+### Submission and caller dispatcher
 
-### `SubmitNotification` RPC
-
-Each invocation has:
-
-| Setting | Value |
-| --- | ---: |
-| Overall deadline | 900 milliseconds |
-| Attempts | 1 |
-| Wait-for-ready | disabled |
-| gRPC automatic retry | disabled |
-
-The caller outbox may later submit the same `request_id` after
-`UNAVAILABLE`, `DEADLINE_EXCEEDED`, `RESOURCE_EXHAUSTED`, or `ABORTED`.
-`INVALID_ARGUMENT`, `REQUEST_ID_CONFLICT`, `PERMISSION_DENIED`, and
-`UNAUTHENTICATED` are non-retryable. `INTERNAL` is not automatically retried.
-
-Cancellation before the durable acceptance commit aborts work when possible.
-Cancellation or deadline expiry after commit cannot undo `ACCEPTED`; the caller
-replays the same `request_id` to recover the committed outcome.
-
-Identity's dispatcher claims with `FOR UPDATE SKIP LOCKED` and uses:
-
-| Setting | Value |
-| --- | ---: |
-| Claim lease | 30 seconds |
-| Batch size | 32 |
-| Poll while backlog exists | 250 milliseconds |
-| Idle poll | 1 second |
-| Retry delays | 1s, 2s, 5s, 10s, then 30s maximum |
-| Jitter | plus or minus 20 percent |
-
-A time-bound handoff starts no new RPC when PostgreSQL-authoritative time is at
-or after `message_not_after - 5s`, and stops immediately when the next
-scheduled attempt would fall after that cutoff. A non-time-bound handoff retries
-for at most 30 minutes, then becomes `HANDOFF_FAILED` and alerts; automatic
-retry is never unbounded.
-
-### Result callback and routing
-
-`ReportNotificationResult` has a 750-millisecond deadline, one attempt,
-wait-for-ready disabled, and no automatic gRPC retry. The durable result-outbox
-dispatcher uses plus or minus 20 percent jitter and this schedule:
+`SubmitNotification` uses:
 
 ```text
-1s -> 5s -> 30s -> 2m -> 10m -> 30m maximum
-maximum automatic retry age = 7 days
+overall deadline: 900 ms
+attempts:         1
+wait-for-ready:   off
+gRPC retry:       none
 ```
 
-`UNAVAILABLE`, `DEADLINE_EXCEEDED`, `RESOURCE_EXHAUSTED`, `ABORTED`, and
-`INTERNAL` are retryable by the durable dispatcher. `UNAUTHENTICATED`,
-`PERMISSION_DENIED`, and malformed `INVALID_ARGUMENT` are non-retryable and
-alertable. A duplicate callback returns `OK` after proving that its prior local
-effect is already committed; it does not return `ALREADY_EXISTS`.
+A durable caller dispatcher may replay the same `request_id` after infrastructure/transport ambiguity; it never invents a new logical intent. Cancellation before durable acceptance aborts work where possible; cancellation/deadline after commit cannot undo `ACCEPTED`, so the caller resolves the outcome by replaying the same ID.
 
-An allow-listed callback registry is structured GitOps configuration. A caller
-cannot supply a callback URL, URI, host, IP, scheme, redirect, port, or method.
-The v1 registry entry is:
+Identity dispatcher baseline:
 
 ```text
-IDENTITY_SERVICE -> identity-service.platform-apps:9091
-method           -> ReportNotificationResult
+claim: FOR UPDATE SKIP LOCKED
+lease: 30s
+batch: 32
+busy poll: 250ms
+idle poll: 1s
+retry: 1s, 2s, 5s, 10s, then <=30s ±20%
+time-bound cutoff: no new RPC at/after message_not_after - 5s
+non-time-bound automatic retry: <=30m, then HANDOFF_FAILED + alert
 ```
 
-Notification constructs the internal Kubernetes DNS name. A caller marked
-`PERMANENTLY_RETIRED` stops retry immediately and moves the result to
-`CALLBACK_SUPPRESSED_CALLER_RETIRED`. Lack of ACK after seven days becomes
-`CALLBACK_EXHAUSTED`, triggers an alert, and retains only approved metadata.
+### Result callback
+
+`ReportNotificationResult` uses:
+
+```text
+deadline:       750 ms
+attempts:       1
+wait-for-ready: off
+gRPC retry:     none
+```
+
+The durable result-outbox dispatcher retries outside the RPC with bounded jittered backoff up to a seven-day automatic retry age. Duplicate callback delivery returns success only after proving the original caller-side effect is already committed.
+
+Callback destinations are reviewed GitOps configuration. The caller cannot provide a callback URL/URI/host/IP/scheme/redirect/port/method. Identity v1 callback is the internal `identity-service` endpoint/method defined by deployment configuration.
 
 ### Workload identity and authorization
 
-Notification and Identity run in namespace `platform-apps` with distinct
-ServiceAccounts named `notification-service` and `identity-service`.
+Identity and Notification use distinct `platform-apps` ServiceAccounts. Submission is authorized only from the approved Identity workload identity; result callback is authorized only from Notification. Both paths use Istio Ambient strict mTLS and least-privilege authorization. No JWT/API key/application-managed TLS is added to these L4-only internal paths.
 
-- `notification-service:9090` accepts `SubmitNotification` only from the
-  `identity-service` principal;
-- `identity-service:9091` accepts `ReportNotificationResult` only from the
-  `notification-service` principal;
-- both paths use Istio Ambient strict mTLS and L4 authorization;
-- v1 adds no JWT, bearer token, API key, application TLS, or waypoint.
+Before a second caller is enabled on a shared L4 submission boundary, caller-to-semantic authorization must be redesigned/reviewed.
 
-Identity is the only v1 caller and may submit exactly these semantic/channel
-combinations:
+### Typed semantic contract
 
-| Semantic type | Channels |
-| --- | --- |
-| `REGISTRATION_VERIFICATION_CODE` | Email, SMS |
-| `PASSWORD_RECOVERY_CODE` | Email, SMS |
-| `MFA_VERIFICATION_CODE` | Email, SMS |
-| `PASSWORD_CHANGED_NOTICE` | Email |
+Initial channels:
 
-Before a second caller is enabled, secure caller-to-semantic permission
-binding must be reviewed. Multiple callers must not share this L4-only port
-without an approved L7 or application-identity design.
+```text
+CHANNEL_UNSPECIFIED = 0
+EMAIL               = 1
+SMS                 = 2
+```
 
-### Typed semantic contract, locale, and templates
+Semantic content is an explicit Protobuf `oneof`; arbitrary parameter maps, caller-supplied subject/body/HTML, arbitrary brand names, or arbitrary URLs are prohibited.
 
-The public v1 channel enum is `CHANNEL_UNSPECIFIED = 0`, `EMAIL = 1`, and
-`SMS = 2`. Semantic content is a Protobuf `oneof` with initial messages
-`RegistrationVerification`, `PasswordRecovery`, `MfaVerification`, and
-`PasswordChanged`. An arbitrary parameter map, subject, HTML/text body, brand
-name, or arbitrary URL is prohibited.
+Initial Identity semantic types:
 
-The three verification messages expose only their explicit `code` parameter.
-It is ASCII, at most 16 bytes, and validated against the exact flow-specific
-format. `PasswordChanged` exposes only `occurred_at` and any other fields later
-added explicitly to its versioned message.
+- `REGISTRATION_VERIFICATION_CODE` -> Email/SMS;
+- `PASSWORD_RECOVERY_CODE` -> Email/SMS;
+- `MFA_VERIFICATION_CODE` -> Email/SMS;
+- `PASSWORD_CHANGED_NOTICE` -> Email.
 
-Initial canonical locales are `en` and `fa`. `en-US` canonicalizes to `en` and
-`fa-IR` to `fa`. An unknown primary language returns
-`INVALID_ARGUMENT / UNSUPPORTED_LOCALE`; it never silently becomes English.
-Template lookup is exact locale, then language locale, then `en`, while CI must
-catch any required missing translation before release.
+Verification messages expose only their explicit code parameter, with bounded flow-specific format/size. `PasswordChanged` exposes only explicitly versioned typed fields.
 
-Time-bound classification is immutable template metadata, not a caller flag:
+### Locale and template resolution
 
-- `RegistrationVerification`, `PasswordRecovery`, and `MfaVerification` are
-  time-bound;
-- `PasswordChanged` is non-time-bound.
+Canonical locales are `en` and `fa`; compatible region variants normalize to their supported primary locale. Unknown primary languages return `INVALID_ARGUMENT / UNSUPPORTED_LOCALE` rather than silently changing language.
 
-Templates are immutable Git-bundled application resources. There is no v1
-PostgreSQL template store, admin workflow, runtime editing, or hot activation.
-Pebble renders in strict mode. HTML auto-escaping is mandatory; text and SMS
-use dedicated plaintext templates. Missing or extra variables fail rendering.
-The version is `<semantic>/<locale>/vN@sha256-<digest>`. Promotion is Git PR,
-tests, image build, and GitOps deployment; rollback deploys the previous image
-and template version.
+Notification PostgreSQL is authoritative for templates. Definitions, immutable versions, activation pointer, and audit are database-owned. Version states are `DRAFT`, `PUBLISHED`, `RETIRED`; every edit creates a new version. Activation validates syntax, allow-listed placeholders, channel shape, and content limits before atomically changing the active pointer.
+
+The active version is resolved during durable acceptance. Version ID, digest, and exact rendered content are fixed for the Notification lifetime; retry never re-resolves or re-renders a newer version.
+
+The renderer is intentionally bounded: no general expression language, loops, conditions, includes, functions, arbitrary variables, or unsafe raw-HTML parameters.
+
+Time-bound classification is immutable template/semantic metadata, not a caller-controlled flag.
 
 ### Recipient canonicalization
 
-Email v1 accepts one mailbox only, with no display name, comment, or quoted
-input. SMTPUTF8 is unsupported. The local part is ASCII, at most 64 octets,
-and case-preserving. The IDN domain is canonicalized using UTS-46/IDNA to a
-lowercase A-label; invalid labels are rejected. The complete canonical mailbox
-is at most 254 bytes.
+Email accepts one mailbox, no display-name/comment input, bounded canonical form, and provider-neutral normalization; provider-specific Gmail dot/plus rewriting is prohibited. SMS input is E.164 and is validated without locale-based national-number inference.
 
-SMS input must already be E.164 with at most 15 digits after `+`. National
-number inference from locale is prohibited. libphonenumber performs possible
-and valid-number validation.
+The canonical provider destination is computed once, encrypted in escrow, and reused unchanged for retry/reconciliation.
 
-The recipient is canonicalized once. Its exact canonical provider destination
-is encrypted in escrow and reused unchanged on every retry.
+### Sensitive material
 
-### Identity handoff escrow
+Caller handoff escrow and Notification delivery escrow use independent local AES-256-GCM key rings sourced from OpenBao through External Secrets. Each encryption uses a random 96-bit nonce and strong AAD binding to stable intent/context identifiers. Keys are purpose-separated, versioned, rotated, and retained only while dependent ciphertext requires decryption.
 
-Identity retains its existing independent AES-256-GCM delivery-escrow key ring
-for this hop. Each encryption uses a random 96-bit nonce. Ciphertext contains
-the exact canonical recipient plus the code or other typed sensitive
-parameters. AAD binds `request_id`, channel, semantic template,
-`message_not_after`, and key ID.
+No OpenBao Transit/hot-path RPC is used for Notification acceptance, dispatch, retry, or reconciliation.
 
-Keys rotate every 90 days with active and previous keys. An old key remains
-until every dependent ciphertext is deleted plus seven days. Handoff escrow is
-deleted immediately after durable `ACCEPTED`, has an absolute 24-hour maximum,
-and for time-bound intents is deleted earlier at expiry or cutoff.
+Sensitive ciphertext has a 24-hour hard maximum and is erased earlier at applicable terminal/cutoff states. Raw recipient, code, rendered content, and arbitrary sensitive parameters have no long-term retention.
 
-### Notification Transit policy
+### Retention
 
-OpenBao Transit uses key `notification-delivery-escrow` with a 200-millisecond
-connect timeout, 400-millisecond request timeout, and no immediate retry.
-Before acceptance, any Transit failure returns `UNAVAILABLE` and commits no
-Notification.
+```text
+request_id + dedup/fingerprint:       35d
+non-PII notification metadata:       90d
+provider attempts/correlation IDs:   30d
+provider receipt evidence:           30d
+result outbox after ACK:              7d
+unacked/exhausted callback metadata: 90d
+security/audit evidence:             365d
+sensitive escrow ciphertext:         <=24h hard maximum
+```
 
-After acceptance, a transient decrypt failure does not consume a provider
-attempt and cannot transition the attempt to `DISPATCHING`. Internal processing
-retries after 1, 5, 15, and then at most 30 seconds without extending the
-persisted delivery deadline. Definitively corrupt or undecryptable ciphertext
-causes a critical alert and quarantine; provider I/O is prohibited. With proof
-of no provider acceptance, the notification becomes `EXPIRED` when its
-deadline arrives.
+Retention cleanup is bounded and observable.
 
-Notification authenticates through Kubernetes Auth as `notification-service`.
-Its token TTL is approximately 15 minutes and is renewed before expiry. Transit
-keys rotate every 90 days, ciphertext retains its key version, and old decrypt
-versions remain available until no dependent ciphertext remains plus seven
-days. Sensitive ciphertext has a 24-hour hard maximum retention.
+## Security and verification requirements
 
-### Data retention
+Required tests cover fingerprint versioning/key rotation/constant-time comparison, equal replay/conflicting reuse, deadline/cancellation-after-commit, dispatcher cutoffs, callback idempotency and destination allow-listing, positive/negative Istio policy, semantic/channel permissions, locale behavior, bounded rendering, recipient canonicalization, local key-ring rotation/corruption/erasure, retention bounds, and PII-safe telemetry.
 
-| Data | Retention |
-| --- | ---: |
-| `request_id`, dedup record, and fingerprint | 35 days |
-| Non-PII notification metadata | 90 days |
-| Provider attempts and provider message IDs | 30 days |
-| Authenticated receipt evidence | 30 days |
-| Result outbox after ACK | 7 days |
-| Unacked or exhausted callback metadata | 90 days |
-| Security and audit records | 365 days |
-| Sensitive escrow ciphertext | 24 hours hard maximum |
+Logs/traces/metrics/errors/outboxes MUST NOT expose raw recipient, code, rendered content, key material, provider payloads, or ciphertext.
 
-Raw recipient, code, and rendered content have no long-term retention.
+## Rollback considerations
 
-## Security and Verification Requirements
-
-Implementation requires tests for fingerprint encoding/versioning, key
-rotation, constant-time comparison use, identical replay, conflict rejection,
-deadline and cancellation after commit, dispatcher cutoffs, callback
-idempotency, registry SSRF rejection, positive and negative Istio policy,
-semantic permissions, locale behavior, strict rendering, content limits,
-recipient canonicalization, Transit outage/corruption, escrow erasure, and every
-retention bound.
-
-Logs, traces, metrics, errors, and outboxes must not contain recipient data,
-codes, rendered content, ciphertext, arbitrary parameters, provider payloads,
-`request_id`, or `notification_id` except where a separately approved bounded
-audit representation explicitly requires it.
-
-The canonical fingerprint rule follows Protocol Buffers' explicit warning that
-[serialization is not canonical](https://protobuf.dev/programming-guides/serialization-not-canonical/).
-
-## Consequences
-
-- Durable retries recover unknown RPC outcomes without duplicate intent.
-- Conflict detection does not expose plaintext or add Transit latency.
-- The callback target is not caller-controlled and therefore does not create
-  an SSRF destination surface.
-- Identity remains the only permitted v1 caller under an L4-only policy.
-- Exact content is stable across provider retries, while sensitive escrow has a
-  bounded lifecycle.
-
-## Rollback or Migration Considerations
-
-Contracts and schema are introduced additively. Mixed versions must preserve
-fingerprint fields, stable identifiers, original accepted outcomes, ciphertext
-versions, and callback idempotency. Rollback cannot recreate caller escrow
-after `ACCEPTED`, change a resolved template, extend a deadline, or relax the
-allow-listed callback route.
+Schema/contracts evolve additively. Mixed versions must preserve stable identifiers, fingerprint semantics/version, original accepted outcome, ciphertext key version, exact accepted template/content, deadlines, and callback idempotency. Rollback cannot recreate erased caller escrow, extend a deadline, or alter an already accepted message.

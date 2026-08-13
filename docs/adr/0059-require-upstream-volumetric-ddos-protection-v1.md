@@ -1,70 +1,40 @@
-# ADR-0059: Require Upstream Volumetric DDoS Protection v1
+# ADR-0059: Upstream Volumetric DDoS Protection v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-11
-
-## Relationship to Earlier Decisions
-
-ADR-0024's Caddy/Coraza tier remains the application-layer WAF. This ADR adds the
-network-layer control that a WAF inside the origin cluster cannot provide when
-an attack saturates the site's external bandwidth or state tables.
+2026-08-11; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Upstream mitigation is mandatory
+Production hosting/networking is eligible only when public traffic has upstream L3/L4 volumetric DDoS detection and mitigation/scrubbing **before** attack traffic can saturate the origin link or state tables.
 
-A production hosting/network provider is eligible only if the public service
-has upstream L3/L4 volumetric DDoS detection and mitigation/scrubbing before
-traffic can saturate the origin link.
+The exact provider is deployment-specific, but production readiness requires documented provider limits, activation behavior, escalation contacts, and an exercised incident path.
 
-The exact provider is a deployment/vendor choice, but the capability is not
-optional. Production readiness requires documented provider limits,
-escalation contacts, mitigation activation behavior, and a runbook.
+### Origin/edge controls
 
-### Origin and edge controls
+The origin additionally uses:
 
-The edge additionally enforces:
-
-- redundant L4 load-balancer capacity;
+- redundant L4 load-balancing capacity;
 - bounded connection/handshake limits;
-- OS/network SYN-flood protections and reviewed conntrack sizing;
-- coarse per-source/emergency rate limits before expensive WAF/application work;
-- origin reachability restricted to the approved upstream/LB paths where the
-  chosen topology permits it;
-- no direct route that bypasses Traefik -> Caddy/Coraza -> BFF.
+- reviewed SYN-flood and conntrack controls;
+- emergency/coarse pre-WAF limits for volumetric pressure;
+- origin reachability restricted to approved upstream/LB paths where topology permits;
+- no route that bypasses Traefik -> Caddy/Coraza WAF -> Web BFF.
 
-NetworkPolicy and Istio remain east-west/cluster controls and are not described
-as volumetric internet DDoS protection.
-
-### WAF responsibility remains L7
-
-Coraza/CRS handles bounded HTTP inspection and application-layer attack
-patterns. It does not replace upstream bandwidth/scrubbing capacity.
+NetworkPolicy and Istio protect cluster/east-west paths but are not described as Internet volumetric mitigation. Coraza/CRS remains bounded L7 application-layer inspection and does not replace upstream bandwidth/scrubbing capacity.
 
 ### Operations
 
-DDoS telemetry separates packets/bytes/connections, LB saturation, Traefik/WAF
-load, and application request rate. Emergency actions are documented and
-reversible; operators do not disable authentication/WAF/authorization merely to
-recover capacity.
+Telemetry separates packets/bytes/connections, load-balancer saturation, Traefik/WAF load, and application request rate. Emergency controls are documented, reversible, and MUST NOT disable authentication, WAF, authorization, tenant isolation, or semantic quotas to recover capacity.
 
-## Verification Requirements
+## Verification requirements
 
-- provider capability/SLA and emergency-contact review;
-- origin-bypass negative tests where source restriction is available;
-- controlled connection/HTTP flood tests in an authorized environment;
-- one edge replica/node loss under elevated load;
-- alerting on link/LB/conntrack/WAF saturation;
-- incident exercise covering provider escalation, temporary coarse limits, and
-  rollback.
+Verify provider capability/SLA and escalation contacts, origin-bypass negatives where restriction is available, authorized connection/HTTP flood tests, one edge replica/node loss under elevated load, link/LB/conntrack/WAF saturation alerting, and an incident exercise covering provider escalation, temporary coarse limits, containment, and rollback.
 
-## Consequences
+## Rollback considerations
 
-The architecture acknowledges that in-cluster WAF capacity cannot absorb an
-attack that exhausts upstream bandwidth. Volumetric mitigation becomes a
-network-provider requirement rather than an application feature.
+Rollback MUST NOT expose an origin bypass, remove required upstream mitigation, or substitute in-cluster WAF/mesh controls for volumetric protection.

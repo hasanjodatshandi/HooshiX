@@ -1,6 +1,6 @@
 # Local Development Baseline
 
-- **Baseline date:** 2026-08-12
+- **Baseline date:** 2026-08-13
 - **Status:** Active local-development baseline
 - **Scope:** Developer workstation, WSL2/Linux toolchain, local container tooling,
   and the production-fidelity kind foundation used for platform integration tests.
@@ -62,7 +62,7 @@ release does not publish an image for the exact production patch.
 | Local cluster name | `platform-local` | Required |
 | kube context | `kind-platform-local` | Required |
 | CNI / NetworkPolicy | Calico OSS 3.32.1 | Pinned; kind default CNI disabled |
-| Helm | 4.2.0 | Pinned to production baseline |
+| Helm | 4.2.3 | Pinned to production baseline |
 | Istio Ambient | 1.30.3 | Pinned to production baseline |
 | Kubernetes Gateway API | 1.5.1 Standard channel | Pinned |
 | Traefik | Proxy 3.7.1; Helm chart 40.2.0 | Pinned |

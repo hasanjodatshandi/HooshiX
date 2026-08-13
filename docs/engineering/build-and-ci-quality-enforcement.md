@@ -1,284 +1,180 @@
-# Build and CI Quality Enforcement
+# Build and CI Quality Enforcement — Current Standard
 
-This document defines the executable quality-gate baseline for independently deployable Java services. It turns architecture/coding rules into required repository artifacts and CI evidence.
-
-Architecture/policy status:
+This document defines executable quality gates for independently deployable Java services. `repository-change-workflow.md` governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
 ```text
-Architecture: DECIDED
+Architecture/policy: DECIDED
 Implementation: REQUIRED
-Evidence: NOT VERIFIED until the corresponding files/tasks exist and execute successfully in the repository
+Evidence: NOT VERIFIED until real files/tasks/workflows execute successfully
 ```
 
-Because application services are not yet implemented in the current repository, this document MUST NOT be cited as proof that Java code already complies. Compliance becomes verified only from actual source, build, static-analysis, test, and CI evidence.
+## 1. Required service/repository artifacts
 
-## 1. Required repository artifacts
-
-Every independently deployable Java service contains, at minimum:
+Each Java service owns an independent build/release boundary with, at minimum when implemented:
 
 ```text
 services/<service>/
 ├── settings.gradle.kts
 ├── build.gradle.kts
-├── gradlew
-├── gradlew.bat
+├── gradlew / gradlew.bat
 ├── gradle/wrapper/
 ├── gradle/verification-metadata.xml
 ├── Dockerfile
 ├── contracts/
-├── src/
-│   ├── main/
-│   ├── test/
-│   ├── integrationTest/
-│   ├── contractTest/
-│   └── architectureTest/
+├── src/{main,test,integrationTest,contractTest,architectureTest}/
 └── deploy/
 ```
 
-Repository governance also owns reusable quality/CI material, for example:
+Repository governance owns reusable workflow/static-policy material such as GitHub Actions, Semgrep rules, SpotBugs configuration, documentation checks, and deployment policy checks. Equivalent paths are allowed only under one explicit repository convention.
 
-```text
-.github/workflows/
-├── java-service-ci.yml          # reusable or path-parameterized PR/service workflow
-└── release.yml                  # system promotion/release workflow when implemented
-quality/
-├── semgrep/
-│   ├── architecture.yml
-│   ├── java-security.yml
-│   └── logging-pii.yml
-└── spotbugs/
-    └── exclude.xml              # narrow reviewed exclusions only
-```
+## 2. Gradle/build requirements
 
-Equivalent paths are allowed only when repository convention is explicit and all services use it consistently.
+Every service uses its own Gradle Wrapper/Kotlin DSL and exposes equivalent behavior for:
 
-## 2. `build.gradle.kts` requirements
-
-Each service build is independent under ADR-0001 and uses the Gradle Wrapper/Kotlin DSL.
-
-The service build MUST configure or expose equivalent behavior for:
-
-- Java 25 toolchain/release;
-- UTF-8 source/test compilation;
+- Java 25 toolchain/release and UTF-8 compilation;
 - JUnit Platform;
-- Spring Boot dependency alignment according to Technology Baseline;
+- Spring Boot dependency alignment from the Technology Baseline;
 - dependency locking/verification metadata;
-- `test`, `integrationTest`, `contractTest`, and `architectureTest` source sets/tasks where applicable;
-- Spotless formatting/check tasks;
-- SpotBugs analysis for production Java code;
-- schema/contract compatibility tasks used by that service;
-- deterministic/reproducible archive output where Gradle produces distributable archives;
-- a repository-defined aggregate quality task (for example `qualityCheck`) that makes mandatory code-quality gates discoverable without forcing expensive platform/DR tests into the local inner loop.
+- applicable `test`, `integrationTest`, `contractTest`, `architectureTest` tasks;
+- Spotless formatting/check;
+- SpotBugs production analysis;
+- schema/contract compatibility;
+- deterministic/reproducible archive/container inputs sufficient to tie output to exact reviewed source;
+- a repository-defined aggregate quality task if useful.
 
-Dynamic dependency versions and production SNAPSHOTs are prohibited. Generated sources are kept in explicit generated directories and may receive narrowly scoped formatter/static-analysis exclusions only when regeneration—not manual editing—is authoritative.
+Dynamic versions/unbounded ranges and unapproved production SNAPSHOTs are prohibited. Generated source lives in explicit generated paths with only narrow regeneration-authoritative exclusions. Mandatory gates never use `ignoreFailures=true` or blanket suppression.
 
-### Reference Gradle shape
-
-The following is illustrative structure, not a copy-paste version pin. Exact plugin aliases/versions come from the service build/tool locks:
-
-```kotlin
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    options.encoding = "UTF-8"
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-}
-
-// The real build also wires repository-approved Spotless, SpotBugs,
-// architectureTest, dependency verification, and applicable contract/schema tasks.
-```
-
-The build MUST remain executable from a clean checkout through the service Wrapper. Do not copy unpinned plugin versions from documentation.
-
-### Expected task semantics
-
-The exact task names are repository-defined, but equivalent mandatory behavior is required:
+Expected semantics, names repository-defined:
 
 ```text
-spotlessCheck          formatting is clean; never mutates CI workspace
-spotlessApply          developer-only formatting fix command
-spotbugsMain           production-code bug-pattern analysis
-architectureTest       ArchUnit architectural rules
+spotlessCheck          verify formatting; never mutate CI workspace
+spotlessApply          developer-only formatting action
+spotbugsMain           production bytecode bug analysis
+architectureTest       ArchUnit rules
 integrationTest        real adapter/infrastructure behavior
-contractTest           gRPC/REST/event compatibility behavior
+contractTest           gRPC/REST/event compatibility
 schemaCompatibilityCheck
-qualityCheck           fast/medium mandatory code-quality aggregation
+qualityCheck           mandatory fast/medium aggregate where adopted
 ```
 
-`ignoreFailures=true` or equivalent blanket suppression is prohibited for mandatory production gates.
+A clean checkout MUST be buildable through the service Wrapper; architecture prose does not invent plugin versions.
 
-## 3. Spotless policy
+## 3. Spotless
 
-Spotless is the standard formatting gate for Java/Gradle-related source where supported.
+- one pinned approved formatter/configuration;
+- CI runs `spotlessCheck`, not `spotlessApply`;
+- formatting covers repository-owned Java/Gradle scripts consistently where supported;
+- generated/vendor exclusion is narrow by path;
+- formatting failures are fixed in source, never hidden by broad exclusions.
 
-Rules:
+## 4. SpotBugs
 
-- one approved formatter/configuration is pinned in build/plugin metadata; floating formatter versions are prohibited;
-- CI runs `spotlessCheck`, never `spotlessApply`;
-- developers may run `spotlessApply` locally;
-- formatting applies consistently to Java and repository-owned Gradle Kotlin scripts and may cover other text formats where stable;
-- generated/vendor code is excluded narrowly by path;
-- formatting failures are fixed in source, not suppressed through broad exclusions;
-- formatting is not used to rewrite unrelated files during a narrow task.
+- `spotbugsMain` or equivalent is blocking for Java production code;
+- strict reviewed threshold;
+- generated-code exclusion only when reproducible/non-maintained;
+- suppression is specific bug pattern + specific scope + rationale;
+- security/correctness patterns are not globally disabled;
+- results retained as CI artifact/SARIF or equivalent.
 
-The exact Spotless plugin/formatter patch is pinned in repository build metadata/lock governance rather than guessed in architecture prose.
+SpotBugs complements compiler warnings, tests, SAST/Semgrep, dependency scanning, and ArchUnit.
 
-## 4. SpotBugs policy
+## 5. ArchUnit
 
-SpotBugs is the baseline Java bytecode bug-pattern analyzer for production code.
+Every Java service enforces applicable architecture invariants:
 
-Rules:
+- Domain has no Spring/JPA/Hibernate/jOOQ/Kafka/Redis/gRPC/Protobuf/Infrastructure/Interfaces dependencies;
+- Application has no Infrastructure/Interfaces/concrete-adapter dependency;
+- JPA/Spring Data/generated persistence types remain Infrastructure-only;
+- Domain/Application cannot use `ApplicationContext`, `BeanFactory`, service locator, runtime bean lookup, or concrete adapter construction;
+- field injection prohibited;
+- package segment/feature-first/nature-separated rules and forbidden dumping-ground names enforced where reliable;
+- package/dependency cycles absent;
+- inbound interfaces remain boundary adapters and dependency direction stays inward;
+- service-specific forbidden dependencies added when current architecture requires them.
 
-- `spotbugsMain` (or equivalent) is a required PR gate for Java services;
-- analysis uses a reviewed strict configuration and fails the gate on findings above the repository-approved threshold;
-- generated code is excluded only when it is reproducible and not manually maintained;
-- suppression is narrow: specific bug pattern + specific scope + written justification;
-- security/correctness findings are not globally excluded to make CI green;
-- suppressions that carry ongoing risk require owner/review and are removed when no longer needed;
-- reports are retained as CI artifacts/SARIF or equivalent so developers can locate findings.
+ArchUnit does not pretend to prove semantic design qualities such as “controller has no business logic” or “class is small” when no reliable rule exists. Java 25 does not receive a blanket `synchronized` ban; JFR/load evidence covers remaining contention/native/FFM risks.
 
-SpotBugs complements, and does not replace, compiler warnings, tests, SAST/Semgrep, dependency scanning, or architecture tests.
+## 6. Semgrep/static source policy
 
-## 5. ArchUnit policy
+Repository Semgrep rules target high-signal patterns such as:
 
-Every Java service has `architectureTest` source containing ArchUnit tests for applicable architectural invariants.
+- field injection/runtime dependency lookup;
+- raw credential/token/cookie/secret/body/SQL-bind/complete-metadata logging;
+- unsafe request/domain/payload string-concatenated logging;
+- production debug body/bind/credential exposure;
+- `Thread.sleep` coordination/test synchronization outside narrow justified tooling cases;
+- unapproved WebFlux/Reactor backend introduction;
+- precise secret/security misconfiguration patterns.
 
-Mandatory baseline rules include:
+Rules have positive/negative fixtures and are not blocking until false-positive behavior is reviewed. Suppression is narrow, reasoned, and security-reviewed for sensitive/logging rules. CI output never echoes raw secret/PII fixtures.
 
-- Domain has no dependency on Spring/JPA/Hibernate/jOOQ/Kafka/Redis/gRPC/Protobuf/Infrastructure/Interfaces;
-- Application has no dependency on Infrastructure/Interfaces/concrete adapters;
-- persistence entities and Spring Data repositories remain under Infrastructure persistence packages;
-- Domain/Application do not access `ApplicationContext`, `BeanFactory`, service-locator patterns, or concrete adapters;
-- field injection in application-owned code is prohibited;
-- package dependency cycles are absent;
-- prohibited dumping-ground package names are absent;
-- Java package naming rules are respected;
-- interfaces/controllers/listeners remain in inbound interface packages and dependency direction stays inward;
-- service-specific forbidden dependencies are added when a bounded-context ADR requires them.
+## 7. GitHub Actions baseline
 
-ArchUnit does not reliably prove that a controller has "no business logic" or that every class is small. Those remain code-review/design rules and may be supplemented with high-signal Semgrep checks; do not create brittle fake enforcement merely to claim coverage.
+### Workflow security
 
-A blanket ArchUnit prohibition on `synchronized` is prohibited on Java 25; Virtual Thread safety is tested with JFR/load evidence as defined elsewhere.
+- third-party actions pinned to immutable commit SHAs; floating `@main`/unbounded tags prohibited for required production workflows;
+- `contents: read`/least privilege by default; writes only for the job that requires them;
+- prefer OIDC/short-lived cloud/platform identity to long-lived credentials;
+- secrets never printed and privileged secrets are unavailable to untrusted/fork PR execution;
+- PR checks execute against the reviewed head revision;
+- cache keys/trust boundaries prevent untrusted artifacts from poisoning privileged release state;
+- workflow/quality-policy files are themselves reviewed/protected.
 
-## 6. Semgrep policy
+### PR quality graph
 
-Repository-owned Semgrep rules enforce high-signal source patterns that are difficult or inappropriate for ArchUnit/SpotBugs.
-
-The baseline custom rule set covers, where technically reliable:
-
-- field injection / disallowed dependency lookup patterns;
-- `ApplicationContext`/`BeanFactory` lookup from Domain/Application;
-- raw `Authorization`, cookie, token, password, OTP, secret, connection-string, request/response-body, SQL-bind, or complete metadata logging patterns;
-- unsafe string-concatenated logging of request/domain/payload objects;
-- direct body/bind/metadata debug logging in production configuration;
-- `Thread.sleep` in application/test synchronization paths, with narrow infrastructure/tooling exceptions when justified;
-- known prohibited production APIs/configuration patterns such as backend WebFlux/Reactor introduction without approved ADR;
-- accidental secret literals and unsafe security configuration patterns that are precise enough to avoid noisy generic scanning.
-
-Rules have positive and negative fixtures. A new custom rule is not enabled as a blocking gate until its false-positive behavior is reviewed against representative source.
-
-Suppressions:
-
-- use the narrowest inline/path/rule suppression supported;
-- include rationale where non-obvious;
-- never suppress a whole package/repository merely because one match is inconvenient;
-- sensitive/logging-policy suppressions receive security review.
-
-Semgrep output may be uploaded as SARIF, but CI logs MUST NOT echo raw secrets/PII discovered by test fixtures.
-
-## 7. GitHub Actions CI baseline
-
-GitHub Actions is the repository CI orchestrator for this project unless a later ADR changes the CI platform.
-
-### Security and reproducibility
-
-- third-party actions are pinned to immutable commit SHAs; floating `@main`/unbounded tags are prohibited for production-required workflows;
-- workflow/job permissions use least privilege (`contents: read` by default); write permissions are granted only to the job that needs them;
-- long-lived cloud/platform credentials are avoided; OIDC/short-lived identity is preferred where supported;
-- secrets are never printed and fork/untrusted PRs do not receive privileged secrets;
-- PR checks build/test the source revision under review;
-- production promotion uses the exact previously built/signed image digest; production rebuild is prohibited;
-- caches use keys that do not allow untrusted artifacts to overwrite privileged release state;
-- required workflow/config files themselves are code-reviewed and protected by branch rules/CODEOWNERS where implemented.
-
-### Pull-request/service quality workflow
-
-Independent safe jobs SHOULD run in parallel. A typical dependency graph is:
+Independent safe jobs SHOULD run in parallel:
 
 ```text
-checkout / tool bootstrap
-├── format: Spotless
-├── compile + unit
-├── ArchUnit
-├── SpotBugs
-├── Semgrep / SAST / secret scan
-├── dependency verification + vulnerability/license checks
-├── contract/schema compatibility
-└── focused integration tests
+format + compile/unit + ArchUnit + SpotBugs + Semgrep/SAST
++ dependency verification/vulnerability/license
++ contract/schema compatibility
++ focused integration
         ↓
-required quality aggregation
+required quality aggregate
         ↓
-Helm/Kubernetes validation (when affected)
+affected Helm/Kubernetes validation
         ↓
 container build
         ↓
-SBOM + vulnerability scan + signature/provenance
+final-image SBOM/vulnerability + signature/provenance
 ```
 
-No downstream mandatory stage proceeds when a required predecessor fails.
+Required predecessor failure stops dependent stages.
 
-### Release workflow
+### Release graph
 
 ```text
-signed immutable image digest
--> deploy staging
+signed immutable digest
+-> staging
 -> backend smoke
 -> critical BDD/API acceptance
 -> critical Playwright
--> production-readiness/evidence gates
--> promote same digest to production
--> production smoke
+-> production-readiness evidence
+-> promote same digest
+-> production-safe smoke
 ```
 
-Smoke failure stops the rollout and uses the deployment rollback policy only when rollback is safe for the corresponding database/schema state.
+Rebuild between staging and production is prohibited. Smoke failure stops rollout and uses rollback only when schema/data compatibility is safe.
 
 ### Required-check governance
 
-Protected branches require the repository-defined mandatory checks. Removing/weakening a required check, broadening a suppression, or changing a quality threshold is a governance/security change and must be reviewed like code—not used as a shortcut to merge.
+Protected `main` requires the repository-defined mandatory checks. Removing/weakening a check, lowering a threshold, or broadening suppression is a governance/security change, not a shortcut to merge.
 
-## 8. Source-code compliance evidence
+## 8. Supply-chain/dependency integrity
 
-"Coding standards documented" is not equivalent to "code compliant".
+Service dependencies/plugins/tools require purpose/owner/compatibility/security/license review as applicable plus dependency verification. Release artifacts carry exact source Git SHA, immutable digest, signed CycloneDX SBOM, provenance, and organization signature. Final-image vulnerability policy follows ADR-0065/0068 and admission policy follows current security architecture.
 
-For each service, compliance evidence includes at least:
+## 9. Evidence and Definition of Done
 
-- service `build.gradle.kts`/Wrapper/verification metadata present and reviewed;
-- `spotlessCheck` passes;
-- `spotbugsMain` passes;
-- Semgrep blocking policy passes;
-- `architectureTest` passes;
-- unit/integration/contract/schema checks required by the change pass;
-- no required check is disabled/suppressed without approved narrow rationale;
-- the actual GitHub Actions required-check set passes on the commit/digest being promoted.
+For each Java service, implementation compliance requires actual evidence that:
 
-Until service source code and CI workflows exist, this evidence status is **NOT VERIFIED**.
-
-## 9. Definition of Done for engineering enforcement
-
-A new Java service is not implementation-complete until:
-
-- its independent Gradle Wrapper/build is executable from a clean checkout;
+- Wrapper/build/verification metadata exist and work from clean checkout;
 - Java 25/toolchain/dependency verification are enforced;
-- Spotless, SpotBugs, ArchUnit, and repository Semgrep gates cover the service;
-- applicable test source sets/tasks exist and run;
-- CI runs the required gates and branch protection treats them as required;
-- container build is reproducible enough to promote one immutable digest through staging/production;
-- security/supply-chain output is produced without leaking sensitive test fixtures;
-- no broad suppression or disabled mandatory task is used to claim success.
+- Spotless/SpotBugs/ArchUnit/Semgrep pass;
+- applicable unit/integration/contract/schema/security tests pass;
+- no required check/suppression is weakened without approved narrow rationale;
+- GitHub required-check set passes on the reviewed commit;
+- container output can be promoted as the same immutable signed digest staging -> production;
+- security/supply-chain output does not leak sensitive fixtures.
+
+Until real service source/build/workflows exist and execute, status remains **NOT VERIFIED**.

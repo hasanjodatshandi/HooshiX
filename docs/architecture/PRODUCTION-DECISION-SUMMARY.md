@@ -1,193 +1,109 @@
-# Production Decision Summary — 2026-08-11
+# Production Decision Summary — Current State
+
+- **Reviewed:** 2026-08-13
+- **Mode:** current-only
+- **Status:** architecture target; implementation evidence remains subject to `PRODUCTION-READINESS-CHECKLIST.md`
+
+This document summarizes the effective production architecture only. The current Decision Register and current-state architecture documents are authoritative for detailed scope.
+
+## Application and service model
+
+- Backend services use DDD + Hexagonal Architecture with inward dependencies.
+- Java services use Java 25, Spring MVC + Virtual Threads, constructor injection, independent Gradle builds, and the executable quality gates in `../engineering/coding-standards.md` and `../engineering/build-and-ci-quality-enforcement.md`.
+- Public/browser traffic terminates through Web BFF; ordinary internal synchronous communication is gRPC; asynchronous integration uses Kafka where a durable event boundary is appropriate.
+- Every service owns its contracts, data, deployment, and release lifecycle. Cross-service database access and shared business/persistence models are prohibited.
+
+## Identity and browser security
+
+- Identity owns registration, password credentials, external identity linking, MFA, token signing, and identity/session semantics.
+- Password hashing uses the Technology Baseline Argon2id parameters with bounded hashing concurrency and compromised-password screening.
+- External identities are bound by stable issuer + subject, never auto-linked only by email.
+- Browser login uses OIDC Authorization Code + PKCE S256 through the BFF with server-side state/nonce/verifier handling.
+- The browser receives only the secure BFF session cookie, not provider/internal access tokens.
+- BFF session security includes fixation/rotation defense, strict CORS, Origin + synchronizer-token CSRF, and reviewed security headers.
+- Identity JWT signing uses local RSA-3072/RS256 key material with stable `kid`, planned rotation, and local GitOps verifier bundles.
+
+## Authorization
+
+- Protected resource services make one authoritative online `CheckPermission` call after safe local reject-only token/context/syntax checks.
+- There is no permission-result cache, Bloom-filter authorization, Kafka invalidation, retry, stale allow fallback, or BFF duplicate routine check.
+- Production Authorization target: >=3 replicas, PDB/topology spread, >=99.95% rolling-30d availability, p95<=100ms, p99<=200ms, 300ms caller deadline, one attempt.
+- Authorization uses bounded global/per-caller concurrency, <=25ms server queue wait, bounded PostgreSQL pool/queries, explicit overload shedding, and fail-closed caller breakers.
+- Breaker recovery is de-correlated per caller instance and uses serialized real `CheckPermission` probes; a health endpoint cannot authorize breaker closure.
+- Dependency criticality/fallback semantics are registered per operation/dependency edge in `dependency-criticality.yaml`.
+
+## Semantic security quotas
+
+- There is no quota microservice. The owning security service enforces its semantic quota atomically in service-owned ACL-isolated Redis.
+- Quotas are fail-safe, use pseudonymous keys, explicit anti-lockout sequencing, and the current trusted-application-time + Redis-time skew/TTL rules.
+
+## Notification
+
+- Identity durably hands off human-channel delivery to Notification through idempotent internal gRPC.
+- Notification owns template versioning/rendering, provider adapters, retry/reconciliation, delivery evidence, and terminal callback results.
+- PostgreSQL is authoritative for Notification templates and lifecycle time.
+- Sensitive caller/Notification escrow uses independent local AES-256-GCM key rings sourced through OpenBao/External Secrets. Routine Notification acceptance/dispatch/retry does not call OpenBao Transit.
+- Exact accepted recipient/template/content/deadline identity remains stable across retries/reconciliation; sensitive ciphertext has a <=24h hard maximum and is erased earlier when possible.
+- Provider I/O occurs only after a durable local `DISPATCHING` commit. Unknown outcomes are reconciled and never authorize blind redispatch.
+- Production Email uses Liara Transactional Email over authenticated SMTP + STARTTLS.
+- Production Iran SMS uses IPPanel Edge Webservice mode with Notification-rendered exact text and bounded authenticated status polling. Provider Pattern rendering is not the semantic authority.
+- Local logging SMS is local-only and never a staging/production fallback.
+
+## PostgreSQL and data isolation
+
+- Every persistent production microservice owns a distinct PostgreSQL database, runtime/migration credentials, Flyway history, and dedicated CloudNativePG cluster.
+- Critical clusters use the current three-instance synchronous durability/failover baseline, independent backup credentials/encryption context, continuous WAL archive, daily base backup, and tested PITR/restore.
+- Tenant-owned production tables use forced RLS. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot cross service/database boundaries.
+- Flyway is the only schema-change mechanism. Executed migrations are immutable; evolution uses expand -> migrate -> contract. Application rollback must remain compatible with the expanded schema.
+- Fleet operations use one reviewed GitOps baseline, one-cluster-at-a-time upgrade waves, monthly isolated restore evidence, and quarterly DR exercises.
+
+## Kafka and contracts
+
+- Kafka uses KRaft with three brokers + three dedicated controllers for the approved production baseline.
+- Critical topics use RF=3, minISR=2, `acks=all`, idempotent producers, and no unclean leader election.
+- State change + integration-event publication uses Transactional Outbox; consumers assume at-least-once delivery and are idempotent with durable Inbox/dedup semantics where required.
+- Critical publication/dedup evidence is retained for the current 35-day recovery horizon.
+- Kafka is rebuildable transport, not business source of truth. Cold DR recreates infrastructure/configuration and replays retained publication/state evidence.
+- Protobuf is governed in Git with Buf compatibility; no runtime Schema Registry is deployed in v1.
+
+## Kubernetes, edge, mesh, and secrets
+
+- Production Kubernetes uses three dedicated stacked control-plane/etcd nodes and >=3 schedulable workers with a redundant stable API endpoint and N+1 capacity for critical paths.
+- Application workloads use immutable digests, non-root execution, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, resources, separate startup/readiness/liveness probes, dedicated ServiceAccounts, and deny-by-default network policy.
+- Public path: upstream volumetric-DDoS mitigation -> Traefik -> dedicated Caddy/Coraza WAF -> Web BFF.
+- Direct public/Traefik application routing to BFF that bypasses the WAF is prohibited.
+- Internal application workloads use Istio Ambient strict mTLS, ServiceAccount-derived identity, and least-privilege authorization. Waypoints exist only for an explicit L7 need.
+- OpenBao 2.6.1 is the secret authority; External Secrets is the normal Kubernetes materialization boundary. Routine application request paths use local validated material rather than OpenBao RPCs.
+- GitOps desired state lives in this repository under reviewed environment roots and is reconciled by Argo CD.
+
+## Supply chain, CI/CD, and production access
+
+- Third-party CI actions/tools/artifacts are pinned/verified according to repository policy; workflow permissions are least privilege and privileged secrets are not exposed to untrusted PR execution.
+- Release images are immutable, SBOM-indexed, signed with Cosign, carry provenance/source identity, and are verified by admission policy.
+- The exact signed image digest validated in staging is promoted to production; production rebuild is prohibited.
+- Vulnerability response continuously correlates deployed digests/SBOMs with approved advisory/threat-intelligence inputs, enforces expiring exceptions, and applies production remediation/escalation policy. No feed/scanner is treated as proof of zero unknown vulnerabilities.
+- Human privileged production access uses Teleport JIT SSO/WebAuthn, short-lived elevation, approvals, least privilege, and audited/recorded sessions.
+
+## Logging and observability
+
+- Services emit structured JSON stdout and OpenTelemetry/Micrometer metrics/traces with bounded low-cardinality attributes.
+- Logging is allow-list based. Secrets, credentials, tokens/cookies, OTPs, sensitive payloads, SQL binds, complete metadata/headers, and unreviewed PII are prohibited from raw telemetry.
+- Source rules, pipeline redaction, synthetic canary tests, and runtime detection provide defense in depth.
+- SLOs/error budgets use burn-rate policy rather than isolated percentile paging.
+
+## Current primary capacity boundaries
+
+1. Authorization + PostgreSQL request path;
+2. per-service PostgreSQL HA fleet capacity/restore/upgrade overhead;
+3. security Redis latency/failover;
+4. password-hashing CPU/memory under attack/load;
+5. WAF inspection on every public request;
+6. Kafka disk/partition/consumer capacity when async flows grow;
+7. Liara/IPPanel availability and IPPanel polling limits;
+8. worker-node capacity and replica placement during node loss.
 
-This document summarizes the production-review decisions added after ADR-0040. The ADR files and Decision Register are authoritative.
+Detailed metrics/scale triggers live in `performance-and-bottlenecks.md`.
 
-## ADR-0041 — Semantic quotas
+## Evidence status
 
-**Decision:** no quota microservice. Identity/Authorization enforce their own semantic quotas with one atomic token-bucket/GCRA-equivalent operation on ACL-isolated Redis Sentinel using pseudonymous HMAC keys, a 75ms/one-attempt dependency budget, and explicit anti-lockout sequencing for login/recovery subject counters.
-
-**Why:** closes ADR-0040 without adding another synchronous service or PostgreSQL write path. Source abuse is blocked hard while account-subject pressure cannot be weaponized into permanent remote lockout.
-
-## ADR-0042 — Authorization SLO/capacity
-
-**Decision:** retain ADR-0039 online authorization but engineer it as a critical HA dependency: one final check per protected resource request, >=3 replicas, PDB/topology spread, availability>=99.95%, p95<=100ms, p99<=200ms production SLO (75/150ms engineering target), 300ms one-attempt caller ceiling, PostgreSQL as the only synchronous downstream, and >=2x peak capacity evidence.
-
-**Why:** preserves immediate fail-closed permission semantics without adding stale cache behavior or duplicate BFF checks.
-
-## ADR-0043 — Notification local key ring
-
-**Decision:** remove OpenBao Transit from Notification per-message hot paths. Use a purpose-specific mounted local AES-256-GCM key ring sourced from OpenBao through External Secrets.
-
-**Why:** Transit added latency/availability coupling while an already-authorized compromised Notification workload could still obtain plaintext through Transit. Local keys materially simplify v1 and let OpenBao remain control-plane rather than request-path infrastructure.
-
-## ADR-0044 — Kafka durability/DR
-
-**Decision:** Kafka 4.2.x KRaft with 3 brokers + 3 dedicated controllers; critical RF3/minISR2/acks=all/idempotent producers. Kafka is rebuildable transport; cold DR recreates it from Git and replays 35-day retained transactional outboxes or reconstructs events from authoritative service state.
-
-**Why:** strong primary-cluster durability without creating a second business source of truth or a hot DR Kafka cluster.
-
-## ADR-0045 — Browser/BFF security
-
-**Decision:** OIDC Authorization Code + PKCE S256, exact redirects, server-side state/nonce/PKCE verifier, `__Host-` server-side session, rotation/fixation defense, Origin + synchronizer-token CSRF, strict CORS, security headers, and no browser internal credentials.
-
-**Why:** closes OAuth/browser/session attack surfaces explicitly instead of relying on SameSite or the WAF alone.
-
-## ADR-0046 — Supply-chain admission
-
-**Decision:** immutable Cosign-signed images + signed provenance + SBOM are enforced at production admission through Kyverno stable CEL image-validation policy after an audit rollout and HA admission deployment.
-
-**Why:** CI signing is not enforcement if an unexpected or unsigned image can still be scheduled.
-
-## ADR-0047 — Notification simplification
-
-**Decision:** remove the custom clock-health-agent/Chrony socket RPC/primary-Pod binding/dispatch-fence/coordinator from current v1. Keep PostgreSQL-authoritative immutable deadlines, short durable `DISPATCHING` transaction before provider I/O, reconciliation, and no blind redispatch after unknown outcomes.
-
-**Why:** this was the largest bespoke engineering/on-call hotspot. Credential validity still belongs to Identity; CloudNativePG synchronous durability closes the important failover state-loss window more simply.
-
-## ADR-0048 — PostgreSQL HA/recovery
-
-**Decision:** CloudNativePG 3-instance PostgreSQL 18.x, automatic failover, one synchronous failover-eligible acknowledgement for required durable writes, <=70% aggregate application connection budget, continuous WAL archive, daily physical backup, 35-day PITR, monthly isolated restore, quarterly DR.
-
-**Why:** established the CloudNativePG HA/durability mechanics. ADR-0057 later strengthened production isolation further by assigning each persistent service its own physical CloudNativePG cluster; ADR-0064 standardizes that fleet so the additional isolation does not become three hand-built operational systems.
-
-## ADR-0053 / ADR-0057 — Database and physical isolation
-
-**Decision:** every persistent microservice owns a distinct PostgreSQL database,
-credentials and Flyway history; ADR-0057 additionally requires a dedicated
-production CloudNativePG cluster, independent backups, and forced tenant RLS for
-tenant-owned tables.
-
-**Why:** application credential, DBA, backup, noisy-neighbor, and recovery blast
-radius are now scoped to one service instead of the whole platform.
-
-## ADR-0049 — Iran SMS
-
-**Decision:** IPPanel Edge **Webservice** mode for Iran, not provider-managed Pattern rendering. Notification remains the sole exact-content/template authority; provider submission has bounded timeouts/no transport retry; ambiguous results reconcile rather than blind resend; recipient delivery evidence is polled with bounded backpressure.
-
-**Why:** enables Iran SMS/SMS MFA without creating a second mutable presentation authority or a new public webhook surface.
-
-## ADR-0050 — Platform compatibility/CNI
-
-**Decision:** pin one tested production compatibility set in Technology Baseline, use Calico OSS standard dataplane for NetworkPolicy with upstream Istio Ambient, retain immutable image digests and explicit upgrade governance. Argo CD remains initially non-HA because it is not request-path infrastructure; OpenBao remains single-node because hot paths use validated local key material.
-
-**Why:** closes version/CNI ambiguity while avoiding HA/control-plane components that do not materially improve request availability in v1.
-
-## ADR-0051 — Self-hosted Kubernetes HA
-
-**Decision:** run three dedicated stacked control-plane/etcd nodes and at least
-three schedulable workers, with a redundant stable API endpoint, N+1 critical
-worker capacity, replica spread, and tested encrypted off-node etcd snapshots.
-
-**Why:** service/database HA is incomplete if Kubernetes itself has a hidden
-single-node control-plane or worker-placement failure domain. Stacked etcd gives
-quorum while avoiding the additional three hosts required by external etcd.
-
-## Security Baseline — Password credentials
-
-**Decision:** close ADR-0006's pending password-hash input with Argon2id
-(`m=19 MiB`, `t=2`, `p=1`, random 16-byte salt, >=32-byte hash), 15..128
-Unicode-code-point password policy, NFC normalization, compromised-password
-blocklist, no composition/periodic-rotation rules, rehash-on-success, and a
-bounded password-hash bulkhead.
-
-**Why:** this gives a memory-hard modern baseline without turning login into an
-unbounded CPU/memory DoS surface or weakening user password-manager/passphrase
-usability.
-
-## ADR-0052 — Identity signing-key lifecycle
-
-**Decision:** retain RS256 but use RSA-3072 local Identity signing keys from
-OpenBao, immutable `kid` values, 90-day rotation, next-key prepublication, and a
-local GitOps public verification bundle for every verifier.
-
-**Why:** makes token verification fast and independent of Identity/OpenBao on the
-request path while giving key rotation and compromise response explicit rules.
-
-## Net architecture effect
-
-The production review **adds** HA where it directly protects user/business correctness (Authorization replicas, Redis Sentinel, PostgreSQL synchronous HA, Kafka replication, WAF/admission replicas) and **removes** bespoke hot-path mechanisms whose cost exceeded their v1 value (Notification Transit RPC and clock-agent/fence subsystem).
-
-The principal remaining bottlenecks are therefore measurable capacity boundaries rather than unresolved architecture: online Authorization, the operational/capacity cost of the per-service PostgreSQL HA fleet, security Redis, WAF inspection, Kafka disk/partition capacity, IPPanel polling, and external provider availability. See `performance-and-bottlenecks.md`.
-
-## ADR-0054 — Quota time safety
-
-**Decision:** semantic quotas use trusted application time plus Redis `TIME`, fail
-closed above two seconds of skew, use the minimum validated time for refill, and
-do not treat Redis TTL expiry as permission to reset a security budget.
-
-## ADR-0055 / ADR-0056 — Failure containment and Authorization overload
-
-**Decision:** synchronous dependencies use semantic circuit breakers/bulkheads;
-Authorization retains one online no-cache/no-retry decision but adds safe local
-invalid-token prechecks, fair-share load shedding, a fail-closed breaker, and a
-p95<=100ms/p99<=200ms production SLO. Bloom filters do not participate in
-authoritative permission decisions.
-
-## ADR-0058 — Data-subject erasure
-
-**Decision:** logical deletion remains reversible lifecycle state; approved
-irreversible erasure is coordinated by Identity and executed idempotently by each
-owning service with non-PII receipts, legal-hold semantics, and mandatory
-re-erasure after backup restore.
-
-## ADR-0059 — Volumetric DDoS
-
-**Decision:** production hosting requires upstream L3/L4 mitigation/scrubbing and
-edge connection controls before the in-cluster L7 WAF.
-
-## ADR-0060 — Human production access
-
-**Decision:** Teleport Enterprise Self-Hosted provides JIT SSO/WebAuthn privileged
-access, two-reviewer production write elevation, short TTLs, and audited/recorded
-Kubernetes/database/host sessions. Standing admin/root/shared credentials are
-prohibited.
-
-## ADR-0061 — PII-safe logging enforcement
-
-**Decision:** custom Semgrep rules, structured attribute allow-lists, telemetry
-redaction, seeded canary sink tests, and runtime detectors enforce the logging
-policy.
-
-## Clarifications from the final security review
-
-- SBOM was already mandatory in ADR-0046; the implementation is strengthened by
-  digest-indexed CycloneDX inventory plus pinned Syft/Grype CVE correlation.
-- Java 25 already contains JEP 491, so `synchronized` is not blanket-banned for
-  virtual-thread pinning. JFR/load tests target the remaining native/FFM and
-  resource-saturation cases instead.
-
-## ADR-0062 — Authorization SLO alerting and breaker recovery
-
-**Decision:** keep the 99.95% / p95<=100ms / p99<=200ms Authorization objectives and paired multi-window burn. ADR-0066 refines recovery with bounded per-instance reopen de-correlation and one real half-open `CheckPermission` probe in flight at a time; three consecutive infrastructure-successful probes close. A health endpoint never closes the breaker.
-
-## ADR-0063 — Dependency criticality matrix
-
-**Decision:** resilience semantics attach to operation->dependency edges. ADR-0066 makes `dependency-criticality.yaml` the machine-checkable source, with CI schema/coverage/render checks and explicit composition rules for operations that have both authoritative and optional dependencies. Missing fallback means no fallback.
-
-## ADR-0064 — Dedicated PostgreSQL fleet operations
-
-**Decision:** keep dedicated production CloudNativePG clusters from ADR-0057; standardize them through one GitOps baseline, common monitoring, independent backup identities, restore evidence, and one-cluster-at-a-time upgrade waves. ADR-0067 standardizes monthly restore evidence and compatibility-aware rollback/fail-forward behavior. There is no planned shared-cluster v2 destination.
-
-## ADR-0065 — Continuous CVE response
-
-**Decision:** signed CycloneDX SBOMs are digest-indexed and rescanned at least every six hours. ADR-0068 adds <=2h threat-advisory/KEV ingestion, targeted rescans, active exception-expiry escalation, and deterministic ownership of direct/transitive components by deployed artifact. Critical/known-exploited production findings target immediate incident handling and <=24h mitigation; High production findings target <=48h.
-
-
-## ADR-0066 — Authorization breaker de-correlation and dependency-policy governance
-
-**Decision:** keep the Authorization SLO/fail-closed model, replace fixed synchronized reopen timing with bounded exponential per-instance de-correlation, serialize real half-open probes, and make `dependency-criticality.yaml` the machine-checkable source of truth. Tenant tier does not affect security breaker recovery.
-
-## ADR-0067 — PostgreSQL restore evidence and upgrade safety
-
-**Decision:** keep monthly isolated restores and quarterly DR, but standardize queryable RPO/RTO/integrity evidence and freeze ordinary service promotion after a failed restore. Upgrade waves stop on staging/production failure; reversible state may roll back, while irreversible/major database transitions never use unsafe automatic downgrade to meet an arbitrary time target.
-
-## ADR-0068 — Vulnerability exception expiry, threat intelligence, and ownership
-
-**Decision:** expired exceptions actively stop authorizing promotion and escalate running-production exposure. CISA KEV plus approved CVE/ecosystem/vendor advisories are ingested frequently and trigger targeted correlation/rescan. No feed is treated as guaranteed zero-day detection. Direct/transitive component accountability follows the deployed service artifact; Platform owns shared base/runtime artifacts and Security owns feed/scanner policy.
-
-
-## ADR-0069 — Java coding standards and executable quality gates
-
-**Decision:** consolidate implementation-level Java coding rules in `docs/engineering/coding-standards.md` and require independent per-service Gradle builds to expose Spotless, SpotBugs, ArchUnit, repository Semgrep rules, dependency verification, applicable test/contract tasks, and GitHub Actions required-check evidence. REST errors use RFC 9457 Problem Details; logging receives explicit CR/LF injection, debug-elevation, exception-safety, export-failure, and log-store access rules; persistence receives explicit batch/fetch/flush measurement and no mandatory one-table/one-model rule; Playwright receives selector/test-data/flakiness discipline.
-
-**Why:** documentation-only coding rules are not proof of implementation. Machine-checkable rules should fail CI, while non-machine-provable design quality remains explicit code-review responsibility. The repository still reports implementation evidence as not verified until real service source/build/workflows exist and pass.
+Architecture and documentation are decisions, not executable proof. Production readiness requires the actual source/build/workflows/manifests plus the tests, scans, load/failover/restore/security evidence defined in `PRODUCTION-READINESS-CHECKLIST.md`. Where implementation artifacts do not yet exist, evidence remains **NOT VERIFIED**.

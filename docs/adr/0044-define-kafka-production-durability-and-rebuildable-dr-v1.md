@@ -1,72 +1,61 @@
-# ADR-0044: Define Kafka Production Durability and Rebuildable DR v1
+# ADR-0044: Kafka Production Durability and Rebuildable DR v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-10
-
-## Relationship to Earlier Decisions
-
-This ADR extends ADR-0026 and ADR-0027. Git + Buf remains the Protobuf source/compatibility model and no runtime Schema Registry is introduced.
+2026-08-10; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-Production uses Apache Kafka 4.2.x KRaft:
+Kafka is durable asynchronous transport, not the business source of truth. Production uses the approved Kafka 4.2.x KRaft line with exact patch/image identity in the Technology Baseline and deployment metadata.
 
-- 3 dedicated controllers;
-- 3 dedicated brokers;
-- failure-domain/rack awareness;
-- TLS + authenticated per-service principals + ACLs + quotas.
-
-Critical topics use:
+### Production topology
 
 ```text
-replication.factor = 3
-min.insync.replicas = 2
-unclean.leader.election.enable = false
-acks = all
-idempotent producer = enabled
+3 brokers
+3 dedicated KRaft controllers
+critical topic replication.factor=3
+critical min.insync.replicas=2
+producer acks=all
+idempotent producer enabled
+unclean leader election disabled
 ```
 
-Development/integration tests use Testcontainers or a lightweight local broker; developers do not reproduce the six-node production topology.
+Brokers/controllers are spread across available failure domains. Native TLS, authenticated per-service principals, ACLs, quotas, bounded partitioning, and service/topic ownership remain mandatory even when clients participate in the mesh.
 
-### Rebuildable cold DR
+### Event durability classes
 
-Kafka transport is not the sole DR source for critical business integration intent.
+Every production event class is explicitly classified as one of:
 
-Every production event class is classified:
+- `OUTBOX_REPLAYABLE` — the service retains immutable publication/outbox evidence sufficient to replay the event;
+- `RECONSTRUCTABLE` — the event can be deterministically reconstructed from authoritative service state;
+- `NON_CRITICAL` — loss during disaster recovery is explicitly acceptable and does not violate business/security correctness.
 
-```text
-OUTBOX_REPLAYABLE
-RECONSTRUCTABLE
-NON_CRITICAL
-```
+Critical replayable publication evidence is retained for at least the current 35-day PostgreSQL PITR/recovery horizon, subject to privacy/erasure/legal-hold policy. Participating consumer Inbox/dedup evidence covers the same required replay horizon.
 
-For `OUTBOX_REPLAYABLE`, the producer retains the published transactional outbox record or equivalent immutable publication evidence for 35 days, aligned with PITR. It preserves stable event ID/type/version/key and the approved payload or deterministic reconstruction reference. Privacy/erasure/legal-hold policy still applies; secrets are never retained just for replay.
+### Cold DR
 
-For `RECONSTRUCTABLE`, the owning service documents deterministic reconstruction from authoritative service-owned state while preserving duplicate safety.
+Kafka broker disks are not the off-site business backup. Cold DR:
 
-`NON_CRITICAL` explicitly accepts loss after total Kafka-cluster disaster; no critical flow may receive this classification by default.
+1. rebuilds Kafka/controller/topic/ACL configuration from reviewed GitOps;
+2. restores authoritative service databases;
+3. replays retained publication evidence or reconstructs current events from service-owned state;
+4. lets idempotent consumers reconcile using stable event/business identifiers;
+5. verifies critical consumer lag/state before traffic opens.
 
-Consumer inbox/dedup evidence is retained sufficiently to make replay within the recovery horizon idempotent.
+Broker offsets may be new after reconstruction; business/event identities remain stable.
 
-Cold DR:
+### Retry and replay
 
-1. restore OpenBao and PostgreSQL/PITR;
-2. create fresh Kafka from Git desired state;
-3. recreate topics/ACLs/quotas;
-4. replay retained outboxes or reconstruct events;
-5. process with idempotent consumers;
-6. reconcile DLQ/outbox/inbox/business counts;
-7. enable normal traffic after verification.
+Consumers assume at-least-once delivery. Retry/DLQ behavior is finite, explicit, observable, owned, and replayable. Secrets are prohibited from Kafka, retry, DLQ, and publication-evidence payloads. PII requires explicit classification/minimization/retention approval.
 
-Consumer offsets are normal-operation state, not authoritative business recovery evidence.
+## Verification requirements
 
-Quarterly DR exercises include Kafka replay.
+Verify broker/controller loss, RF/minISR/acks/idempotence, ACL/TLS/quota controls, topic classifications, 35-day replay/dedup retention for critical flows, duplicate/restart consumer behavior, clean-cluster rebuild from GitOps, representative replay/reconstruction, and quarterly recovery exercise evidence.
 
-## Consequences
+## Rollback considerations
 
-Production Kafka is durable without requiring a hot second cluster. Bounded retained outbox history replaces a separate event-journal service and keeps DR ownership in the producing bounded context.
+Rollback MUST NOT reduce critical replication/minISR/producer durability, enable unclean leader election, remove required replay/dedup evidence, turn Kafka into business source of truth, or introduce non-idempotent replay behavior.

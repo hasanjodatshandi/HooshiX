@@ -78,10 +78,10 @@ The BFF does not create long-running workflows or deep synchronous call chains.
 ## 7. Authorization
 
 Routine protected request flow does **not** pay two online Authorization calls.
-The resource-owning service performs the final ADR-0039/ADR-0042
-`CheckPermission`. BFF only checks authorization for BFF-owned resources or a
-separately justified UX/read-model need; such checks never replace final
-resource enforcement.
+The resource-owning service performs the final online `CheckPermission` under
+the current ADR-0039/ADR-0056/ADR-0062/ADR-0066 authorization runtime. BFF only
+checks authorization for BFF-owned resources or a separately justified
+UX/read-model need; such checks never replace final resource enforcement.
 
 ## 8. Failure behavior
 

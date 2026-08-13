@@ -2,27 +2,15 @@
 
 ## 1. Ownership
 
-`authorization-service` owns:
+`authorization-service` owns tenant Role/RolePermission, MembershipRole, direct MembershipPermissionGrant/Deny, online permission evaluation, management commands, authorization audit, and private PostgreSQL persistence.
 
-- Role and RolePermission;
-- MembershipRole;
-- MembershipPermissionGrant / MembershipPermissionDeny;
-- online permission evaluation;
-- authorization-management commands;
-- authorization audit;
-- private PostgreSQL persistence.
+Identity owns User, Tenant, TenantMembership, membership lifecycle, authentication, sessions, and active-tenant selection. Permission-key meaning and resource/domain invariants remain owned by the protected resource bounded context.
 
-Identity owns User, Tenant, TenantMembership, membership lifecycle,
-authentication, sessions, and active-tenant selection.
+## 2. Role and permission model
 
-## 2. Role/permission model
+Roles attach to `TenantMembership`, not global User. One membership may have multiple tenant-scoped roles. v1 has no role inheritance and no wildcard permission assignment.
 
-Roles attach to `TenantMembership`, not global User. One membership may have
-multiple tenant-scoped roles. v1 has no role inheritance and no wildcard
-permission assignment.
-
-Permission keys are exact stable contracts whose **meaning** belongs to the
-resource-owning bounded context.
+Permission keys are exact stable contracts.
 
 Evaluation:
 
@@ -37,101 +25,84 @@ Inactive/suspended/removed/deleted membership has no tenant permissions.
 
 ## 3. Final enforcement
 
-The resource-owning service is the final security boundary. It verifies
-applicable end-user context, workload identity, active tenant/membership,
-required permission, resource tenant ownership, and domain invariants.
+The resource-owning service is the final security boundary. It verifies applicable end-user context, workload identity, active tenant/membership, required permission, resource tenant ownership, and domain invariants.
 
-The BFF does not duplicate the routine online permission check when the resource
-service will make the authoritative check. A BFF-owned resource or separately
-justified UX/read-model check is an exception and never replaces final
-enforcement.
+The BFF does not duplicate routine online permission checks when the resource service performs the authoritative check. BFF-owned resources or explicitly justified UX/read-model checks are exceptions and never replace final enforcement.
 
 ## 4. Current online runtime
 
-ADR-0039 + ADR-0056:
+ADR-0039 and ADR-0056 define the current request/capacity baseline; ADR-0062/ADR-0066 define current SLI/burn/recovery behavior.
 
 ```text
-CheckPermission deadline: 300 ms
+CheckPermission deadline: 300 ms maximum
 attempts:                 1
 wait-for-ready:           off
 automatic retry:          none
-local cache:              none
+permission cache:         none
 stale fallback:           none
 fail mode:                fail closed
 ```
 
 Authoritative deny -> `PERMISSION_DENIED`.
-Dependency failure -> `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`.
+Dependency failure/open breaker -> `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`.
+Healthy overload -> `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED`, treated as fail-closed dependency unavailability by callers.
 
-There is no v1 authorization Kafka invalidation topic.
+There is no v1 authorization Kafka invalidation topic/policy-snapshot authority.
 
 ## 5. SLO, overload, and capacity
-
-`CheckPermission` production objective (ADR-0056/ADR-0062/ADR-0066):
 
 ```text
 availability >=99.95% rolling 30d
 p95 <=100 ms
 p99 <=200 ms
 hard caller deadline = 300 ms
-steady-state engineering target = p95<=75 ms / p99<=150 ms
+steady engineering target = p95<=75 ms / p99<=150 ms
 ```
 
-Short spikes do not page on percentile samples alone. Authorization uses paired
-multi-window burn alerts: 14.4x on 5m+1h and 6x on 30m+6h page; 3x on 2h+24h
-creates a reliability action. The p99 objective is represented as >=99% of
-eligible calls <=200ms for burn accounting.
+Paging uses paired multi-window burn rather than isolated percentile samples. The <=200ms objective is represented as >=99% eligible calls meeting the threshold for burn accounting.
 
-Before invoking Authorization, the resource service performs only safe local
-JWT/claim/tenant-shape validation; those checks may reject invalid traffic but
-never grant access. No Bloom filter or permission-result cache is authoritative.
+Before Authorization, resource services perform only safe local token/claim/tenant/permission/resource-shape rejection. These checks never grant authority. No Bloom filter/local permission result/signed permission list is authoritative.
 
-Authorization has global + per-workload-principal bounded concurrency, <=25ms
-server queue wait, fair-share load shedding, and `AUTHORIZATION_OVERLOADED`
-status. Callers use a short fail-closed circuit breaker for infrastructure
-failures; open state returns `AUTHORIZATION_UNAVAILABLE`, never stale allow.
-ADR-0066 supersedes ADR-0062's fixed open interval with bounded exponential reopen backoff plus per-instance de-correlation. HALF_OPEN permits only one real `CheckPermission` probe in flight per caller breaker; three consecutive infrastructure-successful probes close, while timeout/unavailable/overload reopens immediately. A separate health endpoint never closes the breaker, and tenant tier never changes breaker semantics.
+Server protections:
 
-Production deployment:
+- global + per-workload-principal bounded concurrency;
+- <=25ms server queue wait before shedding;
+- fair-share overload isolation;
+- bounded PostgreSQL pool/query path;
+- no unbounded application queue.
+
+Caller breakers fail closed. Current recovery uses bounded per-instance de-correlated reopen backoff and at most one real half-open `CheckPermission` probe in flight per breaker. Three consecutive infrastructure-successful probes close; any timeout/unavailable/overload reopens. Health endpoints never close caller breakers; tenant/commercial tier never changes security recovery semantics.
+
+Production deployment baseline:
 
 - minimum 3 replicas;
 - PDB `minAvailable: 2`;
 - topology spread;
-- HPA min 3 / max 12 initially;
-- bounded in-flight concurrency; no unbounded application queue;
+- HPA initial min 3 / max 12;
 - DB acquisition budget <=50ms;
 - permission query budget <=100ms;
-- pool/HPA maxima included in global PostgreSQL connection budget.
+- HPA/pool maxima included in global service-cluster PostgreSQL connection budget.
 
-Before production, load testing proves >=2x projected peak with p95<=100ms and
-p99<=200ms, Hikari acquire p99<25ms, no sustained queue growth, fair-share
-isolation, and adequate DB headroom. Invalid-token floods must be rejected before
-Authorization; valid-token abuse must shed safely without retry amplification.
+Before production, prove >=2x projected peak with p95<=100ms/p99<=200ms, Hikari acquisition p99<25ms, no sustained queue growth, >=30% validated resource/database headroom, fair-share isolation, one replica/node loss, PostgreSQL failover, invalid-token flood rejection before Authorization, and safe valid-token abuse shedding without retry amplification.
 
-## 6. PostgreSQL availability
+## 6. PostgreSQL
 
-Authorization owns a dedicated PostgreSQL database on its own ADR-0057
-CloudNativePG production cluster. Runtime/migration roles are Authorization-only;
-runtime is `NOSUPERUSER NOBYPASSRLS` and is not the table owner. Tenant-owned
-tables use forced RLS in addition to application tenant enforcement. Synchronous
-required durability and safe automatic failover remain mandatory. App replicas
-alone are not treated as HA evidence.
+Authorization owns a dedicated PostgreSQL database and dedicated production CloudNativePG cluster under ADR-0057. Runtime/migration roles are service-only; runtime is `NOSUPERUSER NOBYPASSRLS`, not owner. Tenant-owned tables use forced RLS plus application tenant enforcement. Synchronous required durability/safe failover apply.
 
 Failover under sustained `CheckPermission` traffic is a production gate.
 
 ## 7. Provisioning
 
-Cross-context provisioning uses source-service transactional outbox + idempotent
-Authorization gRPC command. Stable request IDs and intent fingerprints provide:
+Cross-context provisioning uses source-service Transactional Outbox/durable intent + idempotent Authorization gRPC command. Stable request identity/fingerprint behavior:
 
 - equal replay -> original result;
 - conflicting reuse -> `ALREADY_EXISTS`.
 
-This is durable provisioning, not runtime authorization cache invalidation.
+This is durable provisioning, not runtime authorization invalidation.
 
 ## 8. Current roles/capabilities
 
-`platform_admin` is a global platform capability profile, not a tenant role.
+`platform_admin` is a global platform capability profile, not tenant role.
 
 Tenant SYSTEM roles:
 
@@ -139,28 +110,16 @@ Tenant SYSTEM roles:
 - `tenant_admin`: all except `tenant.delete` and `membership.owner.assign`;
 - `tenant_member`: `tenant.read`, `membership.read`, `role.read`.
 
-Every active tenant has an owner; last owner cannot be removed/demoted. Owner
-assignment requires `membership.owner.assign`. Actors cannot grant a permission
-they do not possess, including through custom roles.
+Every active tenant has an owner; last owner cannot be removed/demoted. Owner assignment requires `membership.owner.assign`. Actors cannot grant permissions they do not possess, including through custom roles.
 
 ## 9. Semantic quotas
 
-ADR-0041 resolves ADR-0040's architecture gate for Authorization administration.
-Authorization owns and enforces administration quotas through its ACL-isolated
-`security-redis` namespace; it does not call a quota microservice.
+ADR-0054 is the current semantic quota decision. Authorization owns administration quotas in its ACL-isolated `security-redis` namespace; no quota microservice is called.
 
-ADR-0054 hardens the 75ms one-attempt fail-closed Redis contract with dual
-trusted clocks, <=2s skew, monotonic effective quota time, and no security reset
-from Redis TTL expiry. Bulk administration charges bounded mutation cost, not one
-unit per arbitrarily large request.
+Quota evaluation is atomic, pseudonymous, 75ms/one-attempt/no-retry, dual-clock fail-closed (`trusted_app_time` + Redis `TIME`, <=2s skew), monotonic effective time, and never uses TTL expiry as security reset. Bulk administration charges bounded operation cost, not one unit for an arbitrarily large mutation request.
 
-Production administration remains disabled until the implementation, Redis
-Sentinel failover, atomicity, abuse, and >=2x peak quota-load tests pass.
+Production administration remains gated until atomicity/time-safety/Redis Sentinel failover/outage/abuse and >=2x peak quota-load evidence pass.
 
 ## 10. Verification
 
-Required applicable tests include precedence, cross-tenant denial, inactive
-membership, multiple-role union, last-owner concurrency, privilege escalation,
-platform audit, provisioning replay/conflict, exact no-cache/no-retry behavior,
-deny/outage mapping, workload identity, semantic quotas, PostgreSQL failover,
-capacity/load/bulkhead, query plans, and PII-safe telemetry.
+Required applicable tests include precedence, cross-tenant denial/RLS, inactive membership, multiple-role union, last-owner concurrency, privilege escalation, platform audit, provisioning replay/conflict, exact one-call/no-cache/no-retry behavior, deny/outage/overload mapping, breaker recovery, workload identity, semantic quota time/failover, PostgreSQL failover, capacity/load/bulkhead, query plans, and PII-safe telemetry.

@@ -1,99 +1,98 @@
-# Production Architecture Review
+# Production Architecture Review — Current State
+
+- **Reviewed:** 2026-08-13
+- **Status:** architecture target accepted; implementation evidence is not implied
+- **Documentation mode:** current-only
 
 ## Outcome
 
-The current v1 architecture is approved as the repository production target,
-subject to the implementation/evidence gates in `PRODUCTION-READINESS-CHECKLIST.md`.
+The current v1 architecture is coherent as the repository production target, subject to the executable implementation/evidence gates in `PRODUCTION-READINESS-CHECKLIST.md`.
 
-The review deliberately favors **high security and correctness without adding
-new synchronous services or custom distributed coordination unless evidence
-requires it**.
+The design favors strong correctness/security with bounded operational complexity: add redundancy where loss would violate user/security/data guarantees, and avoid extra synchronous services, request-path secret-manager RPCs, duplicate retry layers, or bespoke distributed coordination without measured need.
 
-## Decisions closed by this review
+## Current architecture conclusions
 
-- ADR-0041: semantic quotas on service-owned, ACL-isolated Redis Sentinel;
-- ADR-0042: online Authorization SLO/HA/capacity and one-final-check rule;
-- ADR-0043: Notification local AES-GCM key ring; no Transit hot path;
-- ADR-0044: Kafka durability + reconstructable cold DR;
-- ADR-0045: BFF/OIDC/PKCE/session/CSRF/CORS browser security;
-- ADR-0046: Cosign/Kyverno signed-provenance admission enforcement;
-- ADR-0047: remove bespoke Notification clock-agent/dispatch-fence runtime;
-- ADR-0048: CloudNativePG synchronous HA + Barman WAL/PITR;
-- ADR-0049: IPPanel Webservice-mode Iran SMS;
-- ADR-0050: pinned platform compatibility set + Calico standard CNI;
-- ADR-0051: three-node stacked Kubernetes control-plane/etcd + >=3 workers;
-- ADR-0052: local RS256/RSA-3072 signing lifecycle + GitOps public verifier bundle.
-- ADR-0053: dedicated PostgreSQL database/roles per persistent microservice;
-- ADR-0054: dual-clock fail-closed semantic-quota time safety;
-- ADR-0055: semantic circuit-breaker/bulkhead policy for synchronous dependencies;
-- ADR-0056: Authorization overload isolation and realistic production latency SLO;
-- ADR-0057: dedicated production PostgreSQL cluster per persistent service + forced tenant RLS;
-- ADR-0058: cross-service irreversible data-subject erasure execution/evidence;
-- ADR-0059: upstream L3/L4 volumetric DDoS mitigation before origin;
-- ADR-0060: Teleport-backed JIT privileged human production access;
-- ADR-0061: static/pipeline/canary/runtime PII-safe logging detection.
+- Identity owns registration, credential/MFA/session/token-signing concerns; external identities bind by issuer+subject and browser credentials remain BFF-managed.
+- Authorization remains one online authoritative fail-closed dependency with no permission cache/Kafka invalidation/stale fallback/retry. It has explicit SLOs, fair overload isolation, HA/capacity gates, burn alerts, and de-correlated real-contract breaker recovery.
+- Semantic security quotas remain service-owned and atomically enforced in isolated Redis; no quota microservice is introduced.
+- Notification owns durable human-channel delivery. Sensitive retry state uses bounded local AES-GCM key rings rather than request-path OpenBao Transit. PostgreSQL-authoritative time and a durable `DISPATCHING` commit replace bespoke clock/fence coordination.
+- Production Notification providers are Liara Transactional Email and IPPanel Webservice-mode Iran SMS. Provider ambiguity is explicit and never converted to fabricated success or blind resend.
+- Every persistent production microservice owns a distinct PostgreSQL database/credentials/Flyway history and dedicated CloudNativePG cluster; tenant-owned tables use forced RLS.
+- Kafka is replicated rebuildable transport, with transactional outbox/idempotent consumer semantics and 35-day critical recovery evidence.
+- Browser traffic follows upstream DDoS mitigation -> Traefik -> Caddy/Coraza WAF -> Web BFF; internal traffic uses Istio Ambient strict mTLS + workload identity + least-privilege authorization.
+- GitOps, signed/provenanced immutable artifacts, admission verification, continuous SBOM/advisory correlation, PII-safe telemetry, and JIT privileged access form the production security/operations baseline.
+- Java/source quality uses the canonical coding standard plus executable Spotless, SpotBugs, ArchUnit, Semgrep, dependency verification, contract, test, and GitHub Actions gates where implementation exists.
 
-ADR-0006's pending password-hash input is also closed in the Technology Baseline
-with Argon2id and explicit password-policy/bulkhead rules.
+## Main bottlenecks and failure domains
 
-## Main bottlenecks
+Highest-risk current capacity/availability boundaries are:
 
-The current highest-risk capacity boundaries are:
+1. Authorization service + PostgreSQL query/pool path;
+2. per-service PostgreSQL HA fleet capacity, synchronous-write latency, backup/restore load, and upgrade/operations overhead;
+3. security Redis latency/failover for semantic quotas and BFF session state;
+4. password-hash CPU/memory under login/credential attack load;
+5. WAF inspection cost on every public request;
+6. Kafka disk, broker, partition, consumer-lag, and replay capacity;
+7. Liara/IPPanel latency/throttling and IPPanel report polling/reconciliation;
+8. Kubernetes worker capacity/replica placement during node loss;
+9. external upstream DDoS/provider/identity dependencies outside the cluster.
 
-1. online Authorization + its PostgreSQL query path;
-2. per-service PostgreSQL HA fleet capacity, synchronous-write latency, backup/restore load, and operational overhead;
-3. security Redis latency/failover for quotas and BFF sessions;
-4. password-hash CPU/memory under login attack/load;
-5. WAF inspection on every public request;
-6. Kafka broker/disk/partition footprint when production async flows are enabled;
-7. IPPanel receipt polling/provider throttling and Liara provider latency;
-8. worker-node capacity/replica placement during one-node loss.
+The metric, mitigation, and scale/split triggers are maintained in `performance-and-bottlenecks.md`.
 
-The exact metrics, mitigations, and scale/split triggers are maintained in
-`performance-and-bottlenecks.md`.
+## Deliberately absent complexity
 
-## Deliberate non-bottleneck choices
+The current production target intentionally does **not** add:
 
-- BFF does not duplicate routine Authorization checks performed by resource services.
-- No quota microservice exists.
-- No runtime Schema Registry exists in v1.
-- Notification does not call OpenBao Transit per message.
-- Notification does not run the former Chrony sidecar/gRPC/fence/coordinator stack.
-- Normal JWT verification is local; no per-request remote JWKS lookup exists.
-- PgBouncer and Redis Cluster are not introduced without measured need.
-- External etcd is not used in v1; stacked etcd provides HA with lower footprint.
-- Argo CD and OpenBao are not made HA merely for symmetry because they are not
-  normal request-path dependencies in the reviewed v1 design.
+- a duplicate routine Authorization check in the BFF;
+- a permission-result cache or Kafka invalidation path;
+- a quota microservice;
+- a runtime Schema Registry in v1;
+- Notification per-message OpenBao RPCs;
+- a bespoke Notification clock-health agent, Chrony `hostPath` sidecar, or dispatch-fence coordinator;
+- per-request remote JWKS lookup for normal internal token verification;
+- PgBouncer/Redis Cluster/external etcd without measured need;
+- an Istio waypoint for every service/namespace;
+- retries in both the application and mesh/client layers for one failure;
+- Argo CD/OpenBao request-path HA merely for symmetry when hot paths do not depend on them.
+
+These omissions are intentional current decisions, not unresolved historical alternatives.
+
+## Security review
+
+Current security boundaries are coherent only when enforced together:
+
+- trusted tenant/user/workload identity is derived/validated at the correct boundary;
+- internal services are not directly Internet-exposed;
+- WAF does not replace authentication/authorization/validation/semantic quotas;
+- Istio identity does not replace NetworkPolicy or native datastore authentication;
+- local reject-only Authorization prechecks cannot grant permission;
+- sensitive material never enters Kafka/logs/traces/metrics/raw provider telemetry;
+- production secrets are not committed to Git/Helm values/images;
+- production workloads use hardened security contexts and independent ServiceAccounts;
+- signed artifact admission does not replace continuous vulnerability response;
+- no vulnerability feed/scanner is considered proof that unknown vulnerabilities do not exist.
+
+## Reliability review
+
+- All synchronous dependencies have finite deadlines and bounded concurrency.
+- Retry is safe/idempotent and single-owner only.
+- Remote I/O is not performed inside database transactions.
+- Kafka publication uses transactional outbox and at-least-once consumers are idempotent.
+- CloudNativePG failover must preserve required durable commits or refuse unsafe failover.
+- Restore evidence, not backup existence, proves recovery capability.
+- Release rollback is allowed only when schema/data/runtime state is backward compatible; unsafe database downgrade is not used to satisfy an arbitrary rollback timer.
+- Error-budget/burn policy, chaos tests, and failover/load evidence remain production gates.
 
 ## Delivery-speed guardrail
 
-Local development remains intentionally smaller than production. Domain and
-application work must not require a full Kubernetes/Istio/OpenBao/WAF/Kafka HA
-stack. Heavy failover, PITR, chaos, provider, and DR validation runs in staging,
-release, or scheduled pipelines according to the testing architecture.
+Local development remains smaller than production. Pure Domain/Application work should run without Kubernetes/Istio/WAF/Kafka HA. Integration work uses the pinned local kind/Ambient/Traefik/WAF foundation only when the integration behavior is actually under test. Heavy load, failover, backup/PITR, DR, provider, certificate, and production-policy evidence belongs to staging/release/scheduled pipelines.
 
-## 2026-08-11 operational-hardening follow-up
+## Coding-quality review
 
-The follow-up review accepts ADR-0062 through ADR-0065:
+The coding baseline incorporates feature-first/nature-separated packages, strict package naming, Domain/persistence separation, constructor injection, bounded files/responsibilities, no dumping-ground packages, explicit transaction/deadline/retry/idempotency rules, PII-safe telemetry, hardened container/Kubernetes settings, Helm migration discipline, and immutable same-digest staging-to-production promotion.
 
-- Authorization keeps its existing objective but uses paired multi-window burn instead of isolated-percentile paging; breaker recovery probes the real contract, not a health endpoint.
-- Dependency criticality is documented per operation edge rather than globally labelling whole services critical/degradable.
-- Dedicated service PostgreSQL clusters remain the production isolation model; fleet automation, not reconsolidation, is the operational response.
-- SBOM is continuously operationalized through digest-indexed rescanning, automatic service/security routing, deployment gates, and remediation SLAs.
+Machine-checkable rules should be executable. Documentation-only presence is not source compliance.
 
-These changes add no new application request-path network hop.
+## Evidence gap
 
-
-## Follow-up SRE review — ADR-0066 through ADR-0068
-
-The latest review accepts the need for stronger dependency-matrix governance, restore evidence, and vulnerability escalation, but rejects two unsafe simplifications:
-
-- Authorization breaker recovery is not varied by tenant/commercial tier. Repeated recovery is de-correlated per caller breaker and half-open probes are serialized.
-- PostgreSQL upgrades do not promise a universal automatic rollback within five minutes. Reversible GitOps/operator changes may revert, while irreversible/major database transitions use tested fail-forward/restore/migration strategies.
-
-The dependency matrix is now machine-readable and CI-enforced; monthly restore drills produce queryable RPO/RTO/integrity evidence; vulnerability exceptions have active expiry escalation; KEV/advisory inputs trigger targeted rescans without claiming guaranteed zero-day discovery.
-
-
-## Coding-quality hardening — ADR-0069
-
-The current architecture now separates coding policy from implementation evidence. `docs/engineering/coding-standards.md` is the canonical Java coding standard and `docs/engineering/build-and-ci-quality-enforcement.md` defines the executable Gradle/Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions baseline. Until actual Java service source and required CI workflows exist and pass, code-compliance evidence remains `NOT VERIFIED`; this is an implementation gate, not an open architecture decision.
+The architecture review does **not** claim that the implementation already satisfies these rules. Until service source/builds, Gradle wrappers/locks, workflows, manifests, policy tests, scans, load/failover/restore exercises, and deployment evidence exist and pass, those implementation dimensions remain `NOT VERIFIED`.

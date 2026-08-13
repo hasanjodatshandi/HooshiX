@@ -2,48 +2,41 @@
 
 ## 1. Architectural baseline
 
-The platform is an enterprise Java system built as independently deployable microservices. Service boundaries are determined by **Domain-Driven Design** and map to real business capabilities or bounded contexts.
+The platform is an enterprise Java system built as independently deployable microservices. Service boundaries follow Domain-Driven Design and map to real business capabilities/bounded contexts.
 
-The internal structure of each backend service uses **Hexagonal Architecture**. Clean Architecture is used only to enforce inward dependency direction; no additional ceremonial nesting is introduced.
-
-Core dependency direction:
+Each backend service uses Hexagonal Architecture. Clean Architecture is used only to enforce inward dependency direction:
 
 ```text
 Infrastructure --> Application --> Domain
 Interfaces     --> Application --> Domain
 ```
 
-Business logic must not depend on Spring, Kafka, PostgreSQL, Redis, gRPC, Protobuf, JPA/Hibernate, jOOQ, Kubernetes, Istio, or other infrastructure technology.
+Domain business logic MUST NOT depend on Spring, Kafka, PostgreSQL, Redis, gRPC, Protobuf, JPA/Hibernate, jOOQ, Kubernetes, Istio, or other infrastructure technology.
 
 ## 2. Service ownership
 
-Every microservice owns its own:
+Every microservice owns its:
 
-- domain model and business rules;
-- a distinct service-owned PostgreSQL database and independent credentials when relational persistence is used;
-- independent Flyway migrations/history;
-- synchronous contracts;
-- asynchronous contracts;
-- deployment and release lifecycle;
+- domain model/business rules;
+- distinct service-owned PostgreSQL database and independent credentials when relational persistence is used;
+- independent Flyway history;
+- synchronous and asynchronous contracts;
+- deployment/release lifecycle;
 - observability and service-level authorization enforcement.
 
-ADR-0053 requires database-per-service. ADR-0057 strengthens production isolation
-further: persistent production microservices also use separate physical
-CloudNativePG clusters and independent backup namespaces/credentials. Direct
-cross-service database access, cross-database joins/foreign keys, shared ORM/
-jOOQ persistence models, and shared business-model libraries are prohibited.
-Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in
-addition to application tenant enforcement.
+Every persistent production microservice also owns a dedicated CloudNativePG cluster and independent backup identity/namespace. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, and shared business-model libraries are prohibited. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
 
-A service is not created merely around a database table, CRUD screen, UI page, entity, or framework component.
+A service is not created merely around a table, CRUD screen, UI page, entity, or framework component.
 
 ## 3. Repository and build ownership
 
-Independently deployable services have independent builds and releases. The root Gradle build is repository governance only and must not aggregate independently deployable services as subprojects.
+Independently deployable services have independent builds/releases. The root Gradle build is repository governance only and does not aggregate independently deployable services as one release unit.
 
-Each service owns its `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, dependency verification, contracts, source sets, container build, and Helm deployment package.
+Each service owns `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, dependency verification, contracts, source sets, container build, and deployment package.
 
-Organization Java namespace and Gradle group: `com.sajtech`.
+Organization Java namespace/Gradle group: `com.sajtech`.
+
+Implementation layout follows the current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical.
 
 ## 4. High-level topology
 
@@ -55,7 +48,7 @@ React + TypeScript
 CDN / External Load Balancer
         |
         v
-Traefik Gateway / Ingress
+Traefik Gateway
         |
         v
 Dedicated Caddy + Coraza WAF
@@ -73,131 +66,108 @@ Domain / Platform Microservices
         +--> service-owned PostgreSQL
 ```
 
-Only the BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly exposed to the internet.
+Only the BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed.
 
 ## 5. Protocol boundaries
 
-### External browser/API boundary
+### External/browser boundary
 
-- HTTPS
-- REST
-- OpenAPI
-- Web BFF as the browser-facing backend boundary
+- HTTPS;
+- REST;
+- OpenAPI;
+- Web BFF as the browser-facing backend boundary.
 
 ### Internal synchronous boundary
 
-- gRPC
-- Protobuf
-- explicit deadlines
-- cancellation propagation where supported
-- Istio workload identity and authorization
+- gRPC + Protobuf;
+- finite deadlines;
+- cancellation propagation where supported;
+- one retry owner and only safe/idempotent retry;
+- Istio workload identity and least-privilege authorization;
+- operation-level dependency/fallback policy in `dependency-criticality.yaml`.
 
 REST is not the default for new internal service-to-service communication.
 
 ### Asynchronous boundary
 
-- Apache Kafka
-- Spring Kafka for Java services
-- Protobuf events
-- Git as source of truth
-- Buf `STANDARD` lint + `FILE` breaking checks
-- no runtime Schema Registry in v1
+- Apache Kafka + Spring Kafka for Java services;
+- Protobuf events;
+- Git-owned schemas/contracts;
+- Buf `STANDARD` lint + `FILE` breaking checks;
+- no runtime Schema Registry in v1;
+- transactional outbox when local state + event publication are one business effect;
+- at-least-once/idempotent consumer semantics.
 
-Asynchronous communication is used when it is semantically appropriate. Kafka being the platform event technology does not mean every interaction should become asynchronous.
+Kafka is used only when asynchronous semantics are appropriate; it is not request/reply transport.
 
-## 6. Bounded contexts and platform services
+## 6. Bounded contexts and platform capabilities
 
-Current or explicitly planned capability boundaries include:
+Current/approved boundaries include:
 
-- Identity Service
-- Authorization Service
-- Notification Service
-- Subscription Service
-- Billing Service
-- Web BFF
-- Compromised Password Service
-- Reference Data Service (planned capability boundary)
-- Workflow Service (future design only; must not absorb business rules from owning bounded contexts)
+- Identity Service;
+- Authorization Service;
+- Notification Service;
+- Subscription Service;
+- Billing Service;
+- Web BFF;
+- Compromised Password Service;
+- Reference Data Service as a planned capability boundary;
+- Workflow Service only as a future capability boundary that MUST NOT absorb business rules from owning contexts.
 
-The first executable backend service is `services/identity-service`. The second executable backend component is `web-bff`.
+The first executable backend service is `services/identity-service`; the second executable backend component is `web-bff`.
 
-## 7. Technology baseline at architecture level
+## 7. Architecture-level technology baseline
 
-- Java 25 LTS
-- Spring Boot 4.1.0
-- Spring MVC
-- Virtual Threads
-- Gradle Kotlin DSL
-- PostgreSQL 18.4 managed by CloudNativePG 1.30.0
-- Flyway
-- HikariCP
-- jOOQ and/or Spring Data JPA according to service responsibility
-- Kafka + Protobuf
-- Redis with service ownership; shared `security-redis` only for approved security/session ephemeral state
-- Resilience4j
-- OpenTelemetry + Micrometer
-- Kubernetes 1.35.6
-- Calico OSS 3.32.1 NetworkPolicy CNI
-- Helm 4.2.0
-- Argo CD
-- Kyverno + Cosign production artifact admission
-- Traefik
-- Caddy + Coraza v3 + CRS 4.x LTS
-- Istio Ambient Mode 1.30.x production baseline
-- External Secrets Operator + OpenBao
-- Liara SMTP Email + IPPanel Edge Webservice SMS for Iran
-- JUnit 5 + Testcontainers
-- ArchUnit
-- Cucumber-JVM for critical BDD scenarios
-- Vitest + React Testing Library
-- Playwright Test + TypeScript
+- Java 25 LTS;
+- Spring Boot 4.1.x;
+- Spring MVC + Virtual Threads;
+- Gradle Kotlin DSL;
+- PostgreSQL 18.x / CloudNativePG 1.30.x;
+- Flyway, HikariCP, jOOQ and/or Spring Data JPA according to service responsibility;
+- Kafka 4.2.x + Protobuf;
+- Redis 8.2.x with service ownership; shared `security-redis` only for approved ephemeral security/session state;
+- Resilience4j;
+- OpenTelemetry + Micrometer;
+- Kubernetes 1.35.x + Calico OSS 3.32.x;
+- Helm 4.x + Argo CD 3.x;
+- Kyverno + Cosign supply-chain admission;
+- Traefik 3.x;
+- Caddy + Coraza v3 + CRS 4.x LTS;
+- Istio Ambient 1.30.x;
+- External Secrets Operator + OpenBao 2.6.1;
+- Liara Transactional Email + IPPanel Edge Webservice SMS for Iran;
+- JUnit 5 + Testcontainers + ArchUnit;
+- Cucumber-JVM for critical BDD;
+- Vitest + React Testing Library;
+- Playwright Test + TypeScript.
 
-Exact patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/images.
+Exact approved patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/image/chart metadata except where the exact value is itself a current architecture constraint.
 
-## 8. Production infrastructure resilience
+## 8. Production resilience and security boundaries
 
-Current v1 production decisions strengthen platform resilience and isolation without
-changing bounded-context/data ownership:
+- **Kubernetes:** three stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint, N+1 critical-worker capacity.
+- **Workload hardening:** immutable digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources/probes, dedicated ServiceAccounts, deny-by-default NetworkPolicy.
+- **PostgreSQL:** dedicated production CloudNativePG cluster per persistent service; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves.
+- **Kafka:** KRaft with three brokers + three controllers; critical RF=3/minISR=2/acks=all; cold DR reconstructs from service-owned evidence.
+- **Security Redis:** one primary + two replicas + three Sentinel voters with TLS/ACL isolation.
+- **Authorization:** >=3 replicas/PDB/spread; one final online no-cache/no-retry `CheckPermission`, safe local prechecks, fail-closed overload/breaker isolation, >=99.95% availability, p95<=100ms/p99<=200ms SLO.
+- **OpenBao:** lean single-Raft authoritative secret source with encrypted snapshots; normal application hot paths use mounted/local validated key material rather than per-request OpenBao calls.
+- **Notification:** PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation; no bespoke clock/fence control plane.
+- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature verified by HA Kyverno, with continuous deployed-digest vulnerability/advisory correlation.
+- **Public edge:** upstream L3/L4 volumetric mitigation -> Traefik -> dedicated Caddy/Coraza WAF -> Web BFF.
+- **Human access:** Teleport JIT SSO/WebAuthn access with approvals, short-lived privilege, and audit/session evidence.
+- **Telemetry:** PII/secret-safe structured telemetry with static rules, pipeline redaction, synthetic canaries, and runtime leak detection.
 
-- **Kubernetes control plane:** 3 stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint, N+1 critical worker capacity (ADR-0051).
-- **CNI/NetworkPolicy:** Calico OSS 3.32.1 standard dataplane; upstream Istio Ambient remains the mesh; NetworkPolicy tests account for HBONE/health traffic (ADR-0050).
-- **PostgreSQL:** one dedicated CloudNativePG-managed PostgreSQL 18.4 production
-  cluster per persistent microservice, with 3-instance HA for critical services,
-  quorum synchronous replication, forced tenant RLS, independent backups, and
-  safe failover (ADR-0048/ADR-0057/ADR-0064/ADR-0067).
-- **Kafka:** KRaft with 3 brokers + 3 dedicated controllers; critical RF=3,
-  minISR=2, acks=all; cold DR reconstructs from service-owned outboxes
-  (ADR-0044).
-- **Security Redis:** 1 primary + 2 replicas + 3 Sentinel voters, TLS/ACL
-  isolation for BFF sessions and semantic quotas (ADR-0041/ADR-0045).
-- **Authorization:** minimum 3 app replicas, PDB/topology spread, one final
-  `CheckPermission` per protected resource operation, safe local prechecks,
-  fail-closed overload/circuit isolation, >=99.95% availability, p95<=100ms and
-  p99<=200ms SLO; 75/150ms remains engineering target (ADR-0056/ADR-0062/ADR-0066).
-- **OpenBao:** intentionally lean single-node Raft authoritative secret source
-  with hourly encrypted snapshots; normal application hot paths consume local
-  mounted key material, including Notification after ADR-0043.
-- **Notification:** bespoke clock-health agent/database dispatch fence removed;
-  PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` +
-  reconciliation are current (ADR-0047/ADR-0048).
-- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign
-  signature is verified at admission by HA Kyverno; SBOMs are indexed by image
-  digest for continuous transitive vulnerability/advisory correlation and exception escalation (ADR-0046/ADR-0065/ADR-0068).
-- **Public DDoS:** hosting/network provider supplies upstream L3/L4 volumetric
-  mitigation before the origin; Coraza remains L7 WAF (ADR-0059).
-- **Human production access:** Teleport Enterprise Self-Hosted JIT access with
-  SSO/WebAuthn, approval, short-lived privilege, and audit/session evidence
-  (ADR-0060).
-- **PII-safe telemetry:** static logging rules + pipeline redaction + canary/runtime
-  leak detection are mandatory (ADR-0061).
+These production controls MUST NOT make local development depend on a full production cluster. The inner loop uses focused unit/architecture/contract tests and Testcontainers; mesh/WAF/HA/DR/chaos/provider evidence runs at the appropriate CI/staging/release cadence.
 
-These production controls must not make local development depend on a full
-production cluster. The developer inner loop uses focused unit/architecture/
-contract tests and Testcontainers; full mesh/WAF/HA/DR/chaos validation is
-performed at the appropriate CI/staging/release cadence.
+## 9. Change and decision rule
 
-## 9. Architecture change rule
+Implementation MUST NOT silently replace a platform technology, bounded-context boundary, data owner, security invariant, or communication model.
 
-A local implementation choice must not replace a platform technology or architectural boundary. Intentional deviations require an accepted ADR before implementation depends on the deviation.
+The active repository-owner documentation policy is current-only. When architecture changes:
 
-Historical decisions remain in `/docs/adr`. Current-state changes must also update the relevant architecture document and Decision Register.
+1. update the applicable current-state document;
+2. create or update the retained current ADR when a durable decision record is useful;
+3. remove or normalize obsolete decision text after confirming no current invariant/contract/security/SLO/operational rule would be lost;
+4. update `../adr/decision-register.md`, `SOURCES.md`, executable architecture/security tests, and technology baselines when applicable;
+5. deliver and review the complete change through the PR-first workflow.

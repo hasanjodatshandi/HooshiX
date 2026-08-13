@@ -1,107 +1,101 @@
-# ADR-0056: Harden Online Authorization Overload Protection and SLO v1
+# ADR-0056: Online Authorization Runtime, Capacity, and Overload Protection v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-11
-
-## Supersedes
-
-This ADR supersedes ADR-0042 only for its production latency SLO values and
-extends its overload/failure-containment requirements. ADR-0039's one online
-`CheckPermission`, no permission-result cache, no Kafka invalidation, no retry,
-no stale fallback, and fail-closed semantics remain accepted.
+2026-08-11; consolidated to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Safe pre-checks before `CheckPermission`
+ADR-0039 defines the one authoritative online `CheckPermission` model. This ADR defines its current production SLO, capacity, deployment, pre-check, overload, and caller-breaker requirements. ADR-0062 owns current SLI/burn alerting and breaker-opening criteria; ADR-0066 owns current de-correlated OPEN/HALF_OPEN recovery behavior.
 
-A resource-owning service rejects requests locally before calling Authorization
-when any of these fail:
+### Request contract
 
-- access-token signature/algorithm/key validation;
-- issuer/audience/expiration validation;
-- required subject, active-tenant, membership, or session claim shape;
-- obvious tenant-context mismatch at the resource boundary;
-- syntactically invalid permission key or resource identifier.
+```text
+availability:              >=99.95% rolling 30d
+p95 server latency:        <=100 ms
+p99 server latency:        <=200 ms
+steady engineering target: p95<=75 ms / p99<=150 ms
+caller hard deadline:      300 ms
+attempts:                  1
+wait-for-ready:            off
+retry:                     none
+permission-result cache:   none
+stale fallback:            none
+failure mode:              fail closed
+```
 
-These checks may reject invalid traffic but never grant a protected operation.
-The authoritative permission decision remains the one online
-`CheckPermission`.
+Authoritative deny returns `PERMISSION_DENIED`. Infrastructure/dependency failure returns `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`. Healthy saturation returns `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED` and is still treated by callers as fail-closed dependency unavailability rather than permission denial.
 
-No Bloom filter, local permission cache, signed permission list, or negative
-permission-result cache is introduced in v1. Probabilistic structures are not
-allowed to make authoritative authorization decisions.
+### Safe caller pre-checks
 
-### Authorization overload isolation
+Before invoking Authorization, a resource-owning service may reject locally when access-token signature/algorithm/key, issuer/audience/time claims, required subject/tenant/membership/session shape, obvious tenant-context shape, permission-key syntax, or resource-identifier syntax is invalid.
+
+These checks may reject invalid traffic but MUST NOT grant access. The authoritative protected-operation decision remains one online `CheckPermission`.
+
+No Bloom filter, local permission cache, signed permission list, negative permission-result cache, Kafka invalidation path, or stale allow state is authoritative in v1.
+
+### Server overload isolation
 
 Authorization enforces:
 
 - global bounded in-flight `CheckPermission` concurrency;
 - per-caller-workload-principal fair-share concurrency;
-- no unbounded server request queue;
-- a maximum server-side queue wait of 25 ms;
-- a dedicated bounded database pool and bounded SQL;
-- load shedding with `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED` when the
-  service is healthy but saturated.
+- no unbounded request/application queue;
+- <=25 ms server-side queue wait before shedding;
+- dedicated bounded PostgreSQL pool and bounded SQL;
+- fair load shedding with stable overload status;
+- resource limits and autoscaling that respect the global PostgreSQL connection budget.
 
-Callers map overload/dependency failure to the existing fail-closed availability
-path; they do not convert it to `PERMISSION_DENIED` and do not retry.
+### Caller circuit breaker
 
-### Fail-closed caller circuit breaker
+Resource services apply the current ADR-0055/ADR-0066 fail-closed Authorization breaker.
 
-The resource service applies ADR-0055's circuit breaker to the Authorization
-client. The breaker counts infrastructure/dependency failures such as
-`UNAVAILABLE`, `DEADLINE_EXCEEDED`, equivalent transport failures, and explicit
-`RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED` saturation responses. An
-authoritative deny and expected contract errors do not trip it.
+Infrastructure/dependency failures—including timeout/unavailable/transport failure and explicit Authorization overload—count toward breaker failure. Authoritative deny and expected contract errors do not.
 
-An open breaker immediately returns
-`UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`. It never serves stale/cached allow
-state. The breaker is deliberately short-lived and half-open probes use the same
-single-attempt 300 ms maximum contract.
+OPEN returns `AUTHORIZATION_UNAVAILABLE` immediately and never serves stale/cached allow state. HALF_OPEN uses real `CheckPermission` probes under the same one-attempt 300 ms contract. Breaker reopen timing, de-correlation, and closing criteria follow ADR-0066.
 
-### Revised production objectives
+### Production deployment baseline
 
 ```text
-availability: >=99.95% rolling 30d
-p95 server latency: <=100 ms
-p99 server latency: <=200 ms
-caller deadline: 300 ms
-attempts: 1
-retry: none
-cache/stale fallback: none
+minimum replicas: 3
+PDB:              minAvailable=2
+topology spread:  required across available failure domains
+HPA initial min:  3
+HPA initial max:  12
+DB acquire budget <=50 ms per request path
+permission query budget <=100 ms
 ```
 
-The former 75/150 ms values become steady-state engineering targets, not paging
-SLOs. Launch/load gates use the 100/200 ms SLO. Alerts use multi-window burn and
-saturation signals rather than paging on an isolated percentile sample.
+HPA/pool maxima are included in the global PostgreSQL connection budget. Autoscaling does not permit unbounded concurrency or pool growth. Readiness reflects ability to safely serve permission checks; liveness does not flap merely because PostgreSQL is temporarily degraded.
 
-### Capacity gate
+### Capacity and launch gate
 
-Before production, prove >=2x projected peak while meeting the revised SLO with:
+Before production, prove >=2x projected peak while meeting p95<=100ms and p99<=200ms with:
 
-- >=30% CPU/memory/database headroom;
-- Hikari acquisition p99 <25 ms under steady target load;
-- no sustained request or pool queue growth;
+- >=30% CPU/memory/database headroom at the validated target;
+- Hikari acquisition p99 <25ms under steady target load;
+- no sustained application/request/pool queue growth;
+- fair-share isolation between caller principals;
 - one Authorization replica/node loss;
-- PostgreSQL failover;
+- PostgreSQL planned/unplanned failover under sustained permission traffic;
 - abusive invalid-token traffic rejected before Authorization;
-- abusive valid-token traffic bounded by caller/server bulkheads without unsafe
-  allow or retry amplification.
+- abusive valid-token traffic bounded by caller/server bulkheads without stale allow or retry amplification;
+- pool/HPA limits proven safe against the database connection budget.
 
-## Verification Requirements
+## Observability and alerting
 
-Tests cover all local pre-checks, one-and-only-one authoritative permission
-call, no Bloom/cache/fallback, fair-share isolation, queue/bulkhead shedding,
-fail-closed circuit behavior, error mapping, SQL/pool budgets, replica loss,
-failover, and >=2x peak latency/error-budget behavior.
+Track request outcome/latency, saturation/load-shed counts, queue wait, per-principal fair-share pressure without high-cardinality identity labels, breaker state/transitions, database pool acquisition, SQL latency, replica availability, and SLO burn.
 
-## Consequences
+Paging uses the paired-window burn policy defined by ADR-0062 rather than isolated percentile samples. ADR-0066 governs breaker recovery de-correlation and serialized real HALF_OPEN probes, not SLO burn thresholds.
 
-Authorization remains freshness-first while gaining explicit DoS/cascade
-protection. The relaxed paging SLO leaves useful headroom inside the 300 ms hard
-deadline without normalizing slow queries.
+## Verification requirements
+
+Tests cover safe pre-check rejection, exactly one authoritative permission call, no cache/Bloom/stale fallback, fair-share isolation, bounded queue/bulkhead shedding, overload/error mapping, breaker OPEN/HALF_OPEN recovery, SQL/pool budgets, HPA/pool connection-budget constraints, replica loss, PostgreSQL failover, invalid/valid abuse traffic, and >=2x peak latency/error-budget behavior.
+
+## Rollback considerations
+
+A rollback MUST NOT reintroduce permission caching, Kafka invalidation, retries, stale allow fallback, lower replica safety, unbounded queues, or pool/HPA limits that violate the global database budget. SLO/capacity changes require new load evidence before becoming release authority.

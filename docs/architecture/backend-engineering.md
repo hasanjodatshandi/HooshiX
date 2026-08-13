@@ -1,41 +1,20 @@
 # Backend Engineering Architecture
 
-The detailed implementation-level Java rules are maintained in `/docs/engineering/coding-standards.md`. Executable build/static-analysis/CI enforcement is defined in `/docs/engineering/build-and-ci-quality-enforcement.md` and ADR-0069. This document remains the current-state architectural summary.
+`../engineering/coding-standards.md` is the canonical implementation-level Java standard. `../engineering/build-and-ci-quality-enforcement.md` and ADR-0069 define executable enforcement/evidence. This document is the architecture-level summary.
 
 ## 1. Java and Spring model
 
-Backend application code uses Java 25 and Spring Boot 4.1.x. Spring MVC is the HTTP model. Virtual Threads are the default request/I/O concurrency model.
+Backend application code uses Java 25 and Spring Boot 4.1.x. Spring MVC + Virtual Threads is the default request/blocking-I/O model.
 
-Java Preview/Incubator APIs are prohibited in production without an accepted ADR and explicit preview enablement. Structured Concurrency remains prohibited while it is a Java 25 Preview API.
+Preview/Incubator APIs are prohibited in production without a new current reviewed decision and explicit enablement. WebFlux/Reactor/`Mono`/`Flux` are not part of the approved backend model unless architecture is intentionally changed.
 
-WebFlux, Reactor, `Mono`, and `Flux` are not part of the approved backend programming model unless a later ADR explicitly changes this decision.
-
-### Java 25 Virtual Thread safety
-
-Java 25 includes JEP 491 (delivered in JDK 24), so ordinary `synchronized`
-methods/statements no longer pin virtual threads merely because they hold or
-wait for a monitor. A blanket ArchUnit prohibition on `synchronized` is therefore
-prohibited as cargo-cult policy.
-
-Remaining scalability risks are still reviewed:
-
-- native/JNI or Foreign Function & Memory callbacks that block can still produce
-  `jdk.VirtualThreadPinned` JFR events;
-- long lock contention is still a latency problem even when it does not pin a
-  carrier;
-- class initialization/native frames can create rare remaining pinning cases;
-- Virtual Threads must not overdrive bounded JDBC/Redis/provider/CPU resources.
-
-Critical-path load/soak tests capture JFR and fail review on sustained carrier
-starvation, native pinning, unbounded contention, or dependency saturation. JDBC
-and other blocking drivers are validated under Java 25 rather than assumed safe
-from their API shape.
+Java 25 includes the JEP 491 monitor improvements delivered in JDK 24, so a blanket ban on `synchronized` is prohibited. Remaining concerns—native/FFM blocking/pinning, lock contention, carrier starvation, and overdriving bounded JDBC/Redis/provider/CPU resources—are measured with JFR/load/soak evidence.
 
 ## 2. DDD and Hexagonal Architecture
 
-DDD is used to define bounded contexts, ubiquitous language, aggregates, entities, value objects, domain services, domain events, and service/data ownership.
+DDD defines bounded contexts, ubiquitous language, aggregates, entities/value objects, domain services/events, and service/data ownership.
 
-Hexagonal Architecture is the primary internal structure. Inbound adapters invoke Application ports/use cases; outbound adapters implement Domain repositories or Application outbound ports.
+Hexagonal Architecture is the internal structure:
 
 ```text
 Inbound Adapter
@@ -45,11 +24,19 @@ Inbound Adapter
                 -> Outbound Adapter
 ```
 
-Controllers, gRPC handlers, and Kafka listeners may validate/map input, extract trusted security context, and invoke use cases. They do not contain business logic.
+Dependency direction:
 
-## 3. Canonical Java package structure
+```text
+Infrastructure -> Application -> Domain
+Interfaces     -> Application -> Domain
+Configuration  -> Application/Domain + adapters for composition
+```
 
-ADR-0007 is authoritative. The convention is **feature-first and nature-separated**. Packages use:
+Domain depends only on JDK/approved domain primitives. Application depends on Domain + abstract ports. Controllers/gRPC handlers/Kafka listeners validate/map/extract trusted context/invoke use cases; business logic remains Domain/Application.
+
+## 3. Canonical package structure
+
+Current coding standard is **feature-first + nature-separated**:
 
 ```text
 architectural layer
@@ -57,20 +44,10 @@ architectural layer
     -> type nature / technical responsibility
 ```
 
-Top-level service packages:
+Canonical top-level shape:
 
 ```text
-domain
-application
-infrastructure
-interfaces
-configuration
-```
-
-Example:
-
-```text
-com/sajtech/<service>/
+com.sajtech.<service>/
 ├── domain/<feature>/
 │   ├── aggregate/
 │   ├── entity/
@@ -86,152 +63,80 @@ com/sajtech/<service>/
 │   ├── port/in/
 │   ├── port/out/
 │   ├── usecase/
-│   └── saga/              # only when a real saga exists
+│   └── saga/                 # only for a real saga
 ├── infrastructure/<feature>/
-│   ├── persistence/
-│   │   ├── jpa/entity/
-│   │   ├── jpa/repository/
-│   │   ├── jpa/mapper/
-│   │   ├── jpa/specification/
-│   │   ├── jpa/adapter/
-│   │   └── query/
+│   ├── persistence/jpa/{entity,repository,mapper,specification,adapter}/
+│   ├── persistence/query/
 │   ├── cache/
 │   ├── config/
 │   ├── di/
-│   ├── messaging/
-│   │   ├── producer/
-│   │   ├── consumer/
-│   │   ├── outbox/
-│   │   └── inbox/
+│   ├── messaging/{producer,consumer,outbox,inbox}/
 │   ├── observability/
 │   ├── security/
+│   ├── client/
 │   └── worker/
-├── interfaces/<feature>/
-│   ├── grpc/
-│   ├── rest/
-│   └── kafka/
+├── interfaces/<feature>/{rest,grpc,kafka}/
 └── configuration/<feature>/
 ```
 
-Packages are created incrementally. Empty package trees and `.gitkeep` placeholders used only to display a future taxonomy are prohibited.
+Packages are created only when real code exists. Package segments match `[a-z][a-z0-9]*`. Dumping grounds such as `common`, `util`, `helper`, `manager`, `misc`, `generic` are prohibited for business code.
 
-Domain aggregate repository interfaces live in `domain/<feature>/repository` and must not be duplicated as `application/.../port/out` merely to satisfy a template.
+Aggregate repository interfaces live in `domain/<feature>/repository`; do not duplicate the same contract under Application merely to fit a template. Domain/JPA/generated/provider/transport models remain separate.
 
 ## 4. Standard service filesystem
 
-A service normally contains:
+Each independently deployable Java service normally owns:
 
 ```text
-service-name/
+services/<service>/
 ├── settings.gradle.kts
 ├── build.gradle.kts
-├── gradlew
-├── gradle/
+├── gradlew / gradlew.bat
+├── gradle/wrapper/
+├── gradle/verification-metadata.xml
 ├── Dockerfile
-├── contracts/
-│   ├── grpc/
-│   ├── events/
-│   └── openapi/
-├── src/
-│   ├── main/
-│   ├── test/
-│   ├── integrationTest/
-│   ├── contractTest/
-│   └── architectureTest/
+├── contracts/{grpc,events,openapi}/
+├── src/{main,test,integrationTest,contractTest,architectureTest}/
 └── deploy/
 ```
 
-Only directories with real responsibilities are created.
+Only directories with real responsibilities are created. The root build remains repository governance rather than one coupled multi-service release.
 
 ## 5. Dependency injection
 
 Spring IoC/ApplicationContext is the only DI container.
 
-Mandatory rules:
-
-- constructor injection for required dependencies;
-- no field injection;
-- no field `@Autowired`;
-- one-constructor classes do not need constructor `@Autowired`;
-- Domain models, entities, value objects, and domain events are not Spring beans;
-- Application use cases remain plain Java and should normally be wired in `configuration` with `@Bean`;
-- adapters/configuration may use Spring annotations;
-- no `ApplicationContext`, `BeanFactory`, service locator, or bean lookup in Domain/Application;
-- a use case never instantiates a real adapter directly;
-- circular dependencies are prohibited;
-- `@Lazy` may not hide a cycle;
-- setter injection is only for a truly optional infrastructure dependency with a safe default;
-- large constructor parameter counts trigger responsibility redesign;
-- singleton beans are stateless or thread-safe;
+- required dependencies use constructor injection;
+- field injection/field `@Autowired` are prohibited;
+- Domain objects/events are not Spring beans;
+- Application use cases remain plain Java and are normally composed in `configuration` with `@Bean`;
+- ApplicationContext/BeanFactory/service-locator/runtime lookup in Domain/Application is prohibited;
+- use cases do not instantiate concrete adapters;
+- circular dependencies and `@Lazy` cycle hiding are prohibited;
+- singleton beans are stateless or explicitly thread-safe;
 - mutable request state in singleton beans is prohibited;
-- request/session scope is BFF-only and requires explicit justification;
-- related typed configuration uses `@ConfigurationProperties`;
-- scattered `@Value` for one logical configuration group is prohibited;
-- multiple port implementations use explicit configuration and meaningful `@Qualifier` when required;
-- Domain/Application unit tests do not start Spring;
-- prefer `@Configuration(proxyBeanMethods = false)` when proxying is unnecessary.
+- request/session scope is BFF-only and justified;
+- related configuration uses typed `@ConfigurationProperties` rather than scattered `@Value`;
+- multiple implementations are selected explicitly through configuration/meaningful qualifiers.
 
-## 6. File and naming rules
+## 6. File, naming, API, and persistence rules
 
-Each meaningful aggregate, entity, value object, domain event, command, query, DTO, port, exception, persistence entity, mapper, repository adapter, controller, listener, worker, and configuration class normally has its own file.
+One meaningful public top-level type per file is the default. Ambiguous business names such as `Manager`, `Helper`, `Util`, `GenericService` are prohibited.
 
-A Java file normally contains one public top-level type.
+External REST errors use RFC 9457 Problem Details or a versioned extension. Internal errors use stable bounded gRPC statuses/metadata and do not copy arbitrary exception/provider text.
 
-Business dumping-ground packages such as `common`, `util`, `helper`, `manager`, `misc`, or `generic` are prohibited.
+HTTP/gRPC calls have finite budgets. Dynamic dependency versions and unapproved production SNAPSHOTs are prohibited. Logging uses structured allow-listed fields with CR/LF-safe input handling.
 
-Ambiguous names such as `Manager`, `Helper`, `Util`, and `GenericService` are prohibited for business types.
+Persistence follows aggregate/query needs rather than one-table/one-model dogma. JPA entities stay Infrastructure-only; Domain/JPA are separate. OSIV, N+1, broad EAGER loading, unbounded queries, `SELECT *`, remote I/O inside DB transactions, and DB locks held across remote I/O are prohibited. Performance-sensitive batch/fetch/flush/query plans are measured.
 
 ## 7. Comments and JavaDoc
 
-Comments explain reasons, constraints, trade-offs, and non-obvious invariants rather than restating code.
+Comments explain reasons/constraints/trade-offs/invariants, not code narration. JavaDoc is appropriate for public APIs/ports/contracts/extensions/non-trivial lifecycle behavior. No file-header comment is mandatory. Source comments/JavaDoc use English; long architectural explanations belong in Markdown/current ADRs.
 
-JavaDoc is appropriate for public APIs, ports, contracts, extension points, and non-trivial lifecycle/invariant behavior.
+## 8. Automated enforcement
 
-There is no requirement for a header comment in every file. Source comments and JavaDoc are written in English. Long architectural explanations belong in ADRs or Markdown documentation.
+Applicable ArchUnit rules prove Domain/Application dependency direction, persistence package placement, forbidden runtime lookup/field injection, package naming/dumping-ground rules, and absence of cycles.
 
-## 8. API, configuration, and implementation details
+ADR-0069 additionally requires Spotless, SpotBugs, repository Semgrep/static rules, Gradle dependency verification/locks, applicable test/contract/schema tasks, workload/deployment policy validation, and GitHub Actions required-check/release evidence.
 
-Additional mandatory implementation rules include:
-
-- external REST errors use RFC 9457 Problem Details or an explicitly versioned extension profile;
-- HTTP clients define finite connect and response/read timeouts;
-- related configuration uses typed `@ConfigurationProperties`;
-- dynamic dependency versions and unapproved production SNAPSHOTs are prohibited;
-- logging uses structured allow-listed fields and input-derived fields are CR/LF/delimiter safe;
-- persistence models follow aggregate/query needs rather than a mandatory one-table/one-model mapping;
-- JPA/Hibernate batch/fetch/flush tuning for performance-sensitive paths is measured rather than copied as magic defaults.
-
-See `/docs/engineering/coding-standards.md` for the full normative coding standard.
-
-## 9. Prohibited coding practices
-
-Unless a later accepted ADR explicitly permits them:
-
-- business logic in controllers/listeners;
-- framework-dependent Domain models;
-- shared business-model `common` packages;
-- field injection or service locator;
-- circular dependencies or `@Lazy` cycle hiding;
-- WebFlux/Reactor programming model;
-- `Thread.sleep` for coordination;
-- unbounded retries/timeouts;
-- network I/O inside database transactions;
-- direct cross-service database access;
-- raw infrastructure types leaking into Domain/Application;
-- preview/incubator APIs in production without ADR approval;
-- unrelated large refactors during narrow tasks.
-
-## 10. ArchUnit and quality enforcement
-
-Architecture tests enforce at least:
-
-- Domain has no Spring/JPA/Kafka/Redis/gRPC/Infrastructure/Interfaces dependency;
-- Application has no Infrastructure/Interfaces/concrete-adapter dependency;
-- JPA entities remain under infrastructure persistence;
-- inbound adapters invoke Application ports/use cases;
-- prohibited dumping-ground packages do not exist;
-- package names follow lowercase/no-hyphen/no-underscore conventions;
-- dependency cycles are absent.
-
-
-ADR-0069 additionally requires Spotless, SpotBugs, repository-owned Semgrep rules, Gradle dependency verification, and GitHub Actions required-check evidence. Documentation alone is not proof that these gates are implemented or that Java source complies.
+Machine-checkable rules SHOULD be executable. Documentation alone is never source/runtime compliance evidence.

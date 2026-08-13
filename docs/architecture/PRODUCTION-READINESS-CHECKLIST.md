@@ -1,280 +1,263 @@
-# Production Readiness Checklist
+# Production Readiness Checklist — Current State
 
-Accepted ADRs through ADR-0069 resolve the current architecture decisions identified during the production reviews. This file tracks the remaining **implementation and evidence checks**. It is not permission to invent different architecture or bypass an accepted ADR through configuration.
+This checklist tracks **implementation and executable evidence**, not architecture discovery. Current retained ADRs/current-state documents define the target. A missing/failed gate is never permission to redesign or bypass the target through configuration.
 
-Production configuration MUST NOT bypass a failed gate.
-
-Architecture decisions in this checklist are already **DECIDED** by accepted ADRs.
 For each applicable item:
 
 ```text
 Architecture: DECIDED
 Implementation: REQUIRED
-Evidence: NOT VERIFIED until measured/tested
+Evidence: NOT VERIFIED until executed/measured
 ```
 
-A missing evidence result is not permission to redesign or bypass the accepted architecture.
+Production configuration MUST NOT bypass a failed gate.
 
-## 1. Kubernetes active-cluster HA
-
-Before claiming production HA under ADR-0051:
-
-- 3 healthy stacked control-plane/etcd nodes;
-- stable redundant L4 Kubernetes API endpoint;
-- at least 3 schedulable worker nodes;
-- critical replicas demonstrably spread across nodes/failure domains;
-- one control-plane failure and one-worker drain/failure tests pass;
-- N+1 worker capacity for Class A/Authorization projected peak;
-- encrypted off-node etcd snapshots and restore procedure are verified.
-
-Status until verified: **platform HA production blocker**.
-
-## 2. Semantic quota enforcement — ADR-0041
+## 1. Kubernetes active-cluster HA — ADR-0051
 
 Required evidence:
 
-- Redis 1-primary/2-replica/3-Sentinel topology healthy across failure domains;
-- TLS, ACL, key-namespace isolation, and `noeviction` verified;
-- atomic token-bucket/GCRA multi-dimension tests with no partial consumption;
-- ADR-0054 dual-clock refill/skew failure and proof that Redis TTL expiry cannot reset a security budget;
-- HMAC pseudonymous-key rotation without budget reset;
-- login/MFA-recovery anti-lockout and non-enumeration tests;
-- Redis outage/failover fails protected operations closed without converting dependency failures into false quota denials;
+- 3 healthy stacked control-plane/etcd nodes;
+- stable redundant L4 API endpoint;
+- >=3 schedulable workers;
+- critical replica spread across failure domains;
+- one control-plane and one-worker loss/drain tests;
+- N+1 critical-path worker capacity;
+- encrypted off-node etcd snapshots + tested restore/rebuild.
+
+Status until verified: **platform HA production blocker**.
+
+## 2. Semantic quotas — ADR-0054
+
+Required evidence:
+
+- Redis 1-primary/2-replica/3-Sentinel topology across failure domains;
+- TLS/ACL/key-namespace isolation + `noeviction`;
+- one atomic multi-dimension quota operation with no partial consumption;
+- trusted app time + Redis `TIME`, <=2s skew, monotonic effective time, no TTL security reset;
+- HMAC pseudonymous keying/rotation without budget reset;
+- authentication/MFA/recovery anti-lockout + non-enumeration tests;
+- Redis outage/failover fails protected operations closed without converting dependency failure into false quota denial;
 - production profiles cannot bypass the limiter;
-- >=2x projected peak load with p95<=10ms, p99<=25ms, 75ms ceiling, >=30% memory headroom, zero eviction.
+- >=2x projected peak with p95<=10ms, p99<=25ms, 75ms ceiling, >=30% memory headroom, zero eviction.
 
-Status until verified: **blocking for ADR-0040-gated entry points**.
+Status until verified: **blocker for semantic-quota-protected production entry points**.
 
-## 3. Authorization online dependency — ADR-0039/0056/0062/0066
+## 3. Online Authorization — ADR-0039/0056/0062/0066
 
 Required evidence:
 
 - >=3 replicas, PDB `minAvailable=2`, topology spread;
-- `CheckPermission` availability >=99.95%;
-- p95<=100ms and p99<=200ms at >=2x projected peak (75/150ms steady-state engineering target);
+- availability >=99.95%; p95<=100ms/p99<=200ms at >=2x projected peak;
 - exact 300ms/one-attempt/wait-for-ready-off/no-cache/no-retry/no-fallback behavior;
-- bounded in-flight concurrency and no unbounded internal queue;
-- repeated OPEN intervals de-correlate across caller replicas with bounded reopen backoff; tenant tier does not alter breaker semantics;
-- HALF_OPEN permits only one real `CheckPermission` probe in flight per caller breaker; three consecutive infrastructure-successful probes close and any infrastructure failure reopens;
-- machine-readable dependency registry schema/coverage/render checks pass for the Authorization edge and every other production synchronous edge;
-- Hikari acquisition p99<20ms at target load, acquisition ceiling<=50ms, permission SQL ceiling<=100ms;
-- no synchronous downstream dependency other than Authorization-owned PostgreSQL;
-- routine duplicate BFF permission check absent;
-- one replica/node loss and CloudNativePG primary failover under sustained Authorization traffic preserve fail-closed semantics and objectives.
+- bounded global/per-caller concurrency and no unbounded queue;
+- current 50%-window/five-consecutive breaker opening behavior;
+- repeated OPEN durations de-correlate with bounded reopen backoff;
+- HALF_OPEN permits one real `CheckPermission` probe in flight; three consecutive infrastructure-successful probes close; infrastructure failure/overload reopens;
+- health endpoint cannot close the breaker; tenant/commercial tier does not alter breaker semantics;
+- `dependency-criticality.yaml` schema/coverage/render checks pass;
+- Hikari acquisition p99<25ms, acquisition ceiling<=50ms, permission SQL ceiling<=100ms;
+- no synchronous downstream other than Authorization-owned PostgreSQL;
+- no routine duplicate BFF permission check;
+- one replica/node loss and PostgreSQL primary failover preserve fail-closed semantics/objectives.
 
-Status until verified: **blocking for protected-operation production traffic**.
+Status until verified: **protected-operation production blocker**.
 
-## 4. PostgreSQL HA and recovery — ADR-0048/0057/0064/0067
+## 4. PostgreSQL isolation/HA/recovery — ADR-0048/0057/0064/0067
 
-Required evidence:
+Required evidence per persistent service:
 
-- CloudNativePG 3-instance topology across independent schedulable failure domains where infrastructure permits;
-- automatic safe primary failover;
+- dedicated production CloudNativePG cluster/database/runtime+migration roles/Flyway history/backup identity;
+- 3 instances for critical clusters across independent schedulable failure domains where possible;
 - synchronous acknowledgement from one failover-eligible replica for required durable writes;
-- planned switchover and unplanned primary-failure tests, ordinary failover target <=60s;
-- ADR-0053 database isolation: a distinct database and runtime/migration credentials per persistent microservice, default/public privilege review, and negative `CONNECT`/object-access tests against every other service database;
-- aggregate application Hikari maxima <=70% of PostgreSQL `max_connections`, with >=30% reserve;
-- continuous WAL archive healthy and measured against PostgreSQL RPO<=5m;
-- encrypted off-site daily physical base backup;
-- 35-day PITR restore test;
-- monthly retained recovery artifacts for 12 months;
-- monthly isolated restore and quarterly full DR evidence;
-- each monthly restore records backup/WAL source, requested/actual recovery timestamp, measured RPO/RTO, PostgreSQL/CNPG/Flyway versions, integrity/RLS/erasure checks, runbook revision, owner, and PASS/FAIL;
-- fleet dashboard shows last successful restore, measured RPO/RTO, next due date, and overdue/failed status per service;
-- a failed monthly restore freezes ordinary promotion for the affected service until a replacement drill passes;
-- upgrade tests prove staging failure stops later waves, reversible GitOps/operator rollback works when supported, and irreversible/major database changes are never automatically downgraded;
-- a tested single-service database recovery procedure that does not overwrite unrelated live service databases;
-- Notification acknowledged `DISPATCHING` commit survives every permitted automatic failover and never causes blind redispatch.
+- safe automatic failover; planned/unplanned failover evidence, ordinary target <=60s when durability is preserved;
+- negative cross-service `CONNECT`/object privilege tests;
+- forced tenant RLS; runtime roles `NOSUPERUSER NOBYPASSRLS` and non-owner;
+- aggregate application Hikari maxima <=70% `max_connections`;
+- continuous WAL archive measured against RPO<=5m;
+- encrypted off-site daily physical base backup + 35-day PITR;
+- monthly retained artifacts for 12 months where policy requires;
+- monthly isolated restore + quarterly full DR;
+- restore record includes backup/WAL identity, requested/actual timestamp, RPO/RTO, versions/Flyway, integrity/RLS/erasure checks, runbook revision, owner, PASS/FAIL;
+- dashboard exposes last restore/RPO/RTO/next due/overdue/failed state;
+- failed monthly restore freezes ordinary affected-service promotion until replacement drill passes;
+- upgrade waves stop on staging/production failure; reversible state only rolls back when supported; irreversible/major changes never use unsafe downgrade;
+- Notification acknowledged `DISPATCHING` survives every permitted automatic failover with no blind redispatch.
 
-Status until verified: **platform production blocker**.
+Status until verified: **platform/data production blocker**.
 
-## 5. Kafka durability and cold-DR replay — ADR-0044
+## 5. Kafka durability/rebuildable DR — ADR-0044
 
 Required evidence:
 
-- KRaft 3 dedicated controllers + 3 brokers across failure domains;
-- critical topics: RF=3, minISR=2, unclean leader election disabled;
-- critical producers: `acks=all`, idempotence enabled;
-- TLS, authenticated per-service principals, ACLs, quotas;
-- every event class explicitly `OUTBOX_REPLAYABLE`, `RECONSTRUCTABLE`, or `NON_CRITICAL`;
-- replayable critical publication evidence retained 35 days, subject to privacy/erasure/legal-hold policy;
-- consumer dedupe/inbox evidence covers the required replay horizon;
-- clean Kafka can be recreated from Git and critical flows replayed/reconstructed from authoritative service state;
-- quarterly representative Kafka reconstruction/replay exercise scheduled and passing.
+- 3 dedicated controllers + 3 brokers;
+- critical RF3/minISR2/unclean leader election disabled;
+- critical producers `acks=all` + idempotence;
+- TLS/authenticated per-service principals/ACLs/quotas;
+- event classes explicitly `OUTBOX_REPLAYABLE`, `RECONSTRUCTABLE`, or `NON_CRITICAL`;
+- replayable critical publication evidence + participating consumer dedup evidence cover 35 days;
+- clean Kafka can be rebuilt from Git and critical flows replayed/reconstructed;
+- quarterly representative reconstruction/replay exercise.
 
-Status until verified: **blocking for critical production async flows**.
+Status until verified: **critical async-flow blocker**.
 
 ## 6. Browser/BFF security — ADR-0045
 
 Required evidence:
 
-- OIDC Authorization Code + PKCE S256, state and nonce replay/mismatch tests;
-- exact registered redirect URI and open-redirect negative tests;
-- `__Host-sajtech-session` cookie flags and session-fixation/rotation tests;
-- server-side BFF session behavior and encrypted refresh-credential storage where used;
-- Origin + synchronizer-token CSRF positive/negative tests;
-- same-origin/default-deny CORS and exact allow-list negatives where cross-origin is explicitly needed;
-- CSP/HSTS/nosniff/referrer/Permissions-Policy checks;
-- browser storage scan proves no provider, refresh, Identity, or internal service token is exposed.
+- OIDC Authorization Code + PKCE S256, state/nonce replay/mismatch negatives;
+- exact redirect and open-redirect negatives;
+- secure `__Host-sajtech-session` + fixation/rotation tests;
+- server-side session + encrypted refresh-credential handling where used;
+- Origin + synchronizer-token CSRF positives/negatives;
+- same-origin/default-deny CORS;
+- CSP/HSTS/nosniff/referrer/Permissions-Policy/frame checks;
+- browser/storage/service-worker inspection proves no provider/internal token leakage or private authenticated cache.
 
-Status until verified: **public-internet production blocker**.
+Status until verified: **public-internet blocker**.
 
-## 7. Supply-chain admission and vulnerability response — ADR-0046/0065/0068
+## 7. Supply chain + vulnerability response — ADR-0046/0065/0068
 
 Required evidence:
 
-- CI emits CycloneDX SBOM, signed provenance, vulnerability result, and Cosign signature/attestations for immutable image digests;
-- staging and production promote the exact same digest;
-- Kyverno stable `policies.kyverno.io/v1` image-validation policy deployed with >=3 admission replicas, PDB, topology spread before fail-closed mode;
-- audit rollout completed before production `Deny` enforcement;
-- unsigned, wrong-signer, wrong-provenance/source/builder, mutable-tag-only, and unapproved-registry images are denied;
-- emergency path still requires an approved trusted signer and audited bounded exception; no unsigned production bypass;
-- advisory/KEV ingestion runs <=2h and targeted correlation/rescan is triggered for affected deployed SBOMs;
-- CISA KEV/known-exploited or Critical production findings page Security + service owner; High findings follow the <=48h remediation target;
-- expired exceptions immediately stop authorizing promotion; running production exposure escalates by severity and is never silently renewed;
-- transitive dependency findings route to the deployed service owner; shared base/runtime findings route to Platform plus all consuming services;
-- stale mandatory feed/scanner state fails promotion closed.
+- final-image CycloneDX SBOM, signed provenance, vulnerability result, Cosign signature/attestations for immutable digest;
+- exact same signed digest staging -> production;
+- Kyverno stable image-validation policy with >=3 replicas/PDB/spread before fail-closed mode;
+- audit rollout before production deny enforcement;
+- unsigned/wrong-signer/wrong-provenance/mutable-tag-only/unapproved-registry negatives;
+- no unsigned emergency bypass;
+- advisory/KEV ingestion <=2h + targeted affected-digest rescan;
+- full deployed inventory rescan <=6h;
+- known-exploited/Critical production findings page Security + owner with <=24h mitigation target; High <=48h;
+- expired exceptions stop promotion immediately and escalate production exposure;
+- transitive findings route to deployed-artifact owner; shared base/runtime findings route to Platform + consumers;
+- stale required feed/scanner state fails promotion closed.
 
 Status until verified: **production deployment-security blocker**.
 
-## 8. Notification simplified runtime — ADR-0043 + ADR-0047
+## 8. Notification runtime — ADR-0029/0030/0043/0047/0049
 
 Required evidence:
 
-- local mounted AES-256-GCM key-ring rotation, historical decrypt, refresh, corruption, staleness, and readiness tests;
-- no OpenBao RPC during Notification acceptance, dispatch, retry, reconciliation, or erasure;
-- former clock-health sidecar/Chrony `hostPath`/9095 polling/fence/coordinator resources absent from current production desired state;
-- PostgreSQL-authoritative acceptance/deadline boundary tests;
-- crash before and after durable `DISPATCHING` commit;
-- CloudNativePG failover around dispatch commit;
-- stale/unknown `DISPATCHING` always enters reconciliation/ambiguity handling and never blind redispatch;
-- exact-content retry, terminal-state immutability, and escrow-erasure invariants remain intact.
+- local AES-256-GCM key-ring rotation/historical decrypt/refresh/corruption/staleness/readiness;
+- no OpenBao RPC on acceptance/dispatch/retry/reconciliation hot paths;
+- no application clock-health sidecar/Chrony `hostPath`/dispatch-fence control plane in desired state;
+- PostgreSQL-authoritative deadline boundaries;
+- request replay/fingerprint conflict behavior;
+- crash before/after durable `DISPATCHING` commit;
+- database failover around dispatch commit;
+- unknown/stale `DISPATCHING` reconciles, never blind resend;
+- exact-content retry/terminal immutability/escrow erasure;
+- Liara SMTP STARTTLS/auth/outcome classification;
+- IPPanel accepted/report fixtures, ambiguity/no blind retry, bounded polling/backpressure;
+- local logging SMS impossible in staging/production.
 
 Status until verified: **Notification production blocker**.
 
-## 9. OpenBao operational recovery
-
-OpenBao intentionally remains single-node in v1 because ADR-0043 removes it from normal Notification request/dispatch hot paths and applications consume validated local mounted key material.
+## 9. OpenBao recovery — ADR-0037
 
 Required evidence:
 
 - exact 2.6.1 image digest;
-- Shamir 3-share/2-threshold custody runbook and access test;
-- encrypted hourly snapshot outside primary PVC plus pre-upgrade snapshots;
+- Shamir 3-share/2-threshold custody/access runbook;
+- encrypted hourly snapshot outside primary PVC + pre-upgrade snapshots;
 - restore + manual unseal exercise;
 - External Secrets/key refresh staleness alerting and fail-closed behavior after allowed local-key staleness;
-- recovery fits the ADR-0027 platform RTO sequence;
-- Istio Root CA private key absent from Kubernetes and OpenBao.
+- recovery fits platform RTO sequence;
+- Istio Root CA private key absent from Kubernetes/OpenBao.
 
-Status until verified: **secret-platform production blocker**.
+Status until verified: **secret-platform blocker**.
 
-A 3-node OpenBao HA decision is required only if measured refresh/recovery availability, compliance, or RTO evidence shows the current control-plane topology is insufficient. Do not add HA merely for symmetry.
-
-## 10. WAF and edge enforcement — ADR-0024
+## 10. WAF + upstream DDoS — ADR-0024/0059
 
 Required evidence:
 
-- only public application route is Traefik -> edge-waf -> Web BFF;
-- NetworkPolicy/Istio negative tests block direct Traefik/Internet-to-BFF application paths;
-- two WAF replicas when >=2 schedulable worker nodes;
-- >=7 representative days DetectionOnly;
-- reviewed narrow CRS exceptions;
-- blocking-mode load/latency test, including Class-A paths;
-- endpoint-specific bounded body-inspection policy for large uploads when needed;
-- no request/response body, credential, token, or PII logging.
+- only public application path is upstream/LB -> Traefik -> edge-waf -> Web BFF;
+- direct bypass negative tests;
+- replicated WAF/placement according to current HA target;
+- >=7 representative DetectionOnly days + reviewed narrow exceptions;
+- blocking-mode load/latency + endpoint body-limit tests;
+- no sensitive request/response logging;
+- upstream L3/L4 mitigation provider capability/escalation/runbook;
+- origin-bypass/connection-pressure controls and authorized saturation exercise.
 
-Status until verified: **public-internet production blocker**.
+Status until verified: **public-internet blocker**.
 
 ## 11. Iran SMS / SMS MFA — ADR-0049
 
 Required evidence:
 
-- IPPanel Edge Webservice-mode sandbox fixture pins the definitive accepted-response correlation field/type;
-- recipient-level report fixtures pin all current status mappings, including delivered evidence;
-- exact Notification-rendered SMS text is submitted; provider-managed Pattern rendering is absent;
-- dedicated token from OpenBao, 90-day rotation, emergency revocation, bounded egress;
-- 500ms connect / 1500ms total request timeout / no HTTP automatic retry verified;
-- timeout/connection-loss/malformed/unproven acceptance maps to `AMBIGUOUS` and never blind resubmits;
-- bounded 15s -> 15m receipt polling/backpressure cannot create provider poll storms;
-- production profile cannot activate `LoggingSmsProviderAdapter`;
-- SMS MFA additionally passes ADR-0041 quotas and ADR-0038 MFA security tests.
+- IPPanel Webservice sandbox fixture pins definitive accepted correlation field/type;
+- recipient-level report fixture pins current status mappings;
+- exact Notification-rendered text; no provider-managed Pattern authority;
+- dedicated OpenBao credential, 90-day rotation/emergency revocation, bounded egress;
+- 500ms connect / 1500ms total / no automatic HTTP retry;
+- timeout/connection loss/malformed/unproven acceptance -> `AMBIGUOUS`, never blind resend;
+- bounded report polling/backpressure;
+- local logging adapter cannot activate in production;
+- SMS MFA additionally passes ADR-0054 quotas and current Identity MFA/session gates.
 
-Status until verified: **blocking only for SMS-dependent production features, including SMS MFA; Email-only capabilities may proceed independently**.
+Status until verified: **SMS-dependent feature blocker; unrelated Email-only capabilities may proceed independently**.
 
 ## 12. Platform compatibility / CNI / immutable artifacts — ADR-0050
 
 Required evidence:
 
-- every deployed platform/application image is pinned by immutable digest;
-- Technology Baseline and compatibility matrix are revalidated against supported upstream combinations at release time;
-- Kubernetes/Istio Ambient/Calico NetworkPolicy positive and negative flows pass, including required HBONE/health paths;
-- CloudNativePG/cert-manager/Kyverno/Traefik/Gateway API/WAF combinations render and validate cleanly;
-- `istioctl analyze`, Helm/Kustomize/Kubernetes policy checks pass;
-- both staging and production desired state render without secret values;
-- rollback manifests/digests remain available;
-- an upstream-EOL component is upgraded to a supported compatible release before rollout rather than deployed solely because an older baseline names it.
+- every deployed image pinned by immutable digest;
+- Technology Baseline + compatibility matrix revalidated against upstream support/security at release time;
+- Kubernetes/Istio Ambient/Calico positive/negative flows including HBONE/health;
+- CloudNativePG/cert-manager/Kyverno/Traefik/Gateway API/WAF render/compatibility checks;
+- `istioctl analyze`, Helm/Kustomize/Kubernetes policy checks;
+- staging/production desired state renders without secret values;
+- rollback artifacts/digests remain available;
+- unsupported/EOL components are replaced by supported compatible baseline before rollout.
 
 Status until verified: **platform release blocker**.
 
-## 13. RS256 signing-key lifecycle — ADR-0052
+## 13. JWT signing-key lifecycle — ADR-0052
 
-Before user-token-protected production traffic:
+Required evidence:
 
-- RSA-3072 private signing keys exist only in Identity/OpenBao local delivery;
-- next public key is deployed to every verifier before activation;
-- local GitOps public verification bundle loads atomically;
-- algorithm-confusion/unknown-kid/issuer/audience negative tests pass;
-- 90-day normal rotation and emergency compromise rotation are exercised;
-- no normal token verification network call to Identity/OpenBao/remote JWKS;
-- private-key Git/telemetry leak tests pass.
+- RSA-3072/RS256 private signing keys only in Identity local/OpenBao delivery boundary;
+- next public key deployed/verified before activation;
+- local GitOps verifier bundle reloads atomically;
+- algorithm-confusion/unknown-kid/issuer/audience negatives;
+- 90-day normal rotation + emergency compromise exercise;
+- no normal verification call to Identity/OpenBao/remote JWKS;
+- private-key Git/telemetry leak tests.
 
-Status until verified: **authentication trust production blocker**.
+Status until verified: **authentication-trust blocker**.
 
-## 14. Java coding/build/CI enforcement — ADR-0069
+## 14. Java/source/build/CI — ADR-0069
 
-Required evidence for each Java service before claiming implementation compliance:
+For each Java service:
 
-- independent `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, and dependency verification metadata exist and work from a clean checkout on Java 25;
-- required source sets/tasks are present for applicable `test`, `integrationTest`, `contractTest`, and `architectureTest`;
-- `spotlessCheck`, `spotbugsMain`, ArchUnit, and repository Semgrep blocking rules pass;
-- custom ArchUnit/Semgrep rules have representative positive/negative fixtures and no broad suppression;
-- GitHub Actions required checks enforce the quality gates with least-privilege workflow permissions and pinned third-party actions;
-- the service source actually satisfies the coding standard; documentation is not used as compliance evidence;
-- production promotion uses the same previously built/signed immutable image digest validated in staging;
-- mandatory tests/analyzers are not disabled and `ignoreFailures`/blanket exclusions are absent.
+- independent `settings.gradle.kts`/`build.gradle.kts`/Wrapper/dependency verification from clean checkout on Java 25;
+- applicable test/integration/contract/architecture tasks exist;
+- Spotless, SpotBugs, ArchUnit, repository Semgrep pass;
+- custom static rules have positive/negative fixtures and no broad suppression;
+- GitHub Actions required checks use least privilege and pinned third-party actions;
+- source actually satisfies Java/SQL/deployment standards;
+- promotion uses same previously built/signed digest;
+- mandatory checks are not disabled/`ignoreFailures`/blanket-excluded.
 
-Status until verified: **Java service implementation/release blocker**.
+Status until verified: **Java implementation/release blocker**.
 
-## 15. Final load, chaos, recovery, and release evidence
+## 15. Frontend/source/browser quality
 
-The exact release candidate passes applicable:
+For affected frontend releases:
 
-- Class-A/Class-B load and latency tests;
-- Authorization/Redis/PostgreSQL/Kafka/WAF/provider capacity tests;
-- replica/node/database failover tests;
-- security-negative and workload-identity tests;
-- backup/PITR/restore evidence;
-- smoke, BDD, critical Playwright, rollback verification;
-- SLO/error-budget release policy checks.
+- Prettier/ESLint/type-aware strict TypeScript/typecheck pass;
+- no unsafe token storage or service-worker private caching;
+- generated OpenAPI client contract is current;
+- unit/component/accessibility tests pass;
+- critical Playwright flows pass without fixed-sleep/flaky-retry masking;
+- route bundle/performance budget passes;
+- browser security/headers/session behavior passes.
 
-Use `performance-and-bottlenecks.md` for the current bottleneck register and scale/split triggers.
+Status until verified: **frontend release blocker when applicable**.
 
-Status until verified: **final release blocker**.
+## 16. Final release evidence
 
-## Additional security verification gates from ADR-0057..ADR-0061
+The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/WAF/provider capacity, node/replica/database failover, security-negative/workload-identity, backup/PITR/restore, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
 
-Architecture is DECIDED; production evidence is still required for:
-
-- per-service physical CloudNativePG isolation, forced tenant RLS, runtime-role
-  `NOSUPERUSER NOBYPASSRLS`, independent backup permissions, and per-service PITR;
-- end-to-end data-subject erasure including legal hold, service receipts, and
-  restore-then-re-erasure before traffic;
-- upstream L3/L4 volumetric DDoS provider capability, escalation/runbook,
-  connection-pressure controls, and authorized edge saturation test;
-- Teleport SSO/WebAuthn JIT access, two-reviewer privileged write elevation,
-  automatic expiry, direct-access denial, and session/audit evidence;
-- custom Semgrep logging policy, telemetry redaction, seeded PII/secret canary
-  absence in the downstream sink, and runtime leakage detector alert safety;
-- digest-indexed signed CycloneDX SBOM plus final-image transitive-vulnerability/advisory correlation, expiring-exception escalation, and deterministic artifact ownership;
-- Java 25 JFR evidence for remaining native/FFM virtual-thread pinning and scarce
-  dependency saturation; `synchronized` itself is not blanket prohibited.
+Until actual service source/build/workflows/manifests and these checks exist/pass, implementation evidence remains **NOT VERIFIED**.

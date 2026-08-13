@@ -1,149 +1,48 @@
-# ADR-0024: Select a Dedicated Caddy and Coraza Edge WAF
+# ADR-0024: Dedicated Caddy + Coraza Edge WAF v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-09
-
-## Relationship to Earlier Decisions
-
-This ADR resolves the pending self-hosted production WAF decision in the
-canonical architecture. It replaces the previously listed production options
-of a managed cloud WAF or Traefik Hub Native Coraza with the dedicated tier
-defined here.
-
-It does not change Traefik's gateway, routing, coarse rate-limiting, TLS, or
-observability responsibilities, and it does not weaken application validation
-or Identity semantic rate limiting.
-
-## Context
-
-The production platform is self-hosted. The WAF must remain an independently
-bounded edge control rather than Java application code or a preview integration
-inside Traefik. Public application traffic needs one enforceable path through
-the WAF before reaching `web-bff`.
-
-WAF rules and request-body inspection can affect legitimate traffic and must
-therefore be versioned, bounded, observed, tuned, and promoted through GitOps.
+2026-08-10; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Product and topology
-
-The production WAF uses:
-
-- OWASP Coraza v3;
-- OWASP Core Rule Set 4.x LTS;
-- a dedicated stateless `edge-waf` tier using Caddy with Coraza.
-
-The canonical public application path is:
+Production public application traffic follows:
 
 ```text
-Internet / External Load Balancer
-  -> Traefik
-  -> dedicated Caddy + Coraza edge-waf
-  -> web-bff
+Internet / upstream L3-L4 mitigation
+-> external load balancing
+-> Traefik
+-> dedicated edge-waf (Caddy + Coraza + OWASP CRS)
+-> Web BFF
 ```
 
-Traefik routes public application traffic to `edge-waf`. The WAF forwards only
-to `web-bff`. A direct Internet-to-BFF or Traefik-to-BFF application path is
-prohibited and must be denied through Kubernetes NetworkPolicy and Istio
-authorization in addition to route configuration.
+The WAF is a separately deployable edge workload. It is not implemented as a Java/Spring filter and cannot be bypassed by an alternate public Traefik -> BFF route.
 
-The direct Traefik Coraza integration is not selected for production. The WAF
-is not implemented in Spring, a Java filter, or application business logic.
+### Enforcement
 
-### Availability baseline
+- Caddy + Coraza v3 + the approved CRS 4.x LTS line;
+- exact artifact/rule pins live in the Technology Baseline and deployment metadata;
+- PL1 initial policy;
+- at least seven representative days in DetectionOnly before reviewed blocking enablement;
+- rule exclusions are narrow, reasoned, owned, reviewed, and versioned;
+- automatic CRS/rule upgrades are prohibited;
+- request-body inspection is bounded; large/upload routes define explicit body policy rather than globally increasing limits;
+- WAF/edge telemetry MUST NOT log full bodies, credentials, tokens, cookies, or unreviewed PII.
 
-`edge-waf` uses two replicas when the cluster has at least two schedulable
-worker nodes. A one-replica fallback is allowed only when the cluster physically
-has one worker node.
+### Availability and identity
 
-The workload remains stateless. Placement, disruption, readiness, and routing
-must avoid treating the one-replica fallback as equivalent to redundant
-production availability.
+Production WAF replication, PDB/topology placement, ServiceAccount, NetworkPolicy, and Istio authorization follow current runtime/SLO requirements. Route and policy controls MUST deny direct Internet -> BFF and Traefik -> BFF application access.
 
-### CRS policy and rollout
+The WAF provides L7 HTTP inspection only. Upstream volumetric DDoS protection is separately mandatory and the in-cluster WAF MUST NOT be described as bandwidth-saturation protection.
 
-The initial CRS paranoia level is `PL1`.
+## Verification requirements
 
-Rollout follows:
+Verify public-route traversal through WAF, direct-bypass negative tests, representative DetectionOnly tuning evidence, controlled blocking tests, request-size/body limits, one-replica/node-loss behavior where HA applies, incremental latency/load impact, PII-safe logging, pinned rule/artifact integrity, and NetworkPolicy/Istio positive/negative paths.
 
-```text
-DetectionOnly -> tune bounded exceptions -> blocking
-```
+## Rollback considerations
 
-`DetectionOnly` runs for at least 7 days of representative traffic before
-blocking is eligible. Moving to blocking requires review of observed rule hits
-and narrowly scoped, documented exceptions.
-
-Rule and CRS changes require an explicit GitOps pull request. Images and rule
-artifacts are pinned by exact version and immutable digest.
-Automatic CRS updates are prohibited.
-
-### Inspection and control boundaries
-
-Request-body inspection is bounded. Endpoints requiring large uploads receive
-a separately approved endpoint-specific policy before those uploads are
-enabled. This ADR does not select the numeric body-inspection limit.
-
-The WAF does not replace:
-
-- Traefik coarse edge rate limiting;
-- Identity semantic and security-sensitive rate limiting;
-- authentication or authorization;
-- input validation, output encoding, or secure coding.
-
-WAF logs record bounded rule identifiers and disposition without request or
-response bodies, credentials, tokens, or PII.
-
-### Implementation gate
-
-Exact Caddy, Coraza, CRS, and container patch versions and digests; bounded
-body-inspection limits; resource sizing; probe values; and concrete policy
-manifests require explicit approval before production deployment.
-
-## Consequences
-
-- The self-hosted WAF has an explicit, independently deployable boundary.
-- Every public BFF request must traverse Traefik and the dedicated WAF tier.
-- Detection and tuning precede blocking, reducing uncontrolled false-positive
-  risk.
-- A physical one-worker cluster retains an explicitly accepted single-replica
-  availability limitation.
-- Another internal proxy hop and its latency, capacity, and failure modes must
-  be included in load and chaos testing.
-
-## Alternatives Considered
-
-### Traefik Hub Native Coraza
-
-Not selected for this production profile.
-
-### Direct Traefik Coraza integration
-
-Not selected because the approved production boundary uses the dedicated Caddy
-connector rather than the preview direct integration.
-
-### Implement WAF behavior in Java
-
-Rejected because WAF is an edge-platform responsibility and must not enter the
-application request-processing code.
-
-### Automatically update CRS
-
-Rejected because an unreviewed rule change can alter or block production
-traffic outside the approved GitOps release path.
-
-## Rollback or Migration Considerations
-
-This ADR creates no runtime deployment by itself.
-
-Rollout must establish the WAF route and positive/negative reachability tests
-before removing any former route. Rollback may restore a previously approved
-WAF artifact through Git revert, but must not restore a direct Traefik-to-BFF or
-Internet-to-BFF path. Moving from detection to blocking and rolling back a rule
-set are GitOps changes using pinned artifacts.
+Rollback may restore a previously approved pinned WAF/rule set through GitOps when compatible. It MUST NOT create a direct BFF bypass, disable authentication/authorization/semantic quotas, enable unsafe body logging, or remove upstream volumetric protection.

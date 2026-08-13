@@ -1,41 +1,31 @@
-# ADR-0064: Standardize Dedicated CloudNativePG Fleet Operations v1
+# ADR-0064: Dedicated CloudNativePG Fleet Operations v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-11
-
-## Relationship to Earlier Decisions
-
-This ADR extends ADR-0048, ADR-0053, and ADR-0057. It does **not** supersede
-ADR-0057's production physical isolation: each persistent production
-microservice continues to own a dedicated CloudNativePG cluster.
+2026-08-11; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-Production keeps dedicated per-service PostgreSQL clusters. Operational
-complexity is reduced through fleet standardization and automation rather than
-by silently reconsolidating security/failure domains.
+Production keeps one dedicated CloudNativePG cluster per persistent microservice. Operational complexity is reduced through fleet standardization and automation, not by reconsolidating service security/failure domains.
+
+ADR-0057 defines service database/cluster isolation. ADR-0048 defines shared HA/backup mechanics. This ADR defines the current fleet-management model; ADR-0067 defines restore evidence and upgrade safety.
 
 ### GitOps fleet model
 
-A versioned reusable PostgreSQL component under `deploy/` defines the common
-CloudNativePG baseline. Per-service overlays may vary only approved inputs such
-as:
+A versioned reusable PostgreSQL component under `deploy/` defines the common CloudNativePG baseline. Per-service overlays vary only reviewed inputs such as:
 
 - service/database identity;
 - resource and storage sizing;
 - workload criticality/SLO class;
 - backup destination namespace/prefix and credentials;
 - maintenance window;
-- service-specific stricter retention or recovery requirements.
+- service-specific stricter retention/recovery requirements.
 
-Common HA, synchronous-durability, security, monitoring, backup verification,
-RLS-role expectations, and policy controls are inherited rather than copied by
-hand.
+Common HA, synchronous durability, security, monitoring, backup verification, RLS-role expectations, and policy controls are inherited rather than copied by hand.
 
 ### Isolation remains real
 
@@ -46,79 +36,58 @@ Every production service cluster retains independent:
 - persistent volumes;
 - backup credentials and object-storage namespace/prefix;
 - encryption context where supported;
-- restore target and recovery evidence;
-- upgrade/rollback execution.
+- restore target/recovery evidence;
+- upgrade/rollback/fail-forward execution.
 
-One service's application or migration credential must not authenticate to
-another service's cluster.
+A service application/migration credential MUST NOT authenticate to another service cluster.
 
 ### Fleet observability
 
-Prometheus/Grafana/Alertmanager use common recording/alert rules parameterized
-by bounded cluster/service labels. The fleet inventory must expose at least:
+Common bounded recording/alert rules expose at least:
 
 - service owner;
-- PostgreSQL/CNPG version;
-- primary/replica health;
-- synchronous-replication health;
+- PostgreSQL/CloudNativePG version;
+- primary/replica and synchronous-replication health;
 - storage/IO pressure;
 - connection/pool headroom;
 - WAL/archive freshness;
 - last successful backup verification;
-- last isolated restore exercise;
+- last successful isolated restore exercise;
 - next maintenance/upgrade wave.
+
+Labels remain bounded and do not expose tenant/user/business identifiers.
 
 ### Upgrade waves
 
-Platform upgrades use one controlled compatibility set and are rolled in waves:
+Platform database/operator upgrades use one controlled compatibility set and roll in waves:
 
 ```text
-staging restore/failover evidence
+staging restore/failover/compatibility evidence
 -> one lowest-risk production service cluster
 -> observation window
 -> remaining clusters one at a time
 ```
 
-A production-wide simultaneous PostgreSQL/CNPG upgrade is prohibited. A failed
-wave stops further rollout.
+A failed staging or production wave stops further rollout. Production-wide simultaneous PostgreSQL/CloudNativePG upgrades are prohibited.
 
 ### Backup and DR automation
 
-Backup policy is generated from the common baseline but every service has
-independent credentials/artifact namespace. Restore exercises target one
-service cluster at a time and produce service-specific evidence. Shared
-operational tooling must not merge service backup trust boundaries.
+Backup policy comes from the common baseline while every service preserves independent credentials/artifact namespace/encryption context. Restore exercises target one service cluster at a time and produce service-specific evidence. Shared operational tooling MUST NOT merge service backup trust boundaries.
 
-### No planned consolidation roadmap
+### Physical consolidation
 
-The architecture does not define `v2 = shared physical PostgreSQL cluster` as
-the expected destination. That would intentionally reduce the isolation added
-by ADR-0057.
+Shared production physical PostgreSQL is not a planned default optimization. Any future shared/hybrid topology intentionally reduces current isolation and therefore requires a new or revised current ADR with security, blast-radius, SLO, backup, noisy-neighbor, migration, and rollback evidence. Cost/operator convenience alone does not override the boundary.
 
-A future shared/hybrid physical topology requires a new accepted ADR showing
-why its security, blast radius, SLO, backup, and noisy-neighbor tradeoffs are
-acceptable. Cost or operator convenience alone does not silently override the
-current production boundary.
+## Verification requirements
 
-## Verification Requirements
+- every service overlay renders from the common fleet baseline;
+- policy tests prove independent database/runtime/migration/backup identities;
+- one-cluster-at-a-time upgrade/rollback/fail-forward drills pass;
+- common dashboards/alerts cover every service without high-cardinality business labels;
+- monthly restore evidence is traceable to each service cluster;
+- one service-cluster failure does not affect another service's PostgreSQL availability;
+- GitOps/policy tests prevent accidental shared production endpoints/credentials.
 
-- rendering every service overlay from one common fleet baseline;
-- policy tests proving independent credentials/backup namespaces;
-- one-cluster-at-a-time upgrade/rollback drill;
-- common dashboard/alert coverage without high-cardinality identifiers;
-- monthly restore evidence traceable to each service cluster;
-- failure of one service cluster does not affect another service's PostgreSQL
-  availability;
-- GitOps tests prevent accidental shared production database endpoints.
+## Rollback considerations
 
-## Consequences
-
-The platform accepts the additional cluster count in exchange for smaller
-security and failure blast radius, while avoiding three independently hand-made
-backup, monitoring, and upgrade systems.
-
-## Rollback Considerations
-
-Rollback may revert a reusable fleet template/version per controlled wave. It
-must not collapse multiple service databases into one production cluster or
-share runtime/migration credentials without a superseding ADR.
+Rollback may revert a compatible reusable fleet template/version per controlled wave. It MUST NOT collapse multiple services into one production cluster, share application/migration/backup identities, or perform an unsafe database downgrade.

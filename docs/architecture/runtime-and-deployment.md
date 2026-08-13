@@ -1,210 +1,49 @@
-# Runtime and Deployment Architecture
+# Runtime and Deployment Architecture — Current State
 
-## 1. Kubernetes baseline
+Exact supported patches belong in the Technology Baseline/deployment metadata. This document defines runtime topology, security, deployment, and operational invariants.
 
-All production services run as immutable OCI-compatible containers on
-Kubernetes. Exact supported pins live in the Technology Baseline and deployment
-metadata.
+## 1. Production workload baseline
 
-Typical workload resources:
+Production application workloads run as immutable OCI containers on Kubernetes and require:
 
-```text
-Deployment / Stateful operator resource as applicable
-Service
-independent ServiceAccount
-ConfigMap
-Secret reference
-NetworkPolicy
-```
-
-HPA/PDB are added when replication/SLA/capacity requires them. HTTPRoute/
-GRPCRoute are created only for BFF/public boundaries or explicitly exposed
-platform adapters.
-
-Mandatory workload rules:
-
-- immutable image digest; `latest` prohibited;
+- immutable image digest; no `latest`;
+- provenance/source identity tied to the reviewed Git commit;
+- non-root execution / `runAsNonRoot`;
+- `allowPrivilegeEscalation: false`;
+- Linux capabilities dropped by default; added capability is a narrow reviewed exception;
+- `seccompProfile: RuntimeDefault`;
+- read-only root filesystem where the approved image permits it;
 - CPU/memory requests and limits;
-- separate startup/readiness/liveness probes;
+- distinct startup/readiness/liveness probes;
 - liveness does not fail merely because a dependency is temporarily unavailable;
-- readiness reflects whether the workload can safely serve its intended traffic;
+- readiness only when the workload can safely serve intended traffic;
 - graceful shutdown aligned with `terminationGracePeriodSeconds`;
-- non-root and read-only root filesystem where practical;
-- privileged/hostPath require explicit security ADR;
-- independent ServiceAccount per workload;
-- deny-by-default NetworkPolicy with explicit egress/ingress;
-- autoscaling uses measured metrics and never replaces load/capacity testing.
+- dedicated least-privilege ServiceAccount; Kubernetes `default` is prohibited for application workloads;
+- deny-by-default NetworkPolicy with explicit ingress/egress;
+- PDB/topology spread/anti-affinity according to availability target;
+- autoscaling from measured valid signals, never as a substitute for capacity tests.
 
-## 2. Kubernetes control-plane HA
+Privileged containers, host networking, `hostPath`, extra capabilities, or materially relaxed security context require an explicit current security decision and automated policy evidence.
 
-ADR-0051 requires 3 dedicated stacked control-plane/etcd nodes and at least 3
-schedulable workers. The API servers are exposed through one stable redundant L4
-`controlPlaneEndpoint`; the endpoint itself must not be a single-host failure
-point. External etcd is intentionally not used in v1.
+## 2. Kubernetes active-cluster HA
 
-Critical replicated workloads spread across workers/failure domains, and worker
-capacity is planned N+1 for the Class A/Authorization request paths. Kubernetes
-etcd is snapshotted encrypted off-node every 6 hours and before control-plane
-upgrades; clean-cluster GitOps rebuild remains the preferred site-DR path when
-appropriate.
-
-## 3. Calico CNI and NetworkPolicy
-
-ADR-0050 selects Calico OSS 3.32.1 as the primary Kubernetes CNI and
-NetworkPolicy implementation on Kubernetes 1.35.6. The platform uses Calico's
-standard dataplane in v1; experimental/eBPF acceleration is not enabled.
-
-Upstream Istio Ambient remains the service mesh. NetworkPolicy is defense in
-depth and must explicitly permit the Ambient HBONE/health flows required by the
-selected enrollment while still enforcing deny-by-default application traffic.
-Positive and negative tests are mandatory across ordinary pod traffic, ztunnel/
-HBONE paths, and selected `platform-data` workloads.
-
-## 4. Helm 4 and Kustomize
-
-Helm 4 is the application packaging baseline. Shared standards belong in a
-company application/library chart rather than copied service charts.
-
-Environment composition under `deploy/clusters/*` may use Kustomize overlays as
-accepted by ADR-0037. Secret values never enter Helm values/Kustomize/Git.
-
-CI runs `helm lint`, renders both environments, validates Kubernetes schemas and
-policy, and scans rendered output for secrets.
-
-## 5. GitOps and Argo CD
-
-Current v1 desired state is in this repository:
+ADR-0051 defines:
 
 ```text
-deploy/clusters/staging
-deploy/clusters/production
+3 dedicated stacked control-plane/etcd nodes
+>=3 schedulable workers
+redundant stable L4 controlPlaneEndpoint
+N+1 critical worker capacity
+6-hour encrypted off-node etcd snapshots + pre-upgrade snapshot
 ```
 
-Argo CD is the GitOps controller. Promotion is PR review + merge to `main` with
-immutable image digests, automated sync, self-heal, prune, `allowEmpty=false`,
-`PruneLast=true`, and `Prune=confirm` for explicitly destructive critical
-resources.
+Critical replicas spread across workers/failure domains. External etcd is not a v1 requirement.
 
-Production rollback is Git revert. Direct unreviewed cluster mutation is
-prohibited.
+## 3. Calico + Istio Ambient
 
-## 6. Production PostgreSQL — CloudNativePG
+Calico OSS 3.32.x is the primary CNI/NetworkPolicy family for Kubernetes 1.35.x; exact patches come from the compatibility baseline. v1 uses standard Calico dataplane.
 
-ADR-0048 + ADR-0057 + ADR-0064 + ADR-0067 are current.
-
-ADR-0057 supersedes the production shared-cluster allowance. Production runs one
-dedicated CloudNativePG cluster per persistent microservice. Each service owns
-its PostgreSQL database, runtime/migration roles, Flyway history, WAL/PITR backup
-namespace/credentials/encryption context, and capacity budget. Critical production
-service clusters use 3 PostgreSQL instances. Non-production may consolidate
-physical clusters only while preserving database/role isolation.
-
-The cluster uses quorum synchronous replication (`ANY 1` equivalent), required
-data durability, and failover quorum. Automatic failover is enabled only when
-safe promotion can preserve acknowledged synchronous commits; unsafe promotion
-fails availability instead of risking acknowledged data loss.
-
-Three instances are spread across independent schedulable nodes/failure domains
-when infrastructure permits.
-
-For each service cluster, aggregate application Hikari `maximumPoolSize` across
-that service's production pods is capped at <=70% of PostgreSQL `max_connections`;
->=30% remains reserved for failover, replication, administration, migrations, and
-emergency headroom. HPA changes must preserve this budget. PgBouncer is not a
-v1 default and is introduced only after measured connection pressure.
-
-ADR-0064/ADR-0067 standardize this dedicated-cluster fleet through one reusable GitOps
-CloudNativePG baseline, bounded per-service overlays, common recording/alert
-rules, independent backup credentials/artifact namespaces, service-specific
-restore evidence, one-cluster-at-a-time production upgrade waves, queryable monthly restore drill evidence, and compatibility-aware rollback/fail-forward rules. A failed
-upgrade wave stops the remaining rollout. Shared physical PostgreSQL is not the
-planned v2 destination; reducing production isolation requires a new ADR.
-
-## 7. PostgreSQL backup/PITR
-
-Barman Cloud CNPG-I plugin is the PostgreSQL backup/WAL integration. cert-manager
-supplies the plugin/operator TLS path.
-
-Baseline:
-
-- continuous WAL archive to encrypted off-site object storage;
-- daily online physical base backup;
-- PostgreSQL RPO <=5 minutes;
-- 35-day PITR window;
-- monthly retained backup set for 12 months;
-- object versioning and object lock/immutability when supported;
-- automated backup verification each cycle;
-- isolated restore monthly;
-- full DR exercise quarterly.
-
-The daily online base backup supersedes the old daily-differential shape; v1
-does not run a separate incremental-backup server solely to reproduce that
-mechanic.
-
-## 8. Kafka runtime
-
-Kafka v1 runs KRaft with 3 brokers and 3 dedicated controllers for production
-critical use. Critical topics use RF=3, minISR=2, producer `acks=all`, idempotent
-producers, and no unclean leader election.
-
-Kafka remains native-TLS/auth/ACL/quota protected. It is transport, not the
-business source of truth. Cold DR reconstructs Kafka from GitOps and replays
-retained service-owned outbox/publication records after PostgreSQL recovery.
-
-## 9. Security Redis
-
-The shared physical `security-redis` deployment is used only for approved
-security-ephemeral capabilities such as semantic quotas and BFF sessions, with
-separate ACL identities and key namespaces.
-
-Production baseline is 1 primary + 2 replicas + 3 Sentinel voters, TLS, and
-`noeviction`. Raw PII/business identifiers are not stored in keys. Quota/session
-state is not treated as durable business truth and is not part of the cold-DR
-RPO.
-
-If BFF session workload and semantic-quota workload interfere materially under
-load, split them into separate physical Redis deployments before adding Redis
-Cluster complexity.
-
-## 10. Traefik and Gateway API
-
-Traefik is the external gateway. Kubernetes Gateway API is preferred; Traefik
-CRDs are used only for proprietary capability not representable through Gateway
-API.
-
-Traefik owns TLS termination/redirect, public routing, edge request-size limits,
-coarse rate limits, security headers, observability, and weighted routing where
-approved. Dashboard is private. Public catch-all routes are prohibited.
-
-## 11. Dedicated production WAF
-
-Public application traffic follows:
-
-```text
-Internet / External LB
--> Traefik
--> edge-waf (Caddy + Coraza v3 + OWASP CRS 4.x LTS)
--> web-bff
-```
-
-Direct Internet->BFF and Traefik->BFF application paths are prohibited by route,
-NetworkPolicy, and Istio authorization.
-
-WAF rollout remains PL1 and DetectionOnly for at least 7 representative days,
-then reviewed narrow tuning, then blocking. Automatic CRS updates are
-prohibited. Large/upload endpoints require explicit request-body policy rather
-than globally expanding inspection.
-
-ADR-0059 requires upstream L3/L4 volumetric DDoS mitigation/scrubbing from the
-hosting/network provider before traffic can saturate the origin. Redundant L4
-load-balancer capacity, bounded connection/handshake limits, reviewed SYN/
-conntrack controls, emergency coarse limits, provider escalation contacts, and
-origin-bypass restrictions are production requirements. Coraza remains the L7
-WAF and is not described as volumetric protection.
-
-## 12. Istio Ambient Mode
-
-Istio Ambient Mode is mandatory for enrolled production application workloads.
+Istio Ambient is the service mesh. NetworkPolicy remains independent defense in depth and permits only required HBONE/health/application paths. Production application workloads use STRICT mTLS, dedicated ServiceAccount identities, default-deny/least-privilege authorization, and positive/negative policy tests.
 
 ```text
 trustDomain = prod.sajtech.internal
@@ -212,113 +51,162 @@ meshID      = platform-prod
 principal   = prod.sajtech.internal/ns/<namespace>/sa/<service-account>
 ```
 
-Production uses STRICT mTLS, default-deny authorization, and least-privilege
-ServiceAccount identities. Waypoints exist only for actual L7 method/path/
-header/claim policy or routing/telemetry needs.
+Waypoints are added only for explicit L7 policy/routing/telemetry needs. Mesh retry MUST NOT duplicate application/client retry ownership.
 
-Istio does not replace NetworkPolicy or native Kafka/PostgreSQL/Redis security.
+Initial enrollment:
 
-## 13. Istio CA hierarchy
-
-```text
-Offline Root CA
--> Production Cluster Intermediate CA
--> Istio workload certificates
-```
-
-- Root lifetime 10 years, key offline, never Kubernetes/OpenBao;
-- two encrypted physical copies in separate locations;
-- intermediate lifetime 1 year;
-- rotation begins 90 days before expiry with >=30-day overlap;
-- intermediate key only in `istio-system`, encrypted at rest and tightly RBACed;
-- workload cert TTL 24h with automatic rotation.
-
-## 14. Ambient enrollment
-
-| Namespace | Initial enrollment |
+| Namespace | State |
 | --- | --- |
 | `platform-edge` | enrolled |
 | `platform-apps` | enrolled |
-| `platform-data` | selective per workload |
+| `platform-data` | selective |
 | `istio-system` | control plane |
 | `argocd` | not initially enrolled |
 | `observability` | not initially enrolled |
 | `kube-system` | not enrolled |
 
-Enrollment is explicit and opt-in.
+## 4. Istio trust hierarchy
 
-## 15. OpenBao and External Secrets
+```text
+Offline Root CA
+-> Production Cluster Intermediate CA
+-> workload certificates
+```
 
-OpenBao 2.6.1 remains the authoritative external Secret Manager. Initial v1
-operating topology remains one OpenBao Raft instance/PVC, manual Shamir seal
-(3 shares, threshold 2), hourly encrypted off-PVC snapshots, no initial HSM or
-multi-node HA.
+- root: 10 years, offline, two encrypted physical copies, never Kubernetes/OpenBao;
+- intermediate: one year, rotate starting 90d before expiry with >=30d overlap, tightly controlled in `istio-system`;
+- workload certificate: 24h automatic rotation.
 
-This single-node topology is acceptable in v1 because normal application hot
-paths consume mounted/local key material rather than making per-request OpenBao
-calls. OpenBao remains an operational/control-plane SPOF for secret refresh,
-rotation, and recovery and has explicit backup/recovery monitoring.
+## 5. Helm, Kustomize, GitOps, promotion
 
-Move to 3-node OpenBao HA through a later ADR when measured secret-refresh
-availability, recovery/unseal time, compliance, or operational evidence makes
-the current topology an SLO risk.
+Helm 4 is the packaging baseline. Shared organization deployment rules belong in one reviewed application/library chart rather than copied charts.
 
-External Secrets Operator uses Kubernetes Auth and namespace-scoped
-`SecretStore` by default. Rotating secrets/key rings are mounted read-only,
-never placed in Git/ConfigMaps/environment variables for the rotating key-ring
-path.
+Environment overlays/values are explicit; secret values never enter Git, Helm/Kustomize values, images, or rendered CI logs. CI runs lint/render/schema/policy/secret checks and target/deployed diffs where applicable.
 
-## 16. Browser/BFF security deployment
+Complex migration Helm hooks are prohibited unless ownership, idempotency, timeout/retry, failure, rollback/fail-forward, and test semantics are explicit. Non-trivial database migrations SHOULD use controlled migration jobs/workflows.
 
-ADR-0045 is mandatory for browser production: OIDC Authorization Code + PKCE
-S256, exact redirect matching, server-side transaction/session state, secure
-`__Host-` cookie, Origin+synchronizer-token CSRF protection, exact CORS policy,
-and centrally tested browser security headers.
+Current GitOps roots:
 
-## 17. Supply-chain admission
+```text
+deploy/clusters/staging
+deploy/clusters/production
+```
 
-ADR-0046 is mandatory before production enforcement.
+Argo CD reconciles reviewed desired state with automated sync/self-heal/prune, `allowEmpty=false`, `PruneLast=true`, and explicit confirmation for destructive critical resources.
 
-Cosign signs immutable image digests and required provenance/CycloneDX SBOM
-attestations. CI generates an SBOM for the final image, indexes it by service +
-image digest, and scans it with pinned Syft/Grype tooling (or an explicitly
-approved equivalent) so transitive CVEs can be correlated to deployed artifacts.
-Kyverno stable `ImageValidatingPolicy` verifies production images at admission.
-Production workloads must use approved registries, immutable digests, valid
-organization signatures, and approved provenance. Exceptions are narrow,
-Git-reviewed, owned, and time limited.
+The exact signed immutable image digest validated in staging is promoted to production. Rebuild between staging and production is prohibited. Rollback is reviewed Git state only when application/schema/data compatibility is safe; otherwise use the approved fail-forward/incident path.
 
-Kyverno runs HA with at least 3 replicas/PDB/topology spread before fail-closed
-production admission is enabled.
+## 6. Production PostgreSQL fleet
 
-## 18. Production human access
+ADR-0048, ADR-0057, ADR-0064, and ADR-0067 define the current model.
 
-ADR-0060 selects Teleport Enterprise Self-Hosted as the privileged human access
-plane. Normal engineers have no standing production admin/root/database-superuser
-credentials. Kubernetes/database/host access uses SSO, phishing-resistant MFA,
-JIT approval, short-lived roles, session/audit evidence, and automatic expiry.
-Privileged write access requires two reviewers and is limited to <=30 minutes.
-Static kubeconfigs, shared SSH keys, shared database passwords, and permanent
-`cluster-admin` are prohibited. The access plane resides in a management failure
-domain so a workload-cluster incident does not remove the only supported recovery
-path.
+Every persistent production microservice owns a dedicated CloudNativePG 1.30.x cluster, PostgreSQL database, runtime/migration roles, Flyway history, storage/capacity budget, WAL/PITR backup identity/namespace, and restore evidence. Critical services use three PostgreSQL instances.
 
-## 19. Deployment validation
+Clusters use quorum synchronous required durability. Automatic failover is permitted only when acknowledged commits can be preserved; unsafe promotion fails availability rather than acknowledged data.
 
-Applicable CI/release checks include:
+Aggregate application Hikari maxima across production pods stay <=70% of cluster `max_connections`, preserving >=30% for replication/failover, migration, monitoring, administration, and emergency work. PgBouncer is evidence-driven, not default.
 
-- Helm/Kustomize render of staging and production;
-- Kubernetes schema/policy validation;
-- secret scan of rendered output;
+Fleet management uses one reusable GitOps baseline with bounded per-service overlays, common bounded alerts, independent backup trust boundaries, monthly service-specific restore evidence, and one-cluster-at-a-time upgrade waves. A failed wave stops remaining rollout. Production physical consolidation requires a reviewed current architecture change.
+
+### Backup/PITR
+
+- continuous encrypted off-site WAL archive;
+- daily online physical base backup;
+- PostgreSQL RPO <=5m;
+- 35-day PITR;
+- monthly retained recovery set for 12 months;
+- versioning/object-lock where supported;
+- verify every backup cycle;
+- isolated restore monthly per service;
+- full cold DR quarterly;
+- queryable RPO/RTO/integrity/RLS/erasure evidence.
+
+A failed restore freezes ordinary affected-service promotion until replacement evidence passes.
+
+## 7. Kafka
+
+Production critical Kafka uses ADR-0044:
+
+```text
+KRaft
+3 brokers + 3 dedicated controllers
+critical RF=3 / minISR=2 / acks=all
+idempotent producers
+unclean leader election disabled
+```
+
+Native TLS/authentication/ACL/quotas remain mandatory. Kafka is rebuildable transport, not business truth. Cold DR rebuilds configuration from GitOps and replays/reconstructs service-owned evidence. Critical publication/dedup evidence covers the 35-day recovery horizon.
+
+## 8. Security Redis
+
+Approved shared physical `security-redis` is restricted to security-ephemeral capabilities such as semantic quotas and BFF session state:
+
+```text
+1 primary + 2 replicas + 3 Sentinel voters
+TLS + per-owner ACL/key namespaces
+noeviction
+```
+
+Raw PII/business IDs are not used as security keys when pseudonymous HMAC keys are required. If quota/session workloads interfere materially, split Sentinel deployments before introducing Redis Cluster complexity.
+
+## 9. Public edge
+
+Production path:
+
+```text
+Internet
+-> upstream L3/L4 DDoS mitigation
+-> external load balancing
+-> Traefik
+-> dedicated Caddy + Coraza WAF
+-> Web BFF
+```
+
+Direct Internet -> BFF and Traefik -> BFF application paths are prohibited by route + NetworkPolicy + Istio authorization.
+
+Traefik uses Gateway API by default; proprietary CRDs require explicit capability need. Dashboard/insecure API is not public. Wildcard/catch-all public routes are prohibited.
+
+WAF uses approved Caddy/Coraza/CRS family, PL1, >=7 representative DetectionOnly days before reviewed blocking, narrow versioned exceptions, bounded body policy, no automatic rule updates, and PII-safe telemetry.
+
+Upstream volumetric mitigation is mandatory; the WAF is L7 inspection and is not bandwidth-saturation protection.
+
+## 10. OpenBao and External Secrets
+
+OpenBao 2.6.1 is the exact current secret-authority pin under ADR-0037. v1 uses one Raft instance/PVC, manual Shamir 3 shares/threshold 2, hourly encrypted off-PVC snapshots, and tested restore/unseal.
+
+Normal application hot paths use validated mounted/local key material, not per-request OpenBao RPCs. OpenBao remains a security-sensitive control-plane dependency for secret refresh/rotation/recovery.
+
+External Secrets uses Kubernetes Auth and namespace-scoped stores where practical. Rotating key material is mounted read-only. Secret values never enter Git, ConfigMaps, ordinary env vars for rotating key rings, logs, traces, or metrics.
+
+## 11. Browser security
+
+Browser production follows ADR-0045: OIDC Authorization Code + PKCE S256, exact redirects, server-side transaction/session state, secure `__Host-` cookie, Origin + synchronizer-token CSRF, exact CORS, and centrally tested security headers.
+
+## 12. Supply-chain admission and continuous vulnerability response
+
+Release images are immutable, signed, carry signed provenance and CycloneDX SBOM evidence, and are indexed by deployed digest. Production admission verifies approved registry/digest/signature/provenance/required attestations through HA Kyverno before fail-closed enforcement.
+
+Vulnerability inventory is continuously rescanned/correlated with approved threat/advisory inputs. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates production exposure. No scanner/feed proves absence of unknown vulnerabilities and no scan result authorizes an unsigned artifact.
+
+## 13. Human production access
+
+Teleport Enterprise Self-Hosted is the privileged human access plane. No standing production admin/root/database-superuser credentials are permitted. Kubernetes/database/host access uses SSO, phishing-resistant MFA, JIT approval, short-lived roles, audit/session evidence, and automatic expiry. Privileged write elevation requires two reviewers and <=30-minute access.
+
+## 14. Deployment validation
+
+Applicable pre-promotion evidence includes:
+
+- code/unit/integration/architecture/contract/schema/security checks;
+- dependency/secret/vulnerability verification;
+- Buf/OpenAPI compatibility;
+- Helm/Kustomize rendering and Kubernetes security/schema/policy checks;
+- rendered-secret and manifest-diff checks;
 - immutable digest/signature/provenance/SBOM verification;
-- CloudNativePG/PostgreSQL policy validation;
-- Barman backup/WAL configuration validation;
-- Kafka topic/controller/broker durability validation;
-- Gateway/Traefik/WAF tests;
-- `istioctl analyze`, Ambient enrollment, STRICT mTLS and authorization tests;
-- ServiceAccount/NetworkPolicy checks;
-- manifest diff;
-- post-deployment smoke and production-safe synthetic checks.
+- PostgreSQL/CloudNativePG backup/restore/upgrade-policy checks;
+- Kafka durability/replay checks;
+- Gateway/Traefik/WAF route and blocking tests;
+- `istioctl analyze`, Ambient/STRICT mTLS/ServiceAccount/NetworkPolicy/authorization positive and negative tests;
+- staging smoke/acceptance/critical browser tests;
+- production-safe smoke/synthetic checks.
 
-See `PRODUCTION-READINESS-CHECKLIST.md` for gates that require implementation/evidence
-rather than another architecture product decision.
+A required predecessor failure stops downstream promotion. Documentation is not runtime evidence; detailed gates live in `PRODUCTION-READINESS-CHECKLIST.md`.
