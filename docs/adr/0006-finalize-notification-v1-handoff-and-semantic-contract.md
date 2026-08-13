@@ -1,4 +1,4 @@
-# ADR-0029: Notification v1 Semantic Contract
+# ADR-0006: Notification v1 Semantic Contract
 
 ## Status
 
