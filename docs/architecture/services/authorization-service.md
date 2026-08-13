@@ -87,7 +87,7 @@ Before production, prove >=2x projected peak with p95<=100ms/p99<=200ms, Hikari 
 
 ## 6. PostgreSQL
 
-Authorization owns a dedicated PostgreSQL database and dedicated production CloudNativePG cluster under ADR-0057. Runtime/migration roles are service-only; runtime is `NOSUPERUSER NOBYPASSRLS`, not owner. Tenant-owned tables use forced RLS plus application tenant enforcement. Synchronous required durability/safe failover apply.
+Authorization owns a dedicated PostgreSQL database and dedicated production CloudNativePG cluster under ADR-0057. Runtime/migration roles are service-only; runtime is `NOSUPERUSER NOBYPASSRLS`, not owner. Tenant-owned tables use forced RLS plus application tenant enforcement. Tenant context comes only from validated authenticated context and uses the canonical parameterized transaction-local setting from the SQL/Flyway standard; session-scoped tenant state on pooled connections is prohibited, missing/malformed context fails closed, and cross-tenant pooled-connection reuse after commit/rollback is a mandatory negative test. Synchronous required durability/safe failover apply.
 
 Failover under sustained `CheckPermission` traffic is a production gate.
 
@@ -122,4 +122,4 @@ Production administration remains gated until atomicity/time-safety/Redis Sentin
 
 ## 10. Verification
 
-Required applicable tests include precedence, cross-tenant denial/RLS, inactive membership, multiple-role union, last-owner concurrency, privilege escalation, platform audit, provisioning replay/conflict, exact one-call/no-cache/no-retry behavior, deny/outage/overload mapping, breaker recovery, workload identity, semantic quota time/failover, PostgreSQL failover, capacity/load/bulkhead, query plans, and PII-safe telemetry.
+Required applicable tests include precedence, cross-tenant denial/RLS including pooled-connection context reuse, inactive membership, multiple-role union, last-owner concurrency, privilege escalation, platform audit, provisioning replay/conflict, exact one-call/no-cache/no-retry behavior, deny/outage/overload mapping, breaker recovery, workload identity, semantic quota time/failover, PostgreSQL failover, capacity/load/bulkhead, query plans, and PII-safe telemetry.
