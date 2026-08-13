@@ -1,6 +1,6 @@
 # Build and CI Quality Enforcement
 
-This document defines the executable quality-gate baseline for independently deployable Java services. It turns architecture/coding rules into required repository artifacts and CI evidence.
+This document defines the executable quality-gate baseline for independently deployable Java services. It turns architecture/coding rules into required repository artifacts and CI evidence. Repository change delivery itself is governed by `repository-change-workflow.md`: normal changes use a task branch and Draft PR, all substantive work remains in that PR, the complete diff is reviewed against current `main`, and merge occurs only after applicable checks and blockers are resolved.
 
 Architecture/policy status:
 
@@ -195,7 +195,7 @@ Semgrep output may be uploaded as SARIF, but CI logs MUST NOT echo raw secrets/P
 
 ## 7. GitHub Actions CI baseline
 
-GitHub Actions is the repository CI orchestrator for this project unless a later ADR changes the CI platform.
+GitHub Actions is the repository CI orchestrator for this project unless a later ADR changes the CI platform. Workflows run on the PR head revision established by `repository-change-workflow.md`; they do not substitute direct changes to `main` for review.
 
 ### Security and reproducibility
 
