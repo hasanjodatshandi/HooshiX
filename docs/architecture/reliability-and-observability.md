@@ -1,29 +1,16 @@
-# Reliability and Observability Architecture
+# Reliability and Observability Architecture — Current State
 
-## 1. Reliability principle
+## 1. Reliability model
 
-Reliability is designed around bounded work, explicit deadlines, durable local
-state, idempotency, and failure isolation. Retrying blindly or increasing
-timeouts is not a reliability strategy.
+Reliability is built from bounded work, finite deadlines, durable local state, idempotency, explicit dependency semantics, and failure isolation. Blind retry or timeout inflation is not a reliability strategy.
 
-## 2. Synchronous call depth
+Avoid deep synchronous chains. Normal design allows at most two consecutive synchronous hops after the BFF; deeper chains require explicit architecture justification. N+1 service calls are prohibited.
 
-Avoid long chains such as:
+Independent downstream calls may run concurrently when correctness permits, but Virtual Threads never make PostgreSQL connections, Redis capacity, provider quota, CPU, memory, or queues unbounded.
 
-```text
-BFF -> A -> B -> C -> D
-```
+## 2. Generic synchronous budgets
 
-Normal design allows at most two consecutive synchronous hops after the BFF.
-Deeper chains require explicit architecture justification.
-
-Independent downstream calls may run concurrently using Virtual Threads and
-stable Java concurrency primitives when correctness permits. N+1 service calls
-are prohibited.
-
-## 3. Baseline request budgets
-
-General baseline:
+Generic ceilings:
 
 ```text
 Client/Gateway:       3000 ms
@@ -33,185 +20,132 @@ Database statement:    800 ms
 Pool acquisition:      200 ms
 ```
 
-More specific accepted ADR deadlines override these generic ceilings.
+A more-specific current contract/ADR overrides these generic values. Every network/database call has a finite budget; child deadlines fit within remaining parent budget; cancellation propagates where supported.
 
-Every network/database call has a finite deadline/timeout. HTTP clients define explicit finite connect and response/read budgets. Child deadlines fit
-inside remaining parent budget. Cancellation is propagated where supported.
+Retry is finite, safe/idempotent, jittered when appropriate, and owned by exactly one layer. Duplicate application + client + mesh/gateway retry for the same failure is prohibited.
 
-## 4. Critical dependency contracts
+## 3. Authorization critical path
 
-### Authorization `CheckPermission`
-
-ADR-0039/ADR-0056/ADR-0062/ADR-0066:
+Current Authorization contract:
 
 ```text
-client deadline: 300 ms
+CheckPermission deadline: 300 ms
 attempts: 1
 wait-for-ready: off
-retry: none
-cache: none
-stale fallback: none
-service SLO availability: >=99.95% rolling 30d
+retry/cache/stale fallback: none
+availability: >=99.95% rolling 30d
 p95 <=100 ms
 p99 <=200 ms
-steady-state engineering target: p95<=75 ms / p99<=150 ms
+engineering target p95/p99 <=75/150 ms
 ```
 
-Authorization pages on paired multi-window burn, not an isolated percentile sample. Availability uses 14.4x (5m+1h) and 6x (30m+6h) paired page conditions; 3x (2h+24h) creates a reliability action. The p99 latency objective is represented as >=99% of eligible calls <=200ms and uses the same burn discipline.
+Resource services perform one final authoritative online check. Safe local validation may reject malformed/invalid traffic but never grant authority. Routine duplicate BFF permission checks are prohibited.
 
-Caller breakers recover through real half-open `CheckPermission` probes, not a separate health endpoint. ADR-0066 de-correlates repeated OPEN intervals across replicas, permits only one half-open probe in flight per caller breaker, and requires three consecutive infrastructure-successful real probes to close. Timeout/unavailable/overload immediately reopens. Authoritative deny is an infrastructure-successful response. Breaker semantics never vary by tenant tier.
+Paging uses paired multi-window burn:
 
-Resource-owning service performs the one final online check. BFF does not add a
-routine duplicate check on the same protected request path.
+- 14.4x: 5m + 1h -> page;
+- 6x: 30m + 6h -> page;
+- 3x: 2h + 24h -> reliability/release-risk action.
 
-### Semantic security quota Redis
+Breaker opening follows current ADR-0062 criteria. Repeated OPEN timing and HALF_OPEN behavior follow ADR-0066: de-correlated bounded reopen backoff, at most one real `CheckPermission` probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, and no tenant-tier variation.
 
-ADR-0041:
+## 4. Semantic quota dependency
+
+ADR-0054 is the single current quota decision:
 
 ```text
 Redis budget: 75 ms
 attempts: 1
 retry: none
-security failure mode: fail closed
+failure: fail closed
 ```
 
-### Notification handoff
+Quota time uses trusted application time + Redis `TIME`, <=2s permitted skew, monotonic effective time, and no security-significant reset based only on TTL expiry.
+
+## 5. Notification critical contracts
 
 ```text
-SubmitNotification: 900 ms, one attempt, no automatic retry
-Result callback:    750 ms, one attempt, durable dispatcher retry outside RPC
+SubmitNotification:        900 ms, one attempt, no transport retry
+ReportNotificationResult:  750 ms, one attempt, durable dispatcher retry outside RPC
 ```
 
-Unknown handoff outcomes recover by stable idempotent replay.
+Unknown handoff outcomes recover through stable idempotent replay. Provider ambiguity remains unknown and is reconciled; it never authorizes blind resend.
 
-## 5. Retry policy
+Notification uses PostgreSQL-authoritative immutable deadlines and a short durable `DISPATCHING` transaction before provider I/O. No application clock-health/fence control plane or request-path OpenBao RPC exists in the current runtime.
 
-Retry only safe/idempotent work and only at one clearly owned layer.
+## 6. Dependency failure containment
 
-- finite attempt count;
-- exponential/bounded backoff + jitter where useful;
-- no duplicate retry in application + gRPC + Istio + gateway;
-- no retry merely because a deadline is large enough;
-- poison/terminal outcomes are explicit.
+The canonical synchronous edge registry is `dependency-criticality.yaml`; its Markdown matrix is generated.
 
-ADR-0039 Authorization is a strict no-retry exception. Notification/provider
-retry semantics follow the canonical lifecycle and never retry ambiguous sends
-blindly.
+Every production synchronous edge has finite deadline, bounded in-flight work/queue, one retry owner, explicit fallback/failure action, stable error mapping, and test evidence. Criticality is operation->dependency, not a whole-service label.
 
-## 6. Circuit breakers, bulkheads, overload
+- authoritative security/state failure blocks;
+- durable commands remain pending only after local durable intent exists;
+- external side effects preserve ambiguous outcome semantics;
+- optional reads degrade only through an explicitly registered bounded fallback;
+- missing fallback means no fallback.
 
-ADR-0055/ADR-0063/ADR-0066 are current. Every synchronous remote call has a finite deadline,
-bounded in-flight concurrency, bounded/zero queue, explicit retry owner, and
-stable failure mapping. Circuit breakers are mandatory only where repeated
-dependency failures would otherwise consume scarce caller resources and the
-open-state behavior is semantically safe; they are **not** a blanket annotation
-around every gRPC call.
+Circuit breakers are used when repeated dependency failures would otherwise consume scarce caller resources and OPEN behavior is semantically safe; they are not blanket annotations around every remote call. Database/Redis correctness relies primarily on bounded pools/timeouts/HA/transaction semantics rather than a generic breaker that obscures transaction outcomes.
 
-The canonical operation-level dependency registry is `dependency-criticality.yaml`; `dependency-criticality-matrix.md` is its generated human-readable view. Criticality belongs to an operation -> dependency edge, not a whole service name. An unspecified fallback means no fallback. Composite operations preserve each edge independently: authoritative failures block, while optional reads degrade only through an explicitly registered fallback.
+## 7. PostgreSQL and Redis HA
 
-Authoritative security dependencies such as Authorization use a fail-closed
-breaker: open state returns the same availability error and never cached/stale
-allow data. External providers use breakers together with their durable retry/
-reconciliation owner. Database/Redis clients rely on bounded pools/timeouts/HA
-behavior rather than a generic breaker that could obscure transaction outcome.
+Critical service PostgreSQL clusters use the current three-instance CloudNativePG synchronous required-durability/failover model. Safe primary recovery target is <=60s for ordinary failover only when acknowledged durability can be preserved; unsafe promotion fails availability instead of acknowledged data.
 
-Bulkheads protect constrained resources such as Authorization DB capacity,
-provider clients, password hashing, and expensive external calls. Application
-queues are bounded; overload fails fast rather than accumulating work past useful
-deadlines.
+Security Redis uses one primary + two replicas + three Sentinel voters. Failover tests cover quota/session semantics and fail-closed behavior where the dependency is authoritative.
 
-Virtual Threads make blocking I/O cheap in thread terms; they do **not** make
-PostgreSQL connections, Redis commands, provider quotas, CPU, or memory
-unbounded. Critical adapters must have explicit concurrency/capacity controls.
+## 8. SLO classes and error budgets
 
-## 7. PostgreSQL HA
+ADR-0028 defines current generic classes:
 
-ADR-0048 runs 3 CloudNativePG PostgreSQL instances with required quorum
-synchronous replication and failover quorum. A safe simple-primary failure is
-expected to restore a writable primary within the operational <=60s objective,
-subject to preserving acknowledged durability.
+### Class A
 
-If safe promotion cannot be proven, write availability may stop rather than
-risk acknowledged data loss.
-
-Authorization and Notification failover/load testing must be performed against
-this real HA behavior, not mocks alone.
-
-## 8. Notification simplification
-
-ADR-0047 removes the previous bespoke clock-health sidecar/gRPC/fence subsystem.
-Notification keeps PostgreSQL-authoritative immutable deadlines and uses a
-short synchronously durable `DISPATCHING` transaction before provider I/O.
-Unknown/in-flight outcomes reconcile and are never blindly re-sent.
-
-This materially reduces runtime/control-plane failure modes while preserving
-conservative external-side-effect semantics.
-
-## 9. SLO classes
-
-ADR-0028 remains the baseline.
-
-### Class A — critical security transactions
-
-Includes login/authentication, OTP/MFA verification, registration completion,
-password reset/change completion.
+Critical interactive security transactions:
 
 ```text
-Availability: 99.90% rolling 30d
-p95: <=500 ms
-p99: <=1500 ms
-server timeout ceiling: 2s
+availability 99.90% rolling 30d
+p95 <=500 ms
+p99 <=1500 ms
+server timeout ceiling 2s
 ```
 
-### Class B — critical internal security dependencies
+### Class B
 
-Includes compromised-password service, Identity semantic limiter, Notification
-durable acceptance, and current online Authorization `CheckPermission`.
-
-General Class-B objective remains:
+Generic critical internal dependency baseline:
 
 ```text
-Availability: >=99.95%
-p95: <=250 ms
-p99: <=750 ms
+availability >=99.95%
+p95 <=250 ms
+p99 <=750 ms
 ```
 
-Authorization has ADR-0056/ADR-0062's stricter p95<=100ms/p99<=200ms SLO inside its
-300ms hard caller deadline; 75/150ms remains a steady-state engineering target.
-Multi-window burn alerts absorb short-lived storage/network noise without deleting it
-from SLO accounting. Dependency-specific stricter deadlines remain valid. ADR-0066 refines only breaker recovery/governance, not these SLO objectives.
+More-specific current contracts such as Authorization, semantic quotas, and Notification handoff override the generic latency envelope.
 
-### Class C — asynchronous Notification processing
+### Class C
 
-99.9% of accepted notification intents begin first provider attempt within 5s
-of durable acceptance. Provider delivery itself is a separate external/channel
-SLI.
+99.9% of durably accepted Notification intents begin first provider attempt within five seconds. External delivery is a separate SLI.
 
-## 10. Error budget
+For a 99.90%/30d objective, approximate error budget is 43m12s:
 
-For 99.90%/30d, approximate budget is 43m12s.
-
-| Consumption | Required response |
+| Consumption | Response |
 | --- | --- |
 | <25% | normal delivery |
 | >=25% within 24h | reliability review; stop risky releases |
-| >=50% | freeze feature releases |
+| >=50% | freeze affected feature releases |
 | >=100% | security/incident/reliability changes only |
 
-Planned maintenance counts when users cannot obtain service.
+Planned maintenance counts when users cannot obtain service. Real errors/latency are never hidden by ad-hoc grace periods.
 
-## 11. Disaster recovery
+## 9. Disaster recovery
 
-Cold DR remains the cross-platform model:
+Cold DR sequence:
 
 ```text
-clean Kubernetes
--> Argo CD desired state
--> restore OpenBao
--> restore CloudNativePG/PostgreSQL + PITR
--> reconstruct Kafka + replay retained outboxes
--> verify secrets/data/event integrity
--> replay deletion/erasure/legal-hold/id-release decisions
+clean Kubernetes/GitOps foundation
+-> restore OpenBao control plane
+-> restore service CloudNativePG/PostgreSQL + PITR
+-> reconstruct Kafka + replay/reconstruct retained service evidence
+-> reconcile erasure/legal-hold/data integrity
+-> verify secrets/contracts/security
 -> smoke/security checks
 -> enable traffic
 ```
@@ -221,80 +155,29 @@ Targets:
 ```text
 PostgreSQL RPO <=5m
 OpenBao RPO <=1h
-Platform RTO <=4h
+platform RTO <=4h
 PostgreSQL PITR 35d
 ```
 
-Every backup cycle verifies artifacts; isolated restore monthly; full DR
-quarterly. A backup without successful restore evidence is not dependable.
+Every backup cycle is verified; isolated restore is monthly per service; full cold DR is quarterly. ADR-0067 requires queryable recovery evidence and freezes ordinary affected-service promotion after a failed restore until replacement evidence passes.
 
-ADR-0067 standardizes per-service monthly restore evidence (backup/WAL source, recovered timestamp, measured RPO/RTO, integrity/RLS/erasure checks, runbook version, owner, PASS/FAIL) and exposes overdue/failed state on the fleet dashboard. A failed restore freezes ordinary promotion for the affected service until a successful replacement drill. Database upgrade rollback is compatibility-aware; irreversible/major transitions are never automatically downgraded to meet an arbitrary rollback timer.
-
-## 12. Observability standards
+## 10. Observability
 
 Every service emits:
 
 - structured JSON logs to stdout;
-- OpenTelemetry distributed traces;
+- OpenTelemetry traces;
 - Micrometer/Prometheus-compatible metrics;
-- W3C `traceparent` / `tracestate` propagation across REST/gRPC/Kafka/workers;
-- bounded low-cardinality labels;
-- SLI/SLO/error-budget/burn-rate telemetry for critical paths.
+- W3C trace propagation across REST/gRPC/Kafka/workers;
+- bounded low-cardinality dimensions;
+- relevant SLI/SLO/error-budget/burn and saturation signals.
 
-Base log fields include equivalents of:
+Base safe operational fields may include timestamp, level, service name/version, environment, trace/span/correlation identity, and stable event code. High-cardinality business/security identifiers are not metric labels.
 
-```text
-timestamp
-level
-service.name
-service.version
-environment
-traceId
-spanId
-correlationId
-eventCode
-```
+Logging is allow-list based. Raw credentials, passwords/PIN/OTP/recovery codes, tokens/API keys, authorization/cookie headers, session IDs, private keys/secrets, connection strings, payment/high-risk PII, full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, and unreviewed provider payload/exception text are prohibited.
 
-## 13. Logging and PII
+Input-derived fields are CR/LF-safe. Production debug elevation is time-bounded/audited and cannot enable sensitive body/bind/credential logging. Logging/export failure does not fail the primary business request, but sustained loss/backpressure is observable/alertable. Log-store access is least privilege and audited.
 
-Logging is allow-list based.
+## 11. Required failure evidence
 
-Never log raw passwords/PIN/OTP/recovery codes, tokens/API keys, Authorization/
-Cookie headers, session IDs, private keys/secrets, DB connection strings,
-payment/bank data, sensitive government/health/biometric data, full request/
-response bodies, SQL bind values, complete gRPC metadata, Kafka headers, or
-unreviewed provider exception payloads.
-
-Ordinary PII requires an approved purpose and bounded representation. Plain
-unsalted hashing is insufficient for guessable PII; use masking/tokenization or
-managed-key HMAC pseudonymization where appropriate.
-
-Metric labels never contain raw user/tenant/session/request identifiers,
-trace IDs, raw URLs, or free-form error strings.
-
-Additional operational logging rules:
-
-- applications emit structured JSON to stdout; request threads do not synchronously ship logs directly to a remote backend;
-- structured fields are allow-listed; string-concatenating request/domain/payload objects into log messages is prohibited;
-- input-derived log fields are sanitized/encoded for CR, LF, and malicious delimiters to prevent log injection;
-- third-party exception messages, nested causes, and stack traces are treated as potentially sensitive and are reviewed/redacted before emission; stable event codes plus bounded safe context are preferred;
-- production debug/trace logging is disabled by default; temporary elevation is time-bound, access-controlled, audited, and must never enable body/bind/credential logging;
-- logging/export failure must not fail the primary business request, but sustained drop/backpressure/export failure is observable and alertable;
-- log-store access follows least privilege and is audited; retention, encryption, residency, and access follow data classification;
-- every changed log statement is covered by applicable PII/secret/log-injection tests and ADR-0061 static/pipeline controls.
-
-## 14. Required failure testing
-
-Critical components require applicable tests for:
-
-- dependency timeout/cancellation;
-- overload/bulkhead behavior;
-- PostgreSQL primary failover;
-- Redis Sentinel failover;
-- Kafka broker/controller failure and replay;
-- OpenBao restore/unseal;
-- WAF/Istio/NetworkPolicy failures;
-- Authorization fail closed;
-- Notification provider ambiguity and crash/failover races;
-- backup/PITR/DR;
-- SLO/burn alert correctness.
+Critical components run applicable timeout/cancellation, overload/bulkhead, PostgreSQL primary loss, Redis Sentinel failover, Kafka broker/controller/replay, OpenBao restore/unseal, WAF/Istio/NetworkPolicy negative, Authorization fail-closed/recovery, Notification provider ambiguity/crash/failover, backup/PITR/DR, and SLO/burn-alert correctness tests.
