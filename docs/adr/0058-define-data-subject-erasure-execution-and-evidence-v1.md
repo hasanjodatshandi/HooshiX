@@ -1,31 +1,22 @@
-# ADR-0058: Define Data-Subject Erasure Execution and Evidence v1
+# ADR-0058: Data-Subject Erasure Execution and Evidence v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-11
-
-## Relationship to Earlier Decisions
-
-This ADR operationalizes ADR-0003. Logical deletion remains the normal first
-lifecycle step; it is not the final state of an approved irreversible erasure.
-Legal holds and legally required retention continue to block incompatible
-purge/anonymization actions.
-
-This architecture supports privacy-erasure obligations but does not by itself
-constitute legal advice or a claim of regulatory compliance.
+2026-08-11; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
+Logical deletion is the normal reversible lifecycle step. Approved irreversible erasure is a separate explicit workflow. Legal hold and required retention block incompatible purge/anonymization actions.
+
+This architecture supports privacy-erasure obligations but is not legal advice or a claim of regulatory compliance.
+
 ### Ownership and workflow
 
-Identity owns the platform-global data-subject erasure request because it owns
-the global User identity. Each bounded context remains the sole owner of
-how its service-owned data is erased, anonymized, retained under legal hold, or
-proved absent.
+Identity owns the platform-global data-subject erasure request because it owns global User identity. Each bounded context remains sole owner of how its service-owned data is erased, anonymized, legally retained, or proved absent.
 
 A stable non-PII `erasure_request_id` coordinates an idempotent workflow:
 
@@ -35,71 +26,57 @@ REQUESTED
 -> COMPLETED
 ```
 
-or an explicit blocking/failure state such as:
+with explicit blocking/failure states such as:
 
 ```text
 BLOCKED_BY_LEGAL_HOLD
 FAILED_RETRYABLE
 ```
 
-No service may mark the global request complete until every required service
-returns a durable receipt.
+Global completion requires a durable current receipt from every required service.
 
 ### Service erasure contract
 
-A service handler must inventory and reconcile all applicable copies it owns,
-including primary rows, logically deleted rows, derived/search/cache state,
-service-owned outbox/inbox payloads, attachments/blobs, and provider-side data
-that the service is contractually able to delete.
+Each service inventories/reconciles all applicable owned copies, including primary/logically deleted rows, derived/search/cache state, service-owned outbox/inbox payloads, attachments/blobs, and provider-side data contractually deletable by the service.
 
-For each category it performs one approved action:
+For each data category it performs one approved action:
 
 - irreversible physical deletion;
-- irreversible anonymization where retention of non-identifying facts is
-  required;
-- cryptographic erasure for independently envelope-encrypted material when a
-  dedicated destroyable data-encryption key exists;
+- irreversible anonymization where non-identifying facts must be retained;
+- cryptographic erasure only for independently envelope-encrypted material with a dedicated destroyable data-encryption key;
 - legal-hold retention with explicit blocking evidence.
 
-Crypto-shredding is not used as a blanket substitute for erasing ordinary
-unencrypted relational data.
+Crypto-shredding is not a blanket substitute for erasing ordinary relational PII.
 
-### Evidence without retaining PII
+### Evidence without retaining erased PII
 
-Each service stores an append-only erasure receipt containing only approved
-non-PII metadata: request ID, service, policy/version, completion time, action
-categories, legal-hold state, and integrity/audit fields. It does not retain the
-removed value merely to prove it was removed.
+Each service persists append-only erasure evidence containing only approved non-PII metadata: request ID, service, policy/version, completion time, action categories, legal-hold state, and integrity/audit fields. It never retains the removed value merely to prove removal.
 
 ### Backup/restore behavior
 
-Existing immutable backups are not rewritten in place. Their approved
-retention still applies. Before a restored environment can serve traffic, the
-platform replays the durable erasure/legal-hold ledger so data restored from an
-older backup is re-erased/anonymized before exposure. Expired backup artifacts
-are destroyed by retention policy.
+Immutable backups are not rewritten in place; approved retention still applies. Before a restored environment can serve traffic, the platform replays durable erasure/legal-hold evidence so older restored personal data is re-erased/anonymized before exposure. Expired backup artifacts are destroyed according to retention policy.
 
 ### Identifier behavior
 
-ADR-0003 remains authoritative: immutable technical/security IDs are not
-reused. Human-facing identifiers are not released while restoration is
-possible and are released only through the explicit irreversible policy.
+Generated technical/security/event/audit identifiers are never reused. Human-facing identifiers remain reserved while restoration is supported and are released only through an explicit irreversible policy. Restoration can never steal an identifier already assigned to a newer owner.
 
-## Verification Requirements
+### Logical deletion/retention baseline
+
+Current platform default retention is 360 days unless a reviewed data-class policy defines another period. Expiry creates eligibility for purge/anonymization; it does not automatically authorize destruction. Physical purge is unavailable through ordinary business APIs/repositories, is idempotent/observable/audited/tenant-safe, and is blocked by active legal hold.
+
+## Verification requirements
 
 - end-to-end erasure across every registered owning service;
 - idempotent replay after partial failure;
 - legal-hold blocking and later release;
-- no retained PII in erasure receipts;
-- cache/search/outbox/blob cleanup where applicable;
-- restore from a pre-erasure backup followed by mandatory re-erasure before
-  traffic;
-- cryptographic-erasure tests only for data classes that actually use
-  independent destroyable keys;
-- audit and alerting for stuck/failed erasure requests.
+- no retained PII in receipts;
+- cache/search/outbox/inbox/blob/provider cleanup where applicable;
+- restore from pre-erasure backup followed by mandatory re-erasure before traffic;
+- cryptographic-erasure tests only for data classes with independent destroyable keys;
+- identifier non-reuse/release conflict tests;
+- audit/alerting for stuck/failed requests;
+- proof that ordinary APIs cannot perform irreversible purge.
 
-## Consequences
+## Rollback considerations
 
-Logical deletion remains reversible operational state while an approved erasure
-has a concrete irreversible workflow and proof model. Backup recovery no longer
-risks silently resurrecting previously erased data into a serving environment.
+Rollback MUST NOT resurrect erased data into serving state, reuse protected identifiers, drop legal-hold checks, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence. Restored systems must replay erasure evidence before traffic regardless of application rollback version.
