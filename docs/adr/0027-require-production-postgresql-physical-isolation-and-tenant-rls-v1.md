@@ -1,4 +1,4 @@
-# ADR-0057: Production PostgreSQL Service Isolation and Tenant RLS v1
+# ADR-0027: Production PostgreSQL Service Isolation and Tenant RLS v1
 
 ## Status
 
@@ -25,7 +25,7 @@ Every independently deployable microservice using PostgreSQL owns a distinct Pos
 
 A service may use multiple schemas inside its own database when technically justified; no schema/database/role is shared with another microservice. Non-production may consolidate physical clusters only while preserving separate databases, credentials, privileges, Flyway histories, and ownership.
 
-Critical service clusters use the current three-instance synchronous required-durability baseline. Fleet automation/restore/upgrade policy is defined by ADR-0064/ADR-0067.
+Critical service clusters use the current three-instance synchronous required-durability baseline. Fleet automation/restore/upgrade policy is defined by ADR-0034/ADR-0037.
 
 ### Role and privilege separation
 
@@ -80,7 +80,7 @@ RLS is defense in depth against application/query defects. It is not claimed to 
 
 Each service cluster writes WAL/base backups to an independent object prefix/bucket with independent credentials/encryption context. Restore permissions are least privilege and service scoped. Cross-service bulk backup access is not granted to application teams by default.
 
-Recovery must demonstrate restoration of one service without destructively restoring another service. Monthly restore evidence and production upgrade/rollback safety follow ADR-0067.
+Recovery must demonstrate restoration of one service without destructively restoring another service. Monthly restore evidence and production upgrade/rollback safety follow ADR-0037.
 
 ### Capacity and pools
 

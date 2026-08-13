@@ -1,4 +1,4 @@
-# ADR-0050: Production Platform Compatibility and CNI v1
+# ADR-0021: Production Platform Compatibility and CNI v1
 
 ## Status
 
@@ -61,7 +61,7 @@ Compatibility CI/staging verifies the current matrix, including:
 - Istio Ambient plus `istioctl analyze`;
 - Calico NetworkPolicy positive/negative flows including HBONE/health paths;
 - CloudNativePG/PostgreSQL failover and compatibility;
-- Kyverno admission behavior, admission-policy authoring RBAC, and bounded CEL HTTP-context egress/SSRF positive/negative behavior from ADR-0046;
+- Kyverno admission behavior, admission-policy authoring RBAC, and bounded CEL HTTP-context egress/SSRF positive/negative behavior from ADR-0017;
 - Argo CD reconciliation;
 - exact immutable artifact identities;
 - applicable load, backup/restore, rollback/fail-forward, and security tests for the changed component set.

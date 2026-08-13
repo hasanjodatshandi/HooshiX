@@ -1,4 +1,4 @@
-# ADR-0059: Upstream Volumetric DDoS Protection v1
+# ADR-0029: Upstream Volumetric DDoS Protection v1
 
 ## Status
 

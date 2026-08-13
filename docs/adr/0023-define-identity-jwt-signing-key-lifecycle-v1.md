@@ -1,4 +1,4 @@
-# ADR-0052: Identity JWT Signing-Key Lifecycle v1
+# ADR-0023: Identity JWT Signing-Key Lifecycle v1
 
 ## Status
 

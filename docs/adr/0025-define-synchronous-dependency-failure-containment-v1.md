@@ -1,4 +1,4 @@
-# ADR-0055: Define Synchronous Dependency Failure Containment v1
+# ADR-0025: Define Synchronous Dependency Failure Containment v1
 
 ## Status
 

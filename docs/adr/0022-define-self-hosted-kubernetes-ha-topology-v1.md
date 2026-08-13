@@ -1,4 +1,4 @@
-# ADR-0051: Self-Hosted Kubernetes HA Topology v1
+# ADR-0022: Self-Hosted Kubernetes HA Topology v1
 
 ## Status
 

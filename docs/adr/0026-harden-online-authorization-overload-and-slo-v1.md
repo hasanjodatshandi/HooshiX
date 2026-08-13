@@ -1,4 +1,4 @@
-# ADR-0056: Online Authorization Runtime, Capacity, and Overload Protection v1
+# ADR-0026: Online Authorization Runtime, Capacity, and Overload Protection v1
 
 ## Status
 
@@ -10,7 +10,7 @@ Accepted — current effective decision
 
 ## Decision
 
-ADR-0039 defines the one authoritative online `CheckPermission` model. This ADR defines its current production SLO, capacity, deployment, pre-check, overload, and caller-breaker requirements. ADR-0062 owns current SLI/burn alerting and breaker-opening criteria; ADR-0066 owns current de-correlated OPEN/HALF_OPEN recovery behavior.
+ADR-0013 defines the one authoritative online `CheckPermission` model. This ADR defines its current production SLO, capacity, deployment, pre-check, overload, and caller-breaker requirements. ADR-0032 owns current SLI/burn alerting and breaker-opening criteria; ADR-0036 owns current de-correlated OPEN/HALF_OPEN recovery behavior.
 
 ### Request contract
 
@@ -52,11 +52,11 @@ Authorization enforces:
 
 ### Caller circuit breaker
 
-Resource services apply the current ADR-0055/ADR-0066 fail-closed Authorization breaker.
+Resource services apply the current ADR-0025/ADR-0036 fail-closed Authorization breaker.
 
 Infrastructure/dependency failures—including timeout/unavailable/transport failure and explicit Authorization overload—count toward breaker failure. Authoritative deny and expected contract errors do not.
 
-OPEN returns `AUTHORIZATION_UNAVAILABLE` immediately and never serves stale/cached allow state. HALF_OPEN uses real `CheckPermission` probes under the same one-attempt 300 ms contract. Breaker reopen timing, de-correlation, and closing criteria follow ADR-0066.
+OPEN returns `AUTHORIZATION_UNAVAILABLE` immediately and never serves stale/cached allow state. HALF_OPEN uses real `CheckPermission` probes under the same one-attempt 300 ms contract. Breaker reopen timing, de-correlation, and closing criteria follow ADR-0036.
 
 ### Production deployment baseline
 
@@ -90,7 +90,7 @@ Before production, prove >=2x projected peak while meeting p95<=100ms and p99<=2
 
 Track request outcome/latency, saturation/load-shed counts, queue wait, per-principal fair-share pressure without high-cardinality identity labels, breaker state/transitions, database pool acquisition, SQL latency, replica availability, and SLO burn.
 
-Paging uses the paired-window burn policy defined by ADR-0062 rather than isolated percentile samples. ADR-0066 governs breaker recovery de-correlation and serialized real HALF_OPEN probes, not SLO burn thresholds.
+Paging uses the paired-window burn policy defined by ADR-0032 rather than isolated percentile samples. ADR-0036 governs breaker recovery de-correlation and serialized real HALF_OPEN probes, not SLO burn thresholds.
 
 ## Verification requirements
 

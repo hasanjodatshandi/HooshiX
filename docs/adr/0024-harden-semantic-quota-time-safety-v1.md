@@ -1,4 +1,4 @@
-# ADR-0054: Semantic Security Quotas — Current v1
+# ADR-0024: Semantic Security Quotas — Current v1
 
 ## Status
 

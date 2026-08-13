@@ -1,4 +1,4 @@
-# ADR-0058: Data-Subject Erasure Execution and Evidence v1
+# ADR-0028: Data-Subject Erasure Execution and Evidence v1
 
 ## Status
 
