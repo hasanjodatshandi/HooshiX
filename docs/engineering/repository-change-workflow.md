@@ -31,6 +31,7 @@ Before merge, reviewers/agents MUST:
 - verify that deleted/normalized decision records do not remove a still-current invariant, contract, security requirement, SLO, failure semantic, migration rule, or operational requirement;
 - verify that exact version/security changes are reflected in the Technology Baseline and compatibility documentation where applicable;
 - report checks that passed, failed, were not run, or were unavailable;
+- distinguish an empty/unconfigured CI/status result from a passing check set; absence of reported checks MUST be stated explicitly and MUST NOT be described as green CI;
 - avoid merging when a known Critical/High security issue, unresolved current-state contradiction, merge conflict, or required verification blocker remains.
 
 ## Scope discipline
