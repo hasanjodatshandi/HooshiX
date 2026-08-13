@@ -108,7 +108,11 @@ Required evidence:
 
 - OIDC Authorization Code + PKCE S256, state/nonce replay/mismatch negatives;
 - exact redirect and open-redirect negatives;
+- provider validation occurs in BFF before Identity invocation; no direct Identity->Google login/link dependency;
+- provider authorization code/tokens do not enter Identity; BFF->Identity uses the bounded short-lived single-use evidence contract from ADR-0012;
+- evidence expiry/replay/wrong-workload-identity negatives;
 - secure `__Host-sajtech-session` + fixation/rotation tests;
+- password+MFA pre-auth cannot become a completed browser session before successful MFA;
 - server-side session + encrypted refresh-credential handling where used;
 - Origin + synchronizer-token CSRF positives/negatives;
 - same-origin/default-deny CORS;
@@ -225,6 +229,7 @@ Required evidence:
 - RSA-3072/RS256 private signing keys only in Identity local/OpenBao delivery boundary;
 - next public key deployed/verified before activation;
 - local GitOps verifier bundle reloads atomically;
+- exact v1 claim allow-list (`iss`,`aud`,`sub`,`jti`,`iat`,`exp`,`tenant_id`,`membership_id`,`sid`), no role/permission snapshot authority, wildcard-audience rejection;
 - algorithm-confusion/unknown-kid/issuer/audience negatives;
 - 90-day normal rotation + emergency compromise exercise;
 - no normal verification call to Identity/OpenBao/remote JWKS;
@@ -261,7 +266,29 @@ For affected frontend releases:
 
 Status until verified: **frontend release blocker when applicable**.
 
-## 16. Final release evidence
+## 16. Identity Service repository-complete evidence — ADR-0009/0012/0023/0028
+
+Required repository/build evidence includes:
+
+- versioned feature-scoped Protobuf + Buf compatibility for registration/auth/session/tenant/invitation/external-identity/MFA/erasure entry points;
+- server-owned IDs/TTLs/security policy and typed bounded gRPC errors;
+- profile/contact canonicalization, verified global uniqueness/reservation, primary-contact and invitation concurrency rules;
+- exactly eight-digit registration challenge, HMAC-only persistence, 10m TTL, five failed attempts, 60s resend spacing, replacement invalidation, single use, registration/resend/confirm semantic quotas and non-enumeration;
+- explicit aggregate/transaction boundaries, JPA aggregate CRUD plus justified JDBC/jOOQ SQL-control paths, no remote I/O in transactions;
+- compromised-password prefix-only outbound contract: raw password remains in Identity, 900ms/one-attempt/no-retry/fail-closed behavior;
+- exact JWT claims/audience plus refresh-family rotation/reuse behavior;
+- BFF-only provider validation, one-time evidence handoff, no Identity->Google path;
+- password+TOTP/recovery pre-auth gate with no access/refresh issuance before MFA completion;
+- tenant invitation existing-user target/7d/single-pending/acceptance-ownership rules;
+- HMAC-versioned idempotency replay/conflict behavior, 35d critical publication/Inbox-dedup evidence, >=14d retry/DLQ evidence when used, >=365d security audit evidence;
+- erasure server-owned required participant registry, Kafka/outbox/inbox replay, non-PII receipts, legal-hold ACTIVE->RELEASED, restore-before-traffic reconciliation;
+- Identity Docker/Helm/GitOps/ServiceAccount/NetworkPolicy/Istio/probe/replica/PDB/topology/security-context/render checks and CI gates.
+
+Repository-complete does **not** equal production-ready. Registry/DNS/secret paths/provider credentials/Redis/CNPG/backup/alert destinations may remain typed environment placeholders, but actual staging/production provider, secret, cluster, load, failover, restore, and DR evidence remains `NOT VERIFIED` until executed.
+
+Status until verified: **Identity repository implementation/evidence blocker; external production evidence remains independently blocking**.
+
+## 17. Final release evidence
 
 The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/WAF/provider capacity, node/replica/database failover, security-negative/workload-identity, backup/PITR/restore, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
 
