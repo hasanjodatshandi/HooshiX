@@ -21,7 +21,7 @@ compatible. Exact image digests are stored in GitOps/deployment metadata.
 | Redis | 8.2.8 | Sentinel/ACL/TLS/noeviction semantic-quota topology |
 | Gateway API | 1.5.1 | Traefik/Istio route resources rendered and compatibility-tested |
 | Traefik | 3.7.1 | Gateway API 1.5.1 resources rendered/validated in CI |
-| Helm | 4.2.0 | charts rendered and schema/policy checked in CI |
+| Helm | 4.2.3 | current approved 4.2.x patch; charts rendered and schema/policy checked in CI |
 | Kyverno | 1.18.2 | stable `policies.kyverno.io/v1`; ImageValidatingPolicy admission |
 | Teleport | 18.10.0 | ADR-0060 privileged human access; JIT/SSO/session audit exercised before rollout |
 | Cosign | 3.0.6 | CI signatures/attestations must verify through Kyverno policy |
