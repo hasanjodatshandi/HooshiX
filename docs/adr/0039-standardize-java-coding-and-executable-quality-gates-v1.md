@@ -1,4 +1,4 @@
-# ADR-0069: Java Coding Rules and Executable Quality Gates v1
+# ADR-0039: Java Coding Rules and Executable Quality Gates v1
 
 ## Status
 
@@ -102,7 +102,7 @@ For every executable Java service:
 
 ## Relationship to current decisions
 
-This decision operates together with current supply-chain/vulnerability controls (ADR-0046/ADR-0065/ADR-0068), PII-safe logging enforcement (ADR-0061), runtime/deployment architecture, and the repository PR-first/current-only governance documents. It does not change Kafka, Authorization, PostgreSQL, OpenBao, or service-domain semantics.
+This decision operates together with current supply-chain/vulnerability controls (ADR-0017/ADR-0035/ADR-0038), PII-safe logging enforcement (ADRÑ0031), runtime/deployment architecture, and the repository PR-first/current-only governance documents. It does not change Kafka, Authorization, PostgreSQL, OpenBao, or service-domain semantics.
 
 ## Rollback considerations
 

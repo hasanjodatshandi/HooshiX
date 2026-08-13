@@ -1,4 +1,4 @@
-# ADR-0066: Authorization Breaker Recovery and Dependency-Policy Governance v1
+# ADR-0036: Authorization Breaker Recovery and Dependency-Policy Governance v1
 
 ## Status
 

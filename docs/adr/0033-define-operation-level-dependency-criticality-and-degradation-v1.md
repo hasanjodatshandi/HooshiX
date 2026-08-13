@@ -1,4 +1,4 @@
-# ADR-0063: Operation-Level Dependency Criticality and Degradation v1
+# ADR-0033: Operation-Level Dependency Criticality and Degradation v1
 
 ## Status
 

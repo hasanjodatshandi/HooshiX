@@ -1,4 +1,4 @@
-# ADR-0062: Authorization SLO Alerting and Breaker Opening v1
+# ADR-0032: Authorization SLO Alerting and Breaker Opening v1
 
 ## Status
 
@@ -10,7 +10,7 @@ Accepted — current effective decision
 
 ## Decision
 
-ADR-0056 defines the production Authorization request/capacity baseline. This ADR defines the current SLI interpretation, multi-window burn alerting, breaker-opening criteria, and the rule that real `CheckPermission` traffic—not a health endpoint—proves recovery. ADR-0066 owns the current reopen backoff and serialized HALF_OPEN behavior.
+ADR-0026 defines the production Authorization request/capacity baseline. This ADR defines the current SLI interpretation, multi-window burn alerting, breaker-opening criteria, and the rule that real `CheckPermission` traffic—not a health endpoint—proves recovery. ADR-0036 owns the current reopen backoff and serialized HALF_OPEN behavior.
 
 Current objectives remain:
 
@@ -65,7 +65,7 @@ Low-volume callers may trigger the consecutive-failure rule before the percentag
 
 ### Current OPEN/HALF_OPEN recovery
 
-Reopen timing and half-open concurrency follow ADR-0066:
+Reopen timing and half-open concurrency follow ADR-0036:
 
 ```text
 base open duration = min(30s, 2s * 2^reopen_streak)

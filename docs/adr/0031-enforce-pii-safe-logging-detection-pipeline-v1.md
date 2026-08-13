@@ -1,4 +1,4 @@
-# ADR-0061: PII-Safe Logging Detection Pipeline v1
+# ADR-0031: PII-Safe Logging Detection Pipeline v1
 
 ## Status
 

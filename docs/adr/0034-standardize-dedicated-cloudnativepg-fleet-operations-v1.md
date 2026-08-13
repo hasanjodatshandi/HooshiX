@@ -1,4 +1,4 @@
-# ADR-0064: Dedicated CloudNativePG Fleet Operations v1
+# ADR-0034: Dedicated CloudNativePG Fleet Operations v1
 
 ## Status
 
@@ -12,7 +12,7 @@ Accepted — current effective decision
 
 Production keeps one dedicated CloudNativePG cluster per persistent microservice. Operational complexity is reduced through fleet standardization and automation, not by reconsolidating service security/failure domains.
 
-ADR-0057 defines service database/cluster isolation. ADR-0048 defines shared HA/backup mechanics. This ADR defines the current fleet-management model; ADR-0067 defines restore evidence and upgrade safety.
+ADR-0027 defines service database/cluster isolation. ADR-0019 defines shared HA/backup mechanics. This ADR defines the current fleet-management model; ADR-0037 defines restore evidence and upgrade safety.
 
 ### GitOps fleet model
 

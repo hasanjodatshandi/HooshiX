@@ -1,4 +1,4 @@
-# ADR-0067: PostgreSQL Restore Evidence and Upgrade Safety v1
+# ADR-0037: PostgreSQL Restore Evidence and Upgrade Safety v1
 
 ## Status
 
@@ -26,7 +26,7 @@ Every monthly isolated per-service restore produces an immutable or append-only 
 - Flyway schema version;
 - integrity checks and result;
 - tenant/RLS negative-access checks where applicable;
-- current ADR-0058 erasure/legal-hold replay checks where applicable;
+- current ADR-0028 erasure/legal-hold replay checks where applicable;
 - runbook revision;
 - executor/approver identity;
 - final `PASS`/`FAIL` and incident/ticket reference when failed.
