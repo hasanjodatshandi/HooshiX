@@ -176,8 +176,10 @@ Base safe operational fields may include timestamp, level, service name/version,
 
 Logging is allow-list based. Raw credentials, passwords/PIN/OTP/recovery codes, tokens/API keys, authorization/cookie headers, session IDs, private keys/secrets, connection strings, payment/high-risk PII, full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, and unreviewed provider payload/exception text are prohibited.
 
-Input-derived fields are CR/LF-safe. Production debug elevation is time-bounded/audited and cannot enable sensitive body/bind/credential logging. Logging/export failure does not fail the primary business request, but sustained loss/backpressure is observable/alertable. Log-store access is least privilege and audited.
+Input-derived fields are CR/LF-safe. Production debug elevation is time-bounded/audited and cannot enable sensitive body/bind/credential logging.
+
+Ordinary non-audit telemetry export follows the `OBSERVABILITY` dependency class: bounded buffering/drop may keep the primary business request serving, but sustained loss/backpressure is observable/alertable. **Required security/audit evidence is different**: when the current operation contract classifies it as `AUTHORITATIVE_STATE`, it must be durably persisted/outboxed according to that contract and cannot be silently dropped merely because an exporter/backend is unavailable. Log-store access is least privilege and audited.
 
 ## 11. Required failure evidence
 
-Critical components run applicable timeout/cancellation, overload/bulkhead, PostgreSQL primary loss, Redis Sentinel failover, Kafka broker/controller/replay, OpenBao restore/unseal, WAF/Istio/NetworkPolicy negative, Authorization fail-closed/recovery, Notification provider ambiguity/crash/failover, backup/PITR/DR, and SLO/burn-alert correctness tests.
+Critical components run applicable timeout/cancellation, overload/bulkhead, PostgreSQL primary loss, Redis Sentinel failover, Kafka broker/controller/replay, OpenBao restore/unseal, WAF/Istio/NetworkPolicy negative, Authorization fail-closed/recovery, Notification provider ambiguity/crash/failover, backup/PITR/DR, ordinary telemetry-loss behavior, required-audit persistence failure behavior, and SLO/burn-alert correctness tests.
