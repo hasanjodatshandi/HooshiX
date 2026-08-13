@@ -1,6 +1,6 @@
 # Technology Baseline
 
-- **Baseline date:** 2026-08-12
+- **Baseline date:** 2026-08-13
 - **Status:** Active production/application baseline
 - **Update policy:** Reviewed compatible patch/minor updates may use the baseline process when permitted by the governing ADR; architecture/security-semantic changes require a superseding ADR.
 - **Local companion:** `docs/technology/local-development-baseline.md`
@@ -34,7 +34,7 @@ newer release.
 | PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0048 |
 | PostgreSQL backup | Barman Cloud CNPG-I plugin 0.13.0 | ADR-0048 |
 | Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 baseline |
-| PostgreSQL JDBC | 42.7.11 | service dependency lock authority |
+| PostgreSQL JDBC | 42.7.13 | fixes CVE-2026-54291 affecting 42.7.4-42.7.11; service dependency lock authority |
 | Migration | Flyway 12.4.0 | sole schema-change mechanism |
 | Pool | HikariCP managed/aligned with Spring Boot | connection budget governed by architecture |
 | Persistence | Spring Data JPA/Hibernate or jOOQ by service responsibility | separate Domain/persistence models |
