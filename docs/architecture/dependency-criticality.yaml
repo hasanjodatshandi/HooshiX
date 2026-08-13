@@ -126,7 +126,7 @@ edges:
     owner: web-bff
     policy_refs:
       - ADR-0016
-      - docs/architecture/services/web-bff.md#5-browser-session-and-security
+      - docs/architecture/services/web-bff.md#3-oidc
 
   - operation_id: web-bff.identity-oidc-evidence-submit
     caller_owner: web-bff
