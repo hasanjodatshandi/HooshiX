@@ -60,7 +60,7 @@ newer release.
 | Containers | OCI immutable images by digest | `latest` prohibited |
 | Kubernetes | 1.35.6 | platform patch upgrades remain controlled GitOps changes |
 | Primary CNI / NetworkPolicy | Calico OSS 3.32.1 | standard dataplane; Ambient-aware NetworkPolicy tests mandatory |
-| Helm | 4.2.0 | chart/tool digests pinned in CI/platform images |
+| Helm | 4.2.3 | upstream 4.2.x patch release; chart/tool digests pinned in CI/platform images |
 | GitOps | Argo CD 3.4.2 | desired state under repository `deploy/` |
 | Edge gateway | Traefik 3.7.1 | chart 40.2.0 |
 | Kubernetes routing API | Gateway API 1.5.1 | preferred for new public routes |
