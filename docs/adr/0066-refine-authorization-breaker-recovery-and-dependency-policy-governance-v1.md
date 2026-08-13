@@ -54,7 +54,9 @@ docs/architecture/dependency-criticality.yaml
 
 `dependency-criticality-matrix.md` is the generated human-readable view.
 
-Each production synchronous edge records at least stable operation/dependency identity, caller owner, dependency class, failure action, retry owner, fallback, current decision reference, and policy owner.
+Each production synchronous edge records stable operation/dependency identity, caller owner, dependency class, failure action, retry owner, fallback, policy owner, and non-empty `policy_refs`.
+
+`policy_refs` may reference retained current ADRs and/or canonical current documents. They MUST point to the real current authority and MUST NOT point to deleted history or an unrelated ADR merely to satisfy schema validation.
 
 ### Composition
 
@@ -72,12 +74,12 @@ An optional dependency never makes a mandatory dependency optional. Missing fall
 
 Caller/bounded-context owner owns each edge; Platform Architecture owns schema/classes; Security co-reviews `AUTHORITATIVE_SECURITY` changes.
 
-CI MUST validate schema/enums, reject duplicate edges/missing required fields/orphans, regenerate/check the Markdown view, require coverage for production synchronous edges represented by current service architecture/contracts, and require architecture/security review when an authoritative edge becomes degradable or gains fallback.
+CI MUST validate schema/enums, reject duplicate edges/missing required fields/orphans, validate current `policy_refs`, regenerate/check the Markdown view, require coverage for production synchronous edges represented by current service architecture/contracts, and require architecture/security review when an authoritative edge becomes degradable or gains fallback.
 
 ## Verification requirements
 
-Verify de-correlated multi-replica recovery, bounded reopen escalation/reset, one in-flight HALF_OPEN probe, three real successes to close, immediate reopen on infrastructure failure/overload, tenant-tier independence, health-endpoint non-authority, registry schema/duplicate/orphan/render/coverage checks, and composite-edge behavior.
+Verify de-correlated multi-replica recovery, bounded reopen escalation/reset, one in-flight HALF_OPEN probe, three real successes to close, immediate reopen on infrastructure failure/overload, tenant-tier independence, health-endpoint non-authority, registry schema/duplicate/orphan/policy-ref/render/coverage checks, and composite-edge behavior.
 
 ## Rollback considerations
 
-Rollback MUST NOT restore synchronized fixed recovery, concurrent half-open probe bursts, tenant-tier-dependent authorization availability, synthetic health-probe recovery, unchecked Markdown authority, implicit fallback, or removal of fail-closed semantics.
+Rollback MUST NOT restore synchronized fixed recovery, concurrent half-open probe bursts, tenant-tier-dependent authorization availability, synthetic health-probe recovery, unchecked Markdown authority, forced ADR-only policy references, implicit fallback, or removal of fail-closed semantics.
