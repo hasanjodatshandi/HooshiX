@@ -1,280 +1,159 @@
-# Data and Messaging Architecture
+# Data and Messaging Architecture — Current State
 
-## 1. Data ownership
+This document is the implementation-facing current data/messaging model. Detailed SQL/Flyway implementation rules live in `../engineering/sql-and-flyway-coding-standards.md`; exact versions live in the Technology Baseline.
 
-PostgreSQL is the primary durable database. ADR-0053 requires every independently deployable microservice with relational persistence to own a **distinct PostgreSQL database**, independent application/migration credentials, Flyway history, schemas, repository/query adapters, and access policy.
+## 1. Data ownership and isolation
 
-A service may use multiple schemas inside its own database when justified, but no database or schema is shared between microservices. Service database roles have no `CONNECT` or object privileges on other service databases.
+Every independently deployable microservice with relational persistence owns:
 
-ADR-0057 strengthens this boundary for production: every persistent microservice
-uses a dedicated physical CloudNativePG cluster and independent backup namespace/
-credentials/encryption context. Non-production may consolidate infrastructure
-without sharing service databases or roles.
+- one distinct PostgreSQL database;
+- independent runtime/migration credentials and Flyway history;
+- its schemas, migrations, repositories/query adapters, connection/capacity budget, and backup identity;
+- in production, one dedicated CloudNativePG cluster under ADR-0057.
 
-No environment permits:
+Non-production may consolidate physical database infrastructure only while database/credential/role/Flyway ownership remains isolated.
 
-- a database or schema shared by multiple services;
-- direct cross-service SQL or cross-database joins;
-- cross-service foreign keys, FDWs, `dblink`, or database views as integration APIs;
-- shared ORM/JPA entities or jOOQ-generated persistence models;
-- using another service's database as an integration API.
+Prohibited in every environment:
 
-Cross-bounded-context data moves only through approved versioned service contracts/events.
+- database/schema shared by multiple services;
+- direct cross-service SQL, joins, foreign keys, FDW/`dblink`, or database views as integration APIs;
+- cross-service ORM/JPA entities or jOOQ persistence models;
+- another service database used as an integration/read API.
+
+Cross-bounded-context data moves only through approved versioned synchronous contracts or integration events.
+
+### Tenant isolation
+
+Every tenant-owned production table uses forced PostgreSQL RLS plus application/repository tenant enforcement. Trusted transaction-local tenant context comes only from validated authenticated context. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot connect/access another service database.
 
 ## 2. Production PostgreSQL topology
 
-ADR-0048 + ADR-0057 are current. Each persistent production microservice owns
-its own HA cluster. Exact patches are owned by the Technology Baseline and
-deployment metadata; the architectural compatibility line is:
+Current production line:
 
 ```text
 per persistent service:
   CloudNativePG 1.30.x
   PostgreSQL 18.x
-  3 instances for critical production services
+  dedicated cluster/database/roles/backups
+  3 instances for critical services
   quorum synchronous replication: ANY 1 equivalent
-  data durability: required
-  failover quorum: enabled
-  automatic safe failover
-  independent WAL/PITR backup namespace and credentials
+  required durability + failover quorum
+  automatic failover only when acknowledged durability is safe
 ```
 
-Safe failover prioritizes acknowledged data durability. If the operator cannot
-prove a safe promotion quorum, write availability may stop instead of promoting
-an unsafe replica.
+Exact patches are owned by `../technology/technology-baseline.md` and deployment metadata.
 
-Services use their own cluster's primary/read-write endpoint for transactions.
-Read replicas are not introduced into a business read path unless consistency
-semantics are explicitly acceptable.
+Application pools use the service cluster primary/read-write endpoint for transactional work. Read replicas enter business read paths only when their consistency semantics are explicitly acceptable.
 
-Every tenant-owned production table also uses forced PostgreSQL RLS with a
-transaction-local tenant context derived only from validated security context.
-Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and retain the
-application/repository tenant checks required by ADR-0002.
+Aggregate application Hikari maxima across a service's HPA maximum stay <=70% of that cluster's `max_connections`; >=30% remains for replication/failover, migrations, monitoring, administration, and emergencies. PgBouncer is not a default and requires measured connection-pressure evidence.
 
-## 3. Flyway and schema evolution
+## 3. Flyway, schema evolution, JPA, and jOOQ
 
-Flyway is the **only** schema-change mechanism.
-
-- executed/released migrations are immutable;
-- schema evolution uses expand -> migrate -> contract;
-- application rollback must remain compatible with the expanded schema;
-- automatic database rollback is never assumed;
-- destructive changes require explicit retention/legal-hold/rollback review.
-
-JPA `ddl-auto` remains `validate` and OSIV is prohibited.
-
-## 4. JPA/Hibernate
-
-Use JPA/Hibernate for aggregate persistence and controlled CRUD where it fits.
-
-Mandatory rules:
-
-- Domain and JPA models are separate;
-- persistence entities stay in Infrastructure;
-- associations LAZY by default;
-- no broad EAGER graphs;
-- explicit fetch plans/projections/entity graphs/join fetches;
-- cascades/orphan removal reviewed against aggregate ownership;
-- N+1 prohibited;
-- `equals`/`hashCode`/`toString` must not traverse lazy graphs unsafely;
-- persistence models follow aggregate/query needs; a mandatory one-table/one-persistence-model mapping is prohibited;
-- batch size, fetch size, flush behavior, and bulk-write strategy are measured for performance-sensitive paths rather than configured as unreviewed global magic values.
-
-## 5. jOOQ
-
-Use jOOQ for complex read/query models, reporting, bulk operations, CTEs,
-window functions, and performance-sensitive SQL. Generated jOOQ types remain
-Infrastructure concerns.
-
-Notification persistence is explicitly jOOQ/JDBC without JPA.
-
-## 6. Query and transaction rules
-
-- every multi-row production query has deterministic pagination or a hard bound;
-- `SELECT *` is prohibited in application production code;
-- expensive/sensitive queries require reviewed indexes and execution plans;
-- transactions are short;
-- network I/O inside a DB transaction is prohibited;
-- no DB lock is held during gRPC/Kafka/HTTP/Redis/provider I/O;
-- retries occur outside the transaction;
-- database lock/statement timeouts are bounded where contention matters.
-
-## 7. Connection capacity
-
-Virtual Threads do not create database capacity.
-
-Hikari pools are sized from each service's own PostgreSQL cluster capacity. For
-each cluster, aggregate application Hikari `maximumPoolSize` across that service's
-HPA maximum is capped at no more than 70% of PostgreSQL `max_connections`,
-retaining at least 30% for failover, replication, migrations, monitoring,
-administration, and emergency headroom.
-
-Increasing pool size is not a fix for slow SQL. Monitor:
+Flyway is the only schema-change mechanism. Released/executed migrations are immutable. Evolution follows:
 
 ```text
-db.pool.active
-db.pool.idle
-db.pool.pending
-db.pool.acquire.duration
-db.query.duration
-db.transaction.duration
+expand -> compatible deploy -> bounded/resumable migrate/backfill -> verify -> contract
 ```
 
-PgBouncer is not a v1 default. Add it only after measured connection-count/
-churn pressure proves value.
+Application rollback must remain compatible with expanded schema; automatic database downgrade is never assumed.
 
-## 8. PostgreSQL backup/PITR
+JPA/Hibernate is appropriate for aggregate persistence and bounded CRUD when it fits. Domain and JPA models remain separate; persistence entities stay Infrastructure-only; LAZY is default; broad EAGER/N+1/OSIV are prohibited; fetch plans/cascades/orphan removal are explicit.
 
-ADR-0027 targets remain current, with ADR-0048's simpler backup shape:
+jOOQ/JDBC is appropriate for complex read/query models, bulk/set-based work, CTE/window/PostgreSQL-specific SQL, and measured performance-sensitive queries. Generated types remain Infrastructure-only. Notification persistence is jOOQ/JDBC without JPA.
+
+Canonical SQL/query/migration details live in `../engineering/sql-and-flyway-coding-standards.md`.
+
+## 4. Query and transaction rules
+
+- every multi-row production query has deterministic pagination or a hard proven bound;
+- explicit column lists; production application `SELECT *` is prohibited;
+- sensitive/expensive queries require reviewed indexes and representative plan evidence;
+- transactions are short and explicit;
+- gRPC/HTTP/Kafka/Redis/provider I/O inside a DB transaction is prohibited;
+- DB locks are never held across remote I/O;
+- retries run outside the failed transaction;
+- lock/statement/acquisition timeouts are finite where contention matters;
+- `SKIP LOCKED` work claims use short claim transactions and process work after commit.
+
+Virtual Threads do not create database capacity; pool pending/acquisition and query/transaction latency are observable.
+
+## 5. PostgreSQL backup, restore, and DR
+
+Current service-cluster baseline:
 
 - PostgreSQL RPO <=5m;
-- platform RTO <=4h;
+- platform cold-DR RTO <=4h;
 - continuous WAL archive to encrypted off-site object storage;
-- daily online physical base backup using Barman Cloud CNPG-I plugin;
-- PITR 35 days;
-- monthly retained backup set 12 months;
-- versioning/object lock when supported;
-- verify every backup cycle;
-- isolated restore monthly;
-- full DR exercise quarterly.
+- daily online physical base backup via approved CloudNativePG/Barman integration;
+- 35-day PITR;
+- monthly retained backup set for 12 months;
+- versioning/object lock where supported;
+- verification every backup cycle;
+- isolated restore monthly per service;
+- full cold-DR exercise quarterly;
+- queryable restore evidence under ADR-0067.
 
-A restored environment does not serve traffic until data integrity and logical
-deletion/erasure/legal-hold/identifier-release decisions are reconciled.
+Restored environments MUST reconcile data integrity plus current logical-deletion/erasure/legal-hold requirements before traffic opens.
 
-## 9. Kafka platform
+## 6. Kafka platform and contracts
 
-Kafka is the asynchronous/event-driven inter-service transport. Each environment
-uses one shared platform-managed cluster with domain topic ownership, ACLs,
-quotas, and consumer groups.
+Kafka is asynchronous integration transport, not ordinary request/reply and not business source of truth.
 
-Production v1 uses the ADR-0044 Kafka 4.2.x KRaft line; the exact patch is owned
-by the Technology Baseline and immutable deployment metadata:
+Current production topology comes from ADR-0044:
 
 ```text
-Kafka 4.2.x / KRaft
-3 brokers
-3 dedicated controllers
-```
-
-Critical topics:
-
-```text
-replication.factor=3
-min.insync.replicas=2
-acks=all
-idempotent producer enabled
+Kafka 4.2.x KRaft
+3 brokers + 3 dedicated controllers
+critical RF=3 / minISR=2 / acks=all
+idempotent producers
 unclean leader election disabled
 ```
 
-Kafka native TLS/auth/ACLs remain required even when clients are in Istio.
+Kafka native TLS/authentication/per-service principals/ACLs/quotas remain mandatory. Exact patches live in the Technology Baseline.
 
-## 10. Protobuf governance
+Protobuf schemas are Git-owned and validated with Buf `STANDARD` lint + `FILE` breaking compatibility. Field numbers are never reused. No runtime Schema Registry exists in v1.
 
-Git is the source of truth; no runtime Schema Registry exists in v1.
+## 7. Transactional Outbox and publication evidence
 
-CI runs equivalent:
+When local state change + integration-event publication are one business effect, state and Outbox record commit in the same local transaction. Direct save-then-Kafka-send as an atomicity substitute is prohibited.
 
-```text
-buf lint                 # STANDARD
-buf breaking --against main  # FILE policy
-```
+Default relay is polling + `SKIP LOCKED`; CDC/Debezium requires measured need and a reviewed current decision.
 
-Field numbers are never reused; removed names/numbers are reserved as needed.
-Dynamic/runtime schema discovery requires a future ADR.
+For critical `OUTBOX_REPLAYABLE` events, published outbox/equivalent immutable publication evidence is retained for **at least 35 days**, aligned with PITR/recovery. It preserves stable event identity and an approved replay payload or deterministic reconstruction reference. Privacy/erasure/legal-hold rules still apply and secrets are never retained merely for replay.
 
-## 11. Transactional Outbox
+## 8. Consumer semantics
 
-When local state change + durable event publication are one business effect,
-persist both in the same local transaction.
+Assume at-least-once delivery:
 
-Prohibited:
+- business effect is idempotent;
+- Inbox/processed-message evidence commits atomically with the local business effect when required;
+- critical replay participants retain dedup/inbox evidence for the full 35-day recovery horizon;
+- offsets commit only after durable effect;
+- retry is finite/single-owner and poison outcomes are explicit;
+- retry/DLQ topics are explicit; critical retry/DLQ retention >=14 days;
+- replay procedure/runbook exists before production;
+- ordering is promised only inside the selected partition key.
 
-```java
-repository.save(entity);
-kafkaTemplate.send(topic, event);
-```
+Kafka cold DR rebuilds infrastructure/configuration from GitOps, then replays/reconstructs critical service-owned evidence. Stable business/event IDs survive reconstruction even when broker offsets change.
 
-Default relay is polling + `SKIP LOCKED`. CDC/Debezium requires a proven scale
-need and ADR.
+## 9. Security Redis
 
-For `OUTBOX_REPLAYABLE` critical events, the published transactional outbox
-record or equivalent immutable publication evidence is retained for at least
-35 days, aligned with the current PITR/recovery horizon. It preserves the stable
-event identity and approved replay payload or deterministic reconstruction
-reference. Privacy, erasure, and legal-hold rules still apply; secrets are never
-retained merely for replay.
-
-## 12. Consumer semantics
-
-Assume at-least-once delivery.
-
-- consumer business effect is idempotent;
-- Inbox/processed-message record is committed with the local business effect
-  where required;
-- consumer Inbox/dedup evidence is retained for at least the full 35-day critical replay/recovery horizon when that consumer participates in `OUTBOX_REPLAYABLE` recovery;
-- offsets commit after durable result;
-- retry is finite and explicit;
-- retry/DLQ topics are explicit and critical retry/DLQ retention >=14 days;
-- poison-message ownership/runbook is mandatory;
-- replay procedure exists before production;
-- partition key follows aggregate ID only where ordering requires it;
-- ordering is only guaranteed within the same partition key.
-
-## 13. Kafka disaster recovery
-
-Kafka broker disks are not the off-site business source-of-truth backup in v1.
-Cold DR rebuilds a clean Kafka cluster from GitOps after PostgreSQL restore and
-replays retained service-owned outboxes/publication records.
-
-Event/business IDs remain stable while broker offsets are new. Consumers rely on
-idempotency/Inbox semantics. Traffic opens only after critical event replay and
-consumer-lag reconciliation succeed.
-
-## 14. Security Redis
-
-ADR-0041 defines one shared physical `security-redis` with separate service ACL
-identities/namespaces:
+The approved physical `security-redis` deployment is restricted to security-ephemeral capabilities such as semantic quotas and BFF session state:
 
 ```text
 1 primary
 2 replicas
 3 Sentinel voters
-TLS
+TLS + independent ACL identities/key namespaces
 noeviction
 ```
 
-Approved v1 uses include semantic security quotas and BFF session state. It is
-not a cross-service business cache and is not a durable source of truth.
+ADR-0054 owns semantic quota behavior: 75ms, one attempt, fail closed, dual trusted time with <=2s skew, monotonic effective time, and no security-budget reset from TTL expiry.
 
-Raw PII/IDs are prohibited in quota keys; HMAC pseudonyms are used. Service
-business caches, when needed, remain independently owned and must not share
-security state merely for convenience.
+Redis is not a shared business cache or durable business source of truth. Raw PII/business identifiers are prohibited in security keys when pseudonymous HMAC keys are required. If session/quota workloads materially interfere, split physical Sentinel deployments before introducing Redis Cluster complexity.
 
-If security session and quota workloads compete materially, split the physical
-Redis deployments before adopting Redis Cluster complexity.
+Any business cache remains service-owned, defines correct miss/TTL/stampede/failure behavior, bounds object/key cardinality, and never fabricates authorization or business truth. Distributed locks require proven need plus fencing; a Redis lock alone does not establish correctness.
 
-## 15. Redis coding/ownership rules
+## 10. Verification
 
-For any current or future Redis-backed cache/state:
-
-- ownership belongs to one service/security subsystem; cross-service shared business caches are prohibited;
-- keys use explicit stable namespaces and bounded key material; raw PII/IDs are not used when a pseudonymous key is required;
-- cache/state TTL is explicit where expiry is part of the data lifecycle, but TTL must not become an authoritative security reset unless an ADR explicitly defines it;
-- cache-miss behavior is defined and correct; a miss never fabricates authorization/business truth;
-- cache stampedes are controlled with bounded concurrency/coalescing or another reviewed strategy where regeneration is expensive;
-- very large objects/collections are prohibited without measured memory/latency justification;
-- sensitive Redis values require explicit encryption/retention review;
-- Redis is not a business source of truth unless a dedicated ADR explicitly changes that rule;
-- distributed locks require a proven need and fencing; a lock alone does not establish correctness.
-
-## 16. Redis failure semantics
-
-Security quota evaluations use ADR-0041 + ADR-0054: 75ms, one attempt,
-fail-closed, dual trusted clocks with <=2s skew, monotonic effective bucket time,
-and no security budget reset based solely on Redis TTL expiry. Session behavior
-follows BFF session security and cannot invent a stateless fallback that exposes
-tokens to the browser.
-
-Distributed locks require a proven need plus fencing; Redis locks are not a
-substitute for PostgreSQL transaction/uniqueness guarantees.
+Applicable evidence includes database privilege isolation, forced-RLS negatives, Flyway rolling compatibility, query-bound/index/plan tests, pool budgets, transaction/no-remote-I/O tests, PostgreSQL failover/restore/PITR, Kafka durability/rebuild/replay, Outbox/Inbox duplicate/restart tests, Protobuf compatibility, Redis Sentinel/quota failure tests, and PII/secret-safe persistence/telemetry.
