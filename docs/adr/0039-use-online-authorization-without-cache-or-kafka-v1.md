@@ -1,74 +1,66 @@
-# ADR-0039: Use Online Authorization Without Cache or Kafka in v1
+# ADR-0039: Online Authorization Without Cache or Kafka v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-10
-
-## Supersedes
-
-This ADR supersedes ADR-0005's v1 Policy Snapshot cache, Kafka invalidation,
-watermark, and authorization-version token model. ADR-0004's ownership,
-scoping, exact permissions, deny precedence, resource-service enforcement, and
-platform-capability separation remain accepted.
+2026-08-10; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-`authorization-service` owns roles, assignments, direct grants/denies, online
-evaluation, audit, and private PostgreSQL persistence. Every protected
-operation uses `CheckPermission` gRPC with a 300ms deadline, one attempt,
-wait-for-ready off, no automatic retry, no local cache, and no stale fallback.
-An authoritative deny maps to `PERMISSION_DENIED`; dependency failure fails
-closed but maps to `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`.
+`authorization-service` owns tenant roles, assignments, direct grants/denies, online evaluation, authorization audit, and its private PostgreSQL persistence. Identity owns users, tenants, memberships, authentication, sessions, and active-tenant selection. Resource-owning bounded contexts own permission-key meaning and final domain/resource enforcement.
 
-There is no Kafka invalidation topic in v1. Cross-context provisioning uses the
-source service's transactional outbox and Authorization's idempotent gRPC
-command. This is durable provisioning, not cache invalidation.
-
-`platform_admin` is a global platform capability profile, not a tenant role,
-and every use is audited. It grants all platform permissions:
+Every protected resource operation uses one authoritative `CheckPermission` gRPC call:
 
 ```text
-platform.tenant.create platform.tenant.read platform.tenant.update
-platform.tenant.suspend platform.tenant.delete
-platform.authorization.read platform.authorization.manage platform.audit.read
+deadline:        300 ms maximum
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+permission cache: none
+stale fallback:   none
+failure mode:     fail closed
 ```
 
-Tenant permissions are:
+Authoritative deny maps to `PERMISSION_DENIED`. Dependency failure/open breaker maps to `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`; healthy service saturation maps to the current overload code and is still treated as fail-closed dependency unavailability by callers.
+
+There is no authorization Kafka invalidation topic, policy-snapshot authorization authority, signed permission-list authority, Bloom-filter grant path, or stale allow fallback in v1.
+
+Safe local token/context/permission/resource syntax checks may reject invalid traffic before the remote call but MUST NOT grant a protected operation.
+
+Cross-context provisioning uses source-service durable local intent/Transactional Outbox plus idempotent Authorization command semantics; it is provisioning state synchronization, not runtime authorization cache invalidation.
+
+### Roles and permissions
+
+Tenant permission precedence:
 
 ```text
-tenant.read tenant.update tenant.delete
-membership.read membership.invite membership.remove
-membership.role.assign membership.owner.assign
-role.read role.create role.update role.delete
-grant.read grant.create grant.revoke
-deny.read deny.create deny.revoke audit.read
+Direct Membership Deny
+> Direct Membership Grant
+> Role-derived Grant
+> Default Deny
 ```
 
-Tenant SYSTEM roles are immutable. `tenant_owner` has every tenant permission.
-`tenant_admin` has all except `tenant.delete` and `membership.owner.assign`.
-`tenant_member` has `tenant.read`, `membership.read`, and `role.read`.
+Tenant SYSTEM roles are immutable by tenants. Current baseline:
 
-Every active tenant has an owner and the last owner cannot be removed/demoted.
-Owner assignment requires `membership.owner.assign`. Actors cannot grant a
-permission they lack, including through custom roles. Direct deny overrides
-direct and role grants. Tenants cannot mutate SYSTEM roles.
+- `tenant_owner`: every tenant permission;
+- `tenant_admin`: all except `tenant.delete` and `membership.owner.assign`;
+- `tenant_member`: `tenant.read`, `membership.read`, `role.read`.
 
-Management is internal gRPC with a BFF REST facade. Provisioning uses stable
-request IDs and intent fingerprints: equal replay returns the original result;
-conflicting reuse returns `ALREADY_EXISTS`.
+Every active tenant has an owner; the last owner cannot be removed/demoted. Owner assignment requires `membership.owner.assign`. Actors cannot grant a permission they do not possess, including through custom roles. Role inheritance and wildcard permission assignment are not part of v1.
 
-## Verification Requirements
+`platform_admin` is a global platform capability profile, not a tenant role. Its use is explicit and audited and never silently bypasses tenant resource/domain invariants.
 
-Tests cover precedence, cross-tenant denial, inactive membership, last-owner
-concurrency, privilege escalation, platform audit, idempotency conflict, exact
-deadlines, no retry/cache/fallback, deny/outage mapping, workload identity, and
-PII-safe logs.
+### Management/provisioning
 
-## Rollback Considerations
+Management is internal gRPC with the approved BFF REST facade where applicable. Idempotent provisioning commands use stable request identity and intent fingerprinting: equal replay returns the original committed result; conflicting ID reuse returns `ALREADY_EXISTS`.
 
-Rollback cannot introduce stale allow, restore caching silently, lose audit,
-or reuse role/permission identifiers.
+## Verification requirements
+
+Tests cover permission precedence, cross-tenant denial, inactive membership, last-owner concurrency, privilege escalation, platform audit, provisioning replay/conflict, exact one-call/no-retry/no-cache/no-fallback behavior, deny/outage/overload mapping, workload identity authorization, and PII-safe telemetry.
+
+## Rollback considerations
+
+Rollback MUST NOT introduce stale allow, local authoritative permission caching/snapshots, Kafka invalidation, automatic retry, lost audit/tenant boundaries, or reused role/permission identifiers.
