@@ -1,0 +1,118 @@
+version: 1
+classes:
+  - AUTHORITATIVE_SECURITY
+  - AUTHORITATIVE_STATE
+  - DURABLE_COMMAND
+  - EXTERNAL_SIDE_EFFECT
+  - OPTIONAL_READ
+  - OBSERVABILITY
+edges:
+  - operation_id: protected-resource.check-permission
+    caller_owner: resource-owning-service
+    dependency_id: authorization.check-permission
+    class: AUTHORITATIVE_SECURITY
+    failure_action: fail_closed_authorization_unavailable
+    retry_owner: none
+    fallback: none
+    owner: platform-authorization
+    adr: ADR-0039/ADR-0062/ADR-0066
+
+  - operation_id: identity.security-semantic-quota
+    caller_owner: identity-service
+    dependency_id: semantic-quota.redis
+    class: AUTHORITATIVE_SECURITY
+    failure_action: fail_closed_security_dependency_unavailable
+    retry_owner: none
+    fallback: none
+    owner: identity
+    adr: ADR-0041/ADR-0054
+
+  - operation_id: identity.password-credential-write
+    caller_owner: identity-service
+    dependency_id: compromised-password-service
+    class: AUTHORITATIVE_SECURITY
+    failure_action: reject_unchecked_password
+    retry_owner: none
+    fallback: none
+    owner: identity
+    adr: ADR-0028
+
+  - operation_id: web-bff.authenticated-session-lookup
+    caller_owner: web-bff
+    dependency_id: bff-session.redis
+    class: AUTHORITATIVE_SECURITY
+    failure_action: session_unavailable
+    retry_owner: none
+    fallback: none
+    owner: web-bff
+    adr: ADR-0038/ADR-0045
+
+  - operation_id: service.normal-transaction-or-query
+    caller_owner: owning-service
+    dependency_id: owning-postgresql
+    class: AUTHORITATIVE_STATE
+    failure_action: abort_or_unavailable
+    retry_owner: transaction-safe-owner-only
+    fallback: none
+    owner: owning-service
+    adr: ADR-0053/ADR-0057
+
+  - operation_id: identity.notification-handoff-dispatch
+    caller_owner: identity-service
+    dependency_id: notification.submit-notification
+    class: DURABLE_COMMAND
+    failure_action: keep_local_outbox_pending
+    retry_owner: caller-durable-dispatcher
+    fallback: none
+    owner: identity
+    adr: ADR-0012/ADR-0029
+
+  - operation_id: notification.provider-dispatch
+    caller_owner: notification-service
+    dependency_id: external-email-or-sms-provider
+    class: EXTERNAL_SIDE_EFFECT
+    failure_action: preserve_ambiguity_and_reconcile
+    retry_owner: notification-worker-lifecycle
+    fallback: never_fabricate_acceptance_or_delivery
+    owner: notification
+    adr: ADR-0013/ADR-0014/ADR-0015
+
+  - operation_id: identity.google-oidc-login
+    caller_owner: identity-service
+    dependency_id: google-oidc-endpoints
+    class: AUTHORITATIVE_SECURITY
+    failure_action: login_unavailable
+    retry_owner: protocol-defined-safe-flow-only
+    fallback: no_alternate_identity_auto_link
+    owner: identity
+    adr: ADR-0006/ADR-0038/ADR-0045
+
+  - operation_id: business.optional-enrichment
+    caller_owner: owning-bounded-context
+    dependency_id: approved-enrichment-service
+    class: OPTIONAL_READ
+    failure_action: use_explicit_bounded_degraded_result
+    retry_owner: none
+    fallback: bounded_context_defined_only
+    owner: owning-bounded-context
+    adr: ADR-0063/ADR-0066
+
+  - operation_id: platform.non-audit-telemetry-export
+    caller_owner: any-service
+    dependency_id: observability-backend
+    class: OBSERVABILITY
+    failure_action: bounded_buffer_or_drop
+    retry_owner: exporter
+    fallback: bounded_loss_allowed
+    owner: platform-observability
+    adr: ADR-0063
+
+  - operation_id: service.required-security-audit-evidence
+    caller_owner: owning-service
+    dependency_id: audit-persistence-or-outbox
+    class: AUTHORITATIVE_STATE
+    failure_action: do_not_silently_drop
+    retry_owner: owning-service
+    fallback: none_unless_explicit_adr
+    owner: owning-service
+    adr: ADR-0003/ADR-0004/ADR-0063

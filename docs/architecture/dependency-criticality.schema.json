@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Platform dependency criticality registry",
+  "type": "object",
+  "required": ["version", "classes", "edges"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "classes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string"}
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "operation_id", "caller_owner", "dependency_id", "class",
+          "failure_action", "retry_owner", "fallback", "owner", "adr"
+        ],
+        "properties": {
+          "operation_id": {"type": "string", "minLength": 3},
+          "caller_owner": {"type": "string", "minLength": 1},
+          "dependency_id": {"type": "string", "minLength": 3},
+          "class": {
+            "enum": [
+              "AUTHORITATIVE_SECURITY", "AUTHORITATIVE_STATE", "DURABLE_COMMAND",
+              "EXTERNAL_SIDE_EFFECT", "OPTIONAL_READ", "OBSERVABILITY"
+            ]
+          },
+          "failure_action": {"type": "string", "minLength": 1},
+          "retry_owner": {"type": "string", "minLength": 1},
+          "fallback": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1},
+          "adr": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
