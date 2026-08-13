@@ -20,7 +20,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 | `identity.google-oidc-login` | Identity | Google OIDC endpoints | `AUTHORITATIVE_SECURITY` | login unavailable | protocol-defined safe flow only | no alternate identity auto-link | Identity | ADR-0038, ADR-0045 |
 | `business.optional-enrichment` | owning bounded context | explicitly approved enrichment service | `OPTIONAL_READ` | use only explicit bounded degraded result | none | bounded-context-defined only | owning bounded context | ADR-0063, ADR-0066 |
 | `platform.non-audit-telemetry-export` | any service | observability backend | `OBSERVABILITY` | bounded buffer/drop; business request continues | exporter | bounded loss allowed | Platform Observability | ADR-0063; `reliability-and-observability.md` §10 |
-| `service.required-security-audit-evidence` | owning service | audit persistence/outbox | `AUTHORITATIVE_STATE` / durable contract | do not silently drop | owning service | none unless explicit current decision | owning service | ADR-0063; `security-architecture.md` §13 |
+| `service.required-security-audit-evidence` | owning service | audit persistence/outbox | `AUTHORITATIVE_STATE` | durable contract; do not silently drop | owning service | none unless explicit current decision | owning service | ADR-0063; `security-architecture.md` §13 |
 
 ## Composition rules
 
