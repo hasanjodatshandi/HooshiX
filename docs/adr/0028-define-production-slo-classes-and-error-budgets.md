@@ -1,151 +1,67 @@
-# ADR-0028: Define Production SLO Classes and Error Budgets
+# ADR-0028: Production SLO Classes and Error Budgets v1
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-09
-
-## Relationship to Earlier Decisions
-
-This ADR resolves the pending production SLO-class, critical-path latency,
-server-timeout ceiling, asynchronous Notification processing objective, and
-error-budget release-policy decisions.
-
-Existing dependency-specific deadlines remain valid when they are below the
-class ceiling. In particular, the compromised-password lookup retains its
-900-millisecond overall deadline.
-
-## Context
-
-Defining an independent SLO for every RPC would obscure the user and platform
-outcomes that matter. Critical security transactions, their internal security
-dependencies, and asynchronous notification dispatch have different meanings
-and must not share one success definition.
-
-Provider delivery is external and channel-dependent. It must not be reported as
-the internal availability of Notification durable acceptance or provider-work
-scheduling.
+2026-08-10; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Class A: critical security transactions
+The platform uses explicit service/operation SLO classes. Dependency-specific ADRs may define stricter objectives and deadlines; the stricter current contract wins for that operation.
 
-Class A includes:
+### Class A — critical user/security transactions
 
-- login and authentication;
-- OTP and MFA verification;
-- registration completion;
-- password-reset completion;
-- password-change completion.
-
-Its rolling 30-day objectives are:
-
-| SLI | Objective |
-| --- | ---: |
-| Availability | 99.90 percent |
-| End-to-end server latency p95 | at most 500 milliseconds |
-| End-to-end server latency p99 | at most 1500 milliseconds |
-| End-to-end server timeout ceiling | 2 seconds |
-
-Every dependency receives a smaller budget than the 2-second ceiling. Nested
-retries must not cause the path to exceed its total budget.
-
-### Class B: critical internal security dependencies
-
-Class B includes at least:
-
-- `compromised-password-service`;
-- the Identity Redis semantic limiter;
-- Notification durable acceptance.
-
-Its rolling 30-day objectives are:
-
-| SLI | Objective |
-| --- | ---: |
-| Availability | 99.95 percent |
-| Latency p95 | at most 250 milliseconds |
-| Latency p99 | at most 750 milliseconds |
-
-An individual RPC may keep a stricter or otherwise explicitly approved
-deadline. The compromised-password RPC retains its existing 900-millisecond
-deadline.
-
-### Class C: asynchronous Notification processing
-
-`SubmitNotification` success means durable acceptance, not provider acceptance
-or Email/SMS delivery.
-
-The internal processing objective is:
+Includes login/authentication, OTP/MFA verification, registration completion, password reset/change completion, and equivalent critical interactive security flows.
 
 ```text
-99.9 percent of accepted intents begin their first provider attempt
-within 5 seconds of durable acceptance.
+availability: 99.90% rolling 30d
+p95: <=500 ms
+p99: <=1500 ms
+server timeout ceiling: 2 s
 ```
 
-Actual SMS and Email delivery use separate provider-dependent SLIs. They must
-not be combined with Notification's internal durable-acceptance availability or
-first-attempt scheduling objective.
+### Class B — critical internal dependencies
 
-### Error-budget release policy
+General baseline for critical internal dependencies such as compromised-password checking, semantic quota evaluation, Notification durable acceptance, and Authorization:
 
-A 99.90-percent availability objective over 30 days has approximately 43
-minutes and 12 seconds of error budget.
+```text
+availability: >=99.95% rolling 30d
+p95: <=250 ms
+p99: <=750 ms
+```
 
-The release policy is:
+Authorization uses its stricter current 300ms hard caller deadline and p95<=100ms/p99<=200ms production objectives. Semantic quota Redis uses its current 75ms one-attempt contract. Notification handoff uses its current 900ms idempotent RPC contract. These more-specific values override the generic Class-B latency envelope.
 
-| Budget condition | Required action |
+### Class C — asynchronous processing
+
+For Notification, 99.9% of durably accepted intents begin their first provider attempt within five seconds. External provider delivery is measured separately from internal scheduling.
+
+### Error-budget policy
+
+For a 99.90% rolling-30-day objective, approximate budget is 43m12s.
+
+| Budget consumption | Required response |
 | --- | --- |
-| Less than 25 percent consumed | Normal software delivery |
-| At least 25 percent consumed within 24 hours | Reliability review and stop risky releases |
-| At least 50 percent consumed | Freeze feature releases |
-| 100 percent exhausted | Permit only security, incident, and reliability changes |
+| <25% | normal delivery |
+| >=25% within 24h | reliability review; stop risky releases |
+| >=50% | freeze feature releases for the affected capability |
+| >=100% | security/incident/reliability changes only until recovered |
 
-A release freeze remains until burn rate is controlled again and a remediation
-plan exists.
+Planned maintenance counts when users cannot obtain the service.
 
-Planned maintenance is not excluded from availability. If the user cannot
-obtain service, that interval counts against the applicable availability SLO.
+SLO accounting MUST NOT remove real errors/latency through ad-hoc grace periods. Where a dependency defines burn-rate alerting, paired multi-window burn is used rather than paging on isolated percentile samples.
 
-### Implementation gate
+### Measurement
 
-Exact SLI event definitions, denominator and eligibility rules, telemetry
-backend, burn-rate alert windows, dashboard queries, and ownership/on-call
-routing require explicit approval before production enforcement.
+SLIs are defined over eligible operations with stable inclusion/exclusion rules. Service telemetry must attribute request/dependency latency, saturation, error outcomes, and relevant downstream components without high-cardinality or sensitive labels.
 
-## Consequences
+## Verification requirements
 
-- Critical security journeys are evaluated as user outcomes rather than a
-  collection of unrelated RPC statistics.
-- Internal dependencies have a higher availability target than Class A user
-  journeys.
-- Notification durable acceptance and dispatch scheduling remain separate from
-  external provider delivery.
-- Error-budget consumption directly constrains release risk.
-- Planned maintenance consumes availability budget.
+Verify SLI denominator rules, objective calculations, alert/release-policy behavior, dependency-specific stricter overrides, load/capacity evidence at target throughput, and absence of timeout increases or retry amplification used merely to hide SLO burn.
 
-## Alternatives Considered
+## Rollback considerations
 
-### Define an SLO for every RPC
-
-Rejected because the approved model uses three outcome classes.
-
-### Treat provider delivery as Notification availability
-
-Rejected because provider behavior is an external, channel-dependent SLI and
-does not redefine durable acceptance.
-
-### Exclude planned maintenance
-
-Rejected because user-visible unavailability counts regardless of whether the
-maintenance was scheduled.
-
-## Rollback or Migration Considerations
-
-This ADR creates no runtime telemetry or alerting configuration by itself.
-
-Rollout must validate SLI queries against synthetic and historical data before
-release freezes are automated. Rollback of dashboards or alert rules must not
-silently weaken the approved objectives or erase consumed error budget.
+Rollback MUST NOT silently weaken an operation's stricter current SLO/deadline, delete real failures from SLI accounting, or resume risky feature promotion while the applicable error-budget policy requires a freeze.
