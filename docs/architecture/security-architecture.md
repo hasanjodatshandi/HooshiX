@@ -24,11 +24,17 @@ Logical deletion records `deleted_at`, `deleted_by`, and stable `deletion_reason
 
 Default retention is 360 days; expiry creates eligibility, not automatic destruction. Physical purge is unavailable from ordinary repositories/APIs and must be authorized, idempotent, observable, tenant-safe, and blocked by legal hold. Generated technical/security/event/audit IDs are never reused. Domain `ON DELETE CASCADE` is prohibited by default unless a current aggregate decision proves safety.
 
-ADR-0028 governs irreversible data-subject erasure. Identity coordinates a non-PII `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. Restore procedures replay erasure/legal-hold decisions before traffic. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
+ADR-0028 governs irreversible data-subject erasure. Identity coordinates a non-PII `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. The required participant registry is server-owned/versioned and cannot be selected or reduced by the caller. Initial required participants are Identity, Authorization, Notification, and Web BFF.
+
+Coordination uses local Transactional Outbox + versioned Kafka/Protobuf events and idempotent participant Inbox/receipt processing rather than availability-coupled synchronous fan-out. Critical publication/Inbox-dedup evidence follows the existing 35-day recovery horizon. Restore procedures replay erasure/legal-hold decisions and reconcile required participant receipts before traffic.
+
+Legal hold is an explicit durable audited ledger with `ACTIVE -> RELEASED`, actor, authority/reference, timestamps, policy version, and integrity evidence. Ordinary erasure callers cannot create, release, omit, or bypass a hold. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
 
 ## 3. Browser/BFF/OIDC security
 
 Browser login uses OIDC Authorization Code + PKCE S256 through Web BFF. BFF stores single-use `state`, `nonce`, and PKCE verifier server-side for <=10m, validates exact redirect, issuer/audience/signature/timestamps, and only permits bounded same-origin relative post-login destinations.
+
+BFF owns provider-protocol validation for browser login/link. Identity does not call Google on that path and does not receive provider authorization codes or provider tokens. After successful validation, BFF invokes the typed Identity gRPC contract over its authorized workload identity with a cryptographically random, short-lived, single-use `evidence_id`, validated canonical `(issuer, subject)`, stable request identity, and only explicitly versioned non-secret evidence metadata. Identity consumes the evidence atomically; email equality never auto-links.
 
 The browser receives no provider token, Identity access/refresh token, internal gRPC credential, trusted role list, or permission list.
 
@@ -45,6 +51,8 @@ no Domain
 
 Session ID rotates after login, MFA completion, tenant switch, recovery, and elevation. Server-side BFF session state uses an ACL-isolated Redis namespace; idle <=7d, absolute <=30d. Any retained Identity refresh credential is AES-256-GCM encrypted with a BFF-specific local key ring and never stored raw in browser/Redis/telemetry.
 
+A password-success response that requires MFA is only pre-auth state. BFF does not establish the completed authenticated browser session/cookie until Identity confirms the MFA challenge and corresponding session/token issuance.
+
 Unsafe cookie-authenticated requests require trusted Origin + session-bound synchronizer CSRF token. Fetch Metadata is defense in depth. Credentialed wildcard/reflected CORS is prohibited; same-origin is preferred. CSP/HSTS/nosniff/referrer/Permissions-Policy and frame protection are centrally tested.
 
 ## 4. Passwords, external identity, and MFA
@@ -59,9 +67,11 @@ m=19 MiB, t=2, p=1
 NFC before hashing
 ```
 
-No arbitrary composition rule or periodic forced rotation. Create/change/reset checks compromised-password service and hashing/verification uses a bounded CPU/memory bulkhead.
+No arbitrary composition rule or periodic forced rotation. Create/change/reset checks the compromised-password service and hashing/verification uses a bounded CPU/memory bulkhead.
 
-External identities bind by stable `(issuer, subject)`. Email equality alone never auto-links an identity.
+The compromised-password contract is k-anonymous/digest-prefix style: raw password never leaves Identity, including over mTLS. The remote check uses a 900ms overall deadline, one attempt, no automatic retry, finite cancellation/concurrency bounds, and fail-closed behavior. An unchecked password is not committed. The remote check occurs outside an Identity DB transaction and dependency failure remains a distinct availability/security error rather than fabricated “compromised” evidence.
+
+External identities bind by stable `(issuer, subject)`. Email equality alone never auto-links an identity. Provider validation/handoff follows the BFF-only evidence contract in §3 and ADR-0012.
 
 TOTP v1:
 
@@ -71,6 +81,8 @@ TOTP v1:
 - 10 independent 80-bit recovery codes shown once and stored only as domain-separated HMAC-SHA-256;
 - enroll/disable/replace/recovery requires authentication age <=5m;
 - no trusted-device bypass.
+
+When active TOTP exists, successful password verification issues only a short-lived pre-auth MFA challenge. No access or refresh credential is issued until the same challenge is successfully completed with TOTP or one valid single-use recovery code. MFA challenge completion is server-owned, single-use, semantic-quota protected, and non-enumerating.
 
 Iran SMS MFA uses IPPanel Webservice mode only after ADR-0024 quota evidence, provider contract/credentials, Notification encrypted exact-content lifecycle, MFA/session controls, and delivery/ambiguity tests pass. Local logging SMS is never a production fallback.
 
@@ -121,6 +133,15 @@ Breaker opening follows ADR-0032; recovery follows ADR-0036: bounded de-correlat
 
 Identity signs access tokens locally using RSA-3072/RS256 private keys sourced from OpenBao/External Secrets and mounted read-only. Key IDs are immutable random values; normal rotation is 90 days with next-key prepublication and >=24h previous public-key overlap.
 
+The v1 access-token claim allow-list is:
+
+```text
+standard: iss, aud, sub, jti, iat, exp
+private:  tenant_id, membership_id, sid
+```
+
+Roles, permissions, `authorization_version`, or equivalent permission snapshots are not authorization authority in the token. `aud` is the exact intended service identifier; wildcard audiences are prohibited. The Identity issuer is typed deployment configuration, with initial production logical value `https://identity.sajtech.internal` unless the reviewed environment configuration supplies the final value before rollout.
+
 Verifiers use a bounded non-secret GitOps public JWK bundle locally. Normal verification makes no Identity/OpenBao/remote-JWKS call and accepts only approved algorithm/issuer/audience/key IDs. Unknown key, algorithm confusion, invalid issuer/audience/time/signature fail closed.
 
 ## 7. Semantic security quotas
@@ -140,11 +161,15 @@ Atomic multi-dimension enforcement uses reviewed versioned Redis Function/Lua lo
 
 Authentication anti-lockout: source dimensions may block before credential work; subject/account failure pressure is charged on failed credentials but alone cannot reject a subsequently proven correct credential after source controls allow evaluation.
 
+Registration register/resend/confirm, login, external-identity login/link, tenant create/invite, and MFA lifecycle/recovery are all subject to versioned service-owned semantic policy where defined. Caller requests cannot choose quota capacity/refill/TTL/security policy.
+
 ## 8. Workload identity, mTLS, network security
 
 Production application workloads use dedicated Kubernetes ServiceAccounts and Istio Ambient STRICT mTLS. Kubernetes `default` ServiceAccount is prohibited. AuthorizationPolicy is default-deny/identity-based; NetworkPolicy is independent defense in depth. New/changed service edges require positive and negative identity/policy tests.
 
 Istio does not replace end-user authorization or native Kafka/PostgreSQL/Redis authentication/ACLs.
+
+Authentication dependency ownership follows the machine-readable registry: Web BFF owns the provider-protocol edge to Google and the trusted evidence/session edge to Identity; Identity does not own a direct Google login/link dependency.
 
 ## 9. Secrets and cryptographic material
 
@@ -193,4 +218,4 @@ Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, le
 
 ## 14. Verification
 
-Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse, authentication/OIDC/MFA/session tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates including policy-authoring RBAC and policy-engine SSRF negatives, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
+Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse, registration challenge/canonical-contact tests, authentication/OIDC evidence replay/provider-token isolation/MFA pre-auth/session tests, compromised-password raw-value non-egress/deadline/fail-closed tests, exact JWT claim/audience tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, erasure required-participant/legal-hold/Kafka-replay/restore tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates including policy-authoring RBAC and policy-engine SSRF negatives, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
