@@ -12,7 +12,7 @@ requires it**.
 ## Decisions closed by this review
 
 - ADR-0041: semantic quotas on service-owned, ACL-isolated Redis Sentinel;
-- ADR-0042: online Authorization SLO/HA/capacity and one-final-check rule;
+- ADR-0039 + ADR-0056 + ADR-0062 + ADR-0066: current online Authorization runtime, SLO/HA/capacity, overload protection, and breaker recovery; ADR-0042 remains historical initial SLO/capacity input;
 - ADR-0043: Notification local AES-GCM key ring; no Transit hot path;
 - ADR-0044: Kafka durability + reconstructable cold DR;
 - ADR-0045: BFF/OIDC/PKCE/session/CSRF/CORS browser security;
@@ -22,11 +22,10 @@ requires it**.
 - ADR-0049: IPPanel Webservice-mode Iran SMS;
 - ADR-0050: pinned platform compatibility set + Calico standard CNI;
 - ADR-0051: three-node stacked Kubernetes control-plane/etcd + >=3 workers;
-- ADR-0052: local RS256/RSA-3072 signing lifecycle + GitOps public verifier bundle.
+- ADR-0052: local RS256/RSA-3072 signing lifecycle + GitOps public verifier bundle;
 - ADR-0053: dedicated PostgreSQL database/roles per persistent microservice;
 - ADR-0054: dual-clock fail-closed semantic-quota time safety;
 - ADR-0055: semantic circuit-breaker/bulkhead policy for synchronous dependencies;
-- ADR-0056: Authorization overload isolation and realistic production latency SLO;
 - ADR-0057: dedicated production PostgreSQL cluster per persistent service + forced tenant RLS;
 - ADR-0058: cross-service irreversible data-subject erasure execution/evidence;
 - ADR-0059: upstream L3/L4 volumetric DDoS mitigation before origin;
@@ -83,7 +82,6 @@ The follow-up review accepts ADR-0062 through ADR-0065:
 
 These changes add no new application request-path network hop.
 
-
 ## Follow-up SRE review — ADR-0066 through ADR-0068
 
 The latest review accepts the need for stronger dependency-matrix governance, restore evidence, and vulnerability escalation, but rejects two unsafe simplifications:
@@ -92,7 +90,6 @@ The latest review accepts the need for stronger dependency-matrix governance, re
 - PostgreSQL upgrades do not promise a universal automatic rollback within five minutes. Reversible GitOps/operator changes may revert, while irreversible/major database transitions use tested fail-forward/restore/migration strategies.
 
 The dependency matrix is now machine-readable and CI-enforced; monthly restore drills produce queryable RPO/RTO/integrity evidence; vulnerability exceptions have active expiry escalation; KEV/advisory inputs trigger targeted rescans without claiming guaranteed zero-day discovery.
-
 
 ## Coding-quality hardening — ADR-0069
 
