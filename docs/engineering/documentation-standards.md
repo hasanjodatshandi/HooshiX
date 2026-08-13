@@ -51,6 +51,10 @@ For humans and agents:
 - screenshots are never the sole location of an instruction;
 - relative repository links are preferred for internal documents.
 
+### Current ADR numbering
+
+The retained current ADR set uses a dense four-digit sequence beginning at `ADR-0001`. ADR filenames use the same four-digit prefix. When the retained current-only set is renumbered, the filename, ADR heading, Decision Register, source/task maps, machine-readable policy references, and every other repository reference MUST be updated atomically in the same PR. Compatibility aliases or historical old-to-new ADR mapping files are not retained as a second identifier system under current-only documentation mode.
+
 ## 5. Current-only maintenance
 
 When a decision changes:
