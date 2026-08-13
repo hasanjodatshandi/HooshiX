@@ -15,7 +15,7 @@ edges:
     retry_owner: none
     fallback: none
     owner: platform-authorization
-    adr: ADR-0039/ADR-0062/ADR-0066
+    adr: ADR-0039/ADR-0056/ADR-0062/ADR-0066
 
   - operation_id: identity.security-semantic-quota
     caller_owner: identity-service
