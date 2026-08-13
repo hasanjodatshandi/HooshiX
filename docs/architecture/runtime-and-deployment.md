@@ -27,7 +27,7 @@ Privileged containers, host networking, `hostPath`, extra capabilities, or mater
 
 ## 2. Kubernetes active-cluster HA
 
-ADR-0051 defines:
+ADR-0022 defines:
 
 ```text
 3 dedicated stacked control-plane/etcd nodes
@@ -98,7 +98,7 @@ The exact signed immutable image digest validated in staging is promoted to prod
 
 ## 6. Production PostgreSQL fleet
 
-ADR-0048, ADR-0057, ADR-0064, and ADR-0067 define the current model.
+ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define the current model.
 
 Every persistent production microservice owns a dedicated CloudNativePG 1.30.x cluster, PostgreSQL database, runtime/migration roles, Flyway history, storage/capacity budget, WAL/PITR backup identity/namespace, and restore evidence. Critical services use three PostgreSQL instances.
 
@@ -125,7 +125,7 @@ A failed restore freezes ordinary affected-service promotion until replacement e
 
 ## 7. Kafka
 
-Production critical Kafka uses ADR-0044:
+Production critical Kafka uses ADR-0015:
 
 ```text
 KRaft
@@ -172,7 +172,7 @@ Upstream volumetric mitigation is mandatory; the WAF is L7 inspection and is not
 
 ## 10. OpenBao and External Secrets
 
-OpenBao 2.6.1 is the exact current secret-authority pin under ADR-0037. v1 uses one Raft instance/PVC, manual Shamir 3 shares/threshold 2, hourly encrypted off-PVC snapshots, and tested restore/unseal.
+OpenBao 2.6.1 is the exact current secret-authority pin under ADR-0011. v1 uses one Raft instance/PVC, manual Shamir 3 shares/threshold 2, hourly encrypted off-PVC snapshots, and tested restore/unseal.
 
 Normal application hot paths use validated mounted/local key material, not per-request OpenBao RPCs. OpenBao remains a security-sensitive control-plane dependency for secret refresh/rotation/recovery.
 
@@ -180,7 +180,7 @@ External Secrets uses Kubernetes Auth and namespace-scoped stores where practica
 
 ## 11. Browser security
 
-Browser production follows ADR-0045: OIDC Authorization Code + PKCE S256, exact redirects, server-side transaction/session state, secure `__Host-` cookie, Origin + synchronizer-token CSRF, exact CORS, and centrally tested security headers.
+Browser production follows ADR-0016: OIDC Authorization Code + PKCE S256, exact redirects, server-side transaction/session state, secure `__Host-` cookie, Origin + synchronizer-token CSRF, exact CORS, and centrally tested security headers.
 
 ## 12. Supply-chain admission and continuous vulnerability response
 
