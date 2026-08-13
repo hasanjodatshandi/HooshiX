@@ -14,9 +14,10 @@ Required sequence:
 4. compare and review the complete pull-request diff against the latest `main`;
 5. run and record every applicable documentation, security, compatibility, build, test, and policy check;
 6. resolve material findings before merge;
-7. mark the pull request ready only when the reviewed scope is complete;
-8. merge into `main` only after the required review and verification pass;
-9. verify the resulting `main` merge/head SHA and final repository state.
+7. if a final review/check uncovers and fixes another issue, re-review the affected file plus all directly dependent canonical/index/policy documents before merge; do not pretend the earlier review covered the new edit;
+8. mark the pull request ready only when the reviewed scope is complete;
+9. merge into `main` only after the required review and verification pass;
+10. verify the resulting `main` merge/head SHA and final repository state.
 
 GitHub does not permit opening a pull request when the head branch has no commits different from the base branch. When a new task begins, the smallest legitimate governance/task-scaffolding commit may be created first solely to establish the Draft PR; all substantive task changes then remain inside that PR.
 
