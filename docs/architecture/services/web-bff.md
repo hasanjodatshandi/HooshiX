@@ -18,14 +18,18 @@ versioned extension profile) and never expose internal exception details.
 ## 2. Public path
 
 ```text
-External LB/CDN
+Internet
+-> upstream L3/L4 volumetric mitigation/scrubbing
+-> redundant external L4 load balancing
 -> Traefik
--> Caddy + Coraza WAF
+-> dedicated Caddy + Coraza WAF
 -> Web BFF
 ```
 
 Direct Internet->BFF and Traefik->BFF application paths are prohibited by
-routing plus NetworkPolicy/Istio authorization.
+routing plus NetworkPolicy/Istio authorization. A CDN is deployment-specific
+and does not replace the mandatory upstream volumetric-mitigation or load-balancer
+controls.
 
 ## 3. OIDC
 
@@ -95,6 +99,6 @@ provider payloads.
 Applicable tests include REST/OpenAPI contracts, PKCE/state/nonce replay,
 redirect/open-redirect negatives, cookie/session rotation/fixation, Redis
 failover/session behavior, CSRF Origin/token, CORS, security headers, browser
-storage token absence, internal gRPC deadlines/error maps, final-authorization
-ownership, PII-safe logging, BDD critical flows, and Playwright critical browser
-journeys.
+storage token absence, public-edge traversal and direct-bypass negatives,
+internal gRPC deadlines/error maps, final-authorization ownership, PII-safe
+logging, BDD critical flows, and Playwright critical browser journeys.
