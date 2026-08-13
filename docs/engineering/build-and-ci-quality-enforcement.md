@@ -165,7 +165,7 @@ Protected `main` requires the repository-defined mandatory checks. Removing/weak
 
 ## 8. Supply-chain/dependency integrity
 
-Service dependencies/plugins/tools require purpose/owner/compatibility/security/license review as applicable plus dependency verification. Release artifacts carry exact source Git SHA, immutable digest, signed CycloneDX SBOM, provenance, and organization signature. Final-image vulnerability policy follows ADR-0065/0068 and admission policy follows current security architecture.
+Service dependencies/plugins/tools require purpose/owner/compatibility/security/license review as applicable plus dependency verification. Release artifacts carry exact source Git SHA, immutable digest, signed CycloneDX SBOM, provenance, and organization signature. Final-image vulnerability policy follows ADR-0035/0038 and admission policy follows current security architecture.
 
 ## 9. Evidence and Definition of Done
 
