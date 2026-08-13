@@ -171,6 +171,8 @@ Direct Internet/Traefik application access to BFF is denied through route + Netw
 
 Final release images use immutable digests, signed CycloneDX SBOMs, signed provenance, Cosign signatures/attestations, and production admission verification through HA Kyverno. Deployed SBOM/digest inventory is continuously correlated with approved vulnerability/advisory/threat-intelligence inputs.
 
+Admission policy authoring is restricted to tightly controlled GitOps/CI identities; ordinary application/service identities cannot create or modify cluster-scoped admission policy. Kyverno CEL HTTP context is disabled when unnecessary. Any approved external context lookup uses an exact versioned destination/purpose allow-list, blocks loopback/link-local/cloud-metadata/unreviewed private/arbitrary caller-controlled targets, forwards no credentials to arbitrary destinations, bounds response/time/failure semantics, and is covered by positive/negative SSRF and NetworkPolicy tests. External-context failure never silently becomes admission allow.
+
 Critical/known-exploited production findings target immediate incident handling and <=24h mitigation; High target <=48h. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates running exposure. Scanner/feed success is never proof of zero unknown vulnerabilities and never authorizes an unsigned artifact.
 
 ## 12. Runtime/container security
@@ -191,4 +193,4 @@ Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, le
 
 ## 14. Verification
 
-Security-impacting changes run applicable cross-tenant/RLS negatives, authentication/OIDC/MFA/session tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
+Security-impacting changes run applicable cross-tenant/RLS negatives, authentication/OIDC/MFA/session tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates including policy-authoring RBAC and policy-engine SSRF negatives, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
