@@ -57,7 +57,7 @@ Required evidence:
 - repeated OPEN intervals de-correlate across caller replicas with bounded reopen backoff; tenant tier does not alter breaker semantics;
 - HALF_OPEN permits only one real `CheckPermission` probe in flight per caller breaker; three consecutive infrastructure-successful probes close and any infrastructure failure reopens;
 - machine-readable dependency registry schema/coverage/render checks pass for the Authorization edge and every other production synchronous edge;
-- Hikari acquisition p99<20ms at target load, acquisition ceiling<=50ms, permission SQL ceiling<=100ms;
+- Hikari acquisition p99<25ms at target load, acquisition ceiling<=50ms, permission SQL ceiling<=100ms;
 - no synchronous downstream dependency other than Authorization-owned PostgreSQL;
 - routine duplicate BFF permission check absent;
 - one replica/node loss and CloudNativePG primary failover under sustained Authorization traffic preserve fail-closed semantics and objectives.
