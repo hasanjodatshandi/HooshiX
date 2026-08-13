@@ -82,7 +82,7 @@ This document summarizes the effective production architecture only. The current
 - Third-party CI actions/tools/artifacts are pinned/verified according to repository policy; workflow permissions are least privilege and privileged secrets are not exposed to untrusted PR execution.
 - Privileged GitHub Actions event contexts such as `pull_request_target`/`workflow_run` do not execute unreviewed PR-controlled code/config with privileged credentials; any trusted follow-up promotion verifies repository/event/source SHA/artifact integrity/producer workflow before granting privilege.
 - Release images are immutable, SBOM-indexed, signed with Cosign, carry provenance/source identity, and are verified by admission policy.
-- Admission-policy authoring is restricted to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested according to ADR-0046.
+- Admission-policy authoring is restricted to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested according to ADR-0017.
 - The exact signed image digest validated in staging is promoted to production; production rebuild is prohibited.
 - Vulnerability response continuously correlates deployed digests/SBOMs with approved advisory/threat-intelligence inputs, enforces expiring exceptions, and applies production remediation/escalation policy. No feed/scanner is treated as proof of zero unknown vulnerabilities.
 - Human privileged production access uses Teleport JIT SSO/WebAuthn, short-lived elevation, approvals, least privilege, and audited/recorded sessions.
