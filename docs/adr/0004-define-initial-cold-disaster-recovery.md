@@ -1,4 +1,4 @@
-# ADR-0027: Cold Disaster Recovery v1
+# ADR-0004: Cold Disaster Recovery v1
 
 ## Status
 
@@ -47,7 +47,7 @@ Security Redis quota/session state is ephemeral and is not treated as durable bu
 
 Compromised-password datasets and other explicitly rebuildable reference data are reconstructed from their authoritative source and remain fail-safe while unavailable.
 
-Kafka is rebuilt from GitOps/configuration and recovered through retained service-owned publication/state evidence according to ADR-0044 rather than restored as business source of truth.
+Kafka is rebuilt from GitOps/configuration and recovered through retained service-owned publication/state evidence according to ADR-0015 rather than restored as business source of truth.
 
 ### Cold recovery sequence
 

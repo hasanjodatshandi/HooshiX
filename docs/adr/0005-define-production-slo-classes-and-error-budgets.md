@@ -1,4 +1,4 @@
-# ADR-0028: Production SLO Classes and Error Budgets v1
+# ADR-0005: Production SLO Classes and Error Budgets v1
 
 ## Status
 
