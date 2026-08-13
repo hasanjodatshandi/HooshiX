@@ -1,279 +1,120 @@
-# ADR-0012: Define Durable Notification Handoff and Result Callback
+# ADR-0012: Durable Notification Handoff and Result Callback
 
 ## Status
 
-Accepted
+Accepted — current effective decision
 
 ## Date
 
-2026-08-09
-
-## Supersedes
-
-This ADR resolves the secure handoff, Notification retry/status, and caller
-escrow-erasure gate recorded by ADR-0010.
-
-For Notification delivery, it supersedes ADR-0008 provisions that prohibited
-recipient PII in delivery escrow and retained provider-delivery state inside
-Identity. ADR-0008's prohibition on plaintext secret persistence, Kafka secret
-payloads, network I/O inside transactions, unbounded retries, and exactly-once
-provider assumptions remains in force.
-
-## Context
-
-ADR-0010 moved template rendering, provider adapters, retry policy, and delivery
-status from Identity to Notification Service. A durable boundary is required so
-that callers know when Notification has accepted responsibility without
-confusing durable acceptance with provider acceptance or delivery.
-
-Verification and recovery messages contain short-lived secrets and recipient
-PII. Notification needs the exact same message for a retry, but neither Kafka nor
-plaintext database columns may carry those values. Caller and Notification
-escrow lifecycles must transfer responsibility without losing the message or
-retaining duplicate sensitive state longer than required.
-
-Provider delivery is inherently ambiguous when a provider accepts a request but
-its response is lost. Result propagation back to a caller is also at-least-once
-and must remain idempotent.
+2026-08-09; normalized to current-only documentation on 2026-08-13
 
 ## Decision
 
-### Durable handoff contract
+### Durable submission
 
-`SubmitNotification` is an idempotent internal gRPC RPC.
+`SubmitNotification` is an idempotent internal gRPC operation. The caller creates one stable `request_id`; Notification creates one stable `notification_id`.
 
-The caller creates one stable `request_id` for each delivery intent and reuses
-it for every retry of that logical handoff. Notification creates one stable
-`notification_id` for the accepted intent.
+```text
+Deadline:        900 ms
+Attempts:        1
+Wait-for-ready:  off
+Automatic retry: none
+```
 
-A successful response has status `ACCEPTED`. It is returned only after:
+`ACCEPTED` is returned only after Notification validates the semantic request, resolves the exact template version/locale, renders exact provider-ready content, encrypts sensitive recipient/content material with its current local AES-256-GCM delivery key ring, and commits the durable Notification record in its PostgreSQL database.
 
-1. the semantic template and type-safe parameters are validated;
-2. the template and locale are resolved to an exact template version;
-3. the exact provider-ready content is rendered and passes content limits;
-4. the exact recipient and rendered payload/code are encrypted through OpenBao
-   Transit;
-5. Notification commits the ciphertext, notification identity, resolved
-   template version, and retry state in its PostgreSQL database.
+`ACCEPTED` means durable responsibility transfer only. It is not provider acceptance and not delivery evidence.
 
-`ACCEPTED` means only that durable delivery responsibility has transferred to
-Notification Service. It does not mean `PROVIDER_ACCEPTED` or `DELIVERED`.
-
-The response to an idempotent replay of an already accepted `request_id` returns
-the stable accepted notification identity without creating a second delivery
-intent. Reuse of a `request_id` with conflicting content requires a separate
-contract decision before implementation and must not be guessed.
+A replay with the same `request_id` and the same versioned intent fingerprint returns the original accepted identity/outcome. Reuse of the ID with conflicting intent returns `ALREADY_EXISTS / REQUEST_ID_CONFLICT`.
 
 ### Caller handoff escrow
 
-Before calling Notification, Identity retains an encrypted handoff escrow for
-the recipient and exact verification/recovery secret required to reconstruct the
-request. The caller performs no gRPC or other network I/O inside its business
-database transaction.
+The caller persists business state, encrypted handoff escrow, and durable delivery intent/outbox in one local transaction. No remote I/O occurs inside that transaction.
 
-Identity retains its handoff escrow until it receives `ACCEPTED`. It then
-irreversibly removes the recipient/code handoff material immediately. A crash
-before local erasure is recovered by replaying the same `request_id`, receiving
-the same accepted identity, and completing erasure.
+The caller keeps the minimum encrypted handoff material required for replay until Notification returns `ACCEPTED`, then irreversibly removes the recipient/code handoff material. Authoritative contact data and one-way challenge verification state remain under caller ownership.
 
-This erasure affects the handoff escrow only. It does not delete the caller's
-authoritative contact data or the one-way challenge verification HMAC.
+### Notification sensitive retry state
 
-### Notification encrypted retry state
+Notification stores only short-lived ciphertext plus approved metadata. No plaintext database column stores recipient address, rendered authentication content, OTP/recovery secret, or arbitrary sensitive template parameters.
 
-Notification uses OpenBao Transit with a purpose-specific independent key named
-`notification-delivery-escrow`.
+Sensitive content is encrypted/decrypted locally with a purpose-specific AES-256-GCM key ring sourced from OpenBao through External Secrets and mounted read-only. There is no routine OpenBao network call on submission, dispatch, retry, or reconciliation.
 
-The Transit key remains inside OpenBao and is not delivered to Notification
-through a Kubernetes Secret. Notification's Transit principal has only the
-minimum encrypt/decrypt operations for this key.
+Every retry/reconciliation preserves the same stable IDs, recipient, resolved template version, and exact accepted content. Retry never re-resolves a newer template or generates replacement secret content for the same intent.
 
-OpenBao Transit network I/O occurs outside Notification database transactions.
-Notification stores only Transit ciphertext and approved non-sensitive
-metadata. It has no plaintext column for recipient addresses, rendered subjects
-or bodies, verification/recovery codes, or arbitrary template parameters.
+Sensitive ciphertext has a hard maximum lifetime of 24 hours and is erased earlier at applicable terminal lifecycle points.
 
-Every provider attempt decrypts a fresh in-memory copy outside a database
-transaction, invokes the provider outside a database transaction, and clears
-mutable plaintext buffers where the runtime controls them.
+### Provider ambiguity and evidence
 
-Every retry uses the same:
+Exactly-once external delivery is not assumed. Provider acceptance and delivery are separate states. `DELIVERED` requires authenticated, correlated provider evidence; successful submission alone is insufficient.
 
-- `request_id`;
-- `notification_id`;
-- recipient;
-- resolved template version;
-- exact rendered content and verification/recovery code.
+Ambiguous submission is never blindly retried. Reconciliation follows the current Notification lifecycle/provider policy.
 
-A retry must not re-resolve or re-render a newer template and must not generate
-a replacement code for the accepted delivery intent.
+### Terminal result and callback
 
-### Provider semantics
+At an approved terminal Notification state, one local Notification transaction:
 
-Exactly-once provider delivery is not guaranteed.
+1. erases sensitive delivery ciphertext when no longer needed;
+2. inserts a non-PII `notification_result_outbox` record.
 
-When a provider supports an idempotency key, Notification supplies the stable
-`notification_id`.
+The result callback is idempotent and at-least-once:
 
-If provider acceptance is ambiguous, bounded retries may create a duplicate of
-the same exact message/code. A retry must never create different content for the
-same notification.
+```text
+ReportNotificationResult deadline: 750 ms
+Attempts:                          1
+Wait-for-ready:                    off
+Automatic gRPC retry:              none
+```
 
-`PROVIDER_ACCEPTED` and `DELIVERED` are distinct states. `DELIVERED` is used only
-when an actual provider delivery receipt exists. Provider request acceptance by
-itself is not evidence of delivery.
+Durable dispatcher retry occurs outside the RPC. The caller records a result transactionally using `request_id` + `notification_id` and acknowledges only after commit. Duplicate callbacks MUST NOT create duplicate business effects.
 
-The complete status enum, terminal-state classification, retry count, backoff,
-and replay policy remain explicit decisions required before implementation.
-
-### Terminal erasure and result outbox
-
-When a notification reaches an approved terminal provider state, Notification
-performs one local database transaction that:
-
-1. irreversibly deletes the sensitive delivery-escrow ciphertext;
-2. persists a non-PII `notification_result_outbox` record.
-
-The result record contains the stable `request_id`, `notification_id`, terminal
-status, and only approved non-sensitive operational metadata. It contains no
-recipient, message body, code, provider credential, provider response payload,
-or escrow ciphertext.
-
-Sensitive ciphertext is deleted at terminal state and does not wait for caller
-acknowledgement.
-
-### Idempotent result callback
-
-Notification delivers result-outbox records through an internal idempotent gRPC
-callback to the originating caller.
-
-The caller identifies the result by both `request_id` and `notification_id` and
-records it transactionally. It returns a successful callback acknowledgement
-only after its local commit succeeds.
-
-Notification retries the callback until that acknowledgement is received.
-Duplicate callbacks produce no duplicate caller business effect. Callback
-retries read only the non-PII result outbox and never require restored sensitive
-escrow.
-
-The callback deadline, backoff, maximum delivery interval, authentication,
-workload authorization, and behavior for a permanently retired caller remain
-explicit decisions required before runtime implementation.
+Callback destinations come from the reviewed GitOps allow-list; a caller-controlled URL/host is prohibited.
 
 ### Transaction boundaries
 
-The lifecycle has separate local transactions and no distributed transaction:
-
 ```text
-Caller transaction
-  -> persist business state + handoff escrow + delivery intent/outbox
+Caller local transaction
+  -> business state + encrypted handoff escrow + durable intent/outbox
 
-Caller dispatcher outside transaction
-  -> SubmitNotification
+Caller dispatcher
+  -> SubmitNotification outside DB transaction
 
 Notification pre-transaction work
-  -> validate + resolve/render + Transit encrypt
+  -> validate + resolve/render + local encrypt
 
 Notification acceptance transaction
-  -> persist ciphertext + notification/retry state
+  -> durable Notification/ciphertext/retry state
   -> commit
-  -> return ACCEPTED
+  -> ACCEPTED
 
 Caller erasure transaction
   -> remove accepted handoff escrow
 
-Notification provider worker outside transaction
-  -> Transit decrypt + provider I/O
+Notification dispatch/reconciliation
+  -> local decrypt + provider I/O outside DB transaction
 
 Notification terminal transaction
-  -> delete sensitive ciphertext + insert non-PII result outbox
+  -> erase sensitive ciphertext + non-PII result outbox
 
-Notification callback worker outside transaction
-  -> caller callback; retry until post-commit ACK
+Notification callback dispatcher
+  -> idempotent caller callback outside DB transaction
 ```
 
-No two services share a transaction or database.
+No two services share a database or distributed transaction.
 
-### Runtime gate
+## Security and reliability requirements
 
-This ADR resolves the architecture shape of durable handoff and terminal result
-return, but does not by itself enable production runtime.
+- raw recipient/secret/rendered sensitive content never enters Kafka, logs, traces, metrics, or provider-debug output;
+- private delivery keys never enter Git or database rows;
+- stable idempotency identity survives transport ambiguity;
+- retries are bounded and occur only where semantics prove them safe;
+- provider I/O and callback I/O never occur while database locks/transactions are held;
+- current Istio workload identity/authorization policy restricts submission and callback methods to approved callers;
+- result records contain no recipient, body, code, credential, provider payload, or ciphertext.
 
-Before implementation, the remaining explicit decisions include:
+## Verification requirements
 
-- the complete provider and notification status model;
-- retry count, backoff, expiry, terminal-state, and operator replay policy;
-- `SubmitNotification` and callback deadlines, retryable gRPC statuses, and
-  cancellation behavior;
-- request-conflict behavior for a reused `request_id`;
-- Transit timeout, outage, rotation, and ciphertext-retention policies;
-- caller authentication and per-method Istio authorization;
-- schema details, indexes, cleanup, migration, and rollback;
-- provider selection and provider-specific idempotency evidence.
+Test idempotent equal replay/conflicting reuse, caller escrow erasure after acceptance, key rotation/reload/corruption, no OpenBao hot-path RPC, exact-content retry, provider ambiguity/no-blind-resend, terminal ciphertext erasure, callback duplicate delivery, crash/restart boundaries, PII-safe telemetry, and positive/negative workload authorization.
 
-ADR-0008 runtime gating remains until these decisions and the required code,
-contracts, migrations, security controls, observability, and tests are complete.
+## Rollback considerations
 
-## Consequences
-
-- `ACCEPTED`, provider acceptance, and actual delivery have separate meanings.
-- Sensitive retry material has one durable owner after handoff.
-- Notification can retry the exact accepted message without Kafka carrying PII
-  or a verification/recovery secret.
-- OpenBao Transit becomes a runtime availability dependency for accepting and
-  attempting sensitive notifications.
-- Terminal ciphertext erasure is not delayed by callback failure.
-- Result propagation is at-least-once and idempotent rather than exactly-once.
-- Ambiguous provider results may create duplicate delivery of the same exact
-  content.
-
-## Alternatives considered
-
-### Treat a successful RPC as provider delivery
-
-Rejected because durable responsibility transfer and external-provider outcome
-are different lifecycle events.
-
-### Put recipient or verification code in Kafka
-
-Rejected because Kafka, retry topics, and dead letters are durable broadly
-observable transports that must not carry these secrets.
-
-### Store plaintext retry columns in Notification PostgreSQL
-
-Rejected because recipient and rendered authentication content require
-short-lived encrypted escrow with explicit erasure.
-
-### Keep caller escrow until callback acknowledgement
-
-Rejected because it duplicates sensitive durable state after Notification has
-accepted responsibility.
-
-### Keep Notification ciphertext until callback acknowledgement
-
-Rejected because callback availability must not extend sensitive payload
-retention after provider delivery becomes terminal.
-
-### Re-render templates on retry
-
-Rejected because a retry must reproduce the exact message/code accepted for the
-delivery intent.
-
-### Guarantee exactly-once provider delivery
-
-Rejected because provider acceptance can be ambiguous and providers do not all
-offer equivalent idempotency guarantees.
-
-## Rollback or migration considerations
-
-This ADR creates no schema or runtime migration by itself.
-
-The production migration must preserve existing Identity-owned delivery state
-until every in-flight record is terminal or has been safely converted. A mixed
-version rollout must keep `SubmitNotification` and callback contracts backward
-compatible.
-
-Rollback after Notification accepts responsibility cannot restore caller
-handoff escrow. It therefore requires Notification to remain capable of
-finishing or terminally resolving every accepted notification and delivering
-its non-PII result callback.
+Rollback cannot recreate caller handoff escrow after durable responsibility transfers. A rollback must therefore preserve the ability to finish/reconcile every already accepted notification and deliver its non-PII result. Contract changes require mixed-version compatibility until all in-flight accepted work is safe.
