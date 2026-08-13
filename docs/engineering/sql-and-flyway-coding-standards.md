@@ -19,6 +19,22 @@ This document is the canonical SQL/Flyway implementation standard. Architecture 
 - JSON/JSONB is used for genuinely flexible/document-shaped data, not to avoid relational modeling.
 - Tenant-owned tables follow current forced-RLS requirements and service-owned role boundaries.
 
+### Tenant RLS context and pooled connections
+
+Production tenant context is transaction-local and derived only from validated authenticated context. With pooled connections, application code MUST NOT use session-scoped `SET` for tenant identity because a reused connection can leak context across requests/tenants.
+
+The canonical pattern is a parameterized transaction-local setting such as:
+
+```sql
+SELECT set_config('app.tenant_id', ?, true);
+```
+
+where the final `true` makes the value local to the current transaction. Equivalent reviewed mechanisms are allowed only when they prove the same transaction-local/no-pool-leakage property. Raw string concatenation into `SET` statements is prohibited.
+
+RLS policies read the trusted setting with fail-closed missing-context semantics, for example through `current_setting('app.tenant_id', true)` plus the required type/validity checks. Repository/service code must establish tenant context before tenant-owned queries in the same transaction; absence, malformed context, or transaction loss must not broaden access.
+
+Tests MUST reuse pooled connections across different tenants and prove that tenant context never survives commit/rollback into the next borrower. Forced RLS remains enabled and runtime roles remain non-owner `NOSUPERUSER NOBYPASSRLS`.
+
 ## 3. Flyway and schema evolution
 
 - Flyway is the only schema-change authority; Hibernate is `ddl-auto=validate`.
@@ -66,6 +82,7 @@ The adapter requires integration tests and representative query-plan/performance
 - DB credentials are service-scoped, least privilege, and never shared across microservices.
 - SQL/logging/telemetry does not expose bind values containing secrets or unreviewed PII.
 - Migration roles and runtime roles remain distinct where current architecture requires it.
+- Tenant RLS context is transaction-local, parameterized, fail closed when absent/malformed, and verified against pooled-connection reuse.
 
 ## 8. Required verification
 
@@ -74,7 +91,7 @@ Applicable PR/release checks include:
 - migration naming/order and Flyway validation;
 - SQL lint/format check;
 - migration integration test against the approved PostgreSQL major;
-- RLS/role negative tests for tenant-owned data;
+- RLS/role negative tests for tenant-owned data, including cross-tenant pooled-connection reuse after commit/rollback;
 - query bound/index/plan evidence for changed critical queries;
 - concurrency/locking/idempotency tests for work claims;
 - expand/contract compatibility tests across supported rolling versions.
