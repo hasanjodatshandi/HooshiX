@@ -21,7 +21,7 @@ This matrix records the production technology combinations that must remain comp
 | Gateway API | 1.5.1 | Traefik/Istio route resources rendered and compatibility-tested |
 | Traefik | 3.7.1 | Gateway API 1.5.1 routes validated; chart 40.2.0 in baseline |
 | Helm | 4.2.3 | approved 4.2.x patch; chart rendering/schema/policy checks required |
-| Kyverno | 1.18.2 | current stable policy APIs and image-validation admission behavior |
+| Kyverno | 1.18.2 | stable policy/image-validation APIs; admission-policy authoring RBAC plus bounded CEL HTTP-context egress/SSRF controls from ADR-0046 must remain valid on Kubernetes 1.35 |
 | Teleport | 18.10.0 | JIT/SSO/WebAuthn/session-audit behavior exercised before rollout |
 | Cosign | 3.0.6 | signatures/attestations verify through current admission policy |
 | OpenBao | 2.6.1 | exact current secret-authority pin; External Secrets/Kubernetes Auth/local-key workflows validated |
@@ -38,6 +38,7 @@ An upgrade is complete only after the affected compatibility set proves, as appl
 - service contract/build compatibility;
 - workload identity/mTLS positive and negative paths;
 - staging smoke and critical security behavior;
+- admission-policy authoring least privilege and policy-engine egress/SSRF behavior where Kyverno is affected;
 - load/latency comparison for request-path components;
 - database/Kafka/Redis failover/recovery behavior;
 - backup/PITR/restore evidence when relevant;
