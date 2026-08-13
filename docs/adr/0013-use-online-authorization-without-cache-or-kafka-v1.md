@@ -1,4 +1,4 @@
-# ADR-0039: Online Authorization Without Cache or Kafka v1
+# ADR-0013: Online Authorization Without Cache or Kafka v1
 
 ## Status
 

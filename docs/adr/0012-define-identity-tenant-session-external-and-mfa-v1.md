@@ -1,4 +1,4 @@
-# ADR-0038: Identity Tenant, Session, External Identity, and MFA v1
+# ADR-0012: Identity Tenant, Session, External Identity, and MFA v1
 
 ## Status
 
@@ -56,7 +56,7 @@ Access tokens are RS256 JWTs with five-minute lifetime and validated issuer, aud
 
 Refresh credentials are opaque/rotating, stored only as keyed secure digests, with seven-day idle and 30-day absolute lifetime. Rotation invalidates predecessor; reuse detection revokes the credential family. Browsers retain only the secure BFF session cookie.
 
-Signing/private-key lifecycle follows ADR-0052; normal resource verification is local from the approved public verifier bundle and does not call Identity/OpenBao/JWKS per request.
+Signing/private-key lifecycle follows ADR-0023; normal resource verification is local from the approved public verifier bundle and does not call Identity/OpenBao/JWKS per request.
 
 ### Google OIDC/external identity
 

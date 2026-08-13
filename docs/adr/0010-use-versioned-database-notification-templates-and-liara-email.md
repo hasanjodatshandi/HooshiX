@@ -1,4 +1,4 @@
-# ADR-0036: Versioned Database Templates and Liara Email
+# ADR-0010: Versioned Database Templates and Liara Email
 
 ## Status
 

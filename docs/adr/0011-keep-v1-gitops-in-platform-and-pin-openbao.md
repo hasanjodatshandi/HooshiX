@@ -1,4 +1,4 @@
-# ADR-0037: Current GitOps and OpenBao Baseline
+# ADR-0011: Current GitOps and OpenBao Baseline
 
 ## Status
 
