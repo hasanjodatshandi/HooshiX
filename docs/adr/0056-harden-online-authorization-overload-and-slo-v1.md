@@ -10,7 +10,7 @@ Accepted — current effective decision
 
 ## Decision
 
-ADR-0039 defines the one authoritative online `CheckPermission` model. This ADR defines its current production SLO, capacity, deployment, pre-check, overload, and caller-breaker requirements. ADR-0062 and ADR-0066 refine alerting and breaker recovery behavior without weakening these requirements.
+ADR-0039 defines the one authoritative online `CheckPermission` model. This ADR defines its current production SLO, capacity, deployment, pre-check, overload, and caller-breaker requirements. ADR-0062 owns current SLI/burn alerting and breaker-opening criteria; ADR-0066 owns current de-correlated OPEN/HALF_OPEN recovery behavior.
 
 ### Request contract
 
@@ -90,7 +90,7 @@ Before production, prove >=2x projected peak while meeting p95<=100ms and p99<=2
 
 Track request outcome/latency, saturation/load-shed counts, queue wait, per-principal fair-share pressure without high-cardinality identity labels, breaker state/transitions, database pool acquisition, SQL latency, replica availability, and SLO burn.
 
-Paging uses the paired-window burn policy defined by ADR-0062/ADR-0066 rather than isolated percentile samples.
+Paging uses the paired-window burn policy defined by ADR-0062 rather than isolated percentile samples. ADR-0066 governs breaker recovery de-correlation and serialized real HALF_OPEN probes, not SLO burn thresholds.
 
 ## Verification requirements
 
