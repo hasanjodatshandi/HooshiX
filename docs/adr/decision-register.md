@@ -4,7 +4,7 @@
 - **Policy:** `../engineering/current-only-documentation-policy.md`
 - **Normalized:** 2026-08-13
 
-This register contains only decision records that still carry current effective scope. Obsolete predecessor ADRs and raw historical design notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture current durable decisions that remain useful for review.
+This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
 
 ## Identity, tenancy, sessions, MFA, and erasure
 
@@ -14,9 +14,9 @@ This register contains only decision records that still carry current effective 
 | [ADR-0035](0035-enable-identity-registration-runtime.md) | Identity registration runtime/composition |
 | [ADR-0038](0038-define-identity-tenant-session-external-and-mfa-v1.md) | Current tenant lifecycle, token/refresh, external identity, TOTP/SMS MFA runtime |
 | [ADR-0052](0052-define-identity-jwt-signing-key-lifecycle-v1.md) | JWT signing/verifier key lifecycle |
-| [ADR-0058](0058-define-data-subject-erasure-execution-and-evidence-v1.md) | Cross-service irreversible erasure execution/evidence |
+| [ADR-0058](0058-define-data-subject-erasure-execution-and-evidence-v1.md) | Cross-service irreversible erasure execution/evidence + logical-deletion/retention baseline |
 
-Core global-user/tenant membership, logical deletion/retention/legal hold, credential, external-identity, and package rules are represented directly in current-state architecture/coding documents rather than retained predecessor ADRs.
+Core global-user/tenant-membership, logical deletion/legal hold, credential, and package rules are represented directly in current-state architecture/coding documents rather than predecessor ADRs.
 
 ## Notification
 
@@ -34,8 +34,7 @@ Core global-user/tenant membership, logical deletion/retention/legal hold, crede
 | ADR | Current scope |
 | --- | --- |
 | [ADR-0039](0039-use-online-authorization-without-cache-or-kafka-v1.md) | One authoritative online no-cache/no-Kafka/no-retry `CheckPermission` model |
-| [ADR-0041](0041-define-semantic-quotas-and-service-owned-redis-enforcement-v1.md) | Service-owned atomic semantic security quotas |
-| [ADR-0054](0054-harden-semantic-quota-time-safety-v1.md) | Current quota clock/skew/TTL safety |
+| [ADR-0054](0054-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: topology, atomicity, pseudonymization, anti-lockout, policy, dual-clock/TTL safety |
 | [ADR-0055](0055-define-synchronous-dependency-failure-containment-v1.md) | Synchronous dependency timeout/bulkhead/breaker/fallback rules |
 | [ADR-0056](0056-harden-online-authorization-overload-and-slo-v1.md) | Authorization runtime SLO, capacity, deployment, prechecks, overload, breaker baseline |
 | [ADR-0062](0062-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md) | Authorization SLI/burn alerts and real-contract recovery |
@@ -65,8 +64,7 @@ Core global-user/tenant membership, logical deletion/retention/legal hold, crede
 | [ADR-0028](0028-define-production-slo-classes-and-error-budgets.md) | Production SLO classes, error budgets, release-freeze policy |
 | [ADR-0044](0044-define-kafka-production-durability-and-rebuildable-dr-v1.md) | Kafka KRaft durability and rebuildable DR |
 | [ADR-0048](0048-adopt-cloudnativepg-ha-and-barman-backups-v1.md) | CloudNativePG synchronous HA and Barman backup/PITR mechanics |
-| [ADR-0053](0053-enforce-dedicated-postgresql-database-per-microservice-v1.md) | Service database/credential/Flyway ownership and cross-service DB prohibitions |
-| [ADR-0057](0057-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Dedicated production physical clusters + forced tenant RLS/runtime-role controls |
+| [ADR-0057](0057-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Complete current service database/cluster/role/Flyway/cross-service-SQL isolation + forced tenant RLS + backup isolation |
 | [ADR-0064](0064-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable dedicated CloudNativePG fleet operations |
 | [ADR-0067](0067-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Restore evidence and DB upgrade/rollback safety |
 
