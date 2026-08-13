@@ -155,8 +155,8 @@ Production path:
 
 ```text
 Internet
--> upstream L3/L4 DDoS mitigation
--> external load balancing
+-> upstream L3/L4 volumetric mitigation/scrubbing
+-> redundant external L4 load balancing
 -> Traefik
 -> dedicated Caddy + Coraza WAF
 -> Web BFF
