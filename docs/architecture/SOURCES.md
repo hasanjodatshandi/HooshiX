@@ -11,13 +11,14 @@ This map points only to current authoritative documentation. Deleted predecessor
 1. `../../AGENTS.md`
 2. `../engineering/current-only-documentation-policy.md`
 3. `../engineering/repository-change-workflow.md`
-4. `README.md`
-5. `TASK-REVIEW-MATRIX.md`
-6. `../adr/decision-register.md`
-7. applicable current-state architecture/service documents
-8. applicable retained current ADRs
-9. technology baselines/compatibility docs when exact versions matter
-10. applicable engineering/operations/runbooks
+4. `../engineering/documentation-standards.md`
+5. `README.md`
+6. `TASK-REVIEW-MATRIX.md`
+7. `../adr/decision-register.md`
+8. applicable current-state architecture/service documents
+9. applicable retained current ADRs
+10. technology baselines/compatibility docs when exact versions matter
+11. applicable engineering/operations/runbooks
 
 ## Current architecture map
 
@@ -25,15 +26,19 @@ This map points only to current authoritative documentation. Deleted predecessor
 
 - `platform-architecture.md`
 - `backend-engineering.md`
+- `architecture-fitness-functions.md`
 - `../engineering/coding-standards.md`
+- `../engineering/sql-and-flyway-coding-standards.md`
+- `../engineering/frontend-coding-standards.md`
 - `../engineering/build-and-ci-quality-enforcement.md`
 - ADR-0069
 
-Current implementation rules include DDD + Hexagonal inward dependency direction, independent service builds, feature-first/nature-separated packages, strict package naming, Domain/JPA/transport separation, constructor injection, no dumping-ground packages, bounded transactions/dependencies/concurrency, hardened runtime manifests, and executable architecture/security/quality gates.
+Current implementation rules include DDD + Hexagonal inward dependency direction, independent service builds, feature-first/nature-separated packages, strict package naming, Domain/JPA/transport separation, constructor injection, no dumping-ground packages, bounded transactions/dependencies/concurrency, hardened runtime manifests, SQL/Flyway evolution/query discipline, strict TypeScript/React boundaries, and executable architecture/security/quality gates.
 
 ### Identity, tenancy, sessions, external identity, MFA, erasure
 
 - `security-architecture.md`
+- `security-verification-matrix.md`
 - `services/identity-service.md`
 - `services/web-bff.md`
 - ADR-0034, ADR-0035, ADR-0038, ADR-0052, ADR-0058
@@ -43,6 +48,7 @@ Current model includes global users with tenant memberships, trusted active-tena
 ### Authorization
 
 - `security-architecture.md`
+- `security-verification-matrix.md`
 - `services/authorization-service.md`
 - `dependency-criticality.yaml`
 - `dependency-criticality-matrix.md`
@@ -54,6 +60,7 @@ Current rule: one authoritative online `CheckPermission`; safe local reject-only
 ### Semantic security quotas
 
 - `security-architecture.md`
+- `security-verification-matrix.md`
 - `services/identity-service.md` / `services/authorization-service.md` as applicable
 - ADR-0054
 
@@ -79,15 +86,16 @@ Current runtime:
 - local logging SMS local-only, never production fallback;
 - authenticated/correlated delivery evidence, bounded retries/reconciliation, non-PII result callback.
 
-### PostgreSQL, persistence, migrations, recovery
+### PostgreSQL, persistence, SQL, migrations, recovery
 
 - `data-and-messaging.md`
 - `runtime-and-deployment.md`
 - applicable `services/*`
 - `performance-and-bottlenecks.md`
+- `../engineering/sql-and-flyway-coding-standards.md`
 - ADR-0048, ADR-0057, ADR-0064, ADR-0067
 
-ADR-0057 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, and forced tenant RLS where applicable. ADR-0048/0064/0067 provide HA/backup/fleet/restore/upgrade mechanics.
+ADR-0057 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, and forced tenant RLS where applicable. ADR-0048/0064/0067 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
 
 ### Kafka, events, contracts
 
@@ -100,6 +108,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 
 - `reliability-and-observability.md`
 - `performance-and-bottlenecks.md`
+- `architecture-fitness-functions.md`
 - `PRODUCTION-READINESS-CHECKLIST.md`
 - `../operations/chaos-engineering-program.md`
 - `../operations/incident-response-runbook.md`
@@ -109,6 +118,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 
 - `runtime-and-deployment.md`
 - `security-architecture.md`
+- `security-verification-matrix.md`
 - `../runbooks/local-istio-ambient.md`
 - `../runbooks/local-traefik-edge.md`
 - `../technology/technology-baseline.md`
@@ -118,10 +128,21 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 
 Public path: upstream L3/L4 DDoS mitigation -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization.
 
+### Frontend and BFF implementation
+
+- `services/web-bff.md`
+- `security-architecture.md`
+- `../engineering/frontend-coding-standards.md`
+- `testing-and-quality-gates.md`
+
+Frontend rules cover strict TypeScript, runtime validation of untrusted data, React purity/effect discipline, feature import boundaries, same-origin BFF-only API access, browser token isolation, accessibility/RTL contracts, service-worker/private-cache restrictions, resilient Playwright practices, and route bundle/performance budgets.
+
 ### Supply chain, vulnerabilities, human access, logging
 
 - `security-architecture.md`
+- `security-verification-matrix.md`
 - `testing-and-quality-gates.md`
+- `architecture-fitness-functions.md`
 - `../engineering/build-and-ci-quality-enforcement.md`
 - `../operations/incident-response-runbook.md`
 - ADR-0046, ADR-0060, ADR-0061, ADR-0065, ADR-0068
@@ -135,6 +156,13 @@ Public path: upstream L3/L4 DDoS mitigation -> Traefik -> Caddy/Coraza WAF -> We
 
 Architecture prose uses product families/major-minor lines unless an exact patch is itself an architecture constraint.
 
+## Documentation/governance authority
+
+- `../engineering/current-only-documentation-policy.md` — retain only effective current decisions under the owner's active directive;
+- `../engineering/documentation-standards.md` — normative language, document authority, single-source rule, and documentation fitness expectations;
+- `architecture-fitness-functions.md` — architecture properties and required executable evidence;
+- `security-verification-matrix.md` — security verification families aligned to the current stable OWASP ASVS baseline without claiming certification.
+
 ## Maintenance rule
 
 When effective architecture changes:
@@ -144,5 +172,5 @@ When effective architecture changes:
 3. remove/normalize predecessor text after preserving every still-current invariant/contract/security/SLO/migration/operation rule;
 4. update this map, Decision Register, and task matrix;
 5. update technology/compatibility docs when versions change;
-6. update executable enforcement/tests/evidence;
+6. update executable enforcement/tests/evidence and affected fitness/security rows;
 7. deliver/review the full change through PR-first workflow.
