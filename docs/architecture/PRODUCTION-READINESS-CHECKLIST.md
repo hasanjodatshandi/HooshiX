@@ -72,6 +72,8 @@ Required evidence per persistent service:
 - safe automatic failover; planned/unplanned failover evidence, ordinary target <=60s when durability is preserved;
 - negative cross-service `CONNECT`/object privilege tests;
 - forced tenant RLS; runtime roles `NOSUPERUSER NOBYPASSRLS` and non-owner;
+- tenant context comes only from validated authenticated context, is parameterized and transaction-local, and pooled-connection reuse across commit/rollback cannot leak a prior tenant into a later borrower;
+- missing/malformed tenant context and deliberately missing application tenant predicates fail closed in cross-tenant negative tests;
 - aggregate application Hikari maxima <=70% `max_connections`;
 - continuous WAL archive measured against RPO<=5m;
 - encrypted off-site daily physical base backup + 35-day PITR;
@@ -174,7 +176,7 @@ Status until verified: **secret-platform blocker**.
 
 Required evidence:
 
-- only public application path is upstream/LB -> Traefik -> edge-waf -> Web BFF;
+- only public application path is upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> edge-waf -> Web BFF;
 - direct bypass negative tests;
 - replicated WAF/placement according to current HA target;
 - >=7 representative DetectionOnly days + reviewed narrow exceptions;
