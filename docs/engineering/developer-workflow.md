@@ -6,20 +6,15 @@ This document defines development ergonomics without weakening production archit
 
 All repository changes follow `repository-change-workflow.md`.
 
-The mandatory delivery sequence is branch -> Draft PR -> task changes -> complete
-diff review against current `main` -> applicable verification -> merge. Normal
-agent/developer work must not commit directly to `main`. A pull request is not
-ready for merge while a known Critical/High security finding, unresolved
-current-state contradiction, or required verification blocker remains.
+Mandatory sequence: branch -> Draft PR -> task changes -> complete diff review against current `main` -> applicable verification -> merge. Normal agent/developer work MUST NOT commit directly to `main`. A PR is not ready while a known Critical/High security finding, unresolved current-state contradiction, merge conflict, or required verification blocker remains.
 
-GitHub does not permit a pull request whose head has no commit different from the
-base. The workflow therefore permits only the smallest legitimate task/governance
-scaffolding commit needed to establish the Draft PR; all substantive changes
-remain inside that PR.
+GitHub cannot open a PR whose head has no commit different from base. The workflow therefore permits only the smallest legitimate task/governance scaffolding commit needed to establish the Draft PR; all substantive task changes remain inside it.
+
+Documentation/ADR work also follows `current-only-documentation-policy.md`.
 
 ## 2. Inner-loop principle
 
-The normal edit/test loop should exercise the smallest trustworthy scope. Developers and agents should not need a complete Kubernetes/Istio/WAF/Argo CD environment to test pure Domain/Application behavior.
+The normal edit/test loop exercises the smallest trustworthy scope. Developers/agents do not need a complete Kubernetes/Istio/WAF/Argo CD environment to test pure Domain/Application behavior.
 
 Preferred order:
 
@@ -32,32 +27,24 @@ Preferred order:
 
 ## 3. Local-only substitutions
 
-Local-only adapters/fakes are allowed only where an accepted ADR or current architecture explicitly permits them. They must be impossible to activate in `staging` or `production`.
+Local-only adapters/fakes are allowed only where current architecture explicitly permits them. They MUST be impossible to activate in `staging` or `production`.
 
-Use profile expressions equivalent to `local & !staging & !production` for local-only production substitutes when Spring composition is involved.
-
-A local adapter is never a production fallback and never satisfies production readiness.
+Use profile expressions equivalent to `local & !staging & !production` for local-only substitutes when Spring composition is involved. A local adapter is never a production fallback and never satisfies production readiness.
 
 ## 4. CI execution efficiency
 
-Quality-gate ordering expresses dependency and blocking semantics; it does not require independent checks to run serially.
-
-Independent gates SHOULD execute in parallel when this preserves correctness, for example:
+Gate ordering expresses blocking dependencies; independent checks SHOULD run in parallel when correctness/security are preserved, for example:
 
 - unit + architecture + static analysis;
 - contract compatibility + dependency verification + secret scan;
 - independent integration-test shards;
 - Helm/Kubernetes render validation in parallel with container-independent checks.
 
-Use Gradle build cache/configuration cache and CI caching where compatible with reproducibility and security.
-
-Do not skip a mandatory gate merely to reduce duration.
+Use Gradle build/configuration cache and CI caching where compatible with reproducibility and security. Do not skip a mandatory gate merely to reduce duration.
 
 ## 5. Heavy verification
 
-Load, chaos, DR restore, failover, certificate-rotation, and full platform exercises are expensive. Run them at the frequency required by the applicable ADR/SLO/release policy rather than in every developer edit cycle.
-
-Critical-path changes still run the applicable heavy verification before the release gate that depends on it.
+Load, chaos, DR restore, failover, certificate-rotation, provider, and full-platform exercises are expensive. Run them at the cadence required by current SLO/release/operations policy rather than every edit cycle. Critical-path changes still run applicable heavy verification before the release gate that depends on it.
 
 ## 6. Microservice startup discipline
 
@@ -65,39 +52,39 @@ Do not start unrelated services for a narrow task. Use explicit contracts and fa
 
 ## 7. Performance guardrails
 
-Virtual Threads simplify blocking I/O concurrency but do not remove downstream limits. Keep database pools, gRPC concurrency, Kafka consumers, Redis operations, and provider calls bounded and observable.
+Virtual Threads simplify blocking-I/O concurrency but do not remove downstream limits. Keep database pools, gRPC concurrency, Kafka consumers, Redis operations, queues, workers, and provider calls bounded/observable.
 
-Do not optimize by adding caches, asynchronous boundaries, retries, new services, or distributed coordination until evidence identifies the bottleneck and the change is compatible with accepted ADRs.
+Do not add caches, asynchronous boundaries, retries, new services, proxies, or distributed coordination merely as speculative optimization. First identify the bottleneck, confirm compatibility with current architecture/SLO/dependency policy, and define measurable success criteria.
 
 ## 8. Local code-quality baseline
 
-For Java services, the normal pre-push path SHOULD run the repository-defined equivalent of:
+For Java services, normal pre-push work SHOULD run the repository-defined equivalent of:
 
 ```bash
 ./gradlew spotlessCheck test architectureTest spotbugsMain
-# focused integration/contract tasks for the change
+# focused integration/contract/schema tasks for the change
 # repository Semgrep blocking rules
 ```
 
-Use `spotlessApply` only as a local formatting action. Do not disable a gate to speed up the loop; select the smallest applicable test scope and let CI/release pipelines run the heavier mandatory gates. See `coding-standards.md` and `build-and-ci-quality-enforcement.md`.
+Use `spotlessApply` only as a local formatting action. Do not disable a gate to speed up the loop. See `coding-standards.md` and `build-and-ci-quality-enforcement.md`.
 
 ## 9. Code-generation preflight
 
-Before implementation starts, complete the mandatory 18-item Code-Generation Checklist in `AGENTS.md` §8.1 / `coding-standards.md` §15. The checklist is a preflight, not a post-hoc documentation exercise: ports, interaction model, transaction/failure semantics, identity/policy impact, migrations, observability, deployment alignment, and required tests are decided before the concrete adapter code is generated.
+Before implementation starts, complete the mandatory 20-item preflight in `AGENTS.md` §15 and `coding-standards.md` §16.
 
-AI-generated code follows exactly the same quality gates as handwritten code. Compilation alone is never sufficient evidence of completion.
+It is a preflight, not post-hoc documentation: ownership/ports, sync-vs-event semantics, transactions, deadlines/retry/idempotency/cancellation/concurrency, workload identity/policy, migrations, observability, deployment/securityContext, artifact promotion, logging/PII, and required tests are decided before concrete adapter code is generated.
+
+AI-generated code follows exactly the same gates as handwritten code. Compilation alone is never evidence of completion.
 
 ## 10. Local platform foundation
 
-Pure Domain/Application work does not require Kubernetes. When a change needs
-real local mesh, edge, Gateway API, NetworkPolicy, or platform integration,
-use the pinned local foundation rather than ad-hoc cluster commands.
+Pure Domain/Application work does not require Kubernetes. When a change needs real local mesh, edge, Gateway API, NetworkPolicy, or platform integration, use the pinned local foundation rather than ad-hoc cluster commands.
 
 Required sources:
 
-- `docs/technology/local-development-baseline.md`
-- `docs/runbooks/local-istio-ambient.md`
-- `docs/runbooks/local-traefik-edge.md`
+- `../technology/local-development-baseline.md`
+- `../runbooks/local-istio-ambient.md`
+- `../runbooks/local-traefik-edge.md`
 
 Expected repository interface:
 
@@ -108,5 +95,4 @@ make verify-local-istio-ambient
 make verify-local-traefik-edge
 ```
 
-These targets are executable evidence only after their implementation exists and
-passes. Do not report local platform compliance from documentation alone.
+These targets are executable evidence only after their implementation exists and passes. Do not report local platform compliance from documentation alone.
