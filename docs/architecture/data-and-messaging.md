@@ -24,12 +24,13 @@ Cross-bounded-context data moves only through approved versioned service contrac
 ## 2. Production PostgreSQL topology
 
 ADR-0048 + ADR-0057 are current. Each persistent production microservice owns
-its own HA cluster:
+its own HA cluster. Exact patches are owned by the Technology Baseline and
+deployment metadata; the architectural compatibility line is:
 
 ```text
 per persistent service:
-  CloudNativePG 1.30.0
-  PostgreSQL 18.4
+  CloudNativePG 1.30.x
+  PostgreSQL 18.x
   3 instances for critical production services
   quorum synchronous replication: ANY 1 equivalent
   data durability: required
@@ -147,10 +148,11 @@ Kafka is the asynchronous/event-driven inter-service transport. Each environment
 uses one shared platform-managed cluster with domain topic ownership, ACLs,
 quotas, and consumer groups.
 
-Production v1:
+Production v1 uses the ADR-0044 Kafka 4.2.x KRaft line; the exact patch is owned
+by the Technology Baseline and immutable deployment metadata:
 
 ```text
-Kafka 4.2.1 / KRaft
+Kafka 4.2.x / KRaft
 3 brokers
 3 dedicated controllers
 ```
@@ -196,8 +198,12 @@ kafkaTemplate.send(topic, event);
 Default relay is polling + `SKIP LOCKED`. CDC/Debezium requires a proven scale
 need and ADR.
 
-For critical events, published outbox/deterministic publication evidence is
-retained >=7 days to support the Kafka cold-DR replay model.
+For `OUTBOX_REPLAYABLE` critical events, the published transactional outbox
+record or equivalent immutable publication evidence is retained for at least
+35 days, aligned with the current PITR/recovery horizon. It preserves the stable
+event identity and approved replay payload or deterministic reconstruction
+reference. Privacy, erasure, and legal-hold rules still apply; secrets are never
+retained merely for replay.
 
 ## 12. Consumer semantics
 
@@ -206,7 +212,7 @@ Assume at-least-once delivery.
 - consumer business effect is idempotent;
 - Inbox/processed-message record is committed with the local business effect
   where required;
-- dedupe state retention >=8 days for critical 7-day replay horizon;
+- consumer Inbox/dedup evidence is retained for at least the full 35-day critical replay/recovery horizon when that consumer participates in `OUTBOX_REPLAYABLE` recovery;
 - offsets commit after durable result;
 - retry is finite and explicit;
 - retry/DLQ topics are explicit and critical retry/DLQ retention >=14 days;
