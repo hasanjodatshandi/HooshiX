@@ -25,7 +25,7 @@ edges:
     retry_owner: none
     fallback: none
     owner: identity
-    adr: ADR-0041/ADR-0054
+    adr: ADR-0054
 
   - operation_id: identity.password-credential-write
     caller_owner: identity-service
@@ -55,7 +55,7 @@ edges:
     retry_owner: transaction-safe-owner-only
     fallback: none
     owner: owning-service
-    adr: ADR-0053/ADR-0057
+    adr: ADR-0057
 
   - operation_id: identity.notification-handoff-dispatch
     caller_owner: identity-service
@@ -65,7 +65,7 @@ edges:
     retry_owner: caller-durable-dispatcher
     fallback: none
     owner: identity
-    adr: ADR-0012/ADR-0029
+    adr: ADR-0029
 
   - operation_id: notification.provider-dispatch
     caller_owner: notification-service
@@ -75,7 +75,7 @@ edges:
     retry_owner: notification-worker-lifecycle
     fallback: never_fabricate_acceptance_or_delivery
     owner: notification
-    adr: ADR-0013/ADR-0014/ADR-0015
+    adr: ADR-0029/ADR-0030/ADR-0049
 
   - operation_id: identity.google-oidc-login
     caller_owner: identity-service
@@ -85,7 +85,7 @@ edges:
     retry_owner: protocol-defined-safe-flow-only
     fallback: no_alternate_identity_auto_link
     owner: identity
-    adr: ADR-0006/ADR-0038/ADR-0045
+    adr: ADR-0038/ADR-0045
 
   - operation_id: business.optional-enrichment
     caller_owner: owning-bounded-context
@@ -113,6 +113,6 @@ edges:
     class: AUTHORITATIVE_STATE
     failure_action: do_not_silently_drop
     retry_owner: owning-service
-    fallback: none_unless_explicit_adr
+    fallback: none_unless_explicit_current_decision
     owner: owning-service
-    adr: ADR-0003/ADR-0004/ADR-0063
+    adr: ADR-0063
