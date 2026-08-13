@@ -4,7 +4,7 @@
 - **Policy:** `../engineering/current-only-documentation-policy.md`
 - **Decision index:** `../adr/decision-register.md`
 
-This map points only to current authoritative documentation. Deleted predecessor ADRs and raw historical notes are intentionally excluded.
+This map points only to current authoritative documentation. Deleted predecessor ADRs/raw historical notes are intentionally excluded.
 
 ## Global entry points
 
@@ -21,7 +21,7 @@ This map points only to current authoritative documentation. Deleted predecessor
 
 ## Current architecture map
 
-### Platform topology, Java architecture, and code quality
+### Platform topology, Java architecture, code quality
 
 - `platform-architecture.md`
 - `backend-engineering.md`
@@ -38,7 +38,7 @@ Current implementation rules include DDD + Hexagonal inward dependency direction
 - `services/web-bff.md`
 - ADR-0034, ADR-0035, ADR-0038, ADR-0052, ADR-0058
 
-Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating BFF/refresh session semantics, JWT signing/verifier lifecycle, and coordinated erasure evidence.
+Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, JWT signing/verifier lifecycle, and coordinated erasure evidence.
 
 ### Authorization
 
@@ -54,9 +54,10 @@ Current rule: one authoritative online `CheckPermission`; safe local reject-only
 ### Semantic security quotas
 
 - `security-architecture.md`
-- ADR-0041, ADR-0054
+- `services/identity-service.md` / `services/authorization-service.md` as applicable
+- ADR-0054
 
-Quotas are service-owned, atomic, fail-safe, pseudonymous, and use the current trusted-application-time + Redis-time skew/TTL model.
+ADR-0054 is the consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
 
 ### Notification
 
@@ -71,11 +72,11 @@ Current runtime:
 
 - idempotent durable internal gRPC handoff;
 - exact versioned templates/content fixed at acceptance;
-- purpose-specific local AES-256-GCM key rings sourced via OpenBao/External Secrets, without routine OpenBao hot-path RPC;
+- purpose-specific local AES-256-GCM key rings via OpenBao/External Secrets, without routine OpenBao hot-path RPC;
 - PostgreSQL-authoritative time + durable `DISPATCHING` commit; no bespoke clock/fence control plane;
 - Liara Transactional Email;
 - IPPanel Webservice-mode Iran SMS;
-- local logging SMS only for local development, never production fallback;
+- local logging SMS local-only, never production fallback;
 - authenticated/correlated delivery evidence, bounded retries/reconciliation, non-PII result callback.
 
 ### PostgreSQL, persistence, migrations, recovery
@@ -84,11 +85,11 @@ Current runtime:
 - `runtime-and-deployment.md`
 - applicable `services/*`
 - `performance-and-bottlenecks.md`
-- ADR-0048, ADR-0053, ADR-0057, ADR-0064, ADR-0067
+- ADR-0048, ADR-0057, ADR-0064, ADR-0067
 
-Every persistent production microservice owns its database, credentials, Flyway history, dedicated CloudNativePG cluster, backup identity, and capacity budget. Tenant-owned tables use forced RLS. Restore evidence and compatibility-aware upgrade/rollback rules are production gates.
+ADR-0057 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, and forced tenant RLS where applicable. ADR-0048/0064/0067 provide HA/backup/fleet/restore/upgrade mechanics.
 
-### Kafka, events, and contracts
+### Kafka, events, contracts
 
 - `data-and-messaging.md`
 - ADR-0026, ADR-0044
@@ -140,7 +141,7 @@ When effective architecture changes:
 
 1. update applicable current-state docs;
 2. create/update a retained current ADR only when it still adds durable decision value;
-3. remove/normalize obsolete predecessor text after preserving every still-current invariant/contract/security/SLO/migration/operation rule;
+3. remove/normalize predecessor text after preserving every still-current invariant/contract/security/SLO/migration/operation rule;
 4. update this map, Decision Register, and task matrix;
 5. update technology/compatibility docs when versions change;
 6. update executable enforcement/tests/evidence;
