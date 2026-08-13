@@ -31,7 +31,7 @@ The BFF does not duplicate routine online permission checks when the resource se
 
 ## 4. Current online runtime
 
-ADR-0039 and ADR-0056 define the current request/capacity baseline; ADR-0062/ADR-0066 define current SLI/burn/recovery behavior.
+ADR-0013 and ADR-0026 define the current request/capacity baseline; ADR-0032/ADR-0036 define current SLI/burn/recovery behavior.
 
 ```text
 CheckPermission deadline: 300 ms maximum
@@ -87,7 +87,7 @@ Before production, prove >=2x projected peak with p95<=100ms/p99<=200ms, Hikari 
 
 ## 6. PostgreSQL
 
-Authorization owns a dedicated PostgreSQL database and dedicated production CloudNativePG cluster under ADR-0057. Runtime/migration roles are service-only; runtime is `NOSUPERUSER NOBYPASSRLS`, not owner. Tenant-owned tables use forced RLS plus application tenant enforcement. Tenant context comes only from validated authenticated context and uses the canonical parameterized transaction-local setting from the SQL/Flyway standard; session-scoped tenant state on pooled connections is prohibited, missing/malformed context fails closed, and cross-tenant pooled-connection reuse after commit/rollback is a mandatory negative test. Synchronous required durability/safe failover apply.
+Authorization owns a dedicated PostgreSQL database and dedicated production CloudNativePG cluster under ADR-0027. Runtime/migration roles are service-only; runtime is `NOSUPERUSER NOBYPASSRLS`, not owner. Tenant-owned tables use forced RLS plus application tenant enforcement. Tenant context comes only from validated authenticated context and uses the canonical parameterized transaction-local setting from the SQL/Flyway standard; session-scoped tenant state on pooled connections is prohibited, missing/malformed context fails closed, and cross-tenant pooled-connection reuse after commit/rollback is a mandatory negative test. Synchronous required durability/safe failover apply.
 
 Failover under sustained `CheckPermission` traffic is a production gate.
 
@@ -114,7 +114,7 @@ Every active tenant has an owner; last owner cannot be removed/demoted. Owner as
 
 ## 9. Semantic quotas
 
-ADR-0054 is the current semantic quota decision. Authorization owns administration quotas in its ACL-isolated `security-redis` namespace; no quota microservice is called.
+ADR-0024 is the current semantic quota decision. Authorization owns administration quotas in its ACL-isolated `security-redis` namespace; no quota microservice is called.
 
 Quota evaluation is atomic, pseudonymous, 75ms/one-attempt/no-retry, dual-clock fail-closed (`trusted_app_time` + Redis `TIME`, <=2s skew), monotonic effective time, and never uses TTL expiry as security reset. Bulk administration charges bounded operation cost, not one unit for an arbitrarily large mutation request.
 
