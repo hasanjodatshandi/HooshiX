@@ -50,9 +50,11 @@ appropriate.
 
 ## 3. Calico CNI and NetworkPolicy
 
-ADR-0050 selects Calico OSS 3.32.1 as the primary Kubernetes CNI and
-NetworkPolicy implementation on Kubernetes 1.35.6. The platform uses Calico's
-standard dataplane in v1; experimental/eBPF acceleration is not enabled.
+ADR-0050 selects the Calico OSS 3.32.x line as the primary Kubernetes CNI and
+NetworkPolicy implementation on the Kubernetes 1.35.x line. Exact supported
+patches are pinned in the Technology Baseline and deployment metadata. The
+platform uses Calico's standard dataplane in v1; experimental/eBPF acceleration
+is not enabled.
 
 Upstream Istio Ambient remains the service mesh. NetworkPolicy is defense in
 depth and must explicitly permit the Ambient HBONE/health flows required by the
@@ -93,11 +95,12 @@ prohibited.
 ADR-0048 + ADR-0057 + ADR-0064 + ADR-0067 are current.
 
 ADR-0057 supersedes the production shared-cluster allowance. Production runs one
-dedicated CloudNativePG cluster per persistent microservice. Each service owns
-its PostgreSQL database, runtime/migration roles, Flyway history, WAL/PITR backup
-namespace/credentials/encryption context, and capacity budget. Critical production
-service clusters use 3 PostgreSQL instances. Non-production may consolidate
-physical clusters only while preserving database/role isolation.
+dedicated CloudNativePG 1.30.x cluster per persistent microservice, with the
+exact approved patch in the Technology Baseline. Each service owns its
+PostgreSQL database, runtime/migration roles, Flyway history, WAL/PITR backup
+namespace/credentials/encryption context, and capacity budget. Critical
+production service clusters use 3 PostgreSQL instances. Non-production may
+consolidate physical clusters only while preserving database/role isolation.
 
 The cluster uses quorum synchronous replication (`ANY 1` equivalent), required
 data durability, and failover quorum. Automatic failover is enabled only when
@@ -249,10 +252,10 @@ Enrollment is explicit and opt-in.
 
 ## 15. OpenBao and External Secrets
 
-OpenBao 2.6.1 remains the authoritative external Secret Manager. Initial v1
-operating topology remains one OpenBao Raft instance/PVC, manual Shamir seal
-(3 shares, threshold 2), hourly encrypted off-PVC snapshots, no initial HSM or
-multi-node HA.
+OpenBao 2.6.1 remains the authoritative external Secret Manager because ADR-0037
+makes that exact version an architectural pin. Initial v1 operating topology
+remains one OpenBao Raft instance/PVC, manual Shamir seal (3 shares, threshold
+2), hourly encrypted off-PVC snapshots, no initial HSM or multi-node HA.
 
 This single-node topology is acceptable in v1 because normal application hot
 paths consume mounted/local key material rather than making per-request OpenBao
