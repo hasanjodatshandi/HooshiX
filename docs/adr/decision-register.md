@@ -36,10 +36,10 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0039](0039-use-online-authorization-without-cache-or-kafka-v1.md) | One authoritative online no-cache/no-Kafka/no-retry `CheckPermission` model |
 | [ADR-0054](0054-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: topology, atomicity, pseudonymization, anti-lockout, policy, dual-clock/TTL safety |
 | [ADR-0055](0055-define-synchronous-dependency-failure-containment-v1.md) | Synchronous dependency timeout/bulkhead/breaker/fallback rules |
-| [ADR-0056](0056-harden-online-authorization-overload-and-slo-v1.md) | Authorization runtime SLO, capacity, deployment, prechecks, overload, breaker baseline |
-| [ADR-0062](0062-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md) | Authorization SLI/burn alerts and real-contract recovery |
-| [ADR-0063](0063-define-operation-level-dependency-criticality-and-degradation-v1.md) | Operation-level criticality/degradation/fallback semantics |
-| [ADR-0066](0066-refine-authorization-breaker-recovery-and-dependency-policy-governance-v1.md) | Breaker de-correlation/serialization and machine-readable dependency-policy governance |
+| [ADR-0056](0056-harden-online-authorization-overload-and-slo-v1.md) | Authorization runtime SLO, capacity, deployment, safe prechecks, overload isolation, and fail-closed breaker baseline |
+| [ADR-0062](0062-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md) | Authorization SLI interpretation, paired burn alerts, breaker-opening criteria, and health-endpoint non-authority |
+| [ADR-0063](0063-define-operation-level-dependency-criticality-and-degradation-v1.md) | Operation-level dependency criticality/degradation/fallback semantics and current-policy references |
+| [ADR-0066](0066-refine-authorization-breaker-recovery-and-dependency-policy-governance-v1.md) | De-correlated OPEN timing, serialized real HALF_OPEN recovery, and machine-readable dependency-policy governance |
 
 ## Browser, edge, workload identity, logging, supply chain, and access
 
@@ -73,7 +73,7 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | ADR | Current scope |
 | --- | --- |
 | [ADR-0037](0037-keep-v1-gitops-in-platform-and-pin-openbao.md) | Current in-repository GitOps + OpenBao topology/secret model |
-| [ADR-0050](0050-pin-production-platform-compatibility-and-cni-v1.md) | Production compatibility baseline and Calico selection |
+| [ADR-0050](0050-pin-production-platform-compatibility-and-cni-v1.md) | Production compatibility authority/upgrade governance and Calico selection |
 | [ADR-0051](0051-define-self-hosted-kubernetes-ha-topology-v1.md) | Self-hosted Kubernetes HA topology |
 
 ## Java engineering
