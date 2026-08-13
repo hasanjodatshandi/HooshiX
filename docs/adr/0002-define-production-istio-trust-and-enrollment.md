@@ -1,4 +1,4 @@
-# ADR-0025: Production Istio Trust and Ambient Enrollment v1
+# ADR-0002: Production Istio Trust and Ambient Enrollment v1
 
 ## Status
 

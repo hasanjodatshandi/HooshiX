@@ -1,4 +1,4 @@
-# ADR-0026: Git + Buf Contract Governance Without Runtime Schema Registry v1
+# ADR-0003: Git + Buf Contract Governance Without Runtime Schema Registry v1
 
 ## Status
 

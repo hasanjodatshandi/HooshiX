@@ -1,4 +1,4 @@
-# ADR-0024: Dedicated Caddy + Coraza Edge WAF v1
+# ADR-0001: Dedicated Caddy + Coraza Edge WAF v1
 
 ## Status
 
@@ -22,7 +22,7 @@ Internet
 -> Web BFF
 ```
 
-The upstream volumetric-mitigation and redundant-L4 requirements are governed in detail by ADR-0059. A CDN is deployment-specific and does not replace either control.
+The upstream volumetric-mitigation and redundant-L4 requirements are governed in detail by ADR-0029. A CDN is deployment-specific and does not replace either control.
 
 Traefik is the Kubernetes/Gateway edge router and forwards public application traffic to the dedicated WAF service. Caddy/Coraza is the L7 inspection layer. Direct Internet->BFF or Traefik->BFF application routes that bypass the WAF are prohibited by route design plus NetworkPolicy/Istio authorization.
 
