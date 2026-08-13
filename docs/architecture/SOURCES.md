@@ -1,162 +1,162 @@
-# Architecture Sources
+# Architecture Sources — Current State
 
-This file is the canonical source catalog for AI agents and reviewers.
+- **Mode:** current-only
+- **Documentation policy:** `../engineering/current-only-documentation-policy.md`
+- **Decision index:** `../adr/decision-register.md`
 
-## Mandatory entry points
+This file maps implementation concerns to the current authoritative documentation. Superseded decision history and raw source notes are intentionally excluded.
 
-- `/AGENTS.md`
-- `/docs/engineering/repository-change-workflow.md`
-- `/docs/architecture/README.md`
-- `/docs/architecture/SOURCES.md`
-- `/docs/architecture/TASK-REVIEW-MATRIX.md`
-- `/docs/architecture/PRODUCTION-READINESS-CHECKLIST.md`
-- `/docs/architecture/performance-and-bottlenecks.md`
-- `/docs/architecture/PRODUCTION-DECISION-SUMMARY.md`
-- `/docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md`
-- `/docs/adr/decision-register.md`
-- `/docs/technology/technology-baseline.md`
-- `/docs/technology/local-development-baseline.md`
-- `/docs/technology/production-compatibility-matrix.md`
-- `/docs/engineering/agent-communication-and-reporting.md`
-- `/docs/engineering/developer-workflow.md`
-- `/docs/engineering/coding-standards.md`
-- `/docs/engineering/build-and-ci-quality-enforcement.md`
+## Global entry points
 
-## Current-state architecture
+1. `../../AGENTS.md`
+2. `../engineering/current-only-documentation-policy.md`
+3. `../engineering/repository-change-workflow.md`
+4. `README.md`
+5. `TASK-REVIEW-MATRIX.md`
+6. `../adr/decision-register.md`
+7. applicable current-state architecture/service docs
+8. applicable retained current ADRs
+9. technology baselines/compatibility documents when exact versions matter
+10. engineering/operations/runbooks required by the task
 
-| Document | Primary scope |
-| --- | --- |
-| `platform-architecture.md` | Global topology, ownership, protocols, shared platform resilience |
-| `backend-engineering.md` | Java/Spring, DDD/Hexagonal, package rules, DI, coding/layering |
-| `security-architecture.md` | Tenancy, deletion, authn/authz, browser security, secrets, quotas, supply chain |
-| `data-and-messaging.md` | PostgreSQL/CloudNativePG, Flyway, JPA/jOOQ, transactions, Kafka, Redis |
-| `reliability-and-observability.md` | Deadlines/retries/bulkheads, SLOs, HA/DR, telemetry, PII-safe logging |
-| `dependency-criticality.yaml` | Canonical machine-readable operation/dependency criticality registry |
-| `dependency-criticality.schema.json` | CI schema for dependency registry validation |
-| `dependency-criticality-matrix.md` | Generated human-readable authoritative/degradable dependency view |
-| `runtime-and-deployment.md` | Kubernetes, Helm/GitOps, Calico, WAF, Istio, OpenBao, admission |
-| `testing-and-quality-gates.md` | Tests, CI/CD, architecture enforcement, Definition of Done |
-| `performance-and-bottlenecks.md` | Runtime/development bottlenecks, mitigations, scale/split triggers |
-| `PRODUCTION-DECISION-SUMMARY.md` | Consolidated production review decisions through ADR-0069 |
-| `PRODUCTION-ARCHITECTURE-REVIEW.md` | Final production review outcome, bottlenecks and simplification rationale |
-| `TASK-REVIEW-MATRIX.md` | Task-to-source routing for targeted review |
-| `PRODUCTION-READINESS-CHECKLIST.md` | Implementation/evidence gates for the accepted production design |
+## Current architecture map
 
-## Service-specific architecture
+### Platform topology and boundaries
 
-| Document | Primary scope |
-| --- | --- |
-| `services/identity-service.md` | Registration, tenant, sessions, OIDC integration, MFA, quotas, Notification handoff |
-| `services/authorization-service.md` | Roles/grants/denies, online CheckPermission, SLO/capacity, admin quotas |
-| `services/notification-service.md` | Durable handoff/lifecycle, PG deadlines, simplified dispatch, templates, Liara/IPPanel providers, local key ring |
-| `services/web-bff.md` | OIDC PKCE, browser session/CSRF/CORS, REST/OpenAPI, internal gRPC |
+- `platform-architecture.md`
+- `backend-engineering.md`
+- ADR-0001, ADR-0002, ADR-0004, ADR-0007
+- `../engineering/coding-standards.md`
+- `../engineering/build-and-ci-quality-enforcement.md`
 
-## ADR thematic map
+### Identity, authentication, tenancy, MFA, sessions
 
-The Decision Register is authoritative for status and supersession. This map is navigation only.
-
-### Foundation / architecture
-
-- ADR-0001 — Identity first; `com.sajtech`; independent service builds.
-- ADR-0007 — feature-first/nature-separated Java packages.
-- ADR-0032 — current Notification package `com.sajtech.notification`; provider portions superseded later.
-
-### Multi-tenancy / deletion / Identity / browser
-
-- ADR-0002 — global User + tenant membership + service-owned tenant-aware DB.
-- ADR-0003 — logical deletion, retention, erasure, legal holds.
-- ADR-0006 — registration, external identity, credential/MFA foundations.
-- ADR-0034 — immutable registration locale + resend reuse.
-- ADR-0035 — registration runtime enabled.
-- ADR-0038 — tenant/session/external identity/MFA v1.
-- ADR-0040 — historical production semantic-quota decision gate.
-- ADR-0041 — semantic quota architecture, resolving ADR-0040.
-- ADR-0054 — current quota time-safety/refill/cleanup hardening.
-- ADR-0045 — current browser/BFF/OIDC/session/CSRF/CORS security.
-- ADR-0049 — current Iran SMS provider baseline used by SMS-dependent flows.
-- ADR-0052 — current Identity RS256/RSA-3072 signing-key lifecycle and local verifier-bundle model.
+- `security-architecture.md`
+- `services/identity-service.md`
+- `services/web-bff.md`
+- ADR-0002, ADR-0003, ADR-0006, ADR-0008, ADR-0009
+- ADR-0034, ADR-0035, ADR-0038, ADR-0045, ADR-0052, ADR-0058
 
 ### Authorization
 
-- ADR-0004 — role/permission ownership and evaluation semantics.
-- ADR-0005 — historical cached runtime; runtime portion superseded by ADR-0039.
-- ADR-0039 — current online CheckPermission, no cache/Kafka/retry/fallback.
-- ADR-0042 — historical initial Authorization SLO/HA/capacity details; latency/overload portions superseded by ADR-0056.
-- ADR-0055 — current synchronous failure-containment/circuit/bulkhead policy.
-- ADR-0056 — current Authorization overload isolation and latency SLO.
-- ADR-0062 — current Authorization burn-rate alerting and half-open real-contract recovery.
-- ADR-0063 — current operation-level dependency criticality/degradation model.
-- ADR-0066 — current Authorization breaker de-correlation/serialized half-open probes plus machine-checkable dependency-policy governance.
+- `security-architecture.md`
+- `services/authorization-service.md`
+- `dependency-criticality.yaml`
+- `dependency-criticality-matrix.md`
+- `performance-and-bottlenecks.md`
+- ADR-0004
+- ADR-0039
+- ADR-0055, ADR-0056, ADR-0062, ADR-0063, ADR-0066
 
-### Secrets / GitOps / supply chain
+Current online rule: one authoritative `CheckPermission`; safe local reject-only prechecks; no permission-result cache, Kafka invalidation, retry, stale allow fallback, or layered retry. Production SLO/capacity/deployment baseline is ADR-0056; current breaker alert/recovery governance is ADR-0062/ADR-0066.
 
-- ADR-0009 — provider-neutral key lifecycle.
-- ADR-0011 — OpenBao + Argo CD selection; GitOps repo location and Notification Transit exception later superseded in part; other scope remains.
-- ADR-0037 — in-repository GitOps + OpenBao 2.6.1.
-- ADR-0043 — Notification local mounted key ring, superseding Transit hot path.
-- ADR-0046 — Cosign + Kyverno signed/provenanced admission.
-- ADR-0065 — continuous digest-indexed SBOM vulnerability response and promotion gates.
-- ADR-0068 — current vulnerability-exception expiry, threat-intelligence prioritization, and artifact/dependency ownership.
-- ADR-0069 — current Java coding-standard and executable Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions quality-gate baseline.
-- ADR-0050 — current version compatibility/CNI/upgrade governance.
+### Semantic security quotas
+
+- `security-architecture.md`
+- ADR-0041
+- ADR-0054
+
+Service-owned Redis quota enforcement remains atomic and fail-safe. Time/skew/TTL semantics use the hardened current model in ADR-0054.
 
 ### Notification
 
-- ADR-0008 — verification-delivery security constraints; ownership/runtime parts superseded by later Notification ADRs.
-- ADR-0010 — human-channel delivery belongs to Notification.
-- ADR-0012..ADR-0017 — durable handoff, lifecycle/evidence/outcomes/retry, acceptance deadlines, PostgreSQL-authoritative time; current except explicit later supersession.
-- ADR-0018..ADR-0023 — historical bespoke clock/degraded/primary/fence runtime; current-v1 mechanism superseded by ADR-0047.
-- ADR-0029 — finalized semantic contract/handoff/fingerprint/callback/retention; Transit hot-path portion superseded by ADR-0043.
-- ADR-0030 — persistence/workers/operations remain where not superseded; provider/single-primary/fence portions superseded later.
-- ADR-0031 — historical clock-agent/fence runtime; superseded for current v1 by ADR-0047.
-- ADR-0032 — historical IPPanel Pattern choice; package remains current, provider portion superseded.
-- ADR-0033 — historical SMS-provider deferral; `LoggingSmsProviderAdapter` remains local-only.
-- ADR-0036 — current PostgreSQL templates + Liara SMTP Email.
-- ADR-0043 — current Notification local escrow key ring.
-- ADR-0047 — current simplified dispatch safety, no bespoke clock/fence runtime.
-- ADR-0048 — current PostgreSQL HA preserving acknowledged dispatch state.
-- ADR-0049 — current IPPanel Edge Webservice SMS for Iran, bounded polling, no Pattern rendering.
+- `services/notification-service.md`
+- `security-architecture.md`
+- `data-and-messaging.md`
+- `reliability-and-observability.md`
+- ADR-0010, ADR-0012 through ADR-0017
+- ADR-0029, ADR-0030, ADR-0036, ADR-0043, ADR-0047, ADR-0049
 
-### Platform / data / production
+Current high-level runtime:
 
-- ADR-0024 — dedicated Caddy+Coraza WAF.
-- ADR-0025 — Istio trust domain/CA/enrollment.
-- ADR-0026 — Git+Buf, no runtime Schema Registry v1.
-- ADR-0027 — cold DR targets/retention/restore exercises; PostgreSQL backup shape superseded by ADR-0048.
-- ADR-0028 — production SLO classes/error budgets.
-- ADR-0037 — in-repo GitOps/OpenBao pin.
-- ADR-0044 — current Kafka durability + outbox/state-based DR reconstruction.
-- ADR-0046 — current artifact admission security.
-- ADR-0048 — current CloudNativePG HA + Barman Cloud WAL/PITR backup shape.
-- ADR-0050 — current Calico + production compatibility/upgrade baseline.
-- ADR-0051 — current self-hosted Kubernetes active-cluster HA topology.
-- ADR-0058 — current cross-service data-subject erasure execution/evidence.
-- ADR-0059 — current upstream L3/L4 volumetric DDoS requirement.
-- ADR-0060 — current JIT privileged human production-access plane.
-- ADR-0061 — current PII-safe logging prevention/detection pipeline.
-- ADR-0053 — distinct PostgreSQL database/credentials per persistent microservice.
-- ADR-0057 — current production physical cluster isolation + mandatory forced tenant RLS.
-- ADR-0064 — current standardized dedicated CloudNativePG fleet operations; no planned reconsolidation.
-- ADR-0067 — current PostgreSQL restore evidence, drill consequence, and safe upgrade/rollback policy.
+- Identity submits idempotently over internal gRPC;
+- Notification owns templates, rendering, Email/SMS providers, retries, reconciliation, and delivery evidence;
+- sensitive handoff/delivery state uses bounded local AES-256-GCM key rings sourced through OpenBao/External Secrets, without routine OpenBao hot-path RPC;
+- PostgreSQL authoritative time + durable `DISPATCHING` commit replaces bespoke clock/fence control-plane components;
+- production Email = Liara Transactional Email;
+- production Iran SMS = IPPanel Webservice mode;
+- local logging SMS adapter is local-only and never a production fallback.
 
-## Historical preservation
+### PostgreSQL, persistence, migrations, data ownership
 
-All accepted ADR files under `/docs/adr/` are immutable historical records. Never edit an old accepted ADR to make it look current. A changed decision is a new superseding ADR plus Decision Register/current-state documentation updates.
+- `data-and-messaging.md`
+- `runtime-and-deployment.md`
+- `services/*` applicable service doc
+- `performance-and-bottlenecks.md`
+- ADR-0048, ADR-0053, ADR-0057, ADR-0064, ADR-0067
 
-## Raw source material
+Every persistent production microservice owns its database, credentials, Flyway history, and dedicated CloudNativePG cluster. Tenant-owned production tables use forced RLS; runtime roles do not own tables and cannot bypass RLS.
 
-`/docs/source-material/original-architecture-notes.md` is preserved input material only. It is not authoritative when it conflicts with current accepted ADR supersession.
+### Kafka/events/contracts
 
-## Engineering workflow
+- `data-and-messaging.md`
+- `dependency-criticality.yaml` for synchronous edges; Kafka is not ordinary request/reply
+- ADR-0026
+- ADR-0044
 
-- `/docs/engineering/repository-change-workflow.md` defines the mandatory branch/PR/review/merge workflow for every repository change; normal work does not commit directly to `main`.
-- `/docs/engineering/developer-workflow.md` defines the fast developer inner loop and heavy verification cadence without weakening production gates.
-- `/docs/engineering/coding-standards.md` is the canonical implementation-level Java coding standard.
-- `/docs/engineering/build-and-ci-quality-enforcement.md` defines required Gradle/Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions enforcement and the evidence required before claiming code compliance.
+Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ, replay procedures, RF/minISR/acks/idempotent-producer durability, and rebuildable Kafka DR are current requirements.
 
-## Operations
+### Reliability, performance, SLOs, DR
 
-- `../operations/incident-response-runbook.md` — minimum production incident command/containment/evidence workflow.
-- `../operations/chaos-engineering-program.md` — staging-first failure, restore, failover, and game-day evidence program.
-- `../runbooks/local-istio-ambient.md` — pinned local kind Ambient install/verify/remove/diagnostic workflow.
-- `../runbooks/local-traefik-edge.md` — local Gateway API/Traefik/WAF edge install/verify/remove/diagnostic workflow.
+- `reliability-and-observability.md`
+- `performance-and-bottlenecks.md`
+- `PRODUCTION-READINESS-CHECKLIST.md`
+- `../operations/chaos-engineering-program.md`
+- `../operations/incident-response-runbook.md`
+- ADR-0027, ADR-0028, ADR-0044, ADR-0048
+- ADR-0055, ADR-0056, ADR-0062, ADR-0063, ADR-0066, ADR-0067
+
+### Kubernetes, GitOps, mesh, edge, secrets
+
+- `runtime-and-deployment.md`
+- `security-architecture.md`
+- `../runbooks/local-istio-ambient.md`
+- `../runbooks/local-traefik-edge.md`
+- `../technology/technology-baseline.md`
+- `../technology/local-development-baseline.md`
+- `../technology/production-compatibility-matrix.md`
+- ADR-0024, ADR-0025, ADR-0037, ADR-0050, ADR-0051, ADR-0059
+
+Public path remains upstream L3/L4 DDoS control -> Traefik -> Caddy/Coraza -> Web BFF. Internal workloads use dedicated ServiceAccounts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization.
+
+### Supply chain, vulnerabilities, human access, logging
+
+- `security-architecture.md`
+- `testing-and-quality-gates.md`
+- `../engineering/build-and-ci-quality-enforcement.md`
+- `../operations/incident-response-runbook.md`
+- ADR-0046, ADR-0060, ADR-0061, ADR-0065, ADR-0068
+
+### Java coding and repository enforcement
+
+- `backend-engineering.md`
+- `../engineering/coding-standards.md`
+- `../engineering/build-and-ci-quality-enforcement.md`
+- `../engineering/developer-workflow.md`
+- `../engineering/repository-change-workflow.md`
+- ADR-0007, ADR-0061, ADR-0069
+
+Key enforceable rules include feature-first/nature-separated packages, strict package segment naming, Domain/JPA separation, constructor injection, no dumping-ground packages, no remote I/O inside DB transactions, bounded deadlines/retries/concurrency, immutable same-digest promotion, hardened Kubernetes security contexts, and machine-enforced architecture/logging/security gates.
+
+## Technology/version authority
+
+Use:
+
+- `../technology/technology-baseline.md` — approved production/application pins;
+- `../technology/local-development-baseline.md` — local workstation/container/kind pins;
+- `../technology/production-compatibility-matrix.md` — supported production combinations;
+- repository wrappers, dependency locks, image digests, chart locks, and GitOps metadata — exact deployed artifact identity.
+
+Current-state architecture should refer to product families/major-minor lines unless an exact patch is architecturally significant.
+
+## Maintenance rule
+
+When architecture changes:
+
+1. update the applicable current-state document;
+2. update or create the retained current ADR when a durable architectural decision record is useful;
+3. remove/normalize any record that would otherwise preserve obsolete alternatives;
+4. update this source map and `../adr/decision-register.md`;
+5. update technology baselines when version/compatibility changes;
+6. update executable enforcement/tests and production-readiness evidence where applicable;
+7. deliver the complete change through the PR-first workflow.
