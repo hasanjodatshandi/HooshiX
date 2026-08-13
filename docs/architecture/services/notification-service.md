@@ -88,7 +88,7 @@ Operator replay of a terminal Notification is prohibited. A resend is a new call
 
 ## 7. PostgreSQL-authoritative time
 
-Notification uses the current ADR-0017/ADR-0047 time model.
+ADR-0047 contains the current Notification clock/deadline/dispatch safety model.
 
 `accepted_at` and lifecycle transition time use PostgreSQL `clock_timestamp()`. Contract/persistence comparison precision is canonical UTC microseconds; finer Protobuf timestamps truncate downward, never round upward.
 
@@ -119,7 +119,7 @@ After `DISPATCHING`, worker crash, lease expiry, database failover, timeout, or 
 
 ## 9. PostgreSQL HA and persistence
 
-Notification owns database `notification` on its dedicated production CloudNativePG cluster. Notification-only runtime/migration roles have no privileges on another service database/cluster. ADR-0048, ADR-0053, ADR-0057, ADR-0064, and ADR-0067 define the current isolation/HA/fleet/restore model.
+Notification owns database `notification` on its dedicated production CloudNativePG cluster. Notification-only runtime/migration roles have no privileges on another service database/cluster. ADR-0048, ADR-0057, ADR-0064, and ADR-0067 define current HA/isolation/fleet/restore behavior.
 
 The critical production cluster has three PostgreSQL instances with synchronous required durability and failover quorum. The `DISPATCHING` transaction is synchronously committed before provider I/O. Permitted automatic failover must retain acknowledged dispatch state; otherwise failover is refused in favor of durability.
 
@@ -152,7 +152,7 @@ Rendering is intentionally bounded: no general expression language, arbitrary fu
 
 ## 11. Sensitive escrow
 
-Sensitive recipient/exact rendered authentication content is encrypted with a purpose-specific local AES-256-GCM key ring sourced from OpenBao through External Secrets Operator and mounted read-only.
+Sensitive recipient/exact rendered authentication content is encrypted with a purpose-specific local AES-256-GCM key ring under ADR-0043, sourced from OpenBao through External Secrets Operator and mounted read-only.
 
 No OpenBao network call occurs during `SubmitNotification`, provider dispatch, retry, or reconciliation.
 
