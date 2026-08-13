@@ -7,11 +7,16 @@ This directory contains the **current-state architecture** of the platform. It i
 Start with:
 
 1. `../../AGENTS.md`
-2. `SOURCES.md`
-3. `TASK-REVIEW-MATRIX.md` for targeted navigation
-4. `../adr/decision-register.md`
-5. the current-state document(s) relevant to the task
-6. the applicable ADRs identified by the register and source map
+2. `../engineering/repository-change-workflow.md`
+3. `SOURCES.md`
+4. `TASK-REVIEW-MATRIX.md` for targeted navigation
+5. `../adr/decision-register.md`
+6. the current-state document(s) relevant to the task
+7. the applicable ADRs identified by the register and source map
+
+All repository changes follow the PR-first workflow: branch -> Draft PR -> task
+changes -> complete review against current `main` -> applicable verification ->
+merge. Normal work does not commit directly to `main`.
 
 For targeted implementation work, read only the current-state documents and ADRs that are clearly applicable. For service-boundary, security, infrastructure, or architecture work, perform a full read of the applicable architecture set.
 
@@ -19,6 +24,7 @@ For targeted implementation work, read only the current-state documents and ADRs
 
 - `platform-architecture.md` — system topology, service ownership, protocol boundaries, architectural principles.
 - `backend-engineering.md` — Java/Spring, DDD/Hexagonal, package structure, DI, coding constraints.
+- `../engineering/repository-change-workflow.md` — mandatory branch/PR/review/merge workflow for every repository change.
 - `../engineering/coding-standards.md` — complete implementation-level Java coding standard.
 - `../engineering/build-and-ci-quality-enforcement.md` — executable Gradle/Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions enforcement baseline.
 - `../engineering/agent-communication-and-reporting.md` — mandatory evidence/reporting contract for implementation and review work.
