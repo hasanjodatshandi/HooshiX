@@ -31,7 +31,7 @@ This map points only to current authoritative documentation. Deleted predecessor
 - `../engineering/sql-and-flyway-coding-standards.md`
 - `../engineering/frontend-coding-standards.md`
 - `../engineering/build-and-ci-quality-enforcement.md`
-- ADR-0069
+- ADR-0039
 
 Current implementation rules include DDD + Hexagonal inward dependency direction, independent service builds, feature-first/nature-separated packages, strict package naming, Domain/JPA/transport separation, constructor injection, no dumping-ground packages, bounded transactions/dependencies/concurrency, hardened runtime manifests, SQL/Flyway evolution/query discipline, strict TypeScript/React boundaries, and executable architecture/security/quality gates.
 
@@ -41,7 +41,7 @@ Current implementation rules include DDD + Hexagonal inward dependency direction
 - `security-verification-matrix.md`
 - `services/identity-service.md`
 - `services/web-bff.md`
-- ADR-0034, ADR-0035, ADR-0038, ADR-0052, ADR-0058
+- ADR-0008, ADR-0009, ADR-0012, ADR-0023, ADR-0028
 
 Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS with pool-safe transaction-local tenant database context, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, JWT signing/verifier lifecycle, and coordinated erasure evidence.
 
@@ -53,18 +53,18 @@ Current model includes global users with tenant memberships, trusted active-tena
 - `dependency-criticality.yaml`
 - `dependency-criticality-matrix.md`
 - `performance-and-bottlenecks.md`
-- ADR-0039, ADR-0055, ADR-0056, ADR-0062, ADR-0063, ADR-0066
+- ADR-0013, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036
 
-Current rule: one authoritative online `CheckPermission`; safe local reject-only prechecks; no permission-result cache, Kafka invalidation, retry, stale allow fallback, or duplicate routine BFF enforcement. Production SLO/capacity/deployment is ADR-0056; burn/recovery/dependency governance is ADR-0062/0063/0066.
+Current rule: one authoritative online `CheckPermission`; safe local reject-only prechecks; no permission-result cache, Kafka invalidation, retry, stale allow fallback, or duplicate routine BFF enforcement. Production SLO/capacity/deployment is ADR-0026; burn/recovery/dependency governance is ADR-0032/0033/0036.
 
 ### Semantic security quotas
 
 - `security-architecture.md`
 - `security-verification-matrix.md`
 - `services/identity-service.md` / `services/authorization-service.md` as applicable
-- ADR-0054
+- ADR-0024
 
-ADR-0054 is the consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
+ADR-0024 is the consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
 
 ### Notification
 
@@ -73,7 +73,7 @@ ADR-0054 is the consolidated current decision for quota ownership, Redis topolog
 - `security-architecture.md`
 - `data-and-messaging.md`
 - `reliability-and-observability.md`
-- ADR-0029, ADR-0030, ADR-0036, ADR-0043, ADR-0047, ADR-0049
+- ADR-0006, ADR-0007, ADR-0010, ADR-0014, ADR-0018, ADR-0020
 
 Current runtime:
 
@@ -93,14 +93,14 @@ Current runtime:
 - applicable `services/*`
 - `performance-and-bottlenecks.md`
 - `../engineering/sql-and-flyway-coding-standards.md`
-- ADR-0048, ADR-0057, ADR-0064, ADR-0067
+- ADR-0019, ADR-0027, ADR-0034, ADR-0037
 
-ADR-0057 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0048/0064/0067 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
+ADR-0027 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
 
 ### Kafka, events, contracts
 
 - `data-and-messaging.md`
-- ADR-0026, ADR-0044
+- ADR-0003, ADR-0015
 
 Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Protobuf + Buf compatibility, KRaft durability, and rebuildable Kafka DR are current. Kafka is not ordinary request/reply or business source of truth.
 
@@ -112,7 +112,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `PRODUCTION-READINESS-CHECKLIST.md`
 - `../operations/chaos-engineering-program.md`
 - `../operations/incident-response-runbook.md`
-- ADR-0027, ADR-0028, ADR-0044, ADR-0048, ADR-0055, ADR-0056, ADR-0062, ADR-0063, ADR-0066, ADR-0067
+- ADR-0004, ADR-0005, ADR-0015, ADR-0019, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036, ADR-0037
 
 ### Kubernetes, GitOps, edge, mesh, secrets
 
@@ -124,7 +124,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `../technology/technology-baseline.md`
 - `../technology/local-development-baseline.md`
 - `../technology/production-compatibility-matrix.md`
-- ADR-0024, ADR-0025, ADR-0037, ADR-0050, ADR-0051, ADR-0059
+- ADR-0001, ADR-0002, ADR-0011, ADR-0021, ADR-0022, ADR-0029
 
 Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization.
 
@@ -145,7 +145,7 @@ Frontend rules cover strict TypeScript, runtime validation of untrusted data, Re
 - `architecture-fitness-functions.md`
 - `../engineering/build-and-ci-quality-enforcement.md`
 - `../operations/incident-response-runbook.md`
-- ADR-0046, ADR-0060, ADR-0061, ADR-0065, ADR-0068
+- ADR-0017, ADR-0030, ADR-0031, ADR-0035, ADR-0038
 
 Current supply-chain controls include immutable signed artifacts, signed provenance/SBOM, least-privilege admission-policy authoring, bounded policy-engine external context/egress with SSRF negatives, and continuous deployed-digest vulnerability response.
 
