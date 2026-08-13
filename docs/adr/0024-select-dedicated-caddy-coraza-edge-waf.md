@@ -6,43 +6,46 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13
+2026-08-10; normalized to current-only documentation on 2026-08-13; topology refreshed on 2026-08-13
 
 ## Decision
 
-Production public application traffic follows:
+Production public application traffic follows one mandatory path:
 
 ```text
-Internet / upstream L3-L4 mitigation
--> external load balancing
+Internet
+-> upstream L3/L4 volumetric mitigation/scrubbing
+-> redundant external L4 load balancing
 -> Traefik
--> dedicated edge-waf (Caddy + Coraza + OWASP CRS)
+-> dedicated edge-waf deployment
+   Caddy + coraza-caddy + Coraza v3 + OWASP CRS 4.x LTS
 -> Web BFF
 ```
 
-The WAF is a separately deployable edge workload. It is not implemented as a Java/Spring filter and cannot be bypassed by an alternate public Traefik -> BFF route.
+The upstream volumetric-mitigation and redundant-L4 requirements are governed in detail by ADR-0059. A CDN is deployment-specific and does not replace either control.
 
-### Enforcement
+Traefik is the Kubernetes/Gateway edge router and forwards public application traffic to the dedicated WAF service. Caddy/Coraza is the L7 inspection layer. Direct Internet->BFF or Traefik->BFF application routes that bypass the WAF are prohibited by route design plus NetworkPolicy/Istio authorization.
 
-- Caddy + Coraza v3 + the approved CRS 4.x LTS line;
-- exact artifact/rule pins live in the Technology Baseline and deployment metadata;
-- PL1 initial policy;
-- at least seven representative days in DetectionOnly before reviewed blocking enablement;
-- rule exclusions are narrow, reasoned, owned, reviewed, and versioned;
-- automatic CRS/rule upgrades are prohibited;
-- request-body inspection is bounded; large/upload routes define explicit body policy rather than globally increasing limits;
-- WAF/edge telemetry MUST NOT log full bodies, credentials, tokens, cookies, or unreviewed PII.
+### WAF policy
 
-### Availability and identity
+- CRS is pinned; no automatic rule update in production;
+- Paranoia Level 1 initial baseline;
+- >=7 representative days in DetectionOnly before reviewed blocking activation;
+- false-positive exceptions are narrow, versioned, owned, reviewed, and expiring where temporary;
+- request-body inspection limits are explicit/bounded per endpoint/content class;
+- unsupported/oversize content follows an explicit safe route/application policy rather than silent bypass;
+- WAF telemetry does not record secrets, credentials, raw sensitive bodies, or unreviewed PII.
 
-Production WAF replication, PDB/topology placement, ServiceAccount, NetworkPolicy, and Istio authorization follow current runtime/SLO requirements. Route and policy controls MUST deny direct Internet -> BFF and Traefik -> BFF application access.
+WAF is defense in depth and does not replace authentication, resource authorization, CSRF/CORS, semantic quotas, validation, output encoding, provider/network security, or upstream volumetric protection.
 
-The WAF provides L7 HTTP inspection only. Upstream volumetric DDoS protection is separately mandatory and the in-cluster WAF MUST NOT be described as bandwidth-saturation protection.
+### Availability
+
+The WAF deployment is replicated and spread according to the current production HA target. One WAF replica/node loss must not intentionally remove the public application path. Saturation/latency/error telemetry is a release/operations signal because every public request traverses this layer.
 
 ## Verification requirements
 
-Verify public-route traversal through WAF, direct-bypass negative tests, representative DetectionOnly tuning evidence, controlled blocking tests, request-size/body limits, one-replica/node-loss behavior where HA applies, incremental latency/load impact, PII-safe logging, pinned rule/artifact integrity, and NetworkPolicy/Istio positive/negative paths.
+Verify the exact upstream mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> WAF -> BFF route, direct-bypass negatives, pinned CRS/image identities, DetectionOnly evidence, reviewed blocking exceptions, body-limit behavior, PII-safe edge logging, one-replica/node loss, load/latency impact, and coexistence with current authentication/authorization/quota controls.
 
 ## Rollback considerations
 
-Rollback may restore a previously approved pinned WAF/rule set through GitOps when compatible. It MUST NOT create a direct BFF bypass, disable authentication/authorization/semantic quotas, enable unsafe body logging, or remove upstream volumetric protection.
+Rollback MUST NOT introduce a direct Traefik/BFF bypass, remove required upstream mitigation or redundant L4 load balancing, silently disable blocking on routes previously approved for blocking, weaken sensitive logging restrictions, or substitute the WAF for current application security controls.
