@@ -14,7 +14,7 @@ Global User
 
 A user may belong to multiple tenants. Trusted active tenant/membership comes from validated authenticated context; caller-controlled headers never establish tenant trust.
 
-Every tenant-owned row has non-null `tenant_id` unless explicitly global. Production tenant-owned PostgreSQL tables additionally use `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`; runtime roles are non-owner `NOSUPERUSER NOBYPASSRLS` and cannot access another service database. Application/repository tenant checks remain mandatory.
+Every tenant-owned row has non-null `tenant_id` unless explicitly global. Production tenant-owned PostgreSQL tables additionally use `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`; runtime roles are non-owner `NOSUPERUSER NOBYPASSRLS` and cannot access another service database. Application/repository tenant checks remain mandatory. Tenant database context is parameterized and transaction-local under the canonical SQL/Flyway standard; session-scoped tenant state on pooled connections is prohibited, missing/malformed context fails closed, and cross-tenant pooled-connection reuse after commit/rollback must prove no context leakage.
 
 Tenant lifecycle is `PROVISIONING`, `ACTIVE`, `SUSPENDED`, `DELETING`, `DELETED`. Creator becomes initial owner. Tenant + creator membership + audit + owner-provisioning Outbox commit locally; activation waits for idempotent Authorization acknowledgement.
 
@@ -158,8 +158,8 @@ Canonical path:
 
 ```text
 Internet
--> upstream L3/L4 volumetric mitigation
--> external load balancing
+-> upstream L3/L4 volumetric mitigation/scrubbing
+-> redundant external L4 load balancing
 -> Traefik
 -> Caddy + Coraza WAF
 -> Web BFF
@@ -193,4 +193,4 @@ Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, le
 
 ## 14. Verification
 
-Security-impacting changes run applicable cross-tenant/RLS negatives, authentication/OIDC/MFA/session tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates including policy-authoring RBAC and policy-engine SSRF negatives, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
+Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse, authentication/OIDC/MFA/session tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates including policy-authoring RBAC and policy-engine SSRF negatives, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
