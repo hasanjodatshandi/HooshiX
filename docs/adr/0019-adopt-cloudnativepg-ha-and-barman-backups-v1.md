@@ -1,4 +1,4 @@
-# ADR-0048: CloudNativePG HA and Barman Backups v1
+# ADR-0019: CloudNativePG HA and Barman Backups v1
 
 ## Status
 
@@ -12,7 +12,7 @@ Accepted — current effective decision
 
 Production PostgreSQL uses CloudNativePG 1.30.x managing PostgreSQL 18.x; exact approved patches are pinned in the Technology Baseline.
 
-Every persistent production microservice has its own dedicated database and dedicated CloudNativePG cluster under ADR-0057. This ADR defines the HA/backup mechanics used by that fleet; ADR-0064/ADR-0067 define fleet standardization, restore evidence, and upgrade safety.
+Every persistent production microservice has its own dedicated database and dedicated CloudNativePG cluster under ADR-0027. This ADR defines the HA/backup mechanics used by that fleet; ADR-0034/ADR-0037 define fleet standardization, restore evidence, and upgrade safety.
 
 ### HA topology for critical service clusters
 

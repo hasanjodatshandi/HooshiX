@@ -1,4 +1,4 @@
-# ADR-0045: Web BFF Browser, OIDC, and Session Security v1
+# ADR-0016: Web BFF Browser, OIDC, and Session Security v1
 
 ## Status
 
@@ -62,7 +62,7 @@ default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
 
 ### Authorization boundary
 
-BFF authenticates the browser session and propagates trusted context, but the resource-owning service performs final ADR-0039 authorization. Routine duplicate `CheckPermission` in BFF is prohibited when the resource service performs the authoritative check.
+BFF authenticates the browser session and propagates trusted context, but the resource-owning service performs final ADR-0013 authorization. Routine duplicate `CheckPermission` in BFF is prohibited when the resource service performs the authoritative check.
 
 ### Runtime isolation
 

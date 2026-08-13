@@ -1,4 +1,4 @@
-# ADR-0047: Notification Clock Safety and Dispatch Commit v1
+# ADR-0018: Notification Clock Safety and Dispatch Commit v1
 
 ## Status
 

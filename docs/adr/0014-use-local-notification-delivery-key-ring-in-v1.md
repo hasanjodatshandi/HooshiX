@@ -1,4 +1,4 @@
-# ADR-0043: Local Notification Delivery Key Ring v1
+# ADR-0014: Local Notification Delivery Key Ring v1
 
 ## Status
 

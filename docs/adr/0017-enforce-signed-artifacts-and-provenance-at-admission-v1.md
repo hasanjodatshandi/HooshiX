@@ -1,4 +1,4 @@
-# ADR-0046: Enforce Signed Artifacts and Provenance at Admission v1
+# ADR-0017: Enforce Signed Artifacts and Provenance at Admission v1
 
 ## Status
 
