@@ -8,9 +8,9 @@ This document summarizes the production-review decisions added after ADR-0040. T
 
 **Why:** closes ADR-0040 without adding another synchronous service or PostgreSQL write path. Source abuse is blocked hard while account-subject pressure cannot be weaponized into permanent remote lockout.
 
-## ADR-0042 — Authorization SLO/capacity
+## ADR-0039 / ADR-0056 / ADR-0062 / ADR-0066 — Online Authorization runtime, SLO, overload, and breaker recovery
 
-**Decision:** retain ADR-0039 online authorization but engineer it as a critical HA dependency: one final check per protected resource request, >=3 replicas, PDB/topology spread, availability>=99.95%, p95<=100ms, p99<=200ms production SLO (75/150ms engineering target), 300ms one-attempt caller ceiling, PostgreSQL as the only synchronous downstream, and >=2x peak capacity evidence.
+**Decision:** retain ADR-0039 online authorization but engineer it as a critical HA dependency: one final check per protected resource request, >=3 replicas, PDB/topology spread, availability>=99.95%, p95<=100ms, p99<=200ms production SLO (75/150ms engineering target), 300ms one-attempt caller ceiling, PostgreSQL as the only synchronous downstream, explicit overload isolation, paired burn-rate alerting, and de-correlated fail-closed breaker recovery. ADR-0042 is the historical initial SLO/capacity decision; its superseded production latency/Hikari gate values are not current.
 
 **Why:** preserves immediate fail-closed permission semantics without adding stale cache behavior or duplicate BFF checks.
 
@@ -172,7 +172,6 @@ policy.
 
 **Decision:** signed CycloneDX SBOMs are digest-indexed and rescanned at least every six hours. ADR-0068 adds <=2h threat-advisory/KEV ingestion, targeted rescans, active exception-expiry escalation, and deterministic ownership of direct/transitive components by deployed artifact. Critical/known-exploited production findings target immediate incident handling and <=24h mitigation; High production findings target <=48h.
 
-
 ## ADR-0066 — Authorization breaker de-correlation and dependency-policy governance
 
 **Decision:** keep the Authorization SLO/fail-closed model, replace fixed synchronized reopen timing with bounded exponential per-instance de-correlation, serialize real half-open probes, and make `dependency-criticality.yaml` the machine-checkable source of truth. Tenant tier does not affect security breaker recovery.
@@ -184,7 +183,6 @@ policy.
 ## ADR-0068 — Vulnerability exception expiry, threat intelligence, and ownership
 
 **Decision:** expired exceptions actively stop authorizing promotion and escalate running-production exposure. CISA KEV plus approved CVE/ecosystem/vendor advisories are ingested frequently and trigger targeted correlation/rescan. No feed is treated as guaranteed zero-day detection. Direct/transitive component accountability follows the deployed service artifact; Platform owns shared base/runtime artifacts and Security owns feed/scanner policy.
-
 
 ## ADR-0069 — Java coding standards and executable quality gates
 
