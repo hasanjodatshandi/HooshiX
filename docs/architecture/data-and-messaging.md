@@ -24,7 +24,7 @@ Cross-bounded-context data moves only through approved versioned synchronous con
 
 ### Tenant isolation
 
-Every tenant-owned production table uses forced PostgreSQL RLS plus application/repository tenant enforcement. Trusted transaction-local tenant context comes only from validated authenticated context. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot connect/access another service database.
+Every tenant-owned production table uses forced PostgreSQL RLS plus application/repository tenant enforcement. Trusted tenant context comes only from validated authenticated context and is installed with transaction-local semantics; session-scoped tenant state on pooled connections is prohibited. The canonical SQL/Flyway standard requires a parameterized transaction-local setting such as `set_config(..., true)`, fail-closed absent/malformed context, and pooled-connection reuse tests across commit/rollback. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot connect/access another service database.
 
 ## 2. Production PostgreSQL topology
 
@@ -156,4 +156,4 @@ Any business cache remains service-owned, defines correct miss/TTL/stampede/fail
 
 ## 10. Verification
 
-Applicable evidence includes database privilege isolation, forced-RLS negatives, Flyway rolling compatibility, query-bound/index/plan tests, pool budgets, transaction/no-remote-I/O tests, PostgreSQL failover/restore/PITR, Kafka durability/rebuild/replay, Outbox/Inbox duplicate/restart tests, Protobuf compatibility, Redis Sentinel/quota failure tests, and PII/secret-safe persistence/telemetry.
+Applicable evidence includes database privilege isolation, forced-RLS negatives including pooled-connection tenant-context reuse, Flyway rolling compatibility, query-bound/index/plan tests, pool budgets, transaction/no-remote-I/O tests, PostgreSQL failover/restore/PITR, Kafka durability/rebuild/replay, Outbox/Inbox duplicate/restart tests, Protobuf compatibility, Redis Sentinel/quota failure tests, and PII/secret-safe persistence/telemetry.
