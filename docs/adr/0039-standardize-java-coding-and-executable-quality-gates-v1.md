@@ -102,7 +102,7 @@ For every executable Java service:
 
 ## Relationship to current decisions
 
-This decision operates together with current supply-chain/vulnerability controls (ADR-0017/ADR-0035/ADR-0038), PII-safe logging enforcement (ADRÑ0031), runtime/deployment architecture, and the repository PR-first/current-only governance documents. It does not change Kafka, Authorization, PostgreSQL, OpenBao, or service-domain semantics.
+This decision operates together with current supply-chain/vulnerability controls (ADR-0017/ADR-0035/ADR-0038), PII-safe logging enforcement (ADR-0031), runtime/deployment architecture, and the repository PR-first/current-only governance documents. It does not change Kafka, Authorization, PostgreSQL, OpenBao, or service-domain semantics.
 
 ## Rollback considerations
 
