@@ -16,10 +16,10 @@ edges:
     fallback: none
     owner: platform-authorization
     policy_refs:
-      - ADR-0039
-      - ADR-0056
-      - ADR-0062
-      - ADR-0066
+      - ADR-0013
+      - ADR-0026
+      - ADR-0032
+      - ADR-0036
 
   - operation_id: identity.security-semantic-quota
     caller_owner: identity-service
@@ -30,7 +30,7 @@ edges:
     fallback: none
     owner: identity
     policy_refs:
-      - ADR-0054
+      - ADR-0024
 
   - operation_id: identity.password-credential-write
     caller_owner: identity-service
@@ -53,8 +53,8 @@ edges:
     fallback: none
     owner: web-bff
     policy_refs:
-      - ADR-0038
-      - ADR-0045
+      - ADR-0012
+      - ADR-0016
 
   - operation_id: service.normal-transaction-or-query
     caller_owner: owning-service
@@ -65,7 +65,7 @@ edges:
     fallback: none
     owner: owning-service
     policy_refs:
-      - ADR-0057
+      - ADR-0027
       - docs/architecture/data-and-messaging.md#1-data-ownership-and-isolation
 
   - operation_id: identity.notification-handoff-dispatch
@@ -77,7 +77,7 @@ edges:
     fallback: none
     owner: identity
     policy_refs:
-      - ADR-0029
+      - ADR-0006
 
   - operation_id: identity.authorization-owner-provisioning
     caller_owner: identity-service
@@ -100,7 +100,7 @@ edges:
     fallback: none
     owner: notification
     policy_refs:
-      - ADR-0029
+      - ADR-0006
       - docs/architecture/services/notification-service.md#14-result-callback
 
   - operation_id: notification.provider-dispatch
@@ -112,9 +112,9 @@ edges:
     fallback: never_fabricate_acceptance_or_delivery
     owner: notification
     policy_refs:
-      - ADR-0029
-      - ADR-0030
-      - ADR-0049
+      - ADR-0006
+      - ADR-0007
+      - ADR-0020
 
   - operation_id: identity.google-oidc-login
     caller_owner: identity-service
@@ -125,8 +125,8 @@ edges:
     fallback: no_alternate_identity_auto_link
     owner: identity
     policy_refs:
-      - ADR-0038
-      - ADR-0045
+      - ADR-0012
+      - ADR-0016
 
   - operation_id: business.optional-enrichment
     caller_owner: owning-bounded-context
@@ -137,8 +137,8 @@ edges:
     fallback: bounded_context_defined_only
     owner: owning-bounded-context
     policy_refs:
-      - ADR-0063
-      - ADR-0066
+      - ADR-0033
+      - ADR-0036
 
   - operation_id: platform.non-audit-telemetry-export
     caller_owner: any-service
@@ -149,7 +149,7 @@ edges:
     fallback: bounded_loss_allowed
     owner: platform-observability
     policy_refs:
-      - ADR-0063
+      - ADR-0033
       - docs/architecture/reliability-and-observability.md#10-observability
 
   - operation_id: service.required-security-audit-evidence
@@ -161,5 +161,5 @@ edges:
     fallback: none_unless_explicit_current_decision
     owner: owning-service
     policy_refs:
-      - ADR-0063
+      - ADR-0033
       - docs/architecture/security-architecture.md#13-loggingpii-and-privileged-access
