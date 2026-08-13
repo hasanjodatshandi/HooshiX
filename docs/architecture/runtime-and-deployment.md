@@ -186,6 +186,8 @@ Browser production follows ADR-0045: OIDC Authorization Code + PKCE S256, exact 
 
 Release images are immutable, signed, carry signed provenance and CycloneDX SBOM evidence, and are indexed by deployed digest. Production admission verifies approved registry/digest/signature/provenance/required attestations through HA Kyverno before fail-closed enforcement.
 
+Admission-policy write access is restricted to tightly controlled GitOps/CI identities; application workloads and ordinary service identities cannot author cluster-scoped admission policy. Kyverno CEL HTTP context is disabled unless a reviewed policy genuinely needs it. Approved external context lookups use explicit versioned destination/purpose allow-lists, deny loopback/link-local/cloud-metadata/unreviewed private/arbitrary caller-influenced targets, do not forward credentials to arbitrary destinations, and use bounded timeout/response/failure semantics. NetworkPolicy and positive/negative SSRF tests enforce the egress contract; lookup failure never silently becomes allow.
+
 Vulnerability inventory is continuously rescanned/correlated with approved threat/advisory inputs. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates production exposure. No scanner/feed proves absence of unknown vulnerabilities and no scan result authorizes an unsigned artifact.
 
 ## 13. Human production access
@@ -202,6 +204,7 @@ Applicable pre-promotion evidence includes:
 - Helm/Kustomize rendering and Kubernetes security/schema/policy checks;
 - rendered-secret and manifest-diff checks;
 - immutable digest/signature/provenance/SBOM verification;
+- Kyverno policy-authoring RBAC and policy-engine egress/SSRF positive/negative tests when applicable;
 - PostgreSQL/CloudNativePG backup/restore/upgrade-policy checks;
 - Kafka durability/replay checks;
 - Gateway/Traefik/WAF route and blocking tests;
