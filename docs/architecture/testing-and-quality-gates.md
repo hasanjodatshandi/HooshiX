@@ -112,7 +112,9 @@ Affected release candidates run applicable:
 - Gateway API/Traefik/WAF route and negative-bypass tests;
 - `istioctl analyze`;
 - Ambient enrollment, STRICT mTLS, ServiceAccount, NetworkPolicy, and authorization positive/negative tests;
-- immutable digest/signature/provenance/SBOM admission checks.
+- immutable digest/signature/provenance/SBOM admission checks;
+- admission-policy authoring RBAC negatives proving ordinary application/service identities cannot create or modify cluster-scoped policy;
+- Kyverno CEL HTTP-context disabled-by-default checks and, when an approved external lookup exists, bounded destination/timeout/response/failure tests plus loopback/link-local/cloud-metadata/unreviewed-private/arbitrary-caller-target SSRF negatives and NetworkPolicy-constrained egress.
 
 ## 9. Production resilience/security evidence
 
@@ -134,7 +136,7 @@ Prove local key-ring rotation/refresh/corruption/erasure with no hot-path OpenBa
 
 ### PostgreSQL — ADR-0048/0057/0064/0067
 
-Prove per-service physical/database/credential/backup isolation, forced RLS/runtime-role restrictions, synchronous required durability, pool budgets, planned/unplanned failover, WAL/PITR, monthly restore evidence, quarterly DR, failed-drill promotion freeze, one-cluster upgrade waves, and no unsafe downgrade.
+Prove per-service physical/database/credential/backup isolation, forced RLS/runtime-role restrictions, transaction-local parameterized tenant context with fail-closed missing/malformed behavior, pooled-connection reuse across different tenants after commit/rollback with no context leakage, synchronous required durability, pool budgets, planned/unplanned failover, WAL/PITR, monthly restore evidence, quarterly DR, failed-drill promotion freeze, one-cluster upgrade waves, and no unsafe downgrade.
 
 ### Kafka — ADR-0044
 
@@ -146,7 +148,7 @@ Prove PKCE/state/nonce/exact redirects, session fixation/rotation, secure cookie
 
 ### Edge/DDoS — ADR-0024/0059
 
-Prove WAF traversal/direct-bypass denial, controlled blocking/load behavior, no sensitive edge logging, upstream volumetric mitigation capability/escalation, connection-pressure telemetry, and authorized saturation exercise.
+Prove the mandatory upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> WAF -> Web BFF path, direct-bypass denial, controlled blocking/load behavior, no sensitive edge logging, provider capability/escalation, connection-pressure telemetry, and authorized saturation exercise.
 
 ### Secrets/access/logging
 
