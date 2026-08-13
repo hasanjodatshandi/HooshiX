@@ -204,7 +204,8 @@ Ordinary PII requires approved purpose and masking/tokenization or managed-key H
 - stable event code + bounded safe context preferred;
 - production debug/trace off by default; temporary elevation time-bound/access-controlled/audited and cannot enable body/bind/credential logging;
 - MDC/context bounded/allow-listed;
-- logging/export failure does not fail business request but sustained drop/backpressure is observable/alertable;
+- ordinary non-audit telemetry export may use bounded buffering/drop and does not fail the business request solely because the exporter/backend is unavailable; sustained loss/backpressure is observable/alertable;
+- required security/audit evidence classified as authoritative state must be durably persisted/outboxed according to its operation contract and MUST NOT be silently dropped or reclassified as ordinary telemetry;
 - log-store access least privilege/audited;
 - metric labels low-cardinality and exclude user/tenant/session/request/resource IDs, trace IDs, raw URLs, free-form errors.
 
