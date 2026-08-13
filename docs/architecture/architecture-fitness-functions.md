@@ -15,7 +15,7 @@ This catalog defines architecture properties that should be continuously verifie
 | AFF-009 | Authorization current model | one-call/no-cache/no-retry/fail-closed/breaker tests | PR/release | block |
 | AFF-010 | Workload identity and east-west authorization | Istio/ServiceAccount positive + negative policy tests | release | block |
 | AFF-011 | Logging/PII safety | Semgrep + canary/redaction sink tests | PR/release/continuous | block/page per policy |
-| AFF-012 | Supply-chain integrity | dependency verification, SBOM, CVE correlation, Cosign/provenance/admission | PR/release/continuous | block/escalate |
+| AFF-012 | Supply-chain/admission integrity | dependency verification, SBOM, CVE correlation, Cosign/provenance/admission, admission-policy RBAC, policy-engine egress/SSRF negatives | PR/release/continuous | block/escalate |
 | AFF-013 | Container/workload hardening | rendered manifest policy tests | PR/release | block |
 | AFF-014 | SLO/capacity critical paths | load tests + SLI/burn/saturation evidence | release/continuous | release policy |
 | AFF-015 | Backup/PITR/restore | queryable restore evidence | monthly/quarterly | production promotion freeze per policy |
