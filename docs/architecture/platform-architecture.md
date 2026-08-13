@@ -124,27 +124,27 @@ The first executable backend service is `services/identity-service`. The second 
 ## 7. Technology baseline at architecture level
 
 - Java 25 LTS
-- Spring Boot 4.1.0
+- Spring Boot 4.1.x
 - Spring MVC
 - Virtual Threads
 - Gradle Kotlin DSL
-- PostgreSQL 18.4 managed by CloudNativePG 1.30.0
+- PostgreSQL 18.x managed by CloudNativePG 1.30.x
 - Flyway
 - HikariCP
 - jOOQ and/or Spring Data JPA according to service responsibility
-- Kafka + Protobuf
-- Redis with service ownership; shared `security-redis` only for approved security/session ephemeral state
+- Kafka 4.2.x + Protobuf
+- Redis 8.2.x with service ownership; shared `security-redis` only for approved security/session ephemeral state
 - Resilience4j
 - OpenTelemetry + Micrometer
-- Kubernetes 1.35.6
-- Calico OSS 3.32.1 NetworkPolicy CNI
-- Helm 4.2.0
-- Argo CD
+- Kubernetes 1.35.x
+- Calico OSS 3.32.x NetworkPolicy CNI
+- Helm 4.x
+- Argo CD 3.x
 - Kyverno + Cosign production artifact admission
-- Traefik
+- Traefik 3.x
 - Caddy + Coraza v3 + CRS 4.x LTS
 - Istio Ambient Mode 1.30.x production baseline
-- External Secrets Operator + OpenBao
+- External Secrets Operator + OpenBao 2.6.1
 - Liara SMTP Email + IPPanel Edge Webservice SMS for Iran
 - JUnit 5 + Testcontainers
 - ArchUnit
@@ -152,7 +152,7 @@ The first executable backend service is `services/identity-service`. The second 
 - Vitest + React Testing Library
 - Playwright Test + TypeScript
 
-Exact patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/images.
+Exact patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/images, except where an accepted ADR intentionally makes an exact version part of the architecture decision (for example OpenBao 2.6.1 in ADR-0037).
 
 ## 8. Production infrastructure resilience
 
@@ -160,36 +160,17 @@ Current v1 production decisions strengthen platform resilience and isolation wit
 changing bounded-context/data ownership:
 
 - **Kubernetes control plane:** 3 stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint, N+1 critical worker capacity (ADR-0051).
-- **CNI/NetworkPolicy:** Calico OSS 3.32.1 standard dataplane; upstream Istio Ambient remains the mesh; NetworkPolicy tests account for HBONE/health traffic (ADR-0050).
-- **PostgreSQL:** one dedicated CloudNativePG-managed PostgreSQL 18.4 production
-  cluster per persistent microservice, with 3-instance HA for critical services,
-  quorum synchronous replication, forced tenant RLS, independent backups, and
-  safe failover (ADR-0048/ADR-0057/ADR-0064/ADR-0067).
-- **Kafka:** KRaft with 3 brokers + 3 dedicated controllers; critical RF=3,
-  minISR=2, acks=all; cold DR reconstructs from service-owned outboxes
-  (ADR-0044).
-- **Security Redis:** 1 primary + 2 replicas + 3 Sentinel voters, TLS/ACL
-  isolation for BFF sessions and semantic quotas (ADR-0041/ADR-0045).
-- **Authorization:** minimum 3 app replicas, PDB/topology spread, one final
-  `CheckPermission` per protected resource operation, safe local prechecks,
-  fail-closed overload/circuit isolation, >=99.95% availability, p95<=100ms and
-  p99<=200ms SLO; 75/150ms remains engineering target (ADR-0056/ADR-0062/ADR-0066).
-- **OpenBao:** intentionally lean single-node Raft authoritative secret source
-  with hourly encrypted snapshots; normal application hot paths consume local
-  mounted key material, including Notification after ADR-0043.
-- **Notification:** bespoke clock-health agent/database dispatch fence removed;
-  PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` +
-  reconciliation are current (ADR-0047/ADR-0048).
-- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign
-  signature is verified at admission by HA Kyverno; SBOMs are indexed by image
-  digest for continuous transitive vulnerability/advisory correlation and exception escalation (ADR-0046/ADR-0065/ADR-0068).
-- **Public DDoS:** hosting/network provider supplies upstream L3/L4 volumetric
-  mitigation before the origin; Coraza remains L7 WAF (ADR-0059).
-- **Human production access:** Teleport Enterprise Self-Hosted JIT access with
-  SSO/WebAuthn, approval, short-lived privilege, and audit/session evidence
-  (ADR-0060).
-- **PII-safe telemetry:** static logging rules + pipeline redaction + canary/runtime
-  leak detection are mandatory (ADR-0061).
+- **CNI/NetworkPolicy:** Calico OSS 3.32.x standard dataplane; upstream Istio Ambient remains the mesh; NetworkPolicy tests account for HBONE/health traffic (ADR-0050).
+- **PostgreSQL:** one dedicated CloudNativePG 1.30.x-managed PostgreSQL 18.x production cluster per persistent microservice, with 3-instance HA for critical services, quorum synchronous replication, forced tenant RLS, independent backups, and safe failover (ADR-0048/ADR-0057/ADR-0064/ADR-0067).
+- **Kafka:** KRaft with 3 brokers + 3 dedicated controllers; critical RF=3, minISR=2, acks=all; cold DR reconstructs from service-owned outboxes (ADR-0044).
+- **Security Redis:** 1 primary + 2 replicas + 3 Sentinel voters, TLS/ACL isolation for BFF sessions and semantic quotas (ADR-0041/ADR-0045).
+- **Authorization:** minimum 3 app replicas, PDB/topology spread, one final `CheckPermission` per protected resource operation, safe local prechecks, fail-closed overload/circuit isolation, >=99.95% availability, p95<=100ms and p99<=200ms SLO; 75/150ms remains engineering target (ADR-0039/ADR-0056/ADR-0062/ADR-0066).
+- **OpenBao:** intentionally lean single-node Raft authoritative secret source with hourly encrypted snapshots; normal application hot paths consume local mounted key material, including Notification after ADR-0043.
+- **Notification:** bespoke clock-health agent/database dispatch fence removed; PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation are current (ADR-0047/ADR-0048).
+- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature is verified at admission by HA Kyverno; SBOMs are indexed by image digest for continuous transitive vulnerability/advisory correlation and exception escalation (ADR-0046/ADR-0065/ADR-0068).
+- **Public DDoS:** hosting/network provider supplies upstream L3/L4 volumetric mitigation before the origin; Coraza remains L7 WAF (ADR-0059).
+- **Human production access:** Teleport Enterprise Self-Hosted JIT access with SSO/WebAuthn, approval, short-lived privilege, and audit/session evidence (ADR-0060).
+- **PII-safe telemetry:** static logging rules + pipeline redaction + canary/runtime leak detection are mandatory (ADR-0061).
 
 These production controls must not make local development depend on a full
 production cluster. The developer inner loop uses focused unit/architecture/
