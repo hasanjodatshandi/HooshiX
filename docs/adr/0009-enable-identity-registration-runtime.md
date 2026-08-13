@@ -56,7 +56,7 @@ Phone:
 - canonical form is E.164;
 - national-number inference from locale is prohibited at the Identity contract boundary.
 
-A verified email or verified phone is globally unique among non-erased Users. Logical deletion does not release the canonical contact value; the value remains reserved until an approved irreversible erasure/release policy permits reuse. Each User has at most one active primary contact for a contact channel/type under the current profile model, enforced transactionally and with database constraints where representable.
+A verified email or verified phone is globally unique among non-erased Users. Logical deletion does not release the canonical contact value; the value remains reserved until an approved irreversible erasure/release policy permits reuse. Each User has at most one active primary Contact in total, enforced transactionally and with database constraints where representable.
 
 ### Registration verification challenge
 
@@ -98,7 +98,7 @@ Tests prove:
 - both gRPC servers bind distinct ports and enforce the configured message/metadata bounds;
 - malformed calls fail closed and usable key-ring state participates in readiness;
 - profile name trim/NFC/control-character/length behavior and case/internal-space preservation;
-- canonical email/provider-neutral behavior, E.164 phone behavior, verified-contact uniqueness, logical-delete reservation, and primary-contact uniqueness/concurrency;
+- canonical email/provider-neutral behavior, E.164 phone behavior, verified-contact uniqueness, logical-delete reservation, and at-most-one active primary Contact per User under concurrent updates;
 - exactly eight-digit CSPRNG challenge generation, HMAC-only persistence, constant-time verification, 10-minute TTL boundaries, five-attempt exhaustion, 60-second resend boundary, replacement invalidation, and single use;
 - caller attempts to supply/extend security policy are rejected/ignored according to the versioned contract;
 - locale persistence/resend behavior from ADR-0008;
@@ -113,4 +113,4 @@ Dependency locking/verification metadata covers the transport.
 
 Runtime exposure may be disabled with `IDENTITY_REGISTRATION_RUNTIME_ENABLED=false` without schema rollback. Already committed handoffs remain durable, retain their stable `request_id`, and resume from the current lease/cutoff rules when dispatch is re-enabled.
 
-Rollback MUST preserve contact canonicalization/verified uniqueness, logical-delete reservation, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.
+Rollback MUST preserve contact canonicalization/verified uniqueness, logical-delete reservation, the single active primary-Contact invariant, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.
