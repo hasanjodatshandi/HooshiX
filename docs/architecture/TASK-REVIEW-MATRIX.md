@@ -2,14 +2,14 @@
 
 This is a navigation aid for targeted architecture review. It never replaces `/docs/adr/decision-register.md` or applicable ADR text.
 
-Always start with `/AGENTS.md`, this directory's `README.md`, `SOURCES.md`, and the Decision Register.
+Always start with `/AGENTS.md`, `../engineering/repository-change-workflow.md`, this directory's `README.md`, `SOURCES.md`, and the Decision Register. Every repository change follows the PR-first branch/review/merge workflow before task-specific sources are applied.
 
 | Task type | Current-state documents | Service docs | Typical current ADRs |
 | --- | --- | --- | --- |
 | Domain/Application behavior | `backend-engineering.md`, `testing-and-quality-gates.md`, `../engineering/coding-standards.md` | affected service | bounded-context ADRs; **0069** quality enforcement |
 | Java build/static-analysis/CI | `testing-and-quality-gates.md`, `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, Technology Baseline | affected Java service | **0001, 0007, 0061, 0069** |
 | PostgreSQL/schema/query/pool | `data-and-messaging.md`, `reliability-and-observability.md`, `performance-and-bottlenecks.md` | affected service | 0002, 0003, 0027, **0048, 0057, 0064**, service persistence ADRs |
-| gRPC/internal sync | `platform-architecture.md`, `reliability-and-observability.md`, `dependency-criticality-matrix.md`, `security-architecture.md` | caller + provider | contract/deadline/auth ADRs; **0055, 0063** failure semantics; **0056, 0062** for Authorization |
+| gRPC/internal sync | `platform-architecture.md`, `reliability-and-observability.md`, `dependency-criticality-matrix.md`, `security-architecture.md` | caller + provider | contract/deadline/auth ADRs; **0055, 0063** failure semantics; **0056, 0062, 0066** for Authorization |
 | Kafka/event/outbox | `data-and-messaging.md`, `reliability-and-observability.md` | producer + consumer | 0026, **0044**, workflow ADRs |
 | Authentication/session/OIDC/MFA | `security-architecture.md` | `identity-service.md`, `web-bff.md` | 0006, 0038, **0041, 0045, 0049, 0052** |
 | Authorization/permissions | `security-architecture.md`, `reliability-and-observability.md`, `dependency-criticality-matrix.md`, `performance-and-bottlenecks.md` | `authorization-service.md` + resource owner | 0004, 0039, **0041, 0054, 0055, 0056, 0062, 0063, 0066** |
