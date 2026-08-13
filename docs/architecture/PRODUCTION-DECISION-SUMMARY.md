@@ -54,6 +54,7 @@ This document summarizes the effective production architecture only. The current
 - Every persistent production microservice owns a distinct PostgreSQL database, runtime/migration credentials, Flyway history, and dedicated CloudNativePG cluster.
 - Critical clusters use the current three-instance synchronous durability/failover baseline, independent backup credentials/encryption context, continuous WAL archive, daily base backup, and tested PITR/restore.
 - Tenant-owned production tables use forced RLS. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot cross service/database boundaries.
+- Tenant database context comes only from validated authenticated context and is parameterized/transaction-local; session-scoped tenant state on pooled connections is prohibited, missing/malformed context fails closed, and cross-tenant pooled-connection reuse after commit/rollback is a mandatory negative test.
 - Flyway is the only schema-change mechanism. Executed migrations are immutable; evolution uses expand -> migrate -> contract. Application rollback must remain compatible with the expanded schema.
 - Fleet operations use one reviewed GitOps baseline, one-cluster-at-a-time upgrade waves, monthly isolated restore evidence, and quarterly DR exercises.
 
@@ -79,6 +80,7 @@ This document summarizes the effective production architecture only. The current
 ## Supply chain, CI/CD, and production access
 
 - Third-party CI actions/tools/artifacts are pinned/verified according to repository policy; workflow permissions are least privilege and privileged secrets are not exposed to untrusted PR execution.
+- Privileged GitHub Actions event contexts such as `pull_request_target`/`workflow_run` do not execute unreviewed PR-controlled code/config with privileged credentials; any trusted follow-up promotion verifies repository/event/source SHA/artifact integrity/producer workflow before granting privilege.
 - Release images are immutable, SBOM-indexed, signed with Cosign, carry provenance/source identity, and are verified by admission policy.
 - Admission-policy authoring is restricted to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested according to ADR-0046.
 - The exact signed image digest validated in staging is promoted to production; production rebuild is prohibited.
@@ -89,6 +91,7 @@ This document summarizes the effective production architecture only. The current
 
 - Services emit structured JSON stdout and OpenTelemetry/Micrometer metrics/traces with bounded low-cardinality attributes.
 - Logging is allow-list based. Secrets, credentials, tokens/cookies, OTPs, sensitive payloads, SQL binds, complete metadata/headers, and unreviewed PII are prohibited from raw telemetry.
+- Ordinary non-audit telemetry may use bounded buffering/drop; required security/audit evidence classified as authoritative state must durably persist/outbox and cannot silently disappear with exporter/backend failure.
 - Source rules, pipeline redaction, synthetic canary tests, and runtime detection provide defense in depth.
 - SLOs/error budgets use burn-rate policy rather than isolated percentile paging.
 
