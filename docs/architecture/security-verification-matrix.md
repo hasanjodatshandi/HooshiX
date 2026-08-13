@@ -21,7 +21,7 @@ Use versioned ASVS identifiers (`v5.0.0-...`) in test/evidence systems so future
 | SEC-011 | Sensitive data: classification, minimization, encryption, redaction, retention/erasure/legal-hold behavior | data inventory + erasure/restore/redaction tests |
 | SEC-012 | Security logging: structured allow-list, CR/LF safety, no raw sensitive data, audited debug elevation | Semgrep + canary sink tests + access audit evidence |
 | SEC-013 | Browser hardening: CSP/security headers, safe redirects, no unsafe raw HTML, no private service-worker caching | header/browser/source tests |
-| SEC-014 | Supply chain: pinned dependencies/actions, dependency verification, SBOM, vulnerability correlation, provenance/signature/admission | CI/release/admission evidence |
+| SEC-014 | Supply chain/admission: pinned dependencies/actions, dependency verification, SBOM, vulnerability correlation, provenance/signature, least-privilege policy authoring, and bounded policy-engine egress/SSRF controls | CI/release/admission evidence + policy RBAC + policy-engine SSRF negative tests |
 | SEC-015 | Runtime/container hardening: non-root, no privilege escalation, dropped capabilities, RuntimeDefault seccomp, read-only FS where possible | rendered manifest/policy tests |
 | SEC-016 | Recovery/security continuity: backups, restore, key/credential rotation, revoked/erased data reconciliation | scheduled restore/rotation exercises |
 | SEC-017 | Production human access: JIT least privilege, phishing-resistant MFA, approvals, short TTL, session/audit evidence | access-plane policy + session evidence |
