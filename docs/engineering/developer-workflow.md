@@ -2,7 +2,22 @@
 
 This document defines development ergonomics without weakening production architecture.
 
-## 1. Inner-loop principle
+## 1. Repository change workflow
+
+All repository changes follow `repository-change-workflow.md`.
+
+The mandatory delivery sequence is branch -> Draft PR -> task changes -> complete
+diff review against current `main` -> applicable verification -> merge. Normal
+agent/developer work must not commit directly to `main`. A pull request is not
+ready for merge while a known Critical/High security finding, unresolved
+current-state contradiction, or required verification blocker remains.
+
+GitHub does not permit a pull request whose head has no commit different from the
+base. The workflow therefore permits only the smallest legitimate task/governance
+scaffolding commit needed to establish the Draft PR; all substantive changes
+remain inside that PR.
+
+## 2. Inner-loop principle
 
 The normal edit/test loop should exercise the smallest trustworthy scope. Developers and agents should not need a complete Kubernetes/Istio/WAF/Argo CD environment to test pure Domain/Application behavior.
 
@@ -15,7 +30,7 @@ Preferred order:
 5. service-level runtime tests;
 6. staging/system checks for production-only infrastructure.
 
-## 2. Local-only substitutions
+## 3. Local-only substitutions
 
 Local-only adapters/fakes are allowed only where an accepted ADR or current architecture explicitly permits them. They must be impossible to activate in `staging` or `production`.
 
@@ -23,7 +38,7 @@ Use profile expressions equivalent to `local & !staging & !production` for local
 
 A local adapter is never a production fallback and never satisfies production readiness.
 
-## 3. CI execution efficiency
+## 4. CI execution efficiency
 
 Quality-gate ordering expresses dependency and blocking semantics; it does not require independent checks to run serially.
 
@@ -38,24 +53,23 @@ Use Gradle build cache/configuration cache and CI caching where compatible with 
 
 Do not skip a mandatory gate merely to reduce duration.
 
-## 4. Heavy verification
+## 5. Heavy verification
 
 Load, chaos, DR restore, failover, certificate-rotation, and full platform exercises are expensive. Run them at the frequency required by the applicable ADR/SLO/release policy rather than in every developer edit cycle.
 
 Critical-path changes still run the applicable heavy verification before the release gate that depends on it.
 
-## 5. Microservice startup discipline
+## 6. Microservice startup discipline
 
 Do not start unrelated services for a narrow task. Use explicit contracts and fakes/test doubles at service boundaries for unit/application tests; use real downstream services only when the integration behavior itself is under test.
 
-## 6. Performance guardrails
+## 7. Performance guardrails
 
 Virtual Threads simplify blocking I/O concurrency but do not remove downstream limits. Keep database pools, gRPC concurrency, Kafka consumers, Redis operations, and provider calls bounded and observable.
 
 Do not optimize by adding caches, asynchronous boundaries, retries, new services, or distributed coordination until evidence identifies the bottleneck and the change is compatible with accepted ADRs.
 
-
-## 7. Local code-quality baseline
+## 8. Local code-quality baseline
 
 For Java services, the normal pre-push path SHOULD run the repository-defined equivalent of:
 
@@ -67,14 +81,13 @@ For Java services, the normal pre-push path SHOULD run the repository-defined eq
 
 Use `spotlessApply` only as a local formatting action. Do not disable a gate to speed up the loop; select the smallest applicable test scope and let CI/release pipelines run the heavier mandatory gates. See `coding-standards.md` and `build-and-ci-quality-enforcement.md`.
 
-## 8. Code-generation preflight
+## 9. Code-generation preflight
 
 Before implementation starts, complete the mandatory 18-item Code-Generation Checklist in `AGENTS.md` §8.1 / `coding-standards.md` §15. The checklist is a preflight, not a post-hoc documentation exercise: ports, interaction model, transaction/failure semantics, identity/policy impact, migrations, observability, deployment alignment, and required tests are decided before the concrete adapter code is generated.
 
 AI-generated code follows exactly the same quality gates as handwritten code. Compilation alone is never sufficient evidence of completion.
 
-
-## 9. Local platform foundation
+## 10. Local platform foundation
 
 Pure Domain/Application work does not require Kubernetes. When a change needs
 real local mesh, edge, Gateway API, NetworkPolicy, or platform integration,
