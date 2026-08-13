@@ -5,6 +5,7 @@ This file is the canonical source catalog for AI agents and reviewers.
 ## Mandatory entry points
 
 - `/AGENTS.md`
+- `/docs/engineering/repository-change-workflow.md`
 - `/docs/architecture/README.md`
 - `/docs/architecture/SOURCES.md`
 - `/docs/architecture/TASK-REVIEW-MATRIX.md`
@@ -148,6 +149,7 @@ All accepted ADR files under `/docs/adr/` are immutable historical records. Neve
 
 ## Engineering workflow
 
+- `/docs/engineering/repository-change-workflow.md` defines the mandatory branch/PR/review/merge workflow for every repository change; normal work does not commit directly to `main`.
 - `/docs/engineering/developer-workflow.md` defines the fast developer inner loop and heavy verification cadence without weakening production gates.
 - `/docs/engineering/coding-standards.md` is the canonical implementation-level Java coding standard.
 - `/docs/engineering/build-and-ci-quality-enforcement.md` defines required Gradle/Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions enforcement and the evidence required before claiming code compliance.
