@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; normalized to current-only documentation on 2026-08-13
+2026-08-11; normalized to current-only documentation on 2026-08-13; erasure coordination contract finalized on 2026-08-13
 
 ## Decision
 
@@ -35,6 +35,31 @@ FAILED_RETRYABLE
 
 Global completion requires a durable current receipt from every required service.
 
+### Required-service registry
+
+The required participant set is server-owned configuration/versioned platform policy. It is never supplied by the API caller, and a caller cannot omit a required service to force premature completion.
+
+Initial v1 required participants are:
+
+```text
+identity-service
+authorization-service
+notification-service
+web-bff
+```
+
+A participant may be added/removed only through reviewed current architecture/data-ownership policy with migration/reconciliation rules for already-open requests.
+
+Identity snapshots the applicable participant-policy version for an erasure request and tracks one durable receipt state per required participant. Global `COMPLETED` is impossible until all required receipts for that policy version are current and successful or an explicitly approved legal-retention outcome is represented according to policy.
+
+### Coordination transport
+
+Erasure coordination is asynchronous and recoverable. Identity commits request/progress state plus Transactional Outbox records locally, then publishes versioned Kafka/Protobuf coordination events after commit. Participating services process at-least-once delivery idempotently and return durable non-PII receipt/progress events through their own outbox/inbox semantics.
+
+Synchronous fan-out gRPC is not the v1 completion mechanism because participant outage must not make the Identity database transaction or initial erasure request depend on simultaneous service availability.
+
+Critical publication and consumer dedup evidence follows the current 35-day recovery horizon under ADR-0015. Retry/DLQ behavior is finite, observable, and retained at least 14 days where a retry/DLQ record exists. No erased PII, raw contact value, access credential, or provider token is placed in erasure coordination events or DLQs.
+
 ### Service erasure contract
 
 Each service inventories/reconciles all applicable owned copies, including primary/logically deleted rows, derived/search/cache state, service-owned outbox/inbox payloads, attachments/blobs, and provider-side data contractually deletable by the service.
@@ -48,13 +73,35 @@ For each data category it performs one approved action:
 
 Crypto-shredding is not a blanket substitute for erasing ordinary relational PII.
 
+### Legal hold ledger
+
+Legal hold is explicit durable state, not a boolean request parameter. The Identity coordination ledger records at least:
+
+```text
+hold_id
+erasure_request_id or data-subject scope
+status: ACTIVE | RELEASED
+authority/reference
+actor
+created_at
+released_at when applicable
+policy_version
+append-only audit/integrity evidence
+```
+
+Only an authorized platform/legal workflow may create or release a hold. Ordinary erasure callers cannot create, remove, or bypass legal hold. `ACTIVE` hold blocks incompatible purge/anonymization while preserving the minimum legally required data/evidence. Release is audited and resumes the idempotent erasure workflow from durable state; it does not create a new unrelated erasure request merely to continue work.
+
 ### Evidence without retaining erased PII
 
 Each service persists append-only erasure evidence containing only approved non-PII metadata: request ID, service, policy/version, completion time, action categories, legal-hold state, and integrity/audit fields. It never retains the removed value merely to prove removal.
 
+Non-PII erasure receipts are retained for the platform lifetime or until an explicit approved legal/data-retention policy defines a shorter safe period. Receipt cleanup must never make a restored backup capable of serving previously erased data without the required replay evidence.
+
 ### Backup/restore behavior
 
 Immutable backups are not rewritten in place; approved retention still applies. Before a restored environment can serve traffic, the platform replays durable erasure/legal-hold evidence so older restored personal data is re-erased/anonymized before exposure. Expired backup artifacts are destroyed according to retention policy.
+
+Restore reconciliation uses the same server-owned participant policy/receipt evidence. Traffic remains disabled until required erasure/legal-hold replay and participant reconciliation complete successfully.
 
 ### Identifier behavior
 
@@ -66,12 +113,16 @@ Current platform default retention is 360 days unless a reviewed data-class poli
 
 ## Verification requirements
 
-- end-to-end erasure across every registered owning service;
+Tests/evidence cover:
+
+- end-to-end erasure across every server-registered owning service;
+- caller inability to omit/forge required participants or participant-policy version;
+- Transactional Outbox/Kafka at-least-once replay, duplicate receipt handling, partial failure, retry/DLQ behavior, and 35-day critical dedup evidence;
 - idempotent replay after partial failure;
-- legal-hold blocking and later release;
-- no retained PII in receipts;
+- legal-hold authorization, ACTIVE blocking, RELEASED continuation, actor/authority/audit evidence;
+- no retained PII in receipts/events/DLQs;
 - cache/search/outbox/inbox/blob/provider cleanup where applicable;
-- restore from pre-erasure backup followed by mandatory re-erasure before traffic;
+- restore from pre-erasure backup followed by mandatory re-erasure/reconciliation before traffic;
 - cryptographic-erasure tests only for data classes with independent destroyable keys;
 - identifier non-reuse/release conflict tests;
 - audit/alerting for stuck/failed requests;
@@ -79,4 +130,6 @@ Current platform default retention is 360 days unless a reviewed data-class poli
 
 ## Rollback considerations
 
-Rollback MUST NOT resurrect erased data into serving state, reuse protected identifiers, drop legal-hold checks, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence. Restored systems must replay erasure evidence before traffic regardless of application rollback version.
+Rollback MUST NOT resurrect erased data into serving state, reuse protected identifiers, drop required-service receipts, accept caller-selected participant sets, replace durable async coordination with availability-coupled synchronous completion, drop legal-hold checks/ledger evidence, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence.
+
+Restored systems must replay erasure/legal-hold evidence before traffic regardless of application rollback version.
