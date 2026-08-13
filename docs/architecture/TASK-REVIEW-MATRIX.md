@@ -8,15 +8,15 @@ Always read `../../AGENTS.md`, `../engineering/current-only-documentation-policy
 | --- | --- |
 | Java/domain/application code | `backend-engineering.md`, `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, ADR-0069, applicable service/current ADR |
 | Build/Gradle/static analysis/CI | `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, `../engineering/developer-workflow.md`, ADR-0069, Technology Baseline |
-| Identity registration/password/MFA | `security-architecture.md`, `services/identity-service.md`, ADR-0034, ADR-0035, ADR-0038, ADR-0052, applicable Notification ADRs |
+| Identity registration/password/MFA | `security-architecture.md`, `services/identity-service.md`, ADR-0034, ADR-0035, ADR-0038, ADR-0052, ADR-0054, applicable Notification ADRs |
 | Browser OIDC/session/CSRF/CORS | `security-architecture.md`, `services/web-bff.md`, ADR-0038, ADR-0045, ADR-0052 |
 | Tenancy/deletion/erasure | `security-architecture.md`, applicable service doc, ADR-0038, ADR-0057, ADR-0058 |
 | Authorization call/path | `services/authorization-service.md`, `security-architecture.md`, `dependency-criticality.yaml`, ADR-0039, ADR-0055, ADR-0056, ADR-0062, ADR-0063, ADR-0066 |
-| Semantic security quota | `security-architecture.md`, ADR-0041, ADR-0054 |
+| Semantic security quota | `security-architecture.md`, applicable service doc, ADR-0054 |
 | Notification handoff/callback | `services/notification-service.md`, `services/identity-service.md`, ADR-0029, ADR-0047 |
 | Notification lifecycle/retry/evidence | `services/notification-service.md`, ADR-0029, ADR-0030, ADR-0047 |
 | Notification templates/Email/SMS | `services/notification-service.md`, ADR-0029, ADR-0036, ADR-0043, ADR-0049 |
-| PostgreSQL/persistence/migration | `data-and-messaging.md`, `runtime-and-deployment.md`, applicable service doc, ADR-0048, ADR-0053, ADR-0057, ADR-0064, ADR-0067 |
+| PostgreSQL/persistence/migration | `data-and-messaging.md`, `runtime-and-deployment.md`, applicable service doc, ADR-0048, ADR-0057, ADR-0064, ADR-0067 |
 | Kafka/event/outbox/consumer | `data-and-messaging.md`, ADR-0026, ADR-0044, applicable service doc |
 | Synchronous remote dependency | `dependency-criticality.yaml`, `dependency-criticality-matrix.md`, `reliability-and-observability.md`, ADR-0055, ADR-0063, applicable dependency ADR |
 | Performance/capacity/scaling | `performance-and-bottlenecks.md`, `reliability-and-observability.md`, applicable service doc, ADR-0028, applicable dependency/data ADR |
