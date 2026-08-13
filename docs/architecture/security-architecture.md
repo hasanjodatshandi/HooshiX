@@ -1,28 +1,10 @@
-# Security Architecture
+# Security Architecture — Current State
 
-## 1. Security model
+Security is layered and fails closed when identity assurance, authorization, or security-significant dependency state cannot be proven. No control substitutes for another.
 
-Security is layered and fail closed when identity assurance, authorization, or security-sensitive dependency state cannot be proven.
+## 1. Tenant and identity trust
 
-Primary controls:
-
-- authenticated end-user/session context;
-- tenant isolation;
-- resource-service authorization and domain invariants;
-- Istio workload identity + strict east-west mTLS;
-- NetworkPolicy and native datastore security;
-- OpenBao/External Secrets lifecycle;
-- semantic security quotas;
-- dedicated edge WAF plus upstream volumetric-DDoS controls;
-- signed/provenanced artifact admission and continuous vulnerability response;
-- PII/secret-safe telemetry;
-- JIT privileged production access.
-
-No single layer substitutes for another.
-
-## 2. Multi-tenancy
-
-ADR-0002 defines the current tenant model:
+Current tenant model:
 
 ```text
 Global User
@@ -30,46 +12,27 @@ Global User
       -> Tenant
 ```
 
-A user may belong to multiple tenants. Every tenant-owned row contains non-null `tenant_id` unless explicitly global. Tenant-owned uniqueness normally includes `tenant_id`.
+A user may belong to multiple tenants. Trusted active tenant/membership comes from validated authenticated context; caller-controlled headers never establish tenant trust.
 
-Trusted active tenant comes from validated authenticated context. Caller-controlled `X-Tenant-Id` never establishes trust. Application and persistence boundaries both enforce isolation and require negative cross-tenant tests.
+Every tenant-owned row has non-null `tenant_id` unless explicitly global. Production tenant-owned PostgreSQL tables additionally use `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`; runtime roles are non-owner `NOSUPERUSER NOBYPASSRLS` and cannot access another service database. Application/repository tenant checks remain mandatory.
 
-Production tenant-owned PostgreSQL tables use `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`; runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot cross another service database. RLS is defense in depth and is not claimed to defeat a PostgreSQL superuser.
+Tenant lifecycle is `PROVISIONING`, `ACTIVE`, `SUSPENDED`, `DELETING`, `DELETED`. Creator becomes initial owner. Tenant + creator membership + audit + owner-provisioning Outbox commit locally; activation waits for idempotent Authorization acknowledgement.
 
-## 3. Tenant lifecycle
+## 2. Logical deletion, retention, erasure, legal hold
 
-Current v1 lifecycle:
+Logical deletion records `deleted_at`, `deleted_by`, and stable `deletion_reason`; `deleted_at` is authoritative. Normal queries exclude deleted rows by persistence contract. Restoration, include-deleted access, purge, and legal-hold actions are explicit, authorized, and audited.
 
-- immutable UUID tenant ID;
-- immutable canonical slug, never reused after deletion;
-- `PROVISIONING`, `ACTIVE`, `SUSPENDED`, `DELETING`, `DELETED`;
-- creator becomes initial owner;
-- Tenant + creator membership + audit + owner-provisioning outbox commit in one local transaction;
-- activation occurs only after idempotent Authorization owner-provisioning acknowledgement.
+Default retention is 360 days; expiry creates eligibility, not automatic destruction. Physical purge is unavailable from ordinary repositories/APIs and must be authorized, idempotent, observable, tenant-safe, and blocked by legal hold. Generated technical/security/event/audit IDs are never reused. Domain `ON DELETE CASCADE` is prohibited by default unless a current aggregate decision proves safety.
 
-## 4. Deletion, retention, erasure, legal hold
+ADR-0058 governs irreversible data-subject erasure. Identity coordinates a non-PII `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. Restore procedures replay erasure/legal-hold decisions before traffic. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
 
-Logical deletion baseline:
+## 3. Browser/BFF/OIDC security
 
-```text
-deleted_at
-deleted_by
-deletion_reason
-```
-
-`deleted_at` is authoritative. Normal queries exclude deleted records by persistence/repository contract. Deleted-record access, restoration, purge, and hold operations are explicit, authorized, and audited.
-
-Default retention is 360 days, but expiry creates purge/anonymization eligibility rather than automatic destruction. Physical purge is unavailable from normal repositories/APIs and is idempotent, tenant-safe, observable, and blocked by legal hold. Generated technical/security/event/audit IDs are never reused. Database `ON DELETE CASCADE` is prohibited by default for domain data.
-
-Irreversible data-subject erasure is coordinated by Identity using a non-PII `erasure_request_id`; each service erases/anonymizes owned copies and returns durable non-PII evidence. Legal holds block incompatible actions. Restore procedures replay erasure evidence before traffic so backup restore cannot silently resurrect erased data. Crypto-shredding is valid only for independently envelope-encrypted material with destroyable keys; it is not a substitute for erasing ordinary relational PII.
-
-## 5. Browser/BFF/OIDC security
-
-Browser OIDC uses Authorization Code + PKCE S256. BFF keeps single-use `state`, `nonce`, and PKCE verifier server-side with <=10-minute authorization-transaction lifetime. Redirect URIs match exact registered values; post-login return targets are bounded same-origin relative paths.
+Browser login uses OIDC Authorization Code + PKCE S256 through Web BFF. BFF stores single-use `state`, `nonce`, and PKCE verifier server-side for <=10m, validates exact redirect, issuer/audience/signature/timestamps, and only permits bounded same-origin relative post-login destinations.
 
 The browser receives no provider token, Identity access/refresh token, internal gRPC credential, trusted role list, or permission list.
 
-Primary browser cookie:
+Primary cookie:
 
 ```text
 __Host-sajtech-session
@@ -77,52 +40,45 @@ Secure
 HttpOnly
 SameSite=Lax
 Path=/
-no Domain attribute
+no Domain
 ```
 
-Session ID rotates after login, MFA completion, tenant switch, recovery, and security elevation. BFF session state is server-side in its ACL-isolated `security-redis` namespace. Idle lifetime <=7d; absolute <=30d.
+Session ID rotates after login, MFA completion, tenant switch, recovery, and elevation. Server-side BFF session state uses an ACL-isolated Redis namespace; idle <=7d, absolute <=30d. Any retained Identity refresh credential is AES-256-GCM encrypted with a BFF-specific local key ring and never stored raw in browser/Redis/telemetry.
 
-If BFF retains an Identity refresh credential, it is AES-256-GCM encrypted with a BFF-specific local key ring sourced from OpenBao through External Secrets. Raw refresh credentials never enter browser storage or Redis.
+Unsafe cookie-authenticated requests require trusted Origin + session-bound synchronizer CSRF token. Fetch Metadata is defense in depth. Credentialed wildcard/reflected CORS is prohibited; same-origin is preferred. CSP/HSTS/nosniff/referrer/Permissions-Policy and frame protection are centrally tested.
 
-State-changing browser requests require trusted Origin + session-bound synchronizer CSRF token (`X-CSRF-Token`). Fetch Metadata is defense in depth. Credentialed wildcard CORS is prohibited; same-origin is preferred.
+## 4. Passwords, external identity, and MFA
 
-## 6. Local credentials, external identities, and MFA
+Passwords cross one explicit Application security port, are never reversibly encrypted/persisted/logged/emitted, and use the current Technology Baseline Argon2id profile:
 
-Passwords cross one explicit hashing boundary, are never persisted/logged/emitted/reversibly encrypted, and are handled through a provider-neutral Application security port.
+```text
+m=19 MiB, t=2, p=1
+16-byte random salt
+>=32-byte derived hash
+15..128 Unicode code points
+NFC before hashing
+```
 
-Production password baseline:
+No arbitrary composition rule or periodic forced rotation. Create/change/reset checks compromised-password service and hashing/verification uses a bounded CPU/memory bulkhead.
 
-- Argon2id: memory 19MiB, iterations 2, parallelism 1;
-- unique random 16-byte salt and >=32-byte derived hash;
-- versioned/self-describing encoded format with rehash-on-success when baseline increases;
-- 15..128 Unicode code points; NFC normalization before hashing;
-- spaces/Unicode/password-manager paste allowed; no arbitrary composition rule;
-- no periodic forced rotation without compromise evidence;
-- create/change/reset checks compromised-password service/blocklist;
-- hashing/verification use bounded CPU/memory concurrency;
-- raw password is never trimmed, lowercased, logged, emitted, or persisted.
-
-External identity linking uses stable issuer + subject. Email address alone is never automatic account-linking authority.
+External identities bind by stable `(issuer, subject)`. Email equality alone never auto-links an identity.
 
 TOTP v1:
 
-- HMAC-SHA-256;
-- 6 digits;
-- 30-second step;
-- ±1 step;
+- HMAC-SHA-256, 6 digits, 30s, ±1 step;
 - issuer `SajTech`;
-- secret encrypted with a local versioned AES-256-GCM key ring sourced from OpenBao;
-- 10 independent 80-bit recovery codes, displayed once and stored only as domain-separated HMAC-SHA-256;
-- enroll/disable/replace/recovery requires authentication age <=5 minutes;
-- no trusted-device bypass in v1.
+- local versioned AES-256-GCM secret key ring sourced through OpenBao/External Secrets;
+- 10 independent 80-bit recovery codes shown once and stored only as domain-separated HMAC-SHA-256;
+- enroll/disable/replace/recovery requires authentication age <=5m;
+- no trusted-device bypass.
 
-Production Iran SMS uses IPPanel Edge Webservice mode. SMS MFA is production-eligible only when semantic quotas, pinned provider contract/credentials, Notification encrypted exact-content lifecycle, provider ambiguity/delivery tests, and Identity MFA controls pass. Provider failure does not activate a local logging adapter or unreviewed fallback.
+Iran SMS MFA uses IPPanel Webservice mode only after ADR-0054 quota evidence, provider contract/credentials, Notification encrypted exact-content lifecycle, MFA/session controls, and delivery/ambiguity tests pass. Local logging SMS is never a production fallback.
 
-## 7. Authorization ownership
+## 5. Authorization ownership and runtime
 
-Authorization Service owns tenant roles, role permissions, membership-role assignments, direct grants/denies, evaluation, and audit. Permission keys are exact stable contracts semantically owned by the resource bounded context. Role inheritance and wildcard assignments are prohibited in v1.
+Authorization Service owns roles, role permissions, membership-role assignments, direct grants/denies, evaluation, management audit, and private persistence. Permission meaning/resource/domain invariants remain owned by the protected bounded context.
 
-Precedence:
+Evaluation:
 
 ```text
 Direct Membership Deny
@@ -131,13 +87,9 @@ Direct Membership Deny
 > Default Deny
 ```
 
-Final enforcement occurs in the resource-owning service and never overrides resource tenant ownership or domain invariants.
+No role inheritance or wildcard permission assignments in v1. Final enforcement is always in the resource-owning service and never overrides tenant ownership/domain invariants.
 
-## 8. Runtime authorization
-
-Current online Authorization is defined by ADR-0039, ADR-0055, ADR-0056, ADR-0062, ADR-0063, and ADR-0066.
-
-Each protected resource operation performs one final online `CheckPermission`:
+Current online `CheckPermission` contract:
 
 ```text
 deadline: 300 ms
@@ -145,125 +97,98 @@ attempts: 1
 wait-for-ready: off
 retry: none
 permission-result cache: none
+Kafka invalidation: none
 stale fallback: none
 fail closed
 ```
 
-Authoritative deny -> `PERMISSION_DENIED`. Dependency failure/open breaker -> `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`. Healthy Authorization saturation -> `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED`, mapped by callers to fail-closed dependency unavailability rather than an authorization deny.
+Authoritative deny -> `PERMISSION_DENIED`; dependency/open-breaker failure -> `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`; healthy saturation -> `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED`, mapped by callers to fail-closed dependency unavailability.
 
-Routine duplicate BFF permission checks are prohibited when the resource service makes the authoritative check. Safe local JWT/claim/tenant/syntax prechecks may reject invalid traffic but never grant access. No Bloom filter, signed permission list, local permission cache, or Kafka invalidation path may make an authoritative decision.
+Safe local JWT/claim/tenant/syntax prechecks may reject invalid traffic but never grant access. Bloom filters, signed permission lists, caches, stale allow, or duplicate routine BFF checks are not authoritative.
 
 Production target:
 
-- >=3 replicas;
-- PDB/topology spread;
+- >=3 replicas, PDB/topology spread;
 - global + per-caller-principal bounded concurrency;
-- <=25ms server queue wait before shedding;
-- bounded PostgreSQL pool/query path;
-- availability >=99.95% rolling 30d;
-- p95<=100ms / p99<=200ms production SLO; 75/150ms engineering target;
-- Hikari acquisition p99<25ms at validated steady target load;
-- >=2x projected-peak launch evidence with >=30% resource/database headroom.
+- <=25ms server queue wait;
+- p95<=100ms / p99<=200ms; availability >=99.95% rolling 30d;
+- Hikari acquisition p99<25ms under validated target load;
+- >=2x projected peak with >=30% validated resource/database headroom.
 
-Paging uses paired multi-window burn. Caller breakers fail closed, de-correlate repeated reopen intervals per instance, serialize one real `CheckPermission` half-open probe at a time, and require three consecutive infrastructure-successful probes to close. A health endpoint never closes the breaker. Commercial/tenant tier does not change security breaker semantics.
+Breaker opening follows ADR-0062; recovery follows ADR-0066: bounded de-correlated reopen backoff, one real half-open probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, no commercial-tier variation.
 
-## 9. Token signing and local verification
+## 6. Token signing and local verification
 
-Identity signs locally with RSA-3072/RS256 private keys sourced from OpenBao through External Secrets. Private keys exist only in Identity's read-only local key ring.
+Identity signs access tokens locally using RSA-3072/RS256 private keys sourced from OpenBao/External Secrets and mounted read-only. Key IDs are immutable random values; normal rotation is 90 days with next-key prepublication and >=24h previous public-key overlap.
 
-Token-verifying workloads use a non-secret GitOps public JWK bundle locally; normal verification never calls Identity/OpenBao/JWKS over the network. Keys use immutable random `kid`, rotate every 90 days, pre-publish the next public key, and retain the previous public key for at least 24 hours. Emergency compromise rotation may invalidate remaining five-minute tokens.
+Verifiers use a bounded non-secret GitOps public JWK bundle locally. Normal verification makes no Identity/OpenBao/remote-JWKS call and accepts only approved algorithm/issuer/audience/key IDs. Unknown key, algorithm confusion, invalid issuer/audience/time/signature fail closed.
 
-Algorithm confusion, arbitrary JWKS URLs, unknown keys, issuer/audience mismatch, and fail-open key lookup are prohibited.
+## 7. Semantic security quotas
 
-## 10. Platform capabilities
-
-`platform_admin` is a separate global capability profile, not a synthetic tenant role. Every use is explicit/audited and does not silently grant tenant business permissions.
-
-Tenant SYSTEM roles are immutable. Every active tenant has an owner; the last owner cannot be removed/demoted.
-
-## 11. Semantic quotas
-
-The operation-owning service enforces its own security quota; there is no quota microservice.
-
-Production uses ACL-isolated namespaces on shared physical `security-redis`: one primary, two replicas, three Sentinel voters, TLS, `noeviction`.
-
-A quota evaluation has a 75ms Redis budget, one attempt, no automatic retry, and fails protected security operations closed on dependency failure.
-
-Atomic multi-dimension token-bucket/GCRA-equivalent enforcement uses a reviewed versioned Redis Function/Lua operation. Current time-safety rules use trusted application wall time + Redis `TIME`, <=2s allowed skew, `effective_now=min(redis_time, app_time)`, monotonic stored bucket time, and fail-closed `QUOTA_TIME_SOURCE_UNHEALTHY` behavior. Security-critical quota state does not reset merely because TTL expires; cleanup is bounded and non-authoritative. Raw PII/IDs are never Redis keys; HMAC-SHA-256 pseudonyms are purpose/domain separated.
-
-Authentication avoids remote account lockout: source dimensions block before credential work, while identifier/account failed-attempt counters are charged on failed credentials and cannot alone reject a subsequently proven correct credential after source controls allow the request.
-
-Traefik/WAF coarse limits remain defense in depth and never substitute for semantic quotas.
-
-## 12. Workload identity and east-west security
-
-End-user identity and workload identity are separate mandatory controls.
-
-Production application workloads use independent Kubernetes ServiceAccounts and Istio Ambient strict mTLS. Kubernetes `default` ServiceAccount is prohibited for production application workloads.
-
-AuthorizationPolicy is deny-by-default and identity-based. Network location/IP does not replace workload identity. NetworkPolicy remains independent defense in depth. Positive and negative authorization tests are required for changed service-to-service edges.
-
-## 13. Secrets and cryptographic key delivery
-
-OpenBao 2.6.1 is the authoritative external secret source. External Secrets Operator is the normal Kubernetes synchronization boundary.
-
-Secret values never enter Git, images, Helm/Kustomize values, logs, traces, or metrics. Rotating key rings are mounted read-only rather than injected through ordinary environment variables. Key purposes are separated; key IDs are immutable and never rebound to different bytes.
-
-Notification and BFF use purpose-specific local AES-256-GCM key rings sourced from OpenBao via External Secrets. Application hot paths do not make routine OpenBao network calls.
-
-OpenBao is security-sensitive control-plane infrastructure with encrypted hourly snapshots and tested recovery.
-
-## 14. Edge security
-
-Canonical public path:
+ADR-0054 is the single current quota decision. The operation-owning service enforces its own quota in an ACL-isolated `security-redis` namespace; no quota microservice exists.
 
 ```text
-Internet / upstream L3/L4 mitigation
+1 primary + 2 replicas + 3 Sentinel voters
+TLS + ACL isolation
+noeviction
+75ms evaluation budget
+1 attempt / no retry
+fail closed on security-significant dependency failure
+```
+
+Atomic multi-dimension enforcement uses reviewed versioned Redis Function/Lua logic. Keys use purpose-separated HMAC pseudonyms. Time uses trusted application wall time + Redis `TIME`, <=2s skew, `effective_now=min(...)`, monotonic stored time, and `QUOTA_TIME_SOURCE_UNHEALTHY` fail-close. TTL expiry alone never resets a security budget.
+
+Authentication anti-lockout: source dimensions may block before credential work; subject/account failure pressure is charged on failed credentials but alone cannot reject a subsequently proven correct credential after source controls allow evaluation.
+
+## 8. Workload identity, mTLS, network security
+
+Production application workloads use dedicated Kubernetes ServiceAccounts and Istio Ambient STRICT mTLS. Kubernetes `default` ServiceAccount is prohibited. AuthorizationPolicy is default-deny/identity-based; NetworkPolicy is independent defense in depth. New/changed service edges require positive and negative identity/policy tests.
+
+Istio does not replace end-user authorization or native Kafka/PostgreSQL/Redis authentication/ACLs.
+
+## 9. Secrets and cryptographic material
+
+OpenBao 2.6.1 is the authoritative secret source; External Secrets is the normal Kubernetes materialization boundary. Secret values never enter Git, images, Helm/Kustomize values, logs, traces, or metrics.
+
+Rotating key rings are mounted read-only; key purposes are separated and key IDs never rebind to new bytes. Notification/BFF use purpose-specific local AES-256-GCM key rings. Normal application hot paths do not make routine OpenBao RPCs.
+
+## 10. Public edge and DDoS
+
+Canonical path:
+
+```text
+Internet
+-> upstream L3/L4 volumetric mitigation
 -> external load balancing
 -> Traefik
 -> Caddy + Coraza WAF
--> web-bff
+-> Web BFF
 ```
 
-Direct Internet/Traefik application access to BFF is denied by routing + NetworkPolicy + Istio policy. WAF uses CRS PL1, DetectionOnly tuning before blocking, pinned rule versions, bounded payload inspection, and PII-safe telemetry.
+Direct Internet/Traefik application access to BFF is denied through route + NetworkPolicy + Istio policy. WAF uses pinned CRS, PL1, DetectionOnly tuning before blocking, narrow exceptions, bounded body inspection, and PII-safe telemetry. WAF never substitutes for authentication, authorization, quotas, validation, output encoding, or upstream volumetric protection.
 
-WAF never replaces authentication, authorization, semantic quotas, validation, output encoding, or secure coding. Upstream volumetric DDoS mitigation/scrubbing must protect the origin link; the in-cluster WAF is not bandwidth-saturation protection.
+## 11. Supply chain and vulnerability response
 
-## 15. Supply-chain security and vulnerability response
+Final release images use immutable digests, signed CycloneDX SBOMs, signed provenance, Cosign signatures/attestations, and production admission verification through HA Kyverno. Deployed SBOM/digest inventory is continuously correlated with approved vulnerability/advisory/threat-intelligence inputs.
 
-CI produces signed CycloneDX SBOM, provenance, vulnerability results, and Cosign signature/attestations for immutable image digests. SBOMs are indexed by service + image digest so newly disclosed vulnerabilities can be correlated to deployed artifacts without rebuilding them.
+Critical/known-exploited production findings target immediate incident handling and <=24h mitigation; High target <=48h. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates running exposure. Scanner/feed success is never proof of zero unknown vulnerabilities and never authorizes an unsigned artifact.
 
-Production admission verifies approved registry, immutable digest, organization signature, provenance/source/builder, and required attestations through the current Kyverno image-validation policy. Kyverno runs HA before fail-closed admission enforcement.
+## 12. Runtime/container security
 
-Deployed digest inventory is continuously rescanned/correlated with approved vulnerability/advisory/threat-intelligence inputs. Current response policy includes frequent targeted correlation on new relevant advisories, expiring exceptions, deterministic component ownership, and production remediation/escalation targets. Scanner/feed success is never described as proof of zero unknown vulnerabilities and never authorizes an unsigned artifact.
+Production application workloads use immutable digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources, safe probes/shutdown, dedicated ServiceAccount, deny-by-default NetworkPolicy, and least-privilege Istio authorization.
 
-## 16. Runtime/container security
+Privileged containers, host networking, `hostPath`, extra capabilities, or relaxed security context require an explicit current security decision plus automated validation.
 
-Production application workloads use:
+## 13. Logging/PII and privileged access
 
-- immutable digest;
-- non-root execution;
-- `allowPrivilegeEscalation=false`;
-- Linux capabilities dropped by default;
-- `RuntimeDefault` seccomp;
-- read-only root filesystem where compatible;
-- finite resources/probes/graceful shutdown;
-- dedicated ServiceAccount;
-- deny-by-default NetworkPolicy;
-- least-privilege Istio authorization.
+Logging is structured and allow-list based. Raw passwords/OTP/recovery codes/tokens/cookies/keys/secrets/payment data/high-risk identity data/full sensitive payloads/SQL binds/complete gRPC metadata/Kafka headers/unreviewed provider payloads are prohibited.
 
-Privileged containers, host networking, `hostPath`, added Linux capabilities, or relaxed security contexts require an explicit current security decision plus automated policy validation.
+Ordinary PII requires an approved purpose and masking/tokenization or managed-key HMAC pseudonymization where correlation is needed. Input-derived fields are CR/LF-safe; exception/provider text is untrusted until sanitized. Metric labels remain low-cardinality and exclude business/security IDs, trace IDs, raw URLs, and free-form errors.
 
-## 17. Security telemetry and privileged access
+Static Semgrep rules, pipeline redaction, synthetic canary sink tests, and runtime leak detection provide defense in depth.
 
-Logging is allow-list based. Raw passwords/OTP/recovery codes/tokens/cookies/keys/secrets/payment/bank/high-risk identity data/full sensitive payloads/SQL binds/complete gRPC metadata/Kafka headers/provider payloads are never logged.
+Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, least privilege, and recorded/audited sessions. Standing admin/root/database-superuser/shared credentials are prohibited.
 
-Ordinary PII appears only for an approved purpose with masking/tokenization or managed-key HMAC pseudonymization when correlation is required. Input-derived fields are protected against CR/LF/log-injection. Exception/cause/provider text is treated as untrusted until explicitly sanitized.
+## 14. Verification
 
-Metric labels are bounded and do not contain raw or pseudonymous user/tenant/session/request/resource identifiers, trace IDs, raw URLs, or free-form errors.
-
-Source Semgrep rules, structured-field allow-lists, telemetry-pipeline redaction, seeded canary tests through the real sink, and runtime leak detection provide defense in depth. Raw canary/sensitive values are never copied into detector alerts.
-
-Human production access has no standing admin/root/DB-superuser credential. Privileged access is JIT through Teleport Enterprise Self-Hosted with SSO, phishing-resistant MFA, approvals, short TTL, least privilege, and recorded/audited sessions. Workload identity remains Istio/ServiceAccount based.
-
-Security changes require applicable positive and negative tests including tenant crossing, Authorization deny/outage/overload, workload identity, CSRF/CORS/OIDC replay, quota time failure, secret/PII logging canaries, edge bypass, volumetric controls, privileged-access expiry, secret leakage, and unsigned-artifact admission denial.
+Security-impacting changes run applicable cross-tenant/RLS negatives, authentication/OIDC/MFA/session tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
