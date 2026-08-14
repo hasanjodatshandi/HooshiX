@@ -1,6 +1,6 @@
 # Technology Baseline
 
-- **Baseline date:** 2026-08-13
+- **Baseline date:** 2026-08-14
 - **Status:** Active production/application baseline
 - **Update policy:** Reviewed compatible patch/minor updates may use the baseline process when permitted by the current architecture decision; architecture/security-semantic changes require a new or revised current ADR before implementation depends on them.
 - **Local companion:** `docs/technology/local-development-baseline.md`
@@ -22,6 +22,7 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Build | Gradle Wrapper 9.6.1 + Kotlin DSL | wrapper per independently deployable service |
 | DI | Spring IoC + constructor injection | sole DI container |
 | Password hashing | Argon2id: m=19 MiB, t=2, p=1; 16-byte random salt; >=32-byte hash | versioned/self-describing storage; benchmark and bounded hash bulkhead required |
+| Compromised-password reference dataset | Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 | ADR-0040; immutable read-only local dataset only; no runtime external provider; service locks verify exact artifact/native components; upgrade when a compatible reviewed Xerial release bundles SQLite 3.53.4+ or a later required security fix |
 | Access-token signing | RS256 / RSA-3072 / 90-day key rotation | ADR-0023; Identity private key local from OpenBao, public verifier bundle via GitOps |
 | Internal synchronous API | gRPC + Protobuf | current architecture choice |
 | gRPC Java | 1.81.0 | dependency locks align runtime/stubs/codegen |
@@ -29,14 +30,14 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0015 durability applies |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
-| Database | PostgreSQL 18.4 | ADR-0019/ADR-0027 |
+| Database | PostgreSQL 18.4 | ADR-0019/ADR-0027 for mutable service relational persistence; ADR-0040 is the explicit immutable SQLite reference-dataset exception |
 | PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0019/ADR-0034 |
 | PostgreSQL backup | Barman Cloud CNPG-I plugin 0.13.0 | current CloudNativePG backup model |
 | Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 baseline |
 | PostgreSQL JDBC | 42.7.13 | fixed line for CVE-2026-54291; dependency locks must not regress below 42.7.12 |
-| Migration | Flyway 12.4.0 | sole schema-change mechanism |
-| Pool | HikariCP managed/aligned with Spring Boot | connection budget governed by architecture |
-| Persistence | Spring Data JPA/Hibernate or jOOQ by service responsibility | separate Domain/persistence models |
+| Migration | Flyway 12.4.0 | sole schema-change mechanism for mutable service relational persistence; ADR-0040 immutable dataset format is built offline, not runtime-migrated |
+| Pool | HikariCP managed/aligned with Spring Boot | connection budget governed by architecture; SQLite read concurrency is service-owned/bounded under ADR-0040 rather than a shared PostgreSQL pool |
+| Persistence | Spring Data JPA/Hibernate or jOOQ by service responsibility | separate Domain/persistence models; ADR-0040 SQLite adapter remains Infrastructure-only |
 | Notification persistence | jOOQ/JDBC, no JPA | fixed service decision |
 | Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2 | Sentinel topology; service-isolated ACL/keyspaces |
 | Resilience | Resilience4j | current semantic circuit-breaker/bulkhead policy; no layered duplicate retry |
@@ -98,7 +99,7 @@ ADR-0022 is authoritative. External etcd is not a v1 requirement.
 ### PostgreSQL
 
 ```text
-per persistent production microservice:
+per persistent production microservice using mutable relational business state:
   CloudNativePG 1.30.0
   PostgreSQL 18.4
   dedicated database/runtime+migration roles/Flyway history
@@ -110,7 +111,7 @@ per persistent production microservice:
   continuous WAL archive + daily base backup
 ```
 
-ADR-0027 defines service database/physical isolation and forced tenant RLS; ADR-0019/ADR-0034/ADR-0037 define HA, fleet, restore, and upgrade operations. Runtime tenant roles are non-owner `NOSUPERUSER NOBYPASSRLS`.
+ADR-0027 defines service database/physical isolation and forced tenant RLS; ADR-0019/ADR-0034/ADR-0037 define HA, fleet, restore, and upgrade operations. Runtime tenant roles are non-owner `NOSUPERUSER NOBYPASSRLS`. ADR-0040 is the only current exception for Compromised Password Service's immutable, read-only, rebuildable SQLite reference-data artifact and does not authorize mutable SQLite business persistence.
 
 ### Kafka
 
@@ -146,6 +147,7 @@ noeviction
 - Calico NetworkPolicy standard dataplane;
 - service-owned semantic quotas under ADR-0024;
 - one online fail-closed no-cache/no-retry `CheckPermission`;
+- compromised-password screening uses the self-contained read-only SQLite reference dataset from ADR-0040 and has no runtime external compromised-password provider;
 - IPPanel Webservice exact-content Iran SMS;
 - Teleport JIT privileged access;
 - PII-safe structured telemetry with static/pipeline/canary/runtime controls.
@@ -164,4 +166,5 @@ Detailed support relationships live in `production-compatibility-matrix.md`. Any
 - platform upgrades use staging/canary/rollback evidence;
 - an exact architecture pin changes only through a new/revised current ADR;
 - safe patch/minor changes inside an approved family may use Technology Baseline + GitOps review only when the current decision permits it and compatibility/security evidence passes;
+- the Xerial SQLite JDBC pin remains under continuous Java-artifact + embedded-native-engine advisory correlation; a compatible reviewed driver bundling SQLite 3.53.4+ is the current upgrade target because upstream SQLite is newer than the embedded 3.53.2 engine;
 - unsupported/EOL versions are not eligible merely because an older baseline once named them.

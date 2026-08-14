@@ -6,6 +6,7 @@
 - **Identity v1 implementation contract finalized:** 2026-08-14
 - **Authorization v1 implementation contract finalized:** 2026-08-14
 - **Web BFF v1 implementation contract finalized:** 2026-08-14
+- **Compromised Password v1 implementation contract finalized:** 2026-08-14
 
 This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
 
@@ -20,6 +21,12 @@ This register contains only ADRs that still carry effective scope. Obsolete pred
 | [ADR-0028](0028-define-data-subject-erasure-execution-and-evidence-v1.md) | Self-erasure authentication shutdown with Membership/last-owner exit precondition and pending-invitation/session revocation, plus cross-service irreversible erasure execution/evidence, server-owned participant registry, async outbox/Kafka coordination, legal-hold ledger/authorization, logical-deletion/retention baseline |
 
 Core global-user/tenant-membership, logical deletion/legal hold, credential, and package rules are represented directly in current-state architecture/coding documents rather than predecessor ADRs.
+
+## Compromised Password
+
+| ADR | Current scope |
+| --- | --- |
+| [ADR-0040](0040-define-self-contained-compromised-password-sqlite-v1.md) | Self-contained internal compromised-password lookup; existing SHA-256 20-bit-prefix privacy contract; immutable read-only embedded SQLite reference dataset; offline dataset compiler/versioning; no runtime external provider, PostgreSQL, Redis, Kafka, or subject-linked state; bounded fail-closed lookup/runtime/deployment/security evidence |
 
 ## Notification
 
@@ -70,6 +77,8 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0027](0027-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Complete current service database/cluster/role/Flyway/cross-service-SQL isolation + forced tenant RLS + pool-safe transaction-local tenant context + backup isolation |
 | [ADR-0034](0034-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable dedicated CloudNativePG fleet operations |
 | [ADR-0037](0037-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Restore evidence and DB upgrade/rollback safety |
+
+The immutable read-only SQLite dataset in Compromised Password Service is the explicit ADR-0040 reference-data exception and is not mutable business/service relational persistence covered by the PostgreSQL fleet rules.
 
 ## Platform/GitOps/runtime compatibility
 

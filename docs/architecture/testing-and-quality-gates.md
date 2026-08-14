@@ -9,11 +9,12 @@ Each service uses applicable layers:
 - Domain unit tests;
 - Application use-case tests with fake ports, no Spring;
 - ArchUnit architecture tests;
-- PostgreSQL/Flyway integration tests with Testcontainers;
+- PostgreSQL/Flyway integration tests with Testcontainers when mutable PostgreSQL persistence is used;
+- SQLite adapter/dataset compiler integration tests when ADR-0040 is used;
 - Kafka/Redis integration tests where used;
 - gRPC/REST/OpenAPI/Protobuf contract compatibility tests;
-- Outbox/Inbox/idempotency/duplicate/restart/replay/DLQ tests;
-- authorization/tenant/RLS/workload-identity/security tests;
+- Outbox/Inbox/idempotency/duplicate/restart/replay/DLQ tests where those semantics exist;
+- authorization/tenant/RLS/workload-identity/security tests where applicable;
 - timeout/cancellation/retry/bulkhead/concurrency tests;
 - logging/PII/log-injection/Semgrep/canary-sink tests;
 - load/failover/chaos/recovery tests for critical paths;
@@ -21,13 +22,13 @@ Each service uses applicable layers:
 - frontend unit/component/accessibility tests;
 - Playwright critical browser journeys.
 
-Do not create meaningless test categories for unused technology.
+Do not create meaningless test categories for unused technology. ADR-0040's immutable SQLite reference artifact does not make PostgreSQL/Flyway/Kafka/Redis tests applicable to Compromised Password unless future scope actually introduces those technologies.
 
 ## 2. Unit and integration rules
 
 Domain/Application unit tests instantiate code directly and do not start Spring or depend on network/database state.
 
-Integration tests use real infrastructure where behavior under test depends on it. Testcontainers is preferred for PostgreSQL/Kafka/Redis adapters. Verify transaction boundaries, Flyway, concurrency/locking, outbox/inbox, retry/error mapping, and security constraints rather than only happy-path CRUD.
+Integration tests use real infrastructure where behavior under test depends on it. Testcontainers is preferred for PostgreSQL/Kafka/Redis adapters. Embedded SQLite tests use the exact approved Xerial/SQLite dependency and deterministic generated fixture databases. Verify transaction/read-only boundaries, query bounds, path/configuration safety, concurrency, error mapping, and security constraints rather than only happy-path lookup.
 
 Tests are deterministic and parallel-safe where intended. Fixed sleeps and shared mutable global fixtures are prohibited as synchronization mechanisms.
 
@@ -44,11 +45,15 @@ Field-number reuse is prohibited. Generated code remains derived from canonical 
 
 OpenAPI and other externally consumed contracts use compatibility diff/contract checks. No runtime Schema Registry exists in v1.
 
+Compromised Password contract tests prove exact five-uppercase-hex request, exact 59-uppercase-hex suffix/non-negative count response, deterministic ordering/bounds and stable sanitized errors without exposing SQLite/JDBC/native/file details.
+
 ## 4. BDD and Playwright
 
 BDD/Gherkin describes critical business behavior understandable by Product/QA/Engineering; it does not encode selectors, SQL, method names, or every CRUD edge case. Cucumber-JVM runs on JUnit Platform. Step definitions stay thin.
 
 Playwright Test + TypeScript is primary browser E2E tool. Use semantic locators, web-first assertions, auto-waiting, isolated data, and parallel-safe tests. Fragile CSS/XPath and fixed `waitForTimeout` synchronization are prohibited when semantic alternatives exist. Retries never redefine flakiness as passing; flaky tests have owner and remediation deadline.
+
+Compromised Password's internal SQLite implementation is not a reason to create browser-level storage tests. Critical user-facing password create/change/reset acceptance may prove compromised-password rejection, while storage/security details stay at service/integration layers.
 
 ## 5. Java executable quality gates
 
@@ -63,6 +68,8 @@ Every Java service is covered by `../engineering/build-and-ci-quality-enforcemen
 - GitHub Actions required checks.
 
 `ignoreFailures`, broad analyzer exclusions, disabled mandatory tests, or required-check removal to obtain green CI are prohibited.
+
+Compromised Password build verification includes the exact Xerial artifact/native engine in dependency locks, SBOM/advisory correlation and architecture tests keeping SQLite/JDBC types/SQL out of Domain/Application.
 
 ## 6. CI dependency graph
 
@@ -81,6 +88,8 @@ compile/unit + formatting/architecture/static checks
 -> promote the same immutable digest
 -> production-safe smoke/synthetic checks
 ```
+
+For ADR-0040, offline dataset compiler validation produces immutable dataset artifact identity/integrity evidence before service release. Production serving does not rebuild/download/mutate the dataset. Application image + dataset format/version compatibility is verified before promotion; exact deployment artifact identity remains reviewed GitOps/release state.
 
 Production rebuild after staging validation is prohibited.
 
@@ -102,6 +111,8 @@ Current continuous policy from ADR-0035/ADR-0038:
 - transitive dependency accountability follows deployed artifact owner;
 - scanners do not unauditedly kill running pods and never authorize unsigned/unprovenanced images.
 
+For Compromised Password, SBOM/advisory evaluation covers both `org.xerial:sqlite-jdbc` and the bundled native SQLite engine. Dataset-source provenance/license/use-right review is separate from software-vulnerability scanning and is required before external source material is admitted by the offline compiler.
+
 ## 8. Kubernetes, mesh, and deployment gates
 
 Affected release candidates run applicable:
@@ -117,6 +128,8 @@ Affected release candidates run applicable:
 - Kyverno CEL HTTP-context disabled-by-default checks and, when approved external lookup exists, bounded destination/timeout/response/failure tests plus loopback/link-local/cloud-metadata/unreviewed-private/arbitrary-caller-target SSRF negatives and NetworkPolicy-constrained egress.
 
 For Web BFF specifically, rendered policy tests prove only the public edge can reach BFF and BFF egress is restricted to Identity, Authorization management, registered resource services, BFF/security Redis, configured Google OIDC endpoints and approved telemetry. Arbitrary Internet/URL egress and wrong workloads are denied.
+
+For Compromised Password, rendered policy tests prove only Identity can reach application gRPC, application Internet/provider egress is absent, the SQLite dataset path is read-only, any Xerial native-extraction writable temp mount is separate/bounded/non-dataset, and wrong workloads cannot access the service.
 
 ## 9. Production resilience/security evidence
 
@@ -145,9 +158,31 @@ Prove complete Authorization contract, not only hot-path happy case:
 - erased User tenant/platform authority removal while tenant-owned Role definitions remain;
 - fair overload shedding, current breaker opening/recovery, paired burn alerts, p95<=100ms/p99<=200ms, >=3 replicas/PDB/spread, Hikari p99<25ms, >=2x peak capacity, one replica/node loss, PostgreSQL failover, and absence of duplicate routine BFF resource permission checks.
 
-### Dependency registry — ADR-0033/0036
+### Dependency registry — ADR-0033/0036/0040
 
-Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, current policy-reference anchors including Authorization platform/lifecycle and Web BFF session/quota/Google/evidence/audience-token/Authorization-management/resource-dispatch edges, one retry owner, no implicit fallback, and composite-edge semantics.
+Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, current policy-reference anchors including Compromised Password, Authorization platform/lifecycle and Web BFF session/quota/Google/evidence/audience-token/Authorization-management/resource-dispatch edges, one retry owner, no implicit fallback, and composite-edge semantics.
+
+### Compromised Password — ADR-0040
+
+Prove the complete self-contained contract:
+
+- Identity NFC/UTF-8/SHA-256 behavior and only first 20 bits/five uppercase hex leave Identity;
+- exact `LookupCompromisedPasswordRange` request validation, 59-uppercase-hex suffix/count response, deterministic ordering and local full-digest exact comparison in Identity;
+- raw password/full hash/User/Tenant/Contact/session data absent from service requests, storage and telemetry;
+- SQLite schema/metadata/version rules; `WITHOUT ROWID` `(prefix,hash)` index path; prefix recomputation/dedup/count-overflow validation;
+- offline dataset compiler deterministic build, source provenance/license/integrity, no plaintext source material in runtime artifact/Git/logs;
+- <=2048 rows per prefix and <=128KiB response compatibility across every prefix; build fails on violation and runtime never truncates;
+- exact Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 baseline until reviewed upgrade; dependency verification, Java25/Linux native compatibility, final-image SBOM/advisory correlation;
+- runtime only server-owned JDBC/database/native configuration; SQLite read-only/query-only; fixed parameterized query; no INSERT/UPDATE/DELETE/DDL/ATTACH/DETACH/arbitrary PRAGMA/extension loading;
+- no full-corpus JVM cache/Bloom authority, Redis/PostgreSQL copy, Kafka path, HIBP/external provider call or arbitrary Internet egress;
+- Identity-only workload authorization, ClusterIP/Ambient strict mTLS/NetworkPolicy negatives;
+- missing/incompatible/corrupt/open/read/storage-saturation/deadline/overload failure maps to fail-closed unchecked-password rejection and never clean result;
+- 900ms caller ceiling, one attempt, no retry/fallback; bounded read connections/in-flight/queue;
+- multi-million-row warm/cold disk-backed load at >=2x projected credential-write peak meets availability>=99.95%, p95<=250ms, p99<=750ms before production;
+- >=3 replicas/PDB2/spread use identical approved dataset version; replica/node loss does not create stale/corrupt fallback;
+- read-only root/dataset path and separate bounded native-extraction temp mount behavior under hardened container;
+- immutable dataset rebuild/redeploy DR and readiness block until compatible dataset identity/schema/integrity passes;
+- no data-subject erasure participant because no subject-linked state; test proves no such state is introduced.
 
 ### Notification — ADR-0006/0007/0014/0018/0020
 
@@ -155,7 +190,7 @@ Prove local key-ring rotation/refresh/corruption/erasure with no hot-path OpenBa
 
 ### PostgreSQL — ADR-0019/0027/0034/0037
 
-Prove per-service physical/database/credential/backup isolation, forced RLS/runtime-role restrictions, transaction-local parameterized tenant context with fail-closed missing/malformed behavior, pooled-connection reuse across different tenants after commit/rollback with no context leakage, synchronous required durability, pool budgets, planned/unplanned failover, WAL/PITR, monthly restore evidence, quarterly DR, failed-drill promotion freeze, one-cluster upgrade waves, and no unsafe downgrade.
+Prove per-service physical/database/credential/backup isolation for mutable relational business state, forced RLS/runtime-role restrictions, transaction-local parameterized tenant context with fail-closed missing/malformed behavior, pooled-connection reuse across different tenants after commit/rollback with no context leakage, synchronous required durability, pool budgets, planned/unplanned failover, WAL/PITR, monthly restore evidence, quarterly DR, failed-drill promotion freeze, one-cluster upgrade waves, and no unsafe downgrade. ADR-0040's immutable SQLite reference artifact does not reduce these requirements where PostgreSQL mutable state exists.
 
 ### Kafka — ADR-0015
 
@@ -196,11 +231,13 @@ Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, BFF ke
 
 ### Java 25 Virtual Threads
 
-Use JFR/load/soak evidence for native/FFM pinning, contention, and scarce dependency saturation. `synchronized` itself is not blanket prohibited.
+Use JFR/load/soak evidence for native/FFM pinning, contention, and scarce dependency saturation. `synchronized` itself is not blanket prohibited. Compromised Password additionally measures bounded SQLite/native/JDBC I/O concurrency; Virtual Threads never justify unbounded SQLite connections/queue.
 
 ## 10. Smoke tests
 
-After deployment, verify applicable startup/readiness/health, database/Kafka/Redis connectivity, one critical REST/gRPC flow, isolated event publish/consume, authentication/authorization, timeout/error behavior, and critical Playwright flows. Event smoke uses isolated test tenants/topics/markers and does not create uncontrolled customer data.
+After deployment, verify applicable startup/readiness/health, database/Kafka/Redis/SQLite-reference connectivity as applicable, one critical REST/gRPC flow, isolated event publish/consume when used, authentication/authorization, timeout/error behavior, and critical Playwright flows. Event smoke uses isolated test tenants/topics/markers and does not create uncontrolled customer data.
+
+Compromised Password smoke uses a deterministic non-sensitive fixture/approved dataset marker contract; it verifies one known compromised match, one not-listed result, corrupt/missing-dataset fail-closed behavior in staging where safe, Identity-only caller policy and absence of external provider egress. It never requires plaintext production source data.
 
 Smoke failure stops rollout; rollback is used only when safe for current schema/data state.
 
@@ -212,10 +249,10 @@ A capability is complete only when applicable:
 - current coding/SQL/frontend standards are satisfied by actual source;
 - required formatter/static/architecture/dependency/CI checks pass;
 - contracts are versioned/compatible;
-- Flyway/rollout/rollback and query/index/pool effects are reviewed;
+- Flyway/rollout/rollback and query/index/pool effects are reviewed for mutable relational persistence; ADR-0040 instead reviews immutable dataset compiler/format/read-only/query/rebuild compatibility;
 - transaction boundaries contain no remote I/O;
 - deadlines/retry owner/cancellation/idempotency/concurrency are explicit;
-- state+event uses Outbox and consumers are idempotent;
+- state+event uses Outbox and consumers are idempotent where applicable;
 - DLQ/replay exists where needed;
 - metrics/logs/traces/alerts are present and PII-safe;
 - workload identity/mesh/network policies are correct;

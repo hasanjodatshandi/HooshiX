@@ -1,6 +1,6 @@
 # Local Development Baseline
 
-- **Baseline date:** 2026-08-13
+- **Baseline date:** 2026-08-14
 - **Status:** Active local-development baseline
 - **Scope:** Developer workstation, WSL2/Linux toolchain, local container tooling,
   and the production-fidelity kind foundation used for platform integration tests.
@@ -154,9 +154,12 @@ production.
 | Internal synchronous transport | gRPC + Protobuf | Required |
 | Event transport | Apache Kafka | Required where the bounded context uses async integration |
 | Event/API schema governance | Protobuf in Git + Buf | Required; runtime Schema Registry absent in v1 |
-| Primary database | PostgreSQL | Required for service relational persistence |
-| Database migration | Flyway | Required |
-| Cache/security state | Redis with service-specific ownership/ACL/keyspace | When applicable |
+| Primary mutable relational database | PostgreSQL | Required for mutable service relational persistence; ADR-0040 immutable Compromised Password reference dataset is the narrow exception |
+| Database migration | Flyway | Required for mutable service relational persistence; ADR-0040 dataset is built offline as a new immutable artifact rather than runtime-migrated |
+| Compromised-password local reference dataset | Xerial SQLite JDBC 3.53.2.1 / SQLite 3.53.2 | Pinned to production ADR-0040 baseline; read-only embedded dataset, no runtime external provider |
+| Cache/security state | Redis with service-specific ownership/ACL/keyspace | When applicable; not used for ADR-0040 compromised-password dataset |
+
+Compromised Password local testing uses the same immutable SQLite format and query contract as production. Small deterministic fixtures may be generated for unit/integration work, but production data/source material is never required for the normal developer inner loop. A fixture or local dataset substitute cannot weaken read-only/path/query/security behavior in staging or production.
 
 Inner-loop tests MAY use Testcontainers and approved local fakes rather than the
 full local Kubernetes foundation. A local substitute is never a production
@@ -198,6 +201,8 @@ infrastructure/waf/pins.env
 infrastructure/waf/
 ```
 
+Service-local application dependencies such as Xerial SQLite JDBC are pinned through the independently deployable service build, dependency lock, and verification metadata rather than shared infrastructure pin files.
+
 Image digests, chart checksums, and downloaded/vendored artifacts are verified
 before cluster mutation. Remote mutable URLs are not trusted as the deployment
 source after an artifact has been admitted into the repository baseline.
@@ -231,6 +236,8 @@ installed Traefik release/image digests
 installed WAF image/rule-set digests
 ```
 
+Service-specific verification additionally proves the Compromised Password Xerial artifact/embedded SQLite version and read-only fixture compatibility when that service is implemented.
+
 Until this check exists and passes, local installed-version compliance is
 `NOT VERIFIED` even when this document contains desired pins.
 
@@ -243,5 +250,6 @@ Until this check exists and passes, local installed-version compliance is
 - A local tool update must not silently update production versions.
 - Security-sensitive tool updates require changelog/security review before pin
   changes.
+- Xerial SQLite JDBC local tests use the exact approved service dependency line unless a dedicated compatibility test intentionally exercises an upgrade candidate.
 - No agent may infer an unlisted patch version.
 - Host-local convenience never weakens CI, staging, or production gates.

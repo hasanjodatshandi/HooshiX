@@ -26,6 +26,7 @@ algorithm/query/model
 | P1 | Virtual Threads vs scarce downstreams | Hikari budgets, adapter bulkheads, bounded queues/deadlines | pool/provider/Redis saturation while JVM thread creation looks healthy; tighten bulkheads/capacity rather than add threads |
 | P1 | Password hashing CPU/memory | Argon2id approved profile, semantic quotas, bounded hash bulkhead | hash queue/saturation affects Class-A SLO; add CPU/replicas/tune bulkhead, never silently weaken password hash |
 | P1 | IPPanel delivery-evidence polling | bounded polling/backpressure/QPS, 12h observation, no blind resend | provider throttling, poll backlog, receipt-lag breach; tune batching/concurrency before new webhook/provider design |
+| P2 | Compromised Password SQLite disk-backed lookup | immutable read-only `WITHOUT ROWID` primary key `(prefix,hash)`; 20-bit indexed prefix; <=2048 rows/prefix; <=128KiB response; no full-dataset JVM cache; 900ms Identity ceiling/one attempt/no fallback; representative multi-million-row warm+cold storage tests | Class-B p95/p99 breach, storage I/O saturation, query/queue pressure after schema/index/storage/concurrency tuning; scale replicas/storage first, and do not add Redis/PostgreSQL/external provider/probabilistic shortcut without measured evidence + revised current decision |
 | P2 | Liara/IPPanel single-provider availability | durable acceptance separated from delivery; explicit ambiguity/reconciliation | sustained provider SLI/business impact justifies a secondary provider and deterministic routing/idempotency decision |
 | P2 | OpenBao single-node control plane | request hot paths use validated local material; hourly encrypted snapshots; tested Shamir restore | refresh/recovery threatens RTO/SLO or compliance; evaluate 3-node Raft/auto-unseal through current architecture review |
 | P2 | Kyverno/registry admission path | >=3 admission replicas before fail-close, audit rollout, CI preflight | admission availability/latency blocks releases; scale dependencies, never disable signing as first fix |
@@ -65,33 +66,59 @@ Measure BFF separately by route class: auth/OIDC, session/bootstrap, Identity on
 
 HPA 3..12 remains disabled until load evidence shows safe scaling signals and downstream capacity. Replica scaling that simply multiplies Redis/downstream pressure is not a performance fix.
 
-## 3. Production PostgreSQL trades fleet cost for isolation
+## 3. Compromised Password stays disk-backed and bounded
 
-Every persistent production microservice owns its own CloudNativePG cluster. This deliberately reduces application-credential, superuser, backup, noisy-neighbor, and recovery blast radius while increasing pod/storage/WAL/backup/upgrade operational cost.
+Compromised Password is called only for password create/change/reset screening, not every normal login. Identity computes the full SHA-256 locally and sends only the five-hex/20-bit prefix. The service performs one fixed indexed SQLite read from its immutable reference artifact and returns the bounded suffix/count range; Identity owns exact comparison.
+
+The current design intentionally does **not** load the corpus into JVM heap, maintain an application hash cache/Bloom authority, use Redis/PostgreSQL as a second copy, or call an external provider at runtime.
+
+Performance evidence measures:
+
+- dataset cardinality and file size;
+- maximum/percentile rows per 20-bit prefix;
+- SQLite lookup latency under warm and deliberately cold OS page-cache/storage conditions;
+- storage read IOPS/latency and filesystem saturation;
+- JDBC/native extraction startup behavior separately from request lookup;
+- bounded connection/in-flight/queue saturation;
+- gRPC serialization/response size;
+- >=3 replica behavior and node/storage contention;
+- multi-million-row datasets at >=2x projected credential-write peak.
+
+The hard build-time `<=2048` rows/prefix plus `<=128 KiB` response compatibility bound prevents a single prefix from creating unbounded work. Runtime never truncates because missing a suffix could create a false clean result.
+
+Class-B objective is availability >=99.95%, p95<=250ms and p99<=750ms; Identity's parent deadline remains <=900ms. If measured latency burns this objective, investigate SQLite schema/index/query plan, disk class/filesystem, native/JDBC configuration, bounded concurrency and replica capacity before changing storage architecture. A new cache/database/provider requires measured evidence and architecture/security review.
+
+## 4. Production PostgreSQL trades fleet cost for isolation
+
+Every service with mutable relational business persistence owns its own CloudNativePG cluster. This deliberately reduces application-credential, superuser, backup, noisy-neighbor, and recovery blast radius while increasing pod/storage/WAL/backup/upgrade operational cost.
 
 Fleet automation, common policy/observability, independent backup trust, per-service capacity budgets, restore evidence, and one-cluster upgrade waves are intended mitigation. Physical consolidation is not a default performance optimization.
 
 Required synchronous durability adds commit latency intentionally. Measure commit p95/p99 on real storage/network topology; do not disable required durability merely to improve latency.
 
-## 4. Security Redis splits before it clusters
+ADR-0040's immutable rebuildable SQLite reference artifact is not mutable PostgreSQL business state and does not weaken this rule.
+
+## 5. Security Redis splits before it clusters
 
 Sentinel topology preserves simple atomic quota/session semantics. If BFF sessions and security quotas materially interfere, split them into independent Sentinel deployments before adding Redis Cluster complexity that may complicate multi-key atomic policy.
 
 For Web BFF specifically, measure session cardinality, User->sessions index cardinality, five-minute last-seen coalescing hit rate, pre-auth churn, OIDC quota operations, memory headroom, failover latency and eviction count. `noeviction` and security fail-closed behavior are not relaxed to recover throughput.
 
-## 5. Kafka stays off synchronous request paths
+Compromised Password does not use Redis as a dataset cache/index in v1.
+
+## 6. Kafka stays off synchronous request paths
 
 Kafka is durable async transport. RF3/acks=all costs disk/network but remains outside ordinary synchronous request/reply. Avoid partition-per-tenant/cardinality explosion; partition/key changes require measured throughput/order evidence.
 
 Critical replayable publication + consumer dedup evidence covers the 35-day recovery horizon.
 
-## 6. WAF latency is measured, never bypassed
+## 7. WAF latency is measured, never bypassed
 
 Measure Coraza/CRS incremental latency, CPU, body inspection, and false-positive rate in DetectionOnly/staging before blocking. Scale replicas and apply narrow route-specific body/rule policy before architecture changes. Direct Traefik -> BFF application routing remains prohibited.
 
 BFF body/header limits remain independent defense in depth; increasing WAF body limits never silently increases application limits.
 
-## 7. Notification current design removed bespoke hot-path complexity
+## 8. Notification current design removed bespoke hot-path complexity
 
 Current Notification avoids two prior classes of overhead:
 
@@ -100,7 +127,7 @@ Current Notification avoids two prior classes of overhead:
 
 Do not reintroduce these mechanisms without measured evidence and a current architecture decision.
 
-## 8. Developer velocity remains lighter than production verification
+## 9. Developer velocity remains lighter than production verification
 
 ```text
 local:        unit + focused architecture/application tests
@@ -112,7 +139,7 @@ scheduled:    heavy load/chaos/PITR/DR/certificate/provider exercises
 
 A heavy test may leave every-PR cadence only if a faster deterministic gate protects the regression class and the heavy test remains mandatory at appropriate release/scheduled cadence.
 
-## 9. Evidence required before adding complexity
+## 10. Evidence required before adding complexity
 
 Before adding cache, broker/proxy, service, second provider, extra control plane, pool/concurrency increase, physical data split/merge, or retry layer, record:
 

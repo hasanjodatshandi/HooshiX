@@ -26,10 +26,13 @@ Use versioned ASVS identifiers (`v5.0.0-...`) in test/evidence systems so future
 | SEC-016 | Recovery/security continuity: backups, restore, key/credential rotation, revoked/erased data reconciliation | scheduled restore/rotation exercises |
 | SEC-017 | Production human access: JIT least privilege, phishing-resistant MFA, approvals, short TTL, session/audit evidence | access-plane policy + session evidence |
 | SEC-018 | External providers/webhooks/files: bounded parsing, signature/auth verification, SSRF destination control, ambiguity/replay handling; Web BFF arbitrary Internet egress prohibited except configured Google OIDC endpoints | provider/webhook/file security + egress/SSRF tests |
+| SEC-019 | Compromised Password privacy/reference-data boundary: only 20-bit SHA-256 prefix leaves Identity; exact full digest remains local; SQLite dataset path/config is server-owned, immutable/read-only/query-only, no write/DDL/ATTACH/extension loading, no external provider/Internet lookup, no subject identity, no full-dataset JVM cache, bounded prefix/result, fail closed on corruption/unavailability, Xerial+bundled SQLite advisory coverage | Identity/service contract tests + malformed/path/URI/SQL/write/extension negatives + workload/egress policy tests + dataset compiler/integrity/bound tests + log/hash leak negatives + dependency/SBOM/native advisory evidence |
 
 ## Security-gate rule
 
 A production-impacting change is not security-verified merely because this matrix is present. Every applicable row requires concrete automated or reviewed evidence tied to the PR/release artifact. A row marked not applicable requires a written scope reason; Critical/High findings and expired exceptions follow ADR-0035/ADR-0038.
+
+ADR-0040's SQLite decision is a narrow immutable reference-data exception. It does not weaken PostgreSQL/RLS/Flyway controls for mutable relational business state.
 
 ## Maintenance
 

@@ -4,7 +4,7 @@ This document is the implementation-facing current data/messaging model. Detaile
 
 ## 1. Data ownership and isolation
 
-Every independently deployable microservice with relational persistence owns:
+Every independently deployable microservice with **mutable relational business persistence** owns:
 
 - one distinct PostgreSQL database;
 - independent runtime/migration credentials and Flyway history;
@@ -22,16 +22,35 @@ Prohibited in every environment:
 
 Cross-bounded-context data moves only through approved versioned synchronous contracts or integration events.
 
+### Immutable local reference-data exception — ADR-0040
+
+Compromised Password Service uses one narrowly approved embedded SQLite database as an **immutable, read-only, rebuildable reference-data artifact**. It is not mutable service business persistence or cross-service integration storage.
+
+The exception is limited to the compromised-password dataset and has these properties:
+
+- SQLite file is service-local and caller-inaccessible;
+- production runtime performs read-only fixed parameterized lookup only;
+- no runtime INSERT/UPDATE/DELETE/DDL, `ATTACH`, arbitrary PRAGMA, extension loading, or caller-selected database path/URI;
+- dataset is built offline and released as a new immutable version rather than mutated/migrated in place;
+- no PostgreSQL/CloudNativePG/Flyway/WAL/PITR is required for this rebuildable artifact;
+- no another service may read the SQLite file directly;
+- raw password, full Identity SHA-256 digest, User/Tenant/Contact/session identity, and mutable subject-owned state are absent;
+- future mutable business/source-of-truth state in this or another service does not inherit this exception and requires the normal persistence architecture.
+
+Exact schema/query/runtime bounds are in `services/compromised-password-service.md` and ADR-0040. Recovery redeploys/reconstructs the approved immutable artifact and validates it before readiness.
+
 ### Tenant isolation
 
-Every tenant-owned production table uses forced PostgreSQL RLS plus application/repository tenant enforcement. Trusted tenant context comes only from validated authenticated context and is installed with transaction-local semantics; session-scoped tenant state on pooled connections is prohibited. The canonical SQL/Flyway standard requires a parameterized transaction-local setting such as `set_config(..., true)`, fail-closed absent/malformed context, and pooled-connection reuse tests across commit/rollback. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot connect/access another service database.
+Every tenant-owned production PostgreSQL table uses forced PostgreSQL RLS plus application/repository tenant enforcement. Trusted tenant context comes only from validated authenticated context and is installed with transaction-local semantics; session-scoped tenant state on pooled connections is prohibited. The canonical SQL/Flyway standard requires a parameterized transaction-local setting such as `set_config(..., true)`, fail-closed absent/malformed context, and pooled-connection reuse tests across commit/rollback. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot connect/access another service database.
+
+The ADR-0040 SQLite reference dataset is global security reference data, not tenant-owned data, and contains no tenant identifier; PostgreSQL RLS does not apply to it.
 
 ## 2. Production PostgreSQL topology
 
-Current production line:
+Current production line for services with mutable relational business persistence:
 
 ```text
-per persistent service:
+per persistent mutable-state service:
   CloudNativePG 1.30.x
   PostgreSQL 18.x
   dedicated cluster/database/roles/backups
@@ -47,9 +66,11 @@ Application pools use the service cluster primary/read-write endpoint for transa
 
 Aggregate application Hikari maxima across a service's HPA maximum stay <=70% of that cluster's `max_connections`; >=30% remains for replication/failover, migrations, monitoring, administration, and emergencies. PgBouncer is not a default and requires measured connection-pressure evidence.
 
-## 3. Flyway, schema evolution, JPA, and jOOQ
+ADR-0040 Compromised Password SQLite lookup uses service-owned bounded read concurrency rather than Hikari/PostgreSQL connection budgets.
 
-Flyway is the only schema-change mechanism. Released/executed migrations are immutable. Evolution follows:
+## 3. Flyway, schema evolution, JPA, jOOQ, and SQLite reference artifact
+
+Flyway is the only schema-change mechanism for mutable service relational persistence. Released/executed migrations are immutable. Evolution follows:
 
 ```text
 expand -> compatible deploy -> bounded/resumable migrate/backfill -> verify -> contract
@@ -61,7 +82,9 @@ JPA/Hibernate is appropriate for aggregate persistence and bounded CRUD when it 
 
 jOOQ/JDBC is appropriate for complex read/query models, bulk/set-based work, CTE/window/PostgreSQL-specific SQL, and measured performance-sensitive queries. Generated types remain Infrastructure-only. Notification persistence is jOOQ/JDBC without JPA.
 
-Canonical SQL/query/migration details live in `../engineering/sql-and-flyway-coding-standards.md`.
+ADR-0040 SQLite does not use runtime Flyway migrations. Its schema is part of the offline immutable dataset format, versioned and validated before publication. SQLite/JDBC types and SQL stay Infrastructure-only and never enter Domain/Application.
+
+Canonical PostgreSQL SQL/query/migration details live in `../engineering/sql-and-flyway-coding-standards.md`; the ADR-0040 exception is governed by its service document and ADR and does not redefine PostgreSQL standards.
 
 ## 4. Query and transaction rules
 
@@ -77,7 +100,9 @@ Canonical SQL/query/migration details live in `../engineering/sql-and-flyway-cod
 
 Virtual Threads do not create database capacity; pool pending/acquisition and query/transaction latency are observable.
 
-## 5. PostgreSQL backup, restore, and DR
+Compromised Password runtime uses one fixed indexed SQLite read by exact 20-bit prefix. It has no runtime write transaction, no full-table scan on the normal path, no dynamic SQL, and no full-dataset application-memory cache. Prefix cardinality and response size are hard-bounded by dataset build validation. Runtime failure never truncates a result into a false clean-password decision.
+
+## 5. PostgreSQL backup, restore, DR, and rebuildable reference data
 
 Current service-cluster baseline:
 
@@ -94,6 +119,8 @@ Current service-cluster baseline:
 - queryable restore evidence under ADR-0037.
 
 Restored environments MUST reconcile data integrity plus current logical-deletion/erasure/legal-hold requirements before traffic opens.
+
+The ADR-0040 SQLite dataset is not restored through PostgreSQL backup/PITR. It is rebuildable reference data and is recovered from the approved immutable dataset release artifact or deterministic approved import evidence. A pod remains unready until compatible dataset identity/schema/integrity requirements pass. This exception is not permission to skip backup/recovery for mutable application state.
 
 ## 6. Kafka platform and contracts
 
@@ -113,6 +140,8 @@ Kafka native TLS/authentication/per-service principals/ACLs/quotas remain mandat
 
 Protobuf schemas are Git-owned and validated with Buf `STANDARD` lint + `FILE` breaking compatibility. Field numbers are never reused. No runtime Schema Registry exists in v1.
 
+Compromised Password v1 uses no Kafka path; its dataset release is an immutable artifact, not an event stream.
+
 ## 7. Transactional Outbox and publication evidence
 
 When local state change + integration-event publication are one business effect, state and Outbox record commit in the same local transaction. Direct save-then-Kafka-send as an atomicity substitute is prohibited.
@@ -120,6 +149,8 @@ When local state change + integration-event publication are one business effect,
 Default relay is polling + `SKIP LOCKED`; CDC/Debezium requires measured need and a reviewed current decision.
 
 For critical `OUTBOX_REPLAYABLE` events, published outbox/equivalent immutable publication evidence is retained for **at least 35 days**, aligned with PITR/recovery. It preserves stable event identity and an approved replay payload or deterministic reconstruction reference. Privacy/erasure/legal-hold rules still apply and secrets are never retained merely for replay.
+
+ADR-0040 runtime has no mutable state+event business effect and therefore no Outbox requirement in v1.
 
 ## 8. Consumer semantics
 
@@ -154,6 +185,10 @@ Redis is not a shared business cache or durable business source of truth. Raw PI
 
 Any business cache remains service-owned, defines correct miss/TTL/stampede/failure behavior, bounds object/key cardinality, and never fabricates authorization or business truth. Distributed locks require proven need plus fencing; a Redis lock alone does not establish correctness.
 
+Compromised Password v1 deliberately does not use Redis as a copy/cache/index of its dataset. Storage/query complexity is not added without measured evidence.
+
 ## 10. Verification
 
 Applicable evidence includes database privilege isolation, forced-RLS negatives including pooled-connection tenant-context reuse, Flyway rolling compatibility, query-bound/index/plan tests, pool budgets, transaction/no-remote-I/O tests, PostgreSQL failover/restore/PITR, Kafka durability/rebuild/replay, Outbox/Inbox duplicate/restart tests, Protobuf compatibility, Redis Sentinel/quota failure tests, and PII/secret-safe persistence/telemetry.
+
+ADR-0040 evidence additionally covers offline SQLite dataset compiler determinism/integrity/bounds, exact indexed prefix lookup, read-only/query-only runtime, no write/DDL/ATTACH/extension loading, server-owned path/URI configuration, Java/native dependency security, no external provider/Internet lookup, representative multi-million-row disk-backed latency/load, replica dataset identity, and rebuild/redeploy recovery.

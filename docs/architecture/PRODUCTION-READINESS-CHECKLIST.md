@@ -90,7 +90,7 @@ Status until verified: **protected-operation and Authorization-management/platfo
 
 ## 4. PostgreSQL isolation/HA/recovery — ADR-0019/0027/0034/0037
 
-Required evidence per persistent service:
+Required evidence per service with mutable relational business persistence:
 
 - dedicated production CloudNativePG cluster/database/runtime+migration roles/Flyway history/backup identity;
 - 3 instances for critical clusters across independent schedulable failure domains where possible;
@@ -111,9 +111,45 @@ Required evidence per persistent service:
 - upgrade waves stop on staging/production failure; reversible state only rolls back when supported; irreversible/major changes never use unsafe downgrade;
 - Notification acknowledged `DISPATCHING` survives every permitted automatic failover with no blind redispatch.
 
+ADR-0040's immutable read-only rebuildable SQLite reference dataset is not mutable business persistence and is covered by §5 instead; it does not weaken this gate for any mutable PostgreSQL service state.
+
 Status until verified: **platform/data production blocker**.
 
-## 5. Kafka durability/rebuildable DR — ADR-0015
+## 5. Compromised Password Service — ADR-0040
+
+Required evidence:
+
+- independent Java 25/Spring Boot service build, Gradle Wrapper, dependency verification, Spotless/SpotBugs/ArchUnit/Semgrep and Protobuf/Buf contract tasks exist and pass;
+- exact internal operation is `LookupCompromisedPasswordRange`; request is exactly five uppercase SHA-256 prefix hex characters, response suffix exactly 59 uppercase hex characters plus non-negative occurrence count, deterministic order and stable redacted errors;
+- Identity NFC-normalizes/UTF-8 encodes/computes SHA-256 locally, sends only first 20 bits, performs exact full-digest match locally, and treats exact count>0 match as compromised;
+- raw password/full SHA-256 digest/User/Tenant/Membership/Contact/Session/provider identity never enters Compromised Password request, storage, log, trace or metric;
+- the SQLite artifact is immutable/read-only/rebuildable reference data, not mutable business state; no PostgreSQL/CloudNativePG/Flyway/Redis/Kafka runtime dataset path exists;
+- exact Technology Baseline Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 is locked/verified until a reviewed compatible upgrade; final image/SBOM/advisory correlation includes Java artifact and bundled native engine;
+- production dataset path/JDBC URI/native-library path/query text/PRAGMA/ATTACH target are server-owned and not caller-controlled;
+- runtime opens the approved SQLite file read-only/query-only; INSERT/UPDATE/DELETE/DDL, `ATTACH`/`DETACH`, arbitrary PRAGMA and extension loading are impossible by production configuration/source tests;
+- runtime SQL is fixed/parameterized and normal lookup uses indexed `(prefix,hash)` access without full-table scan or dynamic SQL;
+- offline compiler validates exact schema/metadata/version, SHA-256 length, prefix equals first 20 hash bits, deterministic deduplication/count aggregation with checked overflow, positive counts and database integrity;
+- every dataset prefix has <=2048 records and serializes within <=128KiB response contract; compiler fails publication on violation and runtime never truncates a prefix response;
+- source provenance, integrity, license/use rights are reviewed; plaintext source material, when an approved import uses it, never enters runtime artifact/source control/logs/telemetry;
+- no full-dataset JVM heap index/cache/Bloom authority exists; OS/SQLite bounded I/O page cache is not application authority;
+- no HIBP/Pwned Passwords/external compromised-password provider or arbitrary application Internet egress exists at runtime;
+- only approved Identity ServiceAccount can call application gRPC; wrong workload/public ingress is denied by NetworkPolicy/Istio/Ambient strict-mTLS policy;
+- Identity dependency contract is <=900ms overall, one attempt, wait-for-ready off, no automatic retry/cache/fallback; cancellation/concurrency/read connections/queue are bounded;
+- missing/incompatible/corrupt dataset, SQLite open/read error, malformed/oversized result, storage I/O saturation, deadline or healthy overload maps to stable unavailable/overloaded outcome and Identity rejects unchecked password; no failure becomes `not compromised`;
+- runtime does not truncate on deadline/size failure and does not fabricate empty success;
+- >=3 replicas, PDB minAvailable=2 and topology spread use identical approved dataset version; one replica/worker loss preserves fail-closed service behavior;
+- root filesystem and dataset path are read-only; if Xerial native extraction needs writable temp space it is a separate bounded ephemeral mount containing no dataset/password/source/subject state;
+- readiness requires approved local dataset path, read-only open/query, compatible schema/metadata/version/artifact identity/integrity and security config; liveness is local process/runtime only;
+- HPA remains disabled until representative disk/query load proves a safe signal/capacity envelope;
+- representative **multi-million-row** warm/cold storage tests at >=2x projected credential-write peak meet availability>=99.95%, p95<=250ms, p99<=750ms and show bounded storage/I/O/concurrency/response behavior;
+- logging/metrics exclude prefix/suffix/full hash/returned rows/subject IDs/caller metadata/unreviewed SQLite/JDBC/native exception text; only low-cardinality outcome/latency/saturation/dataset health is emitted;
+- Compromised Password is not a data-subject erasure participant because no subject-linked state exists; negative tests prove this remains true;
+- cold-DR/recovery rebuilds/redeploys the approved immutable dataset artifact and keeps pods unready until compatibility/integrity passes; no stale/corrupt/provider fallback is used;
+- `dependency-criticality.yaml` and generated Markdown contain the exact Identity->Compromised Password authoritative-security edge and ADR/service policy references.
+
+Status until verified: **password create/change/reset production blocker; unrelated authentication flows may proceed independently when their own gates pass**.
+
+## 6. Kafka durability/rebuildable DR — ADR-0015
 
 Required evidence:
 
@@ -128,7 +164,7 @@ Required evidence:
 
 Status until verified: **critical async-flow blocker**.
 
-## 6. Browser/BFF security — ADR-0016
+## 7. Browser/BFF security — ADR-0016
 
 Required evidence:
 
@@ -170,7 +206,7 @@ Required evidence:
 
 Status until verified: **public-internet/Web-BFF production blocker**.
 
-## 7. Supply chain + vulnerability response — ADR-0017/0035/0038
+## 8. Supply chain + vulnerability response — ADR-0017/0035/0038
 
 Required evidence:
 
@@ -188,11 +224,12 @@ Required evidence:
 - known-exploited/Critical production findings page Security + owner with <=24h mitigation target; High <=48h;
 - expired exceptions stop promotion immediately and escalate production exposure;
 - transitive findings route to deployed-artifact owner; shared base/runtime findings route to Platform + consumers;
-- stale required feed/scanner state fails promotion closed.
+- stale required feed/scanner state fails promotion closed;
+- final-image native components such as the Xerial-bundled SQLite engine are included in SBOM/advisory correlation and not treated as invisible Java-only dependency content.
 
 Status until verified: **production deployment-security blocker**.
 
-## 8. Notification runtime — ADR-0006/0007/0014/0018/0020
+## 9. Notification runtime — ADR-0006/0007/0014/0018/0020
 
 Required evidence:
 
@@ -211,7 +248,7 @@ Required evidence:
 
 Status until verified: **Notification production blocker**.
 
-## 9. OpenBao recovery — ADR-0011
+## 10. OpenBao recovery — ADR-0011
 
 Required evidence:
 
@@ -225,7 +262,7 @@ Required evidence:
 
 Status until verified: **secret-platform blocker**.
 
-## 10. WAF + upstream DDoS — ADR-0001/0029
+## 11. WAF + upstream DDoS — ADR-0001/0029
 
 Required evidence:
 
@@ -240,7 +277,7 @@ Required evidence:
 
 Status until verified: **public-internet blocker**.
 
-## 11. Iran SMS / SMS MFA — ADR-0020/0012
+## 12. Iran SMS / SMS MFA — ADR-0020/0012
 
 Required evidence:
 
@@ -258,7 +295,7 @@ Required evidence:
 
 Status until verified: **SMS-dependent feature blocker; unrelated Email-only capabilities may proceed independently**.
 
-## 12. Platform compatibility / CNI / immutable artifacts — ADR-0021
+## 13. Platform compatibility / CNI / immutable artifacts — ADR-0021/0040
 
 Required evidence:
 
@@ -266,6 +303,7 @@ Required evidence:
 - Technology Baseline + compatibility matrix revalidated against upstream support/security at release time;
 - Kubernetes/Istio Ambient/Calico positive/negative flows including HBONE/health;
 - CloudNativePG/cert-manager/Kyverno/Traefik/Gateway API/WAF render/compatibility checks;
+- Xerial SQLite JDBC/embedded SQLite Java25/Linux native compatibility and current security/advisory relationship when Compromised Password is affected;
 - `istioctl analyze`, Helm/Kustomize/Kubernetes policy checks;
 - staging/production desired state renders without secret values;
 - rollback artifacts/digests remain available;
@@ -273,7 +311,7 @@ Required evidence:
 
 Status until verified: **platform release blocker**.
 
-## 13. JWT signing-key lifecycle — ADR-0023
+## 14. JWT signing-key lifecycle — ADR-0023
 
 Required evidence:
 
@@ -290,7 +328,7 @@ Required evidence:
 
 Status until verified: **authentication-trust blocker**.
 
-## 14. Java/source/build/CI — ADR-0039
+## 15. Java/source/build/CI — ADR-0039
 
 For each Java service:
 
@@ -305,7 +343,7 @@ For each Java service:
 
 Status until verified: **Java implementation/release blocker**.
 
-## 15. Frontend/source/browser quality
+## 16. Frontend/source/browser quality
 
 For affected frontend releases:
 
@@ -319,7 +357,7 @@ For affected frontend releases:
 
 Status until verified: **frontend release blocker when applicable**.
 
-## 16. Identity Service repository-complete evidence — ADR-0009/0012/0023/0028
+## 17. Identity Service repository-complete evidence — ADR-0009/0012/0023/0028/0040
 
 Required repository/build evidence includes:
 
@@ -342,7 +380,7 @@ Required repository/build evidence includes:
 - refresh 32-byte generation/HMAC persistence, 7d idle/30d absolute, rotation/reuse, max 20 active families and deterministic oldest revocation;
 - logout-current/logout-all/password-change/reset/suspension/deleting/ExternalIdentity-unlink/MFA-state-change revocation rules;
 - password change recent-auth/MFA assurance, primary-Contact-only non-enumerating password recovery, no reset-created first local Credential, active-MFA reset requirement, no automated password+MFA-loss bypass, no password history;
-- compromised-password NFC/UTF-8/SHA-256 local digest, only first 20 bits outbound, bounded suffix/count response, raw password/full digest non-egress, 900ms/one-attempt/no-retry/fail-closed behavior;
+- compromised-password NFC/UTF-8/SHA-256 local digest, only first 20 bits/five uppercase hex outbound, bounded suffix/count response, raw password/full digest non-egress, 900ms/one-attempt/no-retry/fail-closed behavior, exact local full-hash match, and no external-provider fallback;
 - BFF-only Google provider validation; exact 256-bit/two-minute/ten-minute evidence semantics; `email_verified=false` no-Contact; verified-email signup collision `ACCOUNT_LINK_REQUIRED`; suggestion-only names; no email auto-link/provider token in Identity;
 - active TOTP after both password and Google primary proof; ExternalIdentity link/unlink recent-auth and last-authentication-method protection;
 - TOTP pre-auth 5m/five-failed-proof/single-use, new-primary-proof invalidation, timestep replay rejection, recovery-code atomic use; MFA-state-change session revocation; no SMS downgrade of active TOTP;
@@ -350,15 +388,15 @@ Required repository/build evidence includes:
 - self-erasure recent-auth + active MFA + no ACTIVE/SUSPENDED Membership for non-DELETED Tenant; last-owner-safe exit; pending-invitation + all-family revocation; server-owned participants; Kafka/outbox/inbox replay/non-PII receipts/legal hold; no self-service undo; restore-before-traffic;
 - Authorization erasure receipt/evidence proves subject-linked tenant authorization and platform capability assignments are removed without deleting tenant-owned Role policy;
 - purpose/version HMAC idempotency replay/conflict, 35d critical publication/Inbox-dedup evidence, >=14d retry/DLQ evidence when used, >=365d security audit evidence;
-- dependency registry includes semantic quota, compromised-password, Notification, owner/member provisioning, Membership removal prepare/resolution, tenant lifecycle, platform permission check, and Web BFF OIDC/audience-token ownership with valid current policy refs;
+- dependency registry includes semantic quota, exact ADR-0040 compromised-password lookup, Notification, owner/member provisioning, Membership removal prepare/resolution, tenant lifecycle, platform permission check, and Web BFF OIDC/audience-token ownership with valid current policy refs;
 - Identity Docker/Helm/GitOps/ServiceAccount/NetworkPolicy/Istio/probe/replica/PDB/topology/security-context/render checks and CI gates.
 
-Repository-complete does **not** equal production-ready. Registry/DNS/secret paths/provider credentials/Redis/CNPG/backup/alert destinations may remain typed environment placeholders, but actual staging/production provider, secret, cluster, load, failover, restore, and DR evidence remains `NOT VERIFIED` until executed.
+Repository-complete does **not** equal production-ready. Registry/DNS/secret paths/provider credentials/Redis/CNPG/backup/alert destinations may remain typed environment placeholders, but actual staging/production provider, secret, cluster, Compromised Password dataset/service, load, failover, restore, and DR evidence remains `NOT VERIFIED` until executed.
 
 Status until verified: **Identity repository implementation/evidence blocker; external production evidence remains independently blocking**.
 
-## 17. Final release evidence
+## 18. Final release evidence
 
-The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/WAF/provider capacity, node/replica/database failover, security-negative/workload-identity, backup/PITR/restore, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
+The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/SQLite/WAF/provider capacity, node/replica/database/reference-artifact failure, security-negative/workload-identity, backup/PITR/restore/rebuild, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
 
 Until actual service source/build/workflows/manifests and these checks exist/pass, implementation evidence remains **NOT VERIFIED**.

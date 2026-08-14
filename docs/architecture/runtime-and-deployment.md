@@ -98,15 +98,17 @@ Exact signed immutable image digest validated in staging is promoted to producti
 
 ## 6. Production PostgreSQL fleet
 
-ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define current model.
+ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define current model for mutable relational service business state.
 
-Every persistent production microservice owns dedicated CloudNativePG 1.30.x cluster, PostgreSQL database, runtime/migration roles, Flyway history, storage/capacity budget, WAL/PITR backup identity/namespace, and restore evidence. Critical services use three PostgreSQL instances.
+Every production microservice with mutable relational business persistence owns dedicated CloudNativePG 1.30.x cluster, PostgreSQL database, runtime/migration roles, Flyway history, storage/capacity budget, WAL/PITR backup identity/namespace, and restore evidence. Critical services use three PostgreSQL instances.
 
 Clusters use quorum synchronous required durability. Automatic failover is permitted only when acknowledged commits can be preserved; unsafe promotion fails availability rather than acknowledged data.
 
 Aggregate application Hikari maxima across production pods stay <=70% of cluster `max_connections`, preserving >=30% for replication/failover, migration, monitoring, administration, and emergency work. PgBouncer is evidence-driven, not default.
 
 Fleet management uses one reusable GitOps baseline with bounded per-service overlays, common bounded alerts, independent backup trust boundaries, monthly service-specific restore evidence, and one-cluster-at-a-time upgrade waves. A failed wave stops remaining rollout. Production physical consolidation requires reviewed current architecture change.
+
+ADR-0040 Compromised Password's immutable rebuildable SQLite reference dataset is not mutable PostgreSQL business state and is outside this fleet. It does not weaken the fleet rule for any mutable service state.
 
 ### Backup/PITR
 
@@ -123,7 +125,46 @@ Fleet management uses one reusable GitOps baseline with bounded per-service over
 
 A failed restore freezes ordinary affected-service promotion until replacement evidence passes.
 
-## 7. Kafka
+## 7. Compromised Password runtime and immutable SQLite dataset
+
+ADR-0040 and `services/compromised-password-service.md` define the self-contained internal runtime:
+
+```text
+base package:      com.sajtech.compromisedpassword
+namespace:         platform-apps
+Deployment:        compromised-password-service
+Service:           compromised-password-service
+ServiceAccount:    compromised-password-service
+application gRPC:  9090
+management:        separate configured port
+replicas:          >=3
+PDB minAvailable:  2
+HPA:               evidence-gated only
+```
+
+Only the approved `identity-service` workload may reach application gRPC. The service is ClusterIP-only and Ambient-enrolled under strict mTLS. NetworkPolicy + Istio authorization deny every other application caller.
+
+The production compromised-password dataset is a service-local immutable, read-only, rebuildable SQLite artifact. Runtime properties:
+
+- Xerial/SQLite version is exact Technology Baseline pin and final-image SBOM/advisory input;
+- dataset path/JDBC URI is server-owned and cannot be selected by request data;
+- dataset is opened read-only/query-only;
+- runtime INSERT/UPDATE/DELETE/DDL, `ATTACH`/`DETACH`, arbitrary PRAGMA and extension loading are prohibited;
+- full dataset is not loaded into JVM heap, application hash map, Bloom authority or Redis/PostgreSQL cache;
+- normal lookup is the fixed indexed 20-bit prefix query from ADR-0040;
+- no HIBP/external compromised-password provider/Internet lookup egress exists;
+- replicas use the same approved dataset version and immutable artifact identity;
+- missing/incompatible/corrupt dataset keeps unsafe service unready/fail closed.
+
+The normal root filesystem remains read-only. The dataset mount/path is read-only. If the Xerial native library requires runtime extraction, use only a separate bounded writable ephemeral mount (for example `emptyDir`) dedicated to native extraction/temp use. It contains no password/dataset/source/subject state and is constrained by security context/resource limits. A writable dataset path, `hostPath`, privileged container or arbitrary native-library path is prohibited.
+
+Liveness proves local process/runtime progress. Readiness validates bounded local prerequisites: expected dataset path, read-only open/query capability, supported metadata/schema/version, deployment artifact identity/integrity evidence and security configuration. It does not perform unbounded full-corpus verification on every probe; full integrity/compiler verification belongs to artifact build/release.
+
+Autoscaling is enabled only after representative multi-million-row warm/cold disk-backed load proves a safe signal, bounded SQLite read concurrency/queue and storage capacity. Replica scaling must not hide slow/corrupt storage or change exact-match security semantics.
+
+DR/recovery redeploys/reconstructs the approved immutable dataset artifact and validates it before readiness. SQLite WAL/PITR/runtime migration is not used for this read-only artifact.
+
+## 8. Kafka
 
 Production critical Kafka uses ADR-0015:
 
@@ -137,7 +178,9 @@ unclean leader election disabled
 
 Native TLS/authentication/ACL/quotas remain mandatory. Kafka is rebuildable transport, not business truth. Cold DR rebuilds configuration from GitOps and replays/reconstructs service-owned evidence. Critical publication/dedup evidence covers 35-day recovery horizon.
 
-## 8. Security Redis
+Compromised Password v1 has no Kafka runtime path.
+
+## 9. Security Redis
 
 Approved shared physical `security-redis` is restricted to security-ephemeral capabilities such as semantic quotas and BFF session/pre-auth state:
 
@@ -151,7 +194,9 @@ Raw PII/business/session/pre-auth identifiers are not used as Redis keys where p
 
 Redis session/quota state is not cold-DR business truth. After state loss users reauthenticate; browser cookies never reconstruct authenticated server state.
 
-## 9. Public edge
+Compromised Password v1 does not use Redis as a dataset store/cache/index.
+
+## 10. Public edge
 
 Production path:
 
@@ -172,7 +217,7 @@ WAF uses approved Caddy/Coraza/CRS family, PL1, >=7 representative DetectionOnly
 
 Upstream volumetric mitigation is mandatory; WAF is L7 inspection and is not bandwidth-saturation protection.
 
-## 10. Web BFF runtime and egress
+## 11. Web BFF runtime and egress
 
 ADR-0016 and `services/web-bff.md` define exact browser runtime defaults:
 
@@ -208,7 +253,7 @@ Arbitrary Internet/URL egress is prohibited. Google endpoints are explicit provi
 
 The browser public namespace is `/api/v1`; current subspaces are `/api/v1/auth`, `/api/v1/identity`, and `/api/v1/authorization`. Public body/header bounds and same-origin/CSP/cache behavior are application contracts from ADR-0016 and are tested independently of edge/WAF limits.
 
-## 11. OpenBao and External Secrets
+## 12. OpenBao and External Secrets
 
 OpenBao 2.6.1 is exact current secret-authority pin under ADR-0011. v1 uses one Raft instance/PVC, manual Shamir 3 shares/threshold 2, hourly encrypted off-PVC snapshots, and tested restore/unseal.
 
@@ -218,11 +263,13 @@ External Secrets uses Kubernetes Auth and namespace-scoped stores where practica
 
 BFF retained-refresh encryption key ring is a dedicated purpose-separated mounted secret. Normal rotation is 90d; old decrypt keys remain through dependent-session lifetime/rekey plus 7d. Reload is atomic. Last fully validated snapshot may bridge secret-source outage <=1h; after that refresh-crypto-dependent operations fail closed. This does not authorize per-request OpenBao RPC or plaintext refresh persistence.
 
-## 12. Browser security
+Compromised Password v1 does not need a secret/provider credential for dataset lookup. Dataset provenance/integrity is supply-chain evidence, not secret material.
+
+## 13. Browser security
 
 Browser production follows ADR-0016: same-origin-only v1; OIDC Authorization Code + PKCE S256; exact state/nonce/verifier/pre-auth rules; exact return redirects; server-side HMAC-located transaction/session state; secure `__Host-` cookies; server-owned downstream-audience brokerage; Origin + synchronizer-token CSRF + mandatory `Sec-Fetch-Site:same-origin` for unsafe production browser requests; exact CSP/security headers; auth/OIDC/session/admin `no-store`; bounded request/error profiles.
 
-## 13. Supply-chain admission and continuous vulnerability response
+## 14. Supply-chain admission and continuous vulnerability response
 
 Release images are immutable, signed, carry signed provenance and CycloneDX SBOM evidence, and are indexed by deployed digest. Production admission verifies approved registry/digest/signature/provenance/required attestations through HA Kyverno before fail-closed enforcement.
 
@@ -230,11 +277,13 @@ Admission-policy write access is restricted to tightly controlled GitOps/CI iden
 
 Vulnerability inventory is continuously rescanned/correlated with approved threat/advisory inputs. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates production exposure. No scanner/feed proves absence of unknown vulnerabilities and no scan result authorizes unsigned artifact.
 
-## 14. Human production access
+For Compromised Password, final-image SBOM/advisory correlation includes both the Xerial Java artifact and its bundled native SQLite engine. Driver/native/dataset-format upgrades require compatibility evidence before rollout.
+
+## 15. Human production access
 
 Teleport Enterprise Self-Hosted is privileged human access plane. No standing production admin/root/database-superuser credentials are permitted. Kubernetes/database/host access uses SSO, phishing-resistant MFA, JIT approval, short-lived roles, audit/session evidence, and automatic expiry. Privileged write elevation requires two reviewers and <=30-minute access.
 
-## 15. Deployment validation
+## 16. Deployment validation
 
 Applicable pre-promotion evidence includes:
 
@@ -245,7 +294,8 @@ Applicable pre-promotion evidence includes:
 - rendered-secret and manifest-diff checks;
 - immutable digest/signature/provenance/SBOM verification;
 - Kyverno policy-authoring RBAC and policy-engine egress/SSRF positive/negative tests when applicable;
-- PostgreSQL/CloudNativePG backup/restore/upgrade-policy checks;
+- PostgreSQL/CloudNativePG backup/restore/upgrade-policy checks for mutable relational state;
+- Compromised Password dataset compiler/integrity/schema/bounds/read-only/path/no-write/no-external-egress/Xerial-native/load/rebuild checks when affected;
 - Kafka durability/replay checks;
 - Gateway/Traefik/WAF route and blocking tests;
 - `istioctl analyze`, Ambient/STRICT mTLS/ServiceAccount/NetworkPolicy/authorization positive and negative tests;

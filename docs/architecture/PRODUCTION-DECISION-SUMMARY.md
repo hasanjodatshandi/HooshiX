@@ -12,6 +12,7 @@ This document summarizes effective production architecture only. Current Decisio
 - Java services use Java 25, Spring MVC + Virtual Threads, constructor injection, independent Gradle builds, and executable quality gates in `../engineering/coding-standards.md` and `../engineering/build-and-ci-quality-enforcement.md`.
 - Public/browser traffic terminates through Web BFF; ordinary internal synchronous communication is gRPC; asynchronous integration uses Kafka where a durable event boundary is appropriate.
 - Every service owns its contracts, data, deployment, and release lifecycle. Cross-service database access and shared business/persistence models are prohibited.
+- Mutable relational business persistence uses service-owned PostgreSQL/Flyway/CloudNativePG. ADR-0040 is the explicit narrow exception for Compromised Password Service's immutable, read-only, rebuildable SQLite reference dataset and does not authorize mutable SQLite business persistence.
 
 ## Identity and Web BFF/browser security
 
@@ -37,6 +38,20 @@ This document summarizes effective production architecture only. Current Decisio
 - BFF runtime is `platform-apps/web-bff`, HTTP8080, separate management port, >=3 replicas/PDB2, HPA 3..12 only after load evidence, hardened pod security, and deny-by-default egress only to Identity, Authorization management, registered resource services, BFF/security Redis, configured Google OIDC and approved telemetry.
 - Identity JWT signing uses local RSA-3072/RS256 key material with stable `kid`, planned rotation, exact audience, five-minute access lifetime and local GitOps verifier bundles.
 - Platform-admin Identity operations do not trust platform-role claim from browser/JWT; Identity uses Authorization's separate fail-closed `CheckPlatformPermission` for exact platform tenant/legal-hold permission.
+
+## Compromised Password
+
+- Compromised Password Service is an independent internal security reference-data bounded context and is called only for password create/change/reset screening.
+- Identity NFC-normalizes the password, UTF-8 encodes it, computes SHA-256 locally, and sends only the first 20 bits/five uppercase hexadecimal characters. Raw password and full digest never leave Identity.
+- The service exposes only bounded `LookupCompromisedPasswordRange`, returns deterministic remaining SHA-256 suffix/count candidates, and Identity performs the exact full-digest comparison and final compromised/not-compromised decision.
+- v1 has no HIBP/Pwned Passwords or other runtime external compromised-password provider/API, no arbitrary Internet lookup egress, and no User/Tenant/Contact/session state.
+- Dataset storage is embedded SQLite through the pinned Xerial JDBC driver. The SQLite file is immutable, read-only, rebuildable reference data produced offline as a complete versioned artifact; production runtime does not mutate/migrate it.
+- Runtime fixed query uses the indexed 20-bit prefix. Dataset build enforces <=2048 rows per prefix and <=128KiB response compatibility; runtime never truncates a result because that could create a false clean-password result.
+- Full dataset is not loaded into JVM heap or application cache/Bloom authority. Redis/PostgreSQL/Kafka are not dataset stores/caches in v1.
+- Identity dependency remains <=900ms overall, one attempt, no retry/cache/fallback; missing/corrupt/incompatible/overloaded SQLite lookup fails closed and rejects an unchecked password.
+- Production runtime is `platform-apps/compromised-password-service`, gRPC9090 plus separate management port, >=3 replicas/PDB2/spread, Identity-only ingress, Ambient strict mTLS, deny-by-default NetworkPolicy and no compromised-password provider egress.
+- Xerial Java artifact and bundled native SQLite engine are part of final-image SBOM/advisory/compatibility evidence. The current exact pin and upgrade trigger are in Technology Baseline.
+- The service is not a data-subject erasure participant in v1 because the runtime dataset has no subject linkage. Recovery redeploys/rebuilds the approved immutable artifact and blocks readiness until compatibility/integrity is valid.
 
 ## Authorization
 
@@ -75,11 +90,13 @@ This document summarizes effective production architecture only. Current Decisio
 
 ## PostgreSQL and data isolation
 
-- Every persistent production microservice owns distinct PostgreSQL database, runtime/migration credentials, Flyway history, and dedicated CloudNativePG cluster.
-- Critical clusters use current three-instance synchronous durability/failover baseline, independent backup credentials/encryption context, continuous WAL archive, daily base backup, and tested PITR/restore.
+- Every production microservice with mutable relational business persistence owns distinct PostgreSQL database, runtime/migration credentials, Flyway history, and dedicated CloudNativePG cluster.
+- ADR-0040 Compromised Password SQLite is an immutable read-only rebuildable reference artifact, not mutable relational business persistence; it is the explicit narrow exception and cannot be reused for mutable service state.
+- Critical PostgreSQL clusters use current three-instance synchronous durability/failover baseline, independent backup credentials/encryption context, continuous WAL archive, daily base backup, and tested PITR/restore.
 - Tenant-owned production tables use forced RLS. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot cross service/database boundaries.
 - Tenant database context comes only from validated authenticated context and is parameterized/transaction-local; session-scoped tenant state on pooled connections is prohibited, missing/malformed context fails closed, and cross-tenant pooled-connection reuse after commit/rollback is mandatory negative test.
-- Flyway is only schema-change mechanism. Executed migrations are immutable; evolution uses expand -> migrate -> contract. Application rollback must remain compatible with expanded schema.
+- Flyway is only schema-change mechanism for mutable relational service persistence. Executed migrations are immutable; evolution uses expand -> migrate -> contract. Application rollback must remain compatible with expanded schema.
+- ADR-0040 SQLite schema/version changes are built offline as a new complete immutable dataset artifact and never use runtime migration/in-place DDL.
 - Fleet operations use one reviewed GitOps baseline, one-cluster-at-a-time upgrade waves, monthly isolated restore evidence, and quarterly DR exercises.
 
 ## Kafka and contracts
@@ -109,12 +126,14 @@ This document summarizes effective production architecture only. Current Decisio
 - Admission-policy authoring is restricted to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested according to ADR-0017.
 - Exact signed image digest validated in staging is promoted to production; production rebuild is prohibited.
 - Vulnerability response continuously correlates deployed digests/SBOMs with approved advisory/threat-intelligence inputs, enforces expiring exceptions, and applies production remediation/escalation policy. No feed/scanner is treated as proof of zero unknown vulnerabilities.
+- Bundled native dependencies such as SQLite in Xerial JDBC remain part of final-image SBOM/advisory ownership and cannot be omitted because the Java artifact wraps them.
 - Human privileged production access uses Teleport JIT SSO/WebAuthn, short-lived elevation, approvals, least privilege, and audited/recorded sessions.
 
 ## Logging and observability
 
 - Services emit structured JSON stdout and OpenTelemetry/Micrometer metrics/traces with bounded low-cardinality attributes.
 - Logging is allow-list based. Secrets, credentials, tokens/cookies, session/pre-auth IDs, OTPs, sensitive payloads, SQL binds, complete metadata/headers, and unreviewed PII are prohibited from raw telemetry.
+- Compromised Password telemetry additionally excludes SHA-256 prefix/suffix/full hash, returned dataset rows and subject/caller identifiers.
 - Ordinary non-audit telemetry may use bounded buffering/drop; required security/audit evidence classified as authoritative state must durably persist/outbox and cannot silently disappear with exporter/backend failure.
 - Source rules, pipeline redaction, synthetic canary tests, and runtime detection provide defense in depth.
 - SLOs/error budgets use burn-rate policy rather than isolated percentile paging.
@@ -126,10 +145,11 @@ This document summarizes effective production architecture only. Current Decisio
 3. per-service PostgreSQL HA fleet capacity/restore/upgrade overhead;
 4. security Redis latency/failover;
 5. password-hashing CPU/memory under attack/load;
-6. WAF inspection on every public request;
-7. Kafka disk/partition/consumer capacity when async flows grow;
-8. Liara/IPPanel availability and IPPanel polling limits;
-9. worker-node capacity and replica placement during node loss.
+6. Compromised Password SQLite disk-backed prefix lookup/storage I/O under multi-million-row datasets;
+7. WAF inspection on every public request;
+8. Kafka disk/partition/consumer capacity when async flows grow;
+9. Liara/IPPanel availability and IPPanel polling limits;
+10. worker-node capacity and replica placement during node loss.
 
 Detailed metrics/scale triggers live in `performance-and-bottlenecks.md`.
 

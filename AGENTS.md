@@ -63,9 +63,11 @@ Infrastructure -> Application -> Domain
 Interfaces     -> Application -> Domain
 ```
 
-Business logic belongs in Domain/Application. Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, or concrete adapters.
+Business logic belongs in Domain/Application. Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, SQLite, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, or concrete adapters.
 
-Each independently deployable relational service owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Every persistent production microservice also owns a dedicated CloudNativePG cluster under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited.
+Each independently deployable service with **mutable relational business persistence** owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Every production microservice with mutable relational business persistence also owns a dedicated CloudNativePG cluster under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited.
+
+A current ADR may define a narrower immutable reference-data artifact that is not mutable service business persistence. ADR-0040 is the current example: Compromised Password Service may use only its service-local immutable, read-only, rebuildable SQLite reference dataset. That exception has no runtime SQLite writes/Flyway/CloudNativePG requirement, cannot store subject/business state, and MUST NOT be generalized to mutable SQLite persistence or another service without a new current architecture decision.
 
 Tenant isolation uses trusted authenticated context plus persistence defense in depth. Production tenant-owned PostgreSQL tables use forced RLS and non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles. Tenant database context comes only from validated authenticated context and uses the canonical parameterized transaction-local mechanism; session-scoped tenant state on pooled connections is prohibited and missing/malformed context fails closed.
 
@@ -91,7 +93,7 @@ When package/module/layering rules change, update ArchUnit/architecture tests in
 
 Review aggregate/transaction boundaries, JPA/jOOQ/Flyway/Hikari behavior, locking, query bounds/plans, backups/PITR, and rollback compatibility.
 
-Mandatory rules:
+Mandatory rules for mutable service relational persistence:
 
 - Flyway is the only schema-change mechanism; executed/released migrations are immutable;
 - evolution follows expand -> migrate -> contract;
@@ -103,6 +105,8 @@ Mandatory rules:
 - retries execute outside failed transactions;
 - persistence models follow aggregate/query needs; one-table/one-model mapping is not mandatory;
 - sensitive/expensive queries require index and representative-plan evidence.
+
+ADR-0040's SQLite reference artifact is built offline as a complete immutable version and has no runtime schema migration or write transaction. Its fixed read query, path/configuration, integrity, bounds, native dependency, recovery, and no-write/DDL/ATTACH/extension rules remain mandatory and do not weaken the mutable-persistence rules above.
 
 ## 7. Synchronous dependencies
 
