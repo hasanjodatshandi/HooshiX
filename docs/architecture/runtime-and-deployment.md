@@ -96,6 +96,8 @@ Argo CD reconciles reviewed desired state with automated sync/self-heal/prune, `
 
 Exact signed immutable image digest validated in staging is promoted to production. Rebuild between staging and production is prohibited. Rollback is reviewed Git state only when application/schema/data compatibility is safe; otherwise use approved fail-forward/incident path.
 
+Immutable application reference bundles such as ADR-0041 are part of the signed service image identity; changing the bundle creates a new reviewed image/release and never mutates production content in place.
+
 ## 6. Production PostgreSQL fleet
 
 ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define current model for mutable relational service business state.
@@ -108,7 +110,7 @@ Aggregate application Hikari maxima across production pods stay <=70% of cluster
 
 Fleet management uses one reusable GitOps baseline with bounded per-service overlays, common bounded alerts, independent backup trust boundaries, monthly service-specific restore evidence, and one-cluster-at-a-time upgrade waves. A failed wave stops remaining rollout. Production physical consolidation requires reviewed current architecture change.
 
-ADR-0040 Compromised Password's immutable rebuildable SQLite reference dataset is not mutable PostgreSQL business state and is outside this fleet. It does not weaken the fleet rule for any mutable service state.
+ADR-0040 Compromised Password's immutable rebuildable SQLite reference dataset is not mutable PostgreSQL business state and is outside this fleet. It does not weaken the fleet rule for any mutable service state. ADR-0041 Reference Data uses no database and therefore also has no CloudNativePG/Flyway runtime.
 
 ### Backup/PITR
 
@@ -164,6 +166,36 @@ Autoscaling is enabled only after representative multi-million-row warm/cold dis
 
 DR/recovery redeploys/reconstructs the approved immutable dataset artifact and validates it before readiness. SQLite WAL/PITR/runtime migration is not used for this read-only artifact.
 
+### 7.1 Reference Data runtime target and immutable application bundle
+
+ADR-0041 and `services/reference-data-service.md` define a target runtime only after the implementation trigger is met:
+
+```text
+service path:      services/reference-data-service
+base package:      com.sajtech.referencedata
+namespace:         platform-apps
+Deployment:        reference-data-service
+Service:           reference-data-service
+ServiceAccount:    reference-data-service
+application gRPC:  9090
+management:        separate configured port
+replicas:          >=3
+PDB minAvailable:  2
+HPA:               evidence-gated only
+```
+
+Until the trigger/source/deployment/build evidence exists, implementation status remains `PLANNED / NOT VERIFIED` and no deployment is implied by this document.
+
+When implemented, only the approved `web-bff` workload may initially reach application gRPC. Reference Data is ClusterIP-only and Ambient-enrolled under strict mTLS; NetworkPolicy + Istio authorization deny every other application caller unless a later caller-specific architecture/dependency decision registers it.
+
+The Country/Currency/TimeZone/SupportedLocale bundle is a small immutable read-only application resource inside the signed image. It has no PostgreSQL/CloudNativePG/Flyway/SQLite/Redis/Kafka or separately mutable production volume. Startup validates its format/version/source manifest/content digest and may build bounded immutable in-process indexes. A bundle failure keeps readiness false rather than downloading or fabricating data.
+
+Serving has no ISO/IANA/Unicode/CLDR Internet synchronization. Application egress is deny-by-default; only narrowly necessary DNS and approved telemetry may be permitted. Source acquisition occurs only in the reviewed offline release/import process.
+
+Liveness proves local runtime progress only. Readiness validates the locally packaged compatible bundle and security/configuration. It never probes standards-source Internet endpoints.
+
+Recovery/redeploy uses the same approved signed image/bundle or a deterministic approved rebuild; there is no database restore/runtime data repair. HPA remains disabled until representative reference-route load proves a safe signal and capacity envelope.
+
 ## 8. Kafka
 
 Production critical Kafka uses ADR-0015:
@@ -178,7 +210,7 @@ unclean leader election disabled
 
 Native TLS/authentication/ACL/quotas remain mandatory. Kafka is rebuildable transport, not business truth. Cold DR rebuilds configuration from GitOps and replays/reconstructs service-owned evidence. Critical publication/dedup evidence covers 35-day recovery horizon.
 
-Compromised Password v1 has no Kafka runtime path.
+Compromised Password v1 and Reference Data v1 have no Kafka runtime path.
 
 ## 9. Security Redis
 
@@ -194,7 +226,7 @@ Raw PII/business/session/pre-auth identifiers are not used as Redis keys where p
 
 Redis session/quota state is not cold-DR business truth. After state loss users reauthenticate; browser cookies never reconstruct authenticated server state.
 
-Compromised Password v1 does not use Redis as a dataset store/cache/index.
+Compromised Password and Reference Data v1 do not use Redis as a dataset store/cache/index. Reference Data's HTTP `ETag`/`Cache-Control` policy is representation caching, not Redis server-state fallback.
 
 ## 10. Public edge
 
@@ -236,14 +268,15 @@ HPA range:         3..12 only after load/connection evidence
 
 `web-bff` uses same immutable/hardened production workload baseline above: non-root, no privilege escalation, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem except explicit writable mounts, bounded resources and graceful termination.
 
-Liveness proves local process/runtime progress only and does not fail on ordinary downstream unavailability. Readiness requires usable local BFF security/session/key configuration and entry-point prerequisites; it does not synchronously probe every Identity/Authorization/resource/provider dependency per health request.
+Liveness proves local process/runtime progress only and does not fail on ordinary downstream unavailability. Readiness requires usable local BFF security/session/key configuration and entry-point prerequisites; it does not synchronously probe every Identity/Authorization/Reference Data/resource/provider dependency per health request.
 
-HPA is disabled until representative load evidence covers HTTP/gRPC connection pools, Redis session/quota throughput/failover, AES-GCM/token-broker CPU, downstream bulkheads and latency. Autoscaling that would only multiply saturated downstream load is not production-ready evidence.
+HPA is disabled until representative load evidence covers HTTP/gRPC connection pools, Redis session/quota throughput/failover, AES-GCM/token-broker CPU, Reference Data/resource downstream bulkheads and latency. Autoscaling that would only multiply saturated downstream load is not production-ready evidence.
 
 NetworkPolicy + Istio authorization are deny-by-default. Production BFF egress is restricted to exact required destinations:
 
 - Identity Service;
 - Authorization tenant-management surface;
+- Reference Data typed read surface when ADR-0041 implementation is active;
 - registered resource services referenced by reviewed BFF routes;
 - BFF/security Redis;
 - configured Google OIDC endpoints;
@@ -251,7 +284,7 @@ NetworkPolicy + Istio authorization are deny-by-default. Production BFF egress i
 
 Arbitrary Internet/URL egress is prohibited. Google endpoints are explicit provider-egress exception and must be configured/allow-listed rather than caller-controlled. Every additional synchronous downstream requires canonical dependency-registry entry and corresponding mesh/network policy review before production use.
 
-The browser public namespace is `/api/v1`; current subspaces are `/api/v1/auth`, `/api/v1/identity`, and `/api/v1/authorization`. Public body/header bounds and same-origin/CSP/cache behavior are application contracts from ADR-0016 and are tested independently of edge/WAF limits.
+The browser public namespace is `/api/v1`; current subspaces are `/api/v1/auth`, `/api/v1/identity`, `/api/v1/authorization`, and `/api/v1/reference`. Reference Data v1 GET/HEAD may be anonymous but remains same-origin/edge/WAF protected and uses explicit locale plus deterministic ETag/public one-hour cache semantics. Public body/header bounds and the remaining same-origin/CSP/private-cache behavior are application contracts from ADR-0016/ADR-0041 and are tested independently of edge/WAF limits.
 
 ## 12. OpenBao and External Secrets
 
@@ -263,11 +296,11 @@ External Secrets uses Kubernetes Auth and namespace-scoped stores where practica
 
 BFF retained-refresh encryption key ring is a dedicated purpose-separated mounted secret. Normal rotation is 90d; old decrypt keys remain through dependent-session lifetime/rekey plus 7d. Reload is atomic. Last fully validated snapshot may bridge secret-source outage <=1h; after that refresh-crypto-dependent operations fail closed. This does not authorize per-request OpenBao RPC or plaintext refresh persistence.
 
-Compromised Password v1 does not need a secret/provider credential for dataset lookup. Dataset provenance/integrity is supply-chain evidence, not secret material.
+Compromised Password v1 and Reference Data v1 need no runtime provider credential for their reference lookups. Reference Data source provenance/integrity/license evidence is release evidence, not a production source credential.
 
 ## 13. Browser security
 
-Browser production follows ADR-0016: same-origin-only v1; OIDC Authorization Code + PKCE S256; exact state/nonce/verifier/pre-auth rules; exact return redirects; server-side HMAC-located transaction/session state; secure `__Host-` cookies; server-owned downstream-audience brokerage; Origin + synchronizer-token CSRF + mandatory `Sec-Fetch-Site:same-origin` for unsafe production browser requests; exact CSP/security headers; auth/OIDC/session/admin `no-store`; bounded request/error profiles.
+Browser production follows ADR-0016: same-origin-only v1; OIDC Authorization Code + PKCE S256; exact state/nonce/verifier/pre-auth rules; exact return redirects; server-side HMAC-located transaction/session state; secure `__Host-` cookies; server-owned downstream-audience brokerage; Origin + synchronizer-token CSRF + mandatory `Sec-Fetch-Site:same-origin` for unsafe production browser requests; exact CSP/security headers; auth/OIDC/session/admin `no-store`; bounded request/error profiles. ADR-0041 adds an explicit anonymous safe-method Reference Data facade with deterministic ETag and `Cache-Control: public, max-age=3600`; it does not relax same-origin CORS or unsafe-method controls.
 
 ## 14. Supply-chain admission and continuous vulnerability response
 
@@ -278,6 +311,8 @@ Admission-policy write access is restricted to tightly controlled GitOps/CI iden
 Vulnerability inventory is continuously rescanned/correlated with approved threat/advisory inputs. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates production exposure. No scanner/feed proves absence of unknown vulnerabilities and no scan result authorizes unsigned artifact.
 
 For Compromised Password, final-image SBOM/advisory correlation includes both the Xerial Java artifact and its bundled native SQLite engine. Driver/native/dataset-format upgrades require compatibility evidence before rollout.
+
+For Reference Data, the signed image/provenance additionally binds the approved immutable reference-bundle identity/source-revision manifest/content digest. Source-data revision changes are reviewed release inputs even though they are not Technology Baseline runtime pins.
 
 ## 15. Human production access
 
@@ -296,10 +331,11 @@ Applicable pre-promotion evidence includes:
 - Kyverno policy-authoring RBAC and policy-engine egress/SSRF positive/negative tests when applicable;
 - PostgreSQL/CloudNativePG backup/restore/upgrade-policy checks for mutable relational state;
 - Compromised Password dataset compiler/integrity/schema/bounds/read-only/path/no-write/no-external-egress/Xerial-native/load/rebuild checks when affected;
+- Reference Data implementation-trigger, offline source provenance/license/integrity/import determinism, bundle manifest/digest/canonicalization/locale/bounds, no-database/broker/runtime-source egress, typed gRPC/BFF cache, workload-policy/load/rebuild checks when affected and implementation exists;
 - Kafka durability/replay checks;
 - Gateway/Traefik/WAF route and blocking tests;
 - `istioctl analyze`, Ambient/STRICT mTLS/ServiceAccount/NetworkPolicy/authorization positive and negative tests;
-- Web BFF exact ingress/egress, request-bound, session/Redis/key-ring/token-broker/CSRF/CORS/Fetch-Metadata/CSP/quota/erasure render+integration tests when affected;
+- Web BFF exact ingress/egress, request-bound, session/Redis/key-ring/token-broker/Reference Data/CSRF/CORS/Fetch-Metadata/CSP/cache/quota/erasure render+integration tests when affected;
 - staging smoke/acceptance/critical browser tests;
 - production-safe smoke/synthetic checks.
 
