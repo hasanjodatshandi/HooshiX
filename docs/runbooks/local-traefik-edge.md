@@ -36,7 +36,7 @@ Use `docs/technology/local-development-baseline.md`.
 Primary local edge pins:
 
 ```text
-Traefik Proxy 3.7.1
+Traefik Proxy 3.7.10
 Traefik Helm chart 40.2.0
 Gateway API 1.5.1 Standard channel
 Caddy 2.11.4
