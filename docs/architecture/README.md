@@ -12,19 +12,30 @@ Start with:
 4. `SOURCES.md`
 5. `TASK-REVIEW-MATRIX.md` for targeted navigation
 6. `../adr/decision-register.md`
-7. ADR-0042 when production topology, capacity, availability, physical PostgreSQL placement, Redis/Kafka topology, Kyverno availability, or human infrastructure access is relevant
-8. the current-state document(s) relevant to the task
-9. the retained current ADRs identified by the register/source map
+7. `implementation-status.md` when repository implementation/evidence presence matters
+8. ADR-0042 when production topology, capacity, availability, physical PostgreSQL placement, Redis/Kafka topology, Kyverno availability, or human infrastructure access is relevant
+9. ADR-0043 plus `network-architecture.md` when public client-address trust, proxy headers, management reachability, or network security is relevant
+10. `threat-model.md` for security-boundary/abuse-case review
+11. the current-state document(s) relevant to the task
+12. the retained current ADRs identified by the register/source map
 
 All repository changes follow the PR-first workflow: branch -> Draft PR -> task changes -> complete review against current `main` -> applicable verification -> merge. Normal work does not commit directly to `main`.
 
 For targeted implementation work, read only the current-state documents and retained current ADRs that are clearly applicable. For service-boundary, security, infrastructure, or architecture work, perform a full read of the applicable architecture set.
+
+## Current repository implementation state
+
+`implementation-status.md` is the canonical repository-level status view. Architecture documents can name planned implementation paths, but a path in a design document is not proof that source, deployment, CI, or runtime evidence exists.
+
+At this documentation revision, the executable `services/`, `deploy/`, `infrastructure/`, and `.github/workflows/` targets are not present. Production readiness therefore remains `NOT VERIFIED` until implementation and executable evidence exist.
 
 ## Current production profile
 
 The selected initial production topology is `production-single-server` under ADR-0042. It is an explicit **non-HA** profile. The `production-ha` topology remains the expansion profile when downtime, capacity, recovery, or business requirements justify additional nodes.
 
 Profile selection changes infrastructure topology and availability only. It MUST NOT weaken service ownership, database/role/Flyway isolation, forced tenant RLS, Outbox/Inbox/idempotency, MFA, OpenBao secret authority, workload identity/mTLS, NetworkPolicy, signed-artifact admission, backup/PITR, or fail-closed security behavior.
+
+ADR-0043 defines the production network trust boundary. Public client network identity comes only from the approved external-L4/Traefik/WAF chain. Caller forwarding headers are not authority. Normal single-server SSH is reachable only through the dedicated WireGuard management overlay and still requires ADR-0030 FIDO2 plus separate JIT privilege.
 
 A replicated deployment target written in a service document remains the `production-ha` target unless that document says otherwise. For `production-single-server`, ADR-0042 and the profile-aware platform ADRs override only replica/HPA/PDB availability settings and physical infrastructure placement. They do not override business or security contracts.
 
@@ -33,6 +44,9 @@ A `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved production capacity 
 ## Current-state documents
 
 - `platform-architecture.md` — system topology, service ownership, protocol boundaries, architectural principles.
+- `network-architecture.md` — production network zones, public client-address trust chain, management plane, egress and host-network capacity evidence.
+- `threat-model.md` — assets, actors, trust boundaries, STRIDE/abuse cases, residual risk and verification mapping.
+- `implementation-status.md` — canonical architecture/implementation/evidence presence for the current repository tree.
 - `backend-engineering.md` — Java/Spring, DDD/Hexagonal, package structure, DI, coding constraints.
 - `../engineering/coding-standards.md` — canonical implementation-level Java coding standard.
 - `../engineering/build-and-ci-quality-enforcement.md` — executable Gradle/Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions enforcement baseline.
@@ -53,6 +67,7 @@ A `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved production capacity 
 - `PRODUCTION-DECISION-SUMMARY.md` — concise current production decision summary.
 - `PRODUCTION-ARCHITECTURE-REVIEW.md` — production review outcome and bottleneck summary.
 - `services/` — service-specific current architecture.
+- `../runbooks/production-cold-dr.md` — complete cold-recovery sequence and traffic-enable evidence gate.
 
 ## Current-only ADR rule
 
