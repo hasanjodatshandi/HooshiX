@@ -37,7 +37,7 @@ Public, application, data, control-plane, and management paths are not interchan
 
 ## 2. Public north-south path
 
-The only normal public application path is:
+The only production public application path is:
 
 ```text
 Internet
@@ -48,11 +48,13 @@ Internet
 -> Web BFF
 ```
 
-Direct Internet -> BFF and Traefik -> BFF application paths are prohibited. NetworkPolicy, Istio authorization, route configuration, and origin/provider firewall controls enforce the path independently.
+The production Traefik application origin accepts public application traffic only from the exact approved external-L4 source ranges. Direct Internet/non-approved-source access to that origin is denied by provider/origin firewall, security-group, routing, or an equivalently effective network control. If the deployment cannot enforce this origin restriction, it is not production-eligible without a revised current decision.
+
+Direct Internet -> BFF and Traefik -> BFF application paths are also prohibited. NetworkPolicy, Istio authorization, route configuration, and origin/provider network controls enforce these paths independently.
 
 The external L4 preserves the validated original client source address to Traefik with PROXY protocol v2 under ADR-0043. Exact external-L4 source CIDRs are environment configuration and MUST be recorded before production approval.
 
-Traefik trusts PROXY protocol only from those exact source CIDRs. Insecure PROXY or forwarded-header trust is prohibited.
+Traefik trusts PROXY protocol only from those exact source CIDRs. Insecure PROXY or forwarded-header trust is prohibited. Application-layer header validation does not substitute for the external-L4-only origin restriction.
 
 ## 3. Client-address trust chain
 
@@ -200,6 +202,7 @@ Network verification includes:
 - forged forwarding/client-IP headers do not change client identity;
 - untrusted PROXY protocol cannot set client identity;
 - missing source-address preservation does not collapse quota identity to a proxy address;
+- direct Internet/non-approved-source access to the Traefik application origin is denied before application routing;
 - direct Internet -> BFF denied;
 - Traefik -> BFF WAF bypass denied;
 - unapproved workload -> internal service denied;
