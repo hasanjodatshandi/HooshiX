@@ -226,7 +226,7 @@ Cold DR sequence:
 ```text
 clean Kubernetes/GitOps foundation
 -> restore OpenBao control plane
--> restore service CloudNativePG/PostgreSQL + PITR
+-> restore service CloudNativePG/PostgreSQL + PITR where mutable PostgreSQL relational business persistence exists
 -> reconstruct Kafka + replay/reconstruct retained service evidence
 -> restore/redeploy approved rebuildable reference artifacts such as ADR-0040 SQLite dataset
 -> reconcile erasure/legal-hold/data integrity
@@ -244,7 +244,7 @@ platform RTO <=4h
 PostgreSQL PITR 35d
 ```
 
-Every PostgreSQL backup cycle is verified; isolated restore is monthly per applicable service; full cold DR is quarterly. ADR-0037 requires queryable recovery evidence and freezes ordinary affected-service promotion after failed restore until replacement evidence passes.
+Every applicable PostgreSQL backup cycle is verified; isolated PostgreSQL restore is monthly per applicable PostgreSQL-backed mutable-state service; full cold DR is quarterly. ADR-0037 requires queryable PostgreSQL recovery evidence and freezes ordinary affected-service promotion after failed restore until replacement evidence passes.
 
 Authorization restore reconciliation must not resurrect erased subject Membership/direct-override/platform-profile authority, reuse retired permission/Role identifiers, release unresolved owner-safety reservations unsafely, or discard required idempotency/audit evidence.
 

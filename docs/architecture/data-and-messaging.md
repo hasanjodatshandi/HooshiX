@@ -104,7 +104,7 @@ Compromised Password runtime uses one fixed indexed SQLite read by exact 20-bit 
 
 ## 5. PostgreSQL backup, restore, DR, and rebuildable reference data
 
-Current service-cluster baseline:
+Current service-cluster baseline for services with mutable PostgreSQL relational business persistence:
 
 - PostgreSQL RPO <=5m;
 - platform cold-DR RTO <=4h;
@@ -114,7 +114,7 @@ Current service-cluster baseline:
 - monthly retained backup set for 12 months;
 - versioning/object lock where supported;
 - verification every backup cycle;
-- isolated restore monthly per service;
+- isolated PostgreSQL restore monthly per service with mutable PostgreSQL relational business persistence;
 - full cold-DR exercise quarterly;
 - queryable restore evidence under ADR-0037.
 
