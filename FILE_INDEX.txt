@@ -40,6 +40,7 @@ docs/adr/0036-refine-authorization-breaker-recovery-and-dependency-policy-govern
 docs/adr/0037-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md
 docs/adr/0038-harden-vulnerability-exceptions-threat-intelligence-and-ownership-v1.md
 docs/adr/0039-standardize-java-coding-and-executable-quality-gates-v1.md
+docs/adr/0040-define-self-contained-compromised-password-sqlite-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -60,6 +61,7 @@ docs/architecture/runtime-and-deployment.md
 docs/architecture/security-architecture.md
 docs/architecture/security-verification-matrix.md
 docs/architecture/services/authorization-service.md
+docs/architecture/services/compromised-password-service.md
 docs/architecture/services/identity-service.md
 docs/architecture/services/notification-service.md
 docs/architecture/services/web-bff.md
