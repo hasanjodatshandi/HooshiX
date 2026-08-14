@@ -4,11 +4,11 @@
 
 This file defines mandatory operating rules for AI coding agents working in this repository.
 
-The repository is the source of truth. Agent memory, summaries, previous reads, and prior conversation context are not substitutes for current repository files.
+The repository is source of truth. Agent memory, summaries, prior reads, and conversation context are not substitutes for current files.
 
 ## 1. Mandatory source order
 
-Before non-trivial planning, implementation, deletion, review, or reporting, inspect the current applicable versions of:
+Before non-trivial planning, implementation, deletion, review, or reporting, inspect current applicable versions of:
 
 1. `AGENTS.md`;
 2. `docs/engineering/current-only-documentation-policy.md`;
@@ -18,392 +18,220 @@ Before non-trivial planning, implementation, deletion, review, or reporting, ins
 6. `docs/architecture/TASK-REVIEW-MATRIX.md` when targeted routing is appropriate;
 7. `docs/adr/decision-register.md`;
 8. applicable current-state architecture/service documents;
-9. applicable retained current ADRs;
-10. `docs/technology/technology-baseline.md`, `local-development-baseline.md`, and `production-compatibility-matrix.md` when versions/compatibility matter;
-11. `docs/architecture/performance-and-bottlenecks.md` for performance/capacity/scaling changes;
-12. `docs/architecture/dependency-criticality.yaml` and its rendered matrix for synchronous dependency/fallback changes;
-13. `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md` for release evidence;
-14. applicable engineering, testing, security, operations, and runbook documents.
+9. applicable current effective ADRs;
+10. Technology Baseline/local baseline/compatibility matrix when versions matter;
+11. performance/capacity documents for scaling/resource changes;
+12. dependency registry/matrix for synchronous dependency changes;
+13. Production Readiness Checklist for release evidence;
+14. applicable engineering/testing/security/operations/runbooks.
 
-Do not rely on remembered architecture when the current file can be inspected.
+Do not rely on remembered architecture when a current file can be inspected.
 
-## 2. Current-only decision policy
+## 2. Current-only documentation and stable ADR IDs
 
-The active repository-owner directive is `docs/engineering/current-only-documentation-policy.md`.
+`docs/engineering/current-only-documentation-policy.md` is the active owner directive.
 
-Until the owner explicitly withdraws it:
+- Current-state documents contain current effective implementation guidance, not obsolete alternatives/history.
+- ADR identifiers are permanent after merge to `main`; they MUST NOT be renumbered, reassigned, or reused.
+- Fully superseded ADRs remain as compact stable-ID provenance records with an explicit superseding pointer; they are not current implementation authority.
+- Current ADRs may be normalized to current retained scope without changing ID.
+- Decision Register separates current effective ADRs from superseded stable identifiers.
+- No new code/doc/test may treat a superseded ADR as current authority.
 
-- the documentation set keeps current effective architecture rather than preserving obsolete decision history;
-- `docs/adr/decision-register.md` indexes only retained ADRs that still contain effective scope;
-- fully superseded ADRs/raw historical source material are removed after confirming no current invariant, contract, security requirement, SLO, failure semantic, migration rule, or operational requirement would be lost;
-- partially stale ADRs are normalized so obsolete alternatives/supersession narrative do not masquerade as current architecture;
-- current-state architecture documents are updated whenever the effective design changes;
-- deleted historical records MUST NOT be cited by new code, docs, tests, or runbooks.
-
-When two current sources conflict, do not reconstruct a deleted historical chain or silently guess. Inspect the Decision Register/current sources and correct the stale document in the same PR before implementation depends on it.
+When current sources conflict, inspect Decision Register/current authorities and correct the stale document in the same PR before implementation depends on it.
 
 ## 3. Architecture review mode
 
 Every non-trivial task uses `full-read` or `targeted` review.
 
-Use `full-read` when the task creates/changes a service or bounded-context boundary, security architecture, infrastructure architecture, service-to-service communication, persistence/consistency, platform technology, or when context loss/uncertainty makes targeted scope unsafe.
+Use `full-read` when changing a service/bounded-context boundary, security architecture, infrastructure, service-to-service communication, persistence/consistency, platform technology, or when context uncertainty makes targeted scope unsafe.
 
-A targeted review is allowed only when scope is narrow and `TASK-REVIEW-MATRIX.md` plus the current Decision Register identify the complete applicable set with confidence.
+Targeted review is allowed only when Task Review Matrix + Decision Register identify the complete applicable set with confidence.
 
-Every non-trivial review also inspects existing implementation/contracts/tests and the current Git/PR diff where available.
+Every non-trivial review also inspects existing implementation/contracts/tests and current Git/PR diff where available.
 
 ## 4. Core architecture rules
 
-Every microservice represents a real business capability/bounded context.
+Every microservice represents a real business capability/bounded context. Do not create an independently deployable service solely because one endpoint/journey can use it.
 
-Backend architecture is **DDD + Hexagonal Architecture**. Clean Architecture is used only to enforce inward dependency direction.
+Backend architecture is **DDD + Hexagonal Architecture**. Clean Architecture is used only for inward dependency direction:
 
 ```text
 Infrastructure -> Application -> Domain
 Interfaces     -> Application -> Domain
 ```
 
-Business logic belongs in Domain/Application. Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, SQLite, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, or concrete adapters.
+Domain MUST NOT depend on Spring, persistence/query frameworks, Kafka, Redis, SQLite, gRPC/Protobuf, Kubernetes/Istio, or concrete adapters. Application depends on Domain + abstract ports only.
 
-Each independently deployable service with **mutable relational business persistence** owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Physical PostgreSQL placement is production-profile specific: `production-single-server` may use one shared physical CloudNativePG/PostgreSQL cluster only while preserving distinct service databases/roles/Flyway histories and strict cross-service privilege denial; `production-ha` uses dedicated CloudNativePG clusters under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited in both profiles.
+Each independently deployable service with mutable relational business persistence owns its database, runtime/migration credentials, Flyway history, contracts, build, deployment, and release lifecycle. Physical PostgreSQL placement is profile-specific; cross-service SQL/models/credentials remain prohibited.
 
-A current ADR may define a narrower immutable reference-data artifact that is not mutable service business persistence. ADR-0040 is the current example: Compromised Password Service may use only its service-local immutable, read-only, rebuildable SQLite reference dataset. That exception has no runtime SQLite writes/Flyway/CloudNativePG requirement, cannot store subject/business state, and MUST NOT be generalized to mutable SQLite persistence or another service without a new current architecture decision.
+ADR-0040 is the narrow immutable SQLite exception for Compromised Password reference data only. ADR-0041 Reference Data may remain an in-process immutable bundle until its explicit independent-service trigger is met.
 
-Tenant isolation uses trusted authenticated context plus persistence defense in depth. Production tenant-owned PostgreSQL tables use forced RLS and non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles. Tenant database context comes only from validated authenticated context and uses the canonical parameterized transaction-local mechanism; session-scoped tenant state on pooled connections is prohibited and missing/malformed context fails closed.
+Tenant-owned PostgreSQL state uses forced RLS and non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles with transaction-local trusted tenant context. Missing/malformed context fails closed.
 
-## 5. Java/package/DI rules
+## 5. Java/package/DI
 
-`docs/engineering/coding-standards.md` is the canonical implementation coding standard.
+`docs/engineering/coding-standards.md` is canonical.
 
-Key mandatory rules include:
+Mandatory:
 
 - feature-first + nature-separated packages;
-- package segments match `[a-z][a-z0-9]*`;
-- business dumping grounds such as `common`, `util`, `helper`, `manager`, `misc`, `generic` are prohibited;
-- Domain and JPA/generated/query/provider/transport models are separate;
+- no `common`, `util`, `helper`, `manager`, `misc`, `generic` dumping grounds;
+- Domain/persistence/generated/provider/transport models separate;
 - one meaningful public top-level type per file by default;
-- Spring IoC is the only DI container;
-- required dependencies use constructor injection;
-- field injection, circular dependencies, `@Lazy` cycle hiding, service locator, `ApplicationContext`/`BeanFactory` lookup inside Domain/Application, and direct adapter construction from use cases are prohibited;
-- singleton beans are stateless or explicitly thread-safe.
+- Spring IoC is sole DI container;
+- constructor injection for required dependencies;
+- no field injection, circular dependency, `@Lazy` cycle hiding, service locator, ApplicationContext lookup in Domain/Application, or direct adapter construction in use cases;
+- singleton beans stateless or explicitly thread-safe;
+- ArchUnit updated with boundary changes.
 
-When package/module/layering rules change, update ArchUnit/architecture tests in the same task.
+## 6. Persistence and transactions
 
-## 6. Persistence and transaction rules
+For mutable relational persistence:
 
-Review aggregate/transaction boundaries, JPA/jOOQ/Flyway/Hikari behavior, locking, query bounds/plans, backups/PITR, and rollback compatibility.
+- Flyway is sole schema-change mechanism; executed migrations immutable;
+- expand -> migrate -> contract;
+- OSIV prohibited;
+- N+1/broad EAGER/`SELECT *`/unbounded production queries prohibited;
+- transactions short/explicit;
+- remote gRPC/HTTP/Kafka/Redis/provider I/O inside DB transaction prohibited;
+- DB locks never held across remote I/O;
+- retries outside failed transaction;
+- sensitive/expensive queries require index + representative-plan evidence.
 
-Mandatory rules for mutable service relational persistence:
-
-- Flyway is the only schema-change mechanism; executed/released migrations are immutable;
-- evolution follows expand -> migrate -> contract;
-- OSIV is prohibited;
-- N+1, broad EAGER loading, `SELECT *`, and unbounded production queries are prohibited;
-- transaction boundaries are short/explicit;
-- remote HTTP/gRPC/Kafka/Redis/provider I/O is prohibited inside DB transactions;
-- DB locks are never held across remote I/O;
-- retries execute outside failed transactions;
-- persistence models follow aggregate/query needs; one-table/one-model mapping is not mandatory;
-- sensitive/expensive queries require index and representative-plan evidence.
-
-ADR-0040's SQLite reference artifact is built offline as a complete immutable version and has no runtime schema migration or write transaction. Its fixed read query, path/configuration, integrity, bounds, native dependency, recovery, and no-write/DDL/ATTACH/extension rules remain mandatory and do not weaken the mutable-persistence rules above.
+ADR-0040 SQLite runtime is immutable/read-only/query-only and built offline as a complete HIBP-derived SHA-1 corpus artifact. SHA-1 is screening-only; password storage remains Argon2id.
 
 ## 7. Synchronous dependencies
 
-For every new/changed remote synchronous edge define:
+For every new/changed remote edge define source/destination workload identity, dependency criticality/failure action, finite deadlines, cancellation, retry owner, idempotency, bounded concurrency/queue, breaker/fallback, positive/negative authorization, observability, and contract tests.
 
-- source/destination workload identities;
-- operation-level criticality/failure action in `dependency-criticality.yaml`;
-- finite parent/child deadlines;
-- cancellation behavior;
-- retry owner and safe/idempotent retry conditions;
-- concurrency/bulkhead/queue bounds;
-- breaker/fallback behavior;
-- positive/negative authorization tests;
-- observability and contract tests.
+Retries are finite and single-owner. Layered app/client/mesh retry for the same failure is prohibited.
 
-Retries are finite and owned by one layer only. Layered application + mesh/client retry for the same failure is prohibited.
+Authorization remains one authoritative online `CheckPermission`, one attempt, 300ms maximum caller deadline, no permission cache/Kafka invalidation/stale fallback/retry, and fail closed.
 
-Authorization is especially strict: one authoritative online `CheckPermission`, one attempt, 300ms maximum caller deadline, no permission-result cache/Kafka invalidation/stale fallback/retry, and fail-closed behavior.
+## 8. Kafka/events
 
-## 8. Kafka/event rules
+Kafka is async integration transport, not request/reply or business authority.
 
-Kafka is asynchronous integration transport, not ordinary request/reply and not business source of truth.
+State + event as one business effect uses Transactional Outbox. Consumers assume at-least-once and are idempotent; Inbox/dedup commits atomically where required. Review ordering, retention, replay, retry/DLQ, schema compatibility, data classification, and observability.
 
-A state change that must publish an integration event as one business effect uses Transactional Outbox. Consumers assume at-least-once delivery and are idempotent; Inbox/dedup state is committed atomically with business effect where required.
+Single-server RF=1 does not weaken Outbox/Inbox/idempotency/TLS/ACL/replay requirements.
 
-Review ordering, Protobuf compatibility, retry/DLQ/replay, retention/recovery evidence, ownership, observability, and tests. Kafka/event payloads MUST NOT carry secrets or unapproved PII.
+## 9. Security
 
-The selected production profile controls Kafka topology. `production-single-server` is an explicit RF=1/non-HA exception under ADR-0042; it does not weaken Outbox/Inbox/idempotency/replay/ACL/TLS requirements or make Kafka business authority.
-
-## 9. Security rules
-
-Security work reviews authentication, tenancy, Authorization, MFA/sessions, workload identity, mTLS, NetworkPolicy, WAF/upstream DDoS, secrets, semantic quotas, supply chain, privileged access, and logging/PII.
+Review authentication, tenancy, Authorization, MFA/session, workload identity, mTLS, NetworkPolicy, WAF/DDoS, secrets, quotas, supply chain, privileged access, and telemetry privacy.
 
 Mandatory principles:
 
-- safe local checks may reject invalid requests but never grant authority reserved for an authoritative service/domain decision;
-- external identities bind by stable issuer + subject, not email-only auto-linking;
-- raw passwords/OTP/recovery codes/tokens/cookies/API keys/private keys/secrets/provider credentials are never logged or durably exposed;
-- production secrets never enter Git, images, Helm/Kustomize values, logs, traces, metrics, or CI output;
-- production workloads use dedicated ServiceAccounts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization;
-- Kubernetes `default` ServiceAccount is prohibited for production application workloads;
-- browser/BFF security follows current OIDC PKCE/session/CSRF/CORS requirements;
-- supply-chain admission verifies immutable signed/provenanced artifacts/SBOM requirements;
-- admission-policy authoring is restricted to controlled GitOps/CI identities; Kyverno external HTTP context is disabled unless explicitly reviewed, and any approved external context uses bounded destination/egress/failure semantics with SSRF-negative verification;
-- vulnerability scanning/advisory correlation is continuous; no scanner/feed is proof of zero unknown vulnerabilities;
-- privileged human production access is JIT/short-lived/phishing-resistant/audited under ADR-0030 and the selected production profile;
-- `production-single-server` MUST NOT replace real system/privilege audit with `.bashrc`/shell-history logging;
-- OpenBao remains the production secret authority under ADR-0011/Technology Baseline unless a separate current security decision explicitly changes it;
-- end-user MFA semantics are not weakened by infrastructure profile selection.
+- local checks may reject but never grant authority reserved for authoritative domain/service decisions;
+- external identities bind by issuer+subject, never email-only auto-link;
+- secrets/passwords/OTP/recovery codes/tokens/cookies/private keys never enter logs/traces/metrics;
+- production secrets never enter Git/images/values/CI output;
+- dedicated ServiceAccounts, deny-by-default NetworkPolicy, strict Ambient mTLS, least privilege;
+- signed/provenanced/SBOM production artifacts verified at admission;
+- Kyverno new production policies use stable CEL-based `policies.kyverno.io/v1` types; legacy `ClusterPolicy`/`CleanupPolicy` are prohibited for new controls and repository gates reject them;
+- OpenBao remains secret authority unless a separate current decision changes it;
+- end-user MFA semantics are not weakened by infrastructure profile;
+- human production access is JIT/phishing-resistant/audited;
+- single-server does not substitute shell history for system/privilege audit.
 
-## 10. Logging and PII
+### Semantic quota security
 
-Logging is allow-list based and structured. Do not log raw sensitive credentials, full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, unreviewed provider payloads, or unreviewed exception/cause text.
+ADR-0024 is authoritative. Public quota network identity uses trusted ADR-0043 exact client address. Hard exact-IP identity is IPv4 `/32` or IPv6 `/128`; `/24`/`/64` is separate aggregate pressure and is not the sole v1 hard deny identity.
 
-Ordinary PII appears only for an approved purpose with masking/tokenization or managed-key HMAC pseudonymization when correlation is required. Protect input-derived log fields against CR/LF/log injection. Metric labels remain low-cardinality and contain no user/tenant/session/request/resource IDs, trace IDs, raw URLs, or free-form errors.
+Quota implementation MUST preserve common-mode clock-step detection, host synchronization gate, Redis time cross-check, no TTL security reset, `noeviction`, new-bucket allocation/cardinality protection, >=30% memory headroom, and fail-closed time/capacity behavior.
 
-Ordinary non-audit telemetry may use bounded buffering/drop according to its registered `OBSERVABILITY` semantics. Required security/audit evidence classified as authoritative state must be durably persisted/outboxed according to its operation contract and MUST NOT be silently dropped or reclassified as ordinary telemetry.
+## 10. Day-One observability, logging, and PII
 
-New/materially changed logging requires source tests/review plus pipeline/runtime leak controls where applicable.
+ADR-0044 is mandatory from the first executable service commit.
 
-## 11. Kubernetes, container, Helm, and GitOps rules
+Every service implements applicable structured logs, Micrometer metrics/observations, OTLP tracing, health/readiness, safe correlation, alerts/dashboard ownership, and telemetry failure tests as part of the feature—not as a later phase.
 
-Production application workloads require:
+- Logging is structured allow-list JSON.
+- Trace/baggage/correlation values are telemetry only; never authentication, tenancy, Authorization, idempotency, quota, or audit authority.
+- Baggage is allow-list only and carries no User/Tenant/session/contact/raw-IP/secret values.
+- Metric labels are low-cardinality and exclude subject/request/resource/trace IDs, raw URLs, raw IPs, and free-form errors.
+- Ordinary telemetry may use bounded buffering/drop; exporter/backend outage does not fail ordinary business processing.
+- Required authoritative audit/security evidence remains durably persisted/off-host and is not reclassified as best-effort telemetry.
+- Material logging/telemetry changes require source + pipeline/runtime leak/cardinality tests.
 
-- immutable image digest; no `latest`;
-- source/provenance identity tied to the reviewed Git commit;
-- non-root execution;
-- `allowPrivilegeEscalation=false`;
-- Linux capabilities dropped by default;
-- `seccompProfile: RuntimeDefault`;
-- read-only root filesystem where compatible;
-- finite CPU/memory resources;
-- distinct startup/readiness/liveness probes;
-- liveness MUST NOT fail merely because a dependency is temporarily unavailable;
-- graceful shutdown;
-- dedicated ServiceAccount;
-- deny-by-default NetworkPolicy;
-- least-privilege mesh authorization.
+## 11. Kubernetes/container/Helm/GitOps
 
-Privileged containers, host networking, `hostPath`, added capabilities, or relaxed security context require an explicit current security decision.
+Production application workloads require immutable digest, non-root, no privilege escalation, capabilities dropped, `RuntimeDefault` seccomp, read-only root filesystem where compatible, finite CPU/memory, correct startup/readiness/liveness, graceful shutdown, dedicated ServiceAccount, deny-by-default NetworkPolicy, and least-privilege mesh authorization.
 
-Shared deployment standards belong in reviewed organization Helm application/library charts rather than copied full charts. Secret values never enter values files. Complex migration hooks require explicit ownership, idempotency, timeout/retry, failure, rollback/fail-forward, and test evidence.
+Privileged containers, host networking, `hostPath`, added capabilities, or relaxed context require explicit current security decision. ADR-0044 permits only its narrow read-only Collector pod-log mount; no broader host filesystem access is implied.
 
-Staging and production promote the exact same signed immutable artifact digest. Production rebuild after staging validation is prohibited.
+Shared deployment standards belong in reviewed organization charts. Secrets never enter values. Production promotes the exact staging-validated signed digest.
 
-The selected production profile controls replica/HPA/PDB and platform topology. `production-single-server` uses the explicit one-replica/non-HA rules in ADR-0042 and MUST NOT claim node failover; it still preserves all security-context, ServiceAccount, NetworkPolicy, admission, backup, and workload-identity controls.
+Single-server replica/HPA/PDB topology follows ADR-0042 and never claims node failover.
 
 ## 12. Testing and executable enforcement
 
-Architecture compliance does not rely on documentation/agent memory.
+Architecture compliance does not rely on prose/agent memory.
 
-Use applicable automated enforcement including:
+Use applicable automated enforcement including Spotless, SpotBugs, ArchUnit, Semgrep/SAST, dependency verification/locks, unit/integration/security/authorization/migration tests, Buf/OpenAPI compatibility, container/Kubernetes/Helm policy validation, secret/render scans, Istio analysis/auth tests, signed SBOM/advisory/admission tests, restore/DR, logging/PII canaries, load/chaos/smoke/browser tests.
 
-- Spotless;
-- SpotBugs;
-- ArchUnit;
-- repository Semgrep/static rules;
-- Gradle dependency verification/locks;
-- unit/integration/security/authorization/migration tests;
-- Buf lint/breaking and OpenAPI compatibility;
-- schema/contract compatibility;
-- container/Kubernetes/Helm policy validation;
-- secret/render scans;
-- `istioctl analyze` and mesh authorization tests;
-- signed SBOM/advisory correlation and admission tests;
-- restore/DR/failover evidence gates;
-- logging/PII canary tests;
-- load/chaos/smoke/critical browser tests where applicable.
+Kyverno deployment validation rejects legacy policy types for new production controls.
 
-Privileged GitHub Actions event contexts such as `pull_request_target` or `workflow_run` MUST NOT execute unreviewed PR-controlled code/config while secrets, write tokens, protected environments, or equivalent privilege are available. Trusted follow-up workflows that consume untrusted build artifacts/metadata must verify repository/event/source SHA, producer workflow, and artifact identity/integrity before granting privilege.
+Quota tests include common-mode app+Redis clock jumps, new-key cardinality floods, no-eviction/OOM behavior, exact-vs-aggregate NAT/IPv6 cases, and fail-closed capacity/time outcomes.
 
-Do not disable tests, weaken a gate, broaden suppressions, or use `ignoreFailures` merely to make CI green.
+Observability tests include end-to-end safe trace/log/metric correlation, Collector/backend outage, private management/OTLP endpoints, redaction/cardinality, and independent external host-down detection.
 
-Never claim compilation/test/security/production-readiness success without actual evidence. Documentation alone never proves source/runtime compliance.
+Never disable tests/gates, broaden suppressions, or use `ignoreFailures` to make CI green. Never claim success without executed evidence.
 
-## 13. Performance and reliability
+## 13. Performance/reliability
 
-Before changing scaling/retries/caches/brokers/proxies/pools/concurrency, review `performance-and-bottlenecks.md`, SLOs, dependency budgets, connection/resource budgets, and existing load evidence.
+Review performance register/SLO/dependency/resource budgets before scaling/retry/cache/broker/proxy/pool/concurrency changes.
 
-Virtual Threads do not create database connections/provider quota/CPU/memory. Constrained dependencies use bounded concurrency/queues. CPU-heavy work uses bounded workers. `Thread.sleep` is prohibited for coordination/polling/test synchronization. A blanket `synchronized` ban is also prohibited on Java 25; use evidence for contention/pinning issues.
+Virtual Threads do not create DB/provider/Redis/CPU/memory capacity. Constrained dependencies use bounded concurrency/queues.
 
-Error budgets and burn-rate policy are release/operations controls. Do not hide SLO burn by simply increasing timeouts/retries.
+Single-server production requires simultaneous complete-stack benchmark with >=30% validated CPU/memory headroom and current security/recovery evidence. Include PostgreSQL, Redis, Kafka, Istio, Kyverno, WAF, OpenBao, applications, **Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager**, host networking, and external-monitor behavior.
 
-For `production-single-server`, a `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved capacity claim. Production approval requires the ADR-0042 complete-stack benchmark, >=30% validated resource headroom, and the current critical-path load/recovery/security evidence. Insufficient capacity is solved by increasing host resources or moving to `production-ha`, not by weakening OpenBao, Kyverno, Ambient security, backup/PITR, MFA, or fail-closed dependencies.
+Insufficient capacity is solved by safe tuning, more host capacity, externalizing ordinary observability, or moving to HA—not by weakening security/correctness/audit/backup/MFA/fail-closed dependencies.
 
 ## 14. Change discipline and PR-first workflow
 
-All normal repository changes follow `docs/engineering/repository-change-workflow.md`:
+All normal changes follow `docs/engineering/repository-change-workflow.md`.
 
-1. branch from current `main`;
-2. open a Draft PR as early as GitHub permits;
-3. make all substantive task changes on the PR branch;
-4. review complete diff against latest `main` and account for base movement;
-5. run/record applicable checks;
-6. resolve material findings;
-7. mark ready only when scope/review is complete;
-8. merge only after required review/verification;
-9. verify resulting `main` merge/head SHA and final state.
+One PR is one coherent reviewed engineering change. Conversation prompts are not engineering boundaries. Normally keep one active task PR per agent/task stream; use a focused follow-up PR for a material post-merge defect when needed.
 
-Direct normal writes to `main` are prohibited.
+Before merge: review complete diff against latest `main`, run/record applicable checks, resolve material findings, mark ready, merge only when evidence permits, verify resulting `main` SHA/state.
 
-Before changing code, identify bounded context/use-case owner, contracts, transaction boundaries, sync/async interactions, deadlines, retry/idempotency/cancellation/concurrency, authentication/authorization/workload identity, secrets/PII/logging, migrations, observability, deployment impact, rollback, and Definition of Done.
+Before changing code identify owner/use case, contracts, transactions, sync/async semantics, deadlines/retry/idempotency/cancellation/concurrency, authN/authZ/workload identity, secrets/PII, migrations, **Day-One observability**, deployment, rollback, and Definition of Done.
 
-Prefer the smallest correct coherent change. Do not absorb unrelated refactoring.
+Prefer smallest correct coherent change. Do not absorb unrelated refactoring.
 
 ## 15. Mandatory code-generation preflight
 
 Before generating/modifying implementation code, explicitly review:
 
 1. bounded context/capability/use-case owner;
-2. inbound/outbound ports before adapters;
+2. inbound/outbound ports;
 3. Domain/Application framework independence;
-4. transport/persistence/messaging/cache/provider placement only in Interfaces/Infrastructure;
-5. sync vs event-driven interaction semantics;
-6. transactional outbox need;
-7. timeout/deadline/retry/idempotency/cancellation/concurrency/breaker/transaction boundaries;
-8. migration/tests/metrics/logs/traces/dashboards/alerts/runbook evidence;
-9. ArchUnit/architecture tests for boundary changes;
-10. dependency/plugin/tool need, owner, compatibility, integrity, security/license review;
-11. Dockerfile/Helm/GitOps/probes/resources/HPA/PDB/ServiceAccount/NetworkPolicy/securityContext/shutdown alignment;
-12. public route/Gateway/Traefik/WAF/upstream-DDoS/security-header/CORS/CSRF impact;
-13. critical BDD scenario impact;
-14. critical Playwright journey impact;
-15. logging/error PII/secret/CRLF/cardinality safety;
-16. constructor injection/ports with no runtime service lookup;
-17. workload identity/Ambient/NetworkPolicy/Istio policy impact;
-18. operation-level dependency registry and positive/negative policy tests;
-19. immutable same-digest staging-to-production promotion tied to Git commit;
-20. Kubernetes security-context and migration-workflow compliance.
+4. adapter placement;
+5. sync vs event semantics;
+6. Transactional Outbox need;
+7. deadline/retry/idempotency/cancellation/concurrency/breaker/transaction boundaries;
+8. migrations/dataset-build/tests/metrics/logs/traces/dashboards/alerts/runbook evidence;
+9. ArchUnit/architecture tests;
+10. dependency/plugin/tool purpose/owner/compatibility/integrity/security/license;
+11. Dockerfile/Helm/GitOps/probes/resources/HPA/PDB/ServiceAccount/NetworkPolicy/securityContext/shutdown;
+12. public route/Gateway/WAF/DDoS/headers/CORS/CSRF impact;
+13. critical BDD impact;
+14. critical Playwright impact;
+15. logging/error/trace PII/secret/CRLF/cardinality safety;
+16. constructor injection/ports/no runtime lookup;
+17. workload identity/Ambient/NetworkPolicy/Istio impact;
+18. dependency registry + positive/negative failure/policy tests;
+19. same signed immutable digest staging->production + source Git identity;
+20. migration/reference-dataset/observability/security-context workflow compliance.
 
-`Not applicable` is valid only when genuinely inapplicable.
+Compilation alone is never completion evidence.
 
-## 16. Repository state and sub-agent rules
+## 16. Reporting
 
-Inspect the current Git/PR diff before modification. Distinguish user/task changes from unrelated existing work. Do not overwrite/revert/reformat unrelated changes without justification.
+Follow `docs/engineering/agent-communication-and-reporting.md`.
 
-Search the repository for established current patterns before inventing a new one, but do not copy a pattern that violates current architecture.
+Reports distinguish verified facts from assumptions and use exact vocabulary: `Passed`, `Failed`, `Not run`, `Not applicable`, `Partially verified`, `Inconclusive`, `Not verified`.
 
-The parent agent remains responsible for delegated work. Sub-agents receive canonical paths, retained current ADRs, search terms/sections, exact task boundary, and applicable Definition of Done; they independently verify current repository files.
-
-## 17. Communication and verification
-
-`docs/engineering/agent-communication-and-reporting.md` is the detailed evidence/reporting contract.
-
-Lead with result, blocker, material risk, or important finding. Do not narrate routine tool operations or private reasoning. Preserve exact paths, symbols, commands/errors, versions/scopes/numeric constraints.
-
-Separate verified facts from assumptions/inference/recommendations. Never claim completion, correctness, security, production readiness, build/test success, or architecture compliance without evidence.
-
-Report every required check as passed, failed, not run, or unavailable. A task is not `completed` when missing verification materially prevents confidence in the requested result.
-
-## 18. Final implementation report
-
-Every completed non-trivial implementation task reports:
-
-```text
-Outcome:
-completed | partial | blocked | failed
-<one- or two-sentence result>
-
-Changes:
-- <path or component> — <change>
-
-Verification:
-- Passed: <checks actually executed>
-- Failed: <executed check and result>
-- Not run: <check and reason>
-
-Risks and limitations:
-- <items or "None identified within reviewed scope">
-
-Remaining work:
-- <required next action or "None">
-
-Architecture report:
-Architecture review mode: full-read/targeted
-Architecture document version/commit:
-Architecture sections reviewed:
-Search terms used:
-ADRs reviewed or changed:
-Changed bounded context/module:
-Contracts changed:
-Database migration:
-Transaction boundary:
-Timeout/deadline behavior:
-Retry/cancellation/concurrency behavior:
-Kafka/event and idempotency behavior:
-Security impact:
-Istio identity and authorization impact:
-Logging and PII impact:
-Observability added or changed:
-Build/CI/architecture enforcement changed:
-Tests executed:
-Architecture deviations:
-Rollback considerations:
-```
-
-Do not leave fields blank; use `None`, `Not applicable`, or `Not verified` when accurate.
-
-## 19. Canonical source groups
-
-### Architecture/index
-
-- `docs/architecture/README.md`
-- `docs/architecture/SOURCES.md`
-- `docs/architecture/TASK-REVIEW-MATRIX.md`
-- `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md`
-- `docs/architecture/PRODUCTION-DECISION-SUMMARY.md`
-- `docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md`
-- `docs/architecture/performance-and-bottlenecks.md`
-- `docs/architecture/dependency-criticality.yaml`
-- `docs/architecture/dependency-criticality.schema.json`
-- `docs/architecture/dependency-criticality-matrix.md`
-
-### Current-state architecture
-
-- `docs/architecture/platform-architecture.md`
-- `docs/architecture/backend-engineering.md`
-- `docs/architecture/security-architecture.md`
-- `docs/architecture/data-and-messaging.md`
-- `docs/architecture/reliability-and-observability.md`
-- `docs/architecture/runtime-and-deployment.md`
-- `docs/architecture/testing-and-quality-gates.md`
-- `docs/architecture/services/*`
-
-### Decisions
-
-- `docs/adr/decision-register.md`
-- retained ADRs listed by that register
-
-### Technology
-
-- `docs/technology/technology-baseline.md`
-- `docs/technology/local-development-baseline.md`
-- `docs/technology/production-compatibility-matrix.md`
-
-### Engineering/operations
-
-- `docs/engineering/current-only-documentation-policy.md`
-- `docs/engineering/repository-change-workflow.md`
-- `docs/engineering/developer-workflow.md`
-- `docs/engineering/coding-standards.md`
-- `docs/engineering/build-and-ci-quality-enforcement.md`
-- `docs/engineering/agent-communication-and-reporting.md`
-- `docs/operations/incident-response-runbook.md`
-- `docs/operations/chaos-engineering-program.md`
-- `docs/runbooks/local-istio-ambient.md`
-- `docs/runbooks/local-traefik-edge.md`
-
-## 20. Source maintenance
-
-When effective architecture changes:
-
-1. update current-state architecture;
-2. create/update the retained current ADR when useful;
-3. remove/normalize obsolete decision/source text only after preserving all still-current semantics;
-4. update Decision Register/SOURCES/TASK-REVIEW-MATRIX as applicable;
-5. update Technology Baseline/compatibility documents when a version decision changes;
-6. update executable architecture/security/quality enforcement and tests;
-7. update production-readiness/operations evidence where applicable;
-8. deliver through the PR-first workflow and verify the final merged state.
+Never claim production readiness from documentation alone.
