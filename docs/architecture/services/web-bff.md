@@ -1,14 +1,18 @@
 # Web BFF Architecture
 
-## 1. Responsibility
+## 1. Responsibility and executable boundary
 
-Web BFF is the browser-facing backend boundary. It translates REST/OpenAPI browser interactions into internal gRPC calls and owns browser-session/OIDC protocol mechanics.
+Web BFF is the browser-facing backend boundary. It translates REST/OpenAPI browser interactions into internal gRPC calls and owns browser session, OIDC, CSRF, public error/bounds and downstream credential brokerage mechanics.
 
-It does not become a second Domain layer. Business invariants and final resource authorization remain in backend bounded contexts.
+It does not become a second Domain layer. Business invariants and final protected-resource authorization remain in backend bounded contexts.
 
-OpenAPI is the authoritative browser/public REST contract. Frontend TypeScript clients are generated from the approved OpenAPI definition; handwritten duplicate transport DTO/client layers are prohibited except for thin UI/domain wrappers around generated clients. Public REST errors use RFC 9457 Problem Details (or a versioned extension profile) and never expose internal exception details.
+Base package: `com.sajtech.webbff`.
 
-## 2. Public path
+The first executable implementation lives at `services/web-bff` and follows the independent-service build/release boundary from the engineering standards.
+
+OpenAPI is the authoritative browser/public REST contract. Frontend TypeScript clients are generated from the approved OpenAPI definition; handwritten duplicate transport DTO/client layers are prohibited except thin UI/domain wrappers around generated clients.
+
+## 2. Public path, namespace, bounds, and errors
 
 ```text
 Internet
@@ -19,19 +23,75 @@ Internet
 -> Web BFF
 ```
 
-Direct Internet->BFF and Traefik->BFF application paths are prohibited by routing plus NetworkPolicy/Istio authorization. A CDN is deployment-specific and does not replace the mandatory upstream volumetric-mitigation or load-balancer controls.
+Direct Internet->BFF and Traefik->BFF application paths are prohibited by routing plus NetworkPolicy/Istio authorization. A CDN is deployment-specific and does not replace mandatory upstream volumetric mitigation or load-balancer controls.
 
-## 3. OIDC
+The v1 public REST namespace is:
 
-ADR-0016 is current; ADR-0012 defines the trusted BFF->Identity evidence/signup/link contract.
+```text
+/api/v1
+/api/v1/auth
+/api/v1/identity
+/api/v1/authorization
+```
 
-Google/future browser login uses Authorization Code + PKCE S256. BFF creates single-use `state`, `nonce`, verifier/challenge; transaction state is server-side and expires <=10m.
+Provider-owned gRPC method names are not mechanically exposed as public REST paths. Public route design remains explicit OpenAPI API design.
 
-Callback validates state, nonce, PKCE, signature, configured issuer/audience, and timestamps before invoking Identity. Redirect URI matching is exact; post-login return destinations are validated same-origin relative paths, not caller-controlled absolute URLs.
+Request limits:
 
-BFF is the application owner of provider-protocol validation. Identity does not call Google during login/link/signup and does not receive provider authorization codes or provider tokens.
+```text
+public JSON body:       <=256 KiB
+auth/OIDC/session body: <=64 KiB
+headers/metadata:       <=16 KiB
+multipart/file upload:  unsupported in v1
+BFF total request:      <=2600 ms outer budget
+```
 
-Immediately after successful provider validation, BFF creates and submits the typed Identity evidence:
+Oversized requests are rejected before expensive parsing/downstream work. The BFF does not buffer unbounded bodies or provider responses.
+
+Public REST errors use the v1 RFC 9457 profile with:
+
+```text
+type
+title
+status
+code
+safe correlation identifier only when needed
+```
+
+Public errors never expose internal exception/provider text, stack traces, access/refresh/provider tokens, tenant/membership/Contact identifiers, internal request IDs, Redis keys, Role/permission internals, or security-policy implementation detail.
+
+## 3. OIDC and pre-auth browser transaction
+
+ADR-0016 is authoritative; ADR-0012 defines trusted BFF->Identity evidence/signup/link semantics.
+
+Google/future browser login uses Authorization Code + PKCE S256.
+
+Exact entropy/encoding:
+
+```text
+state:          exactly 256 CSPRNG bits
+nonce:          exactly 256 CSPRNG bits
+PKCE verifier:  exactly 32 CSPRNG bytes, Base64URL without padding
+PKCE method:    S256 only
+```
+
+One server-side pre-auth transaction binds state, nonce, PKCE verifier, provider/redirect context and post-login target. Browser receives only:
+
+```text
+__Host-sajtech-preauth
+Secure; HttpOnly; SameSite=Lax; Path=/; no Domain
+opaque identifier entropy >=256 CSPRNG bits
+```
+
+The raw pre-auth identifier is not a Redis key and is never logged. BFF derives the Redis locator with a purpose-separated versioned HMAC. Server-side pre-auth state expires <=10m, is single-use, and at most five live transactions may exist for one browser. Expired/consumed state cannot be revived by retry or replacement.
+
+Provider callback validates state, nonce, PKCE, signature, configured issuer/audience, timestamps, redirect binding and bounded claims before invoking Identity. Redirect URI matching is exact.
+
+Post-login return target must be a same-origin relative path beginning with one `/`, <=1024 characters after canonical validation. Reject `//`, backslash, scheme/userinfo/authority forms, control characters, and raw/encoded normalization bypasses that could become an external redirect.
+
+BFF is application owner of provider-protocol validation. Identity does not call Google during login/link/signup and does not receive provider authorization codes or provider tokens.
+
+Immediately after successful provider validation, BFF creates Identity evidence:
 
 ```text
 evidence_id        exactly 256 bits CSPRNG
@@ -43,58 +103,176 @@ metadata_version   explicit bounded version
 metadata           optional validated email + email_verified + bounded given/family-name suggestions
 ```
 
-BFF workload identity, evidence ID, issuance time, issuer, subject, request identity and metadata are part of the Identity evidence/idempotency binding. The two-minute evidence lifetime and >=10-minute spent/replay retention are Identity security policy; browser/provider input cannot extend them.
+BFF workload identity, evidence ID, issuance time, issuer, subject, request identity and metadata are part of Identity evidence/idempotency binding. Evidence lifetime is exactly two minutes from trusted issuance time and spent/replay evidence remains >=10m in Identity.
 
-A provider token is never forwarded as a substitute for evidence. Email equality never authorizes auto-link. `email_verified=true` may only be forwarded as validated evidence that Identity can use when the canonical Contact is free; an existing-email collision becomes `ACCOUNT_LINK_REQUIRED`. Missing/`email_verified=false` never creates an Identity Contact automatically. Provider names remain suggestions and never silently complete the Identity profile.
+Provider token is never forwarded as evidence. Email equality never authorizes auto-link. `email_verified=true` may only be forwarded as validated evidence Identity can use when canonical Contact is free; collision becomes `ACCOUNT_LINK_REQUIRED`. Missing/false verified email creates no Contact automatically. Provider names remain suggestions.
 
-For an existing User with active TOTP, successful Google evidence is only primary-authentication proof. Identity returns the same MFA pre-auth continuation used after password proof; BFF cannot establish a completed session until TOTP or a valid recovery code succeeds.
+For an existing User with active TOTP, Google evidence is only primary-authentication proof. Identity returns MFA pre-auth continuation and no completed Identity/BFF session exists until TOTP or valid recovery code succeeds.
 
-Provider credentials remain inside the approved secret-delivery boundary and do not enter browser storage, Identity requests, Git values, or telemetry.
+Provider credentials remain inside approved secret-delivery boundary and do not enter browser storage, Identity requests, Git values or telemetry.
 
-## 4. Browser session and authenticated onboarding
+## 4. Identity audience-specific token brokerage
 
-Browser receives only the opaque BFF session cookie:
+The browser never receives an Identity access/refresh credential and never chooses a downstream JWT audience.
+
+BFF owns a server-configured, reviewed route->downstream/audience mapping. After validating a BFF session, it requests a short-lived exact-audience access JWT through the Identity-owned internal token-broker operation `IssueAudienceAccessToken` (name may be reflected exactly in canonical Protobuf when implemented).
+
+Contract:
+
+- caller must be the authorized BFF workload;
+- source Identity Session/RefreshFamily must be active and bound to the BFF session;
+- target audience must be in Identity's server-owned allow-list for the BFF workload and session mode;
+- tenant/membership context is derived from authoritative Identity session state, not browser claims;
+- issued JWT uses the existing exact five-minute Identity access-token lifetime and claim baseline;
+- browser-supplied arbitrary audience is rejected and is never forwarded as authority;
+- this is not a public generic OAuth token-exchange endpoint.
+
+`authenticated_onboarding` cannot obtain ordinary resource-service or `authorization-service` audiences. Its route allow-list remains only the reviewed Identity onboarding/profile/tenant-create/invitation-accept/tenant-selection surface.
+
+BFF may retain an issued access JWT only as bounded server-side transport state until that JWT's own `exp` and only while corresponding session/tenant/assurance state is unchanged and valid. This is not an Authorization decision cache. Session/tenant/assurance rotation invalidates reuse, and resource-owning service still performs final online `CheckPermission`.
+
+Dependency contract:
+
+```text
+dependency:      Identity IssueAudienceAccessToken
+class:           AUTHORITATIVE_SECURITY
+deadline:        1500 ms maximum
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+fallback/cache:  none for security decision
+failure mode:    fail closed / authentication dependency unavailable
+```
+
+## 5. Completed browser session
+
+Browser receives only:
 
 ```text
 __Host-sajtech-session
 Secure; HttpOnly; SameSite=Lax; Path=/; no Domain
 ```
 
-BFF session ID has >=256 bits CSPRNG entropy and rotates after login, MFA completion, tenant switch, recovery, password reset/change where the session remains valid, security/assurance elevation, and observed Identity MFA-state changes that preserve a session.
+BFF session ID has >=256 CSPRNG bits. Raw session ID is never a Redis key, metric label or log field. BFF derives its server-side session locator with a purpose-separated versioned HMAC.
 
-Server-side session state lives in BFF-owned ACL/key namespace on `security-redis`; idle <=7d, absolute <=30d. Any retained Identity refresh credential is AES-256-GCM encrypted with a BFF-specific mounted local key ring and is never stored raw in Redis/browser/telemetry.
+Bounded server-side session state includes:
 
-When Identity returns a pre-auth MFA challenge after any primary proof—password or trusted Google evidence—BFF creates no completed authenticated browser session. It retains only bounded pre-auth continuation state. Final authenticated state exists only after Identity confirms required MFA and creates the Identity Session/RefreshFamily result.
+- User/Identity Session/RefreshFamily references required for authentication continuity;
+- active tenant/membership context when present;
+- session mode (`authenticated_onboarding` or tenant-authenticated);
+- CSRF digest;
+- created-at, coalesced last-seen, idle expiry and immutable absolute expiry;
+- encrypted retained Identity refresh credential when present;
+- bounded assurance/security state required for routing and safe rotation.
 
-When Identity authentication succeeds but no active Tenant/Membership is selected, BFF may create only `authenticated_onboarding` state:
+Raw email/phone/provider subject is not session-key material. Session telemetry remains identifier-safe per logging policy.
 
-- no normal tenant-scoped Identity access JWT exists;
-- the browser can access only the reviewed same-origin Identity onboarding/profile/tenant-create/invitation-accept/tenant-selection routes;
-- ordinary resource-service requests are rejected rather than sent without a tenant credential;
-- zero Membership remains onboarding; one valid Membership is selected by Identity automatically; multiple use Identity's valid last-selection/explicit-selection rules;
-- completing tenant selection rotates the BFF session ID and transitions to normal tenant-authenticated state.
+Session lifetime:
 
-Identity current-family logout, logout-all, password reset/change revocation, ExternalIdentity unlink revocation, MFA-state-change revocation, User suspension/DELETING, refresh-family reuse or expiry invalidates the corresponding BFF session/continuation when observed. BFF never manufactures continuity from a revoked/failed Identity refresh.
+```text
+idle:      <=7 days
+absolute:  <=30 days
+absolute expiry: never extended
+underlying Identity RefreshFamily expiry: always an upper bound
+last_seen persistence: at most once per five-minute activity window
+```
 
-## 5. CSRF/CORS/browser hardening
+The five-minute write-coalescing rule limits Redis amplification without turning last-seen state into a client authority.
 
-Unsafe cookie-authenticated browser requests require trusted Origin + session-bound synchronizer token in `X-CSRF-Token`; Fetch Metadata is additional defense. GET/HEAD/OPTIONS do not mutate business state.
+Every completed BFF session maps to exactly one current Identity RefreshFamily. BFF maintains a purpose-HMAC/pseudonymous User->sessions index so logout-all, suspension, DELETING/erasure and family-wide revocation remove all corresponding BFF sessions without unbounded Redis scanning.
 
-Same-origin is preferred. If CORS is needed, use exact origin allow-list; credentialed wildcard/reflected origins are prohibited.
+Session ID rotates after login, MFA completion, tenant switch, recovery, password reset/change where current session remains valid, security/assurance elevation and observed Identity MFA-state change that preserves a session.
 
-CSP, `nosniff`, restrictive referrer/permissions policy, frame protection, and HSTS after HTTPS-domain coverage verification are centrally tested.
+Rotation is atomic. Once replacement session state is authoritative, predecessor session ID is invalid immediately; no dual-valid grace period exists.
 
-## 6. Internal calls
+Identity current-family logout, logout-all, password reset/change revocation, ExternalIdentity unlink revocation, MFA-state-change revocation, User suspension/DELETING, RefreshFamily reuse/expiry/revocation invalidates corresponding BFF session/continuation when observed. BFF never manufactures continuity from revoked/failed Identity refresh state.
 
-Internal synchronous calls use gRPC + Protobuf over Istio Ambient strict mTLS/workload identity. Every call has an explicit deadline/cancellation/error map. The BFF does not create long-running workflows or deep synchronous call chains.
+## 6. Refresh encryption and BFF key ring
 
-Authentication dependency ownership is explicit in `dependency-criticality.yaml`: Web BFF owns the browser-flow edge to Google OIDC endpoints and the trusted evidence/session-establishment edge to Identity. Identity->Google is not an allowed login/link/signup dependency.
+Any retained Identity refresh credential is encrypted before Redis persistence:
 
-BFF->Identity evidence submission has no retry/fallback. A failed/ambiguous call is resolved only through the stable request/evidence idempotency contract; BFF never creates a second provider identity or alters the evidence payload to force success.
+```text
+AES-256-GCM
+random 96-bit nonce per encryption
+128-bit authentication tag
+AAD = session binding + purpose + key-id/version
+key rotation = every 90 days
+```
 
-Tenant Authorization administration is also a real BFF-owned synchronous edge. Browser calls the BFF REST/OpenAPI facade; BFF invokes the matching Authorization gRPC management operation with its approved workload identity and a current Identity access JWT whose audience is exactly `authorization-service`.
+Old decrypt keys remain available through the lifetime/rekeying of dependent sessions plus seven days. Keys are mounted only from the approved BFF-specific secret/key-ring boundary and never stored in Git, Redis or browser data.
 
-The BFF does not pre-authorize or fabricate Authorization management state. Authorization validates the end-user JWT locally and is the management permission/domain authority. The BFF call contract uses the current generic gRPC ceiling as the exact v1 edge limit:
+Key-ring reload is atomic: a partially validated replacement cannot replace the active snapshot. During key-source outage BFF may use the last fully validated snapshot for <=1h. Once snapshot staleness exceeds one hour, operations requiring refresh encrypt/decrypt fail closed rather than extending stale-key use.
+
+Key identifiers may be logged only when they do not reveal secret material and are useful for rotation diagnosis; plaintext credential, nonce+ciphertext payload and AAD identifiers containing session/user IDs are not logged.
+
+## 7. MFA pre-auth and authenticated onboarding
+
+When Identity returns a pre-auth MFA challenge after password or trusted Google evidence, BFF creates no completed normal or onboarding session. It retains only bounded pre-auth continuation state. Final authenticated state exists only after Identity confirms required MFA and creates Identity Session/RefreshFamily result.
+
+When Identity authentication succeeds but no active Tenant/Membership is selected, BFF may create only `authenticated_onboarding`:
+
+- no normal tenant-scoped Identity access JWT;
+- only reviewed same-origin Identity onboarding/profile/tenant-create/invitation-accept/tenant-selection routes;
+- ordinary resource-service and Authorization-management requests rejected before dispatch;
+- zero Membership remains onboarding; one valid Membership selected automatically by Identity; multiple use Identity revalidated last-selection/explicit-selection rules;
+- completing tenant selection rotates BFF session ID and transitions to tenant-authenticated state.
+
+## 8. CSRF, Fetch Metadata, CORS, CSP and cache controls
+
+CSRF synchronizer token is exactly 256 CSPRNG bits and bound to current BFF session. BFF stores only a purpose-separated versioned HMAC digest and compares proofs in constant time. Token rotates with every session/assurance rotation.
+
+There is no CSRF cookie. Frontend receives clear token only from reviewed same-origin session/bootstrap response for use in explicit `X-CSRF-Token` header. It is not persisted in local/session storage or URLs.
+
+Unsafe cookie-authenticated production browser requests require:
+
+```text
+Origin: exact configured same origin
+X-CSRF-Token: valid session-bound proof
+Sec-Fetch-Site: same-origin
+```
+
+Missing/invalid Fetch Metadata on normal production browser routes fails closed. GET/HEAD/OPTIONS do not mutate business state. A future non-browser integration that cannot meet this contract uses a separately reviewed surface.
+
+CORS v1: disabled for cross-origin credentialed API use. Same-origin only. Future cross-origin use requires architecture review; wildcard/reflected credentialed origin remains prohibited.
+
+Exact CSP:
+
+```text
+default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'
+```
+
+`unsafe-eval` and `unsafe-inline` are prohibited. Additional external sources/directives require explicit review.
+
+Also enforce HSTS `max-age=31536000` after HTTPS-domain coverage verification, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, restrictive Permissions Policy and no framing via CSP.
+
+Authentication/OIDC/session/Authorization-administration responses use `Cache-Control: no-store`.
+
+## 9. Semantic OIDC abuse quotas
+
+BFF owns semantic OIDC quotas in its isolated `security-redis` ACL/key namespace and follows ADR-0024 atomic/pseudonymous/dual-clock/fail-closed rules.
+
+Exact network buckets:
+
+| Operation | Capacity | Refill | Cleanup horizon |
+| --- | ---: | --- | --- |
+| `OIDC_START/network` | 60 | 1 token / 5s | 1h |
+| `OIDC_CALLBACK/network` | 120 | 2 tokens / 1s | 30m |
+
+The independent max-five-live-pre-auth/browser rule still applies. Redis/time-source failure does not bypass OIDC abuse control.
+
+## 10. Internal calls and tenant Authorization administration
+
+Internal synchronous calls use gRPC + Protobuf over Istio Ambient strict mTLS/workload identity. Every call has explicit deadline/cancellation/error map. BFF does not create long-running workflows or deep synchronous call chains.
+
+Authentication dependency ownership is explicit in `dependency-criticality.yaml`: browser-flow Google OIDC, trusted Identity evidence/session establishment, Identity audience-token brokerage, session/quota Redis, and Authorization-management edges are BFF-owned. Identity->Google is prohibited.
+
+BFF->Identity evidence submission has no retry/fallback. Ambiguity is resolved only through stable request/evidence idempotency; BFF never creates second provider identity or changes evidence to force success.
+
+Tenant Authorization administration is a real BFF synchronous edge. Browser invokes `/api/v1/authorization`; BFF maps it to matching Authorization gRPC management operation using approved workload identity and current Identity JWT with exact `aud=authorization-service`.
+
+BFF does not pre-authorize or fabricate management state. Authorization validates end-user JWT locally and remains management/domain authority.
+
+Authorization-management edge:
 
 ```text
 deadline:        1500 ms maximum
@@ -105,28 +283,96 @@ fallback:        none
 failure mode:    fail closed / management unavailable
 ```
 
-Write requests preserve the caller/BFF-generated canonical UUIDv4 `request_id`. A timeout/ambiguous result is not retried automatically; a later explicit replay uses the same request identity so Authorization's idempotency contract can return the committed original or stable conflict.
+Write requests preserve canonical UUIDv4 `request_id`. Timeout/ambiguity is not retried automatically; later explicit replay uses same request identity so Authorization idempotency can resolve committed original or stable conflict.
 
-## 7. Authorization
+## 11. Final Authorization boundary
 
-Routine protected resource request flow does **not** pay two online Authorization calls. The resource-owning service performs the final online `CheckPermission` under the current ADR-0013/ADR-0026/ADR-0032/ADR-0036 authorization runtime. BFF only checks authorization for BFF-owned resources or a separately justified UX/read-model need; such checks never replace final resource enforcement.
+Routine protected-resource flow does not pay two online Authorization calls. Resource-owning service performs final online `CheckPermission` under ADR-0013/ADR-0026/ADR-0032/ADR-0036. BFF only checks authorization for BFF-owned resources or separately justified UX/read-model use; such checks never replace final enforcement.
 
-The tenant-management facade is different from duplicate resource authorization: BFF transports browser administration to the Authorization-owned management use case, but does not decide that use case itself. It never trusts Role/permission lists from browser/session/JWT as management authority and never converts an Authorization outage/deny into a local allow.
+Tenant-management facade transports browser administration to Authorization-owned use case. Browser/session/JWT Role/permission lists are not management authority. `GetMembershipAuthorization` responses are administration/UX snapshots only and never authoritative access-control cache.
 
-`GetMembershipAuthorization` responses are administration/UX snapshots only. The BFF/React client must not reuse them as authoritative access-control decisions for protected resource calls.
+`authenticated_onboarding` is not an authorization bypass and never gains Authorization-management implicitly.
 
-`authenticated_onboarding` is not an authorization bypass. It never carries a normal resource token and is restricted to the explicitly reviewed Identity onboarding surface; Authorization management is not implicitly added to the onboarding allow-list.
+## 12. Erasure
 
-## 8. Failure behavior
+BFF participates in Identity-owned global erasure workflow. An authoritative erasure command removes or irreversibly unlinks all subject-associated:
 
-The BFF does not fabricate successful business data when downstream services are unavailable. It maps stable downstream error categories to bounded public error contracts without leaking internal exception details, tokens, tenant IDs, Contact ownership, provider payloads, Role/permission internals, or Authorization audit data.
+- completed BFF sessions;
+- pre-auth/OIDC transaction state;
+- encrypted refresh credentials;
+- User->sessions index entries;
+- other user-linked authentication continuation/token-broker state.
 
-Authorization management deny/unavailable/overload/idempotency-conflict remains distinct in the public RFC 9457 mapping. BFF does not retry a denied/unavailable management mutation with changed payload/request identity to force success.
+Participant processing is idempotent. Completion receipt contains no PII/stable user/session identifier beyond approved pseudonymous workflow evidence. Successful erasure leaves no usable user-linked BFF authentication state. Generic aggregate telemetry without stable subject/session/tenant identity does not require deletion.
 
-OIDC evidence expiry/replay/conflict, Identity dependency failure, Google verified-email collision, or MFA pre-auth failure remains authentication unavailable/denied/explicit-link-required according to the stable contract and never falls back to email auto-link, a browser-stored provider token, SMS downgrade of active TOTP, or a fabricated authenticated session.
+## 13. Runtime/deployment and egress
 
-Session Redis failure fails authentication/session continuity closed. An onboarding session without valid server-side state is not reconstructed from browser data.
+Production defaults:
 
-## 9. Verification
+```text
+namespace:         platform-apps
+Deployment:        web-bff
+Service:           web-bff
+ServiceAccount:    web-bff
+application HTTP:  8080
+management:        separate configured port
+replicas:          >=3
+PDB minAvailable:  2
+HPA:               3..12 only after load/connection evidence
+```
 
-Applicable tests include REST/OpenAPI contracts, PKCE/state/nonce replay, redirect/open-redirect negatives, provider validation before Identity invocation, provider-code/token absence from Identity requests/telemetry, exact 256-bit evidence randomness, issued-at binding, two-minute expiry, >=10-minute replay retention, equal replay/changed-payload conflict/wrong-workload negatives, Google signup verified-email collision/no-auto-link/unverified-email no-Contact/name-suggestion behavior, active-TOTP Google proof entering MFA continuation, password/Google MFA pre-auth with no completed session before MFA, tenantless `authenticated_onboarding` route allow-list + ordinary-resource/Authorization-management denial, zero/one/many Membership journeys, tenant switch/session rotation, cookie/session rotation/fixation/logout/revocation/MFA-state-change behavior, Redis failover/session behavior, CSRF Origin/token, CORS, security headers, browser storage token absence, public-edge traversal/direct-bypass negatives, internal gRPC deadlines/error maps, Authorization management 1500ms/one-attempt/no-retry/no-fallback behavior, exact `aud=authorization-service` token propagation, stable write request-id replay after ambiguity, wrong-workload/expired/wrong-audience management negatives, proof BFF does not locally grant management authority, final resource-authorization ownership, PII-safe logging, BDD critical flows, and Playwright critical authentication/onboarding/administration journeys where implemented.
+Hardened pod security context: non-root, no privilege escalation, drop unnecessary capabilities, read-only root filesystem except explicit writable mounts, approved seccomp profile, bounded CPU/memory/ephemeral resources and graceful termination.
+
+Deny-by-default NetworkPolicy/Istio policy permits production egress only to:
+
+- Identity Service;
+- Authorization management surface;
+- resource services explicitly registered for BFF routes;
+- BFF/security Redis;
+- configured Google OIDC endpoints;
+- approved telemetry backend/collector.
+
+Arbitrary URL/Internet egress is prohibited. New synchronous downstream must be added to canonical dependency registry with class/deadline/retry/failure action before production. Google remains explicit provider-egress exception with configured endpoint allow-list.
+
+Liveness proves local runtime progress only. Readiness requires usable session/key configuration and required entry-point prerequisites, but does not synchronously probe every downstream on every health request. HPA production enablement requires load evidence that includes HTTP/gRPC connection pools, Redis throughput, crypto cost and downstream bulkheads.
+
+## 14. Failure behavior
+
+BFF never fabricates successful business/authentication state when a dependency is unavailable.
+
+- session Redis unavailable -> authentication/session continuity fails closed;
+- semantic quota Redis/time unhealthy -> covered OIDC operation fails closed;
+- Identity evidence/token-broker unavailable -> auth/token operation unavailable, no fabricated session/JWT;
+- Authorization management deny/unavailable/overload/idempotency conflict remains distinct in public stable mapping;
+- Google/OIDC failure never falls back to email auto-link, browser-stored provider token, SMS downgrade of active TOTP or fabricated authenticated state;
+- stale key snapshot beyond one hour -> refresh-key-dependent operation fails closed;
+- onboarding state without valid server-side state is not reconstructed from browser input.
+
+Cancellation propagates from inbound HTTP through owned gRPC/Redis/provider calls. No automatic retry is added to non-idempotent or authoritative-security operations outside their explicit contracts.
+
+## 15. Verification
+
+Required evidence includes:
+
+- OpenAPI `/api/v1` namespace and generated-client contract tests;
+- RFC 9457 profile/redaction and body/header/multipart bound tests;
+- state/nonce/verifier exact entropy, PKCE downgrade, pre-auth HMAC/TTL/single-use/max-five, replay and open-redirect/encoded-bypass tests;
+- provider validation before Identity call; provider-code/token absence from Identity/browser/telemetry;
+- evidence randomness/issued-at/two-minute expiry/ten-minute replay/equal-replay/changed-payload/wrong-workload tests;
+- Google verified-email collision/no-auto-link/unverified-email no-Contact/name-suggestion and active-TOTP continuation tests;
+- server-owned route->audience mapping, arbitrary audience rejection, exact downstream audience, onboarding audience denial, no browser JWT/refresh exposure;
+- session HMAC locator, atomic rotation/no grace, five-minute last-seen coalescing, idle/absolute limits, logout/revocation/user-session-index behavior;
+- AES-GCM nonce/tag/AAD, 90-day rotation, dependent-session+7d decrypt retention, atomic reload and one-hour stale snapshot fail-closed tests;
+- CSRF exact entropy/HMAC/constant-time/rotation, Origin and Fetch Metadata failure tests;
+- no cross-origin CORS, exact CSP/no unsafe-inline/eval, security headers and `no-store` tests;
+- OIDC quota numeric/atomic/outage/skew tests and max-five pre-auth composition;
+- Redis failover/session fail-closed behavior;
+- BFF->Identity/Authorization exact dependency deadlines/one-attempt/no-retry/no-fallback and cancellation propagation;
+- Authorization management exact audience/request-id ambiguity replay/wrong-workload negatives;
+- proof BFF does not locally grant management/final resource authority;
+- erasure cleanup/idempotency/non-PII receipt;
+- deny-by-default egress, wrong-workload and direct-edge-bypass tests;
+- PII/secret-safe logs/metrics/traces;
+- BDD critical flows and Playwright authentication/onboarding/administration journeys where implemented.
+
+Implementation/runtime/build/staging evidence remains `NOT VERIFIED` until `services/web-bff` and required environment artifacts exist and these checks execute.
