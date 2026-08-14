@@ -6,13 +6,15 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13
+2026-08-10; normalized to current-only documentation on 2026-08-14
 
 ## Decision
 
 Production PostgreSQL uses CloudNativePG 1.30.x managing PostgreSQL 18.x; exact approved patches are pinned in the Technology Baseline.
 
-Every persistent production microservice has its own dedicated database and dedicated CloudNativePG cluster under ADR-0027. This ADR defines the HA/backup mechanics used by that fleet; ADR-0034/ADR-0037 define fleet standardization, restore evidence, and upgrade safety.
+Every production microservice that owns mutable PostgreSQL relational business persistence has its own dedicated database and dedicated CloudNativePG cluster under ADR-0027. This ADR defines the HA/backup mechanics used by that PostgreSQL fleet; ADR-0034/ADR-0037 define fleet standardization, restore evidence, and upgrade safety.
+
+ADR-0040 Compromised Password Service's immutable, read-only, rebuildable SQLite reference dataset is not mutable PostgreSQL business persistence and is outside this CloudNativePG fleet. That narrow exception does not authorize mutable SQLite persistence or weaken the PostgreSQL HA/backup rules for services that own mutable relational business state.
 
 ### HA topology for critical service clusters
 
@@ -26,7 +28,7 @@ Applications use the operator writer endpoint and never discover/select primarie
 
 ### Connection budget
 
-For each service cluster, aggregate application Hikari `maximumPoolSize` across production pods is <=70% of PostgreSQL `max_connections`; >=30% remains for failover, replication, administration, migrations, and emergency headroom.
+For each service cluster in this PostgreSQL fleet, aggregate application Hikari `maximumPoolSize` across production pods is <=70% of PostgreSQL `max_connections`; >=30% remains for failover, replication, administration, migrations, and emergency headroom.
 
 HPA changes must preserve the connection budget. PgBouncer is not a default and requires measured connection pressure plus compatibility/load evidence.
 
@@ -42,10 +44,10 @@ Current shape:
 - monthly retained recovery artifact for 12 months;
 - backup before material database/operator upgrade when appropriate;
 - automated backup verification each cycle;
-- monthly isolated service restore;
+- monthly isolated PostgreSQL service restore;
 - quarterly full DR exercise.
 
-Backup success without restore evidence is not recovery proof. Backup credentials/artifact namespaces/encryption contexts are independent per service cluster.
+Backup success without restore evidence is not recovery proof. Backup credentials/artifact namespaces/encryption contexts are independent per PostgreSQL service cluster.
 
 ### Notification durability
 
@@ -57,8 +59,10 @@ Mandatory controls include PostgreSQL TLS, service-scoped least-privilege runtim
 
 ## Verification requirements
 
-Test planned switchover, unplanned primary crash, synchronous acknowledged-write durability, failover refusal when quorum/durability cannot be proven, connection/HPA budgets, WAL/PITR RPO, monthly isolated restore integrity/RTO, quarterly DR, service DB/backup isolation, TLS/NetworkPolicy, runtime-role/RLS restrictions, and Notification dispatch/failover ambiguity safety.
+For each production service that owns mutable PostgreSQL relational business persistence, test planned switchover, unplanned primary crash, synchronous acknowledged-write durability, failover refusal when quorum/durability cannot be proven, connection/HPA budgets, WAL/PITR RPO, monthly isolated restore integrity/RTO, quarterly DR, service DB/backup isolation, TLS/NetworkPolicy, runtime-role/RLS restrictions, and Notification dispatch/failover ambiguity safety where applicable.
+
+ADR-0040 immutable SQLite dataset recovery is verified through its own artifact rebuild/redeploy and fail-closed readiness evidence, not this PostgreSQL restore program.
 
 ## Rollback considerations
 
-Rollback MUST NOT restore shared production physical clusters, weaken required synchronous durability, remove independent backup identities, shorten recovery evidence, exceed safe connection budgets, or permit acknowledged Notification dispatch state to be lost during automatic failover.
+Rollback MUST NOT restore shared production physical clusters, weaken required synchronous durability, remove independent backup identities, shorten recovery evidence, exceed safe connection budgets, permit acknowledged Notification dispatch state to be lost during automatic failover, or silently bring ADR-0040's immutable reference artifact into this mutable PostgreSQL fleet.
