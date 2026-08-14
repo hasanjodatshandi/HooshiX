@@ -24,9 +24,9 @@ Every microservice owns its:
 - deployment/release lifecycle;
 - observability and service-level authorization enforcement.
 
-Every production microservice with mutable relational business persistence also owns a dedicated CloudNativePG cluster and independent backup identity/namespace. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, and shared business-model libraries are prohibited. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
+Physical PostgreSQL placement is profile-specific. `production-single-server` uses one shared physical CloudNativePG/PostgreSQL cluster while every service keeps a distinct database, runtime role, migration role, Flyway history and release lifecycle. `production-ha` uses a dedicated CloudNativePG cluster per mutable PostgreSQL service. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, shared credentials and shared business-model libraries are prohibited in both profiles. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
 
-ADR-0040 defines one narrow storage exception: Compromised Password Service uses a service-local **immutable, read-only, rebuildable SQLite reference-data artifact** for its compromised-password dataset. It is not mutable business persistence, receives no subject-owned application data, is not an integration database, has no runtime SQLite writes/Flyway/CloudNativePG requirement, and does not authorize mutable SQLite persistence for any other service. Future mutable state in that service returns to the normal persistence architecture review.
+ADR-0040 defines one narrow storage exception: Compromised Password Service uses a service-local **immutable, read-only, rebuildable SQLite reference-data artifact** for its compromised-password dataset. It is not mutable business persistence, receives no subject-owned application data, is not an integration database, has no runtime SQLite writes/Flyway/CloudNativePG requirement, and does not authorize mutable SQLite persistence for any other service.
 
 ADR-0041 Reference Data uses no database at all in v1. Its small Country/Currency/TimeZone/SupportedLocale bundle is an immutable read-only application resource inside the signed service image; this creates no mutable-persistence or SQLite exception.
 
@@ -40,7 +40,7 @@ Each service owns `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, dep
 
 Organization Java namespace/Gradle group: `com.sajtech`.
 
-Implementation layout follows current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical.
+Implementation layout follows the current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical.
 
 ## 4. High-level topology
 
@@ -52,7 +52,7 @@ React + TypeScript
 Upstream L3/L4 volumetric mitigation/scrubbing
         |
         v
-Redundant external L4 load balancing
+External L4
         |
         v
 Traefik Gateway
@@ -70,11 +70,29 @@ Domain / Platform Microservices
         |                 |
         |                 +--> Apache Kafka
         |
-        +--> service-owned PostgreSQL when mutable relational state exists
+        +--> service-owned PostgreSQL database when mutable relational state exists
         +--> service-local immutable reference artifact only where explicitly decided
 ```
 
-Only BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace mandatory upstream volumetric protection, redundant load balancing, Traefik, or dedicated WAF path.
+Only BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace upstream volumetric protection, external L4, Traefik, or the dedicated WAF path.
+
+### Selected production profile
+
+ADR-0042 selects `production-single-server` as the initial production profile:
+
+```text
+1 physical server
+1 K3s server/workload node
+1 application replica per service
+HPA disabled
+availability PDB disabled
+1 shared physical PostgreSQL cluster/instance
+1 Redis instance
+1 combined KRaft Kafka broker/controller
+non-HA by design
+```
+
+The `production-ha` topology remains the expansion profile. Service documents can contain replicated HA targets; the selected single-server profile overrides only infrastructure placement and availability settings. It does not override business, security, data-ownership, API, deadline, authorization or idempotency contracts.
 
 ## 5. Protocol boundaries
 
@@ -85,8 +103,8 @@ Only BFF and explicitly approved public adapters/APIs are externally reachable. 
 - OpenAPI;
 - Web BFF as browser-facing backend boundary;
 - v1 application namespace under `/api/v1` with reviewed `/auth`, `/identity`, `/authorization`, and public read-only `/reference` subspaces;
-- `/reference` GET/HEAD may be anonymous and explicitly cacheable under ADR-0041, but same-origin CORS and the mandatory public edge/WAF path remain unchanged;
-- same-origin-only browser credential model; browser never receives provider/Identity/downstream access or refresh credentials.
+- `/reference` GET/HEAD may be anonymous and cacheable under ADR-0041, but same-origin CORS and mandatory public edge/WAF path remain;
+- browser never receives provider/Identity/downstream access or refresh credentials.
 
 ### Internal synchronous boundary
 
@@ -106,10 +124,10 @@ REST is not default for new internal service-to-service communication.
 - Git-owned schemas/contracts;
 - Buf `STANDARD` lint + `FILE` breaking checks;
 - no runtime Schema Registry in v1;
-- transactional outbox when local state + event publication are one business effect;
+- Transactional Outbox when local state + event publication are one business effect;
 - at-least-once/idempotent consumer semantics.
 
-Kafka is used only when asynchronous semantics are appropriate; it is not request/reply transport.
+Kafka is used only when asynchronous semantics are appropriate; it is not request/reply transport or business source of truth.
 
 ## 6. Bounded contexts and platform capabilities
 
@@ -121,7 +139,7 @@ Current/approved boundaries include:
 - Web BFF;
 - Compromised Password Service;
 - Reference Data Service — architecture decided by ADR-0041; executable implementation remains planned/evidence-gated;
-- Workflow Service only as future capability boundary that MUST NOT absorb business rules from owning contexts.
+- Workflow Service only as a future capability boundary that MUST NOT absorb business rules from owning contexts.
 
 The first executable backend service is `services/identity-service`; the second executable backend component is `services/web-bff`.
 
@@ -138,13 +156,13 @@ Reference Data Service is the closed global standard-reference boundary for Coun
 - Spring MVC + Virtual Threads;
 - Gradle Kotlin DSL;
 - PostgreSQL 18.x / CloudNativePG 1.30.x for mutable relational service persistence;
-- Xerial SQLite JDBC + embedded SQLite only for the ADR-0040 immutable Compromised Password reference dataset;
+- Xerial SQLite JDBC + embedded SQLite only for ADR-0040 immutable Compromised Password reference data;
 - Flyway, HikariCP, jOOQ and/or Spring Data JPA according to service responsibility;
 - Kafka 4.2.x + Protobuf;
-- Redis 8.2.x with service ownership; shared `security-redis` only for approved ephemeral security/session state;
+- Redis 8.2.x for approved ephemeral security/session state;
 - Resilience4j;
 - OpenTelemetry + Micrometer;
-- Kubernetes 1.35.x + Calico OSS 3.32.x;
+- Kubernetes 1.35.x; K3s for selected single-server profile; Calico OSS 3.32.x;
 - Helm 4.x + Argo CD 3.x;
 - Kyverno + Cosign supply-chain admission;
 - Traefik 3.x;
@@ -157,38 +175,63 @@ Reference Data Service is the closed global standard-reference boundary for Coun
 - Vitest + React Testing Library;
 - Playwright Test + TypeScript.
 
-Reference Data introduces no new runtime technology family. Exact ISO/IANA/CLDR source revisions are immutable bundle manifest inputs, not platform runtime pins.
-
-Exact approved patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/image/chart metadata except where exact value is itself a current architecture constraint.
+Reference Data introduces no new runtime technology family. Exact approved patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/image/chart/provisioning metadata.
 
 ## 8. Production resilience and security boundaries
 
-- **Kubernetes:** three stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint, N+1 critical-worker capacity.
-- **Workload hardening:** immutable digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources/probes, dedicated ServiceAccounts, deny-by-default NetworkPolicy.
-- **PostgreSQL:** dedicated production CloudNativePG cluster per service with mutable relational business persistence; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves. ADR-0040 immutable reference artifact is outside this mutable-state fleet; ADR-0041 Reference Data has no database.
-- **Compromised Password:** >=3 replicas/PDB2/spread; only Identity gRPC ingress; 900ms caller ceiling/one attempt/no retry/fallback; immutable read-only embedded SQLite dataset; no full-dataset JVM cache; no runtime external provider/Internet lookup; missing/corrupt/incompatible dataset fails closed and keeps unsafe serving unavailable.
-- **Reference Data:** target >=3 replicas/PDB2/spread after implementation trigger; initial Web BFF-only gRPC ingress; <=1000ms BFF child deadline/one attempt/no retry/fabricated fallback; immutable image-bundled data; no database/broker/runtime source-provider Internet egress; Class-B SLO; HPA evidence-gated.
-- **Kafka:** KRaft with three brokers + three controllers; critical RF=3/minISR=2/acks=all; cold DR reconstructs from service-owned evidence.
-- **Security Redis:** one primary + two replicas + three Sentinel voters with TLS/ACL isolation.
-- **Web BFF:** `platform-apps/web-bff`, HTTP 8080, >=3 replicas/PDB2; HPA 3..12 only after representative load evidence; HMAC-located server sessions/pre-auth, bounded OIDC/session quotas/crypto, atomic rotation/revocation, and deny-by-default egress only to registered Identity/Authorization/Reference Data/resource/Redis/Google/telemetry dependencies.
-- **Authorization:** >=3 replicas/PDB/spread; one final online no-cache/no-retry `CheckPermission`, safe local prechecks, fail-closed overload/breaker isolation, >=99.95% availability, p95<=100ms/p99<=200ms SLO.
-- **OpenBao:** lean single-Raft authoritative secret source with encrypted snapshots; normal application hot paths use mounted/local validated key material rather than per-request OpenBao calls.
-- **Notification:** PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation; no bespoke clock/fence control plane.
-- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature verified by HA Kyverno, with continuous deployed-digest vulnerability/advisory correlation and bounded admission-policy authoring/egress controls. Bundled native components such as SQLite remain part of final-image advisory correlation.
-- **Public edge:** upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> dedicated Caddy/Coraza WAF -> Web BFF.
-- **Human access:** Teleport JIT SSO/WebAuthn access with approvals, short-lived privilege, and audit/session evidence.
-- **Telemetry:** PII/secret-safe structured telemetry with static rules, pipeline redaction, synthetic canaries, and runtime leak detection.
+### Shared invariants
 
-These production controls MUST NOT make local development depend on full production cluster. Inner loop uses focused unit/architecture/contract tests and Testcontainers; mesh/WAF/HA/DR/chaos/provider evidence runs at appropriate CI/staging/release cadence.
+Both profiles preserve:
 
-## 9. Change and decision rule
+- immutable hardened workloads, dedicated ServiceAccounts and deny-by-default NetworkPolicy;
+- Istio Ambient strict mTLS/workload identity and least-privilege authorization;
+- forced tenant RLS and strict service DB/role/Flyway boundaries;
+- physical WAL/PITR/off-site backup for mutable PostgreSQL state;
+- Kafka Outbox/Inbox/idempotency/replay semantics;
+- Redis TLS/ACL/`noeviction`/fail-closed security semantics;
+- signed image/provenance/SBOM Kyverno enforcement;
+- upstream volumetric protection -> Traefik -> Caddy/Coraza WAF -> BFF;
+- PII/secret-safe telemetry;
+- zero-standing-privilege human access;
+- **OpenBao 2.6.1 as unchanged secret authority**;
+- current Identity/MFA/browser/Authorization security semantics.
 
-Implementation MUST NOT silently replace a platform technology, bounded-context boundary, data owner, security invariant, or communication model.
+### `production-single-server`
 
-Active repository-owner documentation policy is current-only. When architecture changes:
+- **Kubernetes:** one K3s server/workload node; no quorum/node-failover claim; K3s Flannel/network-policy controller/bundled Traefik/ServiceLB disabled; Calico and repository edge stack retained.
+- **Application workloads:** exactly one replica by default; HPA and availability PDB disabled; host downtime explicitly accepted.
+- **PostgreSQL:** one physical CloudNativePG/PostgreSQL instance; distinct service databases/roles/Flyway/RLS; global connection budget; no primary failover; cluster-wide physical PITR restored first in isolation.
+- **Kafka:** one combined KRaft broker/controller; RF=1/minISR=1/acks=all/idempotence; non-HA acceptance; critical replay evidence retained.
+- **Security Redis:** one TLS/ACL/`noeviction` instance with AOF `appendfsync everysec`; no failover claim; session loss means re-authentication.
+- **Istio:** retained; complete-stack capacity benchmark required; no waypoints by default.
+- **Kyverno:** one replica allowed; reduced high-value policy set allowed; blocking digest/signature/provenance/SBOM/security enforcement retained.
+- **Human access:** hardened OpenSSH + hardware-backed FIDO2 + two-reviewer time-bounded privilege + OS/`sudo`/Kubernetes/database audit exported off-host; shell history is not authoritative audit.
+- **Capacity:** `2 vCPU / 3-4 GiB RAM` is not approved without full-stack evidence and >=30% validated CPU/memory headroom.
+
+### `production-ha`
+
+- 3 stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint and N+1 critical capacity;
+- replicated service workloads/PDB/topology spread according to service target;
+- dedicated service CloudNativePG clusters, critical three-instance synchronous durability/failover;
+- Kafka 3 brokers + 3 controllers, RF=3/minISR=2;
+- Redis primary + two replicas + three Sentinel voters;
+- Kyverno >=3 replicas;
+- Teleport Enterprise JIT privileged human access.
+
+## 9. OpenBao and MFA are outside topology simplification
+
+OpenBao remains exactly under ADR-0011 and Technology Baseline. ADR-0042 does not remove, replace, bypass or weaken it.
+
+End-user MFA remains under ADR-0012. Active TOTP is still required where the current Identity state requires it; Email/SMS verification/recovery is not a freely selectable weaker bypass.
+
+## 10. Change and decision rule
+
+Implementation MUST NOT silently replace a platform technology, bounded-context boundary, data owner, security invariant, communication model, production profile or availability claim.
+
+When architecture changes:
 
 1. update applicable current-state document;
-2. create or update retained current ADR when durable decision record is useful;
-3. remove or normalize obsolete decision text after confirming no current invariant/contract/security/SLO/operational rule would be lost;
-4. update `../adr/decision-register.md`, `SOURCES.md`, executable architecture/security tests, and technology baselines when applicable;
-5. deliver and review complete change through PR-first workflow.
+2. create or update retained current ADR when durable decision value exists;
+3. remove or normalize obsolete decision text after confirming no current invariant/contract/security/SLO/operational rule is lost;
+4. update `../adr/decision-register.md`, `SOURCES.md`, executable architecture/security tests, readiness evidence and technology baselines when applicable;
+5. deliver and review the complete change through PR-first workflow.
