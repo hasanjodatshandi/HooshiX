@@ -51,9 +51,9 @@ Therefore, no service, deployment, CI, security gate, restore exercise, load tes
 | Observability/audit pipeline | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Backup/PITR/cold-DR automation | DESIGNED | NOT PRESENT | NOT VERIFIED |
 
-## Status vocabulary
+## Repository-level status vocabulary
 
-Use these values consistently:
+Use these values for the repository-level summary in this file:
 
 ```text
 Architecture:
@@ -74,6 +74,8 @@ Evidence:
   NOT VERIFIED
   NOT APPLICABLE
 ```
+
+Individual readiness checklist items may use their narrower item-level implementation/evidence vocabulary. They do not override the concrete repository-presence statement in this file.
 
 `IMPLEMENTED` means the required repository implementation artifact exists. It is not runtime proof.
 
