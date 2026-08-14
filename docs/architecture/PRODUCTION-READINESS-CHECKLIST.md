@@ -35,6 +35,8 @@ Required evidence:
 - one atomic multi-dimension quota operation with no partial consumption;
 - trusted app time + Redis `TIME`, <=2s skew, monotonic effective time, no TTL security reset;
 - HMAC pseudonymous keying/rotation without budget reset;
+- exact registration policy tests: REGISTER contact `5, 1/15m, 24h`, REGISTER network `60, 1/5s, 1h`, RESEND contact `5, 1/10m, 2h` plus fixed 60s challenge gap, RESEND network `60, 1/5s, 1h`, CONFIRM network `120, 2/1s, 30m` plus challenge-local five-proof cap;
+- authenticated Contact verification/recovery/MFA operation namespaces cannot share quota keys with registration despite reusing approved numeric envelopes;
 - authentication/MFA/recovery anti-lockout + non-enumeration tests;
 - Redis outage/failover fails protected operations closed without converting dependency failure into false quota denial;
 - production profiles cannot bypass the limiter;
@@ -48,13 +50,14 @@ Required evidence:
 
 - >=3 replicas, PDB `minAvailable=2`, topology spread;
 - availability >=99.95%; p95<=100ms/p99<=200ms at >=2x projected peak;
-- exact 300ms/one-attempt/wait-for-ready-off/no-cache/no-retry/no-fallback behavior;
+- exact 300ms/one-attempt/wait-for-ready-off/no-cache/no-retry/no-fallback behavior for `CheckPermission`;
+- Identity `PrepareMembershipRemoval` uses 300ms/one-attempt/no-cache/no-retry/no-fallback fail-closed semantics and Authorization-side durable owner-safety reservation;
+- concurrent last-owner prepares cannot both consume the final owner; reservation-vs-owner-assignment races are atomic; reservations do not auto-expire into unsafe allow;
+- Identity crash between prepare/local Membership commit recovers through stable request replay and idempotent finalize/cancel durable resolution;
+- default `tenant_member` provisioning and tenant lifecycle cleanup/reconciliation are idempotent durable commands and never fabricate permission while pending;
 - bounded global/per-caller concurrency and no unbounded queue;
-- current 50%-window/five-consecutive breaker opening behavior;
-- repeated OPEN durations de-correlate with bounded reopen backoff;
-- HALF_OPEN permits one real `CheckPermission` probe in flight; three consecutive infrastructure-successful probes close; infrastructure failure/overload reopens;
-- health endpoint cannot close the breaker; tenant/commercial tier does not alter breaker semantics;
-- `dependency-criticality.yaml` schema/coverage/render checks pass;
+- current breaker opening/recovery behavior from ADR-0032/0036;
+- `dependency-criticality.yaml` schema/coverage/render checks pass including all Identity->Authorization lifecycle edges;
 - Hikari acquisition p99<25ms, acquisition ceiling<=50ms, permission SQL ceiling<=100ms;
 - no synchronous downstream other than Authorization-owned PostgreSQL;
 - no routine duplicate BFF permission check;
@@ -108,7 +111,16 @@ Required evidence:
 
 - OIDC Authorization Code + PKCE S256, state/nonce replay/mismatch negatives;
 - exact redirect and open-redirect negatives;
+- provider validation occurs in BFF before Identity invocation; no direct Identity->Google login/link/signup dependency;
+- provider authorization code/tokens do not enter Identity;
+- BFF->Identity evidence is exactly 256-bit CSPRNG, bound to trusted BFF workload + canonical UUIDv4 request + issuer/subject/issued-at/versioned metadata, expires after two minutes, and retains spent/replay evidence >=10m;
+- exact replay returns original result; changed payload/request under same evidence ID returns stable replay conflict;
+- Google signup verified-email collision becomes `ACCOUNT_LINK_REQUIRED`; email equality never auto-links; `email_verified=false` creates no Contact; provider names are suggestion-only;
+- active TOTP after Google proof enters the same MFA pre-auth continuation as password and cannot establish a completed BFF/Identity session before MFA;
 - secure `__Host-sajtech-session` + fixation/rotation tests;
+- tenantless `authenticated_onboarding` has no normal resource JWT, permits only reviewed Identity onboarding routes, and transitions only after valid Membership selection;
+- zero/one/many Membership authentication journeys and tenant-switch session/refresh rotation pass;
+- Identity MFA-state-change revocation/rotation is reflected in BFF session continuity;
 - server-side session + encrypted refresh-credential handling where used;
 - Origin + synchronizer-token CSRF positives/negatives;
 - same-origin/default-deny CORS;
@@ -187,7 +199,7 @@ Required evidence:
 
 Status until verified: **public-internet blocker**.
 
-## 11. Iran SMS / SMS MFA — ADR-0020
+## 11. Iran SMS / SMS MFA — ADR-0020/0012
 
 Required evidence:
 
@@ -199,7 +211,9 @@ Required evidence:
 - timeout/connection loss/malformed/unproven acceptance -> `AMBIGUOUS`, never blind resend;
 - bounded report polling/backpressure;
 - local logging adapter cannot activate in production;
-- SMS MFA additionally passes ADR-0024 quotas and current Identity MFA/session gates.
+- SMS MFA additionally passes ADR-0024 quotas and current Identity MFA/session gates;
+- active TOTP cannot be downgraded/bypassed by SMS; SMS MFA is available only for accounts without active TOTP under the approved production gate;
+- SMS MFA proof is exactly eight CSPRNG decimal digits, purpose-HMAC-only, no plaintext durable storage after safe handoff, expires no later than the enclosing 5m pre-auth challenge, shares that challenge's max-five failed proofs, enforces 60s resend, replacement invalidation and single use.
 
 Status until verified: **SMS-dependent feature blocker; unrelated Email-only capabilities may proceed independently**.
 
@@ -225,9 +239,11 @@ Required evidence:
 - RSA-3072/RS256 private signing keys only in Identity local/OpenBao delivery boundary;
 - next public key deployed/verified before activation;
 - local GitOps verifier bundle reloads atomically;
+- exact v1 claim allow-list (`iss`,`aud`,`sub`,`jti`,`iat`,`exp`,`tenant_id`,`membership_id`,`sid`), no role/permission snapshot authority, wildcard-audience rejection;
 - algorithm-confusion/unknown-kid/issuer/audience negatives;
+- exact five-minute issuance lifetime and configurable verifier clock leeway <=30s, including rejection of >30s config;
 - 90-day normal rotation + emergency compromise exercise;
-- no normal verification call to Identity/OpenBao/remote JWKS;
+- no normal verification call to Identity/OpenBao/remote JWKS/introspection;
 - private-key Git/telemetry leak tests.
 
 Status until verified: **authentication-trust blocker**.
@@ -261,7 +277,42 @@ For affected frontend releases:
 
 Status until verified: **frontend release blocker when applicable**.
 
-## 16. Final release evidence
+## 16. Identity Service repository-complete evidence — ADR-0009/0012/0023/0028
+
+Required repository/build evidence includes:
+
+- versioned feature-scoped Protobuf + Buf compatibility for registration/profile/contact/auth/password/session/tenant/invitation/membership/external-identity/MFA/erasure entry points;
+- canonical UUIDv4 entity/request IDs, 32-byte refresh credential, >=256-bit session IDs, 256-bit OIDC evidence IDs, UTC-microsecond persistence, non-reuse and server-owned TTL/policy fields;
+- EMAIL + PHONE local registration implementation with local Credential/compromised-password dependency and staging/production PHONE gate tied to SMS readiness;
+- User `PENDING -> ACTIVE -> SUSPENDED -> DELETING -> DELETED`, profile+verified-Contact+applicable-Credential activation, first verified primary, authentication shutdown/revocation for suspended/deleting states;
+- one live 10m pending registration reservation per canonical Contact; repeated same pending continuation cannot overwrite protected registration state; reservation expiry releases only unverified reservation authority; stale challenge cannot revive; no second User/challenge for verified/reserved Contact;
+- local password login by any active verified primary/secondary email/phone Contact, unverified/removed denial and non-enumerating unknown/no-local-Credential/wrong-password/blocked-account behavior;
+- profile/contact APIs and recent-auth primary/remove constraints; ACTIVE User cannot lose last verified Contact outside erasure;
+- exact registration/contact/password-recovery challenge format/TTL/attempt/resend/single-use and exact ADR-0024 numeric registration quota behavior/non-enumeration;
+- explicit aggregate/transaction boundaries, JPA aggregate CRUD plus justified JDBC/jOOQ SQL-control paths, no remote I/O in transactions;
+- tenant/invitation/Membership exact lifecycles, existing-user target/7d/single-pending, default `tenant_member` provisioning, no arbitrary invitation role;
+- concurrent last-owner `PrepareMembershipRemoval` durable reservation, 300ms/one-attempt/no-cache/no-retry/fallback, crash-safe local intent + idempotent finalize/cancel and no unsafe automatic reservation expiry;
+- tenant delete/suspend/restore lifecycle, pending invitation revocation, Authorization cleanup/reconciliation, slug/ID non-reuse;
+- tenantless authenticated onboarding with no ordinary resource JWT, zero/one/many Membership selection, stale last-selection rejection and tenant-switch credential/session rotation;
+- exact JWT claim/audience rules, five-minute lifetime, <=30s verifier leeway and local-verification residual-token trade-off;
+- refresh 32-byte generation/HMAC persistence, 7d idle/30d absolute, rotation/reuse, max 20 active families and deterministic oldest revocation;
+- logout-current/logout-all/password-change/reset/suspension/deleting/ExternalIdentity-unlink/MFA-state-change revocation rules;
+- password change recent-auth/MFA assurance, primary-Contact-only non-enumerating password recovery, no reset-created first local Credential, active-MFA reset requirement, no automated password+MFA-loss bypass, no password history;
+- compromised-password NFC/UTF-8/SHA-256 local digest, only first 20 bits outbound, bounded suffix/count response, raw password/full digest non-egress, 900ms/one-attempt/no-retry/fail-closed behavior;
+- BFF-only Google provider validation; exact 256-bit/two-minute/ten-minute evidence semantics; `email_verified=false` no-Contact; verified-email signup collision `ACCOUNT_LINK_REQUIRED`; suggestion-only names; no email auto-link/provider token in Identity;
+- active TOTP after both password and Google primary proof; ExternalIdentity link/unlink recent-auth and last-authentication-method protection;
+- TOTP pre-auth 5m/five-failed-proof/single-use, new-primary-proof invalidation, timestep replay rejection, recovery-code atomic use; MFA-state-change session revocation; no SMS downgrade of active TOTP;
+- exact SMS proof eight-digit/HMAC/no-plaintext/<=5m/five-proof/60s/replacement/single-use semantics and production gate;
+- self-erasure recent-auth + active MFA + no ACTIVE/SUSPENDED Membership for non-DELETED Tenant; last-owner-safe exit; pending-invitation + all-family revocation; server-owned participants; Kafka/outbox/inbox replay/non-PII receipts/legal hold; no self-service undo; restore-before-traffic;
+- purpose/version HMAC idempotency replay/conflict, 35d critical publication/Inbox-dedup evidence, >=14d retry/DLQ evidence when used, >=365d security audit evidence;
+- dependency registry includes semantic quota, compromised-password, Notification, owner/member provisioning, Membership removal prepare/resolution, tenant lifecycle, and Web BFF OIDC ownership with valid current policy refs;
+- Identity Docker/Helm/GitOps/ServiceAccount/NetworkPolicy/Istio/probe/replica/PDB/topology/security-context/render checks and CI gates.
+
+Repository-complete does **not** equal production-ready. Registry/DNS/secret paths/provider credentials/Redis/CNPG/backup/alert destinations may remain typed environment placeholders, but actual staging/production provider, secret, cluster, load, failover, restore, and DR evidence remains `NOT VERIFIED` until executed.
+
+Status until verified: **Identity repository implementation/evidence blocker; external production evidence remains independently blocking**.
+
+## 17. Final release evidence
 
 The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/WAF/provider capacity, node/replica/database failover, security-negative/workload-identity, backup/PITR/restore, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
 

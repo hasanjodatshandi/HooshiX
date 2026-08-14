@@ -42,7 +42,7 @@ edges:
     owner: identity
     policy_refs:
       - docs/architecture/security-architecture.md#4-passwords-external-identity-and-mfa
-      - docs/architecture/services/identity-service.md#7-password-credential-baseline
+      - docs/architecture/services/identity-service.md#7-password-credential-and-compromised-password-baseline
 
   - operation_id: web-bff.authenticated-session-lookup
     caller_owner: web-bff
@@ -88,7 +88,55 @@ edges:
     fallback: none
     owner: identity
     policy_refs:
-      - docs/architecture/services/identity-service.md#5-tenant-v1
+      - ADR-0012
+      - docs/architecture/services/authorization-service.md#7-provisioning
+
+  - operation_id: identity.authorization-member-provisioning
+    caller_owner: identity-service
+    dependency_id: authorization.provision-tenant-member
+    class: DURABLE_COMMAND
+    failure_action: keep_member_provisioning_outbox_pending_and_default_deny
+    retry_owner: caller-durable-dispatcher
+    fallback: none
+    owner: identity
+    policy_refs:
+      - ADR-0012
+      - docs/architecture/services/authorization-service.md#7-provisioning
+
+  - operation_id: identity.authorization-membership-removal-prepare
+    caller_owner: identity-service
+    dependency_id: authorization.prepare-membership-removal
+    class: AUTHORITATIVE_SECURITY
+    failure_action: fail_closed_membership_removal_unavailable
+    retry_owner: none
+    fallback: none
+    owner: identity
+    policy_refs:
+      - ADR-0012
+      - docs/architecture/services/authorization-service.md#8-owner-safety-membership-removal-protocol
+
+  - operation_id: identity.authorization-membership-removal-resolution
+    caller_owner: identity-service
+    dependency_id: authorization.finalize-or-cancel-membership-removal
+    class: DURABLE_COMMAND
+    failure_action: keep_owner_safety_reservation_and_resolution_outbox_pending
+    retry_owner: caller-durable-dispatcher
+    fallback: none
+    owner: identity
+    policy_refs:
+      - ADR-0012
+      - docs/architecture/services/authorization-service.md#8-owner-safety-membership-removal-protocol
+
+  - operation_id: identity.authorization-tenant-lifecycle-sync
+    caller_owner: identity-service
+    dependency_id: authorization.apply-tenant-lifecycle
+    class: DURABLE_COMMAND
+    failure_action: keep_tenant_lifecycle_pending_without_fabricated_authorization_state
+    retry_owner: caller-durable-dispatcher
+    fallback: none
+    owner: identity
+    policy_refs:
+      - ADR-0012
       - docs/architecture/services/authorization-service.md#7-provisioning
 
   - operation_id: notification.result-callback-dispatch
@@ -116,14 +164,26 @@ edges:
       - ADR-0007
       - ADR-0020
 
-  - operation_id: identity.google-oidc-login
-    caller_owner: identity-service
+  - operation_id: web-bff.google-oidc-login
+    caller_owner: web-bff
     dependency_id: google-oidc-endpoints
     class: AUTHORITATIVE_SECURITY
     failure_action: login_unavailable
     retry_owner: protocol-defined-safe-flow-only
     fallback: no_alternate_identity_auto_link
-    owner: identity
+    owner: web-bff
+    policy_refs:
+      - ADR-0016
+      - docs/architecture/services/web-bff.md#3-oidc
+
+  - operation_id: web-bff.identity-oidc-evidence-submit
+    caller_owner: web-bff
+    dependency_id: identity.external-identity-establish
+    class: AUTHORITATIVE_SECURITY
+    failure_action: login_unavailable
+    retry_owner: none
+    fallback: none
+    owner: web-bff
     policy_refs:
       - ADR-0012
       - ADR-0016

@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; consolidated to current-only documentation on 2026-08-13
+2026-08-11; consolidated to current-only documentation on 2026-08-13; Identity registration quota values finalized on 2026-08-14
 
 ## Decision
 
@@ -91,6 +91,11 @@ Numeric tuning may change through a reviewed security-baseline PR without a new 
 
 | Operation | Dimension | Capacity | Refill | Cleanup horizon / prior TTL intent | Cost | Gate |
 | --- | --- | ---: | --- | --- | ---: | --- |
+| `REGISTER` | canonical contact | 5 | 1 / 15m | 24h | 1 | hard gate |
+| `REGISTER` | network | 60 | 1 / 5s | 1h | 1 | pre-auth hard gate |
+| `RESEND_REGISTRATION_VERIFICATION` | canonical contact | 5 | 1 / 10m | 2h | 1 | hard gate + ADR-0009 60s minimum resend spacing |
+| `RESEND_REGISTRATION_VERIFICATION` | network | 60 | 1 / 5s | 1h | 1 | pre-auth hard gate |
+| `CONFIRM_REGISTRATION` | network | 120 | 2 / 1s | 30m | 1 | pre-auth hard gate; challenge-local five-failed-proof limit remains authoritative |
 | `LOGIN` | failed-credential login subject | 8 | 1 / 60s | 15m policy horizon | 1 | post-failure anti-lockout pressure |
 | `LOGIN` | network | 120 | 2 / 1s | 15m | 1 | pre-auth hard gate |
 | `GOOGLE_LOGIN` | provider subject when trusted/known | 20 | 1 / 15s | 10m | 1 | subject abuse pressure |
@@ -109,6 +114,12 @@ Numeric tuning may change through a reviewed security-baseline PR without a new 
 | `MFA_RECOVERY` | network | 30 | 1 / 60s | 2h | 2 | pre-auth hard gate |
 | `AUTH_ADMIN_WRITE` | actor + scope | 120 | 2 / 1s | 1h | 1 | hard gate |
 | `AUTH_ADMIN_WRITE` | tenant/platform scope | 600 | 5 / 1s | 1h | 1 | hard gate |
+
+For `REGISTER`/resend, the contact dimension is the canonical email or E.164 phone after Identity validation and before HMAC pseudonymization. `CONFIRM_REGISTRATION` deliberately has no Redis subject hard-lock bucket; the single challenge's five-failed-proof limit is the subject proof authority so Redis pressure cannot create a separate permanent account/contact lockout.
+
+Authenticated `AddContact`/contact-verification add/resend/confirm reuses the corresponding registration numeric envelope under distinct domain-separated operation names and authenticated-user context; it never shares Redis keys with account registration.
+
+Password-recovery proof and MFA pre-auth proof use the `MFA_RECOVERY` numeric envelope under distinct domain-separated operation names where Redis pressure is required, while their challenge-local proof-attempt limits remain independently authoritative. Reusing the numeric envelope does not reuse keys or challenge state.
 
 ### Failure contract
 
@@ -145,8 +156,8 @@ Semantic quota Redis is a Class-B internal security dependency:
 
 ## Verification requirements
 
-Tests cover atomic races/no partial consumption, Redis outage/failover fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from a one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
+Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, Redis outage/failover fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from a one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
 
 ## Rollback considerations
 
-Rollback MUST NOT restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If the dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled.
+Rollback MUST NOT remove the approved registration quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If the dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled.
