@@ -1,112 +1,58 @@
-# Architecture Decision Register — Current Effective Decisions
+# Architecture Decision Register — Current State
 
-- **Mode:** current-only
-- **Policy:** `../engineering/current-only-documentation-policy.md`
-- **Normalized:** 2026-08-13
-- **Identity v1 implementation contract finalized:** 2026-08-14
-- **Authorization v1 implementation contract finalized:** 2026-08-14
-- **Web BFF v1 implementation contract finalized:** 2026-08-14
-- **Compromised Password v1 implementation contract finalized:** 2026-08-14
-- **Reference Data v1 architecture contract finalized:** 2026-08-14
-- **Production single-server profile finalized:** 2026-08-14
-- **Production network trust boundaries finalized:** 2026-08-15
+This register identifies current effective ADRs. ADR identifiers are stable after merge under `docs/engineering/current-only-documentation-policy.md`; gaps are permitted and IDs are never renumbered/reused.
 
-This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
+## Current effective ADRs
 
-## Identity, tenancy, sessions, MFA, and erasure
-
-| ADR | Current scope |
+| ADR | Current decision area |
 | --- | --- |
-| [ADR-0008](0008-persist-registration-locale-and-reuse-it-for-resend.md) | Registration locale persistence/resend behavior and locale migration safety |
-| [ADR-0009](0009-enable-identity-registration-runtime.md) | Identity EMAIL/PHONE local registration runtime/composition, local Credential + verified-Contact login identifiers, `PENDING -> ACTIVE` gate, profile/contact canonicalization, pending-contact reservation/expiry/non-overwrite, primary-contact and fixed verification-challenge/quota integration invariants |
-| [ADR-0012](0012-define-identity-tenant-session-external-and-mfa-v1.md) | Complete Identity v1 feature-scoped contract: identifiers, User/profile/contact lifecycle, tenant/invitation/membership lifecycle, concurrency-safe last-owner removal, persistence boundaries, password/Google primary authentication + MFA continuation, tenantless onboarding/selection, JWT/refresh/session revocation, password recovery/compromised-password protocol, Google signup/evidence/link/unlink, TOTP/SMS MFA, self-erasure entry, idempotency/audit |
-| [ADR-0023](0023-define-identity-jwt-signing-key-lifecycle-v1.md) | JWT signing/verifier key lifecycle, local verification, <=30-second verifier clock leeway, and Identity-owned authorized-BFF exact-audience access-token brokerage |
-| [ADR-0028](0028-define-data-subject-erasure-execution-and-evidence-v1.md) | Self-erasure authentication shutdown with Membership/last-owner exit precondition and pending-invitation/session revocation, plus cross-service irreversible erasure execution/evidence, server-owned participant registry, async outbox/Kafka coordination, legal-hold ledger/authorization, logical-deletion/retention baseline |
+| ADR-0001 | dedicated Caddy/Coraza edge WAF |
+| ADR-0002 | production Istio trust/enrollment |
+| ADR-0003 | Git/Buf schema governance without runtime Schema Registry |
+| ADR-0004 | initial cold disaster recovery |
+| ADR-0005 | production SLO classes/error budgets |
+| ADR-0006 | Notification durable handoff/semantic contract |
+| ADR-0007 | Notification runtime |
+| ADR-0008 | registration locale persistence/resend reuse |
+| ADR-0009 | Identity registration runtime |
+| ADR-0010 | versioned database Notification templates/Liara email |
+| ADR-0011 | GitOps/OpenBao production secret authority |
+| ADR-0012 | Identity tenant/session/external identity/MFA |
+| ADR-0013 | online Authorization without permission cache/Kafka |
+| ADR-0014 | local Notification delivery key ring |
+| ADR-0015 | Kafka durability/rebuildable DR |
+| ADR-0016 | Web BFF browser OIDC/session security |
+| ADR-0017 | signed artifacts/provenance/admission; Kyverno CEL policy APIs |
+| ADR-0018 | Notification clock/dispatch safety |
+| ADR-0019 | CloudNativePG/Barman persistence baseline |
+| ADR-0020 | IPPanel SMS provider |
+| ADR-0021 | production platform compatibility/CNI |
+| ADR-0022 | self-hosted Kubernetes HA expansion topology |
+| ADR-0023 | Identity JWT signing-key lifecycle |
+| ADR-0024 | semantic security quotas: exact-IP, aggregate pressure, time/cardinality fail-closed safety |
+| ADR-0025 | synchronous dependency failure containment |
+| ADR-0026 | online Authorization overload/SLO |
+| ADR-0027 | PostgreSQL service isolation/tenant RLS |
+| ADR-0028 | data-subject erasure execution/evidence |
+| ADR-0029 | upstream volumetric DDoS protection |
+| ADR-0030 | production human JIT access |
+| ADR-0031 | PII-safe logging detection pipeline |
+| ADR-0032 | Authorization SLO alerting/breaker recovery |
+| ADR-0033 | operation-level dependency criticality/degradation |
+| ADR-0034 | CloudNativePG fleet operations |
+| ADR-0035 | SBOM/vulnerability response/deployment gates |
+| ADR-0036 | Authorization breaker/dependency governance |
+| ADR-0037 | PostgreSQL restore/upgrade evidence |
+| ADR-0038 | vulnerability exceptions/threat intelligence/ownership |
+| ADR-0039 | Java coding/executable quality gates |
+| ADR-0040 | independent Compromised Password service with offline HIBP SHA-1 immutable SQLite corpus |
+| ADR-0041 | Reference Data capability; independent service remains evidence-gated |
+| ADR-0042 | selected single-server production profile + HA expansion profile |
+| ADR-0043 | production network/client-address/management trust boundaries |
+| ADR-0044 | Day-One observability runtime: Micrometer/OpenTelemetry/Prometheus/Loki/Tempo/Grafana/external host-down signal |
 
-Core global-user/tenant-membership, logical deletion/legal hold, credential, and package rules are represented directly in current-state architecture/coding documents rather than predecessor ADRs.
+## Superseded ADR identifiers
 
-## Compromised Password
+None currently retained as fully superseded tombstones.
 
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0040](0040-define-self-contained-compromised-password-sqlite-v1.md) | Self-contained internal compromised-password lookup; existing SHA-256 20-bit-prefix privacy contract; immutable read-only embedded SQLite reference dataset; offline dataset compiler/versioning; no runtime external provider, PostgreSQL, Redis, Kafka, or subject-linked state; bounded fail-closed lookup/runtime/deployment/security evidence |
-
-## Reference Data
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0041](0041-define-reference-data-service-v1.md) | Global non-tenant Country/Currency/TimeZone/SupportedLocale boundary; ISO/IANA/stable-CLDR offline source governance; immutable image-bundled data with no DB/Redis/Kafka/runtime provider; typed bounded gRPC reads; `/api/v1/reference` BFF facade/cache semantics; BFF-only initial runtime edge/workload; Class-B target; executable service deferred until consumer/journey trigger |
-
-## Notification
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0006](0006-finalize-notification-v1-handoff-and-semantic-contract.md) | Durable semantic contract, fingerprinting, exact-content escrow, callbacks, locale/templates/recipient/retention |
-| [ADR-0007](0007-define-notification-v1-runtime.md) | Provider/persistence/dispatch/HA/operations runtime |
-| [ADR-0010](0010-use-versioned-database-notification-templates-and-liara-email.md) | PostgreSQL versioned templates and Liara Email |
-| [ADR-0014](0014-use-local-notification-delivery-key-ring-in-v1.md) | Local AES-GCM delivery key-ring runtime |
-| [ADR-0018](0018-simplify-notification-clock-safety-and-remove-dispatch-fence-v1.md) | PostgreSQL-authoritative time/dispatch-commit safety; no bespoke clock/fence control plane |
-| [ADR-0020](0020-select-ippanel-webservice-sms-for-iran.md) | IPPanel Webservice production SMS for Iran |
-
-## Authorization, quotas, and dependency failure semantics
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0013](0013-use-online-authorization-without-cache-or-kafka-v1.md) | Complete Authorization v1 policy contract: exact permission catalog/lifecycle, tenant SYSTEM/custom Roles and direct overrides, one authoritative no-cache/no-Kafka/no-retry `CheckPermission`, BFF-backed tenant management with privilege-escalation prevention and bounded limits, platform capability profile/`CheckPlatformPermission`, atomic owner safety, idempotency/audit, jOOQ/RLS persistence, and erasure behavior |
-| [ADR-0024](0024-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: profile-aware Redis topology, atomicity, pseudonymization, anti-lockout, exact Identity registration policy values, Web BFF OIDC start/callback values, Authorization semantic-mutation cost, dual-clock/TTL safety |
-| [ADR-0025](0025-define-synchronous-dependency-failure-containment-v1.md) | Synchronous dependency timeout/bulkhead/breaker/fallback rules |
-| [ADR-0026](0026-harden-online-authorization-overload-and-slo-v1.md) | Authorization runtime SLO, capacity, deployment, safe prechecks, overload isolation, and fail-closed breaker baseline |
-| [ADR-0032](0032-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md) | Authorization SLI interpretation, paired burn alerts, breaker-opening criteria, and health-endpoint non-authority |
-| [ADR-0033](0033-define-operation-level-dependency-criticality-and-degradation-v1.md) | Operation-level dependency criticality/degradation/fallback semantics and current-policy references |
-| [ADR-0036](0036-refine-authorization-breaker-recovery-and-dependency-policy-governance-v1.md) | De-correlated OPEN timing, serialized real HALF_OPEN recovery, and machine-readable dependency-policy governance |
-
-## Browser, edge, workload identity, logging, supply chain, and access
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0001](0001-select-dedicated-caddy-coraza-edge-waf.md) | Dedicated Caddy/Coraza WAF topology |
-| [ADR-0002](0002-define-production-istio-trust-and-enrollment.md) | Istio trust domain/CA hierarchy/enrollment |
-| [ADR-0016](0016-define-web-bff-browser-oidc-and-session-security-v1.md) | Complete Web BFF v1 contract: `/api/v1` namespace/request/error bounds, exact OIDC/pre-auth entropy and redirect rules, trusted Identity evidence, server-owned audience token brokerage, HMAC-located Redis sessions, refresh AES-GCM/key lifecycle, atomic session rotation/index/revocation, tenantless onboarding, exact CSRF/Fetch-Metadata/same-origin CORS/CSP/cache policy, OIDC abuse quotas, erasure, runtime/egress and final resource-authorization boundary |
-| [ADR-0017](0017-enforce-signed-artifacts-and-provenance-at-admission-v1.md) | Signed image/provenance/SBOM admission plus profile-aware Kyverno availability, admission-policy authoring, and policy-engine network/SSRF safety |
-| [ADR-0029](0029-require-upstream-volumetric-ddos-protection-v1.md) | Upstream L3/L4 volumetric-DDoS protection |
-| [ADR-0030](0030-define-production-human-jit-access-v1.md) | Zero-standing-privilege JIT access: Teleport for `production-ha`; hardened OpenSSH + hardware FIDO2 + durable system/privilege audit for `production-single-server` |
-| [ADR-0031](0031-enforce-pii-safe-logging-detection-pipeline-v1.md) | PII-safe logging/redaction/canary/runtime detection |
-| [ADR-0035](0035-automate-sbom-vulnerability-response-and-deployment-gates-v1.md) | Continuous SBOM/vulnerability response and deployment gates |
-| [ADR-0038](0038-harden-vulnerability-exceptions-threat-intelligence-and-ownership-v1.md) | Vulnerability exception expiry, threat intelligence, remediation ownership |
-| [ADR-0043](0043-define-production-network-trust-boundaries-v1.md) | Production client-address trust from external-L4 PROXY v2 through Traefik/WAF/BFF, anti-spoofing/fail-closed network-quota context, and dedicated WireGuard management overlay for single-server SSH reachability |
-
-## Data, Kafka, recovery, and PostgreSQL fleet
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0003](0003-use-git-and-buf-without-runtime-schema-registry-in-v1.md) | Git + Buf contract compatibility; no runtime Schema Registry in v1 |
-| [ADR-0004](0004-define-initial-cold-disaster-recovery.md) | Cold-DR objectives/recovery model |
-| [ADR-0005](0005-define-production-slo-classes-and-error-budgets.md) | Production SLO classes, error budgets, release-freeze policy |
-| [ADR-0015](0015-define-kafka-production-durability-and-rebuildable-dr-v1.md) | Kafka KRaft durability/rebuildable DR with HA and formally accepted single-broker profile topology |
-| [ADR-0019](0019-adopt-cloudnativepg-ha-and-barman-backups-v1.md) | Profile-aware CloudNativePG topology plus Barman backup/PITR mechanics |
-| [ADR-0027](0027-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Service database/role/Flyway/cross-service-SQL isolation + forced tenant RLS + pool-safe transaction-local tenant context; dedicated physical clusters in HA profile and explicitly shared physical cluster in single-server profile |
-| [ADR-0034](0034-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable CloudNativePG operations for dedicated HA fleet and shared single-server cluster |
-| [ADR-0037](0037-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Profile-aware restore evidence and DB upgrade/rollback safety |
-
-The immutable read-only SQLite dataset in Compromised Password Service is the explicit ADR-0040 SQLite reference-data exception and is not mutable business/service relational persistence covered by the PostgreSQL fleet rules. ADR-0041 Reference Data uses no database at all; its immutable application bundle therefore does not create another persistence exception.
-
-## Platform/GitOps/runtime compatibility
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0011](0011-keep-v1-gitops-in-platform-and-pin-openbao.md) | Current in-repository GitOps + OpenBao topology/secret model; unchanged by single-server simplification |
-| [ADR-0021](0021-pin-production-platform-compatibility-and-cni-v1.md) | Production compatibility authority/upgrade governance and Calico selection |
-| [ADR-0022](0022-define-self-hosted-kubernetes-ha-topology-v1.md) | Self-hosted Kubernetes topology profiles and cluster-state recovery |
-| [ADR-0042](0042-define-single-server-production-profile-v1.md) | Selected initial non-HA K3s single-server production profile; shared physical PostgreSQL with logical service isolation/PITR; one Redis; one Kafka KRaft broker/controller; benchmark-gated Ambient; retained Kyverno; hardened OpenSSH/FIDO2 audited JIT access; one service replica; unchanged MFA and OpenBao; evidence-based capacity gate |
-
-## Java engineering
-
-| ADR | Current scope |
-| --- | --- |
-| [ADR-0039](0039-standardize-java-coding-and-executable-quality-gates-v1.md) | Canonical Java coding standard and executable quality-gate architecture |
-
-Package structure, constructor injection, Domain/JPA separation, immutable artifact promotion, container hardening, and Helm migration discipline are canonical in `../engineering/coding-standards.md`; executable enforcement belongs in `../engineering/build-and-ci-quality-enforcement.md`.
-
-## Review rule
-
-For implementation, select only applicable current ADRs from this register plus matching current-state documents. Deleted predecessor ADR IDs MUST NOT appear in new code, documentation, tests, or runbooks. If a retained ADR contains a stale clause, normalize it or move the effective rule to the current canonical document in the same PR before implementation relies on it.
+When a current ADR becomes fully superseded, keep its stable original file/ID with `Status: Superseded by ...` and list it here. A superseded entry is provenance, not implementation authority.
