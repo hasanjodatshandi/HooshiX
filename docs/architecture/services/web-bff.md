@@ -2,9 +2,9 @@
 
 ## 1. Responsibility and executable boundary
 
-Web BFF is the browser-facing backend boundary. It translates REST/OpenAPI browser interactions into internal gRPC calls and owns browser session, OIDC, CSRF, public error/bounds and downstream credential brokerage mechanics.
+Web BFF is the browser-facing backend boundary. It translates REST/OpenAPI browser interactions into internal gRPC calls and owns browser session, OIDC, CSRF, public error/bounds, public Reference Data facade, and downstream credential brokerage mechanics.
 
-It does not become a second Domain layer. Business invariants and final protected-resource authorization remain in backend bounded contexts.
+It does not become a second Domain layer. Business invariants and final protected-resource authorization remain in backend bounded contexts. Reference Data canonical metadata remains owned by Reference Data Service; BFF only exposes the approved public read facade.
 
 Base package: `com.sajtech.webbff`.
 
@@ -32,9 +32,10 @@ The v1 public REST namespace is:
 /api/v1/auth
 /api/v1/identity
 /api/v1/authorization
+/api/v1/reference
 ```
 
-Provider-owned gRPC method names are not mechanically exposed as public REST paths. Public route design remains explicit OpenAPI API design.
+The `/api/v1/reference` subspace is the explicit public read-only facade for ADR-0041 Reference Data. Initial routes include countries, currencies, time zones and supported locales. Provider-owned gRPC method names are not mechanically exposed as public REST paths. Public route design remains explicit OpenAPI API design.
 
 Request limits:
 
@@ -46,7 +47,7 @@ multipart/file upload:  unsupported in v1
 BFF total request:      <=2600 ms outer budget
 ```
 
-Oversized requests are rejected before expensive parsing/downstream work. The BFF does not buffer unbounded bodies or provider responses.
+Reference Data v1 uses GET/HEAD only and does not accept request bodies. Oversized requests are rejected before expensive parsing/downstream work. The BFF does not buffer unbounded bodies or provider responses.
 
 Public REST errors use the v1 RFC 9457 profile with:
 
@@ -58,7 +59,7 @@ code
 safe correlation identifier only when needed
 ```
 
-Public errors never expose internal exception/provider text, stack traces, access/refresh/provider tokens, tenant/membership/Contact identifiers, internal request IDs, Redis keys, Role/permission internals, or security-policy implementation detail.
+Public errors never expose internal exception/provider text, stack traces, access/refresh/provider tokens, tenant/membership/Contact identifiers, internal request IDs, Redis keys, Role/permission internals, source-artifact paths, or security-policy implementation detail.
 
 ## 3. OIDC and pre-auth browser transaction
 
@@ -217,6 +218,8 @@ When Identity authentication succeeds but no active Tenant/Membership is selecte
 - zero Membership remains onboarding; one valid Membership selected automatically by Identity; multiple use Identity revalidated last-selection/explicit-selection rules;
 - completing tenant selection rotates BFF session ID and transitions to tenant-authenticated state.
 
+Public `/api/v1/reference` reads are not a tenant/resource operation and may remain available anonymously during onboarding; they create no tenant/session authority and do not permit resource/Authorization dispatch.
+
 ## 8. CSRF, Fetch Metadata, CORS, CSP and cache controls
 
 CSRF synchronizer token is exactly 256 CSPRNG bits and bound to current BFF session. BFF stores only a purpose-separated versioned HMAC digest and compares proofs in constant time. Token rotates with every session/assurance rotation.
@@ -231,9 +234,9 @@ X-CSRF-Token: valid session-bound proof
 Sec-Fetch-Site: same-origin
 ```
 
-Missing/invalid Fetch Metadata on normal production browser routes fails closed. GET/HEAD/OPTIONS do not mutate business state. A future non-browser integration that cannot meet this contract uses a separately reviewed surface.
+Missing/invalid Fetch Metadata on normal production browser routes fails closed. GET/HEAD/OPTIONS do not mutate business state. Public Reference Data v1 uses GET/HEAD only and therefore does not require CSRF proof. A future non-browser integration that cannot meet the relevant contract uses a separately reviewed surface.
 
-CORS v1: disabled for cross-origin credentialed API use. Same-origin only. Future cross-origin use requires architecture review; wildcard/reflected credentialed origin remains prohibited.
+CORS v1: disabled for cross-origin credentialed API use. Same-origin only. Anonymous Reference Data does not create a cross-origin CORS exception. Future cross-origin use requires architecture review; wildcard/reflected credentialed origin remains prohibited.
 
 Exact CSP:
 
@@ -245,7 +248,7 @@ default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; 
 
 Also enforce HSTS `max-age=31536000` after HTTPS-domain coverage verification, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, restrictive Permissions Policy and no framing via CSP.
 
-Authentication/OIDC/session/Authorization-administration responses use `Cache-Control: no-store`.
+Authentication/OIDC/session/Authorization-administration responses use `Cache-Control: no-store`. ADR-0041 public Reference Data responses are the explicit v1 cacheable exception and use deterministic `ETag` plus `Cache-Control: public, max-age=3600`; their representation locale is explicit (`fa` or `en`) and never derived from hidden session/cookie state.
 
 ## 9. Semantic OIDC abuse quotas
 
@@ -264,7 +267,7 @@ The independent max-five-live-pre-auth/browser rule still applies. Redis/time-so
 
 Internal synchronous calls use gRPC + Protobuf over Istio Ambient strict mTLS/workload identity. Every call has explicit deadline/cancellation/error map. BFF does not create long-running workflows or deep synchronous call chains.
 
-Authentication dependency ownership is explicit in `dependency-criticality.yaml`: browser-flow Google OIDC, trusted Identity evidence/session establishment, Identity audience-token brokerage, session/quota Redis, and Authorization-management edges are BFF-owned. Identity->Google is prohibited.
+Dependency ownership is explicit in `dependency-criticality.yaml`: browser-flow Google OIDC, trusted Identity evidence/session establishment, Identity audience-token brokerage, session/quota Redis, Authorization-management, Reference Data reads, and registered resource dispatch edges are BFF-owned. Identity->Google is prohibited.
 
 BFF->Identity evidence submission has no retry/fallback. Ambiguity is resolved only through stable request/evidence idempotency; BFF never creates second provider identity or changes evidence to force success.
 
@@ -285,11 +288,29 @@ failure mode:    fail closed / management unavailable
 
 Write requests preserve canonical UUIDv4 `request_id`. Timeout/ambiguity is not retried automatically; later explicit replay uses same request identity so Authorization idempotency can resolve committed original or stable conflict.
 
+Reference Data facade maps only explicit `/api/v1/reference` read routes to typed Reference Data gRPC operations. It does not forward caller-selected dataset names or generic query/schema strings.
+
+Reference Data edge:
+
+```text
+class:           AUTHORITATIVE_STATE
+deadline:        <=1000 ms and <= remaining parent budget
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+fallback/cache:  none on the server side
+failure mode:    reference data unavailable; no fabricated/stale server result
+```
+
+Inbound cancellation propagates to the gRPC call where supported. The BFF may rely on normal browser/HTTP validators for successful immutable public representations but does not reconstruct current reference data locally on service failure.
+
 ## 11. Final Authorization boundary
 
 Routine protected-resource flow does not pay two online Authorization calls. Resource-owning service performs final online `CheckPermission` under ADR-0013/ADR-0026/ADR-0032/ADR-0036. BFF only checks authorization for BFF-owned resources or separately justified UX/read-model use; such checks never replace final enforcement.
 
 Tenant-management facade transports browser administration to Authorization-owned use case. Browser/session/JWT Role/permission lists are not management authority. `GetMembershipAuthorization` responses are administration/UX snapshots only and never authoritative access-control cache.
+
+Reference Data existence/lifecycle is also not authorization or domain acceptance authority. A resource/domain service still validates its own business policy for country/currency/time-zone/locale usage.
 
 `authenticated_onboarding` is not an authorization bypass and never gains Authorization-management implicitly.
 
@@ -304,6 +325,8 @@ BFF participates in Identity-owned global erasure workflow. An authoritative era
 - other user-linked authentication continuation/token-broker state.
 
 Participant processing is idempotent. Completion receipt contains no PII/stable user/session identifier beyond approved pseudonymous workflow evidence. Successful erasure leaves no usable user-linked BFF authentication state. Generic aggregate telemetry without stable subject/session/tenant identity does not require deletion.
+
+Anonymous Reference Data responses contain no subject-linked state and create no additional erasure participation.
 
 ## 13. Runtime/deployment and egress
 
@@ -327,34 +350,38 @@ Deny-by-default NetworkPolicy/Istio policy permits production egress only to:
 
 - Identity Service;
 - Authorization management surface;
+- Reference Data Service typed read surface when ADR-0041 implementation is active;
 - resource services explicitly registered for BFF routes;
 - BFF/security Redis;
 - configured Google OIDC endpoints;
 - approved telemetry backend/collector.
 
-Arbitrary URL/Internet egress is prohibited. New synchronous downstream must be added to canonical dependency registry with class/deadline/retry/failure action before production. Google remains explicit provider-egress exception with configured endpoint allow-list.
+Arbitrary URL/Internet egress is prohibited. New synchronous downstream must be added to canonical dependency registry with class/deadline/retry/failure action before production. Google remains explicit provider-egress exception with configured endpoint allow-list. Reference Data itself has no standards-source Internet synchronization path.
 
 Liveness proves local runtime progress only. Readiness requires usable session/key configuration and required entry-point prerequisites, but does not synchronously probe every downstream on every health request. HPA production enablement requires load evidence that includes HTTP/gRPC connection pools, Redis throughput, crypto cost and downstream bulkheads.
 
 ## 14. Failure behavior
 
-BFF never fabricates successful business/authentication state when a dependency is unavailable.
+BFF never fabricates successful business/authentication/reference state when a dependency is unavailable.
 
 - session Redis unavailable -> authentication/session continuity fails closed;
 - semantic quota Redis/time unhealthy -> covered OIDC operation fails closed;
 - Identity evidence/token-broker unavailable -> auth/token operation unavailable, no fabricated session/JWT;
 - Authorization management deny/unavailable/overload/idempotency conflict remains distinct in public stable mapping;
+- Reference Data unavailable/incompatible/overloaded -> affected `/api/v1/reference` route returns stable unavailability; no local stale/fabricated reference list;
 - Google/OIDC failure never falls back to email auto-link, browser-stored provider token, SMS downgrade of active TOTP or fabricated authenticated state;
 - stale key snapshot beyond one hour -> refresh-key-dependent operation fails closed;
 - onboarding state without valid server-side state is not reconstructed from browser input.
 
-Cancellation propagates from inbound HTTP through owned gRPC/Redis/provider calls. No automatic retry is added to non-idempotent or authoritative-security operations outside their explicit contracts.
+Cancellation propagates from inbound HTTP through owned gRPC/Redis/provider calls. No automatic retry is added to non-idempotent, authoritative-security, or Reference Data authoritative-state operations outside their explicit contracts.
 
 ## 15. Verification
 
 Required evidence includes:
 
-- OpenAPI `/api/v1` namespace and generated-client contract tests;
+- OpenAPI `/api/v1` namespace including explicit `/reference` routes and generated-client contract tests;
+- Reference Data GET/HEAD anonymous semantics, explicit `fa|en` representation locale, no implicit cookie/session variance, deterministic ETag/304 and `Cache-Control: public, max-age=3600` tests;
+- proof `/reference` does not add cross-origin credentialed CORS, bypass WAF/edge controls, create session/JWT authority, or permit unsafe method side effects;
 - RFC 9457 profile/redaction and body/header/multipart bound tests;
 - state/nonce/verifier exact entropy, PKCE downgrade, pre-auth HMAC/TTL/single-use/max-five, replay and open-redirect/encoded-bypass tests;
 - provider validation before Identity call; provider-code/token absence from Identity/browser/telemetry;
@@ -364,15 +391,16 @@ Required evidence includes:
 - session HMAC locator, atomic rotation/no grace, five-minute last-seen coalescing, idle/absolute limits, logout/revocation/user-session-index behavior;
 - AES-GCM nonce/tag/AAD, 90-day rotation, dependent-session+7d decrypt retention, atomic reload and one-hour stale snapshot fail-closed tests;
 - CSRF exact entropy/HMAC/constant-time/rotation, Origin and Fetch Metadata failure tests;
-- no cross-origin CORS, exact CSP/no unsafe-inline/eval, security headers and `no-store` tests;
+- no cross-origin credentialed CORS, exact CSP/no unsafe-inline/eval, security headers, private `no-store`, and public-reference cache tests;
 - OIDC quota numeric/atomic/outage/skew tests and max-five pre-auth composition;
 - Redis failover/session fail-closed behavior;
 - BFF->Identity/Authorization exact dependency deadlines/one-attempt/no-retry/no-fallback and cancellation propagation;
+- BFF->Reference Data <=1000ms/one-attempt/wait-for-ready-off/no-retry/no-fallback, typed-route mapping, cancellation and unavailable/no-fabrication tests;
 - Authorization management exact audience/request-id ambiguity replay/wrong-workload negatives;
-- proof BFF does not locally grant management/final resource authority;
+- proof BFF does not locally grant management/final resource authority or domain validity from Reference Data existence;
 - erasure cleanup/idempotency/non-PII receipt;
-- deny-by-default egress, wrong-workload and direct-edge-bypass tests;
+- deny-by-default egress including Reference Data allow and wrong/unregistered downstream denial, wrong-workload and direct-edge-bypass tests;
 - PII/secret-safe logs/metrics/traces;
-- BDD critical flows and Playwright authentication/onboarding/administration journeys where implemented.
+- BDD critical flows and Playwright authentication/onboarding/administration/reference journeys where implemented.
 
-Implementation/runtime/build/staging evidence remains `NOT VERIFIED` until `services/web-bff` and required environment artifacts exist and these checks execute.
+Implementation/runtime/build/staging evidence remains `NOT VERIFIED` until `services/web-bff`, Reference Data implementation when triggered, and required environment artifacts exist and these checks execute.
