@@ -17,13 +17,13 @@ OpenAPI is the authoritative browser/public REST contract. Frontend TypeScript c
 ```text
 Internet
 -> upstream L3/L4 volumetric mitigation/scrubbing
--> redundant external L4 load balancing
--> Traefik
+-> external L4
+-> repository-pinned Traefik
 -> dedicated Caddy + Coraza WAF
 -> Web BFF
 ```
 
-Direct Internet->BFF and Traefik->BFF application paths are prohibited by routing plus NetworkPolicy/Istio authorization. A CDN is deployment-specific and does not replace mandatory upstream volumetric mitigation or load-balancer controls.
+Direct Internet->BFF and Traefik->BFF application paths are prohibited by routing plus NetworkPolicy/Istio authorization. A CDN is deployment-specific and does not replace mandatory upstream volumetric mitigation or external-L4 controls.
 
 The v1 public REST namespace is:
 
@@ -330,7 +330,7 @@ Anonymous Reference Data responses contain no subject-linked state and create no
 
 ## 13. Runtime/deployment and egress
 
-Production defaults:
+Production identity and transport defaults are profile-independent:
 
 ```text
 namespace:         platform-apps
@@ -339,9 +339,22 @@ Service:           web-bff
 ServiceAccount:    web-bff
 application HTTP:  8080
 management:        separate configured port
-replicas:          >=3
-PDB minAvailable:  2
-HPA:               3..12 only after load/connection evidence
+```
+
+Deployment topology follows the selected production profile:
+
+```text
+production-single-server:
+  replicas: 1
+  HPA: disabled
+  availability PDB: disabled
+  node-failover claim: none
+
+production-ha:
+  replicas: >=3
+  PDB minAvailable: 2
+  HPA: 3..12 only after load/connection evidence
+  topology spread: required by the HA target
 ```
 
 Hardened pod security context: non-root, no privilege escalation, drop unnecessary capabilities, read-only root filesystem except explicit writable mounts, approved seccomp profile, bounded CPU/memory/ephemeral resources and graceful termination.
@@ -358,7 +371,7 @@ Deny-by-default NetworkPolicy/Istio policy permits production egress only to:
 
 Arbitrary URL/Internet egress is prohibited. New synchronous downstream must be added to canonical dependency registry with class/deadline/retry/failure action before production. Google remains explicit provider-egress exception with configured endpoint allow-list. Reference Data itself has no standards-source Internet synchronization path.
 
-Liveness proves local runtime progress only. Readiness requires usable session/key configuration and required entry-point prerequisites, but does not synchronously probe every downstream on every health request. HPA production enablement requires load evidence that includes HTTP/gRPC connection pools, Redis throughput, crypto cost and downstream bulkheads.
+Liveness proves local runtime progress only. Readiness requires usable session/key configuration and required entry-point prerequisites, but does not synchronously probe every downstream on every health request. HA HPA production enablement requires load evidence that includes HTTP/gRPC connection pools, Redis throughput, crypto cost and downstream bulkheads. `production-single-server` uses the validated fixed one-replica resource/concurrency envelope instead of HPA.
 
 ## 14. Failure behavior
 
@@ -393,13 +406,14 @@ Required evidence includes:
 - CSRF exact entropy/HMAC/constant-time/rotation, Origin and Fetch Metadata failure tests;
 - no cross-origin credentialed CORS, exact CSP/no unsafe-inline/eval, security headers, private `no-store`, and public-reference cache tests;
 - OIDC quota numeric/atomic/outage/skew tests and max-five pre-auth composition;
-- Redis failover/session fail-closed behavior;
+- Redis session/quota fail-closed behavior in both profiles; single-server AOF/restart/loss/re-authentication behavior with no Sentinel claim; HA Sentinel failover where applicable;
 - BFF->Identity/Authorization exact dependency deadlines/one-attempt/no-retry/no-fallback and cancellation propagation;
 - BFF->Reference Data <=1000ms/one-attempt/wait-for-ready-off/no-retry/no-fallback, typed-route mapping, cancellation and unavailable/no-fabrication tests;
 - Authorization management exact audience/request-id ambiguity replay/wrong-workload negatives;
 - proof BFF does not locally grant management/final resource authority or domain validity from Reference Data existence;
 - erasure cleanup/idempotency/non-PII receipt;
 - deny-by-default egress including Reference Data allow and wrong/unregistered downstream denial, wrong-workload and direct-edge-bypass tests;
+- profile-correct deployment render: single-server one replica/no HPA/no availability PDB/no node-failover claim; HA >=3/PDB2/topology spread and evidence-gated HPA;
 - PII/secret-safe logs/metrics/traces;
 - BDD critical flows and Playwright authentication/onboarding/administration/reference journeys where implemented.
 

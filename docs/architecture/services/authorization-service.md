@@ -546,11 +546,11 @@ retry:                  none
 
 Evaluation is atomic, pseudonymous, dual-clock fail-closed (`trusted_app_time` + Redis `TIME`, <=2s skew), monotonic, and has no TTL security reset. Bulk cost follows §8 and therefore cannot turn one arbitrarily large management request into one quota unit.
 
-Production administration remains disabled until atomicity/time-safety/Sentinel failover/outage/abuse and >=2x peak quota-load evidence passes.
+Production administration remains disabled until atomicity/time-safety/outage/abuse and >=2x peak quota-load evidence passes. `production-single-server` additionally verifies Redis AOF/restart/loss behavior and fail-closed recovery without a Sentinel claim; `production-ha` additionally verifies Sentinel failover.
 
 ## 17. Runtime, deployment, and workload identity
 
-Production defaults:
+Production identity and transport defaults are profile-independent:
 
 ```text
 namespace:       platform-apps
@@ -562,12 +562,25 @@ application gRPC local convention: 9090
 management:      separate configured port
 inbound message cap: 64 KiB
 metadata cap:        16 KiB
-minimum replicas:   3
-PDB minAvailable:   2
-HPA initial min/max:3 / 12
 ```
 
-Production uses immutable signed image digest, non-root execution, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, finite resources, deny-by-default NetworkPolicy, Istio Ambient STRICT mTLS and least-privilege AuthorizationPolicy.
+Deployment topology follows the selected production profile:
+
+```text
+production-single-server:
+  replicas: 1
+  HPA: disabled
+  availability PDB: disabled
+  node-failover claim: none
+
+production-ha:
+  minimum replicas: 3
+  PDB minAvailable: 2
+  HPA initial min/max: 3 / 12 after load evidence
+  topology spread: required by the HA target
+```
+
+Production uses immutable signed image digest, non-root execution, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, finite resources, deny-by-default NetworkPolicy, Istio Ambient STRICT mTLS, and least-privilege AuthorizationPolicy.
 
 Inbound policy permits only explicitly registered workload identities/operations. In particular, resource services call only their approved `CheckPermission` surface, Identity calls lifecycle/platform-authority operations it owns, and Web BFF calls approved management operations. Workload identity never substitutes for end-user/tenant authorization.
 
@@ -584,7 +597,7 @@ server queue wait <=25 ms before shedding
 Hikari acquisition p99 <25 ms under validated steady load
 ```
 
-Server enforces bounded global and per-caller-workload concurrency, no unbounded application queue, fair overload shedding, and pool/HPA maxima inside the service PostgreSQL connection budget.
+Server enforces bounded global and per-caller-workload concurrency, no unbounded application queue, fair overload shedding, and pool/HPA maxima inside the service PostgreSQL connection budget. In `production-single-server`, HPA remains disabled and the validated fixed replica/pool/concurrency envelope stays inside the same database and host budget.
 
 ## 18. Verification requirements
 
@@ -607,9 +620,11 @@ Repository and release evidence covers at least:
 - durable audit field/retention/reason/PII controls and proof hot-path checks do not accidentally add synchronous audit writes;
 - jOOQ/JDBC-only persistence boundary, Flyway migration safety, no JPA/generated-type leakage to Domain/Application, no remote I/O in DB transactions;
 - Authorization participant erasure removes tenant/platform subject authority while preserving tenant-owned policy and emits only non-PII receipts;
-- semantic quota atomicity/time/failover and >=2x peak management-quota evidence;
-- online p95/p99/SLO, bounded queue/fair share, breaker recovery, one replica/node loss, PostgreSQL failover, and >=2x projected peak;
-- hardened Docker/Helm/GitOps render, independent ServiceAccount, NetworkPolicy/Istio positive+negative policy, probes/PDB/HPA/securityContext;
+- semantic quota atomicity/time and >=2x peak management-quota evidence, plus profile-specific Redis recovery/failover evidence;
+- online p95/p99/SLO, bounded queue/fair share, breaker recovery, and >=2x projected peak;
+- `production-single-server`: one-replica/no-HPA/no-availability-PDB render, whole-host/reboot/recovery behavior, shared PostgreSQL recovery behavior, and no node-failover claim;
+- `production-ha`: replica/node-loss, PostgreSQL failover, Sentinel failover, PDB/HPA/topology-spread behavior;
+- hardened Docker/Helm/GitOps render, independent ServiceAccount, NetworkPolicy/Istio positive+negative policy, profile-correct probes/replicas/PDB/HPA/securityContext;
 - PII-safe structured telemetry, bounded low-cardinality metrics, SLO/burn/owner-reservation/audit-failure alerts;
 - Spotless, SpotBugs, ArchUnit, Semgrep, dependency verification, unit/integration/contract/schema/security checks and immutable artifact/SBOM/signature/provenance release gates once implementation exists.
 

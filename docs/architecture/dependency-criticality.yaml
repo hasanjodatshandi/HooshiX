@@ -42,7 +42,7 @@ edges:
     owner: identity
     policy_refs:
       - ADR-0040
-      - docs/architecture/security-architecture.md#4-passwords-external-identity-and-mfa
+      - docs/architecture/security-architecture.md#3-authentication-and-mfa--unchanged
       - docs/architecture/services/identity-service.md#7-password-credential-and-compromised-password-baseline
       - docs/architecture/services/compromised-password-service.md#2-internal-grpc-contract
 
@@ -289,7 +289,7 @@ edges:
     owner: platform-observability
     policy_refs:
       - ADR-0033
-      - docs/architecture/reliability-and-observability.md#13-observability
+      - docs/architecture/reliability-and-observability.md#12-observability-model
 
   - operation_id: service.required-security-audit-evidence
     caller_owner: owning-service
@@ -301,4 +301,4 @@ edges:
     owner: owning-service
     policy_refs:
       - ADR-0033
-      - docs/architecture/security-architecture.md#13-loggingpii-and-privileged-access
+      - docs/architecture/security-architecture.md#12-logging-pii-and-audit

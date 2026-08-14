@@ -62,10 +62,10 @@ release does not publish an image for the exact production patch.
 | Local cluster name | `platform-local` | Required |
 | kube context | `kind-platform-local` | Required |
 | CNI / NetworkPolicy | Calico OSS 3.32.1 | Pinned; kind default CNI disabled |
-| Helm | 4.2.3 | Pinned to production baseline |
+| Helm | 4.2.4 | Pinned to production baseline |
 | Istio Ambient | 1.30.3 | Pinned to production baseline |
-| Kubernetes Gateway API | 1.5.1 Standard channel | Pinned |
-| Traefik | Proxy 3.7.1; Helm chart 40.2.0 | Pinned |
+| Kubernetes Gateway API | 1.5.1 Standard channel | Pinned to the Traefik 3.7-supported Standard version |
+| Traefik | Proxy 3.7.10; Helm chart 41.2.0 | Pinned; chart-41 logging/file-provider key migration must be reflected in repository values |
 | Local WAF | Caddy 2.11.4 + coraza-caddy 2.5.0 + Coraza 3.7.0 + OWASP CRS 4.25.1 LTS | Production-fidelity pin |
 
 ### Cluster topology
@@ -104,8 +104,7 @@ localhost:8080 -> kind control-plane port 80
 localhost:8443 -> kind control-plane port 443
 ```
 
-The exact kind cluster configuration belongs under repository infrastructure
-files and must be versioned/reviewed.
+The exact kind cluster configuration belongs in `infrastructure/kind/cluster.yaml` and must be versioned/reviewed.
 
 ## 4. Local mesh and edge security profile
 
@@ -196,7 +195,7 @@ infrastructure/calico/pins.env
 infrastructure/istio/pins.env
 infrastructure/istio/chart/1.30.3/
 infrastructure/traefik/pins.env
-infrastructure/traefik/chart/40.2.0/
+infrastructure/traefik/chart/41.2.0/
 infrastructure/waf/pins.env
 infrastructure/waf/
 ```
