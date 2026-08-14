@@ -65,7 +65,7 @@ release does not publish an image for the exact production patch.
 | Helm | 4.2.3 | Pinned to production baseline |
 | Istio Ambient | 1.30.3 | Pinned to production baseline |
 | Kubernetes Gateway API | 1.5.1 Standard channel | Pinned |
-| Traefik | Proxy 3.7.1; Helm chart 40.2.0 | Pinned |
+| Traefik | Proxy 3.7.10; Helm chart 40.2.0 | Pinned |
 | Local WAF | Caddy 2.11.4 + coraza-caddy 2.5.0 + Coraza 3.7.0 + OWASP CRS 4.25.1 LTS | Production-fidelity pin |
 
 ### Cluster topology
