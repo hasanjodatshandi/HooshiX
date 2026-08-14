@@ -71,7 +71,7 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | WAF engine | Coraza 3.7.0 | v3 architecture choice |
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | Kubernetes compatibility matrix mandatory; single-server profile additionally requires complete-stack capacity benchmark |
-| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred; current security advisories patched before this line |
+| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred; upgrades require compatibility and current-advisory review |
 | Secret authority | OpenBao 2.6.1 | exact current architecture pin; unchanged by ADR-0042 |
 | Admission policy | Kyverno 1.18.2 | stable `policies.kyverno.io/v1`; 1 replica allowed only in explicit non-HA single-server profile; enforcement remains fail closed |
 | Image signing | Cosign 3.0.6 | current supply-chain policy |
