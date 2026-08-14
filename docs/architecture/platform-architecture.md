@@ -110,8 +110,6 @@ Current/approved boundaries include:
 - Identity Service;
 - Authorization Service;
 - Notification Service;
-- Subscription Service;
-- Billing Service;
 - Web BFF;
 - Compromised Password Service;
 - Reference Data Service as a planned capability boundary;
