@@ -53,9 +53,9 @@ Current model includes global users with tenant memberships, trusted active-tena
 - `dependency-criticality.yaml`
 - `dependency-criticality-matrix.md`
 - `performance-and-bottlenecks.md`
-- ADR-0013, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036
+- ADR-0013, ADR-0024, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036
 
-Current rule: one authoritative online `CheckPermission`; safe local reject-only prechecks; no permission-result cache, Kafka invalidation, retry, stale allow fallback, or duplicate routine BFF enforcement. Production SLO/capacity/deployment is ADR-0026; burn/recovery/dependency governance is ADR-0032/0033/0036.
+Current model uses an exact Git-owned permission catalog with TENANT/PLATFORM scope and lifecycle/non-reuse rules; immutable SYSTEM Roles plus bounded/versioned custom Roles/direct Membership overrides; one authoritative online success-is-ALLOW `CheckPermission` with no permission-result cache/Kafka invalidation/retry/stale fallback; BFF-facaded but locally authorized tenant management with privilege-escalation prevention, bounded bulk limits and semantic-mutation quotas; atomic owner safety shared by local owner-role mutation and Identity Membership-removal reservations; separate Identity-only fail-closed `CheckPlatformPermission` with no tenant/resource bypass; UUIDv4/HMAC idempotency, durable PII-safe audit, jOOQ/JDBC + forced RLS persistence, and erased-subject tenant/platform authority removal. Production SLO/capacity/deployment is ADR-0026; burn/recovery/dependency governance is ADR-0032/0033/0036.
 
 ### Semantic security quotas
 
@@ -64,7 +64,7 @@ Current rule: one authoritative online `CheckPermission`; safe local reject-only
 - `services/identity-service.md` / `services/authorization-service.md` as applicable
 - ADR-0024
 
-ADR-0024 is the consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
+ADR-0024 is the consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, Authorization semantic-mutation cost, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
 
 ### Notification
 
