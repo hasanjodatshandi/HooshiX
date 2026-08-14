@@ -364,7 +364,9 @@ Pre-auth MFA after password **or Google evidence** is not an authenticated brows
 
 ## 12. PostgreSQL, aggregates, and transactions
 
-Identity owns dedicated PostgreSQL/CloudNativePG under ADR-0027. Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner. Tenant tables use forced RLS plus application checks. Tenant context uses parameterized transaction-local setting; absent/malformed context fails closed; cross-tenant pool reuse after commit/rollback is tested.
+Identity owns database `identity`, its runtime role, migration/owner role, Flyway history, tenant RLS policy and schema objects. Physical PostgreSQL placement follows the selected production profile under ADR-0027/ADR-0042: `production-single-server` places the distinct Identity database in the shared physical CloudNativePG/PostgreSQL instance, while `production-ha` uses the dedicated Identity CloudNativePG cluster. Identity roles have no `CONNECT` or object privileges on another service database in either profile.
+
+Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner. Tenant tables use forced RLS plus application checks. Tenant context uses parameterized transaction-local setting; absent/malformed context fails closed; cross-tenant pool reuse after commit/rollback is tested.
 
 Aggregate boundaries:
 
@@ -396,7 +398,7 @@ Authorization erasure participation removes subject-linked Membership authorizat
 
 ## 14. Runtime/deployment
 
-Production defaults:
+Production identity, transport and security defaults are profile-independent:
 
 ```text
 namespace:       platform-apps
@@ -409,7 +411,23 @@ Notification callback:              9091
 management: separate configured port
 ```
 
-Production uses deny-by-default NetworkPolicy/Istio authorization, purpose-separated read-only OpenBao/ESO mounts, >=3 Identity replicas with PDB/topology spread, and HPA only after load/connection/hash-bulkhead evidence. Liveness is process/local-runtime only; readiness includes usable required local key material and DB/entry-point prerequisites.
+Deployment topology follows the selected production profile:
+
+```text
+production-single-server:
+  replicas: 1
+  HPA: disabled
+  availability PDB: disabled
+  node-failover claim: none
+
+production-ha:
+  replicas: >=3
+  PDB minAvailable: 2
+  topology spread: required by the HA target
+  HPA: only after load/connection/hash-bulkhead evidence
+```
+
+Production uses deny-by-default NetworkPolicy/Istio authorization and purpose-separated read-only OpenBao/ESO mounts in both profiles. Liveness is process/local-runtime only; readiness includes usable required local key material and DB/entry-point prerequisites.
 
 Image/JDK follows current Technology Baseline (Temurin 25.0.4 at this documentation revision) with immutable digest. Staging/production overlays remain `deploy/clusters/staging` and `deploy/clusters/production`; registry/DNS/secret-path/Redis/CNPG/backup/alert destinations remain typed environment placeholders until provisioned.
 
@@ -457,4 +475,6 @@ Applicable tests include:
 - aggregate/transaction boundaries, forced RLS/pool reuse;
 - Notification/Authorization outbox replay/conflict;
 - 35d critical idempotency/dedup, >=365d audit;
-- NetworkPolicy/Istio positive/negative authorization including Identity-only platform-check access, approved-BFF-only token-broker access, deployment render/policy, PII-safe telemetry, load/failover/restore where applicable.
+- NetworkPolicy/Istio positive/negative authorization including Identity-only platform-check access, approved-BFF-only token-broker access, deployment render/policy, and PII-safe telemetry;
+- `production-single-server`: distinct Identity database/roles/Flyway/RLS within the shared physical PostgreSQL instance, one-replica/no-HPA/no-availability-PDB render, whole-host/reboot/shared-cluster recovery and no node-failover claim;
+- `production-ha`: dedicated Identity CloudNativePG topology, replica/node-loss, PostgreSQL failover, PDB/topology-spread and any evidence-gated HPA behavior.
