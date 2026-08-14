@@ -12,7 +12,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `protected-resource.check-permission` | resource-owning service | Authorization `CheckPermission` | `AUTHORITATIVE_SECURITY` | `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`; fail closed | none | none; no permission cache/stale allow | Platform Authorization | ADR-0013, ADR-0026, ADR-0032, ADR-0036 |
 | `identity.security-semantic-quota` | Identity | semantic-quota Redis | `AUTHORITATIVE_SECURITY` | fail closed; anti-lockout/current quota semantics | none | none | Identity | ADR-0024 |
-| `identity.password-credential-write` | Identity | compromised-password service | `AUTHORITATIVE_SECURITY` | reject unchecked password | none | none | Identity | `security-architecture.md` §4; `services/identity-service.md` §7 |
+| `identity.password-credential-write` | Identity | Compromised Password `LookupCompromisedPasswordRange` | `AUTHORITATIVE_SECURITY` | reject unchecked password; dataset/query failure never becomes clean result | none | none; no external-provider/Redis/PostgreSQL fallback | Identity | ADR-0040; `security-architecture.md` §4; `services/identity-service.md` §7; `services/compromised-password-service.md` §2 |
 | `web-bff.authenticated-session-lookup` | Web BFF | BFF session Redis | `AUTHORITATIVE_SECURITY` | session unavailable; never reconstruct from browser state | none | none | Web BFF | ADR-0016; `services/web-bff.md` §5 |
 | `web-bff.security-semantic-quota` | Web BFF | semantic-quota Redis | `AUTHORITATIVE_SECURITY` | OIDC security operation unavailable; fail closed | none | none | Web BFF | ADR-0024; `services/web-bff.md` §9 |
 | `service.normal-transaction-or-query` | owning service | owning PostgreSQL | `AUTHORITATIVE_STATE` | abort/unavailable; no fabricated state | transaction-safe owner only | none | owning service | ADR-0027; `data-and-messaging.md` §1 |
@@ -42,6 +42,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 - `DURABLE_COMMAND` defers remote execution only after required local intent is durably committed.
 - `EXTERNAL_SIDE_EFFECT` preserves ambiguous outcomes and reconciles them.
 - Authoritative security checks SHOULD run before optional remote enrichment when practical.
+- Compromised-password lookup is authoritative security for password credential writes: SQLite dataset/query/corruption/unavailability fails closed, no response truncation is allowed, and no HIBP/external-provider/Redis/PostgreSQL fallback exists.
 - Membership-removal preparation is deliberately a durable Authorization-side safety reservation rather than a race-prone read-only owner-count check.
 - Platform permission is a separate authoritative check and never converts `platform_admin` into tenant/resource fallback authority.
 - BFF tenant-management transport is an authoritative-security edge because Authorization owns both management authorization and state mutation; BFF/Authorization outage never becomes local allow.
