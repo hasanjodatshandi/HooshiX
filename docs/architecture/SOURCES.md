@@ -43,7 +43,23 @@ Current implementation rules include DDD + Hexagonal inward dependency direction
 - `services/web-bff.md`
 - ADR-0008, ADR-0009, ADR-0012, ADR-0023, ADR-0028
 
-Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS with pool-safe transaction-local tenant database context, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, JWT signing/verifier lifecycle, and coordinated erasure evidence.
+Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS with pool-safe transaction-local tenant database context, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, exact-audience JWT signing/verifier lifecycle, BFF-only server-owned audience brokerage, and coordinated erasure evidence.
+
+### Web BFF/browser boundary
+
+- `services/web-bff.md`
+- `security-architecture.md`
+- `security-verification-matrix.md`
+- `dependency-criticality.yaml`
+- `dependency-criticality-matrix.md`
+- `runtime-and-deployment.md`
+- `reliability-and-observability.md`
+- `performance-and-bottlenecks.md`
+- `testing-and-quality-gates.md`
+- `PRODUCTION-READINESS-CHECKLIST.md`
+- ADR-0012, ADR-0016, ADR-0023, ADR-0024, ADR-0025, ADR-0033
+
+Current Web BFF model uses the `/api/v1` browser namespace with bounded RFC-9457 errors/requests, exact OIDC state/nonce/PKCE/pre-auth and safe-return rules, trusted two-minute Identity evidence, server-owned exact-audience Identity token brokerage, HMAC-located Redis sessions/pre-auth state, 7d idle/30d absolute session limits with five-minute last-seen write coalescing, atomic no-grace session rotation, User->sessions revocation index, AES-256-GCM retained-refresh protection with 90d key rotation/one-hour stale-snapshot fail close, exact synchronizer CSRF + mandatory Fetch Metadata, same-origin-only v1 CORS, exact CSP/no-store behavior, BFF-owned OIDC semantic quotas, erasure participation, and deny-by-default workload/egress policy. Browser never receives provider/Identity/downstream credentials and final protected-resource authorization remains in the resource-owning service.
 
 ### Authorization
 
@@ -61,10 +77,10 @@ Current model uses an exact Git-owned permission catalog with TENANT/PLATFORM sc
 
 - `security-architecture.md`
 - `security-verification-matrix.md`
-- `services/identity-service.md` / `services/authorization-service.md` as applicable
+- `services/identity-service.md`, `services/web-bff.md`, `services/authorization-service.md` as applicable
 - ADR-0024
 
-ADR-0024 is the consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, Authorization semantic-mutation cost, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
+ADR-0024 is consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, exact Identity registration values, exact Web BFF OIDC start/callback values, Authorization semantic-mutation cost, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
 
 ### Notification
 
@@ -95,7 +111,7 @@ Current runtime:
 - `../engineering/sql-and-flyway-coding-standards.md`
 - ADR-0019, ADR-0027, ADR-0034, ADR-0037
 
-ADR-0027 is the consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
+ADR-0027 is consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
 
 ### Kafka, events, contracts
 
@@ -126,7 +142,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `../technology/production-compatibility-matrix.md`
 - ADR-0001, ADR-0002, ADR-0011, ADR-0021, ADR-0022, ADR-0029
 
-Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization.
+Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization. Web BFF egress is additionally restricted to its explicitly registered downstream/provider/telemetry set.
 
 ### Frontend and BFF implementation
 
@@ -134,8 +150,9 @@ Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant externa
 - `security-architecture.md`
 - `../engineering/frontend-coding-standards.md`
 - `testing-and-quality-gates.md`
+- ADR-0016
 
-Frontend rules cover strict TypeScript, runtime validation of untrusted data, React purity/effect discipline, feature import boundaries, same-origin BFF-only API access, browser token isolation, accessibility/RTL contracts, service-worker/private-cache restrictions, resilient Playwright practices, and route bundle/performance budgets.
+Frontend rules cover strict TypeScript, runtime validation of untrusted data, React purity/effect discipline, feature import boundaries, same-origin BFF-only API access, browser token isolation, accessibility/RTL contracts, service-worker/private-cache restrictions, resilient Playwright practices, and route bundle/performance budgets. BFF implementation must additionally satisfy the exact browser/session/token-broker/egress contracts above rather than inventing a second frontend-facing security model.
 
 ### Supply chain, vulnerabilities, human access, logging
 
@@ -160,19 +177,19 @@ Architecture prose uses product families/major-minor lines unless an exact patch
 
 ## Documentation/governance authority
 
-- `../engineering/current-only-documentation-policy.md` — retain only effective current decisions under the owner's active directive;
+- `../engineering/current-only-documentation-policy.md` — retain only effective current decisions under owner's active directive;
 - `../engineering/documentation-standards.md` — normative language, document authority, single-source rule, and documentation fitness expectations;
 - `architecture-fitness-functions.md` — architecture properties and required executable evidence;
-- `security-verification-matrix.md` — security verification families aligned to the current stable OWASP ASVS baseline without claiming certification.
+- `security-verification-matrix.md` — security verification families aligned to current stable OWASP ASVS baseline without claiming certification.
 
 ## Maintenance rule
 
 When effective architecture changes:
 
 1. update applicable current-state docs;
-2. create/update a retained current ADR only when it still adds durable decision value;
+2. create/update retained current ADR only when it still adds durable decision value;
 3. remove/normalize predecessor text after preserving every still-current invariant/contract/security/SLO/migration/operation rule;
 4. update this map, Decision Register, and task matrix;
 5. update technology/compatibility docs when versions change;
 6. update executable enforcement/tests/evidence and affected fitness/security rows;
-7. deliver/review the full change through PR-first workflow.
+7. deliver/review full change through PR-first workflow.

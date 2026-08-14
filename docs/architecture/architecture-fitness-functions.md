@@ -20,12 +20,15 @@ This catalog defines architecture properties that should be continuously verifie
 | AFF-014 | SLO/capacity critical paths | load tests + SLI/burn/saturation evidence | release/continuous | release policy |
 | AFF-015 | Backup/PITR/restore | queryable restore evidence | monthly/quarterly | production promotion freeze per policy |
 | AFF-016 | Kafka durability/rebuildability | broker/topic policy + replay/rebuild exercise | release/scheduled | block/escalate |
-| AFF-017 | Dependency-criticality registry | schema, duplicate/orphan, coverage and render checks | PR | block |
+| AFF-017 | Dependency-criticality registry | schema, duplicate/orphan, policy-ref, coverage and Markdown-render checks including BFF session/quota/Google/evidence/audience-token/Authorization-management/resource-dispatch edges | PR | block |
 | AFF-018 | Frontend type/module boundaries | TypeScript/ESLint/import-boundary checks | PR | block |
-| AFF-019 | Browser session/token isolation | source/browser/cache/security-header tests | PR/release | block |
+| AFF-019 | Web BFF browser/session/token isolation | `/api/v1` OpenAPI/error/request-bound tests + exact OIDC/pre-auth entropy/replay/redirect tests + server-owned audience brokerage/arbitrary-audience rejection + HMAC session/pre-auth locators + atomic no-grace session rotation + refresh AES-GCM/key-staleness + CSRF/Origin/Fetch-Metadata/same-origin-CORS/CSP/no-store/browser-storage tests | PR/release | block |
 | AFF-020 | Accessibility/RTL/browser critical journeys | accessibility + keyboard + RTL/LTR + Playwright evidence | PR/release | block when affected |
 | AFF-021 | Documentation current-only integrity | link/dead-ADR/authority/index/version checks | PR | block |
 | AFF-022 | PR-first repository workflow | branch protection/required checks + PR review evidence | PR | block |
+| AFF-023 | Web BFF exact network/runtime boundary | rendered ServiceAccount/replica/PDB/HPA/security-context + public-edge ingress + deny-by-default egress allow-list + wrong-workload/arbitrary-Internet negatives | PR/release | block |
+| AFF-024 | Web BFF revocation/erasure continuity | one-session-to-RefreshFamily binding, pseudonymous User->sessions index, logout-all/suspension/deleting/family-reuse/erasure cleanup and non-PII receipt tests | PR/release | block |
+| AFF-025 | Semantic-quota current policy | exact Identity registration + BFF OIDC + Authorization admin cost values, atomic dual-clock/HMAC/no-TTL-reset/outage tests | PR/release | block |
 
 ## Rules
 

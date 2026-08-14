@@ -1,6 +1,6 @@
 # Testing and Quality Gates — Current State
 
-Testing proves current contracts and failure semantics at the cheapest trustworthy layer. Documentation/configuration is not evidence until the corresponding executable check exists and passes.
+Testing proves current contracts and failure semantics at the cheapest trustworthy layer. Documentation/configuration is not evidence until corresponding executable check exists and passes.
 
 ## 1. Test portfolio
 
@@ -27,7 +27,7 @@ Do not create meaningless test categories for unused technology.
 
 Domain/Application unit tests instantiate code directly and do not start Spring or depend on network/database state.
 
-Integration tests use real infrastructure where the behavior under test depends on it. Testcontainers is preferred for PostgreSQL/Kafka/Redis adapters. Verify transaction boundaries, Flyway, concurrency/locking, outbox/inbox, retry/error mapping, and security constraints rather than only happy-path CRUD.
+Integration tests use real infrastructure where behavior under test depends on it. Testcontainers is preferred for PostgreSQL/Kafka/Redis adapters. Verify transaction boundaries, Flyway, concurrency/locking, outbox/inbox, retry/error mapping, and security constraints rather than only happy-path CRUD.
 
 Tests are deterministic and parallel-safe where intended. Fixed sleeps and shared mutable global fixtures are prohibited as synchronization mechanisms.
 
@@ -48,7 +48,7 @@ OpenAPI and other externally consumed contracts use compatibility diff/contract 
 
 BDD/Gherkin describes critical business behavior understandable by Product/QA/Engineering; it does not encode selectors, SQL, method names, or every CRUD edge case. Cucumber-JVM runs on JUnit Platform. Step definitions stay thin.
 
-Playwright Test + TypeScript is the primary browser E2E tool. Use semantic locators, web-first assertions, auto-waiting, isolated data, and parallel-safe tests. Fragile CSS/XPath and fixed `waitForTimeout` synchronization are prohibited when semantic alternatives exist. Retries never redefine flakiness as passing; flaky tests have owner and remediation deadline.
+Playwright Test + TypeScript is primary browser E2E tool. Use semantic locators, web-first assertions, auto-waiting, isolated data, and parallel-safe tests. Fragile CSS/XPath and fixed `waitForTimeout` synchronization are prohibited when semantic alternatives exist. Retries never redefine flakiness as passing; flaky tests have owner and remediation deadline.
 
 ## 5. Java executable quality gates
 
@@ -99,7 +99,7 @@ Current continuous policy from ADR-0035/ADR-0038:
 - Critical/known-exploited production exposure targets <=24h mitigation and incident handling;
 - High production exposure targets <=48h;
 - Critical exception <=7d, High <=30d; expiry stops new promotion and escalates production exposure;
-- transitive dependency accountability follows the deployed artifact owner;
+- transitive dependency accountability follows deployed artifact owner;
 - scanners do not unauditedly kill running pods and never authorize unsigned/unprovenanced images.
 
 ## 8. Kubernetes, mesh, and deployment gates
@@ -114,17 +114,19 @@ Affected release candidates run applicable:
 - Ambient enrollment, STRICT mTLS, ServiceAccount, NetworkPolicy, and authorization positive/negative tests;
 - immutable digest/signature/provenance/SBOM admission checks;
 - admission-policy authoring RBAC negatives proving ordinary application/service identities cannot create or modify cluster-scoped policy;
-- Kyverno CEL HTTP-context disabled-by-default checks and, when an approved external lookup exists, bounded destination/timeout/response/failure tests plus loopback/link-local/cloud-metadata/unreviewed-private/arbitrary-caller-target SSRF negatives and NetworkPolicy-constrained egress.
+- Kyverno CEL HTTP-context disabled-by-default checks and, when approved external lookup exists, bounded destination/timeout/response/failure tests plus loopback/link-local/cloud-metadata/unreviewed-private/arbitrary-caller-target SSRF negatives and NetworkPolicy-constrained egress.
+
+For Web BFF specifically, rendered policy tests prove only the public edge can reach BFF and BFF egress is restricted to Identity, Authorization management, registered resource services, BFF/security Redis, configured Google OIDC endpoints and approved telemetry. Arbitrary Internet/URL egress and wrong workloads are denied.
 
 ## 9. Production resilience/security evidence
 
 ### Semantic quotas — ADR-0024
 
-Prove atomic multi-dimension enforcement, HMAC pseudonymous keys, anti-lockout sequencing, dual trusted time/<=2s skew, no TTL security reset, 75ms one-attempt fail-closed semantics, Redis Sentinel failover/outage, exact Authorization semantic-mutation cost/no-refund behavior, and >=2x projected peak load.
+Prove atomic multi-dimension enforcement, HMAC pseudonymous keys, anti-lockout sequencing, dual trusted time/<=2s skew, no TTL security reset, 75ms one-attempt fail-closed semantics, Redis Sentinel failover/outage, exact Identity registration values, exact Web BFF `OIDC_START/network=60,1/5s,1h` and `OIDC_CALLBACK/network=120,2/1s,30m` plus max-five-live-pre-auth composition/domain separation from Identity Google-login keys, exact Authorization semantic-mutation cost/no-refund behavior, and >=2x projected peak load.
 
 ### Authorization — ADR-0013/0026/0032/0036
 
-Prove the complete Authorization contract, not only the hot-path happy case:
+Prove complete Authorization contract, not only hot-path happy case:
 
 - permission-catalog schema/scope/owner/lifecycle/non-reuse plus unknown/retired/deprecated behavior;
 - exact SYSTEM Role mappings/immutability and custom Role normalization/version/archive/limits;
@@ -145,7 +147,7 @@ Prove the complete Authorization contract, not only the hot-path happy case:
 
 ### Dependency registry — ADR-0033/0036
 
-Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, current policy-reference anchors including Authorization platform/lifecycle edges, one retry owner, no implicit fallback, and composite-edge semantics.
+Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, current policy-reference anchors including Authorization platform/lifecycle and Web BFF session/quota/Google/evidence/audience-token/Authorization-management/resource-dispatch edges, one retry owner, no implicit fallback, and composite-edge semantics.
 
 ### Notification — ADR-0006/0007/0014/0018/0020
 
@@ -159,17 +161,38 @@ Prove per-service physical/database/credential/backup isolation, forced RLS/runt
 
 Prove KRaft broker/controller failure, RF/minISR/acks/idempotence, TLS/ACL/quotas, 35-day critical publication/dedup evidence, clean-cluster replay/reconstruction, and consumer duplicate/restart safety.
 
-### Browser — ADR-0016
+### Browser/Web BFF — ADR-0016
 
-Prove PKCE/state/nonce/exact redirects, session fixation/rotation, secure cookie, CSRF Origin/token, CORS, security headers, browser-token absence, service-worker/private-cache restrictions, and critical accessibility/RTL/browser flows where affected.
+Prove the complete BFF implementation contract:
+
+- OpenAPI `/api/v1` namespace, internal-RPC non-exposure, RFC 9457 stable/redacted errors, JSON/auth/header size bounds and multipart rejection;
+- exact 256-bit state/nonce, exact 32-byte Base64URL-no-pad PKCE verifier/S256, `__Host-sajtech-preauth` flags/entropy/HMAC locator, <=10m/single-use/max-five state, replay/mismatch negatives;
+- exact provider redirect and <=1024 same-origin relative return target with absolute/`//`/backslash/control/encoded-bypass negatives;
+- provider validation before Identity and provider-token/code absence from Identity/browser/logs;
+- exact OIDC evidence entropy/2m/10m/replay/conflict and Google email/no-auto-link/profile-suggestion behavior;
+- active TOTP after password/Google proof with no completed session before MFA;
+- Identity `IssueAudienceAccessToken` authorized-BFF/active-session/server-allow-list contract, browser arbitrary-audience rejection, onboarding resource/Authorization-audience rejection, five-minute exact audience, 1500ms one-attempt/no-retry/fallback, and no browser JWT exposure;
+- secure `__Host-sajtech-session`, HMAC Redis locator, bounded state, idle<=7d/absolute<=30d immutable, five-minute last-seen write coalescing;
+- one-session-to-RefreshFamily binding, pseudonymous User->sessions index, logout-all/suspension/deletion/erasure/family-reuse cleanup;
+- atomic session rotation with predecessor immediate invalidation/no dual-valid grace;
+- refresh AES-256-GCM 96-bit nonce/128-bit tag/AAD, 90d rotation, dependent-session+7d prior-key retention, atomic reload, <=1h valid snapshot then fail closed;
+- exact 256-bit CSRF/purpose-HMAC/constant-time/no-CSRF-cookie/rotation behavior;
+- unsafe requests require Origin+CSRF+`Sec-Fetch-Site:same-origin`, missing Fetch Metadata fails closed; safe methods side-effect free;
+- same-origin-only/no cross-origin credentialed CORS; exact CSP/no unsafe-inline/eval, HSTS/nosniff/referrer/Permissions-Policy/no-store;
+- exact OIDC quota values plus outage/skew behavior;
+- Authorization-management exact audience/request-id/1500ms behavior and proof BFF never locally grants management/final resource authority;
+- registered resource-dispatch failure never fabricates business data;
+- BFF erasure removes all user-linked auth state and returns non-PII idempotent receipt;
+- runtime >=3/PDB2/HPA-gated hardening and exact egress/wrong-workload negatives;
+- browser/storage/service-worker token/private-cache restrictions and critical accessibility/RTL/auth/onboarding/admin journeys where affected.
 
 ### Edge/DDoS — ADR-0001/0029
 
-Prove the mandatory upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> WAF -> Web BFF path, direct-bypass denial, controlled blocking/load behavior, no sensitive edge logging, provider capability/escalation, connection-pressure telemetry, and authorized saturation exercise.
+Prove mandatory upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> WAF -> Web BFF path, direct-bypass denial, controlled blocking/load behavior, no sensitive edge logging, provider capability/escalation, connection-pressure telemetry, and authorized saturation exercise.
 
 ### Secrets/access/logging
 
-Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, Authorization platform-profile assignment/revocation JIT audit controls, and ADR-0031 Semgrep + pipeline redaction + canary sink + runtime detector safety.
+Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, BFF key-ring rotation/staleness/no-secret logging, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, Authorization platform-profile assignment/revocation JIT audit controls, and ADR-0031 Semgrep + pipeline redaction + canary sink + runtime detector safety.
 
 ### Java 25 Virtual Threads
 

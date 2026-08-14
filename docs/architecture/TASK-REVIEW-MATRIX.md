@@ -9,7 +9,8 @@ Always read `../../AGENTS.md`, `../engineering/current-only-documentation-policy
 | Java/domain/application code | `backend-engineering.md`, `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, ADR-0039, applicable service/current ADR |
 | Build/Gradle/static analysis/CI | `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, `../engineering/developer-workflow.md`, ADR-0039, Technology Baseline |
 | Identity registration/password/MFA | `security-architecture.md`, `services/identity-service.md`, ADR-0008, ADR-0009, ADR-0012, ADR-0023, ADR-0024, applicable Notification ADRs |
-| Browser OIDC/session/CSRF/CORS | `security-architecture.md`, `services/web-bff.md`, ADR-0012, ADR-0016, ADR-0023 |
+| Web BFF public API/OIDC/session/CSRF/CORS/token brokerage | `services/web-bff.md`, `security-architecture.md`, `security-verification-matrix.md`, `dependency-criticality.yaml`, `reliability-and-observability.md`, `runtime-and-deployment.md`, `performance-and-bottlenecks.md`, `testing-and-quality-gates.md`, `PRODUCTION-READINESS-CHECKLIST.md`, ADR-0012, ADR-0016, ADR-0023, ADR-0024, ADR-0025, ADR-0033 |
+| Identity BFF audience-token provider | `services/identity-service.md`, `services/web-bff.md`, `security-architecture.md`, `dependency-criticality.yaml`, ADR-0012, ADR-0016, ADR-0023, ADR-0025 |
 | Tenancy/deletion/erasure | `security-architecture.md`, applicable service doc, ADR-0012, ADR-0027, ADR-0028 |
 | Authorization permission/admin/platform path | `services/authorization-service.md`, `security-architecture.md`, `security-verification-matrix.md`, `dependency-criticality.yaml`, ADR-0013, ADR-0024, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036 |
 | Semantic security quota | `security-architecture.md`, applicable service doc, ADR-0024 |

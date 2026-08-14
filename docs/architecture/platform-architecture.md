@@ -24,19 +24,19 @@ Every microservice owns its:
 - deployment/release lifecycle;
 - observability and service-level authorization enforcement.
 
-Every persistent production microservice also owns a dedicated CloudNativePG cluster and independent backup identity/namespace. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, and shared business-model libraries are prohibited. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
+Every persistent production microservice also owns dedicated CloudNativePG cluster and independent backup identity/namespace. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, and shared business-model libraries are prohibited. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
 
 A service is not created merely around a table, CRUD screen, UI page, entity, or framework component.
 
 ## 3. Repository and build ownership
 
-Independently deployable services have independent builds/releases. The root Gradle build is repository governance only and does not aggregate independently deployable services as one release unit.
+Independently deployable services have independent builds/releases. Root Gradle build is repository governance only and does not aggregate independently deployable services as one release unit.
 
 Each service owns `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, dependency verification, contracts, source sets, container build, and deployment package.
 
 Organization Java namespace/Gradle group: `com.sajtech`.
 
-Implementation layout follows the current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical.
+Implementation layout follows current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical.
 
 ## 4. High-level topology
 
@@ -69,7 +69,7 @@ Domain / Platform Microservices
         +--> service-owned PostgreSQL
 ```
 
-Only the BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace mandatory upstream volumetric protection, redundant load balancing, Traefik, or the dedicated WAF path.
+Only BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace mandatory upstream volumetric protection, redundant load balancing, Traefik, or dedicated WAF path.
 
 ## 5. Protocol boundaries
 
@@ -78,7 +78,9 @@ Only the BFF and explicitly approved public adapters/APIs are externally reachab
 - HTTPS;
 - REST;
 - OpenAPI;
-- Web BFF as the browser-facing backend boundary.
+- Web BFF as browser-facing backend boundary;
+- v1 application namespace under `/api/v1` with reviewed `/auth`, `/identity`, and `/authorization` subspaces;
+- same-origin-only browser credential model; browser never receives provider/Identity/downstream access or refresh credentials.
 
 ### Internal synchronous boundary
 
@@ -89,7 +91,7 @@ Only the BFF and explicitly approved public adapters/APIs are externally reachab
 - Istio workload identity and least-privilege authorization;
 - operation-level dependency/fallback policy in `dependency-criticality.yaml`.
 
-REST is not the default for new internal service-to-service communication.
+REST is not default for new internal service-to-service communication.
 
 ### Asynchronous boundary
 
@@ -112,10 +114,12 @@ Current/approved boundaries include:
 - Notification Service;
 - Web BFF;
 - Compromised Password Service;
-- Reference Data Service as a planned capability boundary;
-- Workflow Service only as a future capability boundary that MUST NOT absorb business rules from owning contexts.
+- Reference Data Service as planned capability boundary;
+- Workflow Service only as future capability boundary that MUST NOT absorb business rules from owning contexts.
 
-The first executable backend service is `services/identity-service`; the second executable backend component is `web-bff`.
+The first executable backend service is `services/identity-service`; the second executable backend component is `services/web-bff`.
+
+Web BFF is an integration/browser security boundary rather than owner of backend business invariants. It owns public OpenAPI, browser OIDC/pre-auth/session/CSRF, exact-audience credential brokerage mechanics, browser-safe error/request bounds and route-to-downstream orchestration. Identity remains token/session identity authority, Authorization remains tenant permission/admin authority, and resource-owning service remains final protected-resource authorization/business-state authority.
 
 ## 7. Architecture-level technology baseline
 
@@ -142,7 +146,7 @@ The first executable backend service is `services/identity-service`; the second 
 - Vitest + React Testing Library;
 - Playwright Test + TypeScript.
 
-Exact approved patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/image/chart metadata except where the exact value is itself a current architecture constraint.
+Exact approved patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/image/chart metadata except where exact value is itself a current architecture constraint.
 
 ## 8. Production resilience and security boundaries
 
@@ -151,6 +155,7 @@ Exact approved patch versions belong in `../technology/technology-baseline.md` a
 - **PostgreSQL:** dedicated production CloudNativePG cluster per persistent service; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves.
 - **Kafka:** KRaft with three brokers + three controllers; critical RF=3/minISR=2/acks=all; cold DR reconstructs from service-owned evidence.
 - **Security Redis:** one primary + two replicas + three Sentinel voters with TLS/ACL isolation.
+- **Web BFF:** `platform-apps/web-bff`, HTTP 8080, >=3 replicas/PDB2; HPA 3..12 only after representative load evidence; HMAC-located server sessions/pre-auth, bounded OIDC/session quotas/crypto, atomic rotation/revocation, and deny-by-default egress only to registered Identity/Authorization/resource/Redis/Google/telemetry dependencies.
 - **Authorization:** >=3 replicas/PDB/spread; one final online no-cache/no-retry `CheckPermission`, safe local prechecks, fail-closed overload/breaker isolation, >=99.95% availability, p95<=100ms/p99<=200ms SLO.
 - **OpenBao:** lean single-Raft authoritative secret source with encrypted snapshots; normal application hot paths use mounted/local validated key material rather than per-request OpenBao calls.
 - **Notification:** PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation; no bespoke clock/fence control plane.
@@ -159,16 +164,16 @@ Exact approved patch versions belong in `../technology/technology-baseline.md` a
 - **Human access:** Teleport JIT SSO/WebAuthn access with approvals, short-lived privilege, and audit/session evidence.
 - **Telemetry:** PII/secret-safe structured telemetry with static rules, pipeline redaction, synthetic canaries, and runtime leak detection.
 
-These production controls MUST NOT make local development depend on a full production cluster. The inner loop uses focused unit/architecture/contract tests and Testcontainers; mesh/WAF/HA/DR/chaos/provider evidence runs at the appropriate CI/staging/release cadence.
+These production controls MUST NOT make local development depend on full production cluster. Inner loop uses focused unit/architecture/contract tests and Testcontainers; mesh/WAF/HA/DR/chaos/provider evidence runs at appropriate CI/staging/release cadence.
 
 ## 9. Change and decision rule
 
 Implementation MUST NOT silently replace a platform technology, bounded-context boundary, data owner, security invariant, or communication model.
 
-The active repository-owner documentation policy is current-only. When architecture changes:
+Active repository-owner documentation policy is current-only. When architecture changes:
 
-1. update the applicable current-state document;
-2. create or update the retained current ADR when a durable decision record is useful;
+1. update applicable current-state document;
+2. create or update retained current ADR when durable decision record is useful;
 3. remove or normalize obsolete decision text after confirming no current invariant/contract/security/SLO/operational rule would be lost;
 4. update `../adr/decision-register.md`, `SOURCES.md`, executable architecture/security tests, and technology baselines when applicable;
-5. deliver and review the complete change through the PR-first workflow.
+5. deliver and review complete change through PR-first workflow.
