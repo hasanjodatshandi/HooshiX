@@ -275,7 +275,7 @@ Do not use caller-supplied free text, page tokens, arbitrary identifiers, raw UR
 
 ## Release, recovery, and implementation trigger
 
-Reference data is recovered by redeploying the same approved signed application image/bundle or by rebuilding a byte/logically equivalent reviewed release from approved importer inputs. There is no database restore, WAL/PITR, runtime repair, or provider fallback.
+Reference data is recovered by redeploying the same approved signed application image/bundle or by rebuilding a logically equivalent reviewed release from approved importer inputs. There is no database restore, WAL/PITR, runtime repair, or provider fallback.
 
 Before publishing a bundle, compiler/importer verification covers at least:
 
