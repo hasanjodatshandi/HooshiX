@@ -1,184 +1,183 @@
 # Build and CI Quality Enforcement — Current Standard
 
-This document defines executable quality gates for independently deployable Java services. `repository-change-workflow.md` governs PR-first delivery. Documentation alone never proves source/runtime compliance.
+This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
+
+## 1. Required Java PR gates
+
+Every Java service exposes repository-defined tasks for applicable:
 
 ```text
-Architecture/policy: DECIDED
-Implementation: REQUIRED
-Evidence: NOT VERIFIED until real files/tasks/workflows execute successfully
+compile
+test
+integrationTest
+architectureTest
+spotlessCheck
+spotbugsMain
+repository Semgrep/SAST
+dependency verification/lock checks
+contract/schema checks
 ```
 
-## 1. Required service/repository artifacts
+Additional gates apply by changed capability. A mandatory check is not changed to warning/`ignoreFailures` merely to obtain a green pipeline.
 
-Each Java service owns an independent build/release boundary with, at minimum when implemented:
+## 2. Architecture/code gates
+
+CI enforces at least:
+
+- Domain/Application inward dependency direction;
+- package regex and forbidden dumping-ground package names;
+- no Spring/JPA/jOOQ/gRPC/Redis/Kafka/SQLite/provider types in Domain/Application;
+- no field injection/service locator/circular dependency hiding;
+- no remote I/O inside annotated/known DB transaction boundaries where static/test enforcement is feasible;
+- no production local/test backdoor profile;
+- service boundary and contract ownership checks.
+
+## 3. Dependency, supply-chain, and artifact gates
+
+- Gradle dependencies/plugins/tools pinned/verified; dynamic versions prohibited;
+- final image built once from reviewed source;
+- SBOM generated for final image;
+- vulnerability/advisory correlation uses final artifact/SBOM;
+- image signed and provenance/attestation created;
+- deployment promotes exact signed digest from staging to production;
+- privileged workflow contexts never execute unreviewed PR-controlled code/config with write secrets/tokens;
+- downloaded/vendored platform artifacts verify digest/signature/checksum before use.
+
+## 4. Contract and persistence gates
+
+Applicable:
+
+- Buf lint/breaking for Protobuf;
+- OpenAPI compatibility/bounds/security behavior;
+- Flyway validation/migration compatibility;
+- PostgreSQL role/RLS/cross-service negative tests;
+- transaction-local tenant-context pool-reuse tests;
+- query bounds/index/representative plans;
+- Outbox/Inbox/idempotency/replay tests;
+- provider ambiguity/idempotency tests.
+
+ADR-0040 Compromised Password additionally gates:
+
+- official HIBP SHA-1 corpus acquisition/provenance identity;
+- SHA-1 screening-only rule and Argon2id credential-storage rule;
+- zero-count padding rejection;
+- complete-corpus prefix-cardinality/serialized-size measurement;
+- dataset freshness <=35 days at production readiness;
+- immutable 20-byte SHA-1 SQLite format and read-only/query-only runtime;
+- no runtime HIBP/provider egress;
+- false-clean prevention on corrupt/stale/oversized/incompatible data.
+
+ADR-0041 blocks creation of `reference-data-service` until an explicit independent-deployable trigger record exists.
+
+## 5. Semantic quota gates
+
+Changes affecting ADR-0024 run executable checks for:
+
+- atomic multi-dimension consumption/no partial commit;
+- exact `/32` IPv4 and `/128` IPv6 hard client identity;
+- separate `/24`/`/64` aggregate pressure and proof it is not the sole v1 429 gate;
+- trusted ADR-0043 context and forged-header/proxy negatives;
+- app/Redis skew and one-clock jump;
+- common-mode app+Redis host clock step through wall-vs-monotonic Clock Safety Guard;
+- boot synchronization and 60-second safe re-arm;
+- no TTL security reset;
+- `noeviction` and >=30% memory reserve;
+- adversarial high-cardinality new-bucket flood;
+- bounded low-cardinality allocation guard returning `QUOTA_CAPACITY_UNHEALTHY` before OOM/eviction;
+- PII-safe low-cardinality quota telemetry.
+
+A quota time/capacity failure never becomes success or fabricated subject quota denial.
+
+## 6. Day-One observability gates
+
+ADR-0044 applies to the first executable service PR, not a later observability project.
+
+Applicable service PRs must prove:
+
+- structured allow-listed JSON logs;
+- Micrometer request/operation/dependency/saturation metrics;
+- OpenTelemetry tracing to the internal Collector;
+- safe W3C propagation and bounded baggage;
+- no trace/baggage value becomes authN/authZ/tenant/quota/idempotency/audit authority;
+- no secret/credential/contact/raw-IP/prohibited identifier enters logs/metrics/traces;
+- metric label cardinality is bounded;
+- management Prometheus endpoint and OTLP receiver are not public;
+- telemetry backend/exporter outage does not fail ordinary business processing;
+- required audit evidence remains on its authoritative durable/off-host path;
+- at least one synthetic integration path produces correlated safe logs, metrics, and traces when the involved services exist.
+
+Collector/platform checks prove:
+
+- pinned `otelcol-contrib` image/digest;
+- dedicated ServiceAccount/RBAC/NetworkPolicy;
+- exact read-only pod/container log `hostPath` only; no broad host mount/host network/privilege escalation;
+- memory limiter/batch/finite queue configuration;
+- redaction/filtering before export;
+- exporter loss/drop/backpressure telemetry;
+- Loki/Tempo/Prometheus retention/cardinality/storage quotas render as bounded configuration;
+- single-server external black-box monitor is configured outside the host failure domain before production.
+
+## 7. Kyverno CEL-only policy gate
+
+Kyverno 1.18.x new production controls use stable CEL-based `policies.kyverno.io/v1` policy APIs.
+
+Repository/render policy checks fail when a new production manifest uses legacy:
 
 ```text
-services/<service>/
-├── settings.gradle.kts
-├── build.gradle.kts
-├── gradlew / gradlew.bat
-├── gradle/wrapper/
-├── gradle/verification-metadata.xml
-├── Dockerfile
-├── contracts/
-├── src/{main,test,integrationTest,contractTest,architectureTest}/
-└── deploy/
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy | Policy
+
+apiVersion: kyverno.io/v2
+kind: CleanupPolicy | ClusterCleanupPolicy
 ```
 
-Repository governance owns reusable workflow/static-policy material such as GitHub Actions, Semgrep rules, SpotBugs configuration, documentation checks, and deployment policy checks. Equivalent paths are allowed only under one explicit repository convention.
+unless a separately reviewed migration-only exception identifies owner/removal deadline. Greenfield HooshiX production policy authoring has no default exception.
 
-## 2. Gradle/build requirements
+Signature/provenance/SBOM verification uses `ImageValidatingPolicy` where applicable. Resource validation/mutation/generation/deletion uses the corresponding stable CEL policy type.
 
-Every service uses its own Gradle Wrapper/Kotlin DSL and exposes equivalent behavior for:
+## 8. Kubernetes/GitOps gates
 
-- Java 25 toolchain/release and UTF-8 compilation;
-- JUnit Platform;
-- Spring Boot dependency alignment from the Technology Baseline;
-- dependency locking/verification metadata;
-- applicable `test`, `integrationTest`, `contractTest`, `architectureTest` tasks;
-- Spotless formatting/check;
-- SpotBugs production analysis;
-- schema/contract compatibility;
-- deterministic/reproducible archive/container inputs sufficient to tie output to exact reviewed source;
-- a repository-defined aggregate quality task if useful.
+Applicable checks include:
 
-Dynamic versions/unbounded ranges and unapproved production SNAPSHOTs are prohibited. Generated source lives in explicit generated paths with only narrow regeneration-authoritative exclusions. Mandatory gates never use `ignoreFailures=true` or blanket suppression.
+- Helm lint/render/schema;
+- Kubernetes schema/API deprecation checks;
+- Kyverno CEL policy validation/tests;
+- NetworkPolicy/Istio identity positive/negative tests;
+- `istioctl analyze`;
+- security-context negatives;
+- no default ServiceAccount;
+- no public dashboard/insecure edge;
+- ADR-0043 origin/client-address/WAF path negatives;
+- secret/render scans;
+- profile-correct replica/HPA/PDB/topology.
 
-Expected semantics, names repository-defined:
+## 9. Documentation/governance gates
 
-```text
-spotlessCheck          verify formatting; never mutate CI workspace
-spotlessApply          developer-only formatting action
-spotbugsMain           production bytecode bug analysis
-architectureTest       ArchUnit rules
-integrationTest        real adapter/infrastructure behavior
-contractTest           gRPC/REST/event compatibility
-schemaCompatibilityCheck
-qualityCheck           mandatory fast/medium aggregate where adopted
-```
+CI SHOULD enforce when implemented:
 
-A clean checkout MUST be buildable through the service Wrapper; architecture prose does not invent plugin versions.
+- no broken relative links;
+- Decision Register/source/task/index coverage;
+- ADR filename/heading ID match;
+- no duplicate/reused/renumbered merged ADR identifiers;
+- no deletion of a merged ADR without explicit repository-owner exception;
+- superseded ADRs not treated as current authority;
+- no stale baseline version copies outside permitted contexts;
+- dependency YAML/schema/render consistency.
 
-## 3. Spotless
+## 10. Heavy release/scheduled evidence
 
-- one pinned approved formatter/configuration;
-- CI runs `spotlessCheck`, not `spotlessApply`;
-- formatting covers repository-owned Java/Gradle scripts consistently where supported;
-- generated/vendor exclusion is narrow by path;
-- formatting failures are fixed in source, never hidden by broad exclusions.
+Not every edit runs full platform work. Release/scheduled gates retain:
 
-## 4. SpotBugs
+- staging critical journeys/Playwright;
+- load/soak and complete-stack single-server benchmark;
+- chaos/failure behavior;
+- backup/PITR/restore/cold DR;
+- certificate/key rotation;
+- provider integration evidence;
+- external host-down monitoring exercise.
 
-- `spotbugsMain` or equivalent is blocking for Java production code;
-- strict reviewed threshold;
-- generated-code exclusion only when reproducible/non-maintained;
-- suppression is specific bug pattern + specific scope + rationale;
-- security/correctness patterns are not globally disabled;
-- results retained as CI artifact/SARIF or equivalent.
+Heavy checks may move out of every-PR cadence only when a faster deterministic PR gate protects the regression class and the heavy gate remains mandatory before the release/evidence boundary that depends on it.
 
-SpotBugs complements compiler warnings, tests, SAST/Semgrep, dependency scanning, and ArchUnit.
+## 11. CI result language
 
-## 5. ArchUnit
-
-Every Java service enforces applicable architecture invariants:
-
-- Domain has no Spring/JPA/Hibernate/jOOQ/Kafka/Redis/gRPC/Protobuf/Infrastructure/Interfaces dependencies;
-- Application has no Infrastructure/Interfaces/concrete-adapter dependency;
-- JPA/Spring Data/generated persistence types remain Infrastructure-only;
-- Domain/Application cannot use `ApplicationContext`, `BeanFactory`, service locator, runtime bean lookup, or concrete adapter construction;
-- field injection prohibited;
-- package segment/feature-first/nature-separated rules and forbidden dumping-ground names enforced where reliable;
-- package/dependency cycles absent;
-- inbound interfaces remain boundary adapters and dependency direction stays inward;
-- service-specific forbidden dependencies added when current architecture requires them.
-
-ArchUnit does not pretend to prove semantic design qualities such as “controller has no business logic” or “class is small” when no reliable rule exists. Java 25 does not receive a blanket `synchronized` ban; JFR/load evidence covers remaining contention/native/FFM risks.
-
-## 6. Semgrep/static source policy
-
-Repository Semgrep rules target high-signal patterns such as:
-
-- field injection/runtime dependency lookup;
-- raw credential/token/cookie/secret/body/SQL-bind/complete-metadata logging;
-- unsafe request/domain/payload string-concatenated logging;
-- production debug body/bind/credential exposure;
-- `Thread.sleep` coordination/test synchronization outside narrow justified tooling cases;
-- unapproved WebFlux/Reactor backend introduction;
-- precise secret/security misconfiguration patterns.
-
-Rules have positive/negative fixtures and are not blocking until false-positive behavior is reviewed. Suppression is narrow, reasoned, and security-reviewed for sensitive/logging rules. CI output never echoes raw secret/PII fixtures.
-
-## 7. GitHub Actions baseline
-
-### Workflow security
-
-- third-party actions pinned to immutable commit SHAs; floating `@main`/unbounded tags prohibited for required production workflows;
-- `contents: read`/least privilege by default; writes only for the job that requires them;
-- prefer OIDC/short-lived cloud/platform identity to long-lived credentials;
-- secrets never printed and privileged secrets are unavailable to untrusted/fork PR execution;
-- PR checks execute against the reviewed head revision;
-- cache keys/trust boundaries prevent untrusted artifacts from poisoning privileged release state;
-- workflow/quality-policy files are themselves reviewed/protected;
-- privileged event contexts such as `pull_request_target` or `workflow_run` MUST NOT checkout, source, execute, or otherwise trust unreviewed PR-controlled code/config while write tokens, protected environments, or secrets are available;
-- when a trusted follow-up workflow consumes artifacts/metadata from an untrusted build, it verifies the expected repository, event, immutable head/source SHA, artifact identity/integrity, and producer workflow before granting privilege; untrusted artifact contents are never executed merely because a prior workflow uploaded them;
-- jobs that need privileged release credentials are separated from untrusted-code execution and receive only the minimum environment/permissions after required review/gates.
-
-### PR quality graph
-
-Independent safe jobs SHOULD run in parallel:
-
-```text
-format + compile/unit + ArchUnit + SpotBugs + Semgrep/SAST
-+ dependency verification/vulnerability/license
-+ contract/schema compatibility
-+ focused integration
-        ↓
-required quality aggregate
-        ↓
-affected Helm/Kubernetes validation
-        ↓
-container build
-        ↓
-final-image SBOM/vulnerability + signature/provenance
-```
-
-Required predecessor failure stops dependent stages.
-
-### Release graph
-
-```text
-signed immutable digest
--> staging
--> backend smoke
--> critical BDD/API acceptance
--> critical Playwright
--> production-readiness evidence
--> promote same digest
--> production-safe smoke
-```
-
-Rebuild between staging and production is prohibited. Smoke failure stops rollout and uses rollback only when schema/data compatibility is safe.
-
-### Required-check governance
-
-Protected `main` requires the repository-defined mandatory checks. Removing/weakening a check, lowering a threshold, or broadening suppression is a governance/security change, not a shortcut to merge.
-
-## 8. Supply-chain/dependency integrity
-
-Service dependencies/plugins/tools require purpose/owner/compatibility/security/license review as applicable plus dependency verification. Release artifacts carry exact source Git SHA, immutable digest, signed CycloneDX SBOM, provenance, and organization signature. Final-image vulnerability policy follows ADR-0035/0038 and admission policy follows current security architecture.
-
-## 9. Evidence and Definition of Done
-
-For each Java service, implementation compliance requires actual evidence that:
-
-- Wrapper/build/verification metadata exist and work from clean checkout;
-- Java 25/toolchain/dependency verification are enforced;
-- Spotless/SpotBugs/ArchUnit/Semgrep pass;
-- applicable unit/integration/contract/schema/security tests pass;
-- no required check/suppression is weakened without approved narrow rationale;
-- GitHub required-check set passes on the reviewed commit;
-- privileged workflows never execute unreviewed PR-controlled code with privileged credentials and any cross-workflow artifact promotion proves source/integrity before privilege;
-- container output can be promoted as the same immutable signed digest staging -> production;
-- security/supply-chain output does not leak sensitive fixtures.
-
-Until real service source/build/workflows exist and execute, status remains **NOT VERIFIED**.
+A check is `Passed` only when it ran and succeeded. Empty/unconfigured status, missing workflow, documentation assertion, or unavailable environment is `Not run`/`Not verified`, never green CI.

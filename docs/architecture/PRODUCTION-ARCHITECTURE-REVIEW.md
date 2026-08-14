@@ -1,145 +1,156 @@
 # Production Architecture Review — Current State
 
 - **Reviewed:** 2026-08-15
-- **Status:** architecture target accepted; implementation/runtime evidence is not implied
-- **Documentation mode:** current-only
-- **Selected initial profile:** `production-single-server`
+- **Status:** architecture target accepted; implementation/runtime evidence not implied
+- **Selected profile:** `production-single-server`
 - **Availability posture:** explicit non-HA
 
-This document records review conclusions. It does not duplicate the full normative rules from ADRs/current-state documents.
+This document records review conclusions and points to current authority. It does not duplicate full normative rules.
 
 ## Outcome
 
-The single-server architecture remains acceptable only as a named non-HA production profile with security/correctness/recovery invariants preserved.
+The architecture remains acceptable as a named single-server production profile only with security/correctness/recovery invariants preserved. The latest pre-implementation review resolved the remaining material gaps that should be decided before the first executable vertical slice:
 
-The follow-up review confirmed that the architecture already models the major single-server capacity, SLO, shared-PostgreSQL, Authorization, Redis/Kafka, OpenBao, MFA and implementation-evidence risks. It also identified cross-cutting gaps that are now represented by current authority:
+- Day-One observability runtime/evidence -> ADR-0044;
+- Compromised Password source/hash/freshness/provenance -> ADR-0040;
+- quota common-mode clock/cardinality/collateral network behavior -> ADR-0024;
+- stable post-merge ADR identifiers -> current-only/documentation standards;
+- coherent-change PR governance -> repository workflow;
+- stricter Reference Data independent-service trigger -> ADR-0041;
+- greenfield Kyverno stable CEL policy enforcement -> ADR-0017 + build/CI standard.
 
-- **trusted public client-address authority** -> ADR-0043 + `network-architecture.md`;
-- **concrete single-server management network** -> ADR-0043 + ADR-0030;
-- **formal platform threat model** -> `threat-model.md`;
-- **full cold-DR procedure** -> `../runbooks/production-cold-dr.md`;
-- **repository implementation/evidence status** -> `implementation-status.md`;
-- **email product identity vs SMTP delivery representation** -> ADR-0009;
-- **dependency-registry authority ambiguity** -> corrected in `reliability-and-observability.md` to match ADR-0033;
-- **duplicated summary/source rules** -> source maps remain indexes and reference the authoritative owner instead of becoming a second specification.
+Earlier network/management/threat-model/DR/status findings remain represented by ADR-0043, network architecture, threat model, cold-DR runbook, and implementation status.
 
-## Accepted production-profile decisions
+## Accepted topology
 
-The existing ADR-0042 decisions remain accepted:
+ADR-0042 remains selected:
 
 - one K3s server/workload node;
-- one physical PostgreSQL instance with distinct service databases/roles/Flyway histories/RLS;
-- one Redis instance with TLS/ACL/`noeviction`/AOF/fail-closed behavior;
-- one combined KRaft Kafka broker/controller with RF=1/minISR=1 and formal non-HA acceptance;
-- one application replica per service with HPA/availability PDB disabled by default;
-- Istio Ambient retained behind a complete-stack benchmark gate;
-- Kyverno retained with a smaller high-value policy set but blocking enforcement;
-- evidence-based host sizing rather than an assumed 2 vCPU / 3-4 GiB production claim;
+- one physical PostgreSQL instance with distinct service DB/roles/Flyway/RLS;
+- one TLS/ACL/`noeviction`/AOF Redis;
+- one combined KRaft broker/controller, RF1/minISR1, explicitly non-HA;
+- one application replica per implemented independent service; HPA/PDB off by default;
+- Istio Ambient retained behind benchmark gate;
+- Kyverno retained blocking/fail-closed;
+- evidence-based host sizing;
 - OpenBao and end-user MFA unchanged.
 
-ADR-0043 additionally accepts:
+No service boundary is changed by this review. Compromised Password remains independent. Reference Data independent deployment is deferred/gated more strictly.
 
-- external L4 as source-address authority with trusted PROXY protocol v2 to Traefik;
-- strict proxy/header trust through Traefik/Caddy/BFF; caller forwarding headers are not authority;
-- typed BFF-derived client-network context for downstream public security quotas;
-- dedicated WireGuard management overlay for normal single-server SSH reachability;
-- network admission separate from FIDO2 human authentication and JIT privilege;
-- public-interface TCP/22 denial.
+## Quota/client-address review
+
+ADR-0043 still owns the trusted source chain:
+
+```text
+external-L4 validated source
+-> trusted PROXY v2
+-> Traefik
+-> Caddy strict proxy parsing
+-> BFF exact canonical client IP
+-> typed exact internal context
+```
+
+ADR-0024 now separates:
+
+```text
+hard v1 network quota identity:
+  IPv4 /32
+  IPv6 /128
+
+aggregate abuse/allocation pressure:
+  IPv4 /24
+  IPv6 /64
+```
+
+Aggregate prefix is no longer the sole hard user-denial identity. NAT/campus/VPN/IPv6 collateral behavior is an explicit test class.
+
+Single-server app wall time and Redis TIME share a host failure domain, so skew-only detection was insufficient for common-mode clock steps. A local wall-vs-monotonic Clock Safety Guard now detects abrupt host-clock discontinuity, with host-sync readiness and 60-second stable re-arm.
+
+`noeviction` plus non-expiring security state can be attacked through high-cardinality new-key creation. New security-state allocation is therefore bounded with low-cardinality capacity controls and fails as `QUOTA_CAPACITY_UNHEALTHY` before eviction/OOM. This remains fail closed and distinct from normal user quota denial.
+
+## Compromised Password review
+
+V1 corpus authority is official offline HIBP Pwned Passwords SHA-1 data.
+
+- SHA-1 is screening-only; Argon2id remains password-storage authority.
+- Identity computes full SHA-1 locally and sends only the five-hex prefix.
+- Compromised Password stores immutable 20-byte SHA-1 reference rows in SQLite and returns positive-count suffix candidates.
+- Runtime has no HIBP provider dependency.
+- Dataset readiness age <=35 days; acquisition/build verification at least every 30 days.
+- Complete corpus is measured for prefix cardinality/serialized response bounds; implementation does not rely on an unevidenced permanent historical cap.
+- Stale/corrupt/missing/incompatible corpus state fails closed.
+
+## Reference Data review
+
+Reference Data remains a valid capability but no longer gains an independent microservice merely because one journey needs it.
+
+Before the independent-service trigger, the approved immutable bundle may live in the owning deployable, initially BFF.
+
+Create `reference-data-service` only after evidence for at least one of:
+
+- >=2 independently deployable consumers;
+- independent update/release lifecycle;
+- independent security boundary;
+- independent scale/availability profile;
+- independent operational/team ownership.
+
+## Day-One observability review
+
+Observability is implementation work from the first executable service commit, not a later cleanup phase.
+
+Current single-server target:
+
+```text
+structured JSON -> otelcol-contrib -> Loki
+Micrometer metrics -> Prometheus -> Alertmanager
+OpenTelemetry traces -> otelcol-contrib -> Tempo
+Prometheus/Loki/Tempo -> Grafana
+external black-box monitor -> approved public edge from outside host failure domain
+```
+
+Current pins are in Technology Baseline: Collector 0.157.0, Loki 3.7.4, Tempo 3.0.2, with existing Prometheus/Alertmanager/Grafana retained.
+
+Trace/baggage/correlation is telemetry only, never authN/authZ/tenant/quota/idempotency/audit authority. Collector ingress is private, queues/memory bounded, and its node-log filesystem exception is exact/read-only only.
+
+Local telemetry shares the single-host failure domain, so production requires independent external total-host detection. Required privileged/security audit remains separate durable/off-host authority.
+
+## Kyverno review
+
+The current Kyverno 1.18.2 line already supports stable CEL-based `policies.kyverno.io/v1` policy types. Greenfield HooshiX production controls use those APIs. CI/render gates reject new legacy ClusterPolicy/CleanupPolicy families unless a narrow migration-only exception exists.
+
+## Governance review
+
+Current-state documentation remains current-only, but ADR IDs are now stable after merge:
+
+- no renumber;
+- no reuse;
+- gaps permitted;
+- fully superseded ADR keeps a compact stable-ID provenance pointer and is not current implementation authority.
+
+PR workflow is based on coherent engineering change rather than conversation prompt. This preserves atomic review/rollback while allowing a focused post-merge correction when a real material defect is found.
 
 ## Rejected shortcuts
 
-The review does not accept:
+Still rejected:
 
-- replacing physical WAL/PITR/off-site recovery with `pg_dump + cron`;
-- removing or weakening Kyverno, Ambient, WAF, OpenBao, MFA, RLS, Authorization or fail-closed quota behavior to fit one host;
-- using caller `Forwarded`/`X-Forwarded-*`/`X-Real-IP` as security authority;
-- enabling Traefik insecure forwarding/PROXY trust in production;
-- falling back to a proxy address when trusted client identity is unavailable for a required network quota;
-- exposing normal SSH on the public interface;
-- using WireGuard as a substitute for human FIDO2 identity/JIT authorization;
-- using `.bashrc`/shell history as privileged-session audit;
-- claiming one-node/one-broker/one-Redis/one-PostgreSQL topology is HA;
-- claiming planned source/deployment paths are implemented without repository/runtime evidence.
-
-## Review of second-order complexity
-
-The platform intentionally keeps distributed bounded-context/service boundaries even though the selected first production profile is one physical server. This creates operational cost without node-level HA benefits.
-
-The follow-up review considered consolidation/modular-monolith alternatives but did **not** identify a correctness or security defect that requires changing the current bounded-context decisions. No service boundary is changed in this review. A future product/cost decision may revisit deployment consolidation through a separate architecture decision with contract/data/security migration analysis.
-
-Compromised Password remains an independent boundary under ADR-0040. Reference Data remains implementation-gated under ADR-0041.
-
-## Network/security review
-
-The prior architecture had the correct high-level public path but did not define one canonical source-address authority. This was material because ADR-0024 uses network identity for security quotas.
-
-ADR-0043 closes that ambiguity:
-
-```text
-validated external-L4 client source
--> trusted PROXY v2
--> Traefik sanitized forwarding state
--> Caddy strict trusted-proxy resolution
--> server-derived BFF client IP
--> typed internal network context
--> /24 or /64 HMAC quota identity
-```
-
-Missing/malformed/untrusted identity fails closed where a network quota is required. Raw client IP is not normal durable state or telemetry.
-
-The single-server management path is now concrete:
-
-```text
-approved operator device
--> WireGuard
--> host management address
--> OpenSSH/FIDO2
--> JIT privilege
-```
-
-Provider console is break-glass only. Public SSH is not a recovery fallback.
-
-## Recovery review
-
-ADR-0004 remains RPO/RTO authority. The new cold-DR runbook turns the prior high-level recovery model into one ordered operator procedure without claiming it has executed.
-
-The sequence covers clean host/management access, K3s/Calico, unchanged OpenBao, GitOps security controls, shared PostgreSQL PITR, immutable reference artifacts, Redis, Kafka, erasure/legal-hold replay, services, trusted edge/client address, security checks and traffic enablement.
-
-Backup success remains insufficient. Quarterly full cold-DR must measure the actual platform RTO and applicable component RPOs.
-
-## Threat-model review
-
-`threat-model.md` now captures assets, actors, trust boundaries, STRIDE threats, abuse cases, mitigations, residual risk and verification mapping.
-
-The most important residual single-server security risk is host/root compromise: one host has a broad local blast radius. Workload/network policy is not presented as a security boundary against host root. Recovery therefore depends on off-host audit/recovery material, credential rotation/revocation, trusted rebuild artifacts and explicit risk acceptance.
-
-## Email identity review
-
-HooshiX keeps the existing product behavior that email identity equality is case-insensitive. ADR-0009 now states this explicitly as a product identity decision rather than an SMTP protocol claim.
-
-A case-preserving delivery representation is retained so outbound transport does not have to rewrite mailbox local-part spelling. Identity equality/uniqueness and delivery spelling cannot be mutated independently to bypass verification or uniqueness.
-
-## Dependency-policy review
-
-ADR-0033 remains unchanged: the machine-readable dependency registry owns operation-edge criticality/failure/retry-owner/fallback/policy references. Exact deadlines, breaker details, idempotency and concurrency remain in owning contracts/current policy.
-
-The review rejected copying all those values into the registry because that would create duplicate authority unless the architecture deliberately migrated ownership to the registry.
-
-## Capacity and availability review
-
-Existing requirements remain correct:
-
-- actual service SLO/SLI and downtime remain measured in single-server;
-- missing physical redundancy does not remove real downtime from error budgets;
-- complete-stack benchmark is simultaneous, not component-by-component only;
-- >=30% validated CPU/memory headroom and applicable >=2x peak evidence are required;
-- shared disk pressure includes PostgreSQL WAL/checkpoint/backup, Redis AOF/rewrite, Kafka and telemetry;
-- network capacity evidence now also covers MTU/PMTU, conntrack, file descriptors/listen queues, ephemeral ports/TIME_WAIT and interface errors/drops.
-
-Failure to fit requires larger capacity or `production-ha`, not security downgrades.
+- `pg_dump + cron` as primary production recovery;
+- weakening OpenBao/Kyverno/Ambient/WAF/MFA/RLS/Authorization/quota/audit to fit one host;
+- caller forwarding headers as network authority;
+- insecure Traefik PROXY/forwarded trust;
+- proxy address fallback for missing client identity;
+- aggregate `/24`/`/64` as sole hard v1 user quota identity;
+- public SSH or WireGuard as substitute for FIDO2/JIT;
+- shell history as privileged audit;
+- runtime HIBP fallback or SHA-1 password storage;
+- observability headers/baggage as business/security authority;
+- public OTLP/management endpoints or broad Collector host access;
+- legacy Kyverno policy types for new greenfield production controls;
+- false HA claims or production-readiness claims from documentation.
 
 ## Production-readiness conclusion
 
-Architecture is more implementation-ready after these clarifications, but **runtime production readiness remains unproven**.
+Architecture is ready to move from design toward implementation, but production readiness is **not** proven.
 
-At this documentation revision, planned application/platform/CI targets are not present; see `implementation-status.md`. Production traffic remains blocked until all applicable `PRODUCTION-READINESS-CHECKLIST.md` gates have executable evidence.
+The repository still lacks `services/`, `deploy/`, `infrastructure/`, and `.github/workflows/` implementation roots. The next value comes from an executable vertical slice with Day-One telemetry and negative evidence, not additional speculative architecture.
+
+Production traffic remains blocked until applicable readiness gates have executed evidence, including quota fault/cardinality tests, HIBP corpus build evidence, Kyverno CEL policy checks, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.

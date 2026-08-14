@@ -1,91 +1,46 @@
 # Backend Engineering Architecture
 
-`../engineering/coding-standards.md` is the canonical implementation-level Java standard. `../engineering/build-and-ci-quality-enforcement.md` and ADR-0039 define executable enforcement/evidence. This document is the architecture-level summary.
+`../engineering/coding-standards.md` is the canonical Java implementation standard. Build/CI enforcement and ADR-0039 define executable evidence. This document is the architecture-level summary.
 
-## 1. Java and Spring model
+## 1. Runtime model
 
-Backend application code uses Java 25 and Spring Boot 4.1.x. Spring MVC + Virtual Threads is the default request/blocking-I/O model.
+Backend code uses Java 25 + Spring Boot 4.1.x, Spring MVC, and Virtual Threads for blocking-I/O request handling.
 
-Preview/Incubator APIs are prohibited in production without a new current reviewed decision and explicit enablement. WebFlux/Reactor/`Mono`/`Flux` are not part of the approved backend model unless architecture is intentionally changed.
+Preview/Incubator APIs and WebFlux/Reactor are not production defaults without a reviewed current decision.
 
-Java 25 includes the JEP 491 monitor improvements delivered in JDK 24, so a blanket ban on `synchronized` is prohibited. Remaining concerns—native/FFM blocking/pinning, lock contention, carrier starvation, and overdriving bounded JDBC/Redis/provider/CPU resources—are measured with JFR/load/soak evidence.
+Virtual Threads do not create DB/Redis/provider/CPU/memory capacity. Constrained dependencies use bounded pools/concurrency/queues and are measured.
 
-## 2. DDD and Hexagonal Architecture
+## 2. DDD + Hexagonal Architecture
 
-DDD defines bounded contexts, ubiquitous language, aggregates, entities/value objects, domain services/events, and service/data ownership.
-
-Hexagonal Architecture is the internal structure:
-
-```text
-Inbound Adapter
-    -> Application Port / Use Case
-        -> Domain Model
-            -> Domain Repository / Application Outbound Port
-                -> Outbound Adapter
-```
-
-Dependency direction:
+DDD owns capability/bounded-context/business ownership. Independently deployable boundaries require real consumer/lifecycle/security/scale/ownership value; do not create a service only for one screen/journey.
 
 ```text
 Infrastructure -> Application -> Domain
 Interfaces     -> Application -> Domain
-Configuration  -> Application/Domain + adapters for composition
 ```
 
-Domain depends only on JDK/approved domain primitives. Application depends on Domain + abstract ports. Controllers/gRPC handlers/Kafka listeners validate/map/extract trusted context/invoke use cases; business logic remains Domain/Application.
+Domain depends only on JDK/approved domain primitives. Application depends on Domain + abstract ports. Adapters validate/map/extract trusted context and invoke use cases; business logic remains Domain/Application.
 
-## 3. Canonical package structure
+## 3. Package shape
 
-Current coding standard is **feature-first + nature-separated**:
-
-```text
-architectural layer
-  -> business feature
-    -> type nature / technical responsibility
-```
-
-Canonical top-level shape:
+Feature-first + nature-separated:
 
 ```text
 com.sajtech.<service>/
-├── domain/<feature>/
-│   ├── aggregate/
-│   ├── entity/
-│   ├── valueobject/
-│   ├── event/
-│   ├── exception/
-│   ├── repository/
-│   └── service/
-├── application/<feature>/
-│   ├── command/
-│   ├── query/
-│   ├── dto/
-│   ├── port/in/
-│   ├── port/out/
-│   ├── usecase/
-│   └── saga/                 # only for a real saga
-├── infrastructure/<feature>/
-│   ├── persistence/jpa/{entity,repository,mapper,specification,adapter}/
-│   ├── persistence/query/
-│   ├── cache/
-│   ├── config/
-│   ├── di/
-│   ├── messaging/{producer,consumer,outbox,inbox}/
-│   ├── observability/
-│   ├── security/
-│   ├── client/
-│   └── worker/
+├── domain/<feature>/{aggregate,entity,valueobject,event,exception,repository,service}/
+├── application/<feature>/{command,query,dto,port/in,port/out,usecase,saga}/
+├── infrastructure/<feature>/{persistence,cache,config,di,messaging,observability,security,client,worker,dataset}/
 ├── interfaces/<feature>/{rest,grpc,kafka}/
 └── configuration/<feature>/
 ```
 
-Packages are created only when real code exists. Package segments match `[a-z][a-z0-9]*`. Dumping grounds such as `common`, `util`, `helper`, `manager`, `misc`, `generic` are prohibited for business code.
+Create packages only for real code. Package segments match `[a-z][a-z0-9]*`. Business dumping grounds `common`, `util`, `helper`, `manager`, `misc`, `generic` are prohibited.
 
-Aggregate repository interfaces live in `domain/<feature>/repository`; do not duplicate the same contract under Application merely to fit a template. Domain/JPA/generated/provider/transport models remain separate.
+Domain/persistence/generated/provider/transport models remain separate. Aggregate repository abstractions stay Domain-owned.
 
 ## 4. Standard service filesystem
 
-Each independently deployable Java service normally owns:
+An implemented independent Java service normally owns:
 
 ```text
 services/<service>/
@@ -100,43 +55,69 @@ services/<service>/
 └── deploy/
 ```
 
-Only directories with real responsibilities are created. The root build remains repository governance rather than one coupled multi-service release.
+Only real directories are created. Root build/governance does not turn services into one coupled release unit.
+
+Reference Data is not added under `services/` until ADR-0041 independent-service trigger is evidenced.
 
 ## 5. Dependency injection
 
-Spring IoC/ApplicationContext is the only DI container.
+Spring IoC is the only DI container.
 
 - required dependencies use constructor injection;
-- field injection/field `@Autowired` are prohibited;
+- no field injection;
 - Domain objects/events are not Spring beans;
-- Application use cases remain plain Java and are normally composed in `configuration` with `@Bean`;
-- ApplicationContext/BeanFactory/service-locator/runtime lookup in Domain/Application is prohibited;
-- use cases do not instantiate concrete adapters;
-- circular dependencies and `@Lazy` cycle hiding are prohibited;
-- singleton beans are stateless or explicitly thread-safe;
-- mutable request state in singleton beans is prohibited;
-- request/session scope is BFF-only and justified;
-- related configuration uses typed `@ConfigurationProperties` rather than scattered `@Value`;
-- multiple implementations are selected explicitly through configuration/meaningful qualifiers.
+- Application use cases remain plain Java;
+- no ApplicationContext/BeanFactory/service locator/runtime lookup in Domain/Application;
+- use cases do not instantiate real adapters;
+- no circular dependencies/`@Lazy` cycle hiding;
+- singleton beans stateless or explicitly thread-safe;
+- related config uses typed `@ConfigurationProperties`.
 
-## 6. File, naming, API, and persistence rules
+## 6. API/persistence/failure rules
 
-One meaningful public top-level type per file is the default. Ambiguous business names such as `Manager`, `Helper`, `Util`, `GenericService` are prohibited.
+- REST errors use RFC 9457 or reviewed versioned extension;
+- internal gRPC uses stable bounded status/metadata;
+- HTTP/gRPC deadlines finite; retry single-owner and only when safe;
+- no remote I/O inside DB transactions or while DB locks held;
+- OSIV/N+1/broad EAGER/`SELECT *`/unbounded production queries prohibited;
+- dynamic dependency versions/unapproved production SNAPSHOTs prohibited;
+- Transactional Outbox/Inbox used where current event correctness requires it;
+- Authorization, quota, client-address, MFA, and tenant semantics follow their current ADRs without adapter shortcuts.
 
-External REST errors use RFC 9457 Problem Details or a versioned extension. Internal errors use stable bounded gRPC statuses/metadata and do not copy arbitrary exception/provider text.
+ADR-0040 HIBP SHA-1 SQLite lookup stays Infrastructure-only. SHA-1 is compromised-password screening only; Argon2id remains credential storage.
 
-HTTP/gRPC calls have finite budgets. Dynamic dependency versions and unapproved production SNAPSHOTs are prohibited. Logging uses structured allow-listed fields with CR/LF-safe input handling.
+## 7. Day-One observability
 
-Persistence follows aggregate/query needs rather than one-table/one-model dogma. JPA entities stay Infrastructure-only; Domain/JPA are separate. OSIV, N+1, broad EAGER loading, unbounded queries, `SELECT *`, remote I/O inside DB transactions, and DB locks held across remote I/O are prohibited. Performance-sensitive batch/fetch/flush/query plans are measured.
+ADR-0044 is part of the standard service filesystem/Definition of Done, not a later feature.
 
-## 7. Comments and JavaDoc
+From the first executable service path implement applicable:
 
-Comments explain reasons/constraints/trade-offs/invariants, not code narration. JavaDoc is appropriate for public APIs/ports/contracts/extensions/non-trivial lifecycle behavior. No file-header comment is mandatory. Source comments/JavaDoc use English; long architectural explanations belong in Markdown/current ADRs.
+- structured allow-listed JSON logs;
+- Micrometer observations/metrics for request/operation/dependency/saturation;
+- OpenTelemetry traces/propagation through approved internal Collector;
+- health/readiness with correct dependency semantics;
+- safe low-cardinality dimensions;
+- PII/secret/correlation tests;
+- telemetry exporter/backend failure behavior;
+- dashboard/alert ownership for defined SLO/security/reliability signals.
+
+Trace/baggage/correlation is telemetry only. It cannot become authentication, tenant, Authorization, quota, idempotency, or audit authority.
+
+Ordinary telemetry export is asynchronous/bounded and does not fail ordinary business work solely because a telemetry backend is down. Required audit remains separate durable authority.
 
 ## 8. Automated enforcement
 
-Applicable ArchUnit rules prove Domain/Application dependency direction, persistence package placement, forbidden runtime lookup/field injection, package naming/dumping-ground rules, and absence of cycles.
+Applicable CI/ArchUnit/static/runtime checks cover:
 
-ADR-0039 additionally requires Spotless, SpotBugs, repository Semgrep/static rules, Gradle dependency verification/locks, applicable test/contract/schema tasks, workload/deployment policy validation, and GitHub Actions required-check/release evidence.
+- Domain/Application dependency direction;
+- persistence/adapters package placement;
+- forbidden DI/runtime lookup/cycles;
+- package names/dumping grounds;
+- Spotless/SpotBugs/Semgrep/dependency verification;
+- contracts/migrations/reference datasets;
+- ADR-0024 quota clock/cardinality/network behavior;
+- ADR-0044 observability privacy/context/failure behavior;
+- Kyverno CEL-only production policy gate;
+- container/Helm/Kubernetes/Istio/NetworkPolicy/security checks.
 
-Machine-checkable rules SHOULD be executable. Documentation alone is never source/runtime compliance evidence.
+Machine-checkable rules should be executable. Documentation alone is never source/runtime compliance evidence.

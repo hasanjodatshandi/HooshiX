@@ -2,250 +2,177 @@
 
 ## 1. Reliability model
 
-Reliability is built from bounded work, finite deadlines, durable local state, idempotency, explicit dependency semantics, and failure isolation. Blind retry or timeout inflation is not a reliability strategy.
+Reliability is built from bounded work, finite deadlines, durable local state, idempotency, explicit dependency semantics, failure isolation, measurable SLOs, and tested recovery. Blind retry/timeout inflation is not a reliability strategy.
 
-ADR-0042 selects `production-single-server` as the initial production topology. This profile deliberately accepts infrastructure availability loss. It does **not** weaken correctness, security, durability evidence, fail-closed behavior, or recovery requirements. ADR-0043 defines the public client-address trust chain and single-server management-network boundary.
+ADR-0042 selects `production-single-server` initially. That profile accepts infrastructure availability loss but does not weaken correctness/security/durability/fail-closed/recovery evidence. ADR-0043 defines network/client-address/management trust. ADR-0044 defines Day-One ordinary observability.
 
 ## 2. Dependency failure semantics
 
-`dependency-criticality.yaml` is the machine-readable authority for operation-level synchronous dependency class, failure action, retry owner, fallback, owner, and current policy references. Its rendered matrix is generated evidence, not a second decision source.
+`dependency-criticality.yaml` is the machine-readable authority for operation-level synchronous dependency class, failure action, retry owner, fallback, owner, and policy refs. Exact deadlines/cancellation/attempt/breaker/idempotency/concurrency details remain in owning contracts per ADR-0033.
 
-Per ADR-0033, exact caller/child deadlines, cancellation, attempt limits, breaker behavior, idempotency conditions, concurrency/bulkhead/queue bounds, and implementation-specific retry timing remain in the owning service/operation contract and applicable current policy. They are not duplicated into the dependency registry merely for completeness.
+Every synchronous edge has finite caller/child deadlines, cancellation where supported, one retry owner, bounded concurrency/queues, explicit fallback only when approved, and no fabricated security success.
 
-For every synchronous edge:
+Authorization remains one authoritative online check, one attempt, no stale cache/fallback/retry, fail closed.
 
-- caller deadline is finite;
-- child deadline fits the remaining parent budget;
-- cancellation propagates where the technology supports it;
-- retry is finite and owned by one layer only;
-- layered mesh + client/application retry for the same failure is prohibited;
-- bulkheads/queues/concurrency are bounded;
-- fallback exists only when the operation-level registry explicitly permits it;
-- security/authorization dependencies never fabricate success on error.
+## 3. Single-server reliability profile
 
-Authorization remains one authoritative online `CheckPermission`, one attempt, no stale permission cache/fallback/retry and fail closed.
+No infrastructure HA claim exists for Kubernetes node/control plane, PostgreSQL primary, Redis, Kafka, Kyverno, application replica, or host maintenance.
 
-## 3. Virtual Threads and bounded resources
+Host/node/kernel/storage loss may stop the complete platform. Success criteria are safe failure, accurate detection, bounded recovery, and no correctness/security bypass.
 
-Java Virtual Threads do not create downstream capacity. Hikari connections, Redis operations, Kafka IO, provider quotas, CPU-heavy work, cryptographic work and storage IOPS remain finite shared resources.
-
-Adapters use bounded concurrency/queues where required. CPU-heavy work uses bounded workers. Queue growth and pool wait are observable. `Thread.sleep` is not a coordination strategy.
-
-In `production-single-server`, all platform and application components compete for one host. Complete-stack CPU/RAM/storage/network pressure is therefore a first-class reliability signal, not a local component detail.
-
-## 4. Production availability profiles
-
-### 4.1 `production-single-server`
-
-The selected initial profile has no infrastructure HA claim for:
-
-- Kubernetes control plane/node;
-- workload rescheduling to another node;
-- PostgreSQL primary;
-- Redis;
-- Kafka broker/controller;
-- Kyverno admission plane;
-- host maintenance.
-
-A host/node/kernel/storage event may stop the complete platform. This is formally accepted only after operator sign-off and recovery evidence.
-
-Security/correctness behavior remains fail closed. Examples:
+Security/correctness examples:
 
 - Authorization failure never becomes ALLOW;
-- Redis security decision failure never becomes local quota/session bypass;
-- missing trusted public client-network identity never becomes caller-header or shared-proxy quota identity;
-- Kafka outage does not change Outbox/Inbox/idempotency or turn Kafka into business truth;
+- Redis quota/session failure never becomes local bypass;
+- quota time/capacity failure never becomes fabricated denial/success;
+- missing trusted client identity never becomes caller-header/shared-proxy identity;
+- Kafka outage does not change Outbox/Inbox/idempotency or become business truth;
 - PostgreSQL outage does not authorize unsafe state reconstruction;
-- Kyverno outage does not create an admission bypass;
-- Ambient resource pressure does not authorize disabling workload identity/mTLS;
-- OpenBao outage follows existing mounted/local-key/recovery contracts and does not authorize plaintext/Git fallback;
-- management-overlay failure does not authorize public SSH.
+- Kyverno outage does not create admission bypass;
+- Ambient pressure does not authorize disabling identity/mTLS;
+- OpenBao outage does not authorize Git/plaintext secret fallback;
+- WireGuard failure does not authorize public SSH;
+- observability outage does not authorize security/audit downgrade.
 
-### 4.2 `production-ha`
+## 4. SLO and error budgets
 
-The expansion profile retains current redundant Kubernetes, dedicated PostgreSQL, Kafka, Redis, Kyverno and workload replica topology. Its failure tests prove one-component/node loss according to the applicable SLO and ADR.
+Current SLO ADRs remain authoritative. Real user-visible latency/errors/downtime are measured in both profiles. Single-server does not claim infrastructure redundancy-dependent failover objectives.
 
-## 5. SLO and error-budget interpretation
+Planned maintenance/host outage is not silently removed from application availability measurement when the service SLI counts it. Repeated/unacceptable downtime is evidence to increase capacity or move to HA.
 
-ADR-0005 and service-specific ADRs remain the SLO authority.
+## 5. Data/recovery reliability
 
-Application SLIs continue to be measured in both profiles. The single-server profile MUST NOT claim that infrastructure redundancy-dependent availability is proven merely because an application-level percentage target is written in an ADR/service document.
+PostgreSQL retains continuous WAL archive, encrypted off-site physical backup, daily base backup, 35-day PITR, monthly retained artifacts, monthly restore, and quarterly cold DR. `pg_dump + cron` is not primary recovery.
 
-For `production-single-server`:
+Single-server physical PITR restores the whole shared cluster in isolation before controlled service-specific extraction/import. Restored traffic waits for integrity/Flyway/RLS/erasure/legal-hold checks.
 
-- record actual user-visible availability, latency, correctness and dependency error rates;
-- retain burn/error-budget observability where a service SLO is defined;
-- mark node-failover/replica-failover objectives `Not applicable to production-single-server` when physical redundancy is required to prove them;
-- production approval requires explicit acceptance of whole-platform node-failure/maintenance downtime;
-- repeated or unacceptable downtime is a trigger to move to `production-ha`.
+Kafka is rebuildable transport. RF1 in single-server may lose broker-local state; service-owned publication/replay and Inbox/dedup evidence remain authority.
 
-Security/correctness gates do not become N/A because the profile is non-HA.
+Redis is ephemeral security/session state. Single-server uses TLS/ACL/`noeviction`/AOF. Session loss means reauthentication. ADR-0024 owns exact-IP/aggregate-pressure, common-mode clock, cardinality allocation, and fail-closed semantics.
 
-## 6. PostgreSQL reliability and recovery
+## 6. Semantic quota reliability
 
-Both profiles retain continuous WAL archive, encrypted off-site physical backup, daily base backup, 35-day PITR, monthly retained recovery artifacts, monthly restore evidence and quarterly full cold-DR.
+Quota reliability includes security availability under adversarial state creation.
 
-`pg_dump + cron` is not the production recovery strategy.
+Required signals/tests include:
 
-`production-single-server`:
+- app/Redis skew and local wall-vs-monotonic Clock Safety Guard state;
+- host time synchronization readiness and guard re-arm state;
+- common-mode app+Redis clock-step test;
+- Redis used/max memory and >=30% reserve;
+- active security bucket cardinality;
+- new-bucket allocation and cleanup rates by bounded operation/dimension enums;
+- `QUOTA_CAPACITY_UNHEALTHY` events without subject/IP labels;
+- no eviction/OOM during adversarial unique-key pressure;
+- exact-IP hard quota and aggregate-prefix pressure behavior across NAT/IPv6 cases.
 
-- one physical PostgreSQL process/host/storage failure domain for mutable service databases;
-- distinct DB/runtime role/migration role/Flyway/RLS boundaries remain;
-- no automatic primary failover claim;
-- physical PITR restores the whole shared cluster into an isolated recovery environment;
-- service-specific recovery then transfers only the required database through the approved controlled procedure;
-- a failed shared-cluster restore blocks ordinary promotion for affected PostgreSQL-backed services as defined by ADR-0037.
+Capacity/time uncertainty fails closed. It is distinct from a normal user quota denial.
 
-`production-ha` retains per-service dedicated physical clusters, failover and independent physical backup identities.
+## 7. Day-One observability runtime
 
-Restored data does not receive traffic until integrity, schema, RLS and applicable erasure/legal-hold reconciliation pass.
+ADR-0044 is mandatory from the first executable service commit.
 
-`../runbooks/production-cold-dr.md` is the implementation-facing full-platform recovery procedure. ADR-0004 remains the RPO/RTO authority. The quarterly exercise measures the actual platform RTO and does not infer it from backup success.
+### Application path
 
-## 7. Kafka reliability and replay
+```text
+structured JSON stdout -> node-local OpenTelemetry Collector -> Loki
+Micrometer metrics      -> Prometheus
+Micrometer/OTel traces  -> OTLP Collector -> Tempo
+Prometheus alerts       -> Alertmanager
+Prometheus/Loki/Tempo   -> Grafana
+```
 
-Kafka is rebuildable async transport, not business authority.
+Services use Micrometer Observation/Tracing. Trace context/baggage is correlation only and is never authN/authZ/tenant/quota/idempotency/audit authority.
 
-Single-server topology is one combined KRaft broker/controller, RF=1/minISR=1, `acks=all`, idempotence and unclean leader election disabled. Broker/node/disk outage may stop async transport and may lose broker-local data. That exposure is accepted only because critical event flows retain service-owned publication/reconstruction and Inbox/dedup evidence for the required recovery horizon.
+### Single-server deployment
 
-HA topology retains RF=3/minISR=2 with the current broker/controller failure tests.
+- one `otelcol-contrib` node-local Collector;
+- Prometheus current baseline;
+- Loki single-binary/non-HA;
+- Tempo monolithic/non-HA with no extra Tempo Kafka requirement;
+- Grafana and Alertmanager current baseline;
+- at least one external black-box availability check outside the host failure domain before production.
 
-Both profiles require:
+Local monitoring cannot prove total-host detection by itself because it disappears with the failed host.
 
-- Transactional Outbox for atomic state+publication business effects;
-- at-least-once consumer assumption;
-- idempotent/Inbox semantics where required;
-- finite retry/DLQ behavior;
-- stable event identities;
-- critical publication/dedup evidence for at least 35 days;
-- clean-cluster rebuild/replay/reconstruction tests.
+### Collector security
 
-## 8. Redis reliability
+Collector uses dedicated ServiceAccount/RBAC, internal-only OTLP ingress, restricted telemetry-backend egress, memory limiter/batching/finite queues, pre-export redaction/filtering, and no unbounded persistent retry spool.
 
-Security Redis is ephemeral security state, not business source of truth.
+The only approved node-log filesystem exception is the narrow ADR-0044 read-only mount of exact Kubernetes pod/container log paths. No broad host filesystem, host network, privilege escalation, or unrelated `hostPath` is implied.
 
-Single-server uses one TLS/ACL/`noeviction` Redis with AOF `appendfsync everysec`. AOF assists restart recovery but is not HA. If session state is lost, users reauthenticate. Covered semantic-quota/session decisions remain fail closed while Redis cannot produce a valid decision.
+## 8. Telemetry data contract
 
-Network quota dimensions use only the ADR-0043 trusted edge/BFF client-network context. Missing/malformed/untrusted context fails closed for operations that require the network dimension; public forwarding headers never become a fallback identity.
+Never place secrets/credentials/full bodies/SQL binds/complete gRPC metadata/compromised-password hash material/raw client IP or unapproved PII in logs/metrics/traces.
 
-HA uses the current primary/replica/Sentinel topology and failover tests.
+Metric labels are low-cardinality and exclude user/tenant/session/request/resource/trace IDs, raw URLs/IPs, and free-form errors.
 
-Memory headroom, eviction count, AOF/rewrite latency, time-source health and operation latency are observable without raw/high-cardinality subject or client-address labels.
+Baggage is allow-list only and excludes subject/contact/tenant/session/raw-IP/secret values.
 
-## 9. Istio/Kyverno reliability in the single-server profile
+Logs may carry bounded trace/span correlation fields; trace IDs are not metric labels.
 
-Istio Ambient is retained and must fit the complete-stack capacity envelope. Track `istiod`, CNI and `ztunnel` CPU/RAM, request p95/p99 impact, connection pressure, restarts/OOM and Calico interaction. A failed benchmark blocks production approval.
+Ordinary telemetry is `OBSERVABILITY` class: bounded buffering/sampling/drop is allowed. Exporter/backend loss does not fail an ordinary business request. Sustained loss/backpressure/drop is itself alerted.
 
-Kyverno may use one replica in the single-server profile. Admission availability is lower, but fail-closed enforcement remains. Track admission latency/errors/unavailability and policy-engine resource pressure. Existing workloads are not killed merely because admission later becomes unavailable.
+Required security/privileged audit remains authoritative durable/off-host evidence and MUST NOT be silently routed only through Loki/Collector.
 
-The HA profile retains redundant Kyverno and node/failure-domain behavior.
+## 9. Required service signals
 
-## 10. Human-access and audit reliability
+Where applicable each service exposes bounded signals for:
 
-Required privileged-access audit is authoritative security evidence, not best-effort telemetry.
-
-Single-server normal management reachability uses the ADR-0043 WireGuard overlay. Network admission is separate from hardened OpenSSH/FIDO2 authentication and separate from time-bounded JIT privilege. Public TCP/22 remains denied. A WireGuard outage never authorizes public SSH, password SSH, or shared access.
-
-Required OS/`sudo`/Kubernetes/database records are exported off-host to append-only/tamper-resistant storage so loss or compromise of the single host does not erase the only audit copy. Shell history/`.bashrc` is not a recovery or audit substitute.
-
-HA uses the current Teleport session/audit model.
-
-Audit pipeline failure is an incident condition with explicit operational handling; it MUST NOT silently downgrade privileged-session evidence requirements.
-
-## 11. OpenBao reliability — unchanged
-
-ADR-0042 does not change OpenBao.
-
-OpenBao remains the current secret authority with the existing Raft/PVC, Shamir, encrypted snapshot, restore/unseal and External Secrets workflows. Normal hot paths use validated mounted/local material so OpenBao is not a per-request availability dependency.
-
-Secret-source recovery evidence remains mandatory. A profile capacity problem MUST NOT be solved by deleting/replacing OpenBao without a separate current security decision.
-
-## 12. Observability model
-
-Use OpenTelemetry/Micrometer with structured, bounded telemetry.
-
-Required signals include, where applicable:
-
-- request rate, latency, errors and saturation by low-cardinality route/operation;
-- parent/child deadline exhaustion and cancellation;
-- bulkhead/queue/pool wait and rejection;
-- PostgreSQL pool/query/transaction/WAL/archive/backup/restore/storage pressure;
-- Redis latency/memory/eviction/AOF/time-source state;
-- Kafka produce/fetch/consumer lag/disk/rebuild/replay state;
-- Istio/Kyverno/edge control-plane health;
-- node CPU/memory/pressure/storage/free-space in single-server;
-- effective MTU/PMTU failures where observable;
-- conntrack usage/drops, file-descriptor/listen-queue pressure and ephemeral-port/TIME_WAIT pressure;
-- public/management interface packet/error/drop pressure;
-- client-address trust-chain health without emitting the raw client IP as a normal metric/log/trace dimension;
-- security/authentication/authorization/abuse signals without raw subject identifiers;
-- last successful backup/restore/DR evidence and overdue status;
+- request rate/latency/error/saturation by low-cardinality operation;
+- deadline exhaustion/cancellation;
+- bulkhead/queue/pool wait/rejection;
+- datastore/provider latency/outcome;
+- PostgreSQL pool/query/transaction/WAL/archive/backup/restore pressure;
+- Redis latency/memory/AOF/time/cardinality/allocation state;
+- Kafka produce/fetch/lag/disk/rebuild/replay;
+- edge/Istio/Kyverno/control-plane health;
+- host CPU/memory/storage/network/conntrack/FD/listen/ephemeral-port pressure;
+- client-address trust health without raw IP;
+- backup/restore/DR evidence freshness;
 - audit export health.
 
-Trace/log/metric dimensions never use unbounded tenant/user/session/request/resource identifiers or raw client IPs.
+Every service owns the alerts/dashboard or equivalent query/evidence for its defined SLO/security/reliability signals. A metric with no actionable ownership is not a substitute for required evidence.
 
-## 13. Logging and PII
+## 10. Telemetry capacity
 
-Logging is allow-list based, structured and injection-safe.
+Observability competes for the same single-server CPU/RAM/IO/disk/network as applications, PostgreSQL WAL/backups, Redis AOF, Kafka, WAF, Istio, Kyverno, and OpenBao.
 
-Do not log raw passwords, OTP/recovery codes, tokens, cookies, private keys/secrets/provider credentials, full request/response bodies, unreviewed SQL binds, complete gRPC metadata or unreviewed exception/provider payloads.
+Complete-stack evidence measures Collector receive/export/queues/drops; Prometheus series/scrape/TSDB; Loki ingest/query/storage; Tempo ingest/query/storage; Grafana/Alertmanager overhead; retention growth/free space and IO contention.
 
-PII appears only for approved purpose with masking/tokenization or managed-key HMAC pseudonymization where correlation is required. Raw client IP used transiently for network security context is not an ordinary telemetry field. Metric labels remain low-cardinality.
+If observability pressure violates headroom, first reduce safe cardinality/sampling/retention, externalize ordinary telemetry, or add capacity. Never drop required audit/security evidence or disable security controls to fit telemetry.
 
-Ordinary telemetry may use bounded buffering/sampling/drop according to its contract. Required audit/security evidence MUST NOT be silently dropped or reclassified as ordinary telemetry.
+## 11. Failure/chaos evidence
 
-## 14. Single-server recovery order
+Staging/release/scheduled tests prove:
 
-A full-host recovery/reboot uses the tested procedure in `../runbooks/production-cold-dr.md` for disaster recovery and the applicable component runbooks for narrower events.
+- telemetry backend/Collector outage does not fail ordinary business requests;
+- dropped/backpressured telemetry is detected;
+- one synthetic critical journey produces expected safe correlated logs/metrics/traces;
+- PII/secret canaries do not appear in Loki/Tempo/Prometheus/Grafana-visible data;
+- complete-host loss is detected through the external monitor while local stack is unavailable;
+- Redis common-mode clock/cardinality faults remain fail closed and observable;
+- security/audit evidence remains durable/off-host during local observability loss.
 
-At minimum, evidence proves:
+## 12. Recovery order
 
-1. host/storage/network/time baseline is healthy;
-2. management-only access and audit are available without enabling public SSH;
-3. K3s control plane and Calico are healthy;
-4. OpenBao/secret delivery and required local mounted material can recover under their existing contract;
-5. PostgreSQL and required physical recovery state are healthy;
-6. Redis/Kafka recover with their profile-specific semantics;
-7. Istio/Kyverno/edge security controls and client-address trust are healthy before unsafe traffic/deployment paths open;
-8. applications become ready only after local/security dependencies permit safe service;
-9. erasure/legal-hold reconciliation and audit/telemetry confirm recovery and no fail-open bypass occurred.
+Full-host recovery follows `../runbooks/production-cold-dr.md`.
 
-The sequence is validated by reboot/recovery tests rather than assumed from startup ordering.
+Before traffic, establish host/network/time, management/audit, K3s/Calico, OpenBao/secret delivery, PostgreSQL, Redis/Kafka, Istio/Kyverno/edge, applications, and observability. External host-down monitoring must return healthy only after the public path actually satisfies its check.
 
-## 15. Capacity/recovery triggers for `production-ha`
+A health endpoint alone is not recovery evidence.
 
-Move from single-server toward HA when any of these becomes material:
+## 13. Migration triggers to HA/externalization
 
-- business requirement for maintenance without full-platform outage;
-- repeated node/host incidents or unacceptable user downtime;
-- inability to keep >=30% validated CPU/memory headroom;
-- persistent PostgreSQL/Redis/Kafka/telemetry storage contention;
-- security/control-plane components cannot meet safe latency/capacity on one host;
-- shared PostgreSQL blast radius or upgrade window becomes unacceptable;
-- recovery tests show single-server RTO is no longer acceptable;
-- broker/session/security dependency availability needs exceed the non-HA profile.
+Review profile/capacity when any of these becomes material:
 
-Do not mask these triggers by weakening correctness or security.
+- business requirement for maintenance without full outage;
+- repeated host incidents/unacceptable downtime;
+- <30% validated CPU/memory headroom;
+- persistent PostgreSQL/Redis/Kafka/telemetry IO contention;
+- security/control-plane latency/capacity cannot fit;
+- recovery RTO is unacceptable;
+- local observability storage/cardinality materially threatens business/security workloads;
+- broker/session/security dependency availability need exceeds single-server profile.
 
-## 16. Verification
-
-Required evidence includes the applicable dependency registry/schema/render checks, owning-contract deadline/cancellation/bulkhead tests, restore/PITR/DR evidence, Kafka replay/idempotency tests, Redis failure/time/network-identity tests, logging/PII controls, security negative tests and smoke/critical-journey evidence.
-
-Single-server additionally requires:
-
-- whole-host reboot/loss/rebuild exercise under the production cold-DR procedure;
-- measured ADR-0004 RPO/RTO evidence;
-- complete-stack >=2x projected critical-path/security-dependency load evidence where required;
-- >=30% validated CPU+memory headroom;
-- no OOM/sustained swap/node memory-pressure eviction;
-- storage/IO contention evidence including WAL/AOF/Kafka/telemetry;
-- MTU/PMTU, conntrack, file-descriptor/listen-queue and ephemeral-port safe-headroom evidence;
-- isolated shared-PostgreSQL PITR and service-specific recovery evidence;
-- Redis AOF/restart/re-authentication behavior;
-- Kafka clean rebuild/replay under RF=1;
-- Ambient/Kyverno benchmark/fail-closed evidence;
-- trusted client-address anti-spoofing/fail-closed evidence;
-- WireGuard management/public-SSH-denial plus off-host privileged-audit integrity;
-- explicit operator sign-off on whole-platform downtime and host/root blast-radius risk.
-
-Production readiness remains blocked until required runtime evidence exists.
+Do not mask triggers by weakening correctness/security.

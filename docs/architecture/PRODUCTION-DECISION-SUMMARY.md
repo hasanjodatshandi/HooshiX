@@ -1,198 +1,134 @@
 # Production Decision Summary — Current State
 
 - **Reviewed:** 2026-08-15
-- **Mode:** current-only
-- **Selected production profile:** `production-single-server`
-- **Availability posture:** explicit non-HA
-- **Status:** architecture target; repository implementation/evidence state is tracked in `implementation-status.md` and production traffic remains gated by `PRODUCTION-READINESS-CHECKLIST.md`
+- **Selected profile:** `production-single-server`
+- **Expansion profile:** `production-ha`
+- **Implementation evidence:** NOT VERIFIED; see `implementation-status.md`
 
-This document is a summary only. The Decision Register, retained ADRs and current-state architecture/service documents are authoritative for detailed contracts.
+## 1. Selected single-server topology
 
-## 1. Application and service model
+- one K3s `v1.35.6+k3s1` server/workload node;
+- Kubernetes 1.35.6;
+- Calico CNI/NetworkPolicy; K3s Flannel/policy controller disabled;
+- bundled K3s Traefik/ServiceLB disabled; repository Traefik + Caddy/Coraza edge used;
+- one application replica; HPA off; availability PDB off;
+- one physical CloudNativePG/PostgreSQL instance with distinct DB/runtime/migration roles/Flyway per mutable service and forced RLS where applicable;
+- continuous WAL/PITR/encrypted off-site backup; `pg_dump + cron` not primary recovery;
+- one TLS/ACL/`noeviction`/AOF security Redis;
+- one combined KRaft Kafka broker/controller, RF1/minISR1/acks-all/idempotence, explicitly non-HA;
+- Istio Ambient and blocking Kyverno retained subject to complete-stack capacity evidence;
+- OpenBao 2.6.1 remains secret authority; end-user MFA semantics unchanged;
+- WireGuard-only normal management reachability + FIDO2 + JIT + off-host audit.
 
-- Backend services use DDD + Hexagonal Architecture with inward dependencies.
-- Java services use the current Java/Spring MVC/Virtual Threads baseline, constructor injection, independent builds and executable quality gates when implemented.
-- Browser traffic uses Web BFF; ordinary internal synchronous communication is gRPC; asynchronous integration uses Kafka only where a durable event boundary is appropriate.
-- Each service owns its contracts, data, deployment and release lifecycle.
-- Cross-service database access, joins/FKs, shared runtime credentials and shared business/persistence models are prohibited.
-- ADR-0040 is the narrow immutable read-only SQLite reference-data exception for Compromised Password. ADR-0041 Reference Data uses an immutable image bundle and has no runtime DB/Redis/Kafka source.
-- Planned implementation targets are not runtime evidence; current presence is recorded only in `implementation-status.md`.
+## 2. Public network/client identity
 
-## 2. Selected production topology
-
-ADR-0042 selects one physical server as the initial production profile:
-
-```text
-1 K3s server/workload node
-Kubernetes 1.35.6 / K3s v1.35.6+k3s1
-1 application replica per service
-HPA disabled
-availability PDB disabled
-no node/control-plane HA claim
-```
-
-K3s uses Calico as the custom CNI. K3s Flannel/network-policy controller and bundled Traefik/ServiceLB are disabled. The repository-pinned Traefik/Gateway/WAF stack remains authoritative.
-
-`production-ha` remains the expansion profile with redundant control plane/workers, dedicated PostgreSQL clusters, HA Kafka/Redis/Kyverno and replicated service targets.
-
-Service-doc replica/PDB/HPA targets such as `>=3`, `PDB2` or `3..12` are the HA targets unless explicitly stated otherwise. The single-server profile overrides only infrastructure placement/availability settings. Business/security contracts remain unchanged.
-
-## 3. PostgreSQL
-
-Single-server production uses one physical CloudNativePG cluster with one PostgreSQL instance for mutable service databases.
-
-Every PostgreSQL-backed service still owns:
-
-- a distinct database;
-- distinct runtime role;
-- distinct migration/owner role;
-- distinct Flyway history and release lifecycle;
-- no cross-service `CONNECT`/object privilege or SQL integration;
-- forced tenant RLS where applicable.
-
-Aggregate application pools across all service pods stay <=70% of shared `max_connections`; >=30% remains for migrations, backup/recovery, monitoring, administration and emergency work.
-
-This profile accepts shared PostgreSQL process/host/storage blast radius and no automatic primary failover.
-
-## 4. PostgreSQL backup and cold recovery
-
-`pg_dump + cron` is not the production backup strategy.
-
-Both profiles retain:
-
-- encrypted off-site physical backup;
-- continuous WAL archive;
-- PostgreSQL DR RPO <=5 minutes;
-- daily online base backup;
-- 35-day PITR;
-- monthly retained recovery artifact for 12 months;
-- backup verification;
-- monthly restore evidence;
-- quarterly full cold-DR.
-
-In single-server, physical PITR restores the complete shared cluster into an isolated recovery environment. A service-specific recovery then transfers only the required service database through an approved controlled procedure. Unrelated current service databases are not destructively restored.
-
-`../runbooks/production-cold-dr.md` defines the full-host recovery sequence, including clean host/management access, K3s/Calico, unchanged OpenBao recovery, PostgreSQL, immutable artifacts, Redis, Kafka, erasure/legal-hold replay, edge/security checks, and the traffic-enable evidence gate. ADR-0004 remains the RPO/RTO authority.
-
-## 5. Kafka
-
-Single-server Kafka uses one Kafka 4.2.x process with combined KRaft broker/controller roles:
+ADR-0043 path is mandatory:
 
 ```text
-RF=1
-minISR=1
-acks=all
-idempotent producer enabled
-unclean leader election disabled
+Internet -> upstream mitigation -> external L4 -> Traefik -> Caddy/Coraza -> BFF
 ```
 
-This is a formal non-HA exception. Broker/node/disk outage can stop async transport and may lose broker-local data.
+- external L4 preserves validated client address through trusted PROXY v2;
+- direct non-approved Internet access to Traefik origin denied before application routing;
+- insecure proxy/forwarded-header trust prohibited;
+- BFF receives one server-derived exact canonical IP only through WAF path;
+- raw client IP is not ordinary telemetry/business state.
 
-Kafka remains rebuildable transport, not business source of truth. Transactional Outbox, Inbox/idempotency, finite retry/DLQ, stable event identities and >=35-day critical replay/dedup evidence remain mandatory.
-
-The HA profile retains 3 brokers + 3 dedicated controllers with RF=3/minISR=2.
-
-## 6. Security Redis
-
-Single-server uses one Redis instance with TLS, per-owner ACL/key isolation, `noeviction`, AOF `appendfsync everysec`, fail-closed quota/session behavior and no failover claim.
-
-AOF reduces restart loss but is not HA. Lost session state results in re-authentication. Semantic quota correctness, dual-clock checks, pseudonymous keys and anti-lockout rules remain unchanged.
-
-For public network quota dimensions, only ADR-0043 trusted client-network identity is valid. Caller forwarding headers or a shared proxy address cannot become fallback quota identity.
-
-The HA profile retains primary/replicas/Sentinel.
-
-## 7. Istio Ambient and workload identity
-
-Istio Ambient remains the service-mesh security model. Production workloads retain dedicated ServiceAccounts, STRICT mTLS, least-privilege authorization and Calico deny-by-default NetworkPolicy.
-
-Single-server production requires a complete-stack benchmark of `istiod`, Istio CNI and `ztunnel` CPU/RAM/latency/throughput plus Calico interaction. Waypoints are absent by default.
-
-If Ambient cannot fit the validated host capacity envelope, production approval fails. Increase host capacity or approve a reviewed replacement security architecture. Do not silently disable workload identity or strict mTLS.
-
-## 8. Kyverno and supply chain
-
-Kyverno is retained. It is not removed or changed to audit-only.
-
-Single-server may run one Kyverno replica and a reduced high-value policy inventory, but production admission remains blocking for digest-only images, approved signatures, signed provenance, signed CycloneDX SBOM, critical unsafe security-context/host-access patterns and critical workload identity/deployment invariants.
-
-Admission unavailability does not become an allow path. The HA profile retains >=3 Kyverno replicas.
-
-## 9. Production network and client-address trust
-
-ADR-0043 and `network-architecture.md` define the production network trust boundary.
-
-Public path:
+ADR-0024 derives:
 
 ```text
-Internet
--> upstream volumetric mitigation
--> external L4
--> Traefik
--> Caddy/Coraza WAF
--> Web BFF
+exact hard quota identity: IPv4 /32, IPv6 /128
+aggregate pressure only:   IPv4 /24, IPv6 /64
 ```
 
-The external L4 preserves validated original client source using PROXY protocol v2. Traefik trusts PROXY only from exact reviewed external-L4 source CIDRs. Insecure PROXY/forwarded-header trust is prohibited. Caddy uses strict trusted-proxy parsing and replaces the internal client-IP header. BFF accepts only that server-derived value on the WAF-only ingress path.
+Aggregate prefix is not the sole v1 hard 429 bucket.
 
-Public `Forwarded`, `X-Forwarded-*`, `X-Real-IP`, and private client-IP headers are not authority. Missing/invalid trusted network identity fails closed for quota-required operations. Direct Internet -> BFF and Traefik -> BFF WAF bypass remain prohibited.
+## 3. Semantic quota safety
 
-## 10. Human privileged access
+Redis security quotas preserve:
 
-Single-server does not deploy Teleport. Normal management uses:
+- atomic hard-dimension decision;
+- <=2s app/Redis skew;
+- JVM wall-vs-monotonic Clock Safety Guard for common-mode host clock steps;
+- host time synchronization before quota-protected traffic and 60s stable re-arm after guard trip;
+- `noeviction` and no security TTL reset;
+- bounded cleanup;
+- low-cardinality new-bucket allocation guard before memory exhaustion;
+- >=30% validated Redis memory reserve;
+- `QUOTA_TIME_SOURCE_UNHEALTHY` / `QUOTA_CAPACITY_UNHEALTHY` distinct from ordinary quota denial;
+- adversarial unique-subject/address load evidence.
+
+## 4. Compromised Password
+
+The independent Compromised Password service remains.
+
+V1 corpus authority is official offline **HIBP Pwned Passwords SHA-1** data:
+
+- SHA-1 is only compromised-password lookup identity;
+- password storage remains Argon2id;
+- Identity computes full SHA-1 locally, sends five-hex prefix only, and exact-compares returned 35-hex suffixes locally;
+- runtime service has no HIBP/provider dependency;
+- immutable SQLite stores 20-byte SHA-1 + prefix + positive count;
+- dataset acquisition/provenance/full-corpus cardinality/serialized bounds are release evidence;
+- production dataset age <=35 days and build/acquisition verification runs at least every 30 days;
+- stale/corrupt/missing/incompatible data fails closed.
+
+## 5. Reference Data
+
+Reference Data capability is decided but its **independent microservice is gated**.
+
+Before the trigger, the approved immutable bundle may be used in the owning deployable, initially BFF when required.
+
+Create `reference-data-service` only after evidence of at least one:
+
+- >=2 independently deployable consumers;
+- independent release/update lifecycle;
+- independent security boundary;
+- independent scale/availability profile;
+- independent team/operational ownership.
+
+One user journey/route group alone is insufficient.
+
+## 6. Day-One observability
+
+ADR-0044 applies from the first executable service commit.
 
 ```text
-approved operator device
--> WireGuard management overlay
--> host management address
--> hardened OpenSSH + hardware-backed FIDO2
--> separate JIT privilege
+structured JSON logs -> otelcol-contrib -> Loki
+Micrometer metrics    -> Prometheus -> Alertmanager
+OpenTelemetry traces  -> otelcol-contrib -> Tempo
+Prometheus/Loki/Tempo -> Grafana
 ```
 
-WireGuard grants network reachability only. It does not replace human authentication or JIT privilege.
+Pinned current additions:
 
-Mandatory controls include public-interface TCP/22 denial, independent per-device WireGuard peers, minimal routes, no shared peer/SSH credentials, FIDO2 user presence + user verification, at least two reviewers for write/admin/database-write elevation, maximum 30-minute write elevation with automatic expiry, separately scoped read-only elevation <=1 hour, `sudo`/OS/Kubernetes/database audit, off-host protected retention and protected break glass.
+- `otelcol-contrib` 0.157.0;
+- Loki 3.7.4;
+- Tempo 3.0.2;
+- existing Prometheus 3.13.2 / Alertmanager 0.33.1 / Grafana 13.1.3 retained.
 
-`.bashrc`, shell history or `PROMPT_COMMAND` logging is not authoritative audit. The HA profile retains Teleport Enterprise Self-Hosted JIT access.
+Single-server Loki is single-binary/non-HA; Tempo monolithic/non-HA. Collector is internal-only and may read only exact Kubernetes pod/container log paths through the narrow read-only ADR-0044 mount exception.
 
-## 11. OpenBao — unchanged
+Trace/baggage/correlation is telemetry only, never authN/authZ/tenant/quota/idempotency/audit authority. Metric labels remain low-cardinality/PII-safe.
 
-**OpenBao is not part of the topology/network simplification.**
+Because local monitoring shares the host failure domain, production requires an independent external black-box availability signal outside that host. Provider remains TBD until environment selection.
 
-OpenBao 2.6.1 remains the production secret authority under ADR-0011 with the existing Shamir/Raft/PVC/snapshot/restore/unseal and External Secrets/Kubernetes Auth model. Normal application hot paths continue to use validated mounted/local key material rather than per-request OpenBao RPC.
+Required security/privileged audit remains separate durable/off-host authority.
 
-ADR-0042/ADR-0043 MUST NOT remove, replace, bypass or weaken OpenBao.
+## 7. Kyverno
 
-## 12. Identity, email, MFA and browser security
+Kyverno 1.18.2 remains blocking/fail-closed. Greenfield production policies use stable CEL-based `policies.kyverno.io/v1` types. CI/render gates reject new legacy `ClusterPolicy`/`CleanupPolicy` manifests.
 
-Identity/BFF security remains under ADR-0012/0016 and service documents. Active TOTP remains required where the current Identity state requires it; Email/SMS verification or recovery is not a freely selectable weaker substitute.
+## 8. Governance
 
-ADR-0009 clarifies email handling: HooshiX deliberately uses a case-insensitive canonical email identity for equality/uniqueness/login/reservation, while preserving a case-preserving delivery representation so the SMTP path does not have to rewrite mailbox local-part spelling.
+- merged ADR IDs are permanent and never renumbered/reused;
+- current-state documents remain current-only;
+- fully superseded ADRs retain compact stable-ID provenance/pointer and are not current authority;
+- one PR represents one coherent engineering change, not one conversation prompt;
+- material post-merge defects may use focused follow-up PRs rather than being delayed by prompt boundaries.
 
-## 13. Authorization
+## 9. Production approval
 
-Protected resource operations retain one authoritative online `CheckPermission`, one attempt, no permission-result cache, no Kafka invalidation authority, no retry and no stale-allow fallback.
+No documentation above is runtime proof.
 
-The single-server profile may reduce availability; it does not convert dependency failure to ALLOW.
-
-## 14. Threat model
-
-`threat-model.md` is the current formal design-time threat model. It covers assets, actors, trust boundaries, STRIDE/abuse cases, single-host residual risk and mitigation-to-verification mapping.
-
-A documented threat/mitigation is not runtime proof. Security verification and readiness evidence remain mandatory.
-
-## 15. Capacity decision
-
-`2 vCPU / 3-4 GiB RAM` is **not** an approved full-stack production sizing.
-
-Production approval requires complete-stack evidence covering applications, K3s, PostgreSQL/WAL/backup, Redis AOF, Kafka, Istio Ambient, Kyverno, WAF, observability and host network pressure together.
-
-Pass criteria include at least no OOM/sustained swap/node memory-pressure eviction, >=30% validated CPU/memory headroom, applicable >=2x projected peak evidence, safe disk IO, and safe MTU/PMTU/conntrack/file-descriptor/ephemeral-port behavior.
-
-If the host does not pass, increase resources or move to `production-ha`. Do not remove OpenBao, disable Kyverno, weaken Ambient, replace PITR, weaken MFA, disable WAF, disable trusted client-address enforcement, expose public SSH, or convert fail-closed dependencies to fail-open.
-
-## 16. Production-readiness status
-
-The architecture decision is current. The executable application/platform tree is not present at this documentation revision; exact status is in `implementation-status.md`.
-
-Production approval still requires all applicable gates in `PRODUCTION-READINESS-CHECKLIST.md`, including client-address anti-spoofing, management-only WireGuard/OpenSSH access, current threat-model review, cold-DR/RPO/RTO evidence, full-stack capacity, unchanged OpenBao/MFA controls and explicit single-server downtime/host-blast-radius acceptance.
+Production approval still requires complete-stack simultaneous benchmark, >=30% CPU/RAM headroom, safe WAL+AOF+Kafka+telemetry IO, security/admission/network/quota negatives, real observability/alerting, external host-loss detection, restore/PITR/cold-DR evidence, and all mandatory readiness gates `PASS`.

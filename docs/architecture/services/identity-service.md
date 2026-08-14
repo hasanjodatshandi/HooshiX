@@ -2,479 +2,211 @@
 
 ## 1. Ownership
 
-Identity owns global User, Tenant, TenantMembership, membership lifecycle, profile/contact methods, local credentials, external identities, MFA enrollments/recovery material, authentication, sessions, token signing, active-tenant selection, the internal Web BFF exact-audience access-token brokerage surface, and platform-global data-subject erasure coordination. Authorization roles/permissions and platform capability assignments are separate and remain authoritative in Authorization.
+Identity Service owns identity/account lifecycle and authentication state:
 
-Base package: `com.sajtech.identity`.
+- User/Profile/Contact;
+- password Credential;
+- authentication and account recovery;
+- Session/RefreshFamily and access-token issuance;
+- MFA/TOTP/recovery codes;
+- ExternalIdentity binding;
+- Tenant/TenantMembership/Invitation lifecycle;
+- active-tenant/session context;
+- Identity-owned registration/recovery challenges;
+- data-subject erasure coordination.
 
-The first executable implementation lives at `services/identity-service` and follows the independent-service build/release boundary from the engineering standards.
+Authorization owns tenant/platform permission policy. Notification owns delivery. Compromised Password owns the immutable compromised-password reference lookup. Identity never reads another service database.
 
-## 2. Registration, User lifecycle, profile, Contacts, and local login
-
-User lifecycle:
-
-```text
-PENDING
-ACTIVE
-SUSPENDED
-DELETING
-DELETED
-```
-
-Local v1 registration supports both EMAIL and PHONE and creates a User-level local Credential. Password syntax/Argon2id/compromised-password checks apply before that Credential commits; the compromised-password remote call occurs outside every Identity DB transaction.
-
-A new User is `PENDING`. It becomes `ACTIVE` only when the required profile is complete, at least one Contact is verified, the applicable local Credential is valid for local registration, and no blocking security/deletion condition exists. The first verified Contact becomes the one active primary Contact automatically.
-
-Phone registration is implemented but remains disabled in staging/production until ADR-0020 provider/Notification/SMS readiness gates pass. The gate is server-owned typed configuration. Local development may enable the path with the approved local-only SMS substitute.
-
-Profile initially contains required `firstName`, required `lastName`, optional `fatherName`. Email/phone are Contact methods, not duplicated profile fields.
-
-ADR-0009 is authoritative for:
-
-- names: trim + NFC, preserve case/internal spacing, reject control characters, first/last 1..120 code points, fatherName <=120;
-- email: trim, `Locale.ROOT` lowercase canonical storage/comparison, <=254, one mailbox, no provider-specific dot/plus rewriting;
-- phone: canonical E.164 and no locale-based national-number inference;
-- verified email/phone global uniqueness and logical-delete reservation;
-- at most one active primary Contact total;
-- one live pending registration reservation per canonical Contact, bound to the 10-minute challenge;
-- repeated same-live registration continuing the same pending registration non-enumeratingly without overwriting already committed protected profile/Credential/security state;
-- reservation expiry releasing the unverified Contact value for a later fresh registration while never reviving the stale challenge;
-- stale PENDING/no-live-reservation state remaining non-authenticatable and becoming bounded cleanup/logical-deletion eligible;
-- no second User/challenge for an already verified/reserved Contact;
-- exactly eight-digit CSPRNG challenge, purpose-HMAC-only persistence, 10-minute TTL, five failed tries, 60-second resend spacing, replacement invalidation, and single use.
-
-Profile/contact gRPC use cases include:
+Implementation target:
 
 ```text
-GetProfile
-UpdateProfile
-AddContact
-ResendContactVerification
-ConfirmContactVerification
-SetPrimaryContact
-RemoveContact
+services/identity-service
+base package: com.sajtech.identity
 ```
 
-`UpdateProfile` applies registration name rules. `AddContact` applies the same canonicalization/uniqueness rules and uses a purpose-separated challenge namespace with the ADR-0009 challenge baseline. `SetPrimaryContact` accepts only an active verified Contact. Changing primary or removing a Contact requires authentication age <=5m. An ACTIVE User cannot remove the last verified Contact; removing the primary Contact requires another verified Contact to be made primary first. Account deletion/erasure is the only ordinary v1 path that may remove the last verified Contact.
+Domain/Application remain framework-independent. Mutable relational state uses Identity-owned PostgreSQL database/runtime role/migration role/Flyway history and current forced-RLS rules.
 
-Local password authentication has no separate username. Any active verified email or active verified E.164 phone Contact identifies the User after canonicalization; primary status is not required, so a verified secondary Contact remains a valid login identifier until removed. Unverified/removed Contacts do not authenticate. Unknown Contact, no local Credential, wrong password, and blocked User states remain caller-visible non-enumerating failures.
+## 2. Primary authority references
 
-A PENDING local User cannot use password login to bypass Contact verification. A PENDING User that has a valid local Credential plus a verified Contact but still requires onboarding may receive only the restricted authenticated-onboarding continuation after all required MFA; normal tenant-scoped JWT issuance still requires the activation/tenant-selection rules below.
+Detailed current semantics are owned by:
 
-`SUSPENDED` blocks new login/refresh. `DELETING`/`DELETED` are non-authenticatable and trigger the session revocation rules below.
+- ADR-0008/0009 — registration/locale/resend;
+- ADR-0012 — account/session/MFA/external identity/tenant lifecycle;
+- ADR-0023 — JWT signing-key lifecycle;
+- ADR-0024 — semantic quotas;
+- ADR-0028 — erasure;
+- ADR-0040 — compromised-password HIBP/SQLite contract;
+- ADR-0042 — production profile;
+- ADR-0043 — trusted client-address context;
+- ADR-0044 — Day-One observability.
 
-## 3. Registration locale
+This service document adds implementation routing/context and MUST NOT redefine those authorities with divergent copies.
 
-`RegisterLocalRequest` field 5 is required `RegistrationLocale`; canonical values are `fa` and `en`. UNSPECIFIED/unrecognized -> `INVALID_ARGUMENT`.
+## 3. Authentication and password rules
 
-Locale is persisted immutably with each registration challenge. Resend accepts no locale override and reuses the prior challenge locale.
+Password storage uses the Technology Baseline Argon2id profile. Password-only authentication uses the current Identity validation/normalization rules and non-enumerating outcomes from ADR-0012.
 
-## 4. Registration runtime and Notification handoff
-
-ADR-0009 enables the registration composition; ADR-0006 defines durable Notification semantics.
-
-- application/internal Identity gRPC local convention: 9090;
-- Notification result callback: 9091;
-- registration/callback inbound message cap 64KiB and metadata cap 16KiB;
-- canonical Notification-owned Protobuf generates consumer stubs;
-- `SubmitNotification`: 900ms, one attempt, wait-for-ready off, no gRPC retry.
-
-Identity local transaction persists business state + encrypted handoff escrow + durable delivery intent/outbox. Notification RPC occurs only after commit.
-
-Dispatcher baseline:
-
-- `FOR UPDATE SKIP LOCKED`;
-- lease 30s; batch 32;
-- busy poll 250ms; idle 1s;
-- durable retry 1s, 2s, 5s, 10s, then <=30s ±20%;
-- time-bound cutoff at `message_not_after - 5s`;
-- non-time-bound automatic retry <=30m, then `HANDOFF_FAILED` + alert.
-
-After Notification `ACCEPTED`, caller handoff recipient/code material is irreversibly removed while authoritative Contact and one-way challenge state remain.
-
-## 5. Tenant, invitation, Membership, platform operations, and last-owner safety
-
-Tenant create is self-service or platform-admin. Creator becomes initial owner. Tenant remains `PROVISIONING` until idempotent Authorization owner-provisioning ACK, then activates transactionally.
-
-Tenant lifecycle:
+Create/change/reset performs compromised-password screening outside DB transactions:
 
 ```text
-PROVISIONING
-ACTIVE
-SUSPENDED
-DELETING
-DELETED
+NFC password
+-> UTF-8
+-> SHA-1 locally only for HIBP screening
+-> first 20 bits / five uppercase hex chars
+-> Compromised Password gRPC lookup
+-> returned 35-hex suffix + positive count rows
+-> exact full SHA-1 comparison inside Identity
 ```
 
-Tenant + creator Membership + audit + stable owner-provisioning outbox commit in one local transaction without network I/O. Owner provisioning uses 900ms/one invocation/no wait-for-ready/no immediate retry and durable delays 1s, 5s, 30s, 2m, 10m, then <=10m ±20%. Fifteen minutes pending warns; one hour pages.
+Raw password and full screening SHA-1 never leave Identity. SHA-1 is **not** password storage and is not reused as a credential verifier. Malformed/truncated/stale/unavailable lookup fails closed. There is no runtime HIBP call from Identity or Compromised Password.
 
-Self-service tenant creation remains governed by Identity authentication/quota rules. Platform-admin tenant operations additionally require Authorization `CheckPlatformPermission` before the Identity mutation:
+Compromised Password dependency remains 900ms overall, one attempt, no automatic retry/fallback, bounded concurrency and cancellation where supported.
 
-| Identity operation | Required platform permission |
-| --- | --- |
-| platform-admin tenant create | `platform.tenant.create` |
-| suspend tenant | `platform.tenant.suspend` |
-| resume tenant | `platform.tenant.resume` |
-| restore tenant | `platform.tenant.restore` |
+Password change/recovery retains current reauthentication/MFA/session-revocation semantics from ADR-0012.
 
-Platform permission check uses the authenticated platform actor User ID and exact permission key. Identity never accepts caller-supplied platform-role/profile claims as authority. The call is outside every Identity DB transaction and uses:
+## 4. Sessions, tokens, external identity, MFA
+
+Current ADR-0012/0016/0023 rules remain unchanged, including:
+
+- server-side session/refresh authority;
+- bounded idle/absolute lifetimes and rotation/reuse detection;
+- browser never receives provider/internal refresh credentials;
+- exact JWT issuer/audience/time/key lifecycle;
+- BFF-only audience token brokerage under server-owned allow-list;
+- Google/external identity binds stable issuer+subject, not email-only auto-link;
+- provider authentication is primary proof only; active TOTP still requires current MFA continuation;
+- no user-selectable Email/SMS downgrade around active TOTP;
+- recovery-code/TOTP anti-replay and current assurance-age rules.
+
+Implementation MUST NOT invent a local permission snapshot, stale authorization cache, or provider email auto-link shortcut.
+
+## 5. Tenant/Membership lifecycle and Authorization
+
+Identity owns Tenant/TenantMembership lifecycle state, invitation, active-tenant selection, and lifecycle intent.
+
+Authorization owns permission state/evaluation and owner-safety reservations. Identity uses the current typed durable commands and does not copy Role/permission authority into its database/JWT/business model.
+
+Lifecycle flows that require Authorization/Notification use current dependency-registry criticality, one-attempt request semantics, and durable Outbox/reconciliation where specified. Remote I/O is outside Identity DB transactions.
+
+A tenant/membership state transition does not become externally authoritative before required local/remote durable conditions from current ADRs are met.
+
+## 6. Semantic quota integration
+
+Identity quota-owning operations implement ADR-0024 exactly.
+
+Network context comes only from approved BFF workload under ADR-0043 and contains one exact canonical IP.
+
+Identity derives:
 
 ```text
-deadline:        300 ms maximum
-attempts:        1
-wait-for-ready:  off
-automatic retry: none
-cache/fallback:  none
-failure mode:    fail closed
+client_ip_exact:
+  IPv4 /32
+  IPv6 /128
+  -> hard pre-auth quota identity where policy requires
+
+client_network_aggregate:
+  IPv4 /24
+  IPv6 /64
+  -> separate abuse/allocation pressure, not sole v1 hard 429 identity
 ```
 
-Authoritative deny is `PERMISSION_DENIED / AUTHORIZATION_DENIED`; dependency failure is platform-authorization unavailable. `platform_admin` never bypasses tenant owner/domain invariants or ordinary resource `CheckPermission`.
+Identity MUST implement:
 
-Invitation lifecycle:
+- atomic multi-dimension Redis decision;
+- service/operation HMAC domain separation;
+- <=2s app/Redis skew;
+- local wall-vs-monotonic Clock Safety Guard for common-mode host steps;
+- host-time synchronization gate after boot/recovery and 60s safe re-arm after guard trip;
+- `noeviction`, no security TTL reset, bounded cleanup;
+- low-cardinality new-bucket allocation guard;
+- `QUOTA_TIME_SOURCE_UNHEALTHY` / `QUOTA_CAPACITY_UNHEALTHY` as availability failures distinct from normal quota denial;
+- >=30% validated Redis memory reserve and adversarial unique-subject/address load evidence.
+
+Quota/network/raw subject identifiers never become ordinary telemetry labels.
+
+## 7. Persistence and RLS
+
+Identity owns one database and current profile-specific physical placement.
+
+Mandatory:
+
+- runtime role non-owner `NOSUPERUSER NOBYPASSRLS`;
+- distinct migration/owner role;
+- forced RLS for tenant-owned tables;
+- transaction-local trusted tenant context;
+- no cross-service DB credentials/SQL;
+- no remote I/O while DB transaction/locks are held;
+- deterministic bounded queries/pagination;
+- Flyway expand/migrate/contract and rollback compatibility.
+
+Single-server shares physical PostgreSQL only; logical ownership/isolation remain unchanged.
+
+## 8. Events and side effects
+
+A local state change that must publish integration intent uses Transactional Outbox. Consumers/callbacks use stable request/event identities and idempotency according to owning contracts.
+
+Notification durable acceptance is not delivery. Identity state that depends on verification/delivery follows current challenge/result semantics and does not infer provider delivery from submit success.
+
+Kafka is never Identity business source of truth.
+
+## 9. Erasure
+
+ADR-0028 is authoritative. Erasure coordinates current Identity-owned state plus required participant actions and owner-safety/legal-hold constraints.
+
+Restored historical state does not regain current authority before erasure/legal-hold reconciliation passes.
+
+## 10. Runtime identity and workload security
 
 ```text
-PENDING
-ACCEPTED
-DECLINED
-EXPIRED
-REVOKED
+namespace:      platform-apps
+Deployment:     identity-service
+Service:        identity-service
+ServiceAccount: identity-service
+application:    gRPC 9090
+management:     separate configured port
 ```
 
-Membership lifecycle:
+Only registered workloads/operations are reachable under deny-by-default NetworkPolicy and Istio authorization. Strict Ambient mTLS remains mandatory. Provider egress is limited to explicitly owned Identity integrations; Compromised Password/HIBP runtime egress is not allowed.
 
-```text
-ACTIVE
-SUSPENDED
-REMOVED
-```
+Single-server uses one replica/HPA off/availability PDB off. HA uses the current replicated target.
 
-Invitation targets an existing non-erased User through a verified Identity Contact reference. Acceptance belongs to that authenticated target User, TTL is seven days, and at most one pending invitation exists for `(tenant_id,target_user_id)`. Unregistered-contact invitation/linking is outside v1.
+## 11. Day-One observability
 
-Invitation is not a Membership. Acceptance creates one ACTIVE Membership, transitions the Invitation to ACCEPTED, records audit, and writes a durable Authorization outbox in the same local transaction. Authorization idempotently assigns the default `tenant_member` SYSTEM role. v1 Invitation carries no arbitrary role/permission; privilege elevation is a later Authorization-owned operation. Until provisioning ACK, Authorization default-deny remains safe authority.
+ADR-0044 applies from the first executable commit.
 
-Tenant owner with authorized `tenant.delete` may begin deletion. Platform-authorized actor may suspend/resume only after the exact platform check above. `DELETING` rejects new Identity invitation, tenant-selection, and tenant/membership mutations and revokes pending invitations. Authorization tenant-lifecycle cleanup/deny is durable; Identity moves to `DELETED` only after ACK. Restore is platform-authorized only, allowed only before irreversible tenant purge/erasure begins, re-enters `PROVISIONING` for Authorization reconciliation, and never releases the slug/technical IDs.
+Identity implements structured allow-listed JSON logs, Micrometer metrics/observations, OpenTelemetry traces, health/readiness, SLO/security alerts, and telemetry fault/privacy tests.
 
-### Last-owner-safe removal
+Allowed bounded dimensions include operation/outcome/auth-method/MFA state category/dependency result/saturation categories where they do not reveal subject identity.
 
-Authorization owns owner-role state. A read-only owner-count check is race-prone, so Identity uses the ADR-0012/ADR-0013 `PrepareMembershipRemoval` reservation protocol.
+Never log/trace/label raw or pseudonymous values that reveal:
 
-Identity first commits a stable local removal intent in `PREPARING`, then calls Authorization outside the DB transaction:
+- password or HIBP SHA-1 prefix/suffix/full hash;
+- token/cookie/session/refresh/MFA/recovery secret;
+- email/phone/provider subject/User/Tenant/Membership/request ID except an explicitly approved safe audit path;
+- raw client IP;
+- SQL bind/full request/response/provider payload.
 
-```text
-PrepareMembershipRemoval
-deadline:       300ms
-attempts:       1
-wait-for-ready: off
-retry/cache:    none
-fallback:       none
-failure:        fail closed
-```
+Trace/baggage/correlation is telemetry only. It never becomes authentication, tenant, Authorization, quota, idempotency, or audit authority.
 
-Authorization atomically reserves the removal and evaluates effective owner capacity excluding existing reservations. If it could remove the last owner: `FAILED_PRECONDITION / LAST_TENANT_OWNER`. Reservations do not auto-expire into unsafe allow state. Authorization local owner-role mutations share the same owner-safety serialization domain so a concurrent assignment/demotion/removal cannot race the Identity preparation.
+Ordinary telemetry export failure does not fail an otherwise safe Identity operation; required authoritative audit/security state follows its durable contract.
 
-After prepare succeeds, one Identity transaction marks Membership REMOVED + audit + durable finalization outbox. `FinalizeMembershipRemoval` closes Authorization role state/reservation. If the local removal definitively fails, Identity durably resolves `CancelMembershipRemovalPreparation`. Crash between prepare and local commit is recovered by replaying the stable `PREPARING` intent/request ID. Finalize/cancel uses 900ms/one invocation/no immediate retry and durable retry outside transactions.
+## 12. Verification and Definition of Done
 
-Production tenant-owned Identity tables use forced RLS with non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles. Tenant context comes only from validated authenticated context and is installed through the canonical parameterized transaction-local mechanism. Session-scoped pooled tenant state is prohibited; missing/malformed context fails closed; pooled-connection cross-tenant reuse after commit/rollback is a mandatory negative test.
+Identity implementation evidence covers, as applicable:
 
-## 6. Primary authentication, MFA continuation, tenantless onboarding, sessions, and tokens
+- registration/verification/login/recovery non-enumeration;
+- Argon2id storage and HIBP SHA-1 screening-only separation;
+- Compromised Password fail-closed source/freshness/lookup behavior;
+- semantic quota exact/aggregate/common-clock/cardinality behavior;
+- session/refresh/JWT lifecycle and replay/revocation;
+- Google/external identity collision/no-auto-link;
+- TOTP/recovery and no-MFA-downgrade;
+- Tenant/Membership/invitation/owner-safety lifecycle;
+- Authorization/Notification dependency failure/idempotency/Outbox semantics;
+- forced RLS/cross-tenant/pool-reuse/cross-service privilege negatives;
+- erasure/legal-hold/recovery behavior;
+- strict mTLS/NetworkPolicy/wrong-workload negatives;
+- Day-One logs/metrics/traces, PII canaries, correlation, and telemetry-backend outage;
+- profile-correct container/GitOps/render/load/recovery evidence.
 
-Primary authentication proof is either local password proof through an active verified Contact or trusted Google evidence through Web BFF. If active TOTP exists, **either** proof creates only the MFA pre-auth continuation; Google cannot bypass TOTP/recovery-code requirements.
-
-After all required factors succeed, Identity can establish a Session/RefreshFamily even when the User has no active Tenant. A normal access JWT is tenant-scoped and is not issued until a valid ACTIVE Membership/Tenant is selected.
-
-Selection:
-
-1. one active Membership -> select automatically;
-2. multiple -> reuse a stored last-selected Membership only when it is still valid; otherwise require explicit selection;
-3. zero -> authenticated onboarding only: profile/tenant-create/invitation-accept/tenant-selection surface, no ordinary resource JWT.
-
-The last-selected Membership is non-authoritative preference/query state and is always revalidated. Web BFF represents the unselected state as `authenticated_onboarding`; it cannot call normal resource services as an authenticated user until Identity issues tenant-scoped credentials.
-
-Tenant switch validates the target active Membership/Tenant, updates the preference, rotates the refresh credential within the family, issues a new tenant-scoped access JWT, and requires BFF session-ID rotation.
-
-Access JWT:
-
-- RS256;
-- five-minute issuance lifetime;
-- standard claims `iss aud sub jti iat exp`;
-- private claims `tenant_id membership_id sid`;
-- no roles/permissions/authorization snapshot;
-- exact audience only; wildcard prohibited;
-- verifier clock leeway <=30s per ADR-0023.
-
-Issuer is typed config; initial production logical value is `https://identity.sajtech.internal` unless reviewed environment config replaces it.
-
-### Web BFF exact-audience access-token brokerage
-
-Identity provides the internal `IssueAudienceAccessToken` operation for the approved Web BFF workload. It is not a public or generic OAuth token-exchange endpoint.
-
-The operation is provider-owned by Identity and uses server-owned authority:
-
-- caller workload must be the approved Web BFF identity;
-- referenced Identity Session/RefreshFamily must be active and consistent with current User/session state;
-- requested audience must be in Identity's server-owned allow-list for the BFF workload and current session mode;
-- tenant/membership context is derived from authoritative Identity state, not browser/JWT Role or permission snapshots;
-- `authenticated_onboarding` cannot obtain ordinary resource-service or `authorization-service` audiences;
-- browser-selected, arbitrary, unknown, or wildcard audiences fail closed;
-- output is only the existing five-minute exact-audience access JWT under ADR-0023; provider and refresh credentials are never returned.
-
-The BFF->Identity edge is `AUTHORITATIVE_SECURITY`:
-
-```text
-deadline:        1500 ms maximum
-attempts:        1
-wait-for-ready:  off
-automatic retry: none
-fallback/cache:  none
-failure mode:    fail closed / authentication dependency unavailable
-```
-
-Any bounded server-side BFF retention of an issued JWT ends no later than its own `exp` and is invalidated by relevant session/tenant/assurance transition. It is transport reuse only and never permission-result caching or a substitute for the resource-owning service's final online Authorization check.
-
-Refresh credential:
-
-- exactly 32 CSPRNG bytes;
-- Base64URL without padding when string encoded;
-- stored only as purpose-separated versioned HMAC-SHA-256 digest;
-- 7-day idle / 30-day absolute lifetime;
-- predecessor invalidated on rotation;
-- reuse revokes the family.
-
-A User has at most 20 active RefreshFamilies. Creating the 21st revokes the oldest active family by `created_at` with stable identifier tie-break.
-
-Revocation:
-
-- current logout -> current family;
-- logout-all -> all families;
-- password reset -> all families;
-- User suspension/DELETING -> all families and reject login/refresh;
-- password change -> rotate current session/refresh and revoke all other families;
-- successful ExternalIdentity unlink -> rotate current session/refresh and revoke all other families;
-- successful MFA enroll/disable/replace/recovery that changes active MFA material -> rotate the retained current session/refresh when applicable and revoke all other families; a recovery flow may instead revoke all families when the current session is intentionally terminated.
-
-JWT verification stays local from the approved public bundle with no ordinary blacklist/introspection/JWKS network call. An already-issued signed access JWT can therefore remain cryptographically valid until its remaining five-minute lifetime plus only the configured <=30s clock tolerance. Online Authorization still decides resource permission; no permission snapshot is trusted from JWT.
-
-## 7. Password credential and compromised-password baseline
-
-Local passwords use Technology Baseline Argon2id (`m=19 MiB`, `t=2`, `p=1`, random 16-byte salt, >=32-byte hash) behind an Identity security port. Stored encoding is self-describing/versioned and rehashes on successful authentication when the approved baseline increases.
-
-Password-only authentication accepts 15..128 Unicode code points with NFC normalization. No arbitrary composition rules or periodic forced rotation. No password-history/reuse blacklist exists in v1.
-
-Create/change/reset calls the compromised-password dependency outside DB transactions:
-
-1. NFC normalize password;
-2. UTF-8 encode and SHA-256 locally;
-3. send only first 20 digest bits / five canonical hex characters;
-4. receive bounded remaining SHA-256 suffix + non-negative occurrence-count records;
-5. compare full digest locally.
-
-Raw password/full digest never leave Identity. Malformed/oversized/ambiguous response fails closed. Dependency: 900ms overall, one attempt, no automatic retry, bounded concurrency/cancellation. The service is an internal prefix/k-anonymous contract; Identity does not claim direct HIBP wire compatibility.
-
-Change Password requires current password + authentication age <=5m and, when MFA is active, MFA assurance <=5m. It checks compromised-password state before commit.
-
-Forgot/reset applies only to a User that already has an active local Credential and uses only the primary verified Contact. Initiation is non-enumerating for unknown/non-primary/no-local-Credential cases. It never creates the first local Credential for an external-only User.
-
-Password-recovery challenge is purpose-separated but uses eight decimal digits, 10m TTL, five failed tries, 60s resend gap, HMAC-only storage, replacement invalidation and single use. If TOTP is active, reset additionally requires TOTP or one recovery code. Successful reset revokes all RefreshFamilies.
-
-If both password access and active MFA/recovery material are unavailable, v1 has no automated bypass. Manual/support recovery and first-local-Credential enrollment for external-only Users require a future reviewed security/product decision.
-
-## 8. External identity and Google signup
-
-Google uses OIDC Authorization Code + PKCE S256 through Web BFF. Stable identity is `(issuer, subject)`; email equality never auto-links.
-
-Web BFF owns provider validation. Identity never receives provider authorization/access/refresh/ID tokens and does not call Google login/link endpoints.
-
-Trusted BFF evidence includes:
-
-```text
-evidence_id        exactly 256-bit CSPRNG
-evidence_issued_at trusted BFF server timestamp after validation
-issuer             canonical validated
-subject            validated provider subject
-request_id         canonical UUIDv4
-metadata           versioned/bounded optional provider email + email_verified + name suggestions
-```
-
-Identity accepts evidence for exactly two minutes from `evidence_issued_at`, subject only to current clock-skew bounds, and retains spent/replay evidence >=10m after consumption. Evidence fingerprint binds BFF workload identity + evidence ID + issuer + subject + request ID + issued time + metadata.
-
-Exact same replay returns the original committed result. Same `evidence_id` with changed request/payload/fingerprint -> `ALREADY_EXISTS / OIDC_EVIDENCE_REPLAY`.
-
-Google may create a new User:
-
-- known `(issuer,subject)` -> primary authentication proof for existing User, still subject to active TOTP/MFA before Session completion;
-- unknown -> new PENDING User permitted;
-- `email_verified=true` provider email may create a verified Contact only when canonical email is free;
-- absent or `email_verified=false` provider email creates no Contact automatically; onboarding uses normal `AddContact` + verification;
-- verified email collision -> `FAILED_PRECONDITION / ACCOUNT_LINK_REQUIRED`, never auto-link;
-- provider email change does not silently change account binding;
-- provider names are suggestions only; user confirmation/update is required for Identity profile completion.
-
-Link requires authenticated account settings + auth age <=5m/current MFA assurance where applicable. Unlink requires auth age <=5m and fails `FAILED_PRECONDITION / LAST_AUTHENTICATION_METHOD` when it would remove the last sign-in method. Successful unlink rotates current session/refresh and revokes other families.
-
-## 9. MFA
-
-TOTP:
-
-- HMAC-SHA-256;
-- 6 digits / 30s / ±1 step;
-- issuer `SajTech`;
-- AES-256-GCM local versioned key ring through OpenBao/ESO;
-- 10 independent 80-bit recovery codes shown once, stored as purpose-HMAC-SHA-256, atomic single-use;
-- enroll/disable/replace/recover requires authentication age <=5m;
-- no trusted devices in v1.
-
-When TOTP is active, any successful primary proof—password or Google—creates only a pre-auth challenge:
-
-```text
-TTL: 5m
-maximum failed proofs: 5
-single use: yes
-```
-
-No completed Session/RefreshFamily/access token is created until the same challenge receives valid TOTP or one valid recovery code. A new successful primary proof invalidates the previous live pre-auth challenge. An accepted TOTP timestep cannot be reused for the same enrollment.
-
-Successful MFA enrollment/disable/replacement/recovery changes session assurance state and therefore applies the rotation/revocation rules in §6.
-
-SMS cannot downgrade active TOTP. If TOTP is active, only TOTP/recovery code completes the gate. SMS MFA is available only to accounts without active TOTP and only after ADR-0020/Notification/quota/workload/telemetry production gates pass. `LoggingSmsProviderAdapter` remains local-only and is never production fallback.
-
-SMS MFA proof uses a distinct purpose/key namespace with exactly eight decimal CSPRNG digits, HMAC-only verifier persistence, no plaintext durable storage after safe handoff representation, expiry no later than the enclosing 5m pre-auth challenge, maximum five failed proofs across that challenge, 60s minimum resend spacing, replacement invalidation, and single use. Caller/provider input cannot extend those values.
-
-## 10. Semantic quotas
-
-ADR-0024 is the current quota authority. Identity uses ACL-isolated `security-redis`, one atomic 75ms/one-attempt/no-retry operation, HMAC pseudonymous keys, trusted app time + Redis TIME, <=2s skew, monotonic effective time, no security reset from TTL expiry, and fail-closed dependency/time semantics.
-
-Registration exact v1 numeric policy:
-
-- REGISTER/contact: capacity 5, refill 1/15m, cleanup horizon 24h;
-- REGISTER/network: 60, refill 1/5s, 1h;
-- RESEND/contact: 5, refill 1/10m, 2h plus fixed 60s challenge resend gap;
-- RESEND/network: 60, refill 1/5s, 1h;
-- CONFIRM/network: 120, refill 2/1s, 30m; challenge-local five failures remains subject proof limit.
-
-Authenticated Contact verification reuses this numeric envelope under distinct domain-separated operation names. Password/MFA recovery proof uses the ADR-0024 recovery envelope under distinct namespaces.
-
-Authentication anti-lockout remains mandatory: source gate before credential work; subject failure pressure after failed proof and never sufficient alone to reject a later correct proof once source gate permits evaluation.
-
-## 11. Browser boundary
-
-Identity does not expose internal tokens to React. BFF owns browser session, OIDC transaction/provider validation, PKCE, CSRF, CORS and secure cookies per ADR-0016.
-
-For authenticated server-side dispatch, BFF may call Identity `IssueAudienceAccessToken` only under §6/ADR-0023. The browser never selects the target audience and never receives the resulting downstream access JWT or any refresh/provider credential.
-
-Pre-auth MFA after password **or Google evidence** is not an authenticated browser session. `authenticated_onboarding` exists only after all required factors and Session/RefreshFamily creation, carries no normal resource JWT until tenant selection, and is BFF-allow-listed to Identity onboarding operations.
-
-## 12. PostgreSQL, aggregates, and transactions
-
-Identity owns database `identity`, its runtime role, migration/owner role, Flyway history, tenant RLS policy and schema objects. Physical PostgreSQL placement follows the selected production profile under ADR-0027/ADR-0042: `production-single-server` places the distinct Identity database in the shared physical CloudNativePG/PostgreSQL instance, while `production-ha` uses the dedicated Identity CloudNativePG cluster. Identity roles have no `CONNECT` or object privileges on another service database in either profile.
-
-Runtime is `NOSUPERUSER NOBYPASSRLS`, not table owner. Tenant tables use forced RLS plus application checks. Tenant context uses parameterized transaction-local setting; absent/malformed context fails closed; cross-tenant pool reuse after commit/rollback is tested.
-
-Aggregate boundaries:
-
-- User/Profile/active Contact set;
-- Credential;
-- Challenge;
-- Session/RefreshFamily;
-- MFA enrollment/recovery;
-- ExternalIdentity;
-- Tenant;
-- TenantMembership;
-- Invitation.
-
-Cross-service lifecycle intents/outboxes are explicit coordination records. JPA is default aggregate CRUD; JDBC/jOOQ only for justified SQL-control/query paths such as `SKIP LOCKED`/outbox. One giant User graph is prohibited.
-
-No remote gRPC/HTTP/Kafka/Redis/provider I/O inside Identity DB transactions. DB locks never span remote I/O. Retry is outside failed transactions. This explicitly includes `CheckPlatformPermission`, compromised-password, Notification, semantic-quota Redis, and every Authorization lifecycle call.
-
-## 13. Erasure and legal hold
-
-ADR-0028 makes Identity coordinator of global User erasure. Required participants initially: Identity, Authorization, Notification, Web BFF. Coordination is durable async Kafka + Transactional Outbox; critical publication/Inbox dedup evidence remains 35d and retry/DLQ evidence >=14d where used.
-
-Self-erasure requires auth age <=5m and active MFA proof when applicable **and** no remaining ACTIVE/SUSPENDED Membership for a Tenant that is not already DELETED. The User must first leave Memberships, transfer last ownership, or complete tenant deletion. Every Membership exit still uses `PrepareMembershipRemoval`; erasure is not a last-owner bypass.
-
-Acceptance transaction sets User `DELETING`, revokes every RefreshFamily, revokes pending invitations targeted to that User, persists audit/request + outbox, and permits no new invitation acceptance.
-
-Legal hold may block irreversible progress but never re-enables authentication. Legal-hold create/release is not an ordinary tenant/user operation. A platform User entry point requires `CheckPlatformPermission(user_id, platform.legal_hold.manage)` under the same 300ms/one-attempt/no-cache/no-retry/no-fallback fail-closed contract as §5; any separate legal-authority workflow must be at least as privileged/audited and cannot bypass the Authorization authority silently. v1 exposes no normal self-service erasure undo; irreversible participant work can never be cancelled.
-
-Authorization erasure participation removes subject-linked Membership authorization and any platform profile assignment, so an erased User cannot retain tenant/global authority. Security audit evidence remains >=365d unless stricter policy. Non-PII erasure receipts follow ADR-0028. Restore replays erasure/legal-hold before traffic.
-
-## 14. Runtime/deployment
-
-Production identity, transport and security defaults are profile-independent:
-
-```text
-namespace:       platform-apps
-Deployment:      identity-service
-Service:         identity-service
-ServiceAccount:  identity-service
-principal:       prod.sajtech.internal/ns/platform-apps/sa/identity-service
-application gRPC local convention: 9090
-Notification callback:              9091
-management: separate configured port
-```
-
-Deployment topology follows the selected production profile:
-
-```text
-production-single-server:
-  replicas: 1
-  HPA: disabled
-  availability PDB: disabled
-  node-failover claim: none
-
-production-ha:
-  replicas: >=3
-  PDB minAvailable: 2
-  topology spread: required by the HA target
-  HPA: only after load/connection/hash-bulkhead evidence
-```
-
-Production uses deny-by-default NetworkPolicy/Istio authorization and purpose-separated read-only OpenBao/ESO mounts in both profiles. Liveness is process/local-runtime only; readiness includes usable required local key material and DB/entry-point prerequisites.
-
-Image/JDK follows current Technology Baseline (Temurin 25.0.4 at this documentation revision) with immutable digest. Staging/production overlays remain `deploy/clusters/staging` and `deploy/clusters/production`; registry/DNS/secret-path/Redis/CNPG/backup/alert destinations remain typed environment placeholders until provisioned.
-
-## 15. Internal dependency ownership
-
-Current Identity remote edges include:
-
-- semantic quota Redis — authoritative security, 75ms/one attempt/no retry/fallback;
-- compromised-password service — authoritative security, 900ms/one attempt/no retry/fail closed;
-- Notification SubmitNotification — durable command after local outbox commit;
-- Authorization owner/member provisioning — durable commands after local outbox commit;
-- Authorization `PrepareMembershipRemoval` — authoritative security, 300ms one attempt/no retry/cache/fallback;
-- Authorization membership-removal finalize/cancel — durable command resolution;
-- Authorization tenant lifecycle cleanup/reconciliation — durable commands;
-- Authorization `CheckPlatformPermission` — authoritative security for platform tenant/legal-hold entry points, 300ms one attempt/no retry/cache/fallback, fail closed.
-
-Exact outbound operation classes/failure actions are canonical in `../dependency-criticality.yaml`. Google is **not** an Identity dependency; Web BFF owns the Google edge.
-
-`IssueAudienceAccessToken` is an inbound Identity-owned provider surface, not a new Identity outbound dependency. Its caller-side BFF dependency classification/deadline is canonical in `../dependency-criticality.yaml`; Identity still owns validation, session/tenant authority and token issuance semantics from §6/ADR-0023.
-
-## 16. Repository-complete implementation and verification
-
-Repository-complete Identity means code, Protobuf contracts, Flyway migrations, independent Gradle build/wrapper/verification metadata, unit/integration/contract/architecture/security tests, Docker/Helm/GitOps/policies, observability and CI/release artifacts exist and are verified as far as repository/local tooling permits. Actual staging/production external secrets/providers/load/failover/DR remain NOT VERIFIED until those environments and gates execute.
-
-Applicable tests include:
-
-- EMAIL/PHONE registration gates, local Credential/compromised-password registration dependency, Contact reservation expiry/reacquisition/non-overwrite/canonicalization/uniqueness/primary/profile activation;
-- local login through any verified primary/secondary email/phone Contact, removed/unverified Contact denial and non-enumeration;
-- exact registration/contact/password-recovery/SMS-MFA challenge and semantic quota boundaries;
-- User lifecycle and authentication shutdown;
-- profile/contact CRUD + recent-auth/last-contact rules;
-- tenant/invitation/Membership lifecycles, default-member provisioning, slug tombstone, tenant delete/restore;
-- exact platform permission mapping for platform tenant create/suspend/resume/restore and legal-hold management, authoritative deny/outage fail-close, wrong workload/permission negatives, and no platform-profile/wildcard bypass;
-- proof `CheckPlatformPermission` and every other remote dependency executes outside Identity DB transactions;
-- concurrent last-owner prepare reservations, local owner-mutation conflict behavior, crash/replay/finalize/cancel safety;
-- tenantless onboarding, one/many membership selection, tenant switch;
-- JWT exact claims/audience/leeway, key rotation;
-- `IssueAudienceAccessToken` approved-BFF workload, active/revoked/expired Session/RefreshFamily, server-owned exact audience allow-list, arbitrary/browser/wildcard audience rejection, onboarding resource/`authorization-service` audience denial, tenant/membership/session binding, exact five-minute issuance, no provider/refresh credential return, 1500ms/one-attempt/no-retry/no-fallback and cancellation behavior;
-- 20 RefreshFamily cap, logout/revocation/reuse/MFA-state-change revocation and <=5m+bounded-leeway token residual trade-off;
-- password change/recovery, no reset-first-local-Credential, MFA-required reset, no automated password+MFA-loss bypass;
-- compromised-password prefix-only SHA-256 protocol and deadline/fail-closed behavior;
-- BFF-only Google evidence 256-bit/2m/10m replay, signup/unverified-email/collision/no-auto-link/unlink, and active-TOTP Google MFA continuation;
-- TOTP 5m/five-proof gate, primary-proof replacement, timestep replay, recovery code, SMS no-downgrade and exact SMS proof semantics;
-- self-erasure Membership/last-owner precondition, invitation/session revocation, platform-profile erasure, and legal hold;
-- aggregate/transaction boundaries, forced RLS/pool reuse;
-- Notification/Authorization outbox replay/conflict;
-- 35d critical idempotency/dedup, >=365d audit;
-- NetworkPolicy/Istio positive/negative authorization including Identity-only platform-check access, approved-BFF-only token-broker access, deployment render/policy, and PII-safe telemetry;
-- `production-single-server`: distinct Identity database/roles/Flyway/RLS within the shared physical PostgreSQL instance, one-replica/no-HPA/no-availability-PDB render, whole-host/reboot/shared-cluster recovery and no node-failover claim;
-- `production-ha`: dedicated Identity CloudNativePG topology, replica/node-loss, PostgreSQL failover, PDB/topology-spread and any evidence-gated HPA behavior.
+The first executable implementation is repository-complete only when source, contracts, migrations, tests, build/dependency locks, container/deployment/security policy, **observability**, and CI gates for the implemented slice exist. Current repository implementation/runtime evidence remains `NOT VERIFIED` until those artifacts are present and executed.

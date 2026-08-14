@@ -1,297 +1,209 @@
 # Security Architecture — Current State
 
-Security is layered and fails closed when identity assurance, authorization, or security-significant dependency state cannot be proven. No infrastructure profile may use reduced availability as justification to reduce security assurance.
+Security is layered and fails closed when identity assurance, authorization, or security-significant dependency state cannot be proven. Reduced infrastructure availability never justifies reduced security assurance.
 
-ADR-0042 selects `production-single-server` as the initial production topology. It changes selected infrastructure topology only. **OpenBao, end-user MFA, tenant isolation, workload identity, signed-artifact admission, semantic quota correctness, WAF/DDoS controls and authorization semantics remain security invariants.**
+ADR-0042 selects `production-single-server`. OpenBao, end-user MFA, tenant isolation, workload identity, signed-artifact admission, semantic-quota correctness, WAF/DDoS controls, Authorization semantics, and required audit remain invariants.
 
-`threat-model.md` is the formal design-time threat-model authority. `network-architecture.md` and ADR-0043 define production client-address trust, public network boundaries, and the single-server management plane. Documentation is not runtime evidence; applicable rows in `security-verification-matrix.md` and `PRODUCTION-READINESS-CHECKLIST.md` must execute before production approval.
+`threat-model.md`, `security-verification-matrix.md`, and Production Readiness define threat/evidence mapping. ADR-0043 owns network/client-address trust. ADR-0044 owns ordinary observability security.
 
-## 1. Tenant and identity trust
+## 1. Identity/tenant isolation
 
 - User identity is global; tenant authority is membership/context scoped.
-- Active tenant context is derived only from validated authenticated state.
-- Tenant-owned PostgreSQL tables use forced RLS plus application/repository tenant checks.
-- Runtime PostgreSQL roles are non-owner `NOSUPERUSER NOBYPASSRLS` and cannot access another service database.
-- Tenant context is installed only with parameterized transaction-local semantics; session-scoped tenant state on pooled connections is prohibited.
-- Missing/malformed tenant context fails closed.
-- External identities bind by stable issuer + subject. Email alone never auto-links an external identity.
-- Logical deletion, erasure, legal-hold and authority-removal semantics are owned by current Identity/erasure ADRs and are unchanged by production profile.
+- Trusted active tenant context comes only from validated authenticated state.
+- Tenant-owned PostgreSQL tables use forced RLS plus application enforcement.
+- Runtime roles are non-owner `NOSUPERUSER NOBYPASSRLS` and cannot access another service DB.
+- Tenant context is parameterized transaction-local; pooled session-scoped tenant state prohibited.
+- Missing/malformed context fails closed.
+- External identity binds issuer+subject; email alone never auto-links.
+- Erasure/legal-hold/authority-removal semantics remain current ADR authority.
 
-The single-server shared physical PostgreSQL instance increases the blast radius of host/superuser compromise. It does **not** reduce database/role/RLS separation. Human physical/superuser access is therefore time-bounded, approved and audited under ADR-0030. Root compromise of the only physical host remains a documented residual risk in `threat-model.md`; same-host workload boundaries are not represented as protection from host root.
+Single-server broadens host/root blast radius but does not weaken logical isolation.
 
-## 2. Browser and BFF trust boundary
+## 2. Browser/BFF boundary
 
-Browser-facing security remains owned by ADR-0016 and `services/web-bff.md`:
+Current ADR-0016/BFF rules remain:
 
-- browser uses only the Web BFF public API;
-- OAuth/OIDC uses Authorization Code + PKCE S256 with exact state/nonce/pre-auth controls;
-- provider/internal service tokens are never exposed to browser JavaScript;
-- sessions/pre-auth state are server-side and located through purpose/version-separated HMAC identifiers;
-- refresh credentials are protected with current AES-256-GCM key-ring rules;
-- session rotation/revocation is atomic under the current BFF contract;
-- synchronizer CSRF + Fetch Metadata rules remain mandatory for unsafe authenticated methods;
-- v1 is same-origin and uses the current strict CORS/CSP/cache rules;
-- BFF token brokerage uses server-owned exact-audience mapping; callers cannot choose arbitrary audiences or downstreams;
-- final protected-resource authorization remains in the resource-owning service;
-- browser/public forwarding headers are not client-network authority; BFF accepts only the ADR-0043 server-derived internal client address on its WAF-only ingress path.
+- browser uses BFF public API only;
+- OIDC Authorization Code + PKCE S256 + state/nonce/pre-auth/replay controls;
+- provider/internal tokens not exposed to browser;
+- server-side session/pre-auth state;
+- CSRF + Origin + Fetch Metadata + same-origin CORS;
+- strict CSP/cache/security headers;
+- server-owned route->audience mapping;
+- final protected-resource authorization remains resource owner + Authorization;
+- public forwarding/trace/correlation headers are not security authority.
 
-ADR-0042 changes none of these browser/security rules.
+## 3. Authentication/MFA
 
-## 3. Authentication and MFA — unchanged
+Identity authentication/MFA semantics remain unchanged:
 
-Identity authentication/MFA semantics remain owned by ADR-0012 and `services/identity-service.md`.
+- password storage uses Argon2id;
+- TOTP remains required where active policy requires it;
+- Email/SMS is not a freely selectable weaker bypass;
+- Google/external identity does not bypass active MFA;
+- responses remain non-enumerating where required;
+- current session/recovery/assurance rules remain.
 
-- current password, compromised-password, Google external identity, session and recovery controls remain unchanged;
-- TOTP remains the required second factor where the current Identity state requires it;
-- Email/SMS verification/recovery is not a freely selectable weaker bypass around active TOTP;
-- enrollment, disable and recovery remain protected by current proof/quota/audit rules;
-- responses remain non-enumerating where the current authentication contract requires it.
+## 4. Compromised Password / Reference Data
 
-A production infrastructure profile MUST NOT alter factor assurance. Any future change to factor selection requires a separate threat-model/security decision.
+Compromised Password:
 
-ADR-0009 intentionally defines case-insensitive HooshiX email identity equality while preserving a case-preserving delivery representation. This is an application identity rule and does not authorize email-only external-identity linking or weaker verification.
+- official HIBP Pwned Passwords SHA-1 corpus acquired offline;
+- SHA-1 is screening-only, never credential storage;
+- Identity computes full SHA-1 locally and sends five-hex prefix only;
+- service stores immutable 20-byte SHA-1 SQLite reference rows and returns positive-count suffix candidates;
+- Identity performs exact full-hash comparison;
+- no runtime HIBP/provider egress;
+- <=35-day dataset readiness age and <=30-day acquisition/build verification cadence;
+- complete-corpus cardinality/response bounds measured before release;
+- stale/corrupt/missing/incompatible data fails closed.
 
-## 4. Compromised Password and reference-data security
+Reference Data:
 
-Compromised Password remains self-contained and fail closed:
-
-- Identity computes SHA-256 locally and sends only the 20-bit/five-uppercase-hex prefix;
-- Compromised Password performs bounded exact lookup in the immutable read-only SQLite artifact;
-- the full digest remains in Identity for final comparison;
-- no raw password/full digest/subject identity is stored in the dataset or sent to an external provider;
-- no runtime HIBP/Internet lookup, PostgreSQL, Redis or Kafka authority exists for this service;
-- only the approved Identity workload may call the lookup;
-- dataset corruption/incompatibility/unavailability fails closed.
-
-Reference Data remains global, immutable, non-tenant and image-bundled. It has no runtime standards-source Internet synchronization and no database/Redis/Kafka authority. Its initial internal caller is Web BFF.
-
-Service-doc replicated deployment targets apply to `production-ha`; the single-server profile uses one replica without weakening these security semantics.
+- global immutable non-tenant bundle;
+- no runtime source-provider sync or mutable datastore;
+- independent service remains gated by ADR-0041 consumers/lifecycle/security/scale/ownership evidence;
+- one journey alone does not create a network service.
 
 ## 5. Authorization
 
-Authorization remains online, authoritative and fail closed under ADR-0013/0026/0032/0036:
+Authorization remains online/authoritative/fail-closed:
 
-- success-is-ALLOW; errors/timeout/breaker state do not fabricate allow;
-- one authoritative `CheckPermission` for protected resource operations;
-- one attempt, no permission-result cache, no Kafka invalidation authority, no stale-allow fallback and no automatic retry;
-- safe local prechecks may reject but never grant authority;
-- resource owner performs final resource authorization;
-- platform capability checks are separate and cannot bypass tenant/resource authorization;
-- administration paths prevent privilege escalation and retain idempotency/audit rules;
-- owner-safety/membership-removal invariants remain atomic under their current contract.
+- successful authoritative completion is ALLOW;
+- current business DENY gRPC semantics remain unchanged;
+- error/timeout/overload/breaker never fabricates ALLOW;
+- one attempt, no permission-result cache/Kafka invalidation/stale allow/retry;
+- safe local checks reject only;
+- resource owner remains final resource/domain authority;
+- platform permission cannot bypass tenant/resource authority;
+- admin privilege-escalation/owner-safety/idempotency/audit remain current.
 
-The single-server profile may reduce availability but MUST NOT convert Authorization dependency failure to fail open.
+## 6. Semantic security quotas
 
-## 6. Semantic security quotas and Redis
+ADR-0024 is authoritative.
 
-ADR-0024 owns semantic quota correctness. In both production profiles:
+- Redis TLS + per-owner ACL + `noeviction`;
+- atomic hard-dimension decision;
+- HMAC pseudonymous keys where required;
+- exact trusted BFF client address only from ADR-0043;
+- hard client identity: IPv4 `/32`, IPv6 `/128`;
+- separate aggregate pressure: IPv4 `/24`, IPv6 `/64`, not sole v1 hard 429 gate;
+- app/Redis <=2s skew plus local wall-vs-monotonic Clock Safety Guard for common-mode host clock steps;
+- host sync before quota-protected traffic and 60s stable re-arm after a clock trip;
+- no security-significant TTL reset;
+- bounded cleanup;
+- low-cardinality new-bucket allocation guard + >=30% Redis memory reserve;
+- adversarial unique-subject/address allocation test;
+- time/capacity/transport failures are availability failures distinct from normal quota denial and fail closed.
 
-- service owning the operation owns the quota policy;
-- Redis uses TLS and per-owner ACL/key namespaces;
-- raw subject/contact/session/network identifiers do not appear where pseudonymous HMAC keys are required;
-- quota decisions are atomic;
-- dual trusted time validates app/Redis skew with the current <=2s bound;
-- authoritative quota state is not reset merely by TTL expiry;
-- one Redis attempt, no retry/fallback; dependency/time-source failure is distinct from quota denial and fails closed according to the operation contract;
-- `noeviction` is mandatory;
-- anti-lockout semantics remain mandatory.
+A sufficiently large cardinality attack may intentionally make protected operations unavailable. It may not cause fail-open behavior or eviction of authoritative security state.
 
-For a public operation with a network quota dimension, only ADR-0043 trusted client-network context is accepted. Internet-supplied `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, or the internal private header name are not quota authority. Missing, malformed, or proxy-address network context fails closed when that dimension is required. IPv4/IPv6 canonicalization is completed before HMAC derivation, and the raw address is not ordinary telemetry or durable application state.
+## 7. Workload identity/network policy
 
-`production-single-server` uses one Redis instance with AOF `appendfsync everysec`. It has no failover claim. AOF reduces restart loss but does not create HA. Lost session state requires re-authentication.
+Production workloads use dedicated ServiceAccounts, Istio Ambient STRICT mTLS, Calico deny-by-default NetworkPolicy, least-privilege Istio authorization, and positive/negative identity/connectivity tests.
 
-`production-ha` uses the current primary/replicas/Sentinel topology.
+Default ServiceAccount is prohibited for application workloads. Single-server cannot disable Ambient/NetworkPolicy to save capacity.
 
-## 7. Workload identity, mTLS and NetworkPolicy
-
-Production application workloads use:
-
-- dedicated ServiceAccounts;
-- Istio Ambient STRICT mTLS;
-- trust domain `prod.sajtech.internal`;
-- least-privilege Istio authorization policies;
-- Calico deny-by-default NetworkPolicy with explicit ingress/egress;
-- positive and negative authorization/connectivity tests.
-
-Kubernetes `default` ServiceAccount is prohibited for production application workloads.
-
-The single-server K3s profile disables Flannel and the K3s network-policy controller so Calico remains authoritative. Ambient is retained and benchmark-gated. If the host cannot fit Ambient while maintaining the approved capacity envelope, production readiness fails. Workload identity/mTLS MUST NOT be silently disabled for memory savings.
-
-Waypoints are absent by default and require an explicit L7 need plus capacity/security evidence.
-
-## 8. Public edge, client-address trust, and abuse protection
-
-The public path remains:
+## 8. Public edge/client-address trust
 
 ```text
-Internet
--> upstream L3/L4 volumetric mitigation/scrubbing
--> external L4
--> repository-pinned Traefik
--> dedicated Caddy + Coraza WAF
--> Web BFF
+Internet -> upstream mitigation -> external L4 -> Traefik -> Caddy/Coraza -> BFF
 ```
 
-ADR-0043 defines source-address authority:
+- external L4 preserves validated client source through trusted PROXY v2;
+- Traefik trusts exact L4 CIDRs only; insecure PROXY/forwarded modes prohibited;
+- direct non-approved access to Traefik origin denied before routing;
+- caller forwarding/private client-IP headers are not authority;
+- Caddy strict proxy parsing + internal client-IP overwrite;
+- BFF accepts one exact canonical IP only on WAF path;
+- backends receive only typed exact IP context from approved BFF workload;
+- direct Internet->BFF and Traefik->BFF bypass prohibited;
+- raw client IP not ordinary telemetry or durable state.
 
-- external L4 preserves the validated original client source with PROXY protocol v2;
-- Traefik trusts PROXY only from exact reviewed external-L4 source CIDRs;
-- Traefik insecure PROXY/forwarded-header trust is prohibited;
-- public/client-supplied `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto`, `X-Forwarded-Host`, and private client-IP header values are not authority;
-- Caddy trusts only the required Traefik source range and uses strict trusted-proxy parsing;
-- Caddy replaces the internal `X-HooshiX-Client-IP` value with its server-derived client IP before BFF;
-- BFF accepts one server-derived IP literal only on the WAF-only ingress path;
-- backend network quotas accept only the typed BFF-derived network context from the approved BFF workload;
-- missing or invalid trusted network identity fails closed for an operation that requires a network quota.
+WAF/application quotas complement upstream volumetric protection; none replaces another.
 
-Independent path controls remain:
+## 9. Secrets/OpenBao
 
-- direct Internet -> BFF is prohibited;
-- direct Traefik -> BFF application routing that bypasses WAF is prohibited;
-- K3s bundled Traefik/ServiceLB is disabled in the single-server profile;
-- WAF uses current Coraza/CRS policy with reviewed DetectionOnly-to-blocking promotion and narrow exceptions;
-- WAF is not a substitute for upstream volumetric protection;
-- BFF request/body/header/security validation remains independent defense in depth.
+OpenBao 2.6.1 remains unchanged production secret authority with current Raft/PVC/Shamir/snapshot/restore/Kubernetes Auth/External Secrets workflows.
 
-Semantic quotas protect application-specific abuse and do not replace WAF/DDoS controls.
+- secrets never enter Git/images/values/logs/traces/metrics/unapproved CI;
+- normal hot paths use validated local mounted material, not per-request OpenBao RPC;
+- key-ring reload/rotation/stale-source behavior stays fail-closed per owning service;
+- no plaintext/Git fallback under outage/capacity pressure.
 
-## 9. Secrets and OpenBao — unchanged
+## 10. Supply chain/Kyverno
 
-**OpenBao is explicitly outside ADR-0042 simplification scope.**
+Production artifacts are immutable digest-only, signed, provenance-bound, SBOM-attested, advisory-correlated, and fail-closed at admission.
 
-ADR-0011 remains the authority. OpenBao 2.6.1 remains the production secret authority with its current topology, Shamir/recovery, encrypted snapshot, Kubernetes Auth, External Secrets and mounted/local secret workflows.
+Kyverno 1.18.2 remains production admission engine. New greenfield production controls use stable CEL-based `policies.kyverno.io/v1` policy types. CI/render gates reject new legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy/ClusterCleanupPolicy except a narrow migration-only exception with owner/removal deadline.
 
-Mandatory principles:
+Single-server may use one Kyverno replica but cannot switch critical admission to audit-only.
 
-- production secrets never enter Git, images, Helm/Kustomize values, logs, traces, metrics or unapproved CI output;
-- application hot paths use validated mounted/local key material rather than per-request OpenBao RPC;
-- purpose-separated rotating key rings follow their owning ADR/service lifecycle;
-- secret reload is atomic where current service contracts require it;
-- stale/local snapshot behavior is bounded and fail-closed according to the owning secret contract;
-- OpenBao/secret-source outage MUST NOT be converted to plaintext persistence or a bypass;
-- ADR-0042 MUST NOT remove, replace, bypass or weaken OpenBao.
+## 11. Human privileged access
 
-ADR-0043 does not alter OpenBao topology, authority, or secret-delivery semantics.
-
-## 10. Supply chain and Kyverno
-
-Production artifacts remain immutable and admission-controlled:
-
-- image reference is digest-only;
-- approved Cosign/Sigstore-compatible signer identity is exact, not broad wildcard;
-- signed build provenance/attestation is bound to trusted CI/source revision/workflow;
-- signed CycloneDX SBOM attestation is required;
-- vulnerability/advisory correlation remains continuous;
-- production admission is deny/fail-closed for protected creates/updates;
-- ordinary emergency deployment is not allowed to bypass signatures/provenance/SBOM.
-
-Kyverno remains the production admission engine.
-
-`production-single-server` may use one Kyverno replica and a reduced high-value policy inventory. It MUST still enforce digest/signature/provenance/SBOM and critical workload security/identity invariants. Policy reduction is allowed only when removed controls are proven redundant/non-critical or enforced by another blocking control. Removing Kyverno or changing production to audit-only is prohibited.
-
-`production-ha` retains >=3 Kyverno replicas/topology protection.
-
-Policy authoring is restricted to controlled GitOps/CI identities. Unneeded external HTTP context remains disabled. Any approved external context has destination allow-listing, bounded response/timeout/failure semantics, credential protection and SSRF-negative tests.
-
-## 11. Human privileged production access
-
-ADR-0030 preserves the security invariant across profiles:
-
-- no standing root, unrestricted Kubernetes admin or PostgreSQL superuser access;
-- attributable human identity;
-- phishing-resistant hardware-backed authentication;
-- explicit reason/ticket/incident reference;
-- at least two reviewers for write/admin/database-write elevation;
-- maximum 30-minute privileged write elevation with automatic expiry;
-- separately scoped read-only elevation up to one hour;
-- protected break-glass path;
-- durable audit outside ordinary requester modification rights.
-
-### `production-single-server`
-
-ADR-0043 selects normal management network admission through a dedicated WireGuard overlay:
+Single-server normal path:
 
 ```text
-approved operator device
--> WireGuard
--> host management address
--> OpenSSH
--> hardware-backed FIDO2
--> separate JIT privilege
+approved device -> WireGuard -> management address -> OpenSSH/FIDO2 -> JIT
 ```
 
-Network reachability, human identity, and privilege are independent gates.
+- public SSH denied;
+- independent per-device peer keys/minimal routes;
+- no root/password/shared SSH;
+- FIDO2 presence+verification;
+- network/login alone grants no admin;
+- two-reviewer <=30m write elevation and bounded read-only grant;
+- OS/`sudo`/K8s/DB audit exported off-host;
+- shell history is not authoritative audit;
+- provider console is break glass only.
 
-Mandatory controls:
+HA retains current Teleport path.
 
-- public-interface/Internet TCP/22 is denied;
-- SSH is reachable only through the host management address/interface;
-- each approved operator device has its own attributable WireGuard peer key; shared peer keys are prohibited;
-- peer `AllowedIPs` are minimal and do not grant broad workload/application-network reachability by default;
-- WireGuard key possession never grants SSH/root/Kubernetes/database authority by itself;
-- no direct root login;
-- password authentication disabled;
-- no shared SSH accounts or shared SSH keys;
-- privileged OpenSSH FIDO2 authentication requires user presence and user verification;
-- authentication does not itself grant root/Kubernetes/database write authority;
-- JIT grant is least privilege and expires automatically;
-- static shared kubeconfigs/database passwords and permanent `cluster-admin` are prohibited;
-- `sudo` I/O/session logging is used for privileged interactive activity where applicable;
-- OS audit records authentication, execution, privilege and security-relevant configuration events;
-- Kubernetes/database boundary audit remains enabled;
-- required access/audit evidence is exported off-host to append-only/tamper-resistant storage;
-- `.bashrc`, shell history, `PROMPT_COMMAND` or other user-controlled shell logging is **not** authoritative audit;
-- provider emergency console access, if available, is break-glass only and cannot become normal management.
+## 12. Day-One observability security
 
-The management network does not depend on a workload-cluster pod/service that the operator may need to recover.
+ADR-0044 ordinary telemetry is mandatory from first executable service commit but is **not** security/business authority.
 
-### `production-ha`
+### Application telemetry
 
-Teleport Enterprise Self-Hosted remains the privileged human access plane with current SSO/WebAuthn/JIT/session-recording controls.
+- structured allow-list JSON logs;
+- Micrometer low-cardinality metrics/observations;
+- OpenTelemetry traces through internal OTLP Collector;
+- trace/baggage/correlation never becomes authN/authZ/tenant/quota/idempotency/audit authority;
+- no secret/credential/raw contact/raw IP/full body/SQL bind/complete gRPC metadata/compromised-password hash material in logs/metrics/traces;
+- baggage allow-list excludes subject/contact/tenant/session/raw-IP/secret values;
+- trace IDs are not metric labels.
 
-## 12. Logging, PII and audit
+### Collector/backends
 
-Logging is allow-list based and structured.
+- OTLP receiver internal-only and wrong workloads/public sources denied;
+- dedicated Collector ServiceAccount/RBAC/NetworkPolicy;
+- restricted telemetry egress;
+- memory limiter/batching/finite queues/backpressure/drop observability;
+- redaction/filtering before export;
+- no host network/privilege escalation;
+- only exact read-only Kubernetes pod/container log paths mounted from host;
+- no broad host filesystem access.
 
-Never log raw passwords, OTP/recovery codes, tokens, cookies, API keys, private keys, provider credentials, full request/response bodies, unreviewed SQL binds, complete gRPC metadata or unreviewed provider payloads.
+Single-server Loki/Tempo/Prometheus/Grafana/Alertmanager/Collector are non-HA/local. Independent external black-box monitoring outside the host failure domain is required before production.
 
-Ordinary PII appears only for an approved purpose with masking/tokenization or managed-key HMAC pseudonymization where correlation is required. Raw client IP used transiently for trusted network quota identity is not an ordinary logging/metric/trace field. Input-derived fields are protected against CR/LF/log injection. Metric labels remain low-cardinality and exclude user/tenant/session/request/resource IDs, trace IDs, raw URLs and free-form errors.
+Ordinary telemetry loss does not fail ordinary business requests. Required privileged/security audit remains separate durable/off-host evidence and cannot be silently converted to best-effort Loki/Collector telemetry.
 
-Required security/audit evidence is not ordinary best-effort telemetry and MUST NOT be silently dropped/reclassified. In the single-server profile, privileged-access audit is exported off-host so loss/compromise of the only server does not erase the only audit copy.
+## 13. Security availability
 
-## 13. Security availability and non-HA interpretation
+Single-server accepts outages but never weaker decisions:
 
-`production-single-server` explicitly accepts loss of availability for host/node/PostgreSQL/Redis/Kafka/Kyverno failures. It does **not** accept weaker security decisions.
-
-Examples:
-
-- Redis unavailable -> covered quota/session operation follows fail-closed/re-authentication contract, not local bypass;
-- trusted client-network identity unavailable -> quota-required public operation fails closed; caller forwarding header is not fallback authority;
-- Authorization unavailable -> no fabricated ALLOW;
-- Kyverno unavailable -> protected new/updated workload is not admitted through a bypass;
-- OpenBao unavailable -> current bounded local-key/stale-snapshot rules apply; no plaintext or Git secret fallback;
-- Ambient capacity failure -> production readiness fails; strict mTLS is not silently disabled;
-- management overlay unavailable -> public SSH remains disabled;
-- audit export failure -> privileged work follows incident/continuity rules; shell history does not become audit authority.
+- Redis/time/capacity failure -> fail-closed availability, not local quota bypass;
+- missing trusted client identity -> fail closed, no caller-header fallback;
+- Authorization unavailable -> no ALLOW;
+- Kyverno unavailable -> no protected admission bypass;
+- OpenBao unavailable -> no plaintext/Git secret fallback;
+- Ambient pressure -> production gate fails, mTLS not disabled;
+- WireGuard unavailable -> public SSH remains denied;
+- telemetry unavailable -> no security/audit/control bypass;
+- host loss -> external monitor alerts while local observability is unavailable.
 
 ## 14. Verification
 
-Security verification includes, as applicable:
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, and complete-stack capacity/DR.
 
-- current `threat-model.md` review and mitigation-to-test mapping;
-- authentication/MFA downgrade-prevention and recovery tests;
-- tenant/RLS/pool-reuse negatives;
-- Authorization allow/deny/error/timeout/breaker tests;
-- semantic quota atomicity/time/anti-lockout/Redis failure tests;
-- public client-address forged-header/untrusted-PROXY/proxy-address/IPv4/IPv6 negative tests;
-- workload mTLS/ServiceAccount/NetworkPolicy/Istio positive and negative tests;
-- WAF/direct-bypass/upstream protection evidence;
-- secret scans and OpenBao/External Secrets/key-rotation/recovery tests;
-- signed image/provenance/SBOM + wrong-signer/missing-attestation Kyverno negatives;
-- policy-authoring RBAC and policy-engine SSRF/egress tests;
-- single-server WireGuard public-SSH-denial/peer-revocation/minimal-route tests plus OpenSSH FIDO2 no-password/no-root/shared-key negatives, JIT expiry/two-reviewer flow, `sudo` I/O, OS/boundary audit and off-host audit integrity;
-- HA Teleport SSO/WebAuthn/JIT/session-recording tests when HA profile is selected;
-- logging/PII/raw-client-address canary/static/runtime leak tests;
-- `../runbooks/production-cold-dr.md` exercise including security-control restoration and erasure/legal-hold replay;
-- full-stack single-server benchmark proving security controls fit with >=30% validated resource headroom;
-- explicit proof that ADR-0042/ADR-0043 did not change OpenBao or end-user MFA semantics.
+Documentation alone remains `NOT VERIFIED`.

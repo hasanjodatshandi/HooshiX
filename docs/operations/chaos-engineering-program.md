@@ -2,285 +2,201 @@
 
 ## Purpose
 
-The program validates that documented failure semantics actually hold. It is staging-first and evidence-driven; it is not permission for uncontrolled random production failure injection.
+Chaos/reliability exercises validate documented failure semantics. The program is staging-first, hypothesis-driven, bounded, and evidence-based. It is not permission for uncontrolled production fault injection.
 
-ADR-0042 selects `production-single-server`. For that profile, many infrastructure faults are expected to cause complete/partial outage because redundancy is intentionally absent. The test objective is therefore **safe failure + bounded recovery + no security/correctness bypass**, not fabricated failover.
+For `production-single-server`, many infrastructure faults are expected to cause complete/partial outage. Success means **safe failure + accurate detection + bounded recovery + no security/correctness bypass**, not fabricated failover.
 
-## 1. General rules
+## 1. Exercise contract
 
-Every exercise defines before execution:
+Before every exercise define:
 
-- production profile/environment;
-- hypothesis and expected failure semantics;
+- profile/environment;
+- hypothesis and expected behavior;
 - affected services/dependencies;
 - blast radius;
 - preconditions/backup evidence;
 - abort criteria;
-- responsible operator/incident owner;
-- observability/audit signals;
+- owner/incident commander;
+- observability and authoritative audit signals;
 - recovery procedure;
 - pass/fail conditions;
 - evidence retention location.
 
-Production game days require prior staging evidence, approved change window and explicit owner. Never inject a failure that could create unbounded data loss or bypass security controls merely to test resilience.
+Production game days require prior staging evidence and an approved window. Never inject a fault that can create unbounded data loss or require disabling security controls.
 
-## 2. Pass criteria by profile
+## 2. Single-server pass criteria
 
-### `production-single-server`
+A successful exercise proves:
 
-A one-host/node failure can make the platform unavailable. A successful exercise proves:
-
-- outage is detected/alerted accurately;
-- security dependencies fail according to their documented contract rather than fail open;
-- no unsafe data mutation continues during uncertain state;
+- outage/degradation is detected and alerted correctly;
+- at least one external signal can detect complete-host loss even when local observability disappears;
+- security dependencies follow documented fail-closed semantics;
+- no unsafe mutation continues through uncertain state;
 - off-host recovery/audit artifacts remain available;
-- rebuild/restore follows the approved dependency-safe sequence;
-- measured recovery stays within the accepted RTO for the profile;
-- no hidden dependency on local-only unrecoverable state exists;
-- restored traffic passes integrity/security/smoke verification;
-- the event does not falsely claim node/database/Redis/Kafka failover.
+- recovery follows approved sequence;
+- measured RPO/RTO/downtime is recorded honestly;
+- restored traffic passes security/data/critical-journey checks;
+- no node/PostgreSQL/Redis/Kafka/Kyverno/observability HA is falsely claimed.
 
-### `production-ha`
+## 3. Host/node loss
 
-Exercises retain their current quorum/failover/rescheduling objective and prove the applicable service SLO while one allowed failure occurs.
-
-## 3. Single-server host/node loss
-
-At least quarterly before the profile is considered mature, exercise a representative complete-host loss/rebuild or isolated equivalent.
+At least quarterly before the profile is mature, exercise representative complete-host loss/rebuild or isolated equivalent.
 
 Validate:
 
-1. alerts identify platform-wide impact;
-2. off-host K3s datastore/token recovery artifact exists and is usable when chosen;
-3. clean GitOps rebuild is available as an alternative to control-plane-state restore;
-4. OpenBao recovery follows unchanged ADR-0011 procedures;
-5. PostgreSQL physical recovery uses WAL/PITR/off-site backup when required;
-6. Redis/Kafka rebuild/restart semantics are correct;
-7. Istio/Kyverno/edge security returns before unsafe application traffic/deployments;
-8. applications become ready only when safe;
-9. privileged recovery activity has off-host audit evidence;
-10. final state passes security/data/smoke checks.
-
-The expected service availability during the host-loss interval is outage. The test passes on safe bounded recovery, not zero downtime.
+1. local Prometheus/Alertmanager/Grafana/Loki/Tempo/Collector loss does not hide the event because external black-box monitoring detects it;
+2. off-host K3s recovery artifact or clean GitOps rebuild is usable;
+3. OpenBao recovery follows unchanged ADR-0011;
+4. PostgreSQL physical WAL/PITR recovery works;
+5. Redis/Kafka recovery/rebuild semantics hold;
+6. Istio/Kyverno/edge/client-address controls return before unsafe traffic/deployment;
+7. applications become ready only when safe;
+8. privileged recovery activity has off-host audit;
+9. observability returns without being used as a security bypass;
+10. final security/data/smoke/telemetry checks pass.
 
 ## 4. PostgreSQL exercises
 
-### Single-server
+Single-server exercises include process crash/restart, storage unavailability in staging, WAL interruption, backup-verification failure, isolated whole-cluster PITR, service-specific non-destructive recovery, connection/noisy-neighbor saturation, and upgrade rollback/fail-forward behavior.
 
-Exercise at least:
+Expected: affected services may be unavailable; role/RLS isolation never relaxes; failed restore creates promotion freeze; traffic waits for Flyway/integrity/RLS/erasure/legal-hold verification.
 
-- PostgreSQL process crash/restart;
-- storage unavailability simulation in staging;
-- WAL archive interruption alerting;
-- backup verification failure;
-- isolated whole-shared-cluster PITR restore;
-- service-specific recovery extraction/import without destructive restoration of another current DB;
-- connection-pool/noisy-neighbor saturation;
-- rollback/fail-forward behavior for a shared-cluster upgrade failure.
+HA retains its profile-specific primary/replica/quorum/failover exercises.
 
-Expected behavior:
+## 5. Redis and semantic quota exercises
 
-- all affected PostgreSQL-backed services may become unavailable;
-- RLS/role/cross-service DB boundaries never relax;
-- `pg_dump + cron` is never substituted for required WAL/PITR evidence;
-- failed restore creates the correct promotion freeze;
-- recovered traffic does not open before Flyway/integrity/RLS/erasure/legal-hold checks.
+Single-server exercises include:
 
-### HA
+- Redis process kill/restart and AOF replay;
+- AOF rewrite/fsync under PostgreSQL/Kafka/telemetry IO;
+- memory pressure toward `noeviction` boundary;
+- Redis timeout/unavailability;
+- app/Redis skew >2s;
+- one-clock forward/backward jump;
+- **common-mode host wall-clock jump affecting app and Redis together**;
+- boot/recovery before host time synchronization is healthy;
+- Clock Safety Guard trip + 60-second safe re-arm;
+- adversarial flood of unique contacts/client addresses causing high new-bucket allocation rate;
+- allocation-capacity threshold and cleanup backlog;
+- exact-IP vs aggregate-prefix NAT/campus/VPN/IPv6 cases;
+- complete session-state loss.
 
-Retain primary crash, replica loss, synchronous-durability/failover refusal, service-isolated restore and one-cluster-upgrade-wave exercises.
-
-## 5. Redis exercises
-
-### Single-server
-
-Exercise:
-
-- Redis process kill/restart;
-- AOF replay/recovery;
-- AOF rewrite/fsync latency under concurrent PostgreSQL/Kafka/telemetry IO;
-- memory pressure approaching `noeviction` boundary;
-- dependency timeout/unavailability;
-- app/Redis clock skew beyond the approved bound;
-- complete loss of session state.
-
-Expected behavior:
+Expected:
 
 - no local fail-open quota/session bypass;
-- no eviction-based silent authority loss;
-- session loss results in re-authentication;
-- browser cookie does not reconstruct authenticated server state;
-- quota/time-source failure remains distinct from quota denial;
-- no Sentinel/failover claim exists.
-
-### HA
-
-Retain primary/replica/Sentinel loss and failover exercises.
+- common-mode clock jump produces `QUOTA_TIME_SOURCE_UNHEALTHY`, not premature refill;
+- unsafe new allocation produces `QUOTA_CAPACITY_UNHEALTHY` before eviction/OOM;
+- existing security state is not evicted to serve new attacker cardinality;
+- aggregate `/24`/`/64` pressure alone does not act as the sole v1 hard 429 identity;
+- session loss causes reauthentication;
+- quota denial remains distinct from dependency/time/capacity unavailability;
+- no false Sentinel/failover claim.
 
 ## 6. Kafka exercises
 
-### Single-server
+Single-server exercises combined broker/controller kill/restart, isolated data-volume loss, producer failure after local Outbox commit, consumer duplicate/restart, retry/DLQ poison handling, clean GitOps rebuild, replay from service-owned evidence, and storage contention with WAL/AOF/telemetry.
 
-Exercise:
-
-- combined broker/controller process kill/restart;
-- broker data-volume loss in isolated staging;
-- producer failure while service state commits to Outbox;
-- consumer duplicate/restart;
-- retry/DLQ poison handling;
-- clean Kafka rebuild from GitOps;
-- replay/reconstruction from service-owned critical publication evidence;
-- storage contention with WAL/AOF/telemetry.
-
-Expected behavior:
-
-- async transport may stop;
-- broker-local data may be lost in the destructive test;
-- committed business state/outbox evidence remains authoritative;
-- consumer idempotency prevents duplicate business effect;
-- critical event state can be replayed/reconstructed;
-- RF=1 is never described as broker-failure tolerant.
-
-### HA
-
-Retain broker/controller loss, ISR/quorum and RF3/minISR2 durability exercises.
+Expected: transport may stop/local broker data may be lost; business/Outbox evidence remains authority; consumers remain idempotent; RF1 is never described as failure tolerant.
 
 ## 7. Authorization exercises
 
-In both profiles exercise:
+Exercise latency/timeout, overload/concurrency, DB unavailability, breaker OPEN/HALF_OPEN recovery, caller cancellation, wrong workload, and explicit business DENY.
 
-- Authorization latency/timeout;
-- overload/concurrency saturation;
-- DB unavailability;
-- breaker OPEN/HALF_OPEN recovery;
-- caller cancellation;
-- wrong workload identity;
-- explicit denial.
+Expected result is never fabricated ALLOW. Current gRPC business-DENY semantics remain unchanged.
 
-Expected result is never fabricated ALLOW. Safe local checks may reject only. Single-server may show longer/unavailable recovery because redundancy is absent; security semantics remain identical.
+## 8. Istio/Kyverno exercises
 
-## 8. Istio Ambient exercises
+Istio: `ztunnel`/`istiod` restart, plaintext/wrong-SA/NetworkPolicy negatives, node pressure, reboot recovery, and complete-stack impact. Resource pressure does not authorize disabling mTLS/workload identity.
 
-Exercise:
+Kyverno:
 
-- `ztunnel` restart;
-- `istiod` restart/unavailability;
-- NetworkPolicy deny/allow edges;
-- wrong ServiceAccount principal;
-- plaintext attempt;
-- node resource pressure during representative load;
-- Calico/Ambient connectivity after K3s reboot.
-
-Single-server additionally validates complete-stack resource headroom and that resource pressure does not lead operators/automation to disable strict mTLS/workload identity. Waypoints are tested only when explicitly present.
-
-## 9. Kyverno exercises
-
-Single-server:
-
-- one Kyverno replica unavailable;
+- one-replica outage in single-server;
 - unsigned/wrong-signer image;
-- missing/invalid provenance;
-- missing/invalid signed SBOM;
-- prohibited privileged/host-network/unsafe `hostPath`/security-context workload;
-- ordinary workload attempting policy authoring;
-- approved external-context SSRF negatives if such context exists.
+- missing/invalid provenance/SBOM;
+- prohibited privileged/host-network/unsafe hostPath/security context;
+- ordinary workload policy-authoring attempt;
+- legacy `ClusterPolicy`/`CleanupPolicy` production manifest fixture -> repository/render gate rejection;
+- stable CEL `policies.kyverno.io/v1` positive fixtures;
+- external-context SSRF negatives if any approved context exists.
 
-Expected behavior: protected new/updated workload is not admitted through a bypass. Existing workloads are not killed merely because admission is unavailable.
+Expected: protected create/update does not pass through a bypass.
 
-HA additionally validates admission availability through one replica/node loss.
+## 9. OpenBao and human access
 
-## 10. OpenBao exercises — unchanged
+OpenBao remains unchanged. Continue snapshot/restore/unseal/External Secrets/key-rotation/stale-source exercises. Host/capacity fault never justifies replacing/bypassing OpenBao.
 
-ADR-0042 does not change OpenBao.
+Human access exercises public-SSH denial, WireGuard peer revocation, FIDO2 presence/verification, no root/password/shared keys, JIT grant/expiry, `sudo`/OS/boundary audit, off-host audit, and break glass.
 
-Continue current snapshot/restore/unseal/External Secrets/key-rotation/stale-source exercises. Verify normal hot paths do not acquire a new per-request OpenBao dependency.
-
-Exercise capacity or host loss MUST NOT conclude that OpenBao can be removed/replaced/bypassed without a separate current security decision.
-
-## 11. Human privileged-access exercises
-
-### Single-server
+## 10. Edge/client-address exercises
 
 Exercise:
 
-- password SSH attempt -> denied;
-- direct root SSH -> denied;
-- shared/non-approved key -> denied;
-- FIDO2 without required user presence/verification -> denied;
-- approved FIDO2 -> attributable login only, not automatic admin;
-- JIT write elevation -> two reviewers + <=30m expiry;
-- expiry -> privilege removed automatically;
-- `sudo` I/O/session logging;
-- OS audit for auth/process/privilege/security-config changes;
-- off-host audit ingestion and requester inability to alter evidence;
-- audit-export interruption handling;
-- protected break-glass exercise.
+- direct Internet->origin/BFF;
+- Traefik->BFF WAF bypass;
+- forged forwarding/client-IP headers;
+- untrusted/missing PROXY v2;
+- exact BFF client-address context;
+- backend exact `/32`/`/128` hard identity and `/24`/`/64` aggregate pressure derivation;
+- oversized body/header/WAF tuning;
+- upstream volumetric scenario;
+- public SSH denial.
 
-Shell history/`.bashrc` does not satisfy audit evidence.
+Expected: public traffic follows approved edge and untrusted headers never become quota authority.
 
-### HA
+## 11. Observability exercises
 
-Retain Teleport SSO/WebAuthn/JIT/session-recording/break-glass exercises.
+ADR-0044 is itself failure-tested.
 
-## 12. Edge/WAF exercises
+Exercise at least:
 
-Exercise:
+- Collector restart/unavailability;
+- blocked Loki exporter;
+- blocked Tempo exporter;
+- Prometheus scrape failure;
+- Loki/Tempo/Prometheus disk/cardinality pressure;
+- Collector queue saturation/drop behavior;
+- malformed/high-cardinality telemetry attribute attempts;
+- seeded PII/secret canary flow;
+- total local observability loss during complete-host failure;
+- independent external black-box detection and recovery indication.
 
-- direct Internet/BFF path attempt;
-- Traefik/BFF WAF bypass attempt;
-- WAF deny/false-positive tuning cases;
-- oversized body/header;
-- upstream volumetric-protection operational scenario;
-- K3s bundled Traefik/ServiceLB absence in single-server.
+Expected:
 
-Expected behavior: public application traffic always traverses the approved edge/WAF path.
+- ordinary business processing does not fail solely because best-effort telemetry export/backend is down;
+- telemetry queues/memory remain bounded and drops/backpressure are visible;
+- prohibited PII/secrets do not appear in exported data;
+- trace/baggage cannot alter authN/authZ/tenant/quota/idempotency behavior;
+- authoritative security/privileged audit remains durable/off-host;
+- local monitoring outage is not mistaken for healthy host state.
 
-## 13. Backup and DR cadence
+## 12. Compromised Password exercises
 
-Minimum cadence:
+Exercise stale (>35d), corrupt, missing, incompatible, oversized-cardinality, wrong-schema, and storage-failed HIBP-derived SQLite artifacts.
 
-- every backup cycle: automated backup verification;
-- monthly: isolated PostgreSQL restore evidence;
-- quarterly: full platform cold-DR exercise;
-- quarterly or before material access changes: privileged-access/break-glass exercise;
-- before material platform/security version changes: profile-specific recovery/failure evidence;
-- scheduled load/soak: complete-stack single-server capacity evidence.
+Expected: service remains unavailable/fail closed; no runtime HIBP fallback and no false-clean password result. Dataset rebuild/redeploy from approved SHA-1 source/provenance is exercised.
 
-ADR-0040 immutable SQLite and ADR-0041 immutable Reference Data recover by signed artifact rebuild/redeploy under their own gates.
+## 13. Backup/DR cadence
 
-## 14. Complete-stack capacity exercise
+Minimum:
 
-Run all intended single-server platform/application components together. Include representative traffic plus background WAL/base backup, Redis AOF, Kafka log traffic and observability.
+- every backup cycle: backup verification;
+- monthly: isolated PostgreSQL restore;
+- quarterly: full cold DR;
+- quarterly/before material access change: privileged-access/break-glass;
+- before material platform/security version changes: affected recovery/failure evidence;
+- scheduled load/soak: complete-stack capacity including observability;
+- at least every 30 days: Compromised Password corpus acquisition/build verification; production dataset age <=35d.
 
-Record:
+## 14. Complete-stack capacity
 
-- CPU/memory/swap/node pressure;
-- storage latency/IOPS/free space;
-- all JVM RSS/CPU;
-- PostgreSQL connection/query/WAL/checkpoint/backup state;
-- Redis memory/AOF/rewrite;
-- Kafka memory/IO/lag;
-- Istio resources/latency;
-- Kyverno admission;
-- edge/WAF;
-- observability;
-- restart/reboot behavior.
+Run all intended single-server components together under representative traffic plus WAL/base backup, Redis AOF/cardinality attack envelope, Kafka IO, WAF, Istio/Kyverno, and observability.
 
-Pass requires no OOM/sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x projected peak evidence on critical/security paths, safe storage behavior and no security/admission/backup bypass.
+Record CPU/memory/swap/pressure, storage/IOPS/free space, JVMs, PostgreSQL, Redis, Kafka, mesh/admission/edge, Collector queues/drops, Prometheus series/TSDB, Loki/Tempo ingest/query/storage, Grafana/Alertmanager overhead, networking/kernel pressure, reboot behavior, and external monitor behavior.
 
-A `2 vCPU / 3-4 GiB RAM` host is not approved without this evidence.
+Pass requires no OOM/sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security peak, safe storage behavior, and no security/admission/backup/audit/observability bypass.
 
-## 15. Evidence and remediation
+## 15. Evidence/remediation
 
-Every exercise stores:
+Every exercise stores exact versions/profile, timestamps, fault/recovery timeline, expected vs actual behavior, measured SLI/RPO/RTO/resources, security/data result, audit/runbook links, `PASS`/`FAIL`, and remediation owner/deadline.
 
-- exact artifact/profile versions;
-- start/end/fault/recovery timestamps;
-- expected vs actual behavior;
-- measured SLI/RPO/RTO/resource data;
-- security/data-integrity result;
-- audit/runbook links;
-- `PASS`/`FAIL`;
-- remediation owner/deadline.
-
-A failed mandatory exercise blocks production promotion according to the current readiness/recovery policy. Do not relabel a failure `Not applicable` merely because the selected profile is intentionally non-HA.
+A failed mandatory exercise blocks the dependent production promotion. Do not relabel failure `Not applicable` because single-server intentionally lacks HA.

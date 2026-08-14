@@ -2,54 +2,56 @@
 
 - **Baseline date:** 2026-08-15
 - **Status:** Active production/application baseline
-- **Update policy:** Reviewed compatible patch/minor updates may use the baseline process when permitted by the current architecture decision; architecture/security-semantic changes require a new or revised current ADR before implementation depends on them.
+- **Update policy:** Reviewed compatible patch/minor updates may use the baseline process when permitted by current architecture; architecture/security-semantic changes require a current ADR before implementation depends on them.
 - **Local companion:** `docs/technology/local-development-baseline.md`
 
-This file is the exact approved production technology/version authority. Repository wrappers, lock files, image digests, Helm/Kustomize values, host-provisioning package locks, and CI verification metadata remain authoritative for the exact artifact digest/package actually deployed.
+This file is the exact approved production technology/version authority. Repository wrappers, lock files, image digests, Helm/Kustomize values, host-provisioning package locks, and CI verification metadata remain authoritative for the exact artifact actually deployed.
 
-A baseline pin is **not** proof that no unknown or newly disclosed vulnerability exists. Continuous SBOM/vulnerability/advisory correlation, exception-expiry enforcement, and release-time support/security revalidation remain mandatory under ADR-0035/ADR-0038.
+A baseline pin is not proof that no unknown/new vulnerability exists. Continuous SBOM/advisory correlation and release-time support/security revalidation remain mandatory.
 
-Agents MUST NOT silently select newer versions merely because upstream has a newer release.
+Agents MUST NOT silently select a newer version because upstream published one.
 
 ## 1. Application/runtime baseline
 
 | Area | Approved baseline | Authority / notes |
 | --- | --- | --- |
-| JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | JDK image pinned by digest in repo |
+| JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | image pinned by digest in repo |
 | Framework | Spring Boot 4.1.0 | current stable project baseline |
-| HTTP model | Spring MVC | WebFlux/Reactor prohibited without a revised current architecture decision |
-| Request/I/O concurrency | Virtual Threads | `spring.threads.virtual.enabled=true`, keep-alive enabled |
+| HTTP model | Spring MVC | WebFlux/Reactor prohibited without revised decision |
+| Request/I/O concurrency | Virtual Threads | `spring.threads.virtual.enabled=true` |
 | Build | Gradle Wrapper 9.6.1 + Kotlin DSL | wrapper per independently deployable service |
 | DI | Spring IoC + constructor injection | sole DI container |
-| Password hashing | Argon2id: m=19 MiB, t=2, p=1; 16-byte random salt; >=32-byte hash | versioned/self-describing storage; benchmark and bounded hash bulkhead required |
-| Compromised-password reference dataset | Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 | ADR-0040; immutable read-only local dataset only; no runtime external provider; service locks verify exact artifact/native components; upgrade when a compatible reviewed Xerial release bundles SQLite 3.53.4+ or a later required security fix |
-| Access-token signing | RS256 / RSA-3072 / 90-day key rotation | ADR-0023; Identity private key local from OpenBao, public verifier bundle via GitOps |
-| Internal synchronous API | gRPC + Protobuf | current architecture choice |
-| gRPC Java | 1.81.0 | dependency locks align runtime/stubs/codegen |
-| External/browser API | REST + OpenAPI through BFF | current architecture choice |
-| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0015 profile-aware durability applies |
+| Password hashing | Argon2id: m=19 MiB, t=2, p=1; 16-byte random salt; >=32-byte hash | password-storage authority; benchmark/bounded hash bulkhead required |
+| Compromised-password corpus | HIBP Pwned Passwords SHA-1 corpus, offline acquisition | ADR-0040; SHA-1 only for compromised-password lookup, never credential storage; dataset age <=35d for production readiness |
+| Compromised-password dataset runtime | Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 | immutable read-only local dataset; exact artifact/native dependency verified; upgrade when compatible reviewed Xerial bundles required newer SQLite/security fix |
+| Access-token signing | RS256 / RSA-3072 / 90-day rotation | ADR-0023 |
+| Internal synchronous API | gRPC + Protobuf | current architecture |
+| gRPC Java | 1.81.0 | runtime/stubs/codegen aligned in locks |
+| External/browser API | REST + OpenAPI through BFF | current architecture |
+| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0015 profile-aware durability |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
-| Database | PostgreSQL 18.4 | ADR-0019/ADR-0027 profile-aware mutable relational persistence; ADR-0040 immutable SQLite reference-dataset exception |
-| PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0019/ADR-0034 |
-| PostgreSQL backup | Barman Cloud CNPG-I plugin 0.13.0 | current CloudNativePG backup/PITR model in both production profiles |
-| Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 baseline |
-| PostgreSQL JDBC | 42.7.13 | fixed line for CVE-2026-54291; dependency locks must not regress below 42.7.12 |
-| Migration | Flyway 12.4.0 | sole schema-change mechanism for mutable service relational persistence; ADR-0040 immutable dataset format is built offline, not runtime-migrated |
-| Pool | HikariCP managed/aligned with Spring Boot | profile-aware connection budget governed by architecture |
-| Persistence | Spring Data JPA/Hibernate or jOOQ by service responsibility | separate Domain/persistence models; ADR-0040 SQLite adapter remains Infrastructure-only |
+| Database | PostgreSQL 18.4 | profile-aware mutable relational persistence |
+| PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0019/0034 |
+| PostgreSQL backup | Barman Cloud CNPG-I plugin 0.13.0 | WAL/PITR model |
+| Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 |
+| PostgreSQL JDBC | 42.7.13 | must not regress below security-fixed line 42.7.12 |
+| Migration | Flyway 12.4.0 | sole mutable relational schema-change mechanism |
+| Pool | HikariCP managed/aligned with Spring Boot | profile-aware pool budget |
+| Persistence | Spring Data JPA/Hibernate or jOOQ by service responsibility | separate Domain/persistence models |
 | Notification persistence | jOOQ/JDBC, no JPA | fixed service decision |
-| Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2 | `production-single-server`: one TLS/ACL/noeviction/AOF instance; `production-ha`: Sentinel topology |
-| Resilience | Resilience4j | current semantic circuit-breaker/bulkhead policy; no layered duplicate retry |
-| Observability | OpenTelemetry + Micrometer Observation | exact libs in service locks |
-| Logging | structured JSON stdout + Semgrep policy rules | allow-list/redaction/canary/runtime detection |
-| Backend test | JUnit 5 + Testcontainers | service dependency locks |
-| Architecture test | ArchUnit | mandatory for Java service architecture rules |
-| Formatting | Spotless + one approved pinned formatter | exact plugin/formatter in build/tool metadata |
-| Java bug analysis | SpotBugs | strict production-code gate |
-| Source policy/SAST | repository Semgrep rules + approved SAST | exact CLI/ruleset revision pinned in CI tools lock |
-| CI orchestration | GitHub Actions | required-check workflows; third-party actions pinned by commit SHA |
-| BDD | Cucumber-JVM + Gherkin | critical acceptance behavior only |
+| Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2 | single-server TLS/ACL/noeviction/AOF; HA Sentinel |
+| Resilience | Resilience4j | breaker/bulkhead; no layered retry |
+| Observability API | Spring Boot 4.1 Micrometer Observation/Tracing + OpenTelemetry | ADR-0044; Day-1 service requirement |
+| Trace export protocol | OTLP | services -> approved internal Collector |
+| Logging | structured JSON stdout + ADR-0031 controls | allow-list/redaction/canary/runtime detection |
+| Backend test | JUnit 5 + Testcontainers | service locks |
+| Architecture test | ArchUnit | mandatory Java architecture rules |
+| Formatting | Spotless + one approved pinned formatter | exact plugin/formatter in build metadata |
+| Java bug analysis | SpotBugs | blocking production-code gate |
+| Source policy/SAST | repository Semgrep rules + approved SAST | exact rules/tools pinned in CI |
+| CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
+| BDD | Cucumber-JVM + Gherkin | critical behavior only |
 | Frontend unit/component | Vitest + React Testing Library | frontend lockfile |
 | Browser E2E | Playwright Test + TypeScript | frontend lockfile |
 
@@ -58,150 +60,128 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Area | Approved baseline | Authority / notes |
 | --- | --- | --- |
 | Containers | OCI immutable images by digest | `latest` prohibited |
-| Kubernetes API/minor | 1.35.6 | controlled GitOps upgrades |
-| `production-single-server` distribution | K3s `v1.35.6+k3s1` | ADR-0042; exact binary checksum/signature metadata required; embedded SQLite control-plane datastore |
-| `production-ha` distribution | kubeadm-compatible Kubernetes 1.35.6 | ADR-0022 HA topology |
-| Primary CNI / NetworkPolicy | Calico OSS 3.32.1 | standard dataplane; Ambient-aware policy tests mandatory; K3s Flannel/network-policy controller disabled in single-server profile |
-| Helm | 4.2.4 | current reviewed 4.2.x patch; chart/tool digests pinned |
-| GitOps | Argo CD 3.4.2 | current security-patched 3.4.x baseline; desired state under repository `deploy/` |
-| Edge gateway | Traefik 3.7.10 | chart 41.2.0; K3s bundled Traefik disabled; security-fixed 3.7.x patch; chart 41 logging/file-provider breaking-key migration must render and test before rollout |
-| Kubernetes routing API | Gateway API 1.5.1 | Traefik 3.7-supported Standard version; preferred for new public routes |
-| WAF server | Caddy 2.11.4 | immutable image digest required |
+| Kubernetes API/minor | 1.35.6 | controlled upgrades |
+| `production-single-server` distribution | K3s `v1.35.6+k3s1` | ADR-0042; embedded SQLite control plane |
+| `production-ha` distribution | kubeadm-compatible Kubernetes 1.35.6 | ADR-0022 |
+| Primary CNI / NetworkPolicy | Calico OSS 3.32.1 | Ambient-aware tests; K3s Flannel/policy controller disabled in single-server |
+| Helm | 4.2.4 | chart/tool digest pin |
+| GitOps | Argo CD 3.4.2 | security-patched 3.4.x line |
+| Edge gateway | Traefik 3.7.10 | Helm chart 41.2.0; bundled K3s Traefik disabled |
+| Kubernetes routing API | Gateway API 1.5.1 | Traefik 3.7-supported Standard version |
+| WAF server | Caddy 2.11.4 | immutable digest |
 | WAF connector | coraza-caddy 2.5.0 | version/digest pinned |
-| WAF engine | Coraza 3.7.0 | v3 architecture choice |
+| WAF engine | Coraza 3.7.0 | current choice |
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
-| Service mesh | Istio Ambient 1.30.3 | Kubernetes compatibility matrix mandatory; single-server profile additionally requires complete-stack capacity benchmark |
-| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred; upgrades require compatibility and current-advisory review |
-| Secret authority | OpenBao 2.6.1 | exact current architecture pin; unchanged by ADR-0042/ADR-0043 |
-| Admission policy | Kyverno 1.18.2 | stable `policies.kyverno.io/v1`; 1 replica allowed only in explicit non-HA single-server profile; enforcement remains fail closed |
-| Image signing | Cosign 3.0.6 | current supply-chain policy |
-| SBOM | CycloneDX JSON attestation; Syft pinned in CI tools lock | signed/indexed by image digest |
-| Vulnerability correlation | Grype pinned in CI tools lock | final-image SBOM; owned/expiring exceptions |
-| `production-single-server` management network | Host-supported WireGuard kernel/userspace implementation | ADR-0043; exact host package/kernel support and configuration pinned in provisioning metadata; independent per-device peers; network admission only; public TCP/22 denied |
-| `production-single-server` privileged human access | Supported host OpenSSH package + hardware-backed FIDO2 + JIT privilege + `sudo` I/O/system audit | ADR-0030/ADR-0043; exact host package/version pinned in provisioning; WireGuard reachability does not replace FIDO2/JIT; password/root/shared-key access prohibited; no `.bashrc` audit substitute |
-| `production-ha` privileged human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session audit exercised before rollout |
-| Metrics | Prometheus 3.13.2 LTS | current reviewed 3.13.x patch; GitOps digest pin |
-| Alerting | Alertmanager 0.33.1 | current upstream release; GitOps digest pin |
-| Dashboards | Grafana 13.1.3 | current reviewed 13.1.x patch; GitOps digest pin |
-| Email | Liara Transactional Email, authenticated SMTP + STARTTLS | current Notification provider decision |
+| Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
+| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
+| Secret authority | OpenBao 2.6.1 | unchanged by ADR-0042/0043/0044 |
+| Admission policy | Kyverno 1.18.2 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
+| Image signing | Cosign 3.0.6 | admission verification |
+| SBOM | CycloneDX JSON attestation; Syft pinned in CI | signed/indexed by image digest |
+| Vulnerability correlation | Grype pinned in CI | final-image SBOM + owned exceptions |
+| OpenTelemetry Collector | `otelcol-contrib` 0.157.0 | ADR-0044; internal OTLP + node-local log collection; exact image digest pinned in GitOps |
+| Metrics | Prometheus 3.13.2 LTS | application scrape + platform metrics |
+| Alerting | Alertmanager 0.33.1 | alert routing |
+| Log backend | Grafana Loki 3.7.4 | single-binary/non-HA in single-server; bounded storage/retention |
+| Trace backend | Grafana Tempo 3.0.2 | monolithic/non-HA in single-server; no extra Tempo Kafka in this profile |
+| Dashboards | Grafana 13.1.3 | Prometheus/Loki/Tempo data sources |
+| External host-down monitoring | provider TBD before production | must be outside single-host failure domain; environment/provider decision, not guessed here |
+| `production-single-server` management network | host-supported WireGuard | exact host package/kernel pinned; public TCP/22 denied |
+| `production-single-server` human access | supported OpenSSH + hardware FIDO2 + JIT + `sudo`/system audit | ADR-0030/0043 |
+| `production-ha` human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session evidence |
+| Email | Liara Transactional Email, SMTP + STARTTLS | Notification provider |
 | SMS | IPPanel Edge Webservice mode for Iran | local logging adapter local-only |
 
-## 3. Production profiles
-
-### Selected: `production-single-server`
+## 3. Selected production profile: `production-single-server`
 
 ```text
 1 physical server
 K3s v1.35.6+k3s1 / Kubernetes 1.35.6
-1 control-plane + schedulable workload node
-K3s embedded SQLite control-plane datastore
 Calico 3.32.1; K3s Flannel/network-policy controller disabled
-repository Traefik 3.7.10 / chart 41.2.0; K3s bundled Traefik/ServiceLB disabled
+Traefik 3.7.10 / chart 41.2.0; bundled Traefik/ServiceLB disabled
 1 replica per application service
 HPA disabled
 availability PDBs disabled
-non-HA: host/node maintenance or failure may stop the complete platform
+non-HA host/node maintenance/failure may stop complete platform
 ```
 
-#### PostgreSQL
+PostgreSQL:
 
 ```text
-1 CloudNativePG cluster
-1 PostgreSQL 18.4 instance
-separate database/runtime role/migration role/Flyway history per service
-no cross-service SQL or credentials
-forced tenant RLS where applicable
-shared physical failure domain and global connection budget
-continuous WAL archive + daily base backup + encrypted off-site PITR
+1 CloudNativePG cluster / 1 PostgreSQL 18.4 instance
+separate DB/runtime role/migration role/Flyway per owning service
+forced RLS where applicable
+continuous WAL + daily base backup + encrypted off-site PITR
 35-day PITR + monthly retained recovery artifact for 12 months
 ```
 
-`pg_dump + cron` is not the production backup strategy. Service-specific recovery begins from an isolated whole-cluster physical PITR restore, then transfers only the required service database through the approved controlled procedure.
-
-#### Kafka
+Kafka:
 
 ```text
-KRaft combined broker/controller
-1 broker/controller process
-critical RF=1 / minISR=1
-producer acks=all + idempotence
+1 combined KRaft broker/controller
+RF=1 / minISR=1
+acks=all + idempotence
 unclean leader election disabled
 formal non-HA acceptance
 ```
 
-#### Security Redis
+Security Redis:
 
 ```text
-1 Redis 8.2.8 instance
-TLS + per-service ACL isolation
+1 Redis 8.2.8
+TLS + per-service ACL
 noeviction
-AOF enabled; appendfsync everysec
-fail closed for authoritative security/session decisions
-no failover claim
+AOF appendfsync everysec
+ADR-0024 exact-IP/common-clock/cardinality fail-closed controls
 ```
 
-#### Network/security/control-plane profile
-
-- public client network identity follows ADR-0043: external-L4 PROXY v2 -> trusted Traefik -> strict Caddy proxy parsing -> server-derived BFF context; insecure/caller-header trust is prohibited;
-- normal host management uses the ADR-0043 WireGuard overlay with independent per-device peer keys; public TCP/22 is denied;
-- WireGuard is network admission only; privileged access still requires hardened OpenSSH + hardware-backed FIDO2 + time-bounded two-reviewer JIT privilege + OS/`sudo`/boundary audit exported off-host;
-- Istio Ambient 1.30.3 retained; production promotion requires complete-stack benchmark with >=30% validated resource headroom and current workload-identity/mTLS tests;
-- waypoints absent unless an explicit L7 requirement is measured and approved;
-- Kyverno retained with one replica and reduced high-value policy inventory; digest/signature/provenance/SBOM/security-context enforcement remains blocking;
-- OpenBao 2.6.1 remains secret authority with no change;
-- end-user MFA semantics are unchanged.
-
-A `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved production capacity claim. Host sizing is approved only after complete-stack benchmark/load/recovery evidence from ADR-0042/performance/readiness rules.
-
-### Expansion: `production-ha`
+Observability:
 
 ```text
-3 dedicated stacked control-plane/etcd nodes
->=3 schedulable workers
-redundant stable L4 controlPlaneEndpoint
-N+1 worker capacity for critical request paths
-6-hour encrypted off-node etcd snapshots
+applications -> Micrometer/OTLP
+Prometheus 3.13.2
+otelcol-contrib 0.157.0
+Loki 3.7.4 single-binary
+Tempo 3.0.2 monolithic
+Grafana 13.1.3
+Alertmanager 0.33.1
+external black-box host-down signal required before production
 ```
 
-PostgreSQL-backed mutable services use dedicated CloudNativePG clusters; critical clusters use three instances and current synchronous durability/failover rules. Kafka uses 3 brokers + 3 dedicated controllers with RF=3/minISR=2. Security Redis uses one primary + two replicas + three Sentinel voters. Kyverno uses >=3 replicas. Teleport remains the privileged human access plane.
+All observability components share the host failure/capacity domain and do not create HA. Their CPU/RAM/IO/disk/cardinality is included in the complete-stack benchmark. Required privileged/security audit remains separately durable/off-host.
 
-## 4. Security platform baseline
+Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, FIDO2/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.1, and unchanged end-user MFA.
 
-Both production profiles preserve:
+A `2 vCPU / 3-4 GiB RAM` host is not an approved capacity claim. Sizing requires complete-stack evidence with >=30% validated resource headroom.
 
-- browser OAuth/OIDC through BFF using Authorization Code + PKCE S256;
-- secure server-side BFF session; browser receives no provider/internal tokens;
-- Istio Ambient STRICT mTLS + dedicated ServiceAccount workload identity after the selected profile's required validation;
-- `trustDomain = prod.sajtech.internal`;
-- OpenBao -> External Secrets -> read-only mounted local key/secret material;
-- signed/provenanced immutable production artifacts verified at admission;
-- admission-policy authoring limited to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested;
-- upstream L3/L4 volumetric mitigation/scrubbing -> external L4 -> Traefik -> Caddy/Coraza WAF -> Web BFF;
-- ADR-0043 trusted client-address derivation for network security quotas; caller forwarding headers are not authority;
-- Calico NetworkPolicy standard dataplane;
-- service-owned semantic quotas under ADR-0024;
-- one online fail-closed no-cache/no-retry `CheckPermission`;
-- compromised-password screening using ADR-0040 immutable SQLite reference dataset;
-- IPPanel Webservice exact-content Iran SMS;
-- zero-standing-privilege JIT human access according to the selected production profile;
-- PII-safe structured telemetry with static/pipeline/canary/runtime controls.
+## 4. Expansion profile: `production-ha`
 
-OpenBao and Identity/MFA semantics are not simplified by `production-single-server` or ADR-0043.
+Retain current redundant Kubernetes, dedicated mutable-service PostgreSQL clusters, Kafka RF3/minISR2, Redis Sentinel, redundant Kyverno/workloads, Teleport, and profile-specific recovery/evidence. ADR-0044 may evolve Collector topology to agent-to-gateway as multi-node evidence requires; telemetry authority/privacy rules remain unchanged.
 
-## 5. Compatibility authority
+## 5. Security platform invariants
 
-Detailed support relationships live in `production-compatibility-matrix.md`. Any upgrade of a tightly coupled runtime/platform component reruns applicable official support, render/policy, security, workload-identity, network-trust, load/failover/backup/restore, and rollback/fail-forward validation.
+Both profiles preserve:
+
+- BFF-only browser OAuth/OIDC and server-side session/token custody;
+- strict workload identity/mTLS and deny-by-default NetworkPolicy;
+- OpenBao -> External Secrets -> local mounted secrets/keys;
+- signed/provenanced immutable artifacts and SBOM admission;
+- Kyverno CEL-based v1 production policy APIs;
+- trusted public client-address chain and ADR-0024 exact/aggregate quota semantics;
+- one online fail-closed no-cache/no-retry Authorization check;
+- HIBP-derived offline compromised-password screening under ADR-0040;
+- PII-safe Day-One observability under ADR-0031/0044;
+- zero-standing-privilege human access.
 
 ## 6. Version governance
 
-- exact production images/artifacts/packages are immutable-digest/integrity/version pinned through their owning deployment/provisioning mechanism;
-- host-managed components such as WireGuard/OpenSSH are pinned with the production host kernel/package baseline in provisioning metadata before deployment;
+- exact deployed images/artifacts/packages are digest/integrity pinned by owning deployment/provisioning mechanism;
 - services own Wrapper/dependency locks/verification metadata;
-- Spring Boot dependency management is default; overrides require rationale + alignment tests;
+- Spring Boot dependency management is default; overrides require rationale/alignment tests;
 - no agent guesses an unlisted patch;
 - security patches update one bounded compatibility set at a time;
-- platform upgrades use staging/canary/rollback evidence;
-- an exact architecture pin changes only through a new/revised current ADR;
-- safe patch/minor changes inside an approved family may use Technology Baseline + GitOps review only when the current decision permits it and compatibility/security evidence passes;
-- the Xerial SQLite JDBC pin remains under continuous Java-artifact + embedded-native-engine advisory correlation; a compatible reviewed driver bundling SQLite 3.53.4+ is the current upgrade target because upstream SQLite is newer than the embedded 3.53.2 engine;
-- unsupported/EOL versions are not eligible merely because an older baseline once named them.
+- platform upgrades use staging/rollback evidence;
+- safe patch/minor changes inside an approved family require current compatibility/security evidence;
+- Collector/Loki/Tempo upgrades must preserve OTLP/log format/storage/query compatibility and the security/cardinality controls in ADR-0044;
+- Xerial SQLite remains under Java + bundled-native advisory review;
+- unsupported/EOL versions are not production-eligible because an older baseline once named them.

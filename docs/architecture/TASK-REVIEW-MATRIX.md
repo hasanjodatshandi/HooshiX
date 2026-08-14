@@ -1,56 +1,42 @@
 # Task Review Matrix — Current Sources
 
-Use this matrix only for `targeted` architecture review. If scope crosses bounded contexts/security/infrastructure or the applicable set is uncertain, switch to `full-read`.
+Use this matrix only for `targeted` review. If scope crosses bounded contexts/security/infrastructure or applicable sources are uncertain, switch to `full-read`.
 
 Always read `../../AGENTS.md`, `../engineering/current-only-documentation-policy.md`, `../engineering/repository-change-workflow.md`, `README.md`, `SOURCES.md`, and `../adr/decision-register.md` first.
 
-| Task | Minimum current sources |
+| Change area | Minimum current sources |
 | --- | --- |
-| Repository implementation/evidence presence | `implementation-status.md`, `PRODUCTION-READINESS-CHECKLIST.md`, applicable service/platform docs |
-| Production profile / single-server / HA topology / host sizing | `runtime-and-deployment.md`, `network-architecture.md`, `data-and-messaging.md`, `security-architecture.md`, `reliability-and-observability.md`, `performance-and-bottlenecks.md`, `PRODUCTION-READINESS-CHECKLIST.md`, Technology Baseline, Production Compatibility Matrix, ADR-0015, ADR-0017, ADR-0019, ADR-0022, ADR-0024, ADR-0027, ADR-0030, ADR-0034, ADR-0037, ADR-0042, ADR-0043 |
-| Production client IP / proxy trust / forwarded headers / PROXY protocol | `network-architecture.md`, `security-architecture.md`, `services/web-bff.md`, `security-verification-matrix.md`, ADR-0001, ADR-0024, ADR-0029, ADR-0043, local edge runbook where local verification is relevant |
-| Production management network / SSH reachability | `network-architecture.md`, `security-architecture.md`, `security-verification-matrix.md`, `../operations/incident-response-runbook.md`, `../runbooks/production-cold-dr.md`, ADR-0030, ADR-0042, ADR-0043 |
-| Threat model / trust-boundary / abuse-case review | `threat-model.md`, `security-architecture.md`, `network-architecture.md`, `security-verification-matrix.md`, applicable service/data/runtime ADRs |
-| Java/domain/application code | `backend-engineering.md`, `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, ADR-0039, applicable service/current ADR |
-| Build/Gradle/static analysis/CI | `../engineering/coding-standards.md`, `../engineering/build-and-ci-quality-enforcement.md`, `../engineering/developer-workflow.md`, ADR-0039, Technology Baseline |
-| Identity registration/password/MFA | `security-architecture.md`, `services/identity-service.md`, ADR-0008, ADR-0009, ADR-0012, ADR-0023, ADR-0024, applicable Notification ADRs; ADR-0042 when deployment profile is involved because it does not weaken MFA; ADR-0043 when network quota identity is involved |
-| Compromised-password dataset/lookup/SQLite | `services/compromised-password-service.md`, `services/identity-service.md` §7, `security-architecture.md` §4, `data-and-messaging.md`, `dependency-criticality.yaml`, `performance-and-bottlenecks.md`, `testing-and-quality-gates.md`, `../technology/technology-baseline.md`, `../technology/production-compatibility-matrix.md`, ADR-0004, ADR-0005, ADR-0012, ADR-0025, ADR-0033, ADR-0035, ADR-0038, ADR-0040; ADR-0042 for production replicas/capacity |
-| Reference Data family/import/bundle/gRPC/BFF facade | `services/reference-data-service.md`, `services/web-bff.md`, `platform-architecture.md`, `data-and-messaging.md`, `dependency-criticality.yaml`, `reliability-and-observability.md`, `runtime-and-deployment.md`, `security-architecture.md`, `security-verification-matrix.md`, `performance-and-bottlenecks.md`, `testing-and-quality-gates.md`, `PRODUCTION-READINESS-CHECKLIST.md`, ADR-0005, ADR-0016, ADR-0025, ADR-0033, ADR-0041; ADR-0042 for production topology/capacity |
-| Web BFF public API/OIDC/session/CSRF/CORS/token brokerage/reference facade | `services/web-bff.md`, `network-architecture.md`, `security-architecture.md`, `security-verification-matrix.md`, `dependency-criticality.yaml`, `reliability-and-observability.md`, `runtime-and-deployment.md`, `performance-and-bottlenecks.md`, `testing-and-quality-gates.md`, `PRODUCTION-READINESS-CHECKLIST.md`, ADR-0012, ADR-0016, ADR-0023, ADR-0024, ADR-0025, ADR-0033, ADR-0041 as applicable; ADR-0042 for profile topology; ADR-0043 for client-address trust |
-| Identity BFF audience-token provider | `services/identity-service.md`, `services/web-bff.md`, `security-architecture.md`, `dependency-criticality.yaml`, ADR-0012, ADR-0016, ADR-0023, ADR-0025 |
-| Tenancy/deletion/erasure | `security-architecture.md`, applicable service doc, ADR-0012, ADR-0027, ADR-0028; ADR-0042 when shared physical PostgreSQL is involved |
-| Authorization permission/admin/platform path | `services/authorization-service.md`, `security-architecture.md`, `security-verification-matrix.md`, `dependency-criticality.yaml`, ADR-0013, ADR-0024, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036; ADR-0042 for profile availability/capacity |
-| Semantic security quota | `security-architecture.md`, `network-architecture.md` when a network dimension is used, applicable service doc, ADR-0024, ADR-0042 when production Redis topology/capacity changes, ADR-0043 for trusted client-network identity |
-| Notification handoff/callback | `services/notification-service.md`, `services/identity-service.md`, ADR-0006, ADR-0018 |
-| Notification lifecycle/retry/evidence | `services/notification-service.md`, ADR-0006, ADR-0007, ADR-0018; ADR-0042 for profile availability/capacity |
-| Notification templates/Email/SMS | `services/notification-service.md`, ADR-0006, ADR-0010, ADR-0014, ADR-0020 |
-| PostgreSQL/persistence/migration | `data-and-messaging.md`, `runtime-and-deployment.md`, applicable service doc, ADR-0019, ADR-0027, ADR-0034, ADR-0037, ADR-0042 |
-| Kafka/event/outbox/consumer | `data-and-messaging.md`, ADR-0003, ADR-0015, ADR-0042, applicable service doc |
-| Synchronous remote dependency | `dependency-criticality.yaml`, `dependency-criticality-matrix.md`, `reliability-and-observability.md`, ADR-0025, ADR-0033, applicable dependency ADR |
-| Performance/capacity/scaling | `performance-and-bottlenecks.md`, `reliability-and-observability.md`, `network-architecture.md` for conntrack/MTU/FD/port pressure, applicable service doc, ADR-0005, ADR-0042 when production host/profile is involved, applicable dependency/data ADR |
-| SLO/error budget/release freeze | `reliability-and-observability.md`, `PRODUCTION-READINESS-CHECKLIST.md`, ADR-0005, ADR-0042 for single-server availability interpretation, service-specific current ADRs |
-| Backup/PITR/restore/DR | `reliability-and-observability.md`, `runtime-and-deployment.md`, `../runbooks/production-cold-dr.md`, `../operations/chaos-engineering-program.md`, ADR-0004, ADR-0019, ADR-0037, ADR-0042 |
-| Kubernetes/Helm/GitOps | `runtime-and-deployment.md`, `network-architecture.md`, `../engineering/coding-standards.md` §13, `../technology/technology-baseline.md`, ADR-0011, ADR-0021, ADR-0022, ADR-0042 |
-| Istio/Ambient/workload identity | `runtime-and-deployment.md`, `network-architecture.md`, `security-architecture.md`, `performance-and-bottlenecks.md`, `../runbooks/local-istio-ambient.md`, ADR-0002, ADR-0042 for single-server benchmark, ADR-0025/0033 when dependency behavior changes |
-| Traefik/Gateway/WAF/public route | `runtime-and-deployment.md`, `network-architecture.md`, `security-architecture.md`, `../runbooks/local-traefik-edge.md`, ADR-0001, ADR-0029, ADR-0042 when K3s bundled edge components are relevant, ADR-0043 for client-address trust |
-| Secrets/OpenBao/ESO | `runtime-and-deployment.md`, `security-architecture.md`, `../runbooks/production-cold-dr.md`, ADR-0011, ADR-0014, ADR-0023 as applicable; ADR-0042 confirms OpenBao is unchanged by single-server simplification |
-| Supply-chain/image admission/Kyverno | `security-architecture.md`, `testing-and-quality-gates.md`, `../engineering/build-and-ci-quality-enforcement.md`, ADR-0017, ADR-0035, ADR-0038, ADR-0042 |
-| Privileged human production access | `network-architecture.md`, `security-architecture.md`, `security-verification-matrix.md`, `../operations/incident-response-runbook.md`, `../runbooks/production-cold-dr.md`, ADR-0030, ADR-0042, ADR-0043, Technology Baseline |
-| Logging/PII/telemetry | `reliability-and-observability.md`, `../engineering/coding-standards.md`, ADR-0031; ADR-0030/ADR-0042 for privileged-session audit; ADR-0043 for raw client-address handling |
-| Incident/chaos/recovery exercises | `../operations/incident-response-runbook.md`, `../operations/chaos-engineering-program.md`, `../runbooks/production-cold-dr.md`, `threat-model.md`, ADR-0042 when single-server failure/recovery is involved, applicable service/data/security ADRs |
-| Technology/version update | `../technology/technology-baseline.md`, `../technology/production-compatibility-matrix.md`, applicable current ADR, official upstream compatibility/security evidence |
-| Documentation/ADR cleanup | `../engineering/current-only-documentation-policy.md`, `../engineering/documentation-standards.md`, `SOURCES.md`, `../adr/decision-register.md`, all directly affected current-state docs |
+| Identity/password/MFA/session/tenant | Identity service; ADR-0012/0023; ADR-0024 when quota; ADR-0040 when compromised-password; security/testing/readiness |
+| Compromised Password source/dataset/runtime | ADR-0040; Compromised Password service; Identity password section; data/messaging; Technology Baseline/compatibility; build/CI; testing/security/readiness; Sources |
+| Semantic quota/Redis/time/network abuse | ADR-0024; ADR-0043; Identity/BFF affected operations; data/messaging; reliability/performance; security/testing/chaos/readiness; dependency registry if edge changes |
+| Public client address/proxy/WAF | ADR-0043; network architecture; BFF; ADR-0024; security/testing/readiness; edge runbook; Technology compatibility |
+| Authorization | Authorization service; ADR-0013/0026/0032/0036; dependency registry; security/testing/performance/readiness |
+| Notification | Notification service + ADR-0006/0007/0010/0014/0018/0020; data/messaging; testing/recovery |
+| Reference Data capability/bundle/service trigger | ADR-0041; Reference Data service; BFF; data/messaging; implementation status; build/testing/readiness; dependency registry if remote edge activates |
+| New/change service boundary | full-read required; also performance register and implementation status |
+| Day-One application observability | ADR-0044; ADR-0031; reliability/observability; coding/build standards; service doc; Technology Baseline/compatibility; security/testing/readiness/fitness; performance |
+| Collector/Loki/Tempo/Prometheus/Grafana/Alertmanager | ADR-0044; runtime/deployment; platform/reliability/performance/security/testing/readiness; Technology Baseline/compatibility; threat model; chaos/DR |
+| Logging/PII/security audit | ADR-0031; ADR-0044; coding standard; security architecture/matrix; service doc; testing; incident/chaos when failure behavior changes |
+| Kyverno/admission policy | ADR-0017; ADR-0021; Technology Baseline/compatibility; build/CI; testing/security/readiness; platform/runtime; performance |
+| K3s/Calico/Istio/edge/platform profile | ADR-0021/0022/0042/0043 as applicable; platform/runtime/network; Technology Baseline/compatibility; performance/security/testing/readiness; runbooks |
+| PostgreSQL/RLS/Flyway/backup | ADR-0019/0027/0034/0037/0042; data/messaging; SQL standard; testing/readiness/recovery |
+| Kafka/events | ADR-0015/0042; data/messaging; dependency/event contracts; testing/performance/recovery |
+| OpenBao/secrets | ADR-0011 plus affected key/security ADR; security/runtime; Technology Baseline; recovery; OpenBao invariance checks |
+| Human production access | ADR-0030/0043; network/security/runtime; readiness; incident/chaos/DR |
+| ADR/documentation governance | current-only policy; documentation standard; repository workflow; Decision Register; Sources; FILE_INDEX; all inbound references affected by the decision |
+| CI/repository workflow | repository-change-workflow; build/CI; developer workflow; AGENTS; affected checks/fitness/readiness |
+| Production readiness/release | Production Readiness Checklist; implementation status; fitness/security/testing; Technology Baseline; applicable service/platform/DR/chaos evidence |
 
-## Review output
+## Escalation rules
 
-A targeted review still records:
+Use `full-read` when:
 
-```text
-Architecture review mode: targeted
-Architecture document version/commit:
-Architecture sections reviewed:
-Search terms used:
-ADRs reviewed or changed:
-```
+- changing bounded-context/deployable boundaries;
+- changing authN/authZ/MFA/tenant/security authority;
+- changing persistence/consistency/recovery semantics;
+- changing public trust boundaries, quota authority, secret authority, or admission architecture;
+- introducing/removing a platform technology/control plane;
+- current sources disagree;
+- the requested task is broad enough that targeted scope may miss a dependency.
 
-If review discovers cross-cutting effects or uncertainty about current effective architecture, switch to `full-read`.
+Targeted review does not permit skipping executable evidence or current implementation/diff inspection.

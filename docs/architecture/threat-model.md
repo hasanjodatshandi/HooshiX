@@ -1,262 +1,266 @@
 # Threat Model — Current State
 
-This document is the formal design-time threat model for HooshiX. It does not prove that implementation or runtime controls exist. `PRODUCTION-READINESS-CHECKLIST.md` and `security-verification-matrix.md` remain the evidence gates.
+This is the formal design-time threat model for HooshiX. It does not prove implementation/runtime controls. Production Readiness and Security Verification remain evidence gates.
 
 ## 1. Scope
 
-This model covers the current platform architecture, with emphasis on:
+Covers:
 
-- public edge and browser/BFF trust;
-- Identity, MFA, sessions, and token issuance;
-- Authorization and tenant isolation;
-- service-to-service workload identity;
-- PostgreSQL, Redis, Kafka, and immutable reference data;
-- OpenBao and secret delivery;
+- public edge/browser/BFF;
+- Identity/MFA/sessions/token issuance;
+- Authorization/tenant isolation;
+- service-to-service identity;
+- PostgreSQL/Redis/Kafka/reference datasets;
+- OpenBao/secrets;
 - Git/CI/supply chain;
-- human privileged access;
-- backup, restore, erasure, and disaster recovery;
-- `production-single-server` host concentration risk.
+- Day-One logging/metrics/tracing;
+- privileged access;
+- backup/restore/erasure/DR;
+- single-server host concentration.
 
 ## 2. Security objectives
 
-The platform protects these primary properties:
-
-1. only authenticated and authorized actors gain authority;
-2. tenant data and authority do not cross tenant boundaries;
-3. secrets, credentials, MFA material, and private keys remain confidential;
-4. mutable business state remains correct and recoverable;
+1. only authenticated/authorized actors gain authority;
+2. tenant data/authority do not cross tenants;
+3. credentials/secrets/MFA/private keys remain confidential;
+4. mutable business state remains correct/recoverable;
 5. security dependencies fail closed instead of fabricating success;
-6. audit and recovery evidence remains attributable and durable;
-7. software artifacts are reviewed, immutable, signed, and traceable;
-8. public traffic cannot bypass the approved edge/WAF/BFF path;
-9. restored historical data does not revive erased or legally blocked authority;
-10. non-HA availability trade-offs never become security downgrades.
+6. audit/recovery evidence remains attributable/durable;
+7. artifacts are reviewed/immutable/signed/traceable;
+8. public traffic cannot bypass approved edge/WAF/BFF;
+9. restored history cannot revive erased/legally blocked authority;
+10. non-HA availability trade-offs never become security downgrades;
+11. observability cannot become a new security authority or secret-exfiltration path;
+12. abuse controls remain safe under clock faults and adversarial state cardinality.
 
 ## 3. High-value assets
 
-| Asset | Main security property |
+| Asset | Primary property |
 | --- | --- |
-| User credentials, MFA seeds, recovery codes | confidentiality + integrity |
-| Identity sessions, refresh credentials, signing keys | confidentiality + integrity + revocation correctness |
-| Tenant Membership and Authorization state | integrity + tenant isolation |
-| PostgreSQL mutable business data | confidentiality + integrity + recoverability |
-| OpenBao secret material and recovery shares | confidentiality + integrity + recoverability |
-| BFF session/pre-auth Redis state | integrity + fail-closed availability |
-| Semantic quota state | integrity + anti-bypass |
+| Password/MFA/recovery material | confidentiality + integrity |
+| Sessions/refresh/signing keys | confidentiality + revocation correctness |
+| Tenant Membership/Authorization state | integrity + isolation |
+| PostgreSQL business state | confidentiality + integrity + recovery |
+| OpenBao/recovery material | confidentiality + integrity + recovery |
+| Redis session/quota state | integrity + fail-closed availability |
+| Trusted client address/quota identity | integrity + privacy |
+| HIBP-derived compromised-password corpus/release evidence | integrity + freshness + provenance |
 | Kafka publication/replay evidence | integrity + reconstructability |
-| Signed images, provenance, SBOM, GitOps state | integrity + provenance |
-| Security/audit records | integrity + availability + attribution |
-| Backups/WAL/OpenBao snapshots | confidentiality + integrity + recoverability |
-| Erasure/legal-hold evidence | integrity + ordering correctness |
-| Client network identity used by abuse controls | integrity + privacy |
-| Human production identities and JIT grants | integrity + attribution |
+| Signed images/provenance/SBOM/GitOps | integrity + provenance |
+| Logs/metrics/traces | confidentiality + bounded integrity/availability |
+| Security/privileged audit | integrity + durability + attribution |
+| Backups/WAL/snapshots | confidentiality + integrity + recoverability |
+| Erasure/legal-hold state | integrity + ordering correctness |
+| Human production identities/JIT grants | integrity + attribution |
 
 ## 4. Trust boundaries
 
 ### TB-01 Browser -> public edge
 
-The browser is untrusted input. Cookies, headers, URLs, bodies, OIDC callbacks, and forwarded headers are attacker-controlled until validated.
-
-Controls include BFF-only public API, request bounds, WAF, CSRF, Origin/Fetch Metadata, exact redirect validation, OIDC state/nonce/PKCE, and ADR-0043 client-address sanitization.
+Browser input is untrusted, including headers, URLs/bodies, OIDC callbacks, forwarding headers, trace/correlation headers, and baggage.
 
 ### TB-02 External L4 -> Traefik -> WAF -> BFF
 
-Only the reviewed edge chain is trusted to derive client network identity. Caller forwarding headers are not authority. Direct bypass paths are prohibited.
+Only reviewed proxy chain derives trusted exact client address. Caller forwarding headers are not authority. Direct origin/BFF bypass is prohibited.
 
 ### TB-03 BFF -> internal services
 
-BFF is an authenticated workload, not business authority for backend domains. It may carry trusted server-derived identity context only under typed contracts. Resource-owning services still enforce final authorization/domain rules.
+BFF workload identity can carry typed trusted context only under reviewed contracts. It does not own backend business authority.
+
+For quota, BFF sends one exact canonical client address. Backend derives exact hard `/32`/`/128` and separate aggregate `/24`/`/64` pressure identities.
 
 ### TB-04 Service -> Authorization
 
-Authorization is authoritative for permission decisions. Callers may reject locally but cannot fabricate ALLOW. Failure is not denial and is never success.
+Authorization is authoritative for permission decision. Failure is never ALLOW. Business DENY remains explicit current contract behavior.
 
-### TB-05 Service -> service-owned persistence
+### TB-05 Service -> owned persistence
 
-Database identity and tenant context are trusted only after service authentication/authorization. Cross-service SQL is prohibited. Tenant tables use forced RLS and transaction-local context.
+Database identity/tenant context trusted only after validated service/application context. Cross-service SQL prohibited; tenant tables use forced RLS.
 
 ### TB-06 Workloads -> Redis/Kafka/OpenBao/providers
 
-Each dependency has explicit identity, egress, credentials, deadlines, failure behavior, and data classification. A dependency cannot be used as a hidden authority outside its owning contract.
+Every dependency has explicit identity, data classification, deadlines/failure behavior, and no hidden authority.
 
-### TB-07 Git/CI -> production artifacts/GitOps
+### TB-07 Application -> observability Collector/backends
 
-Pull-request input and build artifacts are untrusted until reviewed and verified. Privileged workflows cannot execute unreviewed PR-controlled code with production-capable credentials. Production uses immutable signed/provenanced artifacts.
+Telemetry is untrusted from a security-authority perspective. Trace/baggage/log attributes cannot grant identity/permission/tenant/quota/idempotency/audit status.
 
-### TB-08 Human operator -> management plane
+Collector ingress is internal-only. Telemetry is filtered/redacted before export. Ordinary telemetry is best-effort/bounded; required security audit remains separate durable/off-host evidence.
 
-Network admission, human authentication, and privilege are separate gates. For single-server: WireGuard network admission -> FIDO2 OpenSSH identity -> approved time-bounded JIT elevation.
+### TB-08 Collector -> node log files
 
-### TB-09 Backup/recovery environment -> restored production
+ADR-0044 permits a narrow read-only mount to exact pod/container log paths. A compromised Collector MUST NOT gain general host filesystem, host network, or privileged-container authority.
 
-Restored data is untrusted for current authority until integrity, schema, RLS, erasure/legal-hold, secrets, workload identity, edge, and security gates pass.
+### TB-09 Git/CI -> production
+
+PR/build inputs are untrusted until reviewed/verified. Privileged workflows cannot execute unreviewed PR-controlled code with production-capable privilege. Production uses signed immutable artifacts.
+
+### TB-10 Human operator -> management plane
+
+WireGuard network admission, FIDO2 identity, and JIT privilege are separate gates.
+
+### TB-11 Backup/recovery -> restored production
+
+Restored state is not current authority until integrity/schema/RLS/erasure/legal-hold/secrets/workload/edge/security gates pass.
 
 ## 5. Threat actors
 
-| Actor | Capability assumption |
-| --- | --- |
-| Internet attacker | arbitrary public requests, spoofed headers, credential stuffing, protocol abuse, DDoS participation |
-| Compromised browser/client | valid user session plus attacker-controlled browser inputs/scripts within the compromised client |
-| Malicious tenant user | valid tenant membership with limited permissions, attempts horizontal/vertical escalation |
-| Malicious tenant admin | broad tenant authority but no platform/cross-tenant authority |
-| Compromised workload | one service identity/runtime compromised, attempts lateral movement/data access |
-| Compromised service credential | valid DB/Redis/Kafka/provider credential for one owner |
-| Compromised CI/GitHub identity | attempts artifact or GitOps manipulation |
-| Compromised operator device | may possess a management-network peer key but not necessarily FIDO2/JIT authority |
-| Malicious/compromised privileged operator | time-bounded legitimate privileged capability, potential insider misuse |
-| Compromised host/root | full single-host process/storage visibility; major single-server blast radius |
-| Compromised OpenBao token/recovery material | attempts secret extraction or secret-authority takeover |
-| Compromised external provider | email/SMS/OIDC/upstream-network provider sends malformed, replayed, delayed, or false information within its protocol scope |
-| Storage/backup attacker | tampers with, deletes, or exfiltrates backup/recovery artifacts |
+- Internet attacker: arbitrary requests, spoofed forwarding/trace headers, credential stuffing, high-cardinality abuse, DDoS participation.
+- Compromised browser/user: valid session plus malicious client input.
+- Malicious tenant user/admin: horizontal/vertical escalation attempts.
+- Compromised workload/service credential: lateral DB/Redis/Kafka/OpenBao/provider/telemetry access attempts.
+- Compromised telemetry component: attempts secret collection, host-file access, or data manipulation.
+- Compromised CI/GitHub identity: artifact/GitOps manipulation.
+- Compromised operator device: may hold WireGuard key but not necessarily FIDO2/JIT.
+- Privileged insider: time-bounded legitimate capability with misuse risk.
+- Compromised host/root: broad single-server process/storage visibility.
+- Compromised provider/source: malformed/replayed/delayed/false data within protocol scope.
+- Storage/backup attacker: tamper/delete/exfiltrate recovery artifacts.
 
-## 6. STRIDE review
+## 6. Representative STRIDE mapping
 
-| Category | Representative threat | Primary controls | Required evidence |
+| Category | Threat | Primary controls | Evidence |
 | --- | --- | --- | --- |
-| Spoofing | forged `X-Forwarded-For` changes network quota identity | ADR-0043 trusted PROXY chain; Caddy strict proxy parsing; BFF internal derived address only | header-spoof/PROXY negative tests |
-| Spoofing | forged workload identity calls internal service | Istio strict mTLS + ServiceAccount identity + NetworkPolicy | wrong-workload connectivity/authz tests |
-| Spoofing | email equality links external account | issuer + subject binding; no email-only auto-link | collision/link tests |
-| Tampering | tenant context changed on pooled DB connection | parameterized transaction-local context + FORCE RLS + NOBYPASSRLS | cross-tenant pool reuse tests |
-| Tampering | build/deploy artifact changed after review | digest pin + signature + provenance + SBOM + admission | wrong digest/signer/attestation tests |
-| Tampering | restored backup contains obsolete/deleted authority | erasure/legal-hold replay before traffic | restore reconciliation evidence |
-| Repudiation | privileged operator denies action | attributable FIDO2 identity + JIT approval + OS/sudo/Kubernetes/DB audit + off-host copy | audit integrity and session exercise |
-| Information disclosure | secrets/tokens/PII appear in logs | allow-list logging, redaction, canary/runtime detection | static/runtime leak tests |
-| Information disclosure | one service reads another DB | distinct databases/roles/privileges; no cross-service SQL | privilege-negative tests |
-| Denial of service | Authorization/Redis failure blocks protected work | bounded deadlines/bulkheads; explicit fail-closed semantics; capacity/SLO controls | overload/failure tests; no fabricated ALLOW |
-| Denial of service | single host fails | accepted non-HA profile + cold DR + off-host backups | quarterly cold-DR/RTO evidence |
-| Denial of service | WAF/mesh/admission consumes host capacity | complete-stack benchmark; >=30% headroom; no security bypass | simultaneous load/IO/security benchmark |
-| Elevation of privilege | tenant admin assigns stronger rights than allowed | Authorization privilege-escalation rules and owner safety | admin negative/concurrency tests |
-| Elevation of privilege | network access becomes root access | WireGuard != human identity != JIT privilege | peer/FIDO/JIT separation tests |
-| Elevation of privilege | browser/BFF role claim grants backend access | no role/permission authority in browser; final resource-owner CheckPermission | forged-claim and final-authz tests |
+| Spoofing | forged XFF/client header changes quota identity | ADR-0043 trusted PROXY chain; exact BFF context | header/PROXY negatives |
+| Spoofing | forged trace/baggage becomes identity/tenant/permission | telemetry context classified correlation-only | forged-context auth/quota negatives |
+| Spoofing | wrong workload calls internal service/Collector | strict mTLS + SA + NetworkPolicy/Istio | connectivity/authz negatives |
+| Tampering | tenant context changes on pooled DB | transaction-local context + FORCE RLS | cross-tenant pool tests |
+| Tampering | build/deploy artifact changes | digest/signature/provenance/SBOM/admission | wrong-artifact negatives |
+| Tampering | compromised-password corpus/source altered/stale | HIBP source identity + manifest/digest/freshness/full-corpus validation | dataset release tests |
+| Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
+| Information disclosure | secrets/PII in telemetry | source allow-list + Collector redaction + canary | Loki/Tempo/Prometheus/Grafana negatives |
+| Information disclosure | Collector reads arbitrary host files | exact read-only pod-log mount; no broad host privilege | render/runtime mount negatives |
+| DoS | Authorization/Redis failure blocks work | bounded deadlines/bulkheads + fail closed | overload/failure tests |
+| DoS | attacker creates unbounded Redis security keys | low-cardinality allocation guard + memory reserve + upstream throttling | unique-key attack test |
+| DoS | `/24` hard gate blocks legitimate shared networks | exact-IP hard identity + aggregate pressure only | NAT/campus/VPN tests |
+| DoS | host clock jumps app+Redis together and refills tokens | wall-vs-monotonic guard + Redis TIME + host sync gate | common-mode jump tests |
+| DoS | telemetry consumes single-host resources | finite queues/retention/cardinality + complete-stack benchmark | pressure/load tests |
+| DoS | total host loss also removes local monitoring | independent external black-box signal | host-loss exercise |
+| Elevation | tenant admin grants stronger authority | Authorization privilege-escalation/owner safety | admin concurrency negatives |
+| Elevation | network access becomes root | WireGuard != FIDO2 != JIT | separation tests |
 
 ## 7. Critical abuse cases
 
-### TM-01 Client-IP spoofing to evade abuse controls
+### TM-01 Client-IP spoofing
 
-Attacker sends forwarding headers or malformed address forms to reset/shift network quotas.
+Attacker sends forwarding/private headers or alternate address encodings to reset/shift quota identity.
 
-Required result:
+Required: caller headers ignored; one canonical server-derived exact IP; mapped IPv6 normalized; proxy/missing identity fails closed; raw IP not ordinary telemetry.
 
-- caller headers do not become authority;
-- one canonical server-derived IP is used;
-- IPv4-mapped IPv6/textual aliases cannot create separate budgets;
-- missing trusted identity fails closed for quota-required operations.
+### TM-02 Shared-network collateral lockout
 
-### TM-02 WAF bypass
+Attacker from one address exhausts an aggregate `/24`/`/64` and tries to deny all legitimate users behind the same network.
 
-Attacker or operator attempts direct Traefik -> BFF or Internet -> BFF traffic.
+Required: hard v1 bucket is exact `/32`/`/128`; aggregate prefix is separate pressure and not sole hard 429 gate. NAT/campus/VPN/IPv6 tests validate behavior.
 
-Required result: route, NetworkPolicy, and Istio controls deny the bypass. WAF outage does not create a direct route.
+Residual: exact IPv6 privacy-address rotation can reduce per-address hard-gate effectiveness; contact/subject/browser dimensions plus aggregate pressure/upstream controls provide defense in depth. Any future hard aggregate gate needs evidence.
 
-### TM-03 Cross-tenant data access
+### TM-03 Common-mode clock jump
 
-Authenticated user changes tenant/resource identifiers to access another tenant.
+Host wall clock jumps forward/backward and both JVM wall time and Redis TIME move together, so app-vs-Redis skew alone appears healthy.
 
-Required result: authenticated tenant context, application checks, Authorization, and forced RLS deny the request. Missing tenant context fails closed.
+Required: quota JVM wall-vs-monotonic guard detects abrupt >2s step; time becomes unhealthy; boot requires host synchronization; re-arm requires 60s stable healthy window. No premature refill.
 
-### TM-04 Authorization dependency manipulation
+### TM-04 High-cardinality Redis exhaustion
 
-Attacker causes timeout/breaker/dependency failure and expects fail-open access.
+Attacker generates many unique contacts/addresses/OIDC contexts to grow non-TTL security state until `noeviction` writes fail.
 
-Required result: no ALLOW is fabricated. Permission results are not cached as stale authority and no retry layer changes semantics.
+Required: aggregate active-bucket/allocation/cleanup telemetry, >=30% reserve, bounded low-cardinality new-allocation guard, upstream coarse protection, `QUOTA_CAPACITY_UNHEALTHY` before eviction/OOM, no fail-open/local fallback.
 
-### TM-05 Credential stuffing / MFA downgrade
+Residual: a sufficiently large attack may intentionally make quota-protected operations unavailable. This is preferable to fail-open; capacity/upstream mitigation must keep the attack envelope acceptable.
 
-Attacker uses stolen password or external identity and tries weaker Email/SMS proof instead of active TOTP.
+### TM-05 WAF/origin bypass
 
-Required result: semantic quotas apply, TOTP/recovery rules remain required, and provider login is only primary proof when MFA is active.
+Attacker/operator attempts direct origin or Traefik->BFF route.
 
-### TM-06 Session theft/replay
+Required: firewall/routing + NetworkPolicy/Istio deny; WAF outage never creates bypass.
 
-Attacker obtains browser session material or replays refresh/pre-auth/OIDC state.
+### TM-06 Cross-tenant access
 
-Required result: secure HttpOnly cookies, server-side state, HMAC locators, rotation/revocation, single-use OIDC/pre-auth evidence, and bounded lifetime prevent authority extension.
+Authenticated actor modifies tenant/resource identifiers.
 
-### TM-07 Compromised service lateral movement
+Required: trusted tenant context + Authorization + local domain checks + forced RLS deny.
 
-One workload is compromised and attempts to reach another service database, Redis namespace, Kafka capability, OpenBao path, or arbitrary Internet destination.
+### TM-07 Authorization dependency manipulation
 
-Required result: workload identity, NetworkPolicy, Istio policy, DB roles, ACLs, Kafka ACLs, OpenBao policy, and egress allow-lists limit blast radius.
+Attacker induces timeout/breaker/overload expecting fail-open.
 
-### TM-08 Supply-chain substitution
+Required: no ALLOW fabricated; no permission cache/retry/stale fallback.
 
-Attacker modifies dependency, build output, image, deployment, or CI workflow.
+### TM-08 Credential stuffing/MFA downgrade
 
-Required result: PR review, dependency verification/locks, static checks, signed provenance/SBOM, immutable digest promotion, and Kyverno admission block unapproved artifacts.
+Required: semantic quota defense, compromised-password screening, TOTP/recovery semantics, no provider login MFA bypass.
 
-### TM-09 Privileged access compromise
+### TM-09 Session/token replay
 
-Attacker steals a management peer key, SSH credential, or JIT grant.
+Required: server-side BFF state, secure cookies, HMAC locators, rotation/revocation, OIDC/preauth single-use/lifetimes.
 
-Required result: independent WireGuard peer, FIDO2 user presence/verification, time-bounded JIT, least privilege, revocation, and durable audit prevent one factor from being sufficient.
+### TM-10 Compromised workload lateral movement
 
-### TM-10 Backup/restore rollback of security state
+Required: SA/mTLS/NetworkPolicy/Istio + DB/Redis/Kafka/OpenBao/provider/telemetry least privilege.
 
-Attacker or operator restores old data and unintentionally revives erased user authority, old tenant state, or incompatible schema.
+### TM-11 Telemetry injection/exfiltration
 
-Required result: isolated restore, integrity/Flyway/RLS checks, erasure/legal-hold replay, current secret/policy restoration, and traffic gate.
+Attacker sends crafted headers/inputs causing high-cardinality attributes, log injection, PII/secret export, or trace-baggage authority confusion.
 
-### TM-11 Compromised host in single-server profile
+Required: bounded allow-list logging/attributes, CRLF protection, baggage allow-list, low-cardinality metrics, Collector redaction, canary tests, and security-context non-authority tests.
 
-Root compromise can expose multiple platform components because all run on one physical server.
+### TM-12 Telemetry backend failure
 
-Required result: contain host, revoke/rotate affected credentials, preserve off-host audit, rebuild from trusted artifacts, restore business data/secrets from protected recovery sources, and do not claim same-host isolation as a security boundary against root.
+Collector/Loki/Tempo/Prometheus becomes unavailable or fills disk/memory.
 
-Residual risk: `production-single-server` has a large host-level blast radius. This is accepted only with explicit owner acceptance, hardening, recoverability, and a migration trigger to `production-ha` when risk is no longer acceptable.
+Required: ordinary business path is not synchronously dependent on telemetry export; finite queues/drop; alert on loss; capacity gate; required audit remains separate durable/off-host.
 
-### TM-12 Provider ambiguity or compromise
+### TM-13 Collector compromise
 
-Email/SMS/OIDC/upstream providers may timeout, replay, return malformed data, or be compromised.
+Required: no public OTLP, wrong-workload denial, dedicated SA/RBAC, restricted egress, exact read-only pod-log mount, no host network/privilege/general hostPath.
 
-Required result: provider-specific validation, stable idempotency, explicit ambiguous outcomes, bounded retry/reconciliation, exact OIDC issuer/audience validation, and no provider response becomes broader authority than its contract permits.
+### TM-14 Supply-chain substitution
+
+Required: PR review, locks, static checks, signed provenance/SBOM/digest admission and Kyverno CEL policies.
+
+### TM-15 Privileged access compromise
+
+Required: independent WireGuard/FIDO2/JIT factors, expiry/revocation, protected audit.
+
+### TM-16 Backup/restore rollback
+
+Required: isolated restore, schema/RLS/integrity, erasure/legal-hold replay, current secrets/policy, traffic gate.
+
+### TM-17 Single-host compromise/loss
+
+Root compromise has broad blast radius. Required: containment, credential rotation, off-host audit, trusted rebuild, protected backups, no claim that same-host workload isolation protects against root.
+
+Total host loss also removes local telemetry; independent external monitoring detects availability loss.
+
+### TM-18 External provider/source ambiguity
+
+Required: provider-specific validation/idempotency/ambiguity handling. HIBP is offline dataset source only; production requests never depend on HIBP availability.
 
 ## 8. Single-server residual risks
 
-The selected initial profile deliberately retains these residual risks:
+- one host failure can stop complete platform and local observability;
+- host/root compromise has broad local blast radius;
+- one PostgreSQL physical failure domain affects multiple DBs;
+- Redis/Kafka have no failover;
+- Kyverno/telemetry/control-plane availability is lower;
+- fail-closed security capacity exhaustion can cause user-visible outage;
+- maintenance can consume error budget.
 
-- one host failure can stop the complete platform;
-- host/root compromise has a broad local blast radius;
-- one PostgreSQL process/storage failure domain affects multiple service databases;
-- Redis and Kafka have no same-profile failover;
-- Kyverno and other control-plane components have lower availability;
-- maintenance can consume service error budget.
+These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
 
-These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, admission, audit, backup, or workload-identity controls.
+## 9. Verification mapping
 
-Migration to `production-ha` is required when business availability, repeated incidents, recovery RTO, physical-isolation need, or capacity evidence makes the residual risk unacceptable.
+Material threats map to executable service/security/database/network/CI/observability/chaos/recovery evidence. In particular:
 
-## 9. Security verification mapping
-
-Every material threat maps to at least one executable control/evidence location:
-
-- authentication/MFA/session: Identity/BFF service tests + security verification matrix;
-- Authorization/elevation: Authorization tests + dependency failure tests;
-- tenant isolation: RLS/role/pool negative tests;
-- client-address/WAF/public edge: ADR-0043 + network architecture + edge negative tests;
-- workload lateral movement: NetworkPolicy/Istio positive/negative tests;
-- supply chain: CI + signature/provenance/SBOM/admission tests;
-- secrets: OpenBao/ESO/key-rotation/recovery tests;
-- privileged access: FIDO2/WireGuard/JIT/audit/break-glass tests;
-- recovery: backup/PITR/cold-DR/erasure replay exercises;
-- logging/privacy: static/runtime leak and cardinality tests;
-- capacity/DoS: full-stack benchmark and overload/chaos evidence.
+- TM-02/03/04 -> ADR-0024 tests + Redis load/chaos;
+- TM-11/12/13 -> ADR-0031/0044 tests + Collector/render/canary/fault evidence;
+- TM-17 -> external host-down monitor + cold DR;
+- compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;
+- policy-engine migration risk -> Kyverno CEL manifest gate.
 
 A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
-## 10. Threat-model change triggers
+## 10. Change triggers
 
-Review this model when any of these changes:
-
-- public proxy/L4/CDN/WAF topology;
-- client-address derivation;
-- authentication/MFA/session/token behavior;
-- service or bounded-context boundary;
-- authorization authority/fallback/cache behavior;
-- tenant isolation or persistence model;
-- new datastore/provider/Internet egress;
-- OpenBao/secret model;
-- CI/build/signing/admission model;
-- human production access;
-- production topology/profile;
-- backup/restore/erasure/legal-hold behavior;
-- a security incident reveals a new abuse path.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.

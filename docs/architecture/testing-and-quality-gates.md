@@ -2,348 +2,216 @@
 
 Testing proves current contracts and failure semantics at the cheapest trustworthy layer. Documentation/configuration is not evidence until the corresponding executable check exists and passes.
 
-ADR-0042 selects `production-single-server`; profile-specific tests supplement, not replace, service/security/data tests.
+ADR-0042 selects `production-single-server`; profile-specific tests supplement, not replace, service/security/data tests. ADR-0044 makes observability part of the first executable service Definition of Done.
 
 ## 1. Test portfolio
 
 Use the smallest trustworthy layer:
 
-- Domain/application unit tests for business invariants;
-- ArchUnit for package/layer/dependency direction;
-- adapter/integration tests with real PostgreSQL/Redis/Kafka/SQLite/protocol behavior where required;
-- contract tests for gRPC/Protobuf/OpenAPI/provider boundaries;
-- migration/RLS/security tests for persistence;
-- policy/render tests for Kubernetes/Helm/Istio/Kyverno/NetworkPolicy;
-- BDD only for critical business behavior;
+- Domain/Application unit tests;
+- ArchUnit package/layer/dependency tests;
+- focused adapter/Testcontainers tests for PostgreSQL/Redis/Kafka/SQLite/protocol behavior;
+- gRPC/Protobuf/OpenAPI/provider contract tests;
+- Flyway/RLS/security tests;
+- Kubernetes/Helm/Istio/Kyverno/NetworkPolicy render/policy tests;
+- static + runtime logging/PII/cardinality tests;
+- observability propagation/export/failure tests;
+- BDD only for critical shared behavior;
 - Playwright only for critical browser journeys;
-- load/soak/chaos/recovery tests at staging/release/scheduled cadence where they are too heavy for PR;
-- static + runtime logging/PII/security leak tests;
-- final-image SBOM/signature/provenance/vulnerability tests.
+- load/soak/chaos/recovery at staging/release/scheduled cadence;
+- final-image SBOM/signature/provenance/advisory tests.
 
 Do not duplicate the same assertion at every layer without a distinct failure class.
 
-## 2. Java/build quality gates
+## 2. Java/build gates
 
-Applicable Java services require, at minimum:
+Applicable Java services require compile, unit/integration tests, ArchUnit, Spotless, SpotBugs, Semgrep/SAST, Gradle dependency verification/locks, dependency/security/license checks, contract/migration/security tests, and Day-One observability tests.
 
-- compile;
-- unit tests;
-- JUnit integration tests;
-- ArchUnit architecture tests;
-- Spotless;
-- SpotBugs;
-- repository Semgrep/static rules;
-- Gradle dependency verification/locks;
-- dependency/license/security checks required by current CI;
-- service-specific contract/migration/security tests.
-
-Do not disable a gate, broaden suppression or set `ignoreFailures` merely to pass CI.
+Do not disable a gate, broaden suppression, or set `ignoreFailures` merely to pass CI.
 
 ## 3. Contract compatibility
 
-- Protobuf uses Buf lint + breaking checks under current Git-owned contract governance;
-- field numbers are never reused;
-- OpenAPI compatibility/bounds/security headers/errors are tested for public BFF APIs;
-- provider adapters have bounded request/response/ambiguity tests;
-- schema/contract changes include producer/consumer rollout compatibility.
+- Protobuf: Buf lint + breaking; field numbers never reused.
+- OpenAPI: compatibility, input/output bounds, security headers/errors.
+- Provider adapters: bounded request/response/ambiguity behavior.
+- Schema/contract changes: producer/consumer rollout compatibility.
+- Kafka remains async transport; internal request/reply is not silently switched to broker messaging.
 
-Kafka remains async transport; REST is not silently substituted for internal gRPC.
+## 4. Persistence and recovery
 
-## 4. Persistence tests
+Mutable PostgreSQL services prove Flyway evolution, role isolation, forced RLS, transaction-local tenant context across pooled reuse, no remote I/O inside DB transactions, query/index bounds, and connection budgets.
 
-For mutable PostgreSQL services:
+Single-server additionally proves shared-instance pool/noisy-neighbor behavior, isolated whole-cluster PITR, service-specific controlled recovery, and no destructive restoration of unrelated current DBs.
 
-- Flyway migration from supported prior state to current state;
-- released migration immutability;
-- expand/migrate/contract compatibility;
-- runtime role non-owner `NOSUPERUSER NOBYPASSRLS`;
-- cross-service database/role privilege negatives;
-- forced RLS + `USING`/`WITH CHECK` negatives;
-- pooled transaction-local tenant context across commit/rollback/reuse;
-- no remote I/O inside DB transactions;
-- index/query-plan/bounds for sensitive/expensive queries;
-- connection-pool budget under representative peak.
+`pg_dump + cron` is not recovery evidence for the production PITR requirement.
 
-Single-server additionally tests shared-instance global pool budget/noisy-neighbor behavior and service-isolation negatives inside the same physical PostgreSQL process.
+## 5. Compromised Password tests
 
-ADR-0040 SQLite tests prove immutable/read-only/query-only fixed lookup, no write/DDL/ATTACH/extension loading, server-owned path, bounded cardinality/response, native dependency integrity and rebuild/redeploy recovery.
+ADR-0040 evidence includes:
 
-ADR-0041 Reference Data tests apply only when implementation trigger/release scope is active and prove deterministic importer/bundle, bounded typed reads and no runtime DB/Redis/Kafka/provider authority.
+- official HIBP Pwned Passwords SHA-1 acquisition/provenance;
+- all official prefix ranges or equivalent complete-download evidence;
+- SHA-1 screening-only and Argon2id password-storage separation;
+- exact five-hex prefix, 20-byte SQLite hash, 35-hex suffix reconstruction, positive count;
+- zero-count HIBP padding rejection;
+- dataset age <=35 days for production readiness;
+- full-corpus prefix-cardinality/serialized-size measurement and build/runtime compatibility limit;
+- immutable read-only/query-only SQLite; no write/DDL/ATTACH/extension loading;
+- no runtime HIBP/provider call or application Internet egress;
+- raw password/full SHA-1 non-egress and telemetry negatives;
+- stale/corrupt/missing/oversized/incompatible data fails closed;
+- complete-corpus warm/cold disk-backed latency/saturation and recovery.
 
-## 5. PostgreSQL recovery tests
+## 6. Reference Data tests
 
-Both profiles require continuous WAL/off-site backup/PITR evidence, monthly isolated restore and quarterly cold DR.
+Before an independent `reference-data-service` exists, test the immutable bundle/module source/provenance/integrity/lifecycle/bounds in its owning deployable.
 
-Single-server:
+A separate service deployment is blocked unless ADR-0041 trigger evidence exists. When triggered, additionally test typed gRPC contract, exact BFF dependency semantics, wrong-workload/egress negatives, profile-correct deployment, load/SLO, and clean replacement of any in-process serving adapter.
 
-- whole shared physical cluster restores to an isolated environment at requested PITR point;
-- every service DB/Flyway/role/RLS boundary validates;
-- required service DB can be extracted/imported through approved recovery flow;
-- unrelated current DBs are not destructively restored;
-- failed shared restore triggers correct promotion freeze;
-- `pg_dump + cron` is never treated as substitute for WAL/PITR evidence.
+One journey/route group alone is not an implementation trigger.
 
-HA additionally proves service-cluster failover/independent restore identities.
+## 7. Kafka/event tests
 
-## 6. Kafka/event tests
+Both profiles prove Outbox atomicity, relay duplicate/restart behavior, consumer Inbox/idempotency, offset-after-durable-effect, finite retry/DLQ, stable event identity, required replay/dedup evidence, clean rebuild/replay, TLS/auth/ACL/quota negatives, and Protobuf compatibility.
 
-Both profiles:
+Single-server additionally proves one combined KRaft RF1/minISR1/acks-all/idempotence and explicit non-HA outage behavior.
 
-- Transactional Outbox atomicity;
-- relay duplicate/restart behavior;
-- consumer idempotency/Inbox atomicity where required;
-- offset-after-durable-effect behavior;
-- bounded retry/DLQ;
-- stable event identity;
-- >=35-day critical replay/dedup evidence;
-- clean broker rebuild/replay/reconstruction;
-- TLS/authentication/ACL/quota negatives.
-
-Single-server additionally proves combined KRaft broker/controller configuration, RF=1/minISR=1/acks=all/idempotence, internal-topic compatibility and explicit non-HA outage behavior.
-
-HA proves RF=3/minISR=2 broker/controller failure behavior.
-
-## 7. Security Redis tests
+## 8. Semantic security quota tests
 
 Common:
 
-- TLS;
-- ACL/key-namespace isolation;
-- `noeviction`;
-- atomic quota dimensions;
-- HMAC pseudonymous keying;
-- dual trusted time and exact skew failure;
-- no TTL-based security reset;
-- anti-lockout;
-- outage/time-source fail-closed behavior;
-- memory/cardinality bounds.
+- Redis TLS/ACL/`noeviction`;
+- atomic hard-dimension consumption/no partial commit;
+- HMAC domain-separated pseudonymous keys;
+- exact client-IP hard dimension: IPv4 `/32`, IPv6 `/128`;
+- separate aggregate pressure: IPv4 `/24`, IPv6 `/64`;
+- proof aggregate prefix is not the sole v1 hard 429 gate;
+- NAT/campus/VPN multiple exact-IP tests and IPv6 rotation cases;
+- trusted ADR-0043 exact context; forged forwarding/private-header/proxy negatives;
+- app/Redis <=2s skew and one-clock jump;
+- local wall-vs-monotonic Clock Safety Guard common-mode forward/backward step;
+- boot host-sync gate and 60s stable re-arm;
+- no TTL security reset;
+- bounded cleanup;
+- active-bucket/new-allocation/cleanup aggregate telemetry;
+- adversarial unique-contact/address flood;
+- capacity guard returns `QUOTA_CAPACITY_UNHEALTHY` before eviction/OOM and does not create attacker-cardinality state;
+- outage/time/capacity failures fail closed and stay distinct from normal quota denial;
+- >=30% validated Redis memory reserve at approved peak/attack envelope.
 
-Single-server additionally proves AOF enabled with `appendfsync everysec`, restart recovery, session-loss re-authentication and no false Sentinel/failover claim.
+Single-server adds AOF/restart/session-loss re-authentication/no-failover evidence. HA adds Sentinel/replica behavior.
 
-HA proves Sentinel/replica failover.
-
-## 8. Authentication, MFA and BFF tests
+## 9. Authentication, MFA, BFF, Authorization
 
 Infrastructure profile does not reduce these tests.
 
-Identity/BFF suites cover current:
+Identity/BFF cover password/Google/external identity binding, non-enumeration, TOTP continuation/downgrade prevention, MFA lifecycle/recovery, JWT rules, OIDC state/nonce/PKCE/replay/redirect, browser token isolation, session rotation/revocation/lifetimes, CSRF/Origin/Fetch Metadata/CORS/CSP/cache, exact-audience token brokerage, tenantless restrictions, erasure/session shutdown, and trusted network-context behavior.
 
-- password/Google/external identity binding and non-enumeration;
-- compromised-password fail-closed screening;
-- TOTP continuation and downgrade prevention;
-- MFA enroll/disable/recovery proof/quota/audit;
-- JWT key/audience/time rules;
-- OIDC state/nonce/PKCE/pre-auth/replay/redirect rules;
-- browser token isolation;
-- server-side session entropy/rotation/revocation/index/idle/absolute lifetime;
-- retained-refresh encryption/key rotation/stale-source fail close;
-- CSRF/Origin/Fetch Metadata/same-origin CORS;
-- CSP/cache/security headers;
-- exact-audience BFF token brokerage;
-- tenantless/onboarding authority restrictions;
-- erasure/session shutdown behavior.
+Authorization covers one final authoritative check, ALLOW only on successful authoritative completion, deny/error/timeout/breaker/overload fail closed, no permission cache/Kafka/stale fallback/retry, admin privilege-escalation prevention, owner-safety concurrency, platform-vs-tenant separation, and workload-policy positives/negatives.
 
-Email/SMS MUST NOT pass as an arbitrary weaker substitute for active TOTP where current policy requires TOTP.
+Authorization business DENY remains the current gRPC contract; this PR does not change its semantics.
 
-## 9. Authorization tests
+## 10. Kubernetes/K3s/Istio
 
-- final protected-resource permission path uses one authoritative `CheckPermission`;
-- ALLOW only on successful authoritative completion;
-- denial/error/timeout/breaker/open/overload do not fabricate ALLOW;
-- no permission-result cache/Kafka/stale fallback/retry;
-- safe local checks reject only;
-- caller/operation bulkhead and breaker recovery tests;
-- admin privilege-escalation prevention;
-- owner-safety concurrency;
-- platform capability cannot bypass tenant/resource authority;
-- exact dependency-registry coverage;
-- positive/negative Istio policy cases.
+Single-server proves exact K3s artifact/version/integrity, embedded SQLite, secrets encryption, Flannel/policy controller/bundled Traefik/ServiceLB disabled, Calico active, one replica/HPA off/PDB off, off-host K3s recovery artifacts, clean GitOps rebuild, and whole-host reboot/recovery.
 
-Single-server capacity tests include shared-host contention; security semantics do not change.
+Istio proves STRICT mTLS, exact ServiceAccount identity, least-privilege authorization positives/negatives, NetworkPolicy/HBONE compatibility, `istioctl analyze`, no duplicate retry ownership, and single-server complete-stack resource impact.
 
-## 10. Kubernetes/K3s profile tests
+## 11. Kyverno CEL/supply-chain tests
 
-Single-server:
+New production policy manifests use stable `policies.kyverno.io/v1` CEL types.
 
-- exact K3s/Kubernetes artifact/version/integrity;
-- one server/workload node render;
-- embedded SQLite control-plane datastore;
-- secrets encryption;
-- Flannel disabled;
-- K3s network-policy controller disabled;
-- Calico active and policy negatives pass;
-- bundled K3s Traefik/ServiceLB disabled;
-- repository edge resources remain authoritative;
-- one application replica/HPA disabled/availability PDB disabled render;
-- encrypted off-host K3s datastore+token artifact;
-- clean GitOps rebuild;
-- whole-host reboot/recovery.
+CI/render tests reject legacy production policy declarations such as:
 
-HA keeps current control-plane/worker/quorum/node-loss/topology-spread tests.
+```text
+kyverno.io/v1 ClusterPolicy/Policy
+kyverno.io/v2 CleanupPolicy/ClusterCleanupPolicy
+```
 
-## 11. Istio tests
+unless a narrowly reviewed migration-only exception has owner and removal deadline.
 
-Both profiles:
+Also prove digest-only images, signer positive/wrong/unsigned negatives, provenance/SBOM positive/missing/invalid, privileged/host-network/hostPath/security-context negatives, policy-authoring RBAC, external-context SSRF controls, and fail-closed admission.
 
-- STRICT mTLS positive/plaintext negative;
-- exact ServiceAccount identity;
-- least-privilege AuthorizationPolicy positive/negative;
-- NetworkPolicy/HBONE compatibility;
-- `istioctl analyze`;
-- no duplicate retry ownership.
+Single-server one-replica Kyverno outage must not create bypass.
 
-Single-server additionally runs representative complete-stack benchmark for `istiod`, CNI, `ztunnel`, latency/throughput/connection pressure/OOM and Calico interaction, with >=30% validated resource headroom. Failed capacity blocks production; it does not permit silent mesh disablement.
+## 12. Human access/OpenBao
 
-Waypoints require separate L7 need/capacity/security evidence.
+Single-server proves WireGuard management-only reachability, public SSH denial, FIDO2 presence/verification, no root/password/shared keys, JIT grant/expiry, OS/`sudo`/Kubernetes/DB audit, and off-host audit integrity.
 
-## 12. Kyverno/supply-chain tests
+OpenBao remains unchanged: exact version/topology, snapshot/restore/unseal, Kubernetes Auth/External Secrets, mounted/local key rotation/reload, stale-source fail-close, no request-path OpenBao regression, and no secret leakage.
 
-Both profiles:
+## 13. Edge/client-address tests
 
-- digest-only image;
-- approved signer positive + wrong/unsigned negatives;
-- provenance positive/missing/invalid;
-- signed CycloneDX SBOM positive/missing/invalid;
-- critical privileged/host-network/`hostPath`/securityContext negatives;
-- policy-authoring RBAC;
-- disabled/unneeded HTTP context;
-- approved external-context destination/timeout/response/credential/SSRF negatives;
-- production fail-closed admission.
+- upstream mitigation evidence;
+- external L4 -> Traefik -> WAF -> BFF route;
+- Traefik origin restricted to approved L4 sources;
+- forged forwarding/client-IP headers ignored;
+- untrusted PROXY denied;
+- direct Internet->BFF and Traefik->BFF bypass denied;
+- BFF produces one exact canonical IP context only;
+- backend derives exact hard + aggregate pressure dimensions;
+- no raw client IP in ordinary telemetry.
 
-Single-server additionally verifies that the reduced policy inventory still protects every mandatory control and one-replica admission outage does not create bypass. Audit-only promotion is prohibited.
+## 14. Day-One observability tests
 
-## 13. Human privileged access tests
+Every executable service/critical path proves applicable:
 
-Common:
+- structured allow-listed JSON logs;
+- Micrometer request/operation/dependency/saturation metrics;
+- OpenTelemetry trace creation/propagation/export through internal OTLP Collector;
+- one synthetic journey produces correlated expected logs, metrics, and trace spans across implemented BFF/gRPC boundaries;
+- trace/baggage is correlation only and cannot alter authN/authZ/tenant/quota/idempotency/audit results;
+- baggage allow-list rejects User/Tenant/session/contact/raw-IP/secret values;
+- metric labels remain low-cardinality and exclude trace/subject/request/resource IDs;
+- ADR-0031 secret/PII canaries absent from Loki/Tempo/Prometheus/Grafana-visible data;
+- management scrape and OTLP endpoints not public;
+- Collector wrong-workload/public ingress denied;
+- Collector exact read-only pod-log mount and no broad host access;
+- memory limiter/batch/finite queue/drop behavior;
+- Collector/Loki/Tempo/Prometheus outage/backpressure does not fail ordinary business requests;
+- required authoritative audit remains durable/off-host;
+- independent external black-box check detects total host loss when local monitoring is down.
 
-- no standing administrator/database-superuser/root authority;
-- attributable identity;
-- two-reviewer write elevation;
-- automatic <=30m write expiry;
-- bounded read-only elevation;
-- break-glass exercise;
-- durable protected audit.
+## 15. Complete-stack single-server test
 
-Single-server:
+Run all intended platform/application/observability components together.
 
-- management-path-only SSH;
-- root/password/shared-account/shared-key negatives;
-- hardware-backed OpenSSH FIDO2 user-presence/user-verification positives and negatives;
-- authentication does not itself grant admin;
-- JIT privilege grant/expiry;
-- `sudo` I/O/session audit;
-- OS audit for authentication/process/privilege/security-config changes;
-- Kubernetes/database audit;
-- off-host append-only/tamper-resistant audit integrity and requester access denial;
-- audit export failure handling;
-- `.bashrc`/shell history cannot satisfy session-audit evidence.
-
-HA runs current Teleport SSO/WebAuthn/JIT/session-recording tests.
-
-## 14. OpenBao tests — unchanged
-
-ADR-0042 does not change OpenBao.
-
-Continue current:
-
-- exact OpenBao version/topology checks;
-- Shamir/unseal/recovery exercise;
-- encrypted snapshot/restore;
-- Kubernetes Auth/External Secrets flow;
-- mounted/local key rotation/reload;
-- stale-source/fail-closed behavior;
-- no per-request OpenBao hot-path regression;
-- secret scans proving no Git/image/values/log/trace/metric/CI leakage.
-
-A profile change fails review if it removes/replaces/bypasses OpenBao without a separate current security decision.
-
-## 15. Edge/WAF tests
-
-- upstream volumetric protection evidence;
-- external L4 -> repository Traefik -> Caddy/Coraza -> BFF route;
-- direct Internet->BFF and Traefik->BFF WAF-bypass negatives;
-- K3s bundled Traefik/ServiceLB absence in single-server;
-- WAF DetectionOnly/tuning/blocking evidence;
-- request/body/header bounds independent of WAF;
-- public dashboard/insecure API negatives;
-- anonymous Reference Data routes still traverse the complete edge when active.
-
-## 16. Logging/PII tests
-
-- source/static logging policy;
-- secret/token/cookie/credential leak tests;
-- PII masking/HMAC policy;
-- CR/LF injection negatives;
-- low-cardinality metric labels;
-- pipeline redaction;
-- synthetic canary/runtime leak detection where required;
-- authoritative audit non-drop behavior;
-- single-server off-host privileged-audit durability.
-
-## 17. Complete-stack single-server load/recovery test
-
-Run the selected profile with all intended platform/application components at the same time.
-
-Evidence records:
+Record:
 
 - host CPU/memory/swap/pressure;
-- K3s system overhead;
 - all JVM CPU/RSS;
 - PostgreSQL connections/query/WAL/checkpoint/backup IO;
-- Redis memory/AOF fsync/rewrite;
-- Kafka memory/log IO/produce/fetch/lag;
-- Istio resources/latency;
-- Kyverno admission;
-- edge/WAF;
-- observability;
-- filesystem/free-space/IO latency;
-- reboot/recovery.
+- Redis memory/AOF/cardinality/allocation;
+- Kafka memory/log IO/lag;
+- Istio/Kyverno/edge;
+- Collector queues/drops;
+- Prometheus series/scrape/TSDB;
+- Loki ingest/query/storage;
+- Tempo ingest/query/storage;
+- Grafana/Alertmanager overhead;
+- filesystem/free-space/IO/network/conntrack/FD/listen/ephemeral-port pressure;
+- reboot/recovery and external-monitor behavior.
 
-Required outcome:
+Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security load, safe concurrent WAL+AOF+Kafka+telemetry IO, and no security/admission/backup/observability bypass.
 
-- no OOM kill;
-- no sustained swap pressure;
-- no memory-pressure eviction;
-- >=30% validated CPU+memory headroom at approved peak;
-- applicable >=2x projected peak validation for critical/security paths;
-- safe IO/free-space under concurrent WAL+AOF+Kafka+telemetry;
-- no security/admission/backup bypass required to pass;
-- no fail-open behavior during reboot/recovery.
-
-A `2 vCPU / 3-4 GiB RAM` host is not accepted without this evidence.
-
-## 18. CI/CD ordering
+## 16. CI/CD ordering
 
 Recommended authority order:
 
 ```text
-format/static/architecture
+format/static/architecture/governance
 -> unit
--> contract/schema
--> focused integration/security/migration
--> image build + SBOM/sign/provenance/vulnerability checks
--> Helm/Kubernetes/Istio/Kyverno render/policy/secret checks
--> staging smoke/critical browser
--> profile-specific load/recovery/chaos evidence
+-> contract/schema/dataset
+-> focused integration/security/quota/observability
+-> image + SBOM/sign/provenance/advisory
+-> Helm/Kubernetes/Istio/Kyverno CEL/render/secret
+-> staging smoke/critical browser/telemetry correlation
+-> profile-specific load/recovery/chaos
 -> production approval
 ```
 
-Trusted privileged workflows MUST NOT execute unreviewed PR-controlled code/config with secrets/write tokens/protected environments. Artifacts from untrusted contexts are verified for repository/event/source SHA/producer/integrity before privilege is granted.
+## 17. Definition of Done
 
-## 19. Definition of Done
+A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
 
-A non-trivial change is not complete until applicable evidence proves:
-
-- architecture/service boundary compliance;
-- contract compatibility;
-- migration/transaction correctness;
-- timeout/retry/idempotency/failure behavior;
-- security/authorization/tenant isolation;
-- workload identity/network policy;
-- logging/PII safety;
-- observability;
-- deployment/render/security policy;
-- rollback/fail-forward/recovery behavior;
-- selected production profile consistency.
-
-Documentation-only architecture work may establish target decisions, but it MUST NOT be reported as runtime production readiness when executable implementation/load/recovery evidence does not exist.
+Documentation-only work establishes target decisions only; it never proves runtime production readiness.

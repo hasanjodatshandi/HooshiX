@@ -1,65 +1,46 @@
 # Security Verification Matrix
 
-- **External reference baseline:** OWASP ASVS 5.0.0, latest stable release as reviewed on 2026-08-13.
-- **Repository target:** applicable ASVS Level 2 controls, plus stricter current HooshiX controls where architecture/security decisions require them.
-- **Selected production profile:** `production-single-server` under ADR-0042.
-- **Evidence rule:** this matrix maps verification intent; it is not itself evidence that implementation is secure.
+- **External reference baseline:** OWASP ASVS 5.0.0 as reviewed in current sources.
+- **Repository target:** applicable ASVS Level 2 plus stricter HooshiX controls.
 
-Use versioned ASVS identifiers (`v5.0.0-...`) in test/evidence systems so future ASVS revisions do not silently change the referenced control.
+This matrix maps material security properties to executable evidence. A documented control without executed evidence is `NOT VERIFIED`.
 
-| ID | HooshiX control family | Required evidence |
+| ID | Security property | Required evidence |
 | --- | --- | --- |
-| SEC-001 | New trust boundaries, credential flows, file/webhook/source ingestion and sensitive processing receive threat/abuse modeling; `threat-model.md` is the current platform threat-model authority | reviewed threat model + mitigations + owners + change-trigger review |
-| SEC-002 | Injection prevention: parameterized SQL, safe command construction, contextual output encoding | SAST/Semgrep + negative integration tests |
-| SEC-003 | Boundary validation plus durable domain/database/invariant enforcement | unit/application/integration constraint tests |
-| SEC-004 | Browser session security: BFF-only token custody, HMAC-located server session, secure `__Host-` cookie, exact CSRF/Origin/Fetch-Metadata enforcement, atomic no-grace rotation/termination, user-session revocation index and idle/absolute bounds | browser security tests + Redis/BFF integration/concurrency tests |
-| SEC-005 | Authorization and tenant isolation: deny-by-default final resource enforcement, exact `CheckPermission`/`CheckPlatformPermission` fail-closed contracts, permission-catalog lifecycle/non-reuse, tenant-management privilege-escalation prevention, atomic owner safety, platform no-bypass semantics, forced RLS, transaction-local pool-safe tenant DB context, and cross-service DB privilege denial even when single-server physically consolidates PostgreSQL | authorization contract/matrix + catalog/management/platform/owner-race tests + cross-tenant/RLS pooled-context negatives + cross-database privilege negatives + outage/overload tests |
-| SEC-006 | OAuth/OIDC and token brokerage: exact redirect/return-target canonicalization, PKCE S256, exact state/nonce/verifier entropy, pre-auth HMAC/TTL/single-use/live bound, issuer/audience/signature verification, trusted evidence, server-owned route->audience mapping and arbitrary-audience rejection | protocol/browser replay/tampering/open-redirect + Identity broker contract tests |
-| SEC-007 | Cryptography/key lifecycle: approved algorithms, CSPRNG, purpose-separated keys, BFF AES-256-GCM refresh encryption/AAD, current rotation/old-key/stale-source behavior | config/crypto tests + rotation/staleness/recovery evidence |
-| SEC-008 | Service communication: dedicated workload identity, strict mTLS, least-privilege Istio authorization, deny-by-default NetworkPolicy and exact egress allow-lists; single-server K3s retains Calico custom CNI and benchmark-gated Ambient | positive/negative deployment policy + wrong-workload/arbitrary-egress + K3s/Calico/Ambient benchmark tests |
-| SEC-009 | Secrets/configuration: OpenBao/ESO, no Git/image/log leakage, safe production startup defaults; ADR-0042 does not remove/replace/bypass OpenBao | secret scan + manifest tests + rotation/recovery evidence + profile-diff invariant check |
-| SEC-010 | API abuse controls: OpenAPI/schema validation, Web BFF body/header/multipart bounds, semantic quotas including exact OIDC start/callback buckets, max-five pre-auth, bounded bulk mutation cost, idempotency/replay behavior | API/abuse/concurrency/load tests including Redis outage/skew and Authorization delta-cost/no-refund/all-or-none mutation tests |
-| SEC-011 | Sensitive data: classification, minimization, encryption, redaction, retention/erasure/legal-hold behavior including removal of erased subject tenant/platform authority and BFF sessions/pre-auth/refresh/session-index state | data inventory + erasure/restore/redaction/authorization/session-revocation tests |
-| SEC-012 | Security logging/audit: structured allow-list, CR/LF safety, no raw sensitive data or raw session/pre-auth/client-network identifiers, durable required audit, audited debug elevation; single-server privileged access uses OS/`sudo`/Kubernetes/database audit exported off-host, never shell history as authority | Semgrep + canary sink tests + service audit tests + OpenSSH/JIT/OS/`sudo`/off-host audit evidence |
-| SEC-013 | Browser hardening: same-origin-only v1, mandatory Fetch Metadata on unsafe requests, exact CSP, HSTS/nosniff/referrer/Permissions-Policy, private no-store for auth/session/admin, ADR-0041 public-cache exception only for anonymous safe Reference Data, safe redirects, no unsafe raw HTML/private service-worker caching | header/browser/source/OpenAPI/cache tests |
-| SEC-014 | Supply chain/admission: pinned dependencies/actions, dependency verification, SBOM, vulnerability correlation, provenance/signature, least-privilege policy authoring, bounded policy-engine egress/SSRF controls; single-server may reduce Kyverno replica/policy count but not blocking high-value enforcement | CI/release/admission evidence + wrong/unsigned/missing-attestation negatives + policy inventory review + policy RBAC + SSRF negatives |
-| SEC-015 | Runtime/container hardening: non-root, no privilege escalation, dropped capabilities, RuntimeDefault seccomp, read-only FS where possible, selected-profile replica/HPA/PDB rules without false HA claims | rendered manifest/policy/profile tests |
-| SEC-016 | Recovery/security continuity: off-site WAL/PITR, profile-aware PostgreSQL restore/rebuild, immutable-reference release recovery, key/credential rotation, revoked/erased-data reconciliation; single-server shared-cluster restore starts in isolation; full cold DR follows `runbooks/production-cold-dr.md` and measures ADR-0004 RPO/RTO | scheduled restore/rebuild/rotation exercises + non-destructive service-specific recovery + quarterly cold-DR evidence |
-| SEC-017 | Production human access: zero standing privilege, phishing-resistant authentication, approvals, short TTL, protected audit; single-server normal network admission uses independent per-device WireGuard peers and public TCP/22 denial, then privileged SSH accepts only approved FIDO security-key algorithms, enforces user presence and verification with `PubkeyAuthOptions touch-required,verify-required` or strictly equivalent controls, denies root/password/keyboard-interactive/non-FIDO/shared credentials and unnecessary forwarding, and validates effective `sshd` configuration before activation; HA uses Teleport | WireGuard peer/firewall/public-SSH negatives + `sshd -t`/effective-config evidence + FIDO positive/negative/no-touch-override tests + forwarding/key-revocation negatives + JIT expiry + session/audit evidence |
-| SEC-018 | External providers/webhooks/files/offline reference sources: bounded parsing, signature/auth/integrity/provenance verification as applicable, SSRF destination control, ambiguity/replay handling; BFF arbitrary Internet egress prohibited except configured provider endpoints; Reference Data runtime has no standards-source Internet egress | provider/webhook/file/source security + egress/SSRF tests |
-| SEC-019 | Compromised Password privacy/reference-data boundary: only 20-bit SHA-256 prefix leaves Identity; exact full digest remains local; SQLite dataset path/config server-owned, immutable/read-only/query-only, no write/DDL/ATTACH/extension loading, no external provider/Internet lookup, no subject identity, no full-dataset JVM cache, bounded prefix/result, fail closed on corruption/unavailability, Xerial+bundled SQLite advisory coverage | Identity/service contract tests + malformed/path/URI/SQL/write/extension negatives + workload/egress tests + dataset compiler/integrity/bound tests + log/hash leak negatives + SBOM/native advisory evidence |
-| SEC-020 | Reference Data public/internal boundary: only Country/Currency/TimeZone/SupportedLocale; no generic registry/business authority; reviewed offline source import; immutable signed-image bundle; no DB/Redis/Kafka/runtime source sync; anonymous GET/HEAD creates no session/JWT/CSRF authority; same-origin/WAF path; only BFF workload initially calls gRPC; no subject/tenant state; no stale/fabricated BFF fallback | importer/bundle/canonicalization + OpenAPI/ETag/cache/CORS/CSRF-negative + wrong-workload/egress + no-subject-state/source leak tests when implementation trigger is met |
-| SEC-021 | Single-server Redis security state | TLS/ACL/`noeviction`, AOF `appendfsync everysec`, fail-closed quota/session behavior, no cookie authority reconstruction after state loss, no false Sentinel/failover claim | config + restart/AOF + outage/time + re-authentication + memory-headroom tests |
-| SEC-022 | Single-server Kafka security/correctness despite RF=1 | TLS/auth/ACL/quotas, RF1/minISR1/acks-all/idempotence, Outbox/Inbox, stable replay evidence, no business authority in broker | config + auth negatives + rebuild/replay/duplicate tests |
-| SEC-023 | Single-server capacity does not cause security downgrade | complete-stack load/soak/reboot with >=30% validated CPU/memory headroom, applicable >=2x critical/security peak, safe IO/conntrack/FD/ephemeral-port capacity; no disabling OpenBao/Kyverno/Ambient/PITR/MFA/WAF/fail-closed controls | release benchmark + rendered policy diff + host-network metrics + reboot/recovery evidence |
-| SEC-024 | MFA invariance across infrastructure profiles | active TOTP cannot be bypassed by user-selectable Email/SMS downgrade; infrastructure profile changes no factor-policy contract | Identity/MFA regression + profile-diff review |
-| SEC-025 | Public client-address authority: external L4 supplies validated client source through trusted PROXY v2; Traefik application origin accepts only approved external-L4 sources; Traefik insecure proxy/header trust disabled; Caddy strict trusted-proxy parsing; BFF uses only server-derived internal client IP; backend network quotas use only typed BFF-derived context | direct Internet/non-approved-source Traefik-origin denial + forged `Forwarded`/`X-Forwarded-*`/`X-Real-IP`/private-header negatives + untrusted/missing PROXY tests + proxy-address fail-close + IPv4/IPv6/mapped-address canonicalization + raw-IP leak negatives |
-| SEC-026 | Email identity vs SMTP representation: HooshiX intentionally uses case-insensitive canonical email identity while preserving a case-preserving delivery representation so product equality does not require outbound local-part rewriting | case-only registration/login/reservation uniqueness tests + delivery-address preservation tests + no independent mutation/bypass |
+| SEC-001 | Browser receives no provider/internal access/refresh tokens | BFF cookie/token-custody tests + browser storage/network negatives |
+| SEC-002 | OIDC state/nonce/PKCE/replay/redirect integrity | protocol positive/negative tests |
+| SEC-003 | External identity binds issuer+subject, not email-only | collision/link tests |
+| SEC-004 | Active TOTP cannot be downgraded to weaker factor | MFA regression/negative tests |
+| SEC-005 | Tenant authority/data does not cross tenant boundary | JWT/context + Authorization + forced-RLS/cross-tenant pool negatives |
+| SEC-006 | Authorization failure never fabricates ALLOW | deny/error/timeout/breaker/overload tests; no cache/retry/stale fallback |
+| SEC-007 | Service database/credential isolation | cross-service CONNECT/object/role negatives |
+| SEC-008 | Secrets stay out of Git/image/values/log/trace/metric/CI | secret/render/static/runtime canary scans |
+| SEC-009 | Workload identity/mTLS/NetworkPolicy least privilege | wrong-SA/plaintext/unapproved-edge negatives |
+| SEC-010 | Edge/WAF path cannot be bypassed | direct origin/BFF/Traefik->BFF negatives |
+| SEC-011 | Trusted client address cannot be forged | external-L4 PROXY v2 + exact trusted CIDRs + forged header/untrusted PROXY/proxy-address negatives |
+| SEC-012 | Human privileged access is attributable/JIT/phishing resistant | WireGuard/FIDO2/JIT/audit/break-glass tests |
+| SEC-013 | Supply chain admits only reviewed signed/provenanced/SBOM artifacts | wrong digest/signer/attestation/SBOM/admission negatives |
+| SEC-014 | OpenBao remains secret authority | snapshot/restore/unseal/ESO/local-key tests; no plaintext/Git fallback |
+| SEC-015 | Notification ambiguity does not create blind duplicate send | provider ambiguity/reconciliation/idempotency tests |
+| SEC-016 | Restored data does not revive erased/illegal authority | PITR + erasure/legal-hold reconciliation before traffic |
+| SEC-017 | Compromised-password screening uses approved offline source and fails closed | HIBP SHA-1 source/provenance/freshness/SQLite integrity/no-runtime-provider/false-clean negatives |
+| SEC-018 | Semantic quota exact client identity resists collateral aggregate lockout | `/32`/`/128` hard-gate + separate `/24`/`/64` pressure; NAT/campus/VPN/IPv6 tests |
+| SEC-019 | Semantic quota resists common-mode host clock step | wall-vs-monotonic guard + app/Redis skew + common-forward/backward-step + boot-sync + 60s re-arm tests |
+| SEC-020 | Semantic quota resists high-cardinality Redis exhaustion | unique-subject/address flood + bounded allocation guard + >=30% memory reserve + no eviction/OOM + `QUOTA_CAPACITY_UNHEALTHY` evidence |
+| SEC-021 | Quota failure remains distinct from user denial | time/capacity/transport unavailability mapped separately from 429; no fail-open/local fallback |
+| SEC-022 | Kyverno new production controls use stable CEL APIs | CI/render rejects legacy ClusterPolicy/CleanupPolicy; CEL positive fixtures; wrong signer/provenance/SBOM/security-context negatives |
+| SEC-023 | Day-One telemetry contains no prohibited secrets/PII/high-cardinality identity | source/static + Collector redaction + canary + Loki/Tempo/Prometheus/Grafana query negatives |
+| SEC-024 | Trace/baggage/correlation cannot become security authority | forged trace/baggage tests prove no authN/authZ/tenant/quota/idempotency/audit effect |
+| SEC-025 | Telemetry ingress/storage cannot create public/host compromise path | private OTLP/scrape endpoints + wrong-workload denial + exact read-only Collector log mount + no broad hostPath/host-network/privilege |
+| SEC-026 | Observability failure does not weaken correctness/security | Collector/Loki/Tempo/Prometheus outage/pressure tests; ordinary requests continue where safe; required audit remains durable/off-host |
+| SEC-027 | Total single-host loss is externally detectable | independent external black-box monitor remains alert-capable while local stack is unavailable |
+| SEC-028 | Single-server capacity does not force security downgrade | simultaneous app+DB+Redis+Kafka+mesh+WAF+Kyverno+OpenBao+observability load with >=30% headroom and no bypass |
+| SEC-029 | Email identity comparison/delivery representation remains current product rule | case-only uniqueness/login/reservation + delivery-preservation tests |
 
 ## Security-gate rule
 
-A production-impacting change is not security-verified merely because this matrix is present. Every applicable row requires concrete automated or reviewed evidence tied to the PR/release artifact. A row marked not applicable requires a written scope reason; Critical/High findings and expired exceptions follow ADR-0035/ADR-0038.
+`production-single-server` lowers infrastructure availability only. It does not weaken MFA, Authorization, RLS, OpenBao, WAF, trusted client identity, semantic quota safety, admission, supply-chain, audit, or telemetry privacy.
 
-ADR-0040's SQLite decision is a narrow immutable reference-data exception. It does not weaken PostgreSQL/RLS/Flyway controls for mutable relational business state. ADR-0041 Reference Data uses no database and does not create another persistence exception.
+ADR-0044 ordinary telemetry is best-effort/bounded. Required security/privileged audit is separate authoritative evidence and cannot be silently reclassified as Loki/Collector telemetry.
 
-ADR-0042 is an availability/topology decision. Its single-server exceptions do not weaken security assurance. In particular:
-
-- shared physical PostgreSQL does not weaken service DB/role/Flyway/RLS isolation;
-- RF=1 does not weaken Kafka TLS/ACL/Outbox/Inbox/idempotency/replay semantics;
-- one Redis does not weaken TLS/ACL/`noeviction`/quota-time/fail-closed semantics;
-- one Kyverno replica/reduced policy set does not permit audit-only or unsigned production admission;
-- low memory does not authorize disabling Ambient workload identity/mTLS;
-- hardened OpenSSH/FIDO2 must enforce FIDO presence/verification in effective `sshd` configuration and use real durable audit, not `.bashrc` or shell history;
-- OpenBao remains unchanged;
-- MFA remains unchanged.
-
-ADR-0043 adds network trust boundaries without becoming an authentication/authorization shortcut. WireGuard grants network reachability only. Client forwarding headers are not security authority. The Traefik application origin is not directly Internet-accessible outside the approved external-L4 path.
-
-ADR-0041 implementation/security evidence is required only when its explicit implementation trigger is met and the Reference Data service/facade is included in release scope; architecture documentation alone is not such evidence.
-
-## Maintenance
-
-- Security co-reviews changes that weaken or reclassify a control.
-- ASVS updates are evaluated explicitly; do not silently relabel versioned control identifiers.
-- HooshiX may be stricter than ASVS where current architecture mandates stronger behavior.
-- Do not claim complete ASVS certification from a partial repository mapping.
+A failed applicable security gate blocks the dependent production promotion until remediation and revalidation.
