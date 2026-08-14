@@ -89,7 +89,7 @@ edges:
     owner: identity
     policy_refs:
       - ADR-0012
-      - docs/architecture/services/authorization-service.md#7-provisioning
+      - docs/architecture/services/authorization-service.md#10-identity-provisioning-and-tenant-lifecycle
 
   - operation_id: identity.authorization-member-provisioning
     caller_owner: identity-service
@@ -101,7 +101,7 @@ edges:
     owner: identity
     policy_refs:
       - ADR-0012
-      - docs/architecture/services/authorization-service.md#7-provisioning
+      - docs/architecture/services/authorization-service.md#10-identity-provisioning-and-tenant-lifecycle
 
   - operation_id: identity.authorization-membership-removal-prepare
     caller_owner: identity-service
@@ -113,7 +113,7 @@ edges:
     owner: identity
     policy_refs:
       - ADR-0012
-      - docs/architecture/services/authorization-service.md#8-owner-safety-membership-removal-protocol
+      - docs/architecture/services/authorization-service.md#9-owner-safety-membership-and-role-mutation-protocol
 
   - operation_id: identity.authorization-membership-removal-resolution
     caller_owner: identity-service
@@ -125,7 +125,7 @@ edges:
     owner: identity
     policy_refs:
       - ADR-0012
-      - docs/architecture/services/authorization-service.md#8-owner-safety-membership-removal-protocol
+      - docs/architecture/services/authorization-service.md#9-owner-safety-membership-and-role-mutation-protocol
 
   - operation_id: identity.authorization-tenant-lifecycle-sync
     caller_owner: identity-service
@@ -137,7 +137,19 @@ edges:
     owner: identity
     policy_refs:
       - ADR-0012
-      - docs/architecture/services/authorization-service.md#7-provisioning
+      - docs/architecture/services/authorization-service.md#10-identity-provisioning-and-tenant-lifecycle
+
+  - operation_id: identity.authorization-platform-permission-check
+    caller_owner: identity-service
+    dependency_id: authorization.check-platform-permission
+    class: AUTHORITATIVE_SECURITY
+    failure_action: fail_closed_platform_authorization_unavailable
+    retry_owner: none
+    fallback: none
+    owner: identity
+    policy_refs:
+      - ADR-0013
+      - docs/architecture/services/authorization-service.md#11-platform-capability-authority
 
   - operation_id: notification.result-callback-dispatch
     caller_owner: notification-service
