@@ -1,303 +1,349 @@
 # Testing and Quality Gates — Current State
 
-Testing proves current contracts and failure semantics at the cheapest trustworthy layer. Documentation/configuration is not evidence until corresponding executable check exists and passes.
+Testing proves current contracts and failure semantics at the cheapest trustworthy layer. Documentation/configuration is not evidence until the corresponding executable check exists and passes.
+
+ADR-0042 selects `production-single-server`; profile-specific tests supplement, not replace, service/security/data tests.
 
 ## 1. Test portfolio
 
-Each service uses applicable layers:
+Use the smallest trustworthy layer:
 
-- Domain unit tests;
-- Application use-case tests with fake ports, no Spring;
+- Domain/application unit tests for business invariants;
+- ArchUnit for package/layer/dependency direction;
+- adapter/integration tests with real PostgreSQL/Redis/Kafka/SQLite/protocol behavior where required;
+- contract tests for gRPC/Protobuf/OpenAPI/provider boundaries;
+- migration/RLS/security tests for persistence;
+- policy/render tests for Kubernetes/Helm/Istio/Kyverno/NetworkPolicy;
+- BDD only for critical business behavior;
+- Playwright only for critical browser journeys;
+- load/soak/chaos/recovery tests at staging/release/scheduled cadence where they are too heavy for PR;
+- static + runtime logging/PII/security leak tests;
+- final-image SBOM/signature/provenance/vulnerability tests.
+
+Do not duplicate the same assertion at every layer without a distinct failure class.
+
+## 2. Java/build quality gates
+
+Applicable Java services require, at minimum:
+
+- compile;
+- unit tests;
+- JUnit integration tests;
 - ArchUnit architecture tests;
-- PostgreSQL/Flyway integration tests with Testcontainers when mutable PostgreSQL persistence is used;
-- SQLite adapter/dataset compiler integration tests when ADR-0040 is used;
-- deterministic offline source-import/bundle tests when ADR-0041 Reference Data implementation is used;
-- Kafka/Redis integration tests where used;
-- gRPC/REST/OpenAPI/Protobuf contract compatibility tests;
-- Outbox/Inbox/idempotency/duplicate/restart/replay/DLQ tests where those semantics exist;
-- authorization/tenant/RLS/workload-identity/security tests where applicable;
-- timeout/cancellation/retry/bulkhead/concurrency tests;
-- logging/PII/log-injection/Semgrep/canary-sink tests;
-- load/failover/chaos/recovery tests for critical paths;
-- BDD acceptance tests for critical business behavior;
-- frontend unit/component/accessibility tests;
-- Playwright critical browser journeys.
+- Spotless;
+- SpotBugs;
+- repository Semgrep/static rules;
+- Gradle dependency verification/locks;
+- dependency/license/security checks required by current CI;
+- service-specific contract/migration/security tests.
 
-Do not create meaningless test categories for unused technology. ADR-0040's immutable SQLite reference artifact does not make PostgreSQL/Flyway/Kafka/Redis tests applicable to Compromised Password unless future scope actually introduces those technologies. ADR-0041 Reference Data uses no PostgreSQL/SQLite/Redis/Kafka runtime and does not make those datastore test categories applicable.
-
-## 2. Unit and integration rules
-
-Domain/Application unit tests instantiate code directly and do not start Spring or depend on network/database state.
-
-Integration tests use real infrastructure where behavior under test depends on it. Testcontainers is preferred for PostgreSQL/Kafka/Redis adapters. Embedded SQLite tests use the exact approved Xerial/SQLite dependency and deterministic generated fixture databases. Verify transaction/read-only boundaries, query bounds, path/configuration safety, concurrency, error mapping, and security constraints rather than only happy-path lookup.
-
-Reference Data importer/bundle integration tests use deterministic repository-owned fixtures and source-adapter inputs that preserve source format semantics without requiring live ISO/IANA/Unicode network access. Tests validate provenance/integrity/license metadata handling, canonicalization, duplicate/lifecycle/non-reuse and alias-cycle failures, fa/en coverage, deterministic manifest/content digest, page/response bounds and invalid/tampered bundle readiness behavior.
-
-Tests are deterministic and parallel-safe where intended. Fixed sleeps and shared mutable global fixtures are prohibited as synchronization mechanisms.
+Do not disable a gate, broaden suppression or set `ignoreFailures` merely to pass CI.
 
 ## 3. Contract compatibility
 
-Protobuf contract governance:
+- Protobuf uses Buf lint + breaking checks under current Git-owned contract governance;
+- field numbers are never reused;
+- OpenAPI compatibility/bounds/security headers/errors are tested for public BFF APIs;
+- provider adapters have bounded request/response/ambiguity tests;
+- schema/contract changes include producer/consumer rollout compatibility.
 
-```text
-buf lint: STANDARD
-buf breaking: FILE against current main/approved compatibility base
-```
+Kafka remains async transport; REST is not silently substituted for internal gRPC.
 
-Field-number reuse is prohibited. Generated code remains derived from canonical contracts.
+## 4. Persistence tests
 
-OpenAPI and other externally consumed contracts use compatibility diff/contract checks. No runtime Schema Registry exists in v1.
+For mutable PostgreSQL services:
 
-Compromised Password contract tests prove exact five-uppercase-hex request, exact 59-uppercase-hex suffix/non-negative count response, deterministic ordering/bounds and stable sanitized errors without exposing SQLite/JDBC/native/file details.
+- Flyway migration from supported prior state to current state;
+- released migration immutability;
+- expand/migrate/contract compatibility;
+- runtime role non-owner `NOSUPERUSER NOBYPASSRLS`;
+- cross-service database/role privilege negatives;
+- forced RLS + `USING`/`WITH CHECK` negatives;
+- pooled transaction-local tenant context across commit/rollback/reuse;
+- no remote I/O inside DB transactions;
+- index/query-plan/bounds for sensitive/expensive queries;
+- connection-pool budget under representative peak.
 
-Reference Data contract tests prove only the typed v1 operations (`List/Get` Country/Currency/TimeZone/SupportedLocale plus version), no generic dataset/query surface, canonical identifier/error semantics, deterministic ordering, default page100/max200, opaque family/bundle-bound page tokens, <=128 KiB response, explicit supported display locale and stable sanitized errors.
+Single-server additionally tests shared-instance global pool budget/noisy-neighbor behavior and service-isolation negatives inside the same physical PostgreSQL process.
 
-## 4. BDD and Playwright
+ADR-0040 SQLite tests prove immutable/read-only/query-only fixed lookup, no write/DDL/ATTACH/extension loading, server-owned path, bounded cardinality/response, native dependency integrity and rebuild/redeploy recovery.
 
-BDD/Gherkin describes critical business behavior understandable by Product/QA/Engineering; it does not encode selectors, SQL, method names, or every CRUD edge case. Cucumber-JVM runs on JUnit Platform. Step definitions stay thin.
+ADR-0041 Reference Data tests apply only when implementation trigger/release scope is active and prove deterministic importer/bundle, bounded typed reads and no runtime DB/Redis/Kafka/provider authority.
 
-Playwright Test + TypeScript is primary browser E2E tool. Use semantic locators, web-first assertions, auto-waiting, isolated data, and parallel-safe tests. Fragile CSS/XPath and fixed `waitForTimeout` synchronization are prohibited when semantic alternatives exist. Retries never redefine flakiness as passing; flaky tests have owner and remediation deadline.
+## 5. PostgreSQL recovery tests
 
-Compromised Password's internal SQLite implementation is not a reason to create browser-level storage tests. Critical user-facing password create/change/reset acceptance may prove compromised-password rejection, while storage/security details stay at service/integration layers.
+Both profiles require continuous WAL/off-site backup/PITR evidence, monthly isolated restore and quarterly cold DR.
 
-Reference Data browser tests focus only on public contract behavior: same-origin `/api/v1/reference` GET/HEAD, anonymous access, explicit `fa|en` representation locale, deterministic ETag/304/public one-hour cache, no implicit cookie/session variance, no unsafe method side effects, and stable unavailable/error behavior. Offline source/import internals stay below browser layer.
+Single-server:
 
-## 5. Java executable quality gates
+- whole shared physical cluster restores to an isolated environment at requested PITR point;
+- every service DB/Flyway/role/RLS boundary validates;
+- required service DB can be extracted/imported through approved recovery flow;
+- unrelated current DBs are not destructively restored;
+- failed shared restore triggers correct promotion freeze;
+- `pg_dump + cron` is never treated as substitute for WAL/PITR evidence.
 
-Every Java service is covered by `../engineering/build-and-ci-quality-enforcement.md` and ADR-0039:
+HA additionally proves service-cluster failover/independent restore identities.
 
-- independent Gradle Wrapper/build + dependency verification/locks;
-- Spotless;
-- SpotBugs;
-- ArchUnit `architectureTest`;
-- repository Semgrep architecture/security/logging rules with fixtures;
-- applicable unit/integration/contract/schema tasks;
-- GitHub Actions required checks.
+## 6. Kafka/event tests
 
-`ignoreFailures`, broad analyzer exclusions, disabled mandatory tests, or required-check removal to obtain green CI are prohibited.
+Both profiles:
 
-Compromised Password build verification includes the exact Xerial artifact/native engine in dependency locks, SBOM/advisory correlation and architecture tests keeping SQLite/JDBC types/SQL out of Domain/Application.
+- Transactional Outbox atomicity;
+- relay duplicate/restart behavior;
+- consumer idempotency/Inbox atomicity where required;
+- offset-after-durable-effect behavior;
+- bounded retry/DLQ;
+- stable event identity;
+- >=35-day critical replay/dedup evidence;
+- clean broker rebuild/replay/reconstruction;
+- TLS/authentication/ACL/quota negatives.
 
-Reference Data, when implemented, keeps source parsers/import adapters and bundle serialization in Infrastructure/tooling boundaries; Domain/Application remain independent of source/network/file parser libraries. Dependency/license verification covers any importer library introduced, while the serving runtime retains no standards-source network client unless a later decision explicitly changes that model.
+Single-server additionally proves combined KRaft broker/controller configuration, RF=1/minISR=1/acks=all/idempotence, internal-topic compatibility and explicit non-HA outage behavior.
 
-## 6. CI dependency graph
+HA proves RF=3/minISR=2 broker/controller failure behavior.
 
-Independent checks SHOULD run in parallel, but no downstream mandatory stage proceeds after a required predecessor fails.
+## 7. Security Redis tests
 
-```text
-compile/unit + formatting/architecture/static checks
-+ contract/schema/dependency/secret/security checks
--> focused integration evidence
--> Helm/Kubernetes/runtime policy validation where affected
--> container build
--> final-image SBOM/vulnerability scan + signature/provenance
--> staging deploy
--> smoke + critical acceptance/browser/security checks
--> production-readiness gates
--> promote the same immutable digest
--> production-safe smoke/synthetic checks
-```
+Common:
 
-For ADR-0040, offline dataset compiler validation produces immutable dataset artifact identity/integrity evidence before service release. Production serving does not rebuild/download/mutate the dataset. Application image + dataset format/version compatibility is verified before promotion; exact deployment artifact identity remains reviewed GitOps/release state.
+- TLS;
+- ACL/key-namespace isolation;
+- `noeviction`;
+- atomic quota dimensions;
+- HMAC pseudonymous keying;
+- dual trusted time and exact skew failure;
+- no TTL-based security reset;
+- anti-lockout;
+- outage/time-source fail-closed behavior;
+- memory/cardinality bounds.
 
-For ADR-0041, offline Reference Data import validation runs before the service image is admitted: source revision/provenance/integrity/license metadata, canonical code/lifecycle/alias/display rules, deterministic bundle/manifest/content digest and response/cardinality bounds must pass. The validated immutable bundle is then packaged into the signed service image. Production serving never downloads or mutates standards data.
+Single-server additionally proves AOF enabled with `appendfsync everysec`, restart recovery, session-loss re-authentication and no false Sentinel/failover claim.
 
-Production rebuild after staging validation is prohibited.
+HA proves Sentinel/replica failover.
 
-## 7. Security and supply-chain gates
+## 8. Authentication, MFA and BFF tests
 
-Pre-build controls include applicable SAST, dependency vulnerability/license policy, secret scan, and Gradle verification.
+Infrastructure profile does not reduce these tests.
 
-Final-image controls include signed CycloneDX SBOM, provenance, Cosign signature/attestations, container vulnerability correlation, and exact owned/expiring exceptions.
+Identity/BFF suites cover current:
 
-Current continuous policy from ADR-0035/ADR-0038:
+- password/Google/external identity binding and non-enumeration;
+- compromised-password fail-closed screening;
+- TOTP continuation and downgrade prevention;
+- MFA enroll/disable/recovery proof/quota/audit;
+- JWT key/audience/time rules;
+- OIDC state/nonce/PKCE/pre-auth/replay/redirect rules;
+- browser token isolation;
+- server-side session entropy/rotation/revocation/index/idle/absolute lifetime;
+- retained-refresh encryption/key rotation/stale-source fail close;
+- CSRF/Origin/Fetch Metadata/same-origin CORS;
+- CSP/cache/security headers;
+- exact-audience BFF token brokerage;
+- tenantless/onboarding authority restrictions;
+- erasure/session shutdown behavior.
 
-- newly introduced Critical blocks merge/promotion absent exact unexpired exception;
-- High with available fix blocks production promotion absent exact unexpired exception;
-- deployed digest inventory rescans at least every six hours;
-- advisory/KEV inputs ingest at least every two hours and may trigger targeted rescans;
-- Critical/known-exploited production exposure targets <=24h mitigation and incident handling;
-- High production exposure targets <=48h;
-- Critical exception <=7d, High <=30d; expiry stops new promotion and escalates production exposure;
-- transitive dependency accountability follows deployed artifact owner;
-- scanners do not unauditedly kill running pods and never authorize unsigned/unprovenanced images.
+Email/SMS MUST NOT pass as an arbitrary weaker substitute for active TOTP where current policy requires TOTP.
 
-For Compromised Password, SBOM/advisory evaluation covers both `org.xerial:sqlite-jdbc` and the bundled native SQLite engine. Dataset-source provenance/license/use-right review is separate from software-vulnerability scanning and is required before external source material is admitted by the offline compiler.
+## 9. Authorization tests
 
-For Reference Data, software dependency scanning remains separate from standards-data provenance/license/use-right/integrity review. The signed release provenance binds the exact normalized bundle/source-revision manifest/content digest; production source synchronization is not an alternate recovery/update path.
+- final protected-resource permission path uses one authoritative `CheckPermission`;
+- ALLOW only on successful authoritative completion;
+- denial/error/timeout/breaker/open/overload do not fabricate ALLOW;
+- no permission-result cache/Kafka/stale fallback/retry;
+- safe local checks reject only;
+- caller/operation bulkhead and breaker recovery tests;
+- admin privilege-escalation prevention;
+- owner-safety concurrency;
+- platform capability cannot bypass tenant/resource authority;
+- exact dependency-registry coverage;
+- positive/negative Istio policy cases.
 
-## 8. Kubernetes, mesh, and deployment gates
+Single-server capacity tests include shared-host contention; security semantics do not change.
 
-Affected release candidates run applicable:
+## 10. Kubernetes/K3s profile tests
 
-- `helm lint` and all-environment render;
-- Kubernetes schema/policy/security-context/resources/probes checks;
-- rendered-secret and manifest-diff checks;
-- Gateway API/Traefik/WAF route and negative-bypass tests;
+Single-server:
+
+- exact K3s/Kubernetes artifact/version/integrity;
+- one server/workload node render;
+- embedded SQLite control-plane datastore;
+- secrets encryption;
+- Flannel disabled;
+- K3s network-policy controller disabled;
+- Calico active and policy negatives pass;
+- bundled K3s Traefik/ServiceLB disabled;
+- repository edge resources remain authoritative;
+- one application replica/HPA disabled/availability PDB disabled render;
+- encrypted off-host K3s datastore+token artifact;
+- clean GitOps rebuild;
+- whole-host reboot/recovery.
+
+HA keeps current control-plane/worker/quorum/node-loss/topology-spread tests.
+
+## 11. Istio tests
+
+Both profiles:
+
+- STRICT mTLS positive/plaintext negative;
+- exact ServiceAccount identity;
+- least-privilege AuthorizationPolicy positive/negative;
+- NetworkPolicy/HBONE compatibility;
 - `istioctl analyze`;
-- Ambient enrollment, STRICT mTLS, ServiceAccount, NetworkPolicy, and authorization positive/negative tests;
-- immutable digest/signature/provenance/SBOM admission checks;
-- admission-policy authoring RBAC negatives proving ordinary application/service identities cannot create or modify cluster-scoped policy;
-- Kyverno CEL HTTP-context disabled-by-default checks and, when approved external lookup exists, bounded destination/timeout/response/failure tests plus loopback/link-local/cloud-metadata/unreviewed-private/arbitrary-caller-target SSRF negatives and NetworkPolicy-constrained egress.
+- no duplicate retry ownership.
 
-For Web BFF specifically, rendered policy tests prove only the public edge can reach BFF and BFF egress is restricted to Identity, Authorization management, Reference Data typed read when active, registered resource services, BFF/security Redis, configured Google OIDC endpoints and approved telemetry. Arbitrary Internet/URL egress and wrong workloads are denied.
+Single-server additionally runs representative complete-stack benchmark for `istiod`, CNI, `ztunnel`, latency/throughput/connection pressure/OOM and Calico interaction, with >=30% validated resource headroom. Failed capacity blocks production; it does not permit silent mesh disablement.
 
-For Compromised Password, rendered policy tests prove only Identity can reach application gRPC, application Internet/provider egress is absent, the SQLite dataset path is read-only, any Xerial native-extraction writable temp mount is separate/bounded/non-dataset, and wrong workloads cannot access the service.
+Waypoints require separate L7 need/capacity/security evidence.
 
-For Reference Data, once implemented, rendered policy tests prove only Web BFF may initially reach application gRPC, no public/Traefik direct route targets Reference Data, standards-source Internet egress is absent, the normal root filesystem remains read-only where compatible, and wrong/unregistered application workloads cannot access it. New callers require explicit registry and policy changes.
+## 12. Kyverno/supply-chain tests
 
-## 9. Production resilience/security evidence
+Both profiles:
 
-### Semantic quotas — ADR-0024
+- digest-only image;
+- approved signer positive + wrong/unsigned negatives;
+- provenance positive/missing/invalid;
+- signed CycloneDX SBOM positive/missing/invalid;
+- critical privileged/host-network/`hostPath`/securityContext negatives;
+- policy-authoring RBAC;
+- disabled/unneeded HTTP context;
+- approved external-context destination/timeout/response/credential/SSRF negatives;
+- production fail-closed admission.
 
-Prove atomic multi-dimension enforcement, HMAC pseudonymous keys, anti-lockout sequencing, dual trusted time/<=2s skew, no TTL security reset, 75ms one-attempt fail-closed semantics, Redis Sentinel failover/outage, exact Identity registration values, exact Web BFF `OIDC_START/network=60,1/5s,1h` and `OIDC_CALLBACK/network=120,2/1s,30m` plus max-five-live-pre-auth composition/domain separation from Identity Google-login keys, exact Authorization semantic-mutation cost/no-refund behavior, and >=2x projected peak load.
+Single-server additionally verifies that the reduced policy inventory still protects every mandatory control and one-replica admission outage does not create bypass. Audit-only promotion is prohibited.
 
-### Authorization — ADR-0013/0026/0032/0036
+## 13. Human privileged access tests
 
-Prove complete Authorization contract, not only hot-path happy case:
+Common:
 
-- permission-catalog schema/scope/owner/lifecycle/non-reuse plus unknown/retired/deprecated behavior;
-- exact SYSTEM Role mappings/immutability and custom Role normalization/version/archive/limits;
-- direct override precedence/one-value/no-condition/no-TTL behavior;
-- exact `CheckPermission` request, approved caller workload, success-is-ALLOW/deny-status/no-`allowed=false` semantics;
-- one-call/300ms/no-cache/no-retry/no-fallback and stable deny/unavailable/overload mapping;
-- Web BFF tenant-management workload + local JWT `aud=authorization-service` verification, no role/permission JWT trust and no self-gRPC management check;
-- exact management permission mapping and privilege-escalation negatives for Role permissions/assignment/direct grants/deny removal/owner assignment;
-- bounded management reads, deterministic pagination and `GetMembershipAuthorization` non-authority/no `ExplainPermission` surface;
-- hard limits and atomic management mutation, AUTH_ADMIN_WRITE set-delta cost/max100/quota-before-DB/no-refund behavior;
-- UUIDv4/HMAC idempotency equal-replay/conflict and >=35d evidence;
-- stable error taxonomy and >=365d PII-safe durable audit/reason requirements while proving hot-path checks do not add synchronous audit writes;
-- owner-role mutation and Identity Membership-removal reservation atomic serialization, reservation replay/finalize/cancel/no unsafe expiry;
-- exact `CheckPlatformPermission` Identity-only 300ms/fail-closed profile permissions, platform no-bypass and JIT-only profile assignment/revocation;
-- jOOQ/JDBC-only persistence, forced RLS/pool context negatives, representative query-plan evidence and no remote I/O inside DB transactions;
-- erased User tenant/platform authority removal while tenant-owned Role definitions remain;
-- fair overload shedding, current breaker opening/recovery, paired burn alerts, p95<=100ms/p99<=200ms, >=3 replicas/PDB/spread, Hikari p99<25ms, >=2x peak capacity, one replica/node loss, PostgreSQL failover, and absence of duplicate routine BFF resource permission checks.
+- no standing administrator/database-superuser/root authority;
+- attributable identity;
+- two-reviewer write elevation;
+- automatic <=30m write expiry;
+- bounded read-only elevation;
+- break-glass exercise;
+- durable protected audit.
 
-### Dependency registry — ADR-0033/0036/0040/0041
+Single-server:
 
-Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, current policy-reference anchors including Compromised Password, Reference Data, Authorization platform/lifecycle and Web BFF session/quota/Google/evidence/audience-token/Authorization-management/Reference-Data/resource-dispatch edges, one retry owner, no implicit fallback, and composite-edge semantics.
+- management-path-only SSH;
+- root/password/shared-account/shared-key negatives;
+- hardware-backed OpenSSH FIDO2 user-presence/user-verification positives and negatives;
+- authentication does not itself grant admin;
+- JIT privilege grant/expiry;
+- `sudo` I/O/session audit;
+- OS audit for authentication/process/privilege/security-config changes;
+- Kubernetes/database audit;
+- off-host append-only/tamper-resistant audit integrity and requester access denial;
+- audit export failure handling;
+- `.bashrc`/shell history cannot satisfy session-audit evidence.
 
-### Compromised Password — ADR-0040
+HA runs current Teleport SSO/WebAuthn/JIT/session-recording tests.
 
-Prove the complete self-contained contract:
+## 14. OpenBao tests — unchanged
 
-- Identity NFC/UTF-8/SHA-256 behavior and only first 20 bits/five uppercase hex leave Identity;
-- exact `LookupCompromisedPasswordRange` request validation, 59-uppercase-hex suffix/count response, deterministic ordering and local full-digest exact comparison in Identity;
-- raw password/full hash/User/Tenant/Contact/session data absent from service requests, storage and telemetry;
-- SQLite schema/metadata/version rules; `WITHOUT ROWID` `(prefix,hash)` index path; prefix recomputation/dedup/count-overflow validation;
-- offline dataset compiler deterministic build, source provenance/license/integrity, no plaintext source material in runtime artifact/Git/logs;
-- <=2048 rows per prefix and <=128KiB response compatibility across every prefix; build fails on violation and runtime never truncates;
-- exact Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 baseline until reviewed upgrade; dependency verification, Java25/Linux native compatibility, final-image SBOM/advisory correlation;
-- runtime only server-owned JDBC/database/native configuration; SQLite read-only/query-only; fixed parameterized query; no INSERT/UPDATE/DELETE/DDL/ATTACH/DETACH/arbitrary PRAGMA/extension loading;
-- no full-corpus JVM cache/Bloom authority, Redis/PostgreSQL copy, Kafka path, HIBP/external provider call or arbitrary Internet egress;
-- Identity-only workload authorization, ClusterIP/Ambient strict mTLS/NetworkPolicy negatives;
-- missing/incompatible/corrupt/open/read/storage-saturation/deadline/overload failure maps to fail-closed unchecked-password rejection and never clean result;
-- 900ms caller ceiling, one attempt, no retry/fallback; bounded read connections/in-flight/queue;
-- multi-million-row warm/cold disk-backed load at >=2x projected credential-write peak meets availability>=99.95%, p95<=250ms, p99<=750ms before production;
-- >=3 replicas/PDB2/spread use identical approved dataset version; replica/node loss does not create stale/corrupt fallback;
-- read-only root/dataset path and separate bounded native-extraction temp mount behavior under hardened container;
-- immutable dataset rebuild/redeploy DR and readiness block until compatible dataset identity/schema/integrity passes;
-- no data-subject erasure participant because no subject-linked state; test proves no such state is introduced.
+ADR-0042 does not change OpenBao.
 
-### Reference Data — ADR-0041
+Continue current:
 
-Architecture is decided, but this evidence becomes release-blocking only after the implementation trigger is met and the service/facade enters release scope. Prove:
+- exact OpenBao version/topology checks;
+- Shamir/unseal/recovery exercise;
+- encrypted snapshot/restore;
+- Kubernetes Auth/External Secrets flow;
+- mounted/local key rotation/reload;
+- stale-source/fail-closed behavior;
+- no per-request OpenBao hot-path regression;
+- secret scans proving no Git/image/values/log/trace/metric/CI leakage.
 
-- trigger evidence identifies >=2 independent consumers or one specific production journey; multiple endpoints of one integration layer are not counted automatically;
-- exactly Country/Currency/TimeZone/SupportedLocale families and no generic dictionary/dataset/query/schema API;
-- country ISO 3166-1 alpha-2 identity plus bounded alpha-3/lossless numeric metadata; currency ISO 4217 alpha/numeric/minor-unit metadata; IANA tzdb canonical identifiers; BCP47 supported locales exactly `fa`,`en`;
-- approved ISO/IANA/stable-CLDR offline source revision/provenance/integrity/license/use-right handling and no draft CLDR production input;
-- deterministic canonicalization/dedup/order, lifecycle ACTIVE/DEPRECATED/RETIRED and no silent code reuse/removal; alias graph bounded/acyclic where imported;
-- deterministic immutable bundle/manifest/content digest, tamper/incompatibility readiness failure and bounded startup heap/index footprint;
-- no PostgreSQL/CloudNativePG/Flyway/SQLite/Redis/Kafka datastore and no runtime standards-source/provider Internet call;
-- typed gRPC operations only, exact identifier validation, default100/max200 pagination, opaque family/bundle-bound page tokens, <=128KiB response and stable sanitized errors;
-- BFF `/api/v1/reference` GET/HEAD routes may be anonymous but create no session/JWT/tenant authority, use explicit `fa|en` representation locale, remain same-origin CORS and traverse mandatory edge/WAF;
-- deterministic ETag/304 and `Cache-Control: public, max-age=3600`; no BFF server-side stale/fabricated Reference Data fallback;
-- BFF->Reference Data `AUTHORITATIVE_STATE` <=1000ms/one attempt/wait-for-ready-off/no retry/no fallback/cancellation behavior;
-- only Web BFF workload initially reaches gRPC; wrong workloads/public direct access/arbitrary Internet egress denied;
-- no User/Tenant/Membership/session/credential/permission/business-config state and no ADR-0028 erasure participation;
-- target >=3/PDB2/topology spread, HPA evidence-gated; Class-B availability>=99.95%, p95<=250ms, p99<=750ms and >=2x expected reference-route peak before production;
-- immutable same-digest staging->production image promotion and rebuild/redeploy recovery with bundle validation before readiness.
+A profile change fails review if it removes/replaces/bypasses OpenBao without a separate current security decision.
 
-### Notification — ADR-0006/0007/0014/0018/0020
+## 15. Edge/WAF tests
 
-Prove local key-ring rotation/refresh/corruption/erasure with no hot-path OpenBao RPC, request replay/conflict, exact-content lifecycle, PostgreSQL-authoritative deadlines, durable `DISPATCHING`, crash/failover no-blind-redispatch, Liara SMTP outcome classification, IPPanel accepted/report fixtures, ambiguity/no-blind-retry, and bounded polling.
+- upstream volumetric protection evidence;
+- external L4 -> repository Traefik -> Caddy/Coraza -> BFF route;
+- direct Internet->BFF and Traefik->BFF WAF-bypass negatives;
+- K3s bundled Traefik/ServiceLB absence in single-server;
+- WAF DetectionOnly/tuning/blocking evidence;
+- request/body/header bounds independent of WAF;
+- public dashboard/insecure API negatives;
+- anonymous Reference Data routes still traverse the complete edge when active.
 
-### PostgreSQL — ADR-0019/0027/0034/0037
+## 16. Logging/PII tests
 
-Prove per-service physical/database/credential/backup isolation for mutable relational business state, forced RLS/runtime-role restrictions, transaction-local parameterized tenant context with fail-closed missing/malformed behavior, pooled-connection reuse across different tenants after commit/rollback with no context leakage, synchronous required durability, pool budgets, planned/unplanned failover, WAL/PITR, monthly restore evidence, quarterly DR, failed-drill promotion freeze, one-cluster upgrade waves, and no unsafe downgrade. ADR-0040's immutable SQLite reference artifact and ADR-0041's no-database application bundle do not reduce these requirements where PostgreSQL mutable state exists.
+- source/static logging policy;
+- secret/token/cookie/credential leak tests;
+- PII masking/HMAC policy;
+- CR/LF injection negatives;
+- low-cardinality metric labels;
+- pipeline redaction;
+- synthetic canary/runtime leak detection where required;
+- authoritative audit non-drop behavior;
+- single-server off-host privileged-audit durability.
 
-### Kafka — ADR-0015
+## 17. Complete-stack single-server load/recovery test
 
-Prove KRaft broker/controller failure, RF/minISR/acks/idempotence, TLS/ACL/quotas, 35-day critical publication/dedup evidence, clean-cluster replay/reconstruction, and consumer duplicate/restart safety.
+Run the selected profile with all intended platform/application components at the same time.
 
-### Browser/Web BFF — ADR-0016/0041
+Evidence records:
 
-Prove the complete BFF implementation contract:
+- host CPU/memory/swap/pressure;
+- K3s system overhead;
+- all JVM CPU/RSS;
+- PostgreSQL connections/query/WAL/checkpoint/backup IO;
+- Redis memory/AOF fsync/rewrite;
+- Kafka memory/log IO/produce/fetch/lag;
+- Istio resources/latency;
+- Kyverno admission;
+- edge/WAF;
+- observability;
+- filesystem/free-space/IO latency;
+- reboot/recovery.
 
-- OpenAPI `/api/v1` namespace including `/reference`, internal-RPC non-exposure, RFC 9457 stable/redacted errors, JSON/auth/header size bounds and multipart rejection;
-- Reference Data GET/HEAD anonymous/no-session behavior, explicit `fa|en` representation locale, deterministic ETag/304/public one-hour cache, no hidden cookie/session variance, no cross-origin credentialed CORS, no CSRF requirement only for safe methods, no server stale/fabricated fallback, mandatory edge/WAF traversal and <=1000ms registered gRPC edge when active;
-- exact 256-bit state/nonce, exact 32-byte Base64URL-no-pad PKCE verifier/S256, `__Host-sajtech-preauth` flags/entropy/HMAC locator, <=10m/single-use/max-five state, replay/mismatch negatives;
-- exact provider redirect and <=1024 same-origin relative return target with absolute/`//`/backslash/control/encoded-bypass negatives;
-- provider validation before Identity and provider-token/code absence from Identity/browser/logs;
-- exact OIDC evidence entropy/2m/10m/replay/conflict and Google email/no-auto-link/profile-suggestion behavior;
-- active TOTP after password/Google proof with no completed session before MFA;
-- Identity `IssueAudienceAccessToken` authorized-BFF/active-session/server-allow-list contract, browser arbitrary-audience rejection, onboarding resource/Authorization-audience rejection, five-minute exact audience, 1500ms one-attempt/no-retry/fallback, and no browser JWT exposure;
-- secure `__Host-sajtech-session`, HMAC Redis locator, bounded state, idle<=7d/absolute<=30d immutable, five-minute last-seen write coalescing;
-- one-session-to-RefreshFamily binding, pseudonymous User->sessions index, logout-all/suspension/deletion/erasure/family-reuse cleanup;
-- atomic session rotation with predecessor immediate invalidation/no dual-valid grace;
-- refresh AES-256-GCM 96-bit nonce/128-bit tag/AAD, 90d rotation, dependent-session+7d prior-key retention, atomic reload, <=1h valid snapshot then fail closed;
-- exact 256-bit CSRF/purpose-HMAC/constant-time/no-CSRF-cookie/rotation behavior;
-- unsafe requests require Origin+CSRF+`Sec-Fetch-Site:same-origin`, missing Fetch Metadata fails closed; safe methods side-effect free;
-- same-origin-only/no cross-origin credentialed CORS; exact CSP/no unsafe-inline/eval, HSTS/nosniff/referrer/Permissions-Policy; private auth/session/admin `no-store` and public Reference Data cache exception;
-- exact OIDC quota values plus outage/skew behavior;
-- Authorization-management exact audience/request-id/1500ms behavior and proof BFF never locally grants management/final resource authority;
-- Reference Data existence never becomes business authorization/acceptance authority;
-- registered resource-dispatch failure never fabricates business data;
-- BFF erasure removes all user-linked auth state and returns non-PII idempotent receipt;
-- runtime >=3/PDB2/HPA-gated hardening and exact egress/wrong-workload negatives including Reference Data;
-- browser/storage/service-worker token/private-cache restrictions and critical accessibility/RTL/auth/onboarding/admin/reference journeys where affected.
+Required outcome:
 
-### Edge/DDoS — ADR-0001/0029
+- no OOM kill;
+- no sustained swap pressure;
+- no memory-pressure eviction;
+- >=30% validated CPU+memory headroom at approved peak;
+- applicable >=2x projected peak validation for critical/security paths;
+- safe IO/free-space under concurrent WAL+AOF+Kafka+telemetry;
+- no security/admission/backup bypass required to pass;
+- no fail-open behavior during reboot/recovery.
 
-Prove mandatory upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> WAF -> Web BFF path, direct-bypass denial, controlled blocking/load behavior, no sensitive edge logging, provider capability/escalation, connection-pressure telemetry, and authorized saturation exercise. Anonymous Reference Data remains behind this path.
+A `2 vCPU / 3-4 GiB RAM` host is not accepted without this evidence.
 
-### Secrets/access/logging
+## 18. CI/CD ordering
 
-Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, BFF key-ring rotation/staleness/no-secret logging, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, Authorization platform-profile assignment/revocation JIT audit controls, ADR-0031 Semgrep + pipeline redaction + canary sink + runtime detector safety, and Reference Data no source-path/payload/page-token/unbounded-metadata telemetry leakage when implemented.
+Recommended authority order:
 
-### Java 25 Virtual Threads
+```text
+format/static/architecture
+-> unit
+-> contract/schema
+-> focused integration/security/migration
+-> image build + SBOM/sign/provenance/vulnerability checks
+-> Helm/Kubernetes/Istio/Kyverno render/policy/secret checks
+-> staging smoke/critical browser
+-> profile-specific load/recovery/chaos evidence
+-> production approval
+```
 
-Use JFR/load/soak evidence for native/FFM pinning, contention, and scarce dependency saturation. `synchronized` itself is not blanket prohibited. Compromised Password additionally measures bounded SQLite/native/JDBC I/O concurrency; Virtual Threads never justify unbounded SQLite connections/queue. Reference Data measures bounded in-flight/queue and startup/heap/serialization behavior; Virtual Threads do not authorize unbounded reference requests.
+Trusted privileged workflows MUST NOT execute unreviewed PR-controlled code/config with secrets/write tokens/protected environments. Artifacts from untrusted contexts are verified for repository/event/source SHA/producer/integrity before privilege is granted.
 
-## 10. Smoke tests
+## 19. Definition of Done
 
-After deployment, verify applicable startup/readiness/health, database/Kafka/Redis/SQLite/reference-bundle connectivity or local availability as applicable, one critical REST/gRPC flow, isolated event publish/consume when used, authentication/authorization, timeout/error behavior, and critical Playwright flows. Event smoke uses isolated test tenants/topics/markers and does not create uncontrolled customer data.
+A non-trivial change is not complete until applicable evidence proves:
 
-Compromised Password smoke uses a deterministic non-sensitive fixture/approved dataset marker contract; it verifies one known compromised match, one not-listed result, corrupt/missing-dataset fail-closed behavior in staging where safe, Identity-only caller policy and absence of external provider egress. It never requires plaintext production source data.
+- architecture/service boundary compliance;
+- contract compatibility;
+- migration/transaction correctness;
+- timeout/retry/idempotency/failure behavior;
+- security/authorization/tenant isolation;
+- workload identity/network policy;
+- logging/PII safety;
+- observability;
+- deployment/render/security policy;
+- rollback/fail-forward/recovery behavior;
+- selected production profile consistency.
 
-Reference Data smoke, only after implementation trigger, validates the packaged bundle/version/readiness, one typed list/detail and BFF conditional GET, anonymous/no-session semantics, Web-BFF-only internal caller policy, no direct public service route and absence of runtime standards-source egress. It never downloads live standards data as a smoke-test dependency.
-
-Smoke failure stops rollout; rollback is used only when safe for current schema/data/artifact state.
-
-## 11. Definition of Done
-
-A capability is complete only when applicable:
-
-- behavior is in correct Domain/Application ownership and Hexagonal boundaries;
-- current coding/SQL/frontend standards are satisfied by actual source;
-- required formatter/static/architecture/dependency/CI checks pass;
-- contracts are versioned/compatible;
-- Flyway/rollout/rollback and query/index/pool effects are reviewed for mutable relational persistence; ADR-0040 instead reviews immutable dataset compiler/format/read-only/query/rebuild compatibility; ADR-0041 instead reviews implementation-trigger evidence plus offline source/import/bundle/typed-contract/cache/workload/rebuild compatibility;
-- transaction boundaries contain no remote I/O;
-- deadlines/retry owner/cancellation/idempotency/concurrency are explicit;
-- state+event uses Outbox and consumers are idempotent where applicable;
-- DLQ/replay exists where needed;
-- metrics/logs/traces/alerts are present and PII-safe;
-- workload identity/mesh/network policies are correct;
-- applicable unit/integration/contract/architecture/security/load/recovery/browser tests pass;
-- container/supply-chain/Helm/Kubernetes/Istio/edge checks pass;
-- no current architecture rule is violated;
-- skipped/failed/unavailable required verification is reported.
-
-A task is not reported `completed` when missing required evidence materially prevents confidence. A planned capability such as ADR-0041 Reference Data is not falsely reported as implemented merely because its architecture contract is complete.
+Documentation-only architecture work may establish target decisions, but it MUST NOT be reported as runtime production readiness when executable implementation/load/recovery evidence does not exist.
