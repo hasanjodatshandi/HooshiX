@@ -12,16 +12,17 @@ algorithm/query/model
 -> new architecture mechanism only when evidence earns it
 ```
 
-The selected initial production profile is `production-single-server` under ADR-0042. It intentionally reduces infrastructure redundancy. A `2 vCPU / 3-4 GiB RAM` full-stack host is **not** an approved capacity statement.
+The selected initial production profile is `production-single-server` under ADR-0042. It intentionally reduces infrastructure redundancy. A `2 vCPU / 3-4 GiB RAM` full-stack host is **not** an approved capacity statement. ADR-0043 adds client-address and management-network paths that must be included in host/network capacity evidence.
 
 ## Priority register
 
 | Priority | Bottleneck / risk | Current mitigation | Scale/split trigger |
 | --- | --- | --- | --- |
-| P0 | Single-server shared CPU/RAM/IO/failure domain | complete-stack benchmark; finite requests/limits; >=30% validated CPU+memory headroom; >=2x projected peak evidence on current critical paths/security dependencies; SSD/IO/WAL/AOF/Kafka/telemetry contention measured together; explicit non-HA acceptance | any OOM/memory-pressure eviction, sustained swap, <=30% headroom, repeated host outage, unacceptable maintenance downtime, or unsafe storage contention -> increase host capacity or move to `production-ha` |
+| P0 | Single-server shared CPU/RAM/IO/network/failure domain | complete-stack benchmark; finite requests/limits; >=30% validated CPU+memory headroom; >=2x projected peak evidence on current critical paths/security dependencies; SSD/IO/WAL/AOF/Kafka/telemetry plus MTU/conntrack/FD/ephemeral-port pressure measured together; explicit non-HA acceptance | any OOM/memory-pressure eviction, sustained swap, <=30% headroom, repeated host outage, unsafe storage/network saturation, or unacceptable maintenance downtime -> increase host capacity or move to `production-ha` |
 | P0 | Online Authorization `CheckPermission` on every protected resource operation | exactly one final check; safe reject-only local prechecks; 300ms ceiling; bounded per-caller/global concurrency; no stale allow/cache/retry; current burn/breaker rules | SLO miss after SQL/index/pool/process-capacity tuning at >=2x peak; only then evaluate read-model/cache through revised security decision |
 | P0 | Shared PostgreSQL physical blast radius in single-server profile | distinct service DB/runtime/migration roles/Flyway/RLS; global pool budget <=70% max connections; >=30% operational headroom; WAL/PITR/off-site backup; noisy-neighbor telemetry; isolated whole-cluster restore | sustained IO/checkpoint/WAL/connection contention, unacceptable platform-wide DB maintenance/recovery, or service isolation need -> move persistent services to dedicated `production-ha` clusters |
 | P1 | Web BFF fan-out/session/credential/reference path | 2600ms outer budget; registered bounded downstreams; no automatic authoritative-security retries; HMAC-located Redis state; five-minute `last_seen` write coalescing; bounded AES-GCM work | p95/p99, Redis ops, CPU/crypto, connection pools or downstream saturation burn SLO; tune route budgets/pools/bulkheads, then add host capacity or move to HA before multiplying saturated downstream load |
+| P1 | Public edge/client-address chain | trusted external-L4 PROXY v2, Traefik/Caddy strict trust, WAF-only BFF path, bounded request sizes, caller-header spoof denial | L4/Traefik/WAF handshake/connection/CPU pressure, conntrack/listen/FD/port saturation or client-address parsing cost affects SLO/security -> add capacity/tune bounded edge settings; never enable insecure trust or bypass WAF |
 | P1 | Istio Ambient on one host | no waypoints by default; measure `istiod`/CNI/`ztunnel` idle+peak CPU/RAM, p95/p99 latency, throughput, OOM/restarts and Calico interaction as one full-stack test | benchmark cannot preserve >=30% validated headroom or critical-path budgets -> increase host resources or approve a different reviewed security architecture; do not silently disable workload identity/mTLS |
 | P1 | Security Redis single instance | TLS/ACL/noeviction, AOF everysec, fail-closed quota/session behavior, >=30% memory headroom | sustained AOF/rewrite latency, memory pressure, unacceptable restart/session-loss impact, or security availability need -> split workloads/add capacity or move to HA Sentinel topology |
 | P1 | Kafka single broker/controller | RF1/minISR1/acks=all/idempotence, ACL/TLS/quotas, Outbox/Inbox/replay evidence, broker is not business truth | disk/IO saturation, unacceptable async outage/data-loss exposure, or business need for broker failure tolerance -> move to HA RF3/minISR2 topology |
@@ -40,7 +41,7 @@ The selected initial production profile is `production-single-server` under ADR-
 
 ## 1. Single-server production capacity is an evidence gate
 
-The full stack must be measured **together**. Isolated component sizing is not enough because PostgreSQL WAL/checkpoints/backups, Redis AOF/rewrite, Kafka log IO, Istio, Kyverno, WAF, JVMs and observability compete for the same CPU, memory and storage.
+The full stack must be measured **together**. Isolated component sizing is not enough because PostgreSQL WAL/checkpoints/backups, Redis AOF/rewrite, Kafka log IO, Istio, Kyverno, WAF, JVMs, observability and host networking compete for the same CPU, memory, storage, sockets and kernel tables.
 
 Before production approval, measure at least:
 
@@ -52,6 +53,12 @@ Before production approval, measure at least:
 - Istio `istiod`, CNI and `ztunnel` CPU/RAM/latency/throughput;
 - Kyverno admission latency/memory and fail-closed behavior;
 - edge/WAF and telemetry resource use;
+- effective MTU and PMTU/fragmentation behavior across public/node/pod/Ambient paths;
+- conntrack usage/high-water/drop counters;
+- file-descriptor and listen-queue usage;
+- ephemeral-port/TIME_WAIT pressure;
+- external-L4/Traefik/WAF connection and handshake saturation;
+- public and management interface packet/error/drop counters;
 - complete-stack reboot/startup order and dependency fail-closed behavior.
 
 Pass criteria include:
@@ -64,10 +71,11 @@ no node MemoryPressure eviction
 >=30% validated memory headroom at approved peak
 critical/security dependency load evidence at >=2x projected peak where current readiness policy requires it
 storage latency/free-space inside tested thresholds
-no security/admission/backup bypass required to fit the host
+conntrack/file-descriptor/listen/ephemeral-port safe headroom inside measured thresholds
+no security/admission/backup/network-trust bypass required to fit the host
 ```
 
-If the profile does not pass, increase CPU/RAM/SSD or move to `production-ha`. Do not remove OpenBao, disable Kyverno, weaken Ambient security, reduce PITR, weaken MFA, or convert fail-closed dependencies to fail-open merely to fit a smaller server.
+If the profile does not pass, increase CPU/RAM/SSD/network capacity or move to `production-ha`. Do not remove OpenBao, disable Kyverno, weaken Ambient security, reduce PITR, weaken MFA, enable insecure client-address trust, expose public SSH, or convert fail-closed dependencies to fail-open merely to fit a smaller server.
 
 ## 2. Authorization remains the primary synchronous platform bottleneck
 
@@ -97,9 +105,10 @@ Current controls deliberately reduce amplification:
 - User->sessions index permits bounded revocation/erasure;
 - AES-256-GCM refresh encryption is used only when credential persistence/rotation requires it;
 - access JWT retention never avoids final resource-owner online Authorization;
-- valid public Reference Data uses HTTP validators/cache headers without creating stale BFF authority.
+- valid public Reference Data uses HTTP validators/cache headers without creating stale BFF authority;
+- public network identity is derived once from the ADR-0043 trusted edge and is not reparsed from caller forwarding headers.
 
-Measure BFF by route class and track HTTP latency, in-flight requests, cancellation, downstream pool saturation, Redis ops/latency, provider/token-broker latency, AES-GCM CPU, rejected input counts and write-coalescing effectiveness with low-cardinality labels.
+Measure BFF by route class and track HTTP latency, in-flight requests, cancellation, downstream pool saturation, Redis ops/latency, provider/token-broker latency, AES-GCM CPU, client-address parse/failure counters without raw-IP labels, rejected input counts and write-coalescing effectiveness with low-cardinality labels.
 
 In `production-single-server`, replica count remains one and HPA is disabled. If the BFF saturates after code/bulkhead/pool tuning, first add host capacity or move to `production-ha`; do not create same-host replicas and call them HA.
 
@@ -158,9 +167,11 @@ Waypoints remain absent by default. Add them only for an explicit L7 policy/rout
 
 If Ambient does not fit the validated capacity envelope, the production gate fails. Increase host capacity or approve a reviewed replacement security architecture. Do not silently disable strict mTLS/workload identity.
 
-## 10. WAF latency is measured, never bypassed
+## 10. Public edge/WAF latency and kernel pressure are measured, never bypassed
 
-Measure Coraza/CRS incremental latency, CPU, body inspection, and false-positive rate in DetectionOnly/staging before blocking. Scale host capacity or apply narrow route-specific rule/body policy before architecture changes. Direct Traefik -> BFF application routing remains prohibited.
+Measure external-L4/Traefik/Caddy/Coraza incremental latency, connection/handshake cost, CPU, body inspection, client-address parsing and false-positive rate in DetectionOnly/staging before blocking. Measure conntrack/listen queues/file descriptors/ephemeral ports under the same representative traffic.
+
+Scale host/network capacity or apply narrow route-specific rule/body policy before architecture changes. Direct Traefik -> BFF application routing remains prohibited. A performance problem never authorizes `proxyProtocol.insecure`, `forwardedHeaders.insecure`, caller-header client identity or WAF bypass.
 
 BFF body/header limits remain independent defense in depth.
 
