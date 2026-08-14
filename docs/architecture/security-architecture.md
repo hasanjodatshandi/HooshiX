@@ -18,7 +18,9 @@ Every tenant-owned row has non-null `tenant_id` unless explicitly global. Produc
 
 Tenant lifecycle is `PROVISIONING`, `ACTIVE`, `SUSPENDED`, `DELETING`, `DELETED`. Creator becomes initial owner. Tenant + creator membership + audit + owner-provisioning Outbox commit locally; activation waits for idempotent Authorization acknowledgement.
 
-Authorization owns `tenant_owner` role state. Membership removal never uses a race-prone read-only owner count. Identity first durably records a removal intent, then calls Authorization `PrepareMembershipRemoval` outside the DB transaction with 300ms maximum, one attempt, no retry/cache/fallback. Authorization atomically creates an owner-safety reservation or returns `LAST_TENANT_OWNER`; reservations do not auto-expire into unsafe allow. Identity then commits removal + durable finalize outbox or durably cancels the preparation if removal does not commit. This protocol prevents simultaneous removals from deleting the final owner without duplicating role authority into Identity.
+Authorization owns `tenant_owner` role state. Membership removal never uses a race-prone read-only owner count. Identity first durably records a removal intent, then calls Authorization `PrepareMembershipRemoval` outside the DB transaction with 300ms maximum, one attempt, no retry/cache/fallback. Authorization atomically creates an owner-safety reservation or returns `LAST_TENANT_OWNER`; reservations do not auto-expire into unsafe allow. Identity then commits removal + durable finalize outbox or durably cancels the preparation if removal does not commit.
+
+Authorization local `tenant_owner` assignment/removal/demotion uses the same tenant-scoped owner-safety serialization domain as active Membership-removal reservations. A local role mutation therefore cannot race a prepared Identity removal and independently consume the same final-owner capacity. Caller-supplied owner counts, stale snapshots, and force-last-owner flags are never authority.
 
 ## 2. Logical deletion, retention, erasure, legal hold
 
@@ -30,9 +32,11 @@ ADR-0028 governs irreversible data-subject erasure. Identity coordinates a non-P
 
 Self-erasure requires authentication age <=5m and active MFA proof when applicable. It is not accepted while the User retains an ACTIVE/SUSPENDED Membership for a non-DELETED Tenant. The User must first leave Memberships, transfer last ownership, or complete tenant deletion through the owner-safe protocol above; erasure never bypasses last-owner safety. Acceptance atomically makes the User `DELETING`, revokes all RefreshFamilies, revokes pending invitations targeting that User, records audit/request state, and creates the erasure outbox. No remote I/O occurs inside that transaction.
 
+Authorization erasure removes the erased subject's service-owned tenant/global authority: subject-linked MembershipRole state, direct Membership overrides, subject-linked authorization projections, and any platform capability-profile assignment. Tenant-owned Role/RolePermission definitions remain. Required retained audit facts remove the direct User link or replace it with an irreversible service-scoped erasure pseudonym that cannot restore application authority. Authorization never requires Contact/email/phone data for this workflow.
+
 Coordination uses local Transactional Outbox + versioned Kafka/Protobuf events and idempotent participant Inbox/receipt processing rather than availability-coupled synchronous fan-out. Critical publication/Inbox-dedup evidence follows the existing 35-day recovery horizon. Restore procedures replay erasure/legal-hold decisions and reconcile required participant receipts before traffic.
 
-Legal hold is an explicit durable audited ledger with `ACTIVE -> RELEASED`, actor, authority/reference, timestamps, policy version, and integrity evidence. Ordinary erasure callers cannot create, release, omit, or bypass a hold. A hold may block irreversible progress but never reactivates the User or restores sessions. v1 exposes no ordinary self-service erasure undo; irreversible participant work is never cancellable. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
+Legal hold is an explicit durable audited ledger with `ACTIVE -> RELEASED`, actor, authority/reference, timestamps, policy version, and integrity evidence. Ordinary erasure callers cannot create, release, omit, or bypass a hold. A platform User entry point requires the explicit Authorization platform permission `platform.legal_hold.manage`; any separate legal-authority path must be at least as privileged/audited and cannot silently bypass Authorization. A hold may block irreversible progress but never reactivates the User or restores sessions. v1 exposes no ordinary self-service erasure undo; irreversible participant work is never cancellable. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
 
 ## 3. Browser/BFF/OIDC security
 
@@ -123,9 +127,11 @@ SMS MFA proof is purpose-separated from all other Identity challenges: exactly e
 
 ## 5. Authorization ownership and runtime
 
-Authorization Service owns roles, role permissions, membership-role assignments, direct grants/denies, evaluation, management audit, membership-removal owner-safety reservations, Identity-driven tenant/member lifecycle projections, and private persistence. Permission meaning/resource/domain invariants remain owned by the protected bounded context.
+Authorization Service owns the exact permission-definition catalog/projection, tenant SYSTEM/custom roles, role permissions, membership-role assignments, direct Membership grants/denies, online evaluation, management idempotency/audit, owner-safety reservations, Identity-driven tenant/member lifecycle projections, platform capability assignments, and private PostgreSQL persistence. Permission-key meaning/resource/domain invariants remain owned by the protected bounded context.
 
-Evaluation:
+Permission keys are exact Git-owned contracts with TENANT/PLATFORM scope and `ACTIVE -> DEPRECATED -> RETIRED` lifecycle. Unknown/retired keys fail closed; deprecated keys cannot receive new grants/assignments; identifiers are never reused for new meaning. v1 has no Role inheritance, wildcard permission assignment, resource-condition policy, or caller-defined expression language.
+
+Tenant evaluation:
 
 ```text
 Direct Membership Deny
@@ -134,9 +140,9 @@ Direct Membership Deny
 > Default Deny
 ```
 
-No role inheritance or wildcard permission assignments in v1. Final enforcement is always in the resource-owning service and never overrides tenant ownership/domain invariants.
+SYSTEM Roles are server-owned/immutable. Current semantics are `tenant_owner` = all active tenant permissions, `tenant_admin` = all active tenant permissions except `tenant.delete` and `membership.owner.assign`, and `tenant_member` = `tenant.read`, `membership.read`, `role.read`. Custom Roles are bounded `ACTIVE -> ARCHIVED`, versioned, and tenant-name unique under the current normalization rules.
 
-Current online `CheckPermission` contract:
+Current online `CheckPermission` request contains only `tenant_id`, `membership_id`, and exact `permission_key`:
 
 ```text
 deadline: 300 ms
@@ -149,11 +155,21 @@ stale fallback: none
 fail closed
 ```
 
-Authoritative deny -> `PERMISSION_DENIED`; dependency/open-breaker failure -> `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`; healthy saturation -> `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED`, mapped by callers to fail-closed dependency unavailability.
+Successful RPC completion means **ALLOW**. Authoritative deny -> `PERMISSION_DENIED / AUTHORIZATION_DENIED`; dependency/open-breaker failure -> `UNAVAILABLE / AUTHORIZATION_UNAVAILABLE`; healthy saturation -> `RESOURCE_EXHAUSTED / AUTHORIZATION_OVERLOADED`, mapped by callers to fail-closed dependency unavailability. There is no successful `allowed=false` response and no Role/permission snapshot in success.
 
 Safe local JWT/claim/tenant/syntax prechecks may reject invalid traffic but never grant access. Bloom filters, signed permission lists, caches, stale allow, or duplicate routine BFF checks are not authoritative.
 
-Identity `PrepareMembershipRemoval` is a separate authoritative-security edge, also 300ms maximum/one attempt/no retry/cache/fallback/fail closed. Its safety result is persisted by Authorization as an idempotent reservation rather than cached/read-only state. Finalize/cancel and owner/member/tenant lifecycle synchronization are durable commands resolved after local Identity intent/Outbox commit.
+Browser tenant-administration traffic reaches Authorization through Web BFF. Authorization locally verifies the Identity JWT with exact audience `authorization-service`, derives trusted actor/tenant/Membership claims, and performs the management permission check in-process rather than calling its own gRPC API. Caller-provided actor/role/permission snapshots are not authority. Role/grant mutations cannot introduce a permission the actor does not possess; removing a direct DENY is treated as privilege-elevating and requires that permission.
+
+Administration hard limits are bounded by current ADR-0013/service contract; `AUTH_ADMIN_WRITE` quota is evaluated before the DB transaction by actual semantic mutation count (maximum 100), is not refunded after later DB failure, and the local PostgreSQL mutation remains all-or-nothing.
+
+Identity `PrepareMembershipRemoval` is a separate authoritative-security edge, also 300ms maximum/one attempt/no retry/cache/fallback/fail closed. Its safety result is persisted by Authorization as an idempotent reservation rather than cached/read-only state. Finalize/cancel and owner/member/tenant lifecycle synchronization are durable commands resolved after local Identity intent/Outbox commit. Local owner Role mutations share the same serialization domain.
+
+`platform_admin` is an explicit global SYSTEM capability profile, not a tenant Role/wildcard. Current platform permissions are `platform.tenant.create`, `platform.tenant.suspend`, `platform.tenant.resume`, `platform.tenant.restore`, and `platform.legal_hold.manage`. Identity performs authoritative `CheckPlatformPermission(user_id, permission_key)` with 300ms maximum, one attempt, no retry/cache/fallback and fail-closed behavior. Only Identity workload may use this edge. Platform permission never bypasses tenant/resource/domain invariants, and platform assignment/revocation is excluded from ordinary tenant APIs and requires a separately privileged JIT-controlled audited workflow.
+
+Authorization management/lifecycle/platform writes use canonical UUIDv4 request identity plus purpose/version HMAC-SHA-256 intent fingerprints. Equal replay returns the original committed outcome; changed intent under the same ID returns `REQUEST_ID_CONFLICT`. Security-sensitive idempotency evidence remains >=35d. Required management/platform audit is durable and >=365d; owner changes, direct grant/deny changes, Role-permission mutation and platform-authority operations require a bounded CR/LF-safe reason. Routine hot-path CheckPermission allow/deny remains bounded telemetry rather than adding a synchronous durable audit write on every request.
+
+Authorization uses jOOQ/JDBC without JPA. Tenant-owned tables use forced RLS and transaction-local trusted tenant context. `CheckPermission` query budget remains <=100ms with representative query-plan evidence. No Redis/gRPC/HTTP/Kafka/provider I/O occurs inside Authorization DB transactions.
 
 Production Authorization target:
 
@@ -204,19 +220,23 @@ Authentication anti-lockout: source dimensions may block before credential work;
 
 Registration exact current values are server-owned: REGISTER Contact 5/refill1 per15m/24h and network 60/refill1 per5s/1h; RESEND Contact 5/refill1 per10m/2h plus 60s challenge spacing and network 60/refill1 per5s/1h; CONFIRM network 120/refill2 per1s/30m plus challenge-local five-proof cap. Contact-management/recovery variants use distinct domain-separated namespaces even when reusing an approved numeric envelope.
 
+Authorization `AUTH_ADMIN_WRITE` uses the current actor+scope and tenant/platform buckets. Request cost is the actual semantic mutation count with minimum 1 and maximum 100; for Role permission replacement this is additions+removals. Both dimensions consume atomically before the DB mutation and consumption is not refunded by a later DB failure.
+
 ## 8. Workload identity, mTLS, network security
 
 Production application workloads use dedicated Kubernetes ServiceAccounts and Istio Ambient STRICT mTLS. Kubernetes `default` ServiceAccount is prohibited. AuthorizationPolicy is default-deny/identity-based; NetworkPolicy is independent defense in depth. New/changed service edges require positive and negative identity/policy tests.
 
 Istio does not replace end-user authorization or native Kafka/PostgreSQL/Redis authentication/ACLs.
 
-Authentication dependency ownership follows the machine-readable registry: Web BFF owns the provider-protocol edge to Google and the trusted evidence/session edge to Identity; Identity does not own a direct Google login/link dependency. Identity owns explicit edges to semantic-quota Redis, compromised-password service, Notification durable handoff, Authorization owner/member provisioning, owner-safe Membership-removal prepare/resolution, and tenant lifecycle synchronization.
+Authentication dependency ownership follows the machine-readable registry: Web BFF owns the provider-protocol edge to Google and the trusted evidence/session edge to Identity; Identity does not own a direct Google login/link dependency. Identity owns explicit edges to semantic-quota Redis, compromised-password service, Notification durable handoff, Authorization owner/member provisioning, owner-safe Membership-removal prepare/resolution, tenant lifecycle synchronization, and authoritative `CheckPlatformPermission` for platform tenant/legal-hold operations.
+
+Authorization workload policy distinguishes operations: approved resource-owner workloads may call only registered permission-check surfaces for their namespaces; Identity may call its lifecycle/platform-authority operations; Web BFF may call the reviewed management surface. Workload identity never replaces end-user/tenant management authorization.
 
 ## 9. Secrets and cryptographic material
 
 OpenBao 2.6.1 is the authoritative secret source; External Secrets is the normal Kubernetes materialization boundary. Secret values never enter Git, images, Helm/Kustomize values, logs, traces, or metrics.
 
-Rotating key rings are mounted read-only; key purposes are separated and key IDs never rebind to new bytes. Notification/BFF/Identity use purpose-specific local key rings where current contracts require them. Normal application hot paths do not make routine OpenBao RPCs.
+Rotating key rings are mounted read-only; key purposes are separated and key IDs never rebind to new bytes. Notification/BFF/Identity use purpose-specific local key rings where current contracts require them. Authorization idempotency HMAC material is likewise purpose-separated and locally mounted. Normal application hot paths do not make routine OpenBao RPCs.
 
 ## 10. Public edge and DDoS
 
@@ -247,16 +267,20 @@ Production application workloads use immutable digest, non-root, `allowPrivilege
 
 Privileged containers, host networking, `hostPath`, extra capabilities, or relaxed security context require an explicit current security decision plus automated validation.
 
+Authorization production defaults use `platform-apps/authorization-service` workload identity, application gRPC convention 9090, separate management port, 64KiB inbound message cap, 16KiB metadata cap, minimum 3 replicas, PDB `minAvailable=2`, and HPA initial 3..12. Liveness is local process/runtime only; readiness requires the DB, compatible permission catalog/projection, approved local JWT verifier bundle for management traffic, and required local security configuration.
+
 ## 13. Logging/PII and privileged access
 
 Logging is structured and allow-list based. Raw passwords/OTP/recovery codes/tokens/cookies/keys/secrets/payment data/high-risk identity data/full sensitive payloads/SQL binds/complete gRPC metadata/Kafka headers/unreviewed provider payloads are prohibited.
 
 Ordinary PII requires an approved purpose and masking/tokenization or managed-key HMAC pseudonymization where correlation is needed. Input-derived fields are CR/LF-safe; exception/provider text is untrusted until sanitized. Metric labels remain low-cardinality and exclude business/security IDs, trace IDs, raw URLs, and free-form errors.
 
+Authorization durable audit stores only bounded trusted actor/workload and technical target identifiers, stable action/result/machine code, bounded before/after summary or digest, policy/catalog version, and UTC-microsecond time. It never stores raw JWT, Contact/email/phone, HMAC material, arbitrary request body, SQL bind, or unrestricted exception text. Required reason fields are trim+NFC, 1..500 code points, and reject control characters including CR/LF.
+
 Static Semgrep rules, pipeline redaction, synthetic canary sink tests, and runtime leak detection provide defense in depth.
 
-Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, least privilege, and recorded/audited sessions. Standing admin/root/database-superuser/shared credentials are prohibited.
+Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, least privilege, and recorded/audited sessions. Standing admin/root/database-superuser/shared credentials are prohibited. Authorization platform-profile assignment/revocation is available only through a separately privileged JIT-controlled audited workflow, not ordinary BFF/tenant APIs.
 
 ## 14. Verification
 
-Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse; local registration Contact reservation expiry/non-overwrite/login identifier/non-enumeration tests; password recovery/no-first-local-Credential tests; OIDC exact 256-bit/2m/10m evidence replay/provider-token/unverified-email/no-auto-link tests; active-TOTP after both password and Google proof; five-minute/five-proof/TOTP-replay/SMS no-downgrade and exact SMS challenge tests; MFA-state-change/session-family revocation; compromised-password 20-bit SHA-256 prefix/raw/full-digest non-egress/deadline/fail-closed tests; exact JWT claim/audience/<=30s leeway tests; Authorization deny/outage/overload/recovery plus concurrent owner-safety reservation/finalize/cancel; semantic-quota exact registration/time/failure tests; self-erasure Membership/last-owner/pending-invitation/session/legal-hold/Kafka-replay/restore tests; workload identity/mTLS/NetworkPolicy positives and negatives; WAF/bypass/DDoS controls; secret/key rotation/recovery; PII/log-injection canaries; artifact admission/vulnerability gates including policy-authoring RBAC/policy-engine SSRF negatives; privileged-access expiry/direct-access denial; and restore/erasure reconciliation.
+Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse; local registration Contact reservation expiry/non-overwrite/login identifier/non-enumeration tests; password recovery/no-first-local-Credential tests; OIDC exact 256-bit/2m/10m evidence replay/provider-token/unverified-email/no-auto-link tests; active-TOTP after both password and Google proof; five-minute/five-proof/TOTP-replay/SMS no-downgrade and exact SMS challenge tests; MFA-state-change/session-family revocation; compromised-password 20-bit SHA-256 prefix/raw/full-digest non-egress/deadline/fail-closed tests; exact JWT claim/audience/<=30s leeway tests; Authorization permission-catalog lifecycle/non-reuse, SYSTEM/custom Role/override limits, exact CheckPermission success/deny semantics, management audience/workload/local-evaluator/privilege-escalation negatives, AUTH_ADMIN_WRITE cost/no-refund/all-or-none behavior, platform permission no-bypass/outage/wrong-workload tests, concurrent owner-role/removal reservation safety, idempotency/audit/reason/PII controls, jOOQ/RLS/query-plan/no-remote-I/O tests, and erased subject tenant/platform authority removal; semantic-quota exact registration/time/failure tests; self-erasure Membership/last-owner/pending-invitation/session/legal-hold/Kafka-replay/restore tests; workload identity/mTLS/NetworkPolicy positives and negatives; WAF/bypass/DDoS controls; secret/key rotation/recovery; PII/log-injection canaries; artifact admission/vulnerability gates including policy-authoring RBAC/policy-engine SSRF negatives; privileged-access expiry/direct-access denial; and restore/erasure reconciliation.
