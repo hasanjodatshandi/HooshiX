@@ -241,6 +241,19 @@ edges:
       - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
       - docs/architecture/services/authorization-service.md#7-tenant-management-authentication-and-authorization
 
+  - operation_id: web-bff.reference-data-read
+    caller_owner: web-bff
+    dependency_id: reference-data.read
+    class: AUTHORITATIVE_STATE
+    failure_action: reference_data_unavailable_no_fabrication
+    retry_owner: none
+    fallback: none
+    owner: web-bff
+    policy_refs:
+      - ADR-0041
+      - docs/architecture/services/reference-data-service.md#9-bff-dependency-contract
+      - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
+
   - operation_id: web-bff.resource-api-dispatch
     caller_owner: web-bff
     dependency_id: registered-resource-service
