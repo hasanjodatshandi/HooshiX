@@ -22,7 +22,7 @@ Prohibited in every environment:
 
 Cross-bounded-context data moves only through approved versioned synchronous contracts or integration events.
 
-### Immutable local reference-data exception — ADR-0040
+### Immutable local SQLite reference-data exception — ADR-0040
 
 Compromised Password Service uses one narrowly approved embedded SQLite database as an **immutable, read-only, rebuildable reference-data artifact**. It is not mutable service business persistence or cross-service integration storage.
 
@@ -39,11 +39,28 @@ The exception is limited to the compromised-password dataset and has these prope
 
 Exact schema/query/runtime bounds are in `services/compromised-password-service.md` and ADR-0040. Recovery redeploys/reconstructs the approved immutable artifact and validates it before readiness.
 
+### Immutable application-bundled Reference Data — ADR-0041
+
+Reference Data v1 uses **no database or broker**. Country, Currency, TimeZone, and SupportedLocale are a small immutable read-only application resource packaged inside the same signed service image after reviewed offline import.
+
+This is not another SQLite/persistence exception:
+
+- no PostgreSQL, CloudNativePG, Flyway, SQLite, Redis, or Kafka datastore exists for Reference Data v1;
+- runtime performs no ISO/IANA/Unicode/CLDR Internet synchronization;
+- exact source revisions, provenance/integrity/license evidence and content digest are immutable bundle/release metadata;
+- production has no write/update endpoint or separately mutable dataset volume;
+- startup may load only these deliberately small bounded families into immutable in-process indexes;
+- another service consumes the data only through the approved typed gRPC contract, initially Web BFF;
+- caller-selected dataset/schema/query registries and generic shared key/value data are prohibited;
+- tenant/user/business configuration and mutable source-of-truth state are outside this boundary.
+
+If Reference Data later gains mutable relational business state, the normal PostgreSQL/Flyway/CloudNativePG architecture applies after explicit bounded-context/persistence review.
+
 ### Tenant isolation
 
 Every tenant-owned production PostgreSQL table uses forced PostgreSQL RLS plus application/repository tenant enforcement. Trusted tenant context comes only from validated authenticated context and is installed with transaction-local semantics; session-scoped tenant state on pooled connections is prohibited. The canonical SQL/Flyway standard requires a parameterized transaction-local setting such as `set_config(..., true)`, fail-closed absent/malformed context, and pooled-connection reuse tests across commit/rollback. Runtime roles are `NOSUPERUSER NOBYPASSRLS`, are not table owners, and cannot connect/access another service database.
 
-The ADR-0040 SQLite reference dataset is global security reference data, not tenant-owned data, and contains no tenant identifier; PostgreSQL RLS does not apply to it.
+The ADR-0040 SQLite dataset and ADR-0041 Reference Data bundle are global reference data, not tenant-owned business state, and contain no tenant identifier; PostgreSQL RLS does not apply to them.
 
 ## 2. Production PostgreSQL topology
 
@@ -66,9 +83,9 @@ Application pools use the service cluster primary/read-write endpoint for transa
 
 Aggregate application Hikari maxima across a service's HPA maximum stay <=70% of that cluster's `max_connections`; >=30% remains for replication/failover, migrations, monitoring, administration, and emergencies. PgBouncer is not a default and requires measured connection-pressure evidence.
 
-ADR-0040 Compromised Password SQLite lookup uses service-owned bounded read concurrency rather than Hikari/PostgreSQL connection budgets.
+ADR-0040 Compromised Password SQLite lookup uses service-owned bounded read concurrency rather than Hikari/PostgreSQL connection budgets. ADR-0041 Reference Data has no DB connection pool.
 
-## 3. Flyway, schema evolution, JPA, jOOQ, and SQLite reference artifact
+## 3. Flyway, schema evolution, JPA, jOOQ, and immutable reference data
 
 Flyway is the only schema-change mechanism for mutable service relational persistence. Released/executed migrations are immutable. Evolution follows:
 
@@ -84,7 +101,9 @@ jOOQ/JDBC is appropriate for complex read/query models, bulk/set-based work, CTE
 
 ADR-0040 SQLite does not use runtime Flyway migrations. Its schema is part of the offline immutable dataset format, versioned and validated before publication. SQLite/JDBC types and SQL stay Infrastructure-only and never enter Domain/Application.
 
-Canonical PostgreSQL SQL/query/migration details live in `../engineering/sql-and-flyway-coding-standards.md`; the ADR-0040 exception is governed by its service document and ADR and does not redefine PostgreSQL standards.
+ADR-0041 Reference Data has no runtime schema/migration technology. A format/source change creates a new deterministic immutable application bundle and signed service image. Runtime never performs in-place data/schema migration.
+
+Canonical PostgreSQL SQL/query/migration details live in `../engineering/sql-and-flyway-coding-standards.md`; ADR-0040 and ADR-0041 do not redefine PostgreSQL standards.
 
 ## 4. Query and transaction rules
 
@@ -102,7 +121,9 @@ Virtual Threads do not create database capacity; pool pending/acquisition and qu
 
 Compromised Password runtime uses one fixed indexed SQLite read by exact 20-bit prefix. It has no runtime write transaction, no full-table scan on the normal path, no dynamic SQL, and no full-dataset application-memory cache. Prefix cardinality and response size are hard-bounded by dataset build validation. Runtime failure never truncates a result into a false clean-password decision.
 
-## 5. PostgreSQL backup, restore, DR, and rebuildable reference data
+Reference Data is not a database query path. Its typed immutable in-process reads use deterministic ordering, default page size 100, maximum 200, bounded opaque/versioned page tokens and <=128 KiB serialized response. No generic dataset selector, fuzzy/full-text query language, dynamic schema or caller-selected sort expression exists in v1.
+
+## 5. PostgreSQL backup, restore, DR, and rebuildable/immutable reference data
 
 Current service-cluster baseline for services with mutable PostgreSQL relational business persistence:
 
@@ -122,6 +143,8 @@ Restored environments MUST reconcile data integrity plus current logical-deletio
 
 The ADR-0040 SQLite dataset is not restored through PostgreSQL backup/PITR. It is rebuildable reference data and is recovered from the approved immutable dataset release artifact or deterministic approved import evidence. A pod remains unready until compatible dataset identity/schema/integrity requirements pass. This exception is not permission to skip backup/recovery for mutable application state.
 
+ADR-0041 Reference Data likewise has no database backup/PITR. Recovery redeploys the same approved signed image/bundle or deterministically rebuilds the approved release from reviewed source/import evidence. The service remains unready until bundle format/source-manifest/content-integrity validation passes.
+
 ## 6. Kafka platform and contracts
 
 Kafka is asynchronous integration transport, not ordinary request/reply and not business source of truth.
@@ -140,7 +163,7 @@ Kafka native TLS/authentication/per-service principals/ACLs/quotas remain mandat
 
 Protobuf schemas are Git-owned and validated with Buf `STANDARD` lint + `FILE` breaking compatibility. Field numbers are never reused. No runtime Schema Registry exists in v1.
 
-Compromised Password v1 uses no Kafka path; its dataset release is an immutable artifact, not an event stream.
+Compromised Password and Reference Data v1 use no Kafka path; their immutable reference releases are not event streams.
 
 ## 7. Transactional Outbox and publication evidence
 
@@ -150,7 +173,7 @@ Default relay is polling + `SKIP LOCKED`; CDC/Debezium requires measured need an
 
 For critical `OUTBOX_REPLAYABLE` events, published outbox/equivalent immutable publication evidence is retained for **at least 35 days**, aligned with PITR/recovery. It preserves stable event identity and an approved replay payload or deterministic reconstruction reference. Privacy/erasure/legal-hold rules still apply and secrets are never retained merely for replay.
 
-ADR-0040 runtime has no mutable state+event business effect and therefore no Outbox requirement in v1.
+ADR-0040 and ADR-0041 runtimes have no mutable state+event business effect and therefore no Outbox requirement in v1.
 
 ## 8. Consumer semantics
 
@@ -185,10 +208,12 @@ Redis is not a shared business cache or durable business source of truth. Raw PI
 
 Any business cache remains service-owned, defines correct miss/TTL/stampede/failure behavior, bounds object/key cardinality, and never fabricates authorization or business truth. Distributed locks require proven need plus fencing; a Redis lock alone does not establish correctness.
 
-Compromised Password v1 deliberately does not use Redis as a copy/cache/index of its dataset. Storage/query complexity is not added without measured evidence.
+Compromised Password deliberately does not use Redis as a copy/cache/index of its dataset. Reference Data also has no Redis cache in v1; its public ETag/`Cache-Control` policy is HTTP representation caching after valid BFF responses, not server-side stale fallback. Storage/cache complexity is not added without measured evidence.
 
 ## 10. Verification
 
 Applicable evidence includes database privilege isolation, forced-RLS negatives including pooled-connection tenant-context reuse, Flyway rolling compatibility, query-bound/index/plan tests, pool budgets, transaction/no-remote-I/O tests, PostgreSQL failover/restore/PITR, Kafka durability/rebuild/replay, Outbox/Inbox duplicate/restart tests, Protobuf compatibility, Redis Sentinel/quota failure tests, and PII/secret-safe persistence/telemetry.
 
 ADR-0040 evidence additionally covers offline SQLite dataset compiler determinism/integrity/bounds, exact indexed prefix lookup, read-only/query-only runtime, no write/DDL/ATTACH/extension loading, server-owned path/URI configuration, Java/native dependency security, no external provider/Internet lookup, representative multi-million-row disk-backed latency/load, replica dataset identity, and rebuild/redeploy recovery.
+
+ADR-0041 evidence, once its implementation trigger is met, additionally covers approved ISO/IANA/stable-CLDR offline source provenance/integrity/license use, canonical/deduplicated/lifecycle-safe deterministic bundle generation, exact source-revision manifest/content digest, typed bounded gRPC/pagination/<=128 KiB behavior, bounded startup memory, no DB/Redis/Kafka/runtime source dependency, BFF-only initial workload path, no server stale/fabricated fallback, and signed-image rebuild/redeploy recovery.
