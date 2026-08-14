@@ -36,12 +36,17 @@ ADR-0042 does not deploy Teleport in the selected single-server profile. Human h
 Mandatory authentication/path rules:
 
 - SSH is reachable only through the approved management network/path; no general public SSH exposure;
-- `PermitRootLogin no` equivalent behavior;
-- password authentication is disabled;
+- `PermitRootLogin no`, `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, and `PermitEmptyPasswords no` equivalent behavior is enforced for privileged human access;
 - shared accounts/shared SSH keys are prohibited;
 - privileged human authentication uses hardware-backed OpenSSH FIDO2 security-key algorithms and requires user presence plus user verification;
+- the privileged account/`Match` scope restricts accepted public-key algorithms to the approved FIDO security-key algorithms, currently `sk-ssh-ed25519@openssh.com` and/or `sk-ecdsa-sha2-nistp256@openssh.com` as supported by the pinned host package;
+- `PubkeyAuthOptions touch-required,verify-required` or an equivalently strict reviewed OpenSSH configuration is required so an `authorized_keys` override cannot silently remove presence/verification requirements;
 - ordinary non-hardware keys MUST NOT satisfy privileged production access;
-- static shared kubeconfigs, shared database passwords, and permanent `cluster-admin` assignments are prohibited.
+- agent, TCP, X11, tunnel, gateway-port, and other SSH forwarding capabilities are disabled for privileged human access unless a separately reviewed operation explicitly requires the minimum scoped capability;
+- static shared kubeconfigs, shared database passwords, and permanent `cluster-admin` assignments are prohibited;
+- generated `sshd_config`/included configuration is validated with the pinned host `sshd -t` and effective `sshd -T`/equivalent checks before reload/restart; an invalid or weaker render blocks rollout.
+
+FIDO key enrollment/revocation is attributable and managed as code or through a protected identity inventory. Lost/retired keys are removed promptly and, where OpenSSH KRLs are used, revocation state is protected and distributed before a replacement key is trusted.
 
 JIT elevation is separate from authentication. A successful FIDO2 SSH login does not itself grant root/Kubernetes/database write authority. Approved automation grants the minimum required `sudo`/Kubernetes/database privilege for the approved scope and expires it automatically at the defined deadline. Permanent manual `sudoers`, group, kubeconfig, or database-role edits are not an acceptable substitute for expiry automation.
 
@@ -80,10 +85,10 @@ Its use requires two-person custody/approval where operationally possible, short
 
 Both profiles verify no standing production admin roles, two-reviewer elevation, automatic expiry, denial of static/shared privileged credentials, protected audit evidence, and proof that application workloads continue to use Istio/ServiceAccount identity rather than human credentials.
 
-`production-single-server` additionally verifies management-path-only SSH, password/root/shared-key denial, OpenSSH FIDO2 user-presence + user-verification positive/negative cases, automatic JIT privilege expiry, `sudo` I/O/session audit, OS audit coverage, off-host audit integrity/access restrictions, audit-pipeline failure behavior, and break-glass exercise. Shell-history logging MUST NOT satisfy any audit test.
+`production-single-server` additionally verifies management-path-only SSH; root/password/keyboard-interactive/shared/non-FIDO-key denial; accepted FIDO algorithm allow-list; `PubkeyAuthOptions` user-presence + user-verification positive/negative cases including attempted `no-touch-required` override; `sshd -t` and effective-config checks; forwarding/tunnel denial unless explicitly approved; key revocation/replacement; automatic JIT privilege expiry; `sudo` I/O/session audit; OS audit coverage; off-host audit integrity/access restrictions; audit-pipeline failure behavior; and break-glass exercise. Shell-history logging MUST NOT satisfy any audit test.
 
 `production-ha` additionally verifies Teleport SSO/MFA, Kubernetes/database/SSH access, session recording, management-plane outage, and break-glass behavior.
 
 ## Rollback considerations
 
-Rollback MUST preserve zero standing production privilege, phishing-resistant privileged authentication, bounded elevation, two-reviewer approval, durable protected audit evidence, and denial of static/shared privileged credentials. It MUST NOT replace real audit with shell history, enable password/root/shared-key production SSH, replace workload identity with human credentials, or make break-glass access an ordinary administration path.
+Rollback MUST preserve zero standing production privilege, phishing-resistant privileged authentication, bounded elevation, two-reviewer approval, durable protected audit evidence, and denial of static/shared privileged credentials. It MUST NOT replace real audit with shell history, enable password/root/keyboard-interactive/shared/non-FIDO-key production SSH, remove required FIDO presence/verification enforcement, replace workload identity with human credentials, or make break-glass access an ordinary administration path.
