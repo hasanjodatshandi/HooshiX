@@ -20,17 +20,17 @@ This matrix records the production technology combinations that must remain comp
 | cert-manager | 1.20.3 | compatible with Kubernetes 1.35 baseline |
 | Kafka | 4.2.1 | approved 4.2.x line; Spring Kafka/client compatibility pinned/tested; single-server combined KRaft RF1/minISR1; HA profile RF3/minISR2 with dedicated controllers |
 | Redis | 8.2.8 | single-server: one TLS/ACL/noeviction instance with AOF `appendfsync everysec`; HA: Sentinel/replica topology; semantic quota fail-closed contract unchanged |
-| Gateway API | 1.5.1 | repository Traefik/Istio route resources rendered and compatibility-tested; K3s bundled Traefik not used |
+| Gateway API | 1.5.1 | exact Standard version documented as supported by Traefik 3.7; repository Traefik/Istio route resources rendered and compatibility-tested; K3s bundled Traefik not used |
 | Traefik | 3.7.10 / chart 41.2.0 | chart supports/defaults to Proxy 3.7.10; Gateway API 1.5.1 routes validated; chart-41 logging/file-provider key migration and CRD/render changes must pass migration/render/policy tests before rollout |
-| Helm | 4.2.3 | approved 4.2.x patch; chart rendering/schema/policy checks required |
+| Helm | 4.2.4 | current reviewed 4.2.x patch; chart rendering/schema/policy checks required |
 | Kyverno | 1.18.2 | stable policy/image-validation APIs; 1 replica allowed only in single-server non-HA profile while enforcement stays fail closed; >=3 replicas in HA profile; policy-authoring RBAC/SSRF controls remain valid on Kubernetes 1.35 |
 | `production-single-server` human access | host-supported OpenSSH + hardware FIDO2 + JIT privilege + protected audit | exact host OpenSSH package pinned in provisioning; user-presence/user-verification required; no password/root/shared-key SSH; `sudo` I/O + OS/boundary audit exported off-host |
 | `production-ha` human access | Teleport 18.10.0 | JIT/SSO/WebAuthn/session-audit behavior exercised before rollout |
 | Cosign | 3.0.6 | signatures/attestations verify through current admission policy |
 | OpenBao | 2.6.1 | exact current secret-authority pin; External Secrets/Kubernetes Auth/local-key workflows validated; unchanged by ADR-0042 |
 | Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0; WAF image/rules tested together |
-| Argo CD | 3.4.2 | current GitOps baseline; upgrades require rendered/reconciliation/rollback validation |
-| Prometheus / Alertmanager / Grafana | 3.13.1 / 0.33.1 / 13.1.0 | observability stack deployed by immutable artifacts and reviewed with current security advisories; complete-stack sizing is benchmark-gated in single-server profile |
+| Argo CD | 3.4.2 | current security-patched 3.4.x line; upgrades require rendered/reconciliation/rollback validation |
+| Prometheus / Alertmanager / Grafana | 3.13.2 / 0.33.1 / 13.1.3 | current reviewed patch lines; immutable GitOps artifacts; complete-stack sizing is benchmark-gated in single-server profile |
 
 ## Upgrade and profile-validation rule
 
