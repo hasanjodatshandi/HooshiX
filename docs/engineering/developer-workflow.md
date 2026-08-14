@@ -4,95 +4,134 @@ This document defines development ergonomics without weakening production archit
 
 ## 1. Repository change workflow
 
-All repository changes follow `repository-change-workflow.md`.
+All changes follow `repository-change-workflow.md`:
 
-Mandatory sequence: branch -> Draft PR -> task changes -> complete diff review against current `main` -> applicable verification -> merge. Normal agent/developer work MUST NOT commit directly to `main`. A PR is not ready while a known Critical/High security finding, unresolved current-state contradiction, merge conflict, or required verification blocker remains.
+```text
+current main -> task branch -> Draft PR -> coherent change -> complete diff review -> applicable evidence -> merge -> verify main
+```
 
-GitHub cannot open a PR whose head has no commit different from base. The workflow therefore permits only the smallest legitimate task/governance scaffolding commit needed to establish the Draft PR; all substantive task changes remain inside it.
+One PR represents one coherent engineering change, not one conversation prompt. Unrelated changes stay separate. A material post-merge defect may use a focused follow-up PR.
 
-Documentation/ADR work also follows `current-only-documentation-policy.md`.
+Normal work does not commit directly to `main`. A PR is not ready with a known Critical/High security finding, unresolved current-state contradiction, merge conflict, or required verification blocker.
+
+ADR/documentation work also follows stable-ID/current-only policy.
 
 ## 2. Inner-loop principle
 
-The normal edit/test loop exercises the smallest trustworthy scope. Developers/agents do not need a complete Kubernetes/Istio/WAF/Argo CD environment to test pure Domain/Application behavior.
-
-Preferred order:
+Use the smallest trustworthy scope:
 
 1. Domain/Application unit tests without Spring;
 2. focused adapter tests;
-3. Testcontainers integration tests for real infrastructure behavior;
-4. contract/architecture/static checks (`spotlessCheck`, ArchUnit, SpotBugs, Semgrep as applicable);
-5. service-level runtime tests;
-6. staging/system checks for production-only infrastructure.
+3. Testcontainers for real dependency behavior;
+4. contract/architecture/static checks;
+5. service runtime tests including Day-One observability;
+6. staging/system/mesh/WAF/security checks;
+7. scheduled/release load/chaos/DR/full-stack evidence.
 
-## 3. Local-only substitutions
+Pure Domain/Application work does not require a complete Kubernetes stack.
 
-Local-only adapters/fakes are allowed only where current architecture explicitly permits them. They MUST be impossible to activate in `staging` or `production`.
+## 3. Day-One observability development rule
 
-Use profile expressions equivalent to `local & !staging & !production` for local-only substitutes when Spring composition is involved. A local adapter is never a production fallback and never satisfies production readiness.
+ADR-0044 is part of implementation, not a later platform phase.
 
-## 4. CI execution efficiency
+When a service/critical path is first implemented, the same coherent change includes applicable:
 
-Gate ordering expresses blocking dependencies; independent checks SHOULD run in parallel when correctness/security are preserved, for example:
+- structured allow-listed JSON logs;
+- Micrometer operation/dependency/saturation metrics;
+- OpenTelemetry spans/propagation to the approved local/internal Collector path;
+- correct health/readiness behavior;
+- PII/secret/cardinality tests;
+- trace/baggage non-authority tests;
+- telemetry backend/exporter failure test;
+- alert/dashboard ownership for defined SLO/security signals where the signal becomes meaningful.
 
-- unit + architecture + static analysis;
-- contract compatibility + dependency verification + secret scan;
-- independent integration-test shards;
-- Helm/Kubernetes render validation in parallel with container-independent checks.
+Do not merge a feature with TODO text such as “add observability later” when the path already needs logs/metrics/traces for diagnosis or evidence.
 
-Use Gradle build/configuration cache and CI caching where compatible with reproducibility and security. Do not skip a mandatory gate merely to reduce duration.
+For local development, telemetry backends may be optional when the code path is testable with an in-memory/test exporter or local Collector fixture. This does not remove staging/release evidence against the real Collector/backends.
 
-## 5. Heavy verification
+## 4. Local-only substitutions
 
-Load, chaos, DR restore, failover, certificate-rotation, provider, and full-platform exercises are expensive. Run them at the cadence required by current SLO/release/operations policy rather than every edit cycle. Critical-path changes still run applicable heavy verification before the release gate that depends on it.
+Local adapters/fakes are allowed only where architecture permits and MUST be impossible to activate in staging/production. Use profile constraints equivalent to `local & !staging & !production` where applicable.
 
-## 6. Microservice startup discipline
+A local fake is never a production fallback or production-readiness evidence.
 
-Do not start unrelated services for a narrow task. Use explicit contracts and fakes/test doubles at service boundaries for unit/application tests; use real downstream services only when the integration behavior itself is under test.
+Reference Data may use its approved immutable local bundle before ADR-0041 independent-service trigger; that is current architecture, not a test fake.
 
-## 7. Performance guardrails
+Compromised Password normal PR tests use deterministic generated SHA-1 corpus fixtures. They do not require downloading the production HIBP corpus for every edit. Release/dataset evidence still uses the complete approved HIBP corpus.
 
-Virtual Threads simplify blocking-I/O concurrency but do not remove downstream limits. Keep database pools, gRPC concurrency, Kafka consumers, Redis operations, queues, workers, and provider calls bounded/observable.
+## 5. CI efficiency
 
-Do not add caches, asynchronous boundaries, retries, new services, proxies, or distributed coordination merely as speculative optimization. First identify the bottleneck, confirm compatibility with current architecture/SLO/dependency policy, and define measurable success criteria.
+Independent checks SHOULD run in parallel where safe, such as:
 
-## 8. Local code-quality baseline
+- unit + ArchUnit + static analysis;
+- contract + dependency verification + secret scan;
+- independent integration shards;
+- quota clock/cardinality tests separate from unrelated service tests;
+- observability config/privacy/context tests separate from heavy telemetry storage/load tests;
+- Helm/Kubernetes/Kyverno render checks parallel to container-independent checks.
 
-For Java services, normal pre-push work SHOULD run the repository-defined equivalent of:
+Use Gradle build/configuration cache and secure reproducible CI caching where compatible. Never skip a mandatory gate to reduce duration.
+
+## 6. Heavy verification
+
+These are not every-edit requirements unless the change directly demands them:
+
+- complete-stack load/soak;
+- chaos/fault injection;
+- cold DR/PITR restore;
+- certificate/key rotation;
+- provider integration;
+- full observability storage/cardinality pressure;
+- external total-host-loss detection.
+
+They remain mandatory at the current release/scheduled cadence. A fast gate may protect a regression class at PR time, but it does not delete the heavy evidence gate.
+
+## 7. Service startup discipline
+
+Do not start unrelated services for a narrow task. Use explicit contracts/test doubles for unit/application tests and real downstreams when integration behavior is the subject under test.
+
+Do not create a new network service merely to make local composition look uniform. ADR-0041 Reference Data remains local until its deployable trigger is evidenced.
+
+## 8. Performance guardrails
+
+Virtual Threads do not remove downstream resource limits. Keep DB pools, gRPC concurrency, Kafka consumers, Redis work, telemetry queues, workers, and provider calls bounded/observable.
+
+Do not add cache/broker/proxy/retry/service/distributed coordination as speculative optimization. Measure bottleneck, verify SLO/security impact, and define success criteria first.
+
+Semantic quota development also measures new security-bucket cardinality and common-mode clock behavior; normal-traffic latency alone is not enough.
+
+## 9. Local code-quality baseline
+
+Java pre-push SHOULD run the repository-defined equivalent of:
 
 ```bash
 ./gradlew spotlessCheck test architectureTest spotbugsMain
-# focused integration/contract/schema tasks for the change
+# focused integration/contract/schema/dataset/quota/observability tasks
 # repository Semgrep blocking rules
 ```
 
-Use `spotlessApply` only as a local formatting action. Do not disable a gate to speed up the loop. See `coding-standards.md` and `build-and-ci-quality-enforcement.md`.
+Use `spotlessApply` only for formatting. Do not weaken gates for speed.
 
-## 9. Code-generation preflight
+## 10. Code-generation preflight
 
-Before implementation starts, complete the mandatory 20-item preflight in `AGENTS.md` §15 and `coding-standards.md` §16.
+Before implementation, complete the mandatory preflight in `AGENTS.md` and `coding-standards.md`.
 
-It is a preflight, not post-hoc documentation: ownership/ports, sync-vs-event semantics, transactions, deadlines/retry/idempotency/cancellation/concurrency, workload identity/policy, migrations, observability, deployment/securityContext, artifact promotion, logging/PII, and required tests are decided before concrete adapter code is generated.
+Decide ownership/ports, sync-vs-event, transactions, deadlines/retry/idempotency/cancellation/concurrency, workload identity, migrations/reference datasets, logs/metrics/traces/alerts, deployment/securityContext, artifact promotion, PII/cardinality, and required tests before concrete adapter code.
 
-AI-generated code follows exactly the same gates as handwritten code. Compilation alone is never evidence of completion.
+AI-generated and handwritten code use the same gates. Compilation alone is not completion evidence.
 
-## 10. Local platform foundation
+## 11. Local platform foundation
 
-Pure Domain/Application work does not require Kubernetes. When a change needs real local mesh, edge, Gateway API, NetworkPolicy, or platform integration, use the pinned local foundation rather than ad-hoc cluster commands.
+Use the pinned local foundation only when real mesh/edge/Gateway/NetworkPolicy/telemetry integration is under test.
 
-Required sources:
-
-- `../technology/local-development-baseline.md`
-- `../runbooks/local-istio-ambient.md`
-- `../runbooks/local-traefik-edge.md`
-
-Expected repository interface:
+Expected interface after implementation exists:
 
 ```bash
 make baseline-verify
 make local-cluster-verify
 make verify-local-istio-ambient
 make verify-local-traefik-edge
+make verify-local-observability   # when ADR-0044 local target exists
 ```
 
-These targets are executable evidence only after their implementation exists and passes. Do not report local platform compliance from documentation alone.
+A documented target is not evidence until the target actually exists and passes.
