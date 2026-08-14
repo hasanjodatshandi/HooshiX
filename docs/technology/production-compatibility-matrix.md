@@ -21,7 +21,7 @@ This matrix records the production technology combinations that must remain comp
 | Kafka | 4.2.1 | approved 4.2.x line; Spring Kafka/client compatibility pinned/tested; single-server combined KRaft RF1/minISR1; HA profile RF3/minISR2 with dedicated controllers |
 | Redis | 8.2.8 | single-server: one TLS/ACL/noeviction instance with AOF `appendfsync everysec`; HA: Sentinel/replica topology; semantic quota fail-closed contract unchanged |
 | Gateway API | 1.5.1 | repository Traefik/Istio route resources rendered and compatibility-tested; K3s bundled Traefik not used |
-| Traefik | 3.7.1 | Gateway API 1.5.1 routes validated; chart 40.2.0 in baseline |
+| Traefik | 3.7.10 | Gateway API 1.5.1 routes validated; chart 40.2.0 in baseline; security-fixed 3.7.x patch |
 | Helm | 4.2.3 | approved 4.2.x patch; chart rendering/schema/policy checks required |
 | Kyverno | 1.18.2 | stable policy/image-validation APIs; 1 replica allowed only in single-server non-HA profile while enforcement stays fail closed; >=3 replicas in HA profile; policy-authoring RBAC/SSRF controls remain valid on Kubernetes 1.35 |
 | `production-single-server` human access | host-supported OpenSSH + hardware FIDO2 + JIT privilege + protected audit | exact host OpenSSH package pinned in provisioning; user-presence/user-verification required; no password/root/shared-key SSH; `sudo` I/O + OS/boundary audit exported off-host |
