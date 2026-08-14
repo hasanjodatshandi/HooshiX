@@ -1,12 +1,8 @@
 # Production Cold Disaster Recovery Runbook
 
-## Purpose
+## Purpose and status
 
-This runbook defines the repeatable cold-DR sequence for the current production architecture. ADR-0004 owns RPO/RTO targets. ADR-0042 owns the selected `production-single-server` topology.
-
-This runbook does not claim that recovery automation or environments exist. Exact commands, provider identifiers, credentials, bucket names, host images, and GitOps paths remain implementation/environment artifacts.
-
-## Status
+ADR-0004 owns RPO/RTO. ADR-0042 owns selected single-server topology. This runbook defines the repeatable recovery sequence; it does not claim automation/environment evidence exists.
 
 ```text
 Architecture:       DECIDED
@@ -16,312 +12,290 @@ Exercise evidence:  NOT VERIFIED
 Production gate:    BLOCKED until required exercise passes
 ```
 
-## Recovery objectives
-
 Current targets:
 
 ```text
-PostgreSQL RPO: <=5 minutes
-OpenBao RPO:    <=1 hour
-Platform RTO:   <=4 hours
+PostgreSQL RPO <=5m
+OpenBao RPO    <=1h
+Platform RTO   <=4h
 ```
 
-A backup job marked successful is not recovery proof. Measured restore evidence is required.
+A successful backup job is not restore proof.
 
-## 1. Declare and contain
+## 1. Declare, contain, select recovery point
 
-Before rebuilding:
+1. declare incident/commander and record start/last safe state;
+2. stop unsafe deploy/migration/reconciliation/credential automation;
+3. preserve provider/host/audit/backup evidence;
+4. determine hardware failure vs possible compromise;
+5. revoke/rotate affected access/secrets when compromise is possible;
+6. keep public traffic closed;
+7. select and record PostgreSQL PITR target, OpenBao snapshot, Git commit/immutable artifacts, expected loss window, approver.
 
-1. declare the incident and assign an incident commander;
-2. record the last known safe production state and time window;
-3. stop unsafe deployment, migration, reconciliation, and credential automation;
-4. preserve available host/provider/audit/backup evidence;
-5. determine whether compromise is suspected, not only hardware failure;
-6. if compromise is possible, revoke/rotate affected access and secret material before normal traffic resumes;
-7. keep public application traffic closed until the final traffic gate in this runbook.
+Do not reuse potentially compromised images/kubeconfigs/credentials/WireGuard/SSH/OpenBao/signing material merely to reduce RTO.
 
-Do not reuse a potentially compromised host image, kubeconfig, database credential, WireGuard peer key, SSH key, OpenBao token, or signing material merely to reduce RTO.
+## 2. Provision clean host and management path
 
-## 2. Select the recovery point
+- provision approved host baseline;
+- validate CPU/RAM/storage/clock/network health;
+- apply reviewed kernel/system/firewall hardening;
+- establish healthy host time synchronization before quota-protected traffic can later enable;
+- restore WireGuard management overlay without private keys in Git;
+- prove public TCP/22 denied and management-only SSH reachable;
+- pin/verify K3s/OpenSSH/WireGuard/host artifacts;
+- establish required off-host privileged audit before normal recovery work.
 
-Record:
+Prove:
 
 ```text
-incident start:
-last known safe application time:
-selected PostgreSQL PITR target:
-selected OpenBao snapshot:
-selected Git commit / immutable artifact set:
-expected data-loss window:
-RPO owner approval:
+WireGuard = network reachability only
+FIDO2     = attributable human authentication
+JIT       = bounded privilege
 ```
 
-For PostgreSQL, select a target that is supported by the continuous WAL/base-backup evidence. For OpenBao, select a verified encrypted snapshot and required Shamir/recovery material.
+Root/password/shared/non-FIDO SSH remains denied. Public SSH is never a DR shortcut.
 
-If required recovery artifacts cannot be validated, stop and escalate. Do not invent state.
+## 3. Rebuild K3s/base network
 
-## 3. Provision a clean host
+Restore exact single-server baseline:
 
-For `production-single-server`:
-
-1. provision a replacement physical/virtual host from the approved host baseline;
-2. validate CPU, RAM, SSD/storage, firmware/virtualization, clock, and network health;
-3. apply reviewed host firewall and kernel/system hardening;
-4. restore the ADR-0043 management overlay without placing WireGuard private keys in Git;
-5. prove public-interface TCP/22 is closed and management-only SSH reachability works;
-6. pin/verify the approved K3s, host OpenSSH, WireGuard, and other host packages/artifacts from provisioning metadata;
-7. establish off-host audit export before ordinary privileged recovery work continues when the audit design requires it.
-
-If the original host is suspected compromised, it is not reintroduced into the trusted recovery path until forensic disposition permits it.
-
-## 4. Restore privileged management access
-
-Prove the separation of controls:
-
-```text
-WireGuard peer -> network reachability only
-FIDO2 OpenSSH -> attributable human session
-JIT approval -> bounded privileged authority
-```
-
-Required checks:
-
-- revoked/unapproved WireGuard peer denied;
-- root/password/keyboard-interactive/shared/non-FIDO SSH denied;
-- FIDO2 user presence and user verification required;
-- JIT privilege expires automatically;
-- privileged activity is captured by OS/`sudo`/boundary audit;
-- break glass remains exceptional and incident-linked.
-
-Do not enable public SSH as a DR shortcut.
-
-## 5. Rebuild K3s and base network
-
-Use the exact approved `production-single-server` platform line.
-
-Required state:
-
-- K3s server installed with integrity-verified artifact;
-- embedded SQLite control-plane datastore configured according to ADR-0042;
-- K3s secrets encryption enabled;
-- K3s Flannel disabled;
+- K3s server + embedded SQLite + secrets encryption;
+- Flannel disabled;
 - K3s network-policy controller disabled;
-- bundled K3s Traefik and ServiceLB disabled;
-- Calico installed as the CNI/NetworkPolicy authority;
-- cluster DNS and time synchronization healthy;
-- required namespace and ServiceAccount baseline available.
+- bundled Traefik/ServiceLB disabled;
+- Calico CNI/NetworkPolicy;
+- healthy DNS/time;
+- required namespaces/ServiceAccounts.
 
-A clean GitOps rebuild is preferred over restoring stale Kubernetes operational state when it is safer. Restore the K3s datastore/token only through the reviewed recovery path and only when that path is justified.
+Prefer clean GitOps rebuild where safer. Restore K3s datastore/token only through reviewed path.
 
-## 6. Restore OpenBao and secret delivery
+## 4. Restore OpenBao/secret delivery
 
-ADR-0011 and current OpenBao procedures remain authoritative.
+Use current ADR-0011 procedures:
 
-Sequence:
+1. restore approved OpenBao runtime/storage;
+2. restore selected encrypted snapshot;
+3. execute Shamir/unseal/recovery;
+4. verify health/audit/storage;
+5. rotate/revoke if compromise suspected;
+6. restore Kubernetes Auth/External Secrets;
+7. verify secrets materialize only to approved workloads;
+8. verify no secret entered Git/log/trace/metric/incident artifact.
 
-1. restore the approved OpenBao runtime/storage topology;
-2. restore the selected encrypted snapshot;
-3. perform the approved Shamir/unseal/recovery procedure;
-4. verify audit/health/storage state;
-5. rotate/revoke credentials if compromise is suspected;
-6. restore Kubernetes Auth/External Secrets integration;
-7. verify required secret material can be materialized only to approved workloads/paths;
-8. verify no secret entered Git, values, logs, traces, metrics, or incident attachments.
+Record achieved OpenBao RPO. No plaintext/Git fallback is allowed.
 
-Record the measured OpenBao recovery point and compare it to the <=1h RPO target.
+## 5. Reconcile GitOps security and observability control plane
 
-OpenBao recovery is not bypassed by plaintext or Git-managed substitutes.
+Before application traffic reconcile:
 
-## 7. Reconcile GitOps security/control-plane state
+- namespaces/RBAC/ServiceAccounts;
+- Calico policies;
+- Istio Ambient/strict mTLS/authorization;
+- Kyverno stable CEL-based blocking policy set and supply-chain admission;
+- Traefik + Caddy/Coraza edge;
+- OpenTelemetry Collector, Prometheus, Loki, Tempo, Grafana, Alertmanager;
+- authoritative off-host audit path;
+- required storage/operators.
 
-Before application traffic:
+Verify Collector has internal-only OTLP, dedicated SA/RBAC/NetworkPolicy, finite memory/queues, restricted telemetry egress, and only exact read-only pod/container log paths. No broad hostPath/host network/privilege.
 
-- reconcile reviewed namespaces/RBAC/ServiceAccounts;
-- reconcile Calico NetworkPolicy;
-- reconcile Istio Ambient, trust configuration, strict mTLS, and authorization;
-- reconcile Kyverno blocking policies;
-- reconcile Traefik and Caddy/Coraza WAF;
-- reconcile observability and required audit export;
-- reconcile storage/operator components required for PostgreSQL recovery;
-- verify immutable image/signature/provenance/SBOM admission controls.
+Do not open a direct edge/admission/telemetry-management bypass while controls are unavailable.
 
-Do not open a direct edge route while WAF, mesh, or admission controls are unavailable.
+## 6. Restore PostgreSQL
 
-## 8. Restore PostgreSQL
+Single-server physical recovery is whole-cluster:
 
-For the selected single-server profile, physical recovery is cluster-wide.
+1. select verified Barman base backup/WAL target;
+2. restore full shared physical cluster in approved isolated recovery target;
+3. verify integrity/recovery completion;
+4. verify every service DB/Flyway version;
+5. verify distinct runtime/migration roles and cross-service privilege negatives;
+6. verify forced RLS/tenant-context behavior;
+7. record RPO and restore duration;
+8. keep traffic closed.
 
-Sequence:
+Service-specific recovery extracts only required DB from validated isolated restore, then performs controlled import. Do not overwrite unrelated current databases.
 
-1. select the verified Barman base backup and WAL target;
-2. restore the complete shared physical PostgreSQL cluster to the approved recovery environment/target;
-3. validate PostgreSQL integrity and recovery completion;
-4. validate every service database expected at the recovery point;
-5. validate Flyway schema versions/compatibility;
-6. validate distinct runtime/migration roles and negative cross-service privileges;
-7. validate forced RLS and tenant-context behavior;
-8. record achieved RPO and restore duration;
-9. keep traffic closed.
+`pg_dump + cron` is not primary DR.
 
-For service-specific recovery, do not overwrite unrelated current databases. Restore the full physical cluster in isolation, validate it, extract only the required service database through the approved logical transfer, then import it during controlled maintenance with compatibility and erasure/legal-hold checks.
+## 7. Restore immutable reference artifacts
 
-`pg_dump + cron` is not the primary DR path.
+### Compromised Password
 
-## 9. Restore immutable reference artifacts
+Deploy exact approved HIBP-derived SHA-1 SQLite artifact and verify:
 
-Compromised Password:
+- official source/provenance/tool identity;
+- content digest/schema/integrity;
+- 20-byte SHA-1 format and positive-count semantics;
+- production age <=35 days;
+- complete-corpus compatibility/cardinality bounds;
+- no runtime HIBP/provider path.
 
-- deploy the exact approved immutable SQLite dataset artifact;
-- verify digest/provenance, schema, integrity, version, and prefix/response bounds;
-- corrupt/missing/incompatible dataset keeps the service unavailable/fail closed.
+Stale/corrupt/missing/incompatible dataset keeps screening unavailable/fail closed.
 
-Reference Data, when implemented:
+### Reference Data
 
-- deploy the exact approved signed image/bundle;
-- verify bundle manifest/source revision/integrity and typed dataset validation.
+Restore approved immutable bundle in current owning deployable. Restore independent `reference-data-service` only if ADR-0041 deployable trigger is currently satisfied and that service is part of reviewed desired state.
 
-No database restore is fabricated for immutable rebuildable reference data.
+No fake database restore exists for immutable reference artifacts.
 
-## 10. Recover Redis
+## 8. Recover Redis and quota time/capacity safety
 
-Redis is not business source of truth.
+1. restore TLS/ACL/`noeviction`/AOF `appendfsync everysec`;
+2. recover AOF only when valid/safe;
+3. verify memory reserve and AOF state;
+4. if session state lost/uncertain, require reauthentication;
+5. verify host time sync healthy;
+6. verify app/Redis skew <=2s;
+7. verify local wall-vs-monotonic Clock Safety Guard has no active trip;
+8. after a clock fault, require the ADR-0024 continuous 60s safe re-arm window;
+9. verify active-bucket/new-allocation/cleanup state is inside reviewed capacity envelope;
+10. verify new unsafe allocations return `QUOTA_CAPACITY_UNHEALTHY` before eviction/OOM;
+11. verify no browser/local fallback reconstructs authority.
 
-Sequence:
+Do not reconstruct non-authoritative session/quota history when reauthentication/fail-closed is the defined safe result.
 
-1. restore the approved TLS/ACL/`noeviction` configuration;
-2. recover AOF only when it is valid and safe;
-3. verify `appendfsync everysec` and memory bounds;
-4. if session state is lost/uncertain, invalidate affected session continuity and require re-authentication;
-5. verify semantic quota operations fail closed until Redis/time-source state is valid;
-6. verify no browser cookie or local fallback reconstructs server-side authority.
+## 9. Rebuild Kafka/replay
 
-Do not delay platform recovery merely to reconstruct non-authoritative session/quota history when safe re-authentication/fail-closed behavior is the defined result.
+- deploy approved one combined KRaft broker/controller;
+- verify RF1/minISR1/acks-all/idempotence/TLS/principals/ACLs/quotas/internal topics;
+- recreate desired topics/config;
+- identify service-owned Outbox/publication/Inbox/dedup evidence;
+- replay/reconstruct with stable event/request identities;
+- verify consumer idempotency and offsets-after-durable-effect;
+- record broker-local loss/reconciliation.
 
-## 11. Rebuild Kafka and replay
+Broker data is not business truth.
 
-Kafka is rebuildable transport.
+## 10. Replay erasure/legal hold
 
-Sequence:
+Before restored business data receives traffic:
 
-1. deploy the approved single combined KRaft broker/controller configuration;
-2. verify RF=1/minISR=1, `acks=all`, idempotence, TLS, principals, ACLs, quotas, and internal-topic settings;
-3. recreate topics/configuration from reviewed desired state;
-4. do not treat broker-local recovery as business truth;
-5. identify retained service-owned Outbox/publication/Inbox/dedup evidence;
-6. replay/reconstruct critical events with stable event/request identities;
-7. verify consumers remain idempotent and offsets advance only after durable effects;
-8. record any broker-local loss window and reconciliation result.
+- reconcile current erasure requests/evidence;
+- reconcile legal hold;
+- ensure erased Users do not regain authentication/session/Authorization authority;
+- ensure participant replay is idempotent;
+- record non-PII reconciliation evidence.
 
-Do not disable deduplication or idempotency to accelerate catch-up.
+Historical backup is not current authority before this gate.
 
-## 12. Replay erasure and legal-hold state
+## 11. Restore applications
 
-Before restored application data receives user traffic:
+Deploy only approved signed immutable digests.
 
-1. reconcile current erasure requests/evidence against restored state;
-2. reconcile legal-hold state;
-3. ensure erased Users do not regain authentication/session/Authorization authority;
-4. ensure participant completion/replay is idempotent;
-5. record non-PII evidence of reconciliation.
+For each implemented service verify:
 
-Historical backup state is not current authority until this step passes.
+- correct SA/workload identity;
+- correct secret mounts;
+- only expected DB/Redis/Kafka/provider/telemetry access;
+- readiness reflects mandatory local/security prerequisites;
+- liveness does not fail solely for temporary downstream outage;
+- single-server one replica/HPA off/PDB off;
+- structured logs/Micrometer metrics/OpenTelemetry traces are PII/secret safe;
+- telemetry backend failure does not change ordinary business correctness.
 
-## 13. Restore application workloads
+Reference Data stays local unless its service trigger is currently satisfied.
 
-Deploy only approved signed immutable artifact digests.
+## 12. Verify public edge/client quota identity
 
-For each service:
+Prove:
 
-- correct ServiceAccount/workload identity;
-- correct secret mounts/key snapshots;
-- expected database/Redis/Kafka/provider access only;
-- readiness does not hide failed mandatory local/security prerequisites;
-- liveness does not fail only because a downstream is unavailable;
-- profile render is one replica, HPA off, availability PDB off unless a reviewed exception exists;
-- logs/metrics/traces remain PII/secret safe.
+- upstream mitigation/external L4 active;
+- Traefik origin accepts only approved external-L4 source ranges;
+- external L4 preserves source with approved PROXY v2;
+- Traefik trusts only approved L4 CIDRs; insecure forwarded/PROXY trust off;
+- Caddy strict trusted-proxy parsing active;
+- BFF receives only server-derived exact client IP;
+- forged forwarding/private headers do not alter identity;
+- backend hard quota identity is `/32` IPv4 or `/128` IPv6;
+- `/24`/`/64` aggregate pressure is separate and not sole hard 429 gate;
+- direct Internet->BFF/Traefik->BFF bypass denied;
+- WAF blocking config is approved.
 
-Application order follows dependency-safe readiness. Startup order alone is not authority; services stay unready/fail closed until required local/security state is valid.
+## 13. Verify Day-One observability and external detection
 
-## 14. Verify public edge and client network identity
+Before traffic:
 
-Before opening traffic, prove:
+- one synthetic implemented journey produces expected correlated safe logs/metrics/traces;
+- Prometheus scrape endpoints and OTLP receiver are not public;
+- wrong workload cannot submit OTLP;
+- Collector queues/memory/exporters are healthy;
+- Loki/Tempo/Prometheus/Grafana/Alertmanager are usable inside the approved capacity envelope;
+- ADR-0031 canaries/prohibited fields are absent;
+- trace/baggage cannot alter authentication/tenant/Authorization/quota/idempotency decisions;
+- authoritative security/privileged audit is healthy off-host;
+- independent external black-box monitor sees the approved public path as healthy.
 
-- upstream mitigation/external L4 path is active;
-- the Traefik application origin accepts traffic only from the exact approved external-L4 source ranges and direct Internet/non-approved-source access is denied before application routing;
-- external L4 preserves client address with the approved PROXY-v2 contract;
-- Traefik trusts PROXY only from approved L4 CIDRs;
-- insecure forwarded/PROXY trust is disabled;
-- Caddy strict trusted-proxy parsing is active;
-- BFF receives only server-derived `X-HooshiX-Client-IP`;
-- forged forwarding/client-IP headers do not change quota identity;
-- direct Internet -> BFF and Traefik -> BFF bypasses are denied;
-- WAF blocking configuration is the approved version.
+The external monitor MUST have detected the host outage while local monitoring was down. Otherwise total-host detection evidence fails.
 
-A missing client-address trust path or external-L4-only origin restriction blocks public quota-protected traffic.
+## 14. Security/correctness gate
 
-## 15. Security and correctness gate
+Run applicable critical checks:
 
-Run the applicable critical checks:
+- Identity password/login/MFA/session/token/erasure;
+- HIBP screening source/freshness/fail-closed behavior;
+- Authorization ALLOW/DENY/error/timeout/breaker behavior;
+- tenant RLS/cross-tenant negatives;
+- workload mTLS/NetworkPolicy/Istio positives/negatives;
+- quota exact/aggregate/common-clock/cardinality behavior;
+- Kafka replay/idempotency;
+- OpenBao/secret delivery;
+- Kyverno CEL/signature/provenance/SBOM/security-context negatives;
+- edge/WAF/client-IP spoof/bypass;
+- privileged management/audit;
+- critical BFF/browser journey;
+- observability fault/privacy/correlation tests.
 
-- Identity login/password/MFA/session/token/erasure flows;
-- active TOTP downgrade-prevention;
-- Authorization allow/deny/error/timeout fail-closed behavior;
-- tenant RLS and cross-tenant negative tests;
-- workload mTLS/identity/NetworkPolicy positive and negative tests;
-- Redis quota/time failure behavior;
-- Kafka replay/idempotency state;
-- OpenBao/secret-delivery state;
-- Kyverno signature/provenance/SBOM/security-context negatives;
-- edge/WAF/client-IP spoof negatives;
-- privileged management/audit state;
-- critical BFF/browser smoke flows when implemented.
+A health endpoint alone is insufficient.
 
-A health endpoint alone is not sufficient recovery evidence.
+## 15. Traffic-enable gate
 
-## 16. Traffic-enable gate
-
-Traffic may open only when all mandatory recovery gates are `PASS` and the incident commander records:
+Traffic opens only after all mandatory gates are `PASS` and incident commander records:
 
 ```text
-selected recovery point:
-measured PostgreSQL RPO:
-measured OpenBao RPO:
-measured platform RTO:
-data/schema/RLS integrity:
-erasure/legal-hold replay:
-secret/workload identity:
-edge/WAF/client-IP trust:
-Authorization/MFA/security negatives:
-Kafka/Redis reconciliation:
-audit/observability health:
-known residual risk:
-approver:
+recovery point
+PostgreSQL RPO
+OpenBao RPO
+platform RTO
+data/schema/RLS integrity
+erasure/legal-hold reconciliation
+secret/workload identity
+edge/WAF/client identity
+quota clock/capacity state
+Authorization/MFA/security negatives
+Kafka/Redis reconciliation
+Compromised Password corpus age/integrity
+local observability health
+external host-monitor health/audit of outage detection
+authoritative audit health
+known residual risk
+approver
 ```
 
-If platform RTO exceeds four hours, record the miss and trigger reliability/profile review. Do not hide the miss by redefining the start/end time after the exercise.
+If platform RTO exceeds four hours, record the miss. Do not redefine timing to hide it.
 
-## 17. Post-recovery actions
-
-After traffic is stable:
+## 16. Post-recovery
 
 - rotate temporary/break-glass/recovery credentials;
-- revoke unused WireGuard peers and JIT grants;
-- verify off-host backups/snapshots resume;
-- verify WAL archive freshness;
-- verify Redis AOF and Kafka state;
-- verify audit/telemetry retention;
-- record root cause, measured RPO/RTO, failed/slow steps, and owners;
-- update this runbook when evidence shows an unsafe or ambiguous step;
-- review whether `production-single-server` remains acceptable.
+- revoke unused WireGuard peers/JIT grants;
+- verify backups/snapshots/WAL resume;
+- verify Redis AOF/Kafka state;
+- verify Collector/backends/retention and external monitor;
+- verify audit durability;
+- record root cause/RPO/RTO/slow or failed steps/owners;
+- update runbook from evidence;
+- review whether single-server remains acceptable.
 
 ## Exercise cadence
 
-- PostgreSQL backup verification: every backup cycle;
+- backup verification: every cycle;
 - isolated PostgreSQL restore: monthly;
-- full shared-cluster PITR plus service-specific non-destructive recovery: current monthly restore cadence when applicable;
-- OpenBao snapshot/restore evidence: according to current OpenBao recovery cadence and before material changes;
-- Compromised Password artifact recovery: quarterly and before material dataset changes;
-- single-server host/K3s rebuild: quarterly or before material platform changes;
+- full shared-cluster PITR/service recovery: monthly when applicable;
+- OpenBao recovery evidence: current cadence/before material changes;
+- HIBP corpus acquisition/build validation: at least every 30 days;
+- Compromised Password artifact recovery: quarterly/material dataset change;
+- single-server host/K3s rebuild: quarterly/material platform change;
+- external total-host detection: with quarterly full cold DR;
 - full cold DR: quarterly.
 
-Any mandatory failed/overdue recovery evidence blocks affected ordinary production promotion until remediation and revalidation.
+Any mandatory failed/overdue evidence blocks affected production promotion.
