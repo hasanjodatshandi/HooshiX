@@ -32,7 +32,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 | `web-bff.reference-data-read` | Web BFF | Reference Data typed read gRPC | `AUTHORITATIVE_STATE` | reference route unavailable; no fabricated/stale server-side data | none | none | Web BFF | ADR-0041; `services/reference-data-service.md` §9; `services/web-bff.md` §10 |
 | `web-bff.resource-api-dispatch` | Web BFF | registered resource service | `AUTHORITATIVE_STATE` | abort request/resource unavailable; no fabricated business data | none | none | Web BFF | ADR-0016; `services/web-bff.md` §§10-11 |
 | `business.optional-enrichment` | owning bounded context | explicitly approved enrichment service | `OPTIONAL_READ` | use only explicit bounded degraded result | none | bounded-context-defined only | owning bounded context | ADR-0033, ADR-0036 |
-| `platform.non-audit-telemetry-export` | any service | observability backend | `OBSERVABILITY` | bounded buffer/drop; business request continues | exporter | bounded loss allowed | Platform Observability | ADR-0033; `reliability-and-observability.md` §10 |
+| `platform.non-audit-telemetry-export` | any service | observability backend | `OBSERVABILITY` | bounded buffer/drop; business request continues | exporter | bounded loss allowed | Platform Observability | ADR-0033; `reliability-and-observability.md` §13 |
 | `service.required-security-audit-evidence` | owning service | audit persistence/outbox | `AUTHORITATIVE_STATE` | durable contract; do not silently drop | owning service | none unless explicit current decision | owning service | ADR-0033; `security-architecture.md` §13 |
 
 ## Composition rules
