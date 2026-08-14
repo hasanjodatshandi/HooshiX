@@ -1,431 +1,141 @@
 # Reference Data Service Architecture
 
-## 1. Status, ownership, and implementation gate
+## 1. Status and ownership
 
-Reference Data is the authoritative platform boundary for the current global standard reference families:
+Reference Data is a decided platform capability, but the **independent service is not yet authorized for implementation** until ADR-0041's deployable trigger is evidenced.
 
-- Country;
-- Currency;
-- TimeZone;
-- SupportedLocale.
-
-Status:
+Current state:
 
 ```text
-Architecture:         DECIDED
-Implementation:       PLANNED
-Runtime evidence:     NOT VERIFIED
-Production readiness: NOT VERIFIED
+Capability architecture: DECIDED
+Independent service:     PLANNED / GATED
+Implementation:           NOT PRESENT
+Runtime evidence:         NOT VERIFIED
+Production readiness:     NOT VERIFIED
 ```
 
-Executable `services/reference-data-service` work starts only after at least **two independent consumers** require the boundary or **one specific production user journey** proves the centralized service is needed. Multiple endpoints owned by one integration layer do not automatically count as independent consumers.
+The capability owns canonical reference-source governance for exactly Country, Currency, TimeZone, and SupportedLocale. It is not a generic dictionary/configuration/validation service.
 
-The service owns canonical reference identifiers, imported standard metadata, lifecycle/non-reuse policy, localized display metadata, bundle format/build validation, typed read contracts, and runtime delivery of the approved immutable bundle.
+## 2. Before the independent-service trigger
 
-It does **not** own tenant configuration, user preference, business validation/eligibility, pricing, exchange rates, payments, tax/legal policy, feature flags, product catalogs, permissions, roles, workflow rules, or another bounded context's domain state.
+The approved immutable reference bundle may be served inside the current owning deployable, initially Web BFF when the browser reference surface is implemented.
 
-Implementation target when the gate is met:
+Before the trigger:
 
-```text
-service path: services/reference-data-service
-base package: com.sajtech.referencedata
-```
+- no `reference-data-service` Deployment/Service/ServiceAccount is created;
+- no BFF->Reference Data gRPC edge is required;
+- no independent service build/container/release exists;
+- source/provenance/version/integrity/lifecycle rules still apply;
+- no mutable cache/database/provider sync is introduced;
+- local module boundaries remain explicit and do not become a generic shared business library.
 
-## 2. Closed v1 reference families
+One user journey, screen, route group, or multiple endpoints of one deployable is not sufficient reason to create the service.
 
-v1 has exactly four typed families. There is no generic shared dictionary or caller-defined registry.
+## 3. Independent-service trigger
 
-### Country
+Create `services/reference-data-service` only after one of these is evidenced:
 
-Canonical identifier: ISO 3166-1 alpha-2.
+1. >=2 independently deployable consumers need the same capability;
+2. independent update/release lifecycle is required;
+3. separate security/trust boundary is required;
+4. independent scale/availability profile is required by measurement/SLO;
+5. independent team/operational ownership and release accountability exists.
 
-Metadata may include:
+The trigger record identifies the actual consumer/ownership/change/scale/security evidence.
 
-```text
-alpha2
-alpha3
-numeric_code
-lifecycle
-localized_display_name.fa
-localized_display_name.en
-```
+## 4. Data/source model
 
-Alpha-2/alpha-3 are canonical uppercase ASCII source codes. Numeric source code is represented losslessly so leading zeroes are not discarded by transport/serialization. Private/user-assigned ranges are outside the canonical country list unless a later explicit platform decision defines their meaning.
+Sources remain ISO 3166-1, ISO 4217, IANA Language Subtag Registry/BCP 47, IANA tzdb, and stable Unicode CLDR.
 
-### Currency
+Bundle is immutable/read-only with no PostgreSQL/SQLite/Redis/Kafka runtime state. Manifest records format/bundle version, controlled build timestamp, source revisions, supported locales, record counts, and content SHA-256.
 
-Canonical identifier: ISO 4217 three-letter code.
+Production runtime never downloads/synchronizes standards data. Reference codes use ACTIVE/DEPRECATED/RETIRED lifecycle and are not silently reused.
 
-Metadata may include:
-
-```text
-alpha_code
-numeric_code
-minor_unit metadata when defined by the approved source
-lifecycle
-localized_display_name.fa
-localized_display_name.en
-```
-
-Reference Data never interprets this as pricing/payment/provider availability authority.
-
-### TimeZone
-
-Canonical identifier: IANA Time Zone Database identifier.
-
-Persisted/reference selection uses canonical tzdb identifiers, not abbreviations such as `EST` and not raw offsets such as `+03:30`.
-
-Metadata may contain reviewed aliases only when the imported source format needs historical/canonical-resolution support. Alias graphs must be validated as bounded and acyclic before publication. The exact tzdb release is bundle metadata.
-
-### SupportedLocale
-
-Canonical identifiers are BCP 47 tags. v1 exposes exactly:
+Supported product locales remain:
 
 ```text
 fa
 en
 ```
 
-These records describe product-supported reference/display locales only. Identity still owns persisted registration locale. BFF/frontend may own language negotiation/presentation selection. Notification owns template localization. Reference Data does not take those responsibilities over.
+## 5. Public BFF surface
 
-## 3. Source authority and offline ingestion
+When implemented, BFF may expose read-only `GET`/`HEAD` reference routes under `/api/v1/reference` from either the local immutable adapter or, after trigger, the independent gRPC service.
 
-Runtime has no Internet/source-provider dependency. Approved inputs are acquired only by the offline importer/release process.
+The public surface:
 
-Source authorities:
+- still traverses upstream L4 -> Traefik -> WAF -> BFF;
+- may be anonymous because data is global/public;
+- does not enable credentialed cross-origin CORS;
+- uses deterministic representation locale/order/pagination;
+- may use deterministic ETag and `Cache-Control: public, max-age=3600`;
+- never fabricates unreviewed stale data.
 
-| Family/metadata | Authority |
-| --- | --- |
-| Country | ISO 3166-1 |
-| Currency | ISO 4217 |
-| Locale identifier | IANA Language Subtag Registry / BCP 47 |
-| Time zone | IANA Time Zone Database |
-| Localized display metadata | stable Unicode CLDR release |
-
-A new bundle records the exact source revision/artifact used for every applicable authority. The platform does not permanently hardcode today's tzdb/CLDR source revision into the runtime Technology Baseline.
-
-Before import, release evidence verifies source provenance, integrity, and license/use rights. Production bundles never ingest draft/development CLDR data.
-
-Importer pipeline:
+## 6. Independent runtime contract when triggered
 
 ```text
-approved source acquisition
--> provenance/license/integrity checks
--> parse with bounded source-specific adapter
--> canonical normalization
--> duplicate/code/lifecycle/alias validation
--> fa/en display coverage validation
--> deterministic sort/serialization
--> manifest + SHA-256 content digest
--> signed image/release evidence
+service path:    services/reference-data-service
+base package:    com.sajtech.referencedata
+namespace:       platform-apps
+Deployment:      reference-data-service
+Service:         reference-data-service
+ServiceAccount:  reference-data-service
+application:     gRPC 9090
+management:      separate configured port
 ```
 
-No production request can choose a source URL, source revision, parser, dataset family, or arbitrary schema.
+Typed operations remain Country/Currency/TimeZone/SupportedLocale list/get plus version query. No generic dataset/query surface.
 
-## 4. Immutable application bundle
-
-Reference Data v1 has no database or broker:
+Initial BFF dependency when activated:
 
 ```text
-PostgreSQL:     none
-CloudNativePG:  none
-Flyway:         none
-SQLite:         none
-Redis:          none
-Kafka:          none
-runtime source/provider HTTP: none
+class:           AUTHORITATIVE_STATE
+deadline:        <=1000 ms and remaining-parent bounded
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+fallback:        none
 ```
 
-The reference bundle is a versioned immutable read-only application resource included in the same signed service image. There is no separately mutable production data volume and no runtime update endpoint.
+The service is ClusterIP-only, Ambient-enrolled, strict mTLS, deny-by-default, and has no standards-source Internet egress.
 
-This is not another ADR-0040 storage exception. ADR-0040 remains the SQLite-specific Compromised Password decision. Reference Data simply has no mutable relational persistence.
+Single-server: one replica/HPA off/PDB off. HA: reviewed replicated target.
 
-At startup the service validates the bundle format/manifest/digest and may load the small v1 families into bounded immutable in-process indexes. Bundle cardinality/memory remains measured and bounded; this decision does not authorize arbitrary large datasets to be added to the service.
+## 7. Day-One observability
 
-Manifest contains at least:
+Whether local module or independent service, first executable reference path follows ADR-0044.
 
-```text
-format_version
-bundle_version
-built_at_utc
-source_revisions
-supported_locales
-record_counts_by_family
-content_sha256
-```
+Allowed telemetry:
 
-`built_at_utc` is a controlled build/release input. Rebuilding from identical approved logical inputs and build metadata must produce deterministic normalized content/digest under the same format version.
+- bounded family/operation enum;
+- latency/outcome;
+- bundle/version/integrity state;
+- bounded record counts;
+- service in-flight/queue saturation when remote.
 
-## 5. Lifecycle and compatibility
+No caller free text/page token/raw URL/unbounded source metadata becomes metric label/log/trace attribute.
 
-Every reference record has:
+## 8. Verification
 
-```text
-ACTIVE
-DEPRECATED
-RETIRED
-```
+Before any executable reference path:
 
-Rules:
+- source revision/provenance/integrity/license evidence;
+- deterministic importer/bundle/manifest/digest;
+- canonical identifiers/lifecycle/non-reuse;
+- `fa`/`en` display metadata where required;
+- bounded memory/pagination/response;
+- no runtime standards-source dependency or mutable datastore;
+- public BFF edge/CORS/cache semantics where exposed;
+- Day-One PII-safe logs/metrics/traces.
 
-- ordinary selection lists default to ACTIVE;
-- exact lookup may resolve DEPRECATED/RETIRED values for historical display/migration;
-- a code already used by the platform is not silently reused for new meaning;
-- removal that prevents historical resolution needs an explicit migration/compatibility plan;
-- bundle upgrades preserve contract compatibility or are rolled out with explicit client migration;
-- existence/lifecycle never becomes business acceptance authority.
+Before independent service creation additionally:
 
-The owning business context decides whether a reference value may be used in a specific command. Reference Data can reject malformed/unknown reference identifiers but does not grant a business operation.
+- explicit ADR-0041 trigger record;
+- no one-journey-only justification;
+- typed Protobuf/Buf contract;
+- BFF deadline/cancellation/no-retry/no-fallback behavior;
+- wrong-workload and egress negatives;
+- local adapter cleanly replaced so there are not two authorities;
+- profile-correct signed deployment/load/recovery evidence.
 
-## 6. Internal gRPC contract
-
-Canonical typed v1 operations:
-
-```text
-ListCountries
-GetCountry
-ListCurrencies
-GetCurrency
-ListTimeZones
-GetTimeZone
-ListSupportedLocales
-GetSupportedLocale
-GetReferenceDataVersion
-```
-
-No operation accepts an arbitrary dataset name/schema/query/sort expression. No generic `GetDataset`, fuzzy search, full-text search, or dynamic query language exists in v1.
-
-List behavior:
-
-```text
-page_size default: 100
-page_size maximum: 200
-page_token: opaque, bounded, version-bound
-ordering: deterministic family-specific canonical order
-serialized response maximum: 128 KiB
-```
-
-Page tokens are service-generated navigation state only; caller cannot use them to select arbitrary file/object paths or internal data structures. A token created for one family/bundle is rejected for another family/incompatible bundle.
-
-Exact lookup validates canonical identifier shape. A request may select display locale only from current supported locales; unsupported locale is a stable invalid-argument result, not a fallback to arbitrary server locale.
-
-`GetReferenceDataVersion` exposes bounded non-sensitive bundle/format/source-revision identity required for cache/diagnostic compatibility. It does not expose build filesystem paths, source credentials, or unbounded source payload metadata.
-
-## 7. Stable failure families
-
-The exact Protobuf/public mappings are versioned when implemented. Semantic families include at least:
-
-```text
-REFERENCE_DATA_INVALID_ARGUMENT
-REFERENCE_DATA_NOT_FOUND
-REFERENCE_DATA_UNSUPPORTED_LOCALE
-REFERENCE_DATA_BUNDLE_UNAVAILABLE
-REFERENCE_DATA_BUNDLE_INCOMPATIBLE
-REFERENCE_DATA_OVERLOADED
-```
-
-Internal parser/build path, stack trace, filesystem path, source payload, or library exception text is never copied into caller-visible errors.
-
-## 8. Web BFF public facade
-
-Web BFF exposes explicit OpenAPI routes:
-
-```text
-/api/v1/reference
-/api/v1/reference/countries
-/api/v1/reference/currencies
-/api/v1/reference/time-zones
-/api/v1/reference/locales
-```
-
-The list/detail route shape is OpenAPI-owned and may use path/query parameters only when typed and bounded. Internal gRPC method names are not mechanically translated into URLs.
-
-v1 Reference Data public methods are GET/HEAD only and side-effect free. They may be anonymous because the payload is global, public, non-user-specific reference metadata.
-
-Anonymous means:
-
-- no authenticated BFF session is required just to read reference data;
-- no user/tenant JWT authority is created or inferred;
-- no CSRF token is required for side-effect-free GET/HEAD;
-- no cross-origin credentialed CORS is introduced;
-- mandatory Internet -> upstream volumetric protection -> Traefik -> WAF -> BFF path remains unchanged;
-- BFF must not use a cookie/session locale implicitly to vary public-cache representation.
-
-Representation locale is explicit and canonical, for example a bounded `locale=fa|en` query field defined by OpenAPI. Cache keying therefore does not depend on hidden session state.
-
-Successful public reference responses use:
-
-```text
-ETag: deterministic from bundle + family + representation identity
-Cache-Control: public, max-age=3600
-```
-
-Conditional GET/HEAD may return `304 Not Modified`. `no-store` remains mandatory for authentication/OIDC/session/private administration surfaces but does not apply to these intentionally public immutable-reference responses.
-
-BFF does not hold an application-level stale reference cache/fallback in v1. An unavailable/invalid Reference Data response maps to stable public unavailability rather than a fabricated or unreviewed stale list.
-
-## 9. BFF dependency contract
-
-Canonical edge:
-
-```text
-operation_id:     web-bff.reference-data-read
-caller:           web-bff
-dependency:       reference-data.read
-class:            AUTHORITATIVE_STATE
-deadline:         <=1000 ms and <= remaining BFF parent budget
-attempts:         1
-wait-for-ready:   off
-automatic retry:  none
-fallback:         none
-failure action:   reference route unavailable; no fabricated data
-```
-
-The BFF outer request ceiling remains <=2600ms. Cancellation propagates to gRPC where supported. BFF and Reference Data release bounded in-flight capacity promptly after cancellation/deadline.
-
-Reference Data server uses finite global/per-caller in-flight and queue limits. Exact launch values require load evidence. Virtual Threads never authorize unbounded work.
-
-This initial edge is read-only. No other service is authorized to create a hidden dependency on Reference Data. A new caller requires dependency-registry entry, consumer-specific failure semantics and explicit NetworkPolicy/Istio authorization.
-
-## 10. Runtime and deployment target
-
-When the implementation trigger is met, identity and transport defaults are profile-independent:
-
-```text
-namespace:         platform-apps
-Deployment:        reference-data-service
-Service:           reference-data-service
-ServiceAccount:    reference-data-service
-principal:         prod.sajtech.internal/ns/platform-apps/sa/reference-data-service
-application gRPC:  9090
-management:        separate configured port
-```
-
-Deployment topology follows the selected production profile:
-
-```text
-production-single-server:
-  replicas: 1
-  HPA: disabled
-  availability PDB: disabled
-  node-failover claim: none
-
-production-ha:
-  replicas: >=3
-  PDB minAvailable: 2
-  topology spread: required by the HA target
-  HPA: disabled until evidence permits it
-```
-
-The service is ClusterIP-only and Ambient-enrolled under STRICT mTLS. NetworkPolicy and Istio authorization initially allow application gRPC ingress only from `platform-apps/web-bff` ServiceAccount. Wrong workloads are denied.
-
-Application egress is deny-by-default. Serving has no ISO/IANA/Unicode/CLDR/Internet synchronization. Only narrowly necessary DNS and approved telemetry egress may be configured.
-
-Normal workload hardening applies:
-
-- immutable signed image digest;
-- non-root;
-- `allowPrivilegeEscalation=false`;
-- capabilities dropped by default;
-- `RuntimeDefault` seccomp;
-- read-only root filesystem where compatible;
-- bounded CPU/memory/ephemeral resources;
-- startup/readiness/liveness separation;
-- graceful shutdown;
-- topology spread in `production-ha`; single-server has no cross-node spread claim.
-
-Liveness is local runtime progress only. Readiness requires a valid compatible bundle, successful bounded startup validation, and required security/configuration. It does not probe external source authorities.
-
-## 11. SLO, load, and scaling
-
-Initial service objective when implemented is Class B:
-
-```text
-availability >=99.95% rolling 30d
-p95 <=250 ms
-p99 <=750 ms
-```
-
-The BFF child deadline is stricter at <=1000ms and remains inside its 2600ms outer budget.
-
-Before production, representative load proves:
-
-- list/detail latency by family;
-- pagination and max-128-KiB response behavior;
-- startup bundle validation/memory footprint;
-- bounded in-flight/queue behavior;
-- profile-correct availability/recovery behavior: whole-host/reboot recovery without a failover claim for `production-single-server`, or replica/node-loss behavior for `production-ha`;
-- BFF cache/conditional request behavior;
-- >=2x projected reference-route peak with >=30% validated resource headroom where applicable.
-
-If load proves a bottleneck, first optimize serialization/indexing/bounds, then replicas/resources. Do not add Redis/database/provider synchronization merely as speculative optimization.
-
-## 12. Security, privacy, and erasure
-
-The service contains no subject- or tenant-linked application state. It is not an ADR-0028 erasure participant in v1.
-
-Reference Data does not accept authentication credentials, provider secrets, user IDs, tenant IDs, membership IDs, session IDs, permission snapshots, or arbitrary URLs as data-selection authority.
-
-The public BFF facade remains protected by the existing edge/WAF/security-header/request-boundary controls. Anonymous reference reads do not weaken OIDC/session/Authorization routes.
-
-Any future tenant-specific, user-specific, mutable business configuration or source-of-truth state is outside this contract and requires a bounded-context/persistence/security/erasure decision before implementation.
-
-## 13. Logging and observability
-
-Use structured allow-list telemetry. Safe bounded dimensions include:
-
-```text
-operation/family
-stable outcome class
-latency
-in-flight/queue saturation
-bundle format/version from a bounded deployed set
-bundle readiness/integrity category
-safe aggregate record counts
-```
-
-Do not metric-label page tokens, caller free text, arbitrary reference values, raw URLs, trace IDs, source filenames/paths, or unbounded upstream metadata. Do not dump full source artifacts or response bodies into request logs.
-
-Alerts cover bundle readiness failures, incompatible bundle, sustained service/BFF dependency error rate, saturation and Class-B SLO burn when the service is implemented.
-
-## 14. Release, recovery, and rollback
-
-Bundle changes are release changes. Import/build validation runs before service/image release. Production never edits the active bundle.
-
-Recovery:
-
-```text
-reviewed Git/source-import identity
--> deterministic immutable bundle
--> signed immutable service image
--> deploy
--> readiness validates bundle
-```
-
-There is no database backup/PITR/restore step. A lost pod/node is replaced from the same approved image/bundle where capacity exists. In `production-single-server`, loss of the only host is a platform recovery/redeploy event rather than transparent rescheduling. Cold DR rebuilds/redeploys the same approved release and keeps the workload unready until bundle compatibility/integrity passes.
-
-Rollback selects a previously approved signed image/bundle only when contract and source-support policy remain compatible. Rollback never reuses a retired identifier for new meaning or silently downgrades business semantics owned by consumers.
-
-## 15. Required implementation evidence
-
-Before production, prove:
-
-- implementation trigger evidence is documented;
-- independent Java 25/Spring Boot service build/Wrapper/dependency verification exists;
-- Protobuf/Buf contracts implement only the typed v1 operations and stable errors;
-- ISO/IANA/CLDR source adapters are offline-only, bounded, deterministic and license/integrity reviewed;
-- Country/Currency/TimeZone/SupportedLocale canonicalization, lifecycle/non-reuse, duplicate/alias-cycle and fa/en coverage tests pass;
-- bundle manifest/content digest is deterministic and tamper/incompatibility detection blocks readiness;
-- no PostgreSQL/CloudNativePG/Flyway/SQLite/Redis/Kafka or runtime source-provider dependency is introduced;
-- bounded startup memory/indexes and list/detail/page/128-KiB contracts pass;
-- BFF OpenAPI `/api/v1/reference` GET/HEAD routes, anonymous read semantics, explicit locale, ETag/304 and `public, max-age=3600` behavior pass;
-- same-origin CORS and mandatory edge/WAF path remain intact; reference routes do not create session/JWT/CSRF authority;
-- BFF->Reference Data <=1000ms/one-attempt/no-retry/no-fallback/cancellation behavior passes;
-- only Web BFF workload reaches application gRPC and arbitrary application Internet/source egress is denied;
-- profile-correct hardened deployment renders safely: single-server one replica/no HPA/no availability PDB, or HA >=3/PDB2/topology spread with HPA evidence-gated;
-- Class-B and >=2x expected-peak load evidence passes before production;
-- PII-safe low-cardinality telemetry and alerting passes;
-- same signed immutable digest promotion and rebuild/redeploy recovery pass;
-- single-server whole-host/reboot recovery has no node-failover claim; HA replica/node-loss behavior is verified where applicable.
-
-Documentation alone is not implementation evidence. Until the trigger, source, contracts, build, deployment, and tests exist and execute, implementation remains `PLANNED / NOT VERIFIED`.
+Until those artifacts exist, the independent service remains `PLANNED / GATED / NOT VERIFIED`.
