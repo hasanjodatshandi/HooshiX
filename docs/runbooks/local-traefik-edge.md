@@ -37,7 +37,7 @@ Primary local edge pins:
 
 ```text
 Traefik Proxy 3.7.10
-Traefik Helm chart 40.2.0
+Traefik Helm chart 41.2.0
 Gateway API 1.5.1 Standard channel
 Caddy 2.11.4
 coraza-caddy 2.5.0
@@ -46,11 +46,13 @@ OWASP CRS 4.25.1 LTS
 Istio Ambient 1.30.3
 ```
 
+Chart 41 requires the repository values to use the current `log`/`accessLog` keys and object-form `providers.file.content`. Render/upgrade verification must reject stale chart-40 key shapes before cluster mutation.
+
 Repository pin locations:
 
 ```text
 infrastructure/traefik/pins.env
-infrastructure/traefik/chart/40.2.0/
+infrastructure/traefik/chart/41.2.0/
 infrastructure/waf/pins.env
 infrastructure/waf/
 ```
@@ -202,12 +204,13 @@ Required order:
 1. validate pin/checksum files;
 2. create/validate `traefik-system` and `platform-edge` namespaces;
 3. create independent ServiceAccounts and RBAC;
-4. install/upgrade Traefik from the pinned chart;
-5. install/upgrade the pinned Caddy/Coraza WAF;
-6. apply Ambient enrollment and least-privilege authorization;
-7. apply the Gateway/GatewayClass/HTTPRoute resources;
-8. apply local TLS material references;
-9. wait for readiness and run verification.
+4. render chart 41 values and reject stale chart-40 logging/file-provider keys;
+5. install/upgrade Traefik from the pinned chart;
+6. install/upgrade the pinned Caddy/Coraza WAF;
+7. apply Ambient enrollment and least-privilege authorization;
+8. apply the Gateway/GatewayClass/HTTPRoute resources;
+9. apply local TLS material references;
+10. wait for readiness and run verification.
 
 The installer must not silently enable the dashboard, Kubernetes Ingress
 provider, CRD provider, wildcard routes, or direct BFF backend routes.
@@ -222,6 +225,7 @@ The verifier must check at least:
 
 - Traefik and WAF Helm/workload resources are ready;
 - running image digests/chart metadata match repository pins;
+- rendered Traefik values use chart-41 logging/file-provider key shapes and contain no stale chart-40 aliases;
 - Traefik uses the expected independent ServiceAccount;
 - WAF uses the expected independent ServiceAccount;
 - both namespaces have the intended Ambient enrollment;
@@ -329,7 +333,7 @@ If edge verification fails:
 1. stop downstream application acceptance testing;
 2. preserve rendered manifests, Helm status, Events, route status, policy status,
    and minimal safe logs;
-3. determine whether the failure is hostPort, Gateway API, RBAC, Ambient identity,
+3. determine whether the failure is chart migration, hostPort, Gateway API, RBAC, Ambient identity,
    AuthorizationPolicy, WAF, TLS, or backend readiness;
 4. do not route Traefik directly to BFF as a workaround;
 5. do not disable WAF/STRICT mTLS/deny-by-default to obtain a green smoke test;
