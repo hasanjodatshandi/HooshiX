@@ -92,15 +92,36 @@ Authentication dependency ownership is explicit in `dependency-criticality.yaml`
 
 BFF->Identity evidence submission has no retry/fallback. A failed/ambiguous call is resolved only through the stable request/evidence idempotency contract; BFF never creates a second provider identity or alters the evidence payload to force success.
 
+Tenant Authorization administration is also a real BFF-owned synchronous edge. Browser calls the BFF REST/OpenAPI facade; BFF invokes the matching Authorization gRPC management operation with its approved workload identity and a current Identity access JWT whose audience is exactly `authorization-service`.
+
+The BFF does not pre-authorize or fabricate Authorization management state. Authorization validates the end-user JWT locally and is the management permission/domain authority. The BFF call contract uses the current generic gRPC ceiling as the exact v1 edge limit:
+
+```text
+deadline:        1500 ms maximum
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+fallback:        none
+failure mode:    fail closed / management unavailable
+```
+
+Write requests preserve the caller/BFF-generated canonical UUIDv4 `request_id`. A timeout/ambiguous result is not retried automatically; a later explicit replay uses the same request identity so Authorization's idempotency contract can return the committed original or stable conflict.
+
 ## 7. Authorization
 
-Routine protected request flow does **not** pay two online Authorization calls. The resource-owning service performs the final online `CheckPermission` under the current ADR-0013/ADR-0026/ADR-0032/ADR-0036 authorization runtime. BFF only checks authorization for BFF-owned resources or a separately justified UX/read-model need; such checks never replace final resource enforcement.
+Routine protected resource request flow does **not** pay two online Authorization calls. The resource-owning service performs the final online `CheckPermission` under the current ADR-0013/ADR-0026/ADR-0032/ADR-0036 authorization runtime. BFF only checks authorization for BFF-owned resources or a separately justified UX/read-model need; such checks never replace final resource enforcement.
 
-`authenticated_onboarding` is not an authorization bypass. It never carries a normal resource token and is restricted to the explicitly reviewed Identity onboarding surface.
+The tenant-management facade is different from duplicate resource authorization: BFF transports browser administration to the Authorization-owned management use case, but does not decide that use case itself. It never trusts Role/permission lists from browser/session/JWT as management authority and never converts an Authorization outage/deny into a local allow.
+
+`GetMembershipAuthorization` responses are administration/UX snapshots only. The BFF/React client must not reuse them as authoritative access-control decisions for protected resource calls.
+
+`authenticated_onboarding` is not an authorization bypass. It never carries a normal resource token and is restricted to the explicitly reviewed Identity onboarding surface; Authorization management is not implicitly added to the onboarding allow-list.
 
 ## 8. Failure behavior
 
-The BFF does not fabricate successful business data when downstream services are unavailable. It maps stable downstream error categories to bounded public error contracts without leaking internal exception details, tokens, tenant IDs, Contact ownership, or provider payloads.
+The BFF does not fabricate successful business data when downstream services are unavailable. It maps stable downstream error categories to bounded public error contracts without leaking internal exception details, tokens, tenant IDs, Contact ownership, provider payloads, Role/permission internals, or Authorization audit data.
+
+Authorization management deny/unavailable/overload/idempotency-conflict remains distinct in the public RFC 9457 mapping. BFF does not retry a denied/unavailable management mutation with changed payload/request identity to force success.
 
 OIDC evidence expiry/replay/conflict, Identity dependency failure, Google verified-email collision, or MFA pre-auth failure remains authentication unavailable/denied/explicit-link-required according to the stable contract and never falls back to email auto-link, a browser-stored provider token, SMS downgrade of active TOTP, or a fabricated authenticated session.
 
@@ -108,4 +129,4 @@ Session Redis failure fails authentication/session continuity closed. An onboard
 
 ## 9. Verification
 
-Applicable tests include REST/OpenAPI contracts, PKCE/state/nonce replay, redirect/open-redirect negatives, provider validation before Identity invocation, provider-code/token absence from Identity requests/telemetry, exact 256-bit evidence randomness, issued-at binding, two-minute expiry, >=10-minute replay retention, equal replay/changed-payload conflict/wrong-workload negatives, Google signup verified-email collision/no-auto-link/unverified-email no-Contact/name-suggestion behavior, active-TOTP Google proof entering MFA continuation, password/Google MFA pre-auth with no completed session before MFA, tenantless `authenticated_onboarding` route allow-list + ordinary-resource denial, zero/one/many Membership journeys, tenant switch/session rotation, cookie/session rotation/fixation/logout/revocation/MFA-state-change behavior, Redis failover/session behavior, CSRF Origin/token, CORS, security headers, browser storage token absence, public-edge traversal/direct-bypass negatives, internal gRPC deadlines/error maps, final-authorization ownership, PII-safe logging, BDD critical flows, and Playwright critical authentication/onboarding journeys.
+Applicable tests include REST/OpenAPI contracts, PKCE/state/nonce replay, redirect/open-redirect negatives, provider validation before Identity invocation, provider-code/token absence from Identity requests/telemetry, exact 256-bit evidence randomness, issued-at binding, two-minute expiry, >=10-minute replay retention, equal replay/changed-payload conflict/wrong-workload negatives, Google signup verified-email collision/no-auto-link/unverified-email no-Contact/name-suggestion behavior, active-TOTP Google proof entering MFA continuation, password/Google MFA pre-auth with no completed session before MFA, tenantless `authenticated_onboarding` route allow-list + ordinary-resource/Authorization-management denial, zero/one/many Membership journeys, tenant switch/session rotation, cookie/session rotation/fixation/logout/revocation/MFA-state-change behavior, Redis failover/session behavior, CSRF Origin/token, CORS, security headers, browser storage token absence, public-edge traversal/direct-bypass negatives, internal gRPC deadlines/error maps, Authorization management 1500ms/one-attempt/no-retry/no-fallback behavior, exact `aud=authorization-service` token propagation, stable write request-id replay after ambiguity, wrong-workload/expired/wrong-audience management negatives, proof BFF does not locally grant management authority, final resource-authorization ownership, PII-safe logging, BDD critical flows, and Playwright critical authentication/onboarding/administration journeys where implemented.

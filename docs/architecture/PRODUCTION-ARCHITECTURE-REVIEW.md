@@ -1,6 +1,6 @@
 # Production Architecture Review — Current State
 
-- **Reviewed:** 2026-08-13
+- **Reviewed:** 2026-08-14
 - **Status:** architecture target accepted; implementation evidence is not implied
 - **Documentation mode:** current-only
 
@@ -13,8 +13,10 @@ The design favors strong correctness/security with bounded operational complexit
 ## Current architecture conclusions
 
 - Identity owns registration, credential/MFA/session/token-signing concerns; external identities bind by issuer+subject and browser credentials remain BFF-managed.
-- Authorization remains one online authoritative fail-closed dependency with no permission cache/Kafka invalidation/stale fallback/retry. It has explicit SLOs, fair overload isolation, HA/capacity gates, burn alerts, and de-correlated real-contract breaker recovery.
-- Semantic security quotas remain service-owned and atomically enforced in isolated Redis; no quota microservice is introduced.
+- Authorization remains the online authoritative tenant-permission boundary with no permission cache/Kafka invalidation/stale fallback/retry. Its permission catalog is exact/versioned/non-reused; SYSTEM/custom Role and direct-override semantics are bounded; management is BFF-facaded but locally authorized in Authorization; privilege escalation is denied; owner-role mutation shares atomic safety with Identity Membership-removal reservations; platform capability checks are a separate Identity-only fail-closed authority and never become tenant/resource bypass.
+- Authorization uses jOOQ/JDBC with forced tenant RLS and bounded query plans; management/platform idempotency/audit and erased-subject authority removal are explicit current contracts.
+- Authorization has explicit SLOs, fair overload isolation, HA/capacity gates, burn alerts, and de-correlated real-contract breaker recovery.
+- Semantic security quotas remain service-owned and atomically enforced in isolated Redis; no quota microservice is introduced. Authorization bulk administration is charged by bounded actual semantic mutations rather than one unit for an arbitrarily large request.
 - Notification owns durable human-channel delivery. Sensitive retry state uses bounded local AES-GCM key rings rather than request-path OpenBao Transit. PostgreSQL-authoritative time and a durable `DISPATCHING` commit replace bespoke clock/fence coordination.
 - Production Notification providers are Liara Transactional Email and IPPanel Webservice-mode Iran SMS. Provider ambiguity is explicit and never converted to fabricated success or blind resend.
 - Every persistent production microservice owns a distinct PostgreSQL database/credentials/Flyway history and dedicated CloudNativePG cluster; tenant-owned tables use forced RLS.
@@ -43,8 +45,12 @@ The metric, mitigation, and scale/split triggers are maintained in `performance-
 
 The current production target intentionally does **not** add:
 
-- a duplicate routine Authorization check in the BFF;
+- a duplicate routine Authorization check in the BFF for ordinary protected resource calls;
 - a permission-result cache or Kafka invalidation path;
+- caller-supplied Role/permission/owner snapshots as authorization authority;
+- wildcard/custom Role inheritance or resource-expression policy in v1;
+- a successful `allowed=false` permission-result shape;
+- a public/admin permission-explanation endpoint;
 - a quota microservice;
 - a runtime Schema Registry in v1;
 - Notification per-message OpenBao RPCs;
@@ -67,6 +73,9 @@ Current security boundaries are coherent only when enforced together:
 - WAF does not replace authentication/authorization/validation/semantic quotas;
 - Istio identity does not replace NetworkPolicy or native datastore authentication;
 - local reject-only Authorization prechecks cannot grant permission;
+- Authorization permission identifiers are lifecycle-governed/non-reused; actors cannot grant authority they do not possess; platform capability is separate from tenant permission and cannot bypass resource/domain invariants;
+- last-owner protection is atomic across Identity removal reservations and local owner Role changes;
+- erased subjects cannot retain Membership/direct-override/platform-profile authority;
 - sensitive material never enters Kafka/logs/traces/metrics/raw provider telemetry;
 - production secrets are not committed to Git/Helm values/images;
 - production workloads use hardened security contexts and independent ServiceAccounts;
@@ -78,7 +87,8 @@ Current security boundaries are coherent only when enforced together:
 
 - All synchronous dependencies have finite deadlines and bounded concurrency.
 - Retry is safe/idempotent and single-owner only.
-- Remote I/O is not performed inside database transactions.
+- Authorization `CheckPermission` and `CheckPlatformPermission` are one-attempt fail-closed authority calls with no cache/retry/fallback; platform-check outage blocks only operations requiring that platform authority rather than fabricating it.
+- Remote I/O is not performed inside database transactions; Authorization administration quota is intentionally evaluated before its PostgreSQL mutation transaction.
 - Kafka publication uses transactional outbox and at-least-once consumers are idempotent.
 - CloudNativePG failover must preserve required durable commits or refuse unsafe failover.
 - Restore evidence, not backup existence, proves recovery capability.
@@ -92,6 +102,8 @@ Local development remains smaller than production. Pure Domain/Application work 
 ## Coding-quality review
 
 The coding baseline incorporates feature-first/nature-separated packages, strict package naming, Domain/persistence separation, constructor injection, bounded files/responsibilities, no dumping-ground packages, explicit transaction/deadline/retry/idempotency rules, PII-safe telemetry, hardened container/Kubernetes settings, Helm migration discipline, and immutable same-digest staging-to-production promotion.
+
+Authorization's jOOQ/JDBC-only implementation decision does not relax Hexagonal boundaries: generated SQL types remain Infrastructure-only and critical permission queries require plan/index evidence.
 
 Machine-checkable rules should be executable. Documentation-only presence is not source compliance.
 

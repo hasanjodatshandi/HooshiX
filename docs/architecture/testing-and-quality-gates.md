@@ -120,15 +120,32 @@ Affected release candidates run applicable:
 
 ### Semantic quotas — ADR-0024
 
-Prove atomic multi-dimension enforcement, HMAC pseudonymous keys, anti-lockout sequencing, dual trusted time/<=2s skew, no TTL security reset, 75ms one-attempt fail-closed semantics, Redis Sentinel failover/outage, and >=2x projected peak load.
+Prove atomic multi-dimension enforcement, HMAC pseudonymous keys, anti-lockout sequencing, dual trusted time/<=2s skew, no TTL security reset, 75ms one-attempt fail-closed semantics, Redis Sentinel failover/outage, exact Authorization semantic-mutation cost/no-refund behavior, and >=2x projected peak load.
 
 ### Authorization — ADR-0013/0026/0032/0036
 
-Prove exact one-call/no-cache/no-retry/fail-closed contract, safe local reject-only prechecks, fair overload shedding, current breaker opening/recovery, paired burn alerts, p95<=100ms/p99<=200ms, >=3 replicas/PDB/spread, Hikari p99<25ms, >=2x peak capacity, one replica/node loss, PostgreSQL failover, and absence of duplicate routine BFF checks.
+Prove the complete Authorization contract, not only the hot-path happy case:
+
+- permission-catalog schema/scope/owner/lifecycle/non-reuse plus unknown/retired/deprecated behavior;
+- exact SYSTEM Role mappings/immutability and custom Role normalization/version/archive/limits;
+- direct override precedence/one-value/no-condition/no-TTL behavior;
+- exact `CheckPermission` request, approved caller workload, success-is-ALLOW/deny-status/no-`allowed=false` semantics;
+- one-call/300ms/no-cache/no-retry/no-fallback and stable deny/unavailable/overload mapping;
+- Web BFF tenant-management workload + local JWT `aud=authorization-service` verification, no role/permission JWT trust and no self-gRPC management check;
+- exact management permission mapping and privilege-escalation negatives for Role permissions/assignment/direct grants/deny removal/owner assignment;
+- bounded management reads, deterministic pagination and `GetMembershipAuthorization` non-authority/no `ExplainPermission` surface;
+- hard limits and atomic management mutation, AUTH_ADMIN_WRITE set-delta cost/max100/quota-before-DB/no-refund behavior;
+- UUIDv4/HMAC idempotency equal-replay/conflict and >=35d evidence;
+- stable error taxonomy and >=365d PII-safe durable audit/reason requirements while proving hot-path checks do not add synchronous audit writes;
+- owner-role mutation and Identity Membership-removal reservation atomic serialization, reservation replay/finalize/cancel/no unsafe expiry;
+- exact `CheckPlatformPermission` Identity-only 300ms/fail-closed profile permissions, platform no-bypass and JIT-only profile assignment/revocation;
+- jOOQ/JDBC-only persistence, forced RLS/pool context negatives, representative query-plan evidence and no remote I/O inside DB transactions;
+- erased User tenant/platform authority removal while tenant-owned Role definitions remain;
+- fair overload shedding, current breaker opening/recovery, paired burn alerts, p95<=100ms/p99<=200ms, >=3 replicas/PDB/spread, Hikari p99<25ms, >=2x peak capacity, one replica/node loss, PostgreSQL failover, and absence of duplicate routine BFF resource permission checks.
 
 ### Dependency registry — ADR-0033/0036
 
-Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, one retry owner, no implicit fallback, and composite-edge semantics.
+Validate `dependency-criticality.yaml` schema, duplicates/orphans/coverage, generated Markdown view, current policy-reference anchors including Authorization platform/lifecycle edges, one retry owner, no implicit fallback, and composite-edge semantics.
 
 ### Notification — ADR-0006/0007/0014/0018/0020
 
@@ -152,7 +169,7 @@ Prove the mandatory upstream L3/L4 mitigation/scrubbing -> redundant external L4
 
 ### Secrets/access/logging
 
-Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, and ADR-0031 Semgrep + pipeline redaction + canary sink + runtime detector safety.
+Prove OpenBao snapshot/restore/Shamir unseal and secret-refresh behavior, Teleport JIT SSO/WebAuthn/two-reviewer write elevation/expiry/direct-access denial/session audit, Authorization platform-profile assignment/revocation JIT audit controls, and ADR-0031 Semgrep + pipeline redaction + canary sink + runtime detector safety.
 
 ### Java 25 Virtual Threads
 

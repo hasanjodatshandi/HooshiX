@@ -24,9 +24,9 @@ A more-specific current contract/ADR overrides these generic values. Every netwo
 
 Retry is finite, safe/idempotent, jittered when appropriate, and owned by exactly one layer. Duplicate application + client + mesh/gateway retry for the same failure is prohibited.
 
-## 3. Authorization critical path
+## 3. Authorization critical paths
 
-Current Authorization contract:
+Tenant resource authorization contract:
 
 ```text
 CheckPermission deadline: 300 ms
@@ -39,7 +39,23 @@ p99 <=200 ms
 engineering target p95/p99 <=75/150 ms
 ```
 
-Resource services perform one final authoritative online check. Safe local validation may reject malformed/invalid traffic but never grant authority. Routine duplicate BFF permission checks are prohibited.
+Resource services perform one final authoritative online check. Safe local validation may reject malformed/invalid traffic but never grant authority. Successful `CheckPermission` RPC completion means ALLOW; authoritative deny is a denial status, not a successful `allowed=false` result. Routine duplicate BFF resource permission checks are prohibited.
+
+Identity platform-only tenant/legal-hold operations use the separate authoritative edge:
+
+```text
+CheckPlatformPermission deadline: 300 ms
+attempts: 1
+wait-for-ready: off
+retry/cache/fallback: none
+failure: fail closed
+```
+
+Only Identity may call this operation. Platform-check failure blocks the platform-authorized operation and never fabricates `platform_admin` authority or falls back to tenant permission. The platform profile never changes the tenant/resource authorization meaning.
+
+Authorization tenant-management RPCs are authenticated through the BFF facade but authorization is evaluated locally in Authorization from a locally verified exact-audience Identity JWT; no self-gRPC authorization dependency is introduced.
+
+Authorization `AUTH_ADMIN_WRITE` quota is evaluated before the local PostgreSQL mutation transaction. Its cost equals the actual bounded semantic mutation count; consumed quota is not refunded on later DB failure, while the DB mutation itself remains all-or-none. This prevents abuse amplification without holding DB locks across Redis I/O.
 
 Paging uses paired multi-window burn:
 
@@ -48,6 +64,8 @@ Paging uses paired multi-window burn:
 - 3x: 2h + 24h -> reliability/release-risk action.
 
 Breaker opening follows current ADR-0032 criteria. Repeated OPEN timing and HALF_OPEN behavior follow ADR-0036: de-correlated bounded reopen backoff, at most one real `CheckPermission` probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, and no tenant-tier variation.
+
+Owner safety is a correctness boundary rather than an availability optimization. Identity Membership-removal reservations and local `tenant_owner` assignment/removal/demotion share the same tenant-scoped serialization domain. Unresolved reservations remain fail-closed and never auto-expire into owner capacity.
 
 ## 4. Semantic quota dependency
 
@@ -90,6 +108,8 @@ Circuit breakers are used when repeated dependency failures would otherwise cons
 ## 7. PostgreSQL and Redis HA
 
 Critical service PostgreSQL clusters use the current three-instance CloudNativePG synchronous required-durability/failover model. Safe primary recovery target is <=60s for ordinary failover only when acknowledged durability can be preserved; unsafe promotion fails availability instead of acknowledged data.
+
+Authorization uses jOOQ/JDBC and keeps permission queries bounded; critical plans/indexes are measured. No remote dependency is placed inside its DB transaction merely to improve policy composition.
 
 Security Redis uses one primary + two replicas + three Sentinel voters. Failover tests cover quota/session semantics and fail-closed behavior where the dependency is authoritative.
 
@@ -161,6 +181,8 @@ PostgreSQL PITR 35d
 
 Every backup cycle is verified; isolated restore is monthly per service; full cold DR is quarterly. ADR-0037 requires queryable recovery evidence and freezes ordinary affected-service promotion after a failed restore until replacement evidence passes.
 
+Authorization restore reconciliation must not resurrect erased subject Membership/direct-override/platform-profile authority, reuse retired permission/Role identifiers, release unresolved owner-safety reservations unsafely, or discard required idempotency/audit evidence.
+
 ## 10. Observability
 
 Every service emits:
@@ -180,6 +202,8 @@ Input-derived fields are CR/LF-safe. Production debug elevation is time-bounded/
 
 Ordinary non-audit telemetry export follows the `OBSERVABILITY` dependency class: bounded buffering/drop may keep the primary business request serving, but sustained loss/backpressure is observable/alertable. **Required security/audit evidence is different**: when the current operation contract classifies it as `AUTHORITATIVE_STATE`, it must be durably persisted/outboxed according to that contract and cannot be silently dropped merely because an exporter/backend is unavailable. Log-store access is least privilege and audited.
 
+Authorization records bounded SLO/deny/unavailable/overload/queue/SQL/pool/breaker signals without user/tenant/Membership IDs as metric labels. Its required management/platform audit stays in durable local evidence and is not replaced by ordinary telemetry export. Routine `CheckPermission` allow/deny does not synchronously append one durable audit row per request.
+
 ## 11. Required failure evidence
 
-Critical components run applicable timeout/cancellation, overload/bulkhead, PostgreSQL primary loss, Redis Sentinel failover, Kafka broker/controller/replay, OpenBao restore/unseal, WAF/Istio/NetworkPolicy negative, Authorization fail-closed/recovery, Notification provider ambiguity/crash/failover, backup/PITR/DR, ordinary telemetry-loss behavior, required-audit persistence failure behavior, and SLO/burn-alert correctness tests.
+Critical components run applicable timeout/cancellation, overload/bulkhead, PostgreSQL primary loss, Redis Sentinel failover, Kafka broker/controller/replay, OpenBao restore/unseal, WAF/Istio/NetworkPolicy negative, Authorization tenant/platform fail-closed/recovery, owner-safety concurrency, admin-quota-before-DB/no-refund, erased-authority restore reconciliation, Notification provider ambiguity/crash/failover, backup/PITR/DR, ordinary telemetry-loss behavior, required-audit persistence failure behavior, and SLO/burn-alert correctness tests.
