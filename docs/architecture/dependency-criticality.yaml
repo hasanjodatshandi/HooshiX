@@ -53,8 +53,20 @@ edges:
     fallback: none
     owner: web-bff
     policy_refs:
-      - ADR-0012
       - ADR-0016
+      - docs/architecture/services/web-bff.md#5-completed-browser-session
+
+  - operation_id: web-bff.security-semantic-quota
+    caller_owner: web-bff
+    dependency_id: semantic-quota.redis
+    class: AUTHORITATIVE_SECURITY
+    failure_action: fail_closed_security_dependency_unavailable
+    retry_owner: none
+    fallback: none
+    owner: web-bff
+    policy_refs:
+      - ADR-0024
+      - docs/architecture/services/web-bff.md#9-semantic-oidc-abuse-quotas
 
   - operation_id: service.normal-transaction-or-query
     caller_owner: owning-service
@@ -186,7 +198,7 @@ edges:
     owner: web-bff
     policy_refs:
       - ADR-0016
-      - docs/architecture/services/web-bff.md#3-oidc
+      - docs/architecture/services/web-bff.md#3-oidc-and-pre-auth-browser-transaction
 
   - operation_id: web-bff.identity-oidc-evidence-submit
     caller_owner: web-bff
@@ -199,6 +211,19 @@ edges:
     policy_refs:
       - ADR-0012
       - ADR-0016
+      - docs/architecture/services/web-bff.md#3-oidc-and-pre-auth-browser-transaction
+
+  - operation_id: web-bff.identity-audience-token-broker
+    caller_owner: web-bff
+    dependency_id: identity.issue-audience-access-token
+    class: AUTHORITATIVE_SECURITY
+    failure_action: fail_closed_token_broker_unavailable
+    retry_owner: none
+    fallback: none
+    owner: web-bff
+    policy_refs:
+      - ADR-0016
+      - docs/architecture/services/web-bff.md#4-identity-audience-specific-token-brokerage
 
   - operation_id: web-bff.authorization-tenant-management
     caller_owner: web-bff
@@ -210,8 +235,22 @@ edges:
     owner: web-bff
     policy_refs:
       - ADR-0013
-      - docs/architecture/services/web-bff.md#6-internal-calls
+      - ADR-0016
+      - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
       - docs/architecture/services/authorization-service.md#7-tenant-management-authentication-and-authorization
+
+  - operation_id: web-bff.resource-api-dispatch
+    caller_owner: web-bff
+    dependency_id: registered-resource-service
+    class: AUTHORITATIVE_STATE
+    failure_action: abort_request_or_resource_unavailable
+    retry_owner: none
+    fallback: none
+    owner: web-bff
+    policy_refs:
+      - ADR-0016
+      - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
+      - docs/architecture/services/web-bff.md#11-final-authorization-boundary
 
   - operation_id: business.optional-enrichment
     caller_owner: owning-bounded-context
