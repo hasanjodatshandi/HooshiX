@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13; registration invariants finalized on 2026-08-13; v1 registration/contact lifecycle finalized on 2026-08-14
+2026-08-10; normalized to current-only documentation on 2026-08-13; registration invariants finalized on 2026-08-13; v1 registration/contact/authentication-entry lifecycle finalized on 2026-08-14
 
 ## Decision
 
@@ -31,12 +31,15 @@ This enables the registration/callback runtime composition. The wider Identity f
 
 ### Registration modes and User activation
 
-v1 implements local registration through both `EMAIL` and `PHONE` contact channels. A newly created User starts `PENDING`.
+v1 implements local registration through both `EMAIL` and `PHONE` contact channels. Local registration includes creation of a User-level local Credential and therefore requires the password to pass the current password syntax/Argon2id/compromised-password rules before the credential is committed. The compromised-password remote check occurs outside the Identity DB transaction.
+
+A newly created User starts `PENDING`.
 
 A `PENDING` User becomes `ACTIVE` only when all of the following are true:
 
 - the required profile is complete under the canonical name rules below;
 - at least one Contact is verified;
+- the local Credential is valid when the registration mode is local password registration;
 - no suspension, deletion, legal/security, or other current blocking condition applies.
 
 The first Contact successfully verified for a User becomes that User's active primary Contact automatically. A User still has at most one active primary Contact in total.
@@ -76,9 +79,25 @@ A verified email or verified phone is globally unique among non-erased Users. Lo
 
 Before verification, one canonical email/phone value may belong to at most one live registration reservation at a time. The reservation lifetime is exactly the active registration challenge lifetime: 10 minutes. A replacement resend challenge replaces the reservation/challenge generation without extending the original semantic policy outside the newly issued 10-minute challenge.
 
-A repeated registration request for the same canonical Contact while the matching registration remains live continues that same pending registration non-enumeratingly; it does not create a second User or a second independently valid reservation. If the canonical Contact is already verified/reserved by a non-erased User, the public/internal caller-visible response remains bounded and non-enumerating and no second User/challenge is created.
+A repeated registration request for the same canonical Contact while the matching registration remains live continues that same pending registration non-enumeratingly; it does not create a second User or a second independently valid reservation. A different request against the same live reservation MUST NOT overwrite the already committed pending profile/Credential/security-sensitive registration state merely because it knows the Contact value. Equal idempotent replay returns the original result; any continuation that changes protected registration intent requires a new reviewed flow after proof rather than silent replacement.
+
+If the canonical Contact is already verified/reserved by a non-erased User, the caller-visible response remains bounded and non-enumerating and no second User/challenge is created.
+
+When the challenge/reservation expires, the stale challenge cannot regain authority. The old unverified Contact no longer reserves the canonical value. A later registration must acquire a new live reservation and challenge under current uniqueness/quota rules; an expired prior challenge can never activate after another User has obtained verified ownership. Stale `PENDING` registration/User data that has no live reservation is non-authenticatable and becomes bounded cleanup/logical-deletion eligible under the current retention policy rather than retaining the Contact reservation indefinitely.
 
 Reservation acquisition/replacement is concurrency-safe. Database uniqueness/locking is used where representable so two concurrent registration attempts cannot both obtain a live reservation for one canonical Contact.
+
+### Local password authentication identifier
+
+v1 has no separate username. Local password authentication accepts exactly one canonical Contact identifier plus the User-level password:
+
+- any active **verified** email Contact may identify the User after the same provider-neutral canonicalization used at registration;
+- any active **verified** phone Contact may identify the User after E.164 canonicalization;
+- primary status is not required for login; verified secondary Contacts remain valid login identifiers until removed;
+- unverified/removed Contacts do not authenticate;
+- authentication responses remain non-enumerating across unknown Contact, missing local Credential, wrong password, suspended/deleting User, and equivalent caller-visible failure cases.
+
+A local `PENDING` User with a valid local Credential may obtain only the restricted ADR-0012 onboarding continuation after proving a verified Contact/password and any required MFA; no normal tenant-scoped access JWT is issued until all activation/tenant-selection rules pass. A local `PENDING` User with no verified Contact cannot use password login as a shortcut around registration verification.
 
 ### Registration verification challenge
 
@@ -121,11 +140,12 @@ Tests prove:
 
 - both gRPC servers bind distinct ports and enforce the configured message/metadata bounds;
 - malformed calls fail closed and usable key-ring state participates in readiness;
-- EMAIL and PHONE registration composition, with staging/production phone registration impossible until the SMS gate is explicitly satisfied;
-- `PENDING -> ACTIVE` occurs only after required profile completion + at least one verified Contact and first verification establishes the primary Contact;
+- EMAIL and PHONE registration composition, local password/compromised-password requirement, with staging/production phone registration impossible until the SMS gate is explicitly satisfied;
+- `PENDING -> ACTIVE` occurs only after required profile completion + at least one verified Contact + applicable local Credential and first verification establishes the primary Contact;
 - profile name trim/NFC/control-character/length behavior and case/internal-space preservation;
 - canonical email/provider-neutral behavior, E.164 phone behavior, verified-contact uniqueness, logical-delete reservation, and at-most-one active primary Contact per User under concurrent updates;
-- one-live-registration reservation per canonical Contact, 10-minute expiry, concurrent acquisition, repeated same-pending continuation, and no second User/challenge for an already verified/reserved Contact;
+- one-live-registration reservation per canonical Contact, 10-minute expiry, concurrent acquisition, repeated same-pending continuation without protected-state overwrite, stale-pending cleanup eligibility, and no second User/challenge for an already verified/reserved Contact;
+- local password login by any verified email/phone Contact, secondary Contact login, removed/unverified Contact denial, and non-enumerating failure behavior;
 - exactly eight-digit CSPRNG challenge generation, HMAC-only persistence, constant-time verification, 10-minute TTL boundaries, five-attempt exhaustion, 60-second resend boundary, replacement invalidation, and single use;
 - caller attempts to supply/extend security policy are rejected/ignored according to the versioned contract;
 - locale persistence/resend behavior from ADR-0008;
@@ -140,4 +160,4 @@ Dependency locking/verification metadata covers the transport.
 
 Runtime exposure may be disabled with `IDENTITY_REGISTRATION_RUNTIME_ENABLED=false` without schema rollback. Phone registration may remain independently gated without removing its schema/contracts. Already committed handoffs remain durable, retain their stable `request_id`, and resume from the current lease/cutoff rules when dispatch is re-enabled.
 
-Rollback MUST preserve contact canonicalization/verified uniqueness, pending reservation uniqueness, logical-delete reservation, the single active primary-Contact invariant, `PENDING -> ACTIVE` verification/profile gate, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.
+Rollback MUST preserve contact canonicalization/verified uniqueness, pending reservation uniqueness/non-overwrite, logical-delete reservation, verified-Contact local login semantics, the single active primary-Contact invariant, `PENDING -> ACTIVE` verification/profile/Credential gate, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.

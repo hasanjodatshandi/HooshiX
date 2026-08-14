@@ -41,9 +41,14 @@ A User may request erasure of their own account through the reviewed authenticat
 
 - authentication age <=5 minutes;
 - when MFA is active, current MFA proof satisfying the same recent-assurance requirement;
-- a stable idempotent UUIDv4 request identity.
+- a stable idempotent UUIDv4 request identity;
+- no remaining Identity Membership that is `ACTIVE` or `SUSPENDED` for a Tenant in `PROVISIONING`, `ACTIVE`, `SUSPENDED`, or `DELETING`.
 
-Acceptance is one local Identity transaction that transitions the User to non-authenticatable `DELETING`, revokes all active RefreshFamilies, records required audit/erasure request state, and creates the erasure coordination Transactional Outbox. No remote service call occurs inside this transaction.
+The Membership precondition is deliberate. A User must first leave ordinary tenant Memberships, transfer ownership when required, or complete the applicable tenant-deletion flow. Every Membership removal uses ADR-0012's Authorization owner-safety preparation/reservation, so self-erasure cannot bypass the last-tenant-owner invariant merely because the final data lifecycle is erasure. Memberships attached only to an already `DELETED` Tenant do not create an active-owner obligation and do not by themselves block self-erasure; their service-owned data is handled by the erasure participants.
+
+Pending invitations targeted to the User are revoked as part of erasure acceptance. New invitation acceptance is impossible after the User enters `DELETING`.
+
+After those local preconditions are satisfied, acceptance is one local Identity transaction that transitions the User to non-authenticatable `DELETING`, revokes all active RefreshFamilies, revokes pending targeted invitations, records required audit/erasure request state, and creates the erasure coordination Transactional Outbox. No remote service call occurs inside this transaction.
 
 `DELETING` rejects new login and refresh. Already-issued access JWTs retain only the bounded cryptographic residual lifetime defined by ADR-0012/ADR-0023; the erasure flow does not add token introspection/blacklisting.
 
@@ -133,7 +138,9 @@ Current platform default retention is 360 days unless a reviewed data-class poli
 
 Tests/evidence cover:
 
-- self-erasure recent-auth + active-MFA proof, idempotent acceptance, `DELETING` transition, all-refresh-family revocation, and no remote I/O in the acceptance transaction;
+- self-erasure recent-auth + active-MFA proof, stable request identity, Membership precondition, pending-invitation revocation, idempotent acceptance, `DELETING` transition, all-refresh-family revocation, and no remote I/O in the acceptance transaction;
+- attempted self-erasure while any ACTIVE/SUSPENDED Membership exists for a non-DELETED Tenant is rejected until membership exit/owner transfer/tenant deletion is resolved;
+- last-owner Membership exit still uses the Authorization owner-safety reservation and cannot be bypassed by erasure;
 - no self-service cancellation/undo and no cancellation after the first irreversible participant effect;
 - legal-hold blocking without User/session reactivation;
 - platform/legal-only hold create/release authorization and audit;
@@ -152,6 +159,6 @@ Tests/evidence cover:
 
 ## Rollback considerations
 
-Rollback MUST NOT reactivate a User whose accepted erasure request made them non-authenticatable, resurrect erased data into serving state, reuse protected identifiers, drop required-service receipts, accept caller-selected participant sets, replace durable async coordination with availability-coupled synchronous completion, drop legal-hold checks/ledger evidence, expose a self-service cancellation after irreversible work, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence.
+Rollback MUST NOT reactivate a User whose accepted erasure request made them non-authenticatable, bypass Membership/last-owner exit preconditions, resurrect erased data into serving state, reuse protected identifiers, drop required-service receipts, accept caller-selected participant sets, replace durable async coordination with availability-coupled synchronous completion, drop legal-hold checks/ledger evidence, expose a self-service cancellation after irreversible work, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence.
 
 Restored systems must replay erasure/legal-hold evidence before traffic regardless of application rollback version.
