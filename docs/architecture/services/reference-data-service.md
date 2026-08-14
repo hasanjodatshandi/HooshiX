@@ -12,10 +12,10 @@ Reference Data is the authoritative platform boundary for the current global sta
 Status:
 
 ```text
-Architecture:        DECIDED
-Implementation:      PLANNED
-Runtime evidence:    NOT VERIFIED
-Production readiness:NOT VERIFIED
+Architecture:         DECIDED
+Implementation:       PLANNED
+Runtime evidence:     NOT VERIFIED
+Production readiness: NOT VERIFIED
 ```
 
 Executable `services/reference-data-service` work starts only after at least **two independent consumers** require the boundary or **one specific production user journey** proves the centralized service is needed. Multiple endpoints owned by one integration layer do not automatically count as independent consumers.
