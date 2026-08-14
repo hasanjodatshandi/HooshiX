@@ -64,6 +64,25 @@ Current model includes global users with tenant memberships, trusted active-tena
 
 Current v1 model is self-contained: Identity computes SHA-256 and sends only the 20-bit/five-uppercase-hex prefix; Compromised Password performs a bounded exact range lookup from a service-local immutable read-only embedded SQLite dataset and returns suffix/count candidates; Identity keeps the full digest and final compromised/not-compromised decision. The SQLite artifact is rebuildable reference data, not mutable business persistence. There is no runtime HIBP/external compromised-password provider, PostgreSQL, Redis, Kafka, full-dataset JVM cache, or subject-linked application state. Only Identity workload may call the service; dataset corruption/incompatibility/unavailability fails closed.
 
+### Reference Data
+
+- `services/reference-data-service.md`
+- `services/web-bff.md`
+- `platform-architecture.md`
+- `data-and-messaging.md`
+- `dependency-criticality.yaml`
+- `dependency-criticality-matrix.md`
+- `reliability-and-observability.md`
+- `runtime-and-deployment.md`
+- `security-architecture.md`
+- `security-verification-matrix.md`
+- `performance-and-bottlenecks.md`
+- `testing-and-quality-gates.md`
+- `PRODUCTION-READINESS-CHECKLIST.md`
+- ADR-0005, ADR-0016, ADR-0025, ADR-0033, ADR-0041
+
+Reference Data architecture is decided but executable implementation is evidence-gated. v1 owns only global non-tenant Country, Currency, TimeZone and SupportedLocale reference families. ISO 3166/4217, IANA BCP 47/tzdb and stable CLDR source material enters only through a reviewed offline deterministic importer; exact source revisions live in the immutable bundle manifest. Runtime uses an image-bundled read-only resource with no PostgreSQL/SQLite/Redis/Kafka/source-provider dependency. The initial runtime caller is Web BFF through typed bounded gRPC; public `/api/v1/reference` GET/HEAD routes are anonymous/global, same-origin, edge/WAF-protected and deterministically cacheable. Reference Data is not a generic dictionary or business-validation authority.
+
 ### Web BFF/browser boundary
 
 - `services/web-bff.md`
@@ -76,9 +95,9 @@ Current v1 model is self-contained: Identity computes SHA-256 and sends only the
 - `performance-and-bottlenecks.md`
 - `testing-and-quality-gates.md`
 - `PRODUCTION-READINESS-CHECKLIST.md`
-- ADR-0012, ADR-0016, ADR-0023, ADR-0024, ADR-0025, ADR-0033
+- ADR-0012, ADR-0016, ADR-0023, ADR-0024, ADR-0025, ADR-0033, ADR-0041
 
-Current Web BFF model uses the `/api/v1` browser namespace with bounded RFC-9457 errors/requests, exact OIDC state/nonce/PKCE/pre-auth and safe-return rules, trusted Identity evidence, server-owned exact-audience Identity token brokerage, HMAC-located Redis sessions/pre-auth state, 7d idle/30d absolute session limits with five-minute last-seen write coalescing, atomic no-grace session rotation, User->sessions revocation index, AES-256-GCM retained-refresh protection with 90d key rotation/one-hour stale-snapshot fail close, exact synchronizer CSRF + mandatory Fetch Metadata, same-origin-only v1 CORS, exact CSP/no-store behavior, BFF-owned OIDC semantic quotas, erasure participation, and deny-by-default workload/egress policy. Browser never receives provider/Identity/downstream credentials and final protected-resource authorization remains in the resource-owning service.
+Current Web BFF model uses the `/api/v1` browser namespace with bounded RFC-9457 errors/requests, exact OIDC state/nonce/PKCE/pre-auth and safe-return rules, trusted Identity evidence, server-owned exact-audience Identity token brokerage, HMAC-located Redis sessions/pre-auth state, 7d idle/30d absolute session limits with five-minute last-seen write coalescing, atomic no-grace session rotation, User->sessions revocation index, AES-256-GCM retained-refresh protection with 90d key rotation/one-hour stale-snapshot fail close, exact synchronizer CSRF + mandatory Fetch Metadata for unsafe authenticated methods, same-origin-only v1 CORS, exact CSP/private no-store behavior, BFF-owned OIDC semantic quotas, erasure participation, public cacheable Reference Data GET/HEAD facade, and deny-by-default workload/egress policy. Browser never receives provider/Identity/downstream credentials and final protected-resource authorization remains in the resource-owning service.
 
 ### Authorization
 
@@ -99,7 +118,7 @@ Current model uses an exact Git-owned permission catalog with TENANT/PLATFORM sc
 - `services/identity-service.md`, `services/web-bff.md`, `services/authorization-service.md` as applicable
 - ADR-0024
 
-ADR-0024 is consolidated current decision for quota ownership, Redis topology, atomic multi-dimension policy, pseudonymization, anti-lockout behavior, exact Identity registration values, exact Web BFF OIDC start/callback values, Authorization semantic-mutation cost, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
+ADR-0024 is consolidated current decision for quota ownership, Redis topology, atomicity, pseudonymization, anti-lockout behavior, exact Identity registration values, exact Web BFF OIDC start/callback values, Authorization semantic-mutation cost, dual trusted time, no security-significant TTL reset, failure semantics, SLO/capacity, and verification.
 
 ### Notification
 
@@ -130,7 +149,7 @@ Current runtime:
 - `../engineering/sql-and-flyway-coding-standards.md`
 - ADR-0019, ADR-0027, ADR-0034, ADR-0037
 
-ADR-0027 is consolidated current service-isolation decision for mutable relational business persistence: every such production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership. ADR-0040 is the explicit immutable rebuildable SQLite reference-dataset exception and does not authorize mutable SQLite business persistence.
+ADR-0027 is consolidated current service-isolation decision for mutable relational business persistence: every such production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership. ADR-0040 is the explicit immutable rebuildable SQLite reference-dataset exception and does not authorize mutable SQLite business persistence; ADR-0041 Reference Data has no database and therefore no persistence exception.
 
 ### Kafka, events, contracts
 
@@ -147,7 +166,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `PRODUCTION-READINESS-CHECKLIST.md`
 - `../operations/chaos-engineering-program.md`
 - `../operations/incident-response-runbook.md`
-- ADR-0004, ADR-0005, ADR-0015, ADR-0019, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036, ADR-0037, ADR-0040
+- ADR-0004, ADR-0005, ADR-0015, ADR-0019, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036, ADR-0037, ADR-0040, ADR-0041
 
 ### Kubernetes, GitOps, edge, mesh, secrets
 
@@ -159,9 +178,9 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `../technology/technology-baseline.md`
 - `../technology/local-development-baseline.md`
 - `../technology/production-compatibility-matrix.md`
-- ADR-0001, ADR-0002, ADR-0011, ADR-0021, ADR-0022, ADR-0029, ADR-0040
+- ADR-0001, ADR-0002, ADR-0011, ADR-0021, ADR-0022, ADR-0029, ADR-0040, ADR-0041
 
-Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization. Web BFF egress is additionally restricted to its explicitly registered downstream/provider/telemetry set. Compromised Password has no public ingress and no runtime provider/Internet lookup egress; only Identity may call its gRPC lookup.
+Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization. Web BFF egress is restricted to its explicitly registered downstream/provider/telemetry set, now including the Reference Data read edge. Compromised Password has no public ingress and no runtime provider/Internet lookup egress; only Identity may call its gRPC lookup. Reference Data is also internal/ClusterIP-only and its serving process has no runtime standards-source Internet synchronization; initial gRPC ingress is Web BFF only.
 
 ### Frontend and BFF implementation
 
@@ -169,9 +188,9 @@ Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant externa
 - `security-architecture.md`
 - `../engineering/frontend-coding-standards.md`
 - `testing-and-quality-gates.md`
-- ADR-0016
+- ADR-0016, ADR-0041
 
-Frontend rules cover strict TypeScript, runtime validation of untrusted data, React purity/effect discipline, feature import boundaries, same-origin BFF-only API access, browser token isolation, accessibility/RTL contracts, service-worker/private-cache restrictions, resilient Playwright practices, and route bundle/performance budgets. BFF implementation must additionally satisfy the exact browser/session/token-broker/egress contracts above rather than inventing a second frontend-facing security model.
+Frontend rules cover strict TypeScript, runtime validation of untrusted data, React purity/effect discipline, feature import boundaries, same-origin BFF-only API access, browser token isolation, accessibility/RTL contracts, service-worker/private-cache restrictions, resilient Playwright practices, and route bundle/performance budgets. BFF implementation must additionally satisfy the exact browser/session/token-broker/Reference Data/egress contracts above rather than inventing a second frontend-facing security model.
 
 ### Supply chain, vulnerabilities, human access, logging
 
@@ -181,9 +200,9 @@ Frontend rules cover strict TypeScript, runtime validation of untrusted data, Re
 - `architecture-fitness-functions.md`
 - `../engineering/build-and-ci-quality-enforcement.md`
 - `../operations/incident-response-runbook.md`
-- ADR-0017, ADR-0030, ADR-0031, ADR-0035, ADR-0038, ADR-0040
+- ADR-0017, ADR-0030, ADR-0031, ADR-0035, ADR-0038, ADR-0040, ADR-0041
 
-Current supply-chain controls include immutable signed artifacts, signed provenance/SBOM, least-privilege admission-policy authoring, bounded policy-engine external context/egress with SSRF negatives, and continuous deployed-digest vulnerability response. Compromised Password final-image evidence includes both the Xerial Java artifact and bundled native SQLite engine.
+Current supply-chain controls include immutable signed artifacts, signed provenance/SBOM, least-privilege admission-policy authoring, bounded policy-engine external context/egress with SSRF negatives, and continuous deployed-digest vulnerability response. Compromised Password final-image evidence includes both the Xerial Java artifact and bundled native SQLite engine. Reference Data release evidence additionally binds the immutable source-revision manifest and bundle content digest to the signed image.
 
 ## Technology/version authority
 
@@ -192,7 +211,7 @@ Current supply-chain controls include immutable signed artifacts, signed provena
 - `../technology/production-compatibility-matrix.md` — supported production combinations;
 - repository wrappers, dependency locks, image digests, chart locks, GitOps metadata — exact deployed artifact identity.
 
-Architecture prose uses product families/major-minor lines unless an exact patch is itself an architecture constraint.
+Architecture prose uses product families/major-minor lines unless an exact patch is itself a current architecture constraint. Reference Data's ISO/IANA/CLDR source revisions are release-input metadata in its bundle manifest rather than runtime-platform technology pins.
 
 ## Documentation/governance authority
 
