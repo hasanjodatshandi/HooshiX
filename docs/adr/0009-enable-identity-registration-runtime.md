@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13; registration invariants finalized on 2026-08-13
+2026-08-10; normalized to current-only documentation on 2026-08-13; registration invariants finalized on 2026-08-13; v1 registration/contact lifecycle finalized on 2026-08-14
 
 ## Decision
 
@@ -28,6 +28,20 @@ The runtime uses gRPC Java 1.81.0 aligned across transport, stubs, services, Pro
 Production explicitly configures key staleness/refresh policies and mounted key directories. Tests disable default runtime composition except where the runtime itself is under integration test.
 
 This enables the registration/callback runtime composition. The wider Identity feature-scoped gRPC surface is governed by ADR-0012 and ADR-0003. Notification provider dispatch, production SMS, edge routing, semantic quotas, GitOps, Istio/NetworkPolicy, and supply-chain controls remain independent production gates. `LoggingSmsProviderAdapter` is local-development-only and cannot satisfy production SMS readiness; production Iran SMS follows ADR-0020.
+
+### Registration modes and User activation
+
+v1 implements local registration through both `EMAIL` and `PHONE` contact channels. A newly created User starts `PENDING`.
+
+A `PENDING` User becomes `ACTIVE` only when all of the following are true:
+
+- the required profile is complete under the canonical name rules below;
+- at least one Contact is verified;
+- no suspension, deletion, legal/security, or other current blocking condition applies.
+
+The first Contact successfully verified for a User becomes that User's active primary Contact automatically. A User still has at most one active primary Contact in total.
+
+Phone-registration code and contracts are part of v1, but staging/production phone registration remains disabled until the current ADR-0020 SMS/provider and Production Readiness SMS gates pass. The production/staging gate is typed server-owned configuration; a caller cannot enable it. Local development may enable the phone path with the approved local provider substitute. Email registration may proceed independently when its own gates pass.
 
 ### Profile and contact canonicalization
 
@@ -58,6 +72,14 @@ Phone:
 
 A verified email or verified phone is globally unique among non-erased Users. Logical deletion does not release the canonical contact value; the value remains reserved until an approved irreversible erasure/release policy permits reuse. Each User has at most one active primary Contact in total, enforced transactionally and with database constraints where representable.
 
+### Pending-contact reservation
+
+Before verification, one canonical email/phone value may belong to at most one live registration reservation at a time. The reservation lifetime is exactly the active registration challenge lifetime: 10 minutes. A replacement resend challenge replaces the reservation/challenge generation without extending the original semantic policy outside the newly issued 10-minute challenge.
+
+A repeated registration request for the same canonical Contact while the matching registration remains live continues that same pending registration non-enumeratingly; it does not create a second User or a second independently valid reservation. If the canonical Contact is already verified/reserved by a non-erased User, the public/internal caller-visible response remains bounded and non-enumerating and no second User/challenge is created.
+
+Reservation acquisition/replacement is concurrency-safe. Database uniqueness/locking is used where representable so two concurrent registration attempts cannot both obtain a live reservation for one canonical Contact.
+
 ### Registration verification challenge
 
 Registration verification code semantics are server-owned and fixed for v1:
@@ -83,7 +105,9 @@ Registration challenge locale follows ADR-0008: initial registration supplies ex
 
 The registration entry points `REGISTER`, `RESEND_REGISTRATION_VERIFICATION`, and `CONFIRM_REGISTRATION` are protected by Identity-owned semantic quota policy in its ACL-isolated security Redis namespace under ADR-0024 semantics: atomic evaluation, pseudonymous keys, finite 75ms budget, one attempt, no retry/fallback, and non-enumerating caller behavior.
 
-Exact numeric quota capacities/refill values are versioned security-baseline configuration. They are server-owned and cannot be supplied by the request. A quota dependency/time-source failure is an availability/security-dependency failure and is not misreported as an invalid code or account-existence result.
+ADR-0024 is authoritative for the now-fixed v1 numeric capacities/refill/cleanup horizons for these three registration operations. They are server-owned and cannot be supplied by the request. The challenge-local five-failed-try limit remains authoritative for confirmation proof attempts in addition to the network quota. A quota dependency/time-source failure is an availability/security-dependency failure and is not misreported as an invalid code or account-existence result.
+
+Authenticated add-contact verification uses the same v1 challenge format/TTL/attempt/resend safety baseline under a distinct purpose/key namespace; it never reuses a registration challenge verifier or plaintext secret.
 
 ### Registration idempotency and handoff
 
@@ -97,12 +121,15 @@ Tests prove:
 
 - both gRPC servers bind distinct ports and enforce the configured message/metadata bounds;
 - malformed calls fail closed and usable key-ring state participates in readiness;
+- EMAIL and PHONE registration composition, with staging/production phone registration impossible until the SMS gate is explicitly satisfied;
+- `PENDING -> ACTIVE` occurs only after required profile completion + at least one verified Contact and first verification establishes the primary Contact;
 - profile name trim/NFC/control-character/length behavior and case/internal-space preservation;
 - canonical email/provider-neutral behavior, E.164 phone behavior, verified-contact uniqueness, logical-delete reservation, and at-most-one active primary Contact per User under concurrent updates;
+- one-live-registration reservation per canonical Contact, 10-minute expiry, concurrent acquisition, repeated same-pending continuation, and no second User/challenge for an already verified/reserved Contact;
 - exactly eight-digit CSPRNG challenge generation, HMAC-only persistence, constant-time verification, 10-minute TTL boundaries, five-attempt exhaustion, 60-second resend boundary, replacement invalidation, and single use;
 - caller attempts to supply/extend security policy are rejected/ignored according to the versioned contract;
 - locale persistence/resend behavior from ADR-0008;
-- registration/resend/confirm non-enumeration and Redis semantic-quota outage/time-safety behavior;
+- registration/resend/confirm exact ADR-0024 quota behavior, non-enumeration, and Redis outage/time-safety behavior;
 - accepted typed Notification responses map correctly, one logical submission creates one transport invocation, and corrupt caller escrow becomes a permanent handoff failure without provider invocation;
 - equal replay/conflicting request reuse and no remote I/O inside database transactions;
 - logs/metrics/traces/errors expose no recipient, code, ciphertext, `request_id`, or `notification_id`.
@@ -111,6 +138,6 @@ Dependency locking/verification metadata covers the transport.
 
 ## Rollback considerations
 
-Runtime exposure may be disabled with `IDENTITY_REGISTRATION_RUNTIME_ENABLED=false` without schema rollback. Already committed handoffs remain durable, retain their stable `request_id`, and resume from the current lease/cutoff rules when dispatch is re-enabled.
+Runtime exposure may be disabled with `IDENTITY_REGISTRATION_RUNTIME_ENABLED=false` without schema rollback. Phone registration may remain independently gated without removing its schema/contracts. Already committed handoffs remain durable, retain their stable `request_id`, and resume from the current lease/cutoff rules when dispatch is re-enabled.
 
-Rollback MUST preserve contact canonicalization/verified uniqueness, logical-delete reservation, the single active primary-Contact invariant, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.
+Rollback MUST preserve contact canonicalization/verified uniqueness, pending reservation uniqueness, logical-delete reservation, the single active primary-Contact invariant, `PENDING -> ACTIVE` verification/profile gate, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.

@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; normalized to current-only documentation on 2026-08-13; erasure coordination contract finalized on 2026-08-13
+2026-08-11; normalized to current-only documentation on 2026-08-13; erasure coordination contract finalized on 2026-08-13; self-erasure/session/legal-hold entry semantics finalized on 2026-08-14
 
 ## Decision
 
@@ -18,7 +18,7 @@ This architecture supports privacy-erasure obligations but is not legal advice o
 
 Identity owns the platform-global data-subject erasure request because it owns global User identity. Each bounded context remains sole owner of how its service-owned data is erased, anonymized, legally retained, or proved absent.
 
-A stable non-PII `erasure_request_id` coordinates an idempotent workflow:
+A stable non-PII UUIDv4 `erasure_request_id` coordinates an idempotent workflow:
 
 ```text
 REQUESTED
@@ -34,6 +34,22 @@ FAILED_RETRYABLE
 ```
 
 Global completion requires a durable current receipt from every required service.
+
+### Self-erasure entry point and authentication shutdown
+
+A User may request erasure of their own account through the reviewed authenticated Identity/BFF flow. Identity requires:
+
+- authentication age <=5 minutes;
+- when MFA is active, current MFA proof satisfying the same recent-assurance requirement;
+- a stable idempotent UUIDv4 request identity.
+
+Acceptance is one local Identity transaction that transitions the User to non-authenticatable `DELETING`, revokes all active RefreshFamilies, records required audit/erasure request state, and creates the erasure coordination Transactional Outbox. No remote service call occurs inside this transaction.
+
+`DELETING` rejects new login and refresh. Already-issued access JWTs retain only the bounded cryptographic residual lifetime defined by ADR-0012/ADR-0023; the erasure flow does not add token introspection/blacklisting.
+
+An active legal hold may block irreversible erasure progress, but it does not restore User authentication, sessions, or the prior `ACTIVE` lifecycle state. A User blocked by legal hold remains non-authenticatable while the erasure request is blocked.
+
+v1 exposes no ordinary self-service “undo erasure” path after the request is accepted. At minimum, once any participant has begun an irreversible erase/anonymize effect, cancellation is prohibited. Any future reversible grace/recovery workflow before that point requires a separate reviewed security/data-lifecycle decision; operators must not improvise one through direct database state changes.
 
 ### Required-service registry
 
@@ -73,7 +89,7 @@ For each data category it performs one approved action:
 
 Crypto-shredding is not a blanket substitute for erasing ordinary relational PII.
 
-### Legal hold ledger
+### Legal hold ledger and authorization
 
 Legal hold is explicit durable state, not a boolean request parameter. The Identity coordination ledger records at least:
 
@@ -89,7 +105,9 @@ policy_version
 append-only audit/integrity evidence
 ```
 
-Only an authorized platform/legal workflow may create or release a hold. Ordinary erasure callers cannot create, remove, or bypass legal hold. `ACTIVE` hold blocks incompatible purge/anonymization while preserving the minimum legally required data/evidence. Release is audited and resumes the idempotent erasure workflow from durable state; it does not create a new unrelated erasure request merely to continue work.
+Only an explicitly authorized platform/legal workflow may create or release a hold. Ordinary users, erasure callers, tenant owners, and generic administrators cannot create, remove, omit, or bypass legal hold. Hold create/release requires stable typed authorization, authentication assurance appropriate to privileged operations, and append-only audit evidence.
+
+`ACTIVE` hold blocks incompatible purge/anonymization while preserving the minimum legally required data/evidence. Release is audited and resumes the idempotent erasure workflow from durable state; it does not create a new unrelated erasure request merely to continue work. Releasing a hold never by itself reactivates the User or restores sessions.
 
 ### Evidence without retaining erased PII
 
@@ -115,6 +133,10 @@ Current platform default retention is 360 days unless a reviewed data-class poli
 
 Tests/evidence cover:
 
+- self-erasure recent-auth + active-MFA proof, idempotent acceptance, `DELETING` transition, all-refresh-family revocation, and no remote I/O in the acceptance transaction;
+- no self-service cancellation/undo and no cancellation after the first irreversible participant effect;
+- legal-hold blocking without User/session reactivation;
+- platform/legal-only hold create/release authorization and audit;
 - end-to-end erasure across every server-registered owning service;
 - caller inability to omit/forge required participants or participant-policy version;
 - Transactional Outbox/Kafka at-least-once replay, duplicate receipt handling, partial failure, retry/DLQ behavior, and 35-day critical dedup evidence;
@@ -130,6 +152,6 @@ Tests/evidence cover:
 
 ## Rollback considerations
 
-Rollback MUST NOT resurrect erased data into serving state, reuse protected identifiers, drop required-service receipts, accept caller-selected participant sets, replace durable async coordination with availability-coupled synchronous completion, drop legal-hold checks/ledger evidence, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence.
+Rollback MUST NOT reactivate a User whose accepted erasure request made them non-authenticatable, resurrect erased data into serving state, reuse protected identifiers, drop required-service receipts, accept caller-selected participant sets, replace durable async coordination with availability-coupled synchronous completion, drop legal-hold checks/ledger evidence, expose a self-service cancellation after irreversible work, convert irreversible erasure into reversible logical deletion, or retain raw PII as evidence.
 
 Restored systems must replay erasure/legal-hold evidence before traffic regardless of application rollback version.

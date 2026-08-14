@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13
+2026-08-10; normalized to current-only documentation on 2026-08-13; verifier clock-leeway contract finalized on 2026-08-14
 
 ## Decision
 
@@ -36,6 +36,12 @@ BFF/resource services verify tokens locally. Normal JWT verification performs no
 
 Verifier reload is atomic: an invalid candidate bundle never replaces the last valid bundle. A verifier with no valid approved bundle is not Ready for token-protected traffic.
 
+### Time validation and clock leeway
+
+Identity writes `iat`/`exp` from trusted server time and access-token `exp` represents exactly the current five-minute issuance lifetime.
+
+Verifier clock leeway is typed configuration and MUST NOT exceed 30 seconds in either direction. A deployment may choose a smaller value. Caller/token input cannot select or extend leeway. Tokens outside the configured issuer/audience/time window fail closed; leeway is clock-tolerance only and is never used to intentionally lengthen issued token lifetime or mask clock-health defects.
+
 ### Normal rotation
 
 Normal rotation occurs every 90 days:
@@ -62,20 +68,23 @@ Every protected service validates at least:
 
 - signature using an approved local public key selected by bounded `kid`;
 - algorithm exactly RS256;
-- issuer and audience;
+- issuer and exact audience;
 - `sub`;
-- active tenant/membership/session claims where required;
+- active tenant/membership/session claim shape where required;
 - `jti`, `iat`, and `exp`;
+- configured verifier clock leeway <=30 seconds;
 - canonical token/claim size bounds.
 
 Permission lists are not trusted from the token. Protected resource operations use the current online Authorization contract.
 
+Normal access-token verification remains local and has no blacklist/introspection callback. Session/family revocation therefore does not retroactively alter a correctly signed already-issued JWT; its remaining cryptographic lifetime is bounded by the five-minute token lifetime plus only the configured <=30-second clock tolerance. Authorization decisions remain online under ADR-0013.
+
 ## Verification requirements
 
-Tests cover RSA key size/generation, `kid` uniqueness, algorithm confusion, unknown `kid`, invalid issuer/audience/signature, prepublish-before-sign ordering, current/next/previous bundles, atomic reload failure, scheduled rotation, previous-key overlap, emergency key removal, five-minute expiry, readiness without valid material, file permissions, and absence of private keys from Git/telemetry.
+Tests cover RSA key size/generation, `kid` uniqueness, algorithm confusion, unknown `kid`, invalid issuer/audience/signature, exact five-minute issuance lifetime, zero/normal/30-second leeway boundaries and rejection of >30-second configuration, future-`iat`/expired-token edges, prepublish-before-sign ordering, current/next/previous bundles, atomic reload failure, scheduled rotation, previous-key overlap, emergency key removal, readiness without valid material, file permissions, and absence of private keys from Git/telemetry.
 
 A staging rotation exercise is required before production and at least annually in addition to normal scheduled rotations.
 
 ## Rollback considerations
 
-Rollback may use a prior signing key only while its bounded private rollback material and matching public verification key are intentionally retained and uncompromised. Rollback MUST NOT resurrect destroyed/compromised material, reuse a `kid`, or introduce network JWKS lookup as a fallback.
+Rollback may use a prior signing key only while its bounded private rollback material and matching public verification key are intentionally retained and uncompromised. Rollback MUST NOT resurrect destroyed/compromised material, reuse a `kid`, increase verifier leeway beyond 30 seconds, extend access-token TTL, or introduce network JWKS/introspection lookup as a normal verification fallback.
