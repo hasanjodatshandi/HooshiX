@@ -28,7 +28,9 @@ Every production microservice with mutable relational business persistence also 
 
 ADR-0040 defines one narrow storage exception: Compromised Password Service uses a service-local **immutable, read-only, rebuildable SQLite reference-data artifact** for its compromised-password dataset. It is not mutable business persistence, receives no subject-owned application data, is not an integration database, has no runtime SQLite writes/Flyway/CloudNativePG requirement, and does not authorize mutable SQLite persistence for any other service. Future mutable state in that service returns to the normal persistence architecture review.
 
-A service is not created merely around a table, CRUD screen, UI page, entity, or framework component.
+ADR-0041 Reference Data uses no database at all in v1. Its small Country/Currency/TimeZone/SupportedLocale bundle is an immutable read-only application resource inside the signed service image; this creates no mutable-persistence or SQLite exception.
+
+A service is not created merely around a table, CRUD screen, UI page, entity, or framework component. Reference Data architecture is decided, but executable service implementation remains deferred until ADR-0041's explicit consumer/production-journey trigger is met.
 
 ## 3. Repository and build ownership
 
@@ -82,7 +84,8 @@ Only BFF and explicitly approved public adapters/APIs are externally reachable. 
 - REST;
 - OpenAPI;
 - Web BFF as browser-facing backend boundary;
-- v1 application namespace under `/api/v1` with reviewed `/auth`, `/identity`, and `/authorization` subspaces;
+- v1 application namespace under `/api/v1` with reviewed `/auth`, `/identity`, `/authorization`, and public read-only `/reference` subspaces;
+- `/reference` GET/HEAD may be anonymous and explicitly cacheable under ADR-0041, but same-origin CORS and the mandatory public edge/WAF path remain unchanged;
 - same-origin-only browser credential model; browser never receives provider/Identity/downstream access or refresh credentials.
 
 ### Internal synchronous boundary
@@ -117,7 +120,7 @@ Current/approved boundaries include:
 - Notification Service;
 - Web BFF;
 - Compromised Password Service;
-- Reference Data Service as planned capability boundary;
+- Reference Data Service — architecture decided by ADR-0041; executable implementation remains planned/evidence-gated;
 - Workflow Service only as future capability boundary that MUST NOT absorb business rules from owning contexts.
 
 The first executable backend service is `services/identity-service`; the second executable backend component is `services/web-bff`.
@@ -125,6 +128,8 @@ The first executable backend service is `services/identity-service`; the second 
 Web BFF is an integration/browser security boundary rather than owner of backend business invariants. It owns public OpenAPI, browser OIDC/pre-auth/session/CSRF, exact-audience credential brokerage mechanics, browser-safe error/request bounds and route-to-downstream orchestration. Identity remains token/session identity authority, Authorization remains tenant permission/admin authority, and resource-owning service remains final protected-resource authorization/business-state authority.
 
 Compromised Password Service is an internal security reference-data boundary. Identity computes SHA-256 locally and sends only the current 20-bit prefix; Compromised Password performs a bounded indexed lookup against its immutable read-only SQLite dataset and returns suffix/count candidates; Identity performs the exact full-hash match and owns the final credential decision. The service has no User/Tenant/Contact/session state and no runtime external compromised-password provider/API.
+
+Reference Data Service is the closed global standard-reference boundary for Country, Currency, TimeZone, and SupportedLocale. It owns canonical code/metadata/lifecycle and the offline deterministic immutable bundle, but it is not a generic dictionary, tenant/business configuration store, authorization service, or universal business validation service. ISO/IANA/stable-CLDR source material is imported only offline; production serving has no source-provider Internet dependency. The initial runtime consumer is Web BFF through the typed bounded read contract, and other callers require separate architecture/dependency review.
 
 ## 7. Architecture-level technology baseline
 
@@ -152,17 +157,20 @@ Compromised Password Service is an internal security reference-data boundary. Id
 - Vitest + React Testing Library;
 - Playwright Test + TypeScript.
 
+Reference Data introduces no new runtime technology family. Exact ISO/IANA/CLDR source revisions are immutable bundle manifest inputs, not platform runtime pins.
+
 Exact approved patch versions belong in `../technology/technology-baseline.md` and repository locks/wrappers/image/chart metadata except where exact value is itself a current architecture constraint.
 
 ## 8. Production resilience and security boundaries
 
 - **Kubernetes:** three stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint, N+1 critical-worker capacity.
 - **Workload hardening:** immutable digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources/probes, dedicated ServiceAccounts, deny-by-default NetworkPolicy.
-- **PostgreSQL:** dedicated production CloudNativePG cluster per service with mutable relational business persistence; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves. ADR-0040 immutable reference artifact is outside this mutable-state fleet.
+- **PostgreSQL:** dedicated production CloudNativePG cluster per service with mutable relational business persistence; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves. ADR-0040 immutable reference artifact is outside this mutable-state fleet; ADR-0041 Reference Data has no database.
 - **Compromised Password:** >=3 replicas/PDB2/spread; only Identity gRPC ingress; 900ms caller ceiling/one attempt/no retry/fallback; immutable read-only embedded SQLite dataset; no full-dataset JVM cache; no runtime external provider/Internet lookup; missing/corrupt/incompatible dataset fails closed and keeps unsafe serving unavailable.
+- **Reference Data:** target >=3 replicas/PDB2/spread after implementation trigger; initial Web BFF-only gRPC ingress; <=1000ms BFF child deadline/one attempt/no retry/fabricated fallback; immutable image-bundled data; no database/broker/runtime source-provider Internet egress; Class-B SLO; HPA evidence-gated.
 - **Kafka:** KRaft with three brokers + three controllers; critical RF=3/minISR=2/acks=all; cold DR reconstructs from service-owned evidence.
 - **Security Redis:** one primary + two replicas + three Sentinel voters with TLS/ACL isolation.
-- **Web BFF:** `platform-apps/web-bff`, HTTP 8080, >=3 replicas/PDB2; HPA 3..12 only after representative load evidence; HMAC-located server sessions/pre-auth, bounded OIDC/session quotas/crypto, atomic rotation/revocation, and deny-by-default egress only to registered Identity/Authorization/resource/Redis/Google/telemetry dependencies.
+- **Web BFF:** `platform-apps/web-bff`, HTTP 8080, >=3 replicas/PDB2; HPA 3..12 only after representative load evidence; HMAC-located server sessions/pre-auth, bounded OIDC/session quotas/crypto, atomic rotation/revocation, and deny-by-default egress only to registered Identity/Authorization/Reference Data/resource/Redis/Google/telemetry dependencies.
 - **Authorization:** >=3 replicas/PDB/spread; one final online no-cache/no-retry `CheckPermission`, safe local prechecks, fail-closed overload/breaker isolation, >=99.95% availability, p95<=100ms/p99<=200ms SLO.
 - **OpenBao:** lean single-Raft authoritative secret source with encrypted snapshots; normal application hot paths use mounted/local validated key material rather than per-request OpenBao calls.
 - **Notification:** PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation; no bespoke clock/fence control plane.
