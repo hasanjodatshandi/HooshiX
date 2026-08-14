@@ -65,7 +65,7 @@ Interfaces     -> Application -> Domain
 
 Business logic belongs in Domain/Application. Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, SQLite, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, or concrete adapters.
 
-Each independently deployable service with **mutable relational business persistence** owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Every production microservice with mutable relational business persistence also owns a dedicated CloudNativePG cluster under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited.
+Each independently deployable service with **mutable relational business persistence** owns its database, credentials, Flyway history, contracts, build, deployment, and release lifecycle. Physical PostgreSQL placement is production-profile specific: `production-single-server` may use one shared physical CloudNativePG/PostgreSQL cluster only while preserving distinct service databases/roles/Flyway histories and strict cross-service privilege denial; `production-ha` uses dedicated CloudNativePG clusters under the current database decisions. Direct cross-service database access, cross-database joins/foreign keys, and shared business/domain/persistence models are prohibited in both profiles.
 
 A current ADR may define a narrower immutable reference-data artifact that is not mutable service business persistence. ADR-0040 is the current example: Compromised Password Service may use only its service-local immutable, read-only, rebuildable SQLite reference dataset. That exception has no runtime SQLite writes/Flyway/CloudNativePG requirement, cannot store subject/business state, and MUST NOT be generalized to mutable SQLite persistence or another service without a new current architecture decision.
 
@@ -134,6 +134,8 @@ A state change that must publish an integration event as one business effect use
 
 Review ordering, Protobuf compatibility, retry/DLQ/replay, retention/recovery evidence, ownership, observability, and tests. Kafka/event payloads MUST NOT carry secrets or unapproved PII.
 
+The selected production profile controls Kafka topology. `production-single-server` is an explicit RF=1/non-HA exception under ADR-0042; it does not weaken Outbox/Inbox/idempotency/replay/ACL/TLS requirements or make Kafka business authority.
+
 ## 9. Security rules
 
 Security work reviews authentication, tenancy, Authorization, MFA/sessions, workload identity, mTLS, NetworkPolicy, WAF/upstream DDoS, secrets, semantic quotas, supply chain, privileged access, and logging/PII.
@@ -150,7 +152,10 @@ Mandatory principles:
 - supply-chain admission verifies immutable signed/provenanced artifacts/SBOM requirements;
 - admission-policy authoring is restricted to controlled GitOps/CI identities; Kyverno external HTTP context is disabled unless explicitly reviewed, and any approved external context uses bounded destination/egress/failure semantics with SSRF-negative verification;
 - vulnerability scanning/advisory correlation is continuous; no scanner/feed is proof of zero unknown vulnerabilities;
-- privileged human production access is JIT/short-lived/audited under the current Teleport policy.
+- privileged human production access is JIT/short-lived/phishing-resistant/audited under ADR-0030 and the selected production profile;
+- `production-single-server` MUST NOT replace real system/privilege audit with `.bashrc`/shell-history logging;
+- OpenBao remains the production secret authority under ADR-0011/Technology Baseline unless a separate current security decision explicitly changes it;
+- end-user MFA semantics are not weakened by infrastructure profile selection.
 
 ## 10. Logging and PII
 
@@ -187,6 +192,8 @@ Shared deployment standards belong in reviewed organization Helm application/lib
 
 Staging and production promote the exact same signed immutable artifact digest. Production rebuild after staging validation is prohibited.
 
+The selected production profile controls replica/HPA/PDB and platform topology. `production-single-server` uses the explicit one-replica/non-HA rules in ADR-0042 and MUST NOT claim node failover; it still preserves all security-context, ServiceAccount, NetworkPolicy, admission, backup, and workload-identity controls.
+
 ## 12. Testing and executable enforcement
 
 Architecture compliance does not rely on documentation/agent memory.
@@ -222,6 +229,8 @@ Before changing scaling/retries/caches/brokers/proxies/pools/concurrency, review
 Virtual Threads do not create database connections/provider quota/CPU/memory. Constrained dependencies use bounded concurrency/queues. CPU-heavy work uses bounded workers. `Thread.sleep` is prohibited for coordination/polling/test synchronization. A blanket `synchronized` ban is also prohibited on Java 25; use evidence for contention/pinning issues.
 
 Error budgets and burn-rate policy are release/operations controls. Do not hide SLO burn by simply increasing timeouts/retries.
+
+For `production-single-server`, a `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved capacity claim. Production approval requires the ADR-0042 complete-stack benchmark, >=30% validated resource headroom, and the current critical-path load/recovery/security evidence. Insufficient capacity is solved by increasing host resources or moving to `production-ha`, not by weakening OpenBao, Kyverno, Ambient security, backup/PITR, MFA, or fail-closed dependencies.
 
 ## 14. Change discipline and PR-first workflow
 
