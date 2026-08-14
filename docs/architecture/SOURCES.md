@@ -45,6 +45,25 @@ Current implementation rules include DDD + Hexagonal inward dependency direction
 
 Current model includes global users with tenant memberships, trusted active-tenant context, current tenant lifecycle, forced production tenant RLS with pool-safe transaction-local tenant database context, provider-neutral password/TOTP controls, issuer+subject external identity binding, rotating session/refresh semantics, exact-audience JWT signing/verifier lifecycle, BFF-only server-owned audience brokerage, and coordinated erasure evidence.
 
+### Compromised Password
+
+- `services/compromised-password-service.md`
+- `services/identity-service.md` §7
+- `security-architecture.md` §4
+- `data-and-messaging.md`
+- `dependency-criticality.yaml`
+- `dependency-criticality-matrix.md`
+- `performance-and-bottlenecks.md`
+- `reliability-and-observability.md`
+- `runtime-and-deployment.md`
+- `testing-and-quality-gates.md`
+- `PRODUCTION-READINESS-CHECKLIST.md`
+- `../technology/technology-baseline.md`
+- `../technology/production-compatibility-matrix.md`
+- ADR-0004, ADR-0005, ADR-0012, ADR-0025, ADR-0033, ADR-0035, ADR-0038, ADR-0040
+
+Current v1 model is self-contained: Identity computes SHA-256 and sends only the 20-bit/five-uppercase-hex prefix; Compromised Password performs a bounded exact range lookup from a service-local immutable read-only embedded SQLite dataset and returns suffix/count candidates; Identity keeps the full digest and final compromised/not-compromised decision. The SQLite artifact is rebuildable reference data, not mutable business persistence. There is no runtime HIBP/external compromised-password provider, PostgreSQL, Redis, Kafka, full-dataset JVM cache, or subject-linked application state. Only Identity workload may call the service; dataset corruption/incompatibility/unavailability fails closed.
+
 ### Web BFF/browser boundary
 
 - `services/web-bff.md`
@@ -59,7 +78,7 @@ Current model includes global users with tenant memberships, trusted active-tena
 - `PRODUCTION-READINESS-CHECKLIST.md`
 - ADR-0012, ADR-0016, ADR-0023, ADR-0024, ADR-0025, ADR-0033
 
-Current Web BFF model uses the `/api/v1` browser namespace with bounded RFC-9457 errors/requests, exact OIDC state/nonce/PKCE/pre-auth and safe-return rules, trusted two-minute Identity evidence, server-owned exact-audience Identity token brokerage, HMAC-located Redis sessions/pre-auth state, 7d idle/30d absolute session limits with five-minute last-seen write coalescing, atomic no-grace session rotation, User->sessions revocation index, AES-256-GCM retained-refresh protection with 90d key rotation/one-hour stale-snapshot fail close, exact synchronizer CSRF + mandatory Fetch Metadata, same-origin-only v1 CORS, exact CSP/no-store behavior, BFF-owned OIDC semantic quotas, erasure participation, and deny-by-default workload/egress policy. Browser never receives provider/Identity/downstream credentials and final protected-resource authorization remains in the resource-owning service.
+Current Web BFF model uses the `/api/v1` browser namespace with bounded RFC-9457 errors/requests, exact OIDC state/nonce/PKCE/pre-auth and safe-return rules, trusted Identity evidence, server-owned exact-audience Identity token brokerage, HMAC-located Redis sessions/pre-auth state, 7d idle/30d absolute session limits with five-minute last-seen write coalescing, atomic no-grace session rotation, User->sessions revocation index, AES-256-GCM retained-refresh protection with 90d key rotation/one-hour stale-snapshot fail close, exact synchronizer CSRF + mandatory Fetch Metadata, same-origin-only v1 CORS, exact CSP/no-store behavior, BFF-owned OIDC semantic quotas, erasure participation, and deny-by-default workload/egress policy. Browser never receives provider/Identity/downstream credentials and final protected-resource authorization remains in the resource-owning service.
 
 ### Authorization
 
@@ -111,7 +130,7 @@ Current runtime:
 - `../engineering/sql-and-flyway-coding-standards.md`
 - ADR-0019, ADR-0027, ADR-0034, ADR-0037
 
-ADR-0027 is consolidated current service-isolation decision: every persistent production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership.
+ADR-0027 is consolidated current service-isolation decision for mutable relational business persistence: every such production service owns its database, credentials/roles, Flyway history, dedicated CloudNativePG cluster, backup identity, capacity budget, no-cross-service-SQL/model boundary, forced tenant RLS where applicable, and parameterized transaction-local tenant context that cannot leak through pooled connections. ADR-0019/0034/0037 provide HA/backup/fleet/restore/upgrade mechanics. SQL/Flyway standards define naming, bounded/indexed query behavior, plan evidence, migration/backfill discipline, and JPA-vs-jOOQ/JDBC selection guidance without changing ownership. ADR-0040 is the explicit immutable rebuildable SQLite reference-dataset exception and does not authorize mutable SQLite business persistence.
 
 ### Kafka, events, contracts
 
@@ -128,7 +147,7 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `PRODUCTION-READINESS-CHECKLIST.md`
 - `../operations/chaos-engineering-program.md`
 - `../operations/incident-response-runbook.md`
-- ADR-0004, ADR-0005, ADR-0015, ADR-0019, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036, ADR-0037
+- ADR-0004, ADR-0005, ADR-0015, ADR-0019, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036, ADR-0037, ADR-0040
 
 ### Kubernetes, GitOps, edge, mesh, secrets
 
@@ -140,9 +159,9 @@ Transactional Outbox, consumer idempotency/Inbox, bounded retry/DLQ/replay, Prot
 - `../technology/technology-baseline.md`
 - `../technology/local-development-baseline.md`
 - `../technology/production-compatibility-matrix.md`
-- ADR-0001, ADR-0002, ADR-0011, ADR-0021, ADR-0022, ADR-0029
+- ADR-0001, ADR-0002, ADR-0011, ADR-0021, ADR-0022, ADR-0029, ADR-0040
 
-Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization. Web BFF egress is additionally restricted to its explicitly registered downstream/provider/telemetry set.
+Public path: upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF. Internal workloads use dedicated ServiceAccounts, hardened pod security contexts, deny-by-default NetworkPolicy, Istio Ambient strict mTLS, and least-privilege authorization. Web BFF egress is additionally restricted to its explicitly registered downstream/provider/telemetry set. Compromised Password has no public ingress and no runtime provider/Internet lookup egress; only Identity may call its gRPC lookup.
 
 ### Frontend and BFF implementation
 
@@ -162,9 +181,9 @@ Frontend rules cover strict TypeScript, runtime validation of untrusted data, Re
 - `architecture-fitness-functions.md`
 - `../engineering/build-and-ci-quality-enforcement.md`
 - `../operations/incident-response-runbook.md`
-- ADR-0017, ADR-0030, ADR-0031, ADR-0035, ADR-0038
+- ADR-0017, ADR-0030, ADR-0031, ADR-0035, ADR-0038, ADR-0040
 
-Current supply-chain controls include immutable signed artifacts, signed provenance/SBOM, least-privilege admission-policy authoring, bounded policy-engine external context/egress with SSRF negatives, and continuous deployed-digest vulnerability response.
+Current supply-chain controls include immutable signed artifacts, signed provenance/SBOM, least-privilege admission-policy authoring, bounded policy-engine external context/egress with SSRF negatives, and continuous deployed-digest vulnerability response. Compromised Password final-image evidence includes both the Xerial Java artifact and bundled native SQLite engine.
 
 ## Technology/version authority
 
