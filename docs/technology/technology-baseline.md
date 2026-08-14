@@ -64,7 +64,7 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Primary CNI / NetworkPolicy | Calico OSS 3.32.1 | standard dataplane; Ambient-aware policy tests mandatory; K3s Flannel/network-policy controller disabled in single-server profile |
 | Helm | 4.2.3 | approved 4.2.x patch; chart/tool digests pinned |
 | GitOps | Argo CD 3.4.2 | desired state under repository `deploy/` |
-| Edge gateway | Traefik 3.7.1 | chart 40.2.0; K3s bundled Traefik disabled |
+| Edge gateway | Traefik 3.7.10 | chart 40.2.0; K3s bundled Traefik disabled; security-fixed 3.7.x patch |
 | Kubernetes routing API | Gateway API 1.5.1 | preferred for new public routes |
 | WAF server | Caddy 2.11.4 | immutable image digest required |
 | WAF connector | coraza-caddy 2.5.0 | version/digest pinned |
@@ -95,7 +95,7 @@ K3s v1.35.6+k3s1 / Kubernetes 1.35.6
 1 control-plane + schedulable workload node
 K3s embedded SQLite control-plane datastore
 Calico 3.32.1; K3s Flannel/network-policy controller disabled
-repository Traefik 3.7.1; K3s bundled Traefik/ServiceLB disabled
+repository Traefik 3.7.10; K3s bundled Traefik/ServiceLB disabled
 1 replica per application service
 HPA disabled
 availability PDBs disabled
