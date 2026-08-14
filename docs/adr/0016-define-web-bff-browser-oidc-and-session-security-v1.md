@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13; Identity onboarding/OIDC evidence semantics finalized on 2026-08-14; Web BFF implementation contract finalized on 2026-08-14; Reference Data public facade aligned on 2026-08-14
+2026-08-10; normalized to current-only documentation on 2026-08-13; Identity onboarding/OIDC evidence semantics finalized on 2026-08-14; Web BFF implementation contract finalized on 2026-08-14; Reference Data public facade aligned on 2026-08-14; deployment made profile-aware on 2026-08-14
 
 ## Decision
 
@@ -282,9 +282,26 @@ Service:           web-bff
 ServiceAccount:    web-bff
 application HTTP:  8080
 management:        separate configured port
-production floor:  3 replicas
-PDB minAvailable:  2
+```
+
+Production deployment target is profile-specific.
+
+`production-single-server` under ADR-0042:
+
+```text
+replicas:          1
+HPA:               disabled
+availability PDB:  disabled
+node failover:     none
+```
+
+`production-ha`:
+
+```text
+minimum replicas:  3
+PDB:               minAvailable=2
 HPA range:         3..12 only after load/connection evidence
+topology spread:   required across available failure domains
 ```
 
 Pod security context is hardened: non-root, no privilege escalation, drop unnecessary capabilities, read-only root filesystem except explicit writable mounts, seccomp/runtime-default or stronger approved profile, bounded resources and graceful termination.
@@ -300,6 +317,8 @@ NetworkPolicy/Istio authorization is deny-by-default. Web BFF production egress 
 - approved telemetry backend/collector.
 
 Arbitrary URL/Internet egress is prohibited. Every new synchronous downstream must be entered into the canonical dependency registry with class/deadline/retry/failure behavior before production use. Google is the explicit provider-egress exception and remains allow-listed by configured endpoint policy. Reference Data itself has no runtime standards-source Internet synchronization.
+
+The single-server one-replica target is an availability reduction only. It does not weaken same-origin browser controls, session/Redis fail-closed behavior, exact-audience token brokerage, MFA continuation, CSRF, OIDC replay protection, NetworkPolicy/Istio authorization, or public edge/WAF requirements.
 
 ## Verification requirements
 
@@ -320,15 +339,16 @@ Required evidence includes at least:
 - no cross-origin credentialed CORS, exact CSP/no unsafe-inline/no unsafe-eval, security headers, private `no-store`, and public Reference Data cache tests;
 - request/body/header bounds and multipart rejection/DoS tests;
 - OIDC_START/OIDC_CALLBACK quota atomicity/outage/skew tests;
-- Redis failover/session behavior and no reconstruction from browser state;
+- Redis selected-profile behavior and no reconstruction from browser state;
 - Authorization management 1500ms/one-attempt/no-retry/no-fallback/exact-audience behavior and stable request-id replay after ambiguity;
 - Reference Data <=1000ms/one-attempt/wait-for-ready-off/no-retry/no-fallback/cancellation, typed route mapping, wrong-workload and unavailable/no-fabrication behavior;
 - proof BFF does not locally grant Authorization-management, final protected-resource authority, or business validity merely from a Reference Data record;
 - erasure deletion/idempotency/non-PII receipt tests;
 - deny-by-default egress/workload-policy/direct-bypass tests including Reference Data allow and unregistered downstream denial;
 - PII/secret-safe logging and bounded-metadata verification;
+- profile-correct workload render: one replica/HPA off/PDB off and whole-host outage semantics in single-server; >=3/PDB2/topology spread and evidence-gated HPA in HA;
 - BDD and Playwright critical authentication/onboarding/administration/reference journeys where implemented.
 
 ## Rollback considerations
 
-Rollback MUST NOT weaken public request bounds/error redaction, same-origin/CORS rules, Origin/CSRF/Fetch-Metadata enforcement, PKCE/state/nonce/pre-auth replay protection, exact redirects, evidence entropy/expiry/replay binding, email no-auto-link/unverified-email behavior, active-MFA enforcement, browser/token isolation, server-owned audience brokerage, cookie/session HMAC/rotation/revocation rules, refresh encryption/key staleness controls, tenantless onboarding isolation, Authorization authority, Reference Data typed/cache/no-fabrication/workload controls, OIDC quotas, erasure, deny-by-default egress, or resource-owner final authorization.
+Rollback MUST NOT weaken public request bounds/error redaction, same-origin/CORS rules, Origin/CSRF/Fetch-Metadata enforcement, PKCE/state/nonce/pre-auth replay protection, exact redirects, evidence entropy/expiry/replay binding, email no-auto-link/unverified-email behavior, active-MFA enforcement, browser/token isolation, server-owned audience brokerage, cookie/session HMAC/rotation/revocation rules, refresh encryption/key staleness controls, tenantless onboarding isolation, Authorization authority, Reference Data typed/cache/no-fabrication/workload controls, OIDC quotas, erasure, deny-by-default egress, or resource-owner final authorization. Moving to `production-single-server` MUST NOT be represented as retaining replicated node-failure availability.
