@@ -1,6 +1,6 @@
 # Documentation Standards and Authority
 
-This document defines how repository documentation remains current, non-duplicative, and agent-usable. It complements `current-only-documentation-policy.md`.
+This document defines how repository documentation remains current, non-duplicative, traceable, and agent-usable. It complements `current-only-documentation-policy.md`.
 
 ## 1. Normative language
 
@@ -15,7 +15,7 @@ A normative rule has one authoritative home. Other documents link to it and incl
 When documents overlap, use this order unless an explicit current decision says otherwise:
 
 1. legal/security/privacy obligations and approved security controls;
-2. current retained ADRs and Decision Register;
+2. current effective ADRs and Decision Register;
 3. current-state architecture/service documents;
 4. engineering/security/operations standards;
 5. technology baselines and compatibility matrices for exact approved versions;
@@ -23,13 +23,13 @@ When documents overlap, use this order unless an explicit current decision says 
 7. runbooks/playbooks;
 8. examples/templates/reference configuration.
 
-A lower level may make a higher-level rule more specific but MUST NOT contradict or weaken it.
+A lower level may make a higher-level rule more specific but MUST NOT contradict or weaken it. A superseded ADR retained only for stable reference is not current architecture authority.
 
 ## 3. Document classes
 
 | Class | Purpose |
 | --- | --- |
-| ADR | current durable material decision and its enforceable consequences |
+| ADR | durable material decision identifier; current ADRs own effective decision scope, superseded ADRs retain stable provenance/pointer only |
 | Architecture | current capabilities, boundaries, ownership and topology |
 | Standard | normative implementation/verification rules |
 | Governance | ownership, evidence, quality/security mapping and traceability |
@@ -51,9 +51,21 @@ For humans and agents:
 - screenshots are never the sole location of an instruction;
 - relative repository links are preferred for internal documents.
 
-### Current ADR numbering
+### ADR numbering and identifier stability
 
-The retained current ADR set uses a dense four-digit sequence beginning at `ADR-0001`. ADR filenames use the same four-digit prefix. When the retained current-only set is renumbered, the filename, ADR heading, Decision Register, source/task maps, machine-readable policy references, and every other repository reference MUST be updated atomically in the same PR. Compatibility aliases or historical old-to-new ADR mapping files are not retained as a second identifier system under current-only documentation mode.
+ADR filenames use a four-digit monotonic identifier such as `ADR-0044`.
+
+After an ADR ID merges to `main`:
+
+- the ID and filename MUST NOT be renumbered;
+- the ID MUST NOT be reused for another decision;
+- gaps are allowed;
+- supersession does not free the number;
+- inbound Git/PR/incident/audit/security-report references keep the same meaning permanently.
+
+The Decision Register distinguishes current effective ADRs from superseded retained ADR identifiers. No compatibility alias or old-to-new renumbering table is needed because the original identifier remains stable.
+
+Repository automation SHOULD reject duplicate ADR IDs, ID reuse, filename/heading mismatch, and deletion of a merged ADR without an explicit repository-owner exception.
 
 ## 5. Current-only maintenance
 
@@ -61,10 +73,10 @@ When a decision changes:
 
 1. identify every authoritative location and inbound reference;
 2. preserve every still-current invariant/security/SLO/contract/operational rule;
-3. update the single authoritative rule;
-4. remove or normalize obsolete duplicate/predecessor text under current-only policy;
+3. update the single current authoritative rule;
+4. remove or normalize obsolete duplicate/predecessor implementation text under current-only policy while retaining stable ADR provenance when applicable;
 5. update Decision Register, source map, task matrix, machine-readable registries, baselines, and verification references as applicable;
-6. validate that no deleted document is still referenced;
+6. validate that no current document references a deleted/non-current implementation authority;
 7. review the complete PR diff against current `main`.
 
 ## 6. Documentation fitness checks
@@ -72,7 +84,8 @@ When a decision changes:
 Repository automation SHOULD check, where practical:
 
 - broken relative links and missing referenced files;
-- references to deleted/non-current ADRs;
+- duplicate/reused/renumbered ADR identifiers and ADR filename/heading mismatch;
+- current references that incorrectly treat a superseded ADR as current authority;
 - duplicate/conflicting normative rules in known canonical areas;
 - terminology drift for canonical concepts;
 - stale version pins outside baseline/lock authority;
