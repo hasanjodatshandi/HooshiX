@@ -7,6 +7,7 @@
 - **Authorization v1 implementation contract finalized:** 2026-08-14
 - **Web BFF v1 implementation contract finalized:** 2026-08-14
 - **Compromised Password v1 implementation contract finalized:** 2026-08-14
+- **Reference Data v1 architecture contract finalized:** 2026-08-14
 
 This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
 
@@ -27,6 +28,12 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | ADR | Current scope |
 | --- | --- |
 | [ADR-0040](0040-define-self-contained-compromised-password-sqlite-v1.md) | Self-contained internal compromised-password lookup; existing SHA-256 20-bit-prefix privacy contract; immutable read-only embedded SQLite reference dataset; offline dataset compiler/versioning; no runtime external provider, PostgreSQL, Redis, Kafka, or subject-linked state; bounded fail-closed lookup/runtime/deployment/security evidence |
+
+## Reference Data
+
+| ADR | Current scope |
+| --- | --- |
+| [ADR-0041](0041-define-reference-data-service-v1.md) | Global non-tenant Country/Currency/TimeZone/SupportedLocale boundary; ISO/IANA/stable-CLDR offline source governance; immutable image-bundled data with no DB/Redis/Kafka/runtime provider; typed bounded gRPC reads; `/api/v1/reference` BFF facade/cache semantics; BFF-only initial runtime edge/workload; Class-B target; executable service deferred until consumer/journey trigger |
 
 ## Notification
 
@@ -78,7 +85,7 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0034](0034-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable dedicated CloudNativePG fleet operations |
 | [ADR-0037](0037-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Restore evidence and DB upgrade/rollback safety |
 
-The immutable read-only SQLite dataset in Compromised Password Service is the explicit ADR-0040 reference-data exception and is not mutable business/service relational persistence covered by the PostgreSQL fleet rules.
+The immutable read-only SQLite dataset in Compromised Password Service is the explicit ADR-0040 SQLite reference-data exception and is not mutable business/service relational persistence covered by the PostgreSQL fleet rules. ADR-0041 Reference Data uses no database at all; its immutable application bundle therefore does not create another persistence exception.
 
 ## Platform/GitOps/runtime compatibility
 
