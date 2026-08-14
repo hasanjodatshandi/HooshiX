@@ -289,7 +289,7 @@ edges:
     owner: platform-observability
     policy_refs:
       - ADR-0033
-      - docs/architecture/reliability-and-observability.md#10-observability
+      - docs/architecture/reliability-and-observability.md#13-observability
 
   - operation_id: service.required-security-audit-evidence
     caller_owner: owning-service
