@@ -2,7 +2,7 @@
 
 ## 1. Ownership
 
-Identity owns global User, Tenant, TenantMembership, membership lifecycle, profile/contact methods, local credentials, external identities, MFA enrollments/recovery material, authentication, sessions, token signing, active-tenant selection, and platform-global data-subject erasure coordination. Authorization roles/permissions and platform capability assignments are separate and remain authoritative in Authorization.
+Identity owns global User, Tenant, TenantMembership, membership lifecycle, profile/contact methods, local credentials, external identities, MFA enrollments/recovery material, authentication, sessions, token signing, active-tenant selection, the internal Web BFF exact-audience access-token brokerage surface, and platform-global data-subject erasure coordination. Authorization roles/permissions and platform capability assignments are separate and remain authoritative in Authorization.
 
 Base package: `com.sajtech.identity`.
 
@@ -203,6 +203,33 @@ Access JWT:
 
 Issuer is typed config; initial production logical value is `https://identity.sajtech.internal` unless reviewed environment config replaces it.
 
+### Web BFF exact-audience access-token brokerage
+
+Identity provides the internal `IssueAudienceAccessToken` operation for the approved Web BFF workload. It is not a public or generic OAuth token-exchange endpoint.
+
+The operation is provider-owned by Identity and uses server-owned authority:
+
+- caller workload must be the approved Web BFF identity;
+- referenced Identity Session/RefreshFamily must be active and consistent with current User/session state;
+- requested audience must be in Identity's server-owned allow-list for the BFF workload and current session mode;
+- tenant/membership context is derived from authoritative Identity state, not browser/JWT Role or permission snapshots;
+- `authenticated_onboarding` cannot obtain ordinary resource-service or `authorization-service` audiences;
+- browser-selected, arbitrary, unknown, or wildcard audiences fail closed;
+- output is only the existing five-minute exact-audience access JWT under ADR-0023; provider and refresh credentials are never returned.
+
+The BFF->Identity edge is `AUTHORITATIVE_SECURITY`:
+
+```text
+deadline:        1500 ms maximum
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+fallback/cache:  none
+failure mode:    fail closed / authentication dependency unavailable
+```
+
+Any bounded server-side BFF retention of an issued JWT ends no later than its own `exp` and is invalidated by relevant session/tenant/assurance transition. It is transport reuse only and never permission-result caching or a substitute for the resource-owning service's final online Authorization check.
+
 Refresh credential:
 
 - exactly 32 CSPRNG bytes;
@@ -331,6 +358,8 @@ Authentication anti-lockout remains mandatory: source gate before credential wor
 
 Identity does not expose internal tokens to React. BFF owns browser session, OIDC transaction/provider validation, PKCE, CSRF, CORS and secure cookies per ADR-0016.
 
+For authenticated server-side dispatch, BFF may call Identity `IssueAudienceAccessToken` only under §6/ADR-0023. The browser never selects the target audience and never receives the resulting downstream access JWT or any refresh/provider credential.
+
 Pre-auth MFA after password **or Google evidence** is not an authenticated browser session. `authenticated_onboarding` exists only after all required factors and Session/RefreshFamily creation, carries no normal resource JWT until tenant selection, and is BFF-allow-listed to Identity onboarding operations.
 
 ## 12. PostgreSQL, aggregates, and transactions
@@ -397,7 +426,9 @@ Current Identity remote edges include:
 - Authorization tenant lifecycle cleanup/reconciliation — durable commands;
 - Authorization `CheckPlatformPermission` — authoritative security for platform tenant/legal-hold entry points, 300ms one attempt/no retry/cache/fallback, fail closed.
 
-Exact operation classes/failure actions are canonical in `../dependency-criticality.yaml`. Google is **not** an Identity dependency; Web BFF owns the Google edge.
+Exact outbound operation classes/failure actions are canonical in `../dependency-criticality.yaml`. Google is **not** an Identity dependency; Web BFF owns the Google edge.
+
+`IssueAudienceAccessToken` is an inbound Identity-owned provider surface, not a new Identity outbound dependency. Its caller-side BFF dependency classification/deadline is canonical in `../dependency-criticality.yaml`; Identity still owns validation, session/tenant authority and token issuance semantics from §6/ADR-0023.
 
 ## 16. Repository-complete implementation and verification
 
@@ -416,6 +447,7 @@ Applicable tests include:
 - concurrent last-owner prepare reservations, local owner-mutation conflict behavior, crash/replay/finalize/cancel safety;
 - tenantless onboarding, one/many membership selection, tenant switch;
 - JWT exact claims/audience/leeway, key rotation;
+- `IssueAudienceAccessToken` approved-BFF workload, active/revoked/expired Session/RefreshFamily, server-owned exact audience allow-list, arbitrary/browser/wildcard audience rejection, onboarding resource/`authorization-service` audience denial, tenant/membership/session binding, exact five-minute issuance, no provider/refresh credential return, 1500ms/one-attempt/no-retry/no-fallback and cancellation behavior;
 - 20 RefreshFamily cap, logout/revocation/reuse/MFA-state-change revocation and <=5m+bounded-leeway token residual trade-off;
 - password change/recovery, no reset-first-local-Credential, MFA-required reset, no automated password+MFA-loss bypass;
 - compromised-password prefix-only SHA-256 protocol and deadline/fail-closed behavior;
@@ -425,4 +457,4 @@ Applicable tests include:
 - aggregate/transaction boundaries, forced RLS/pool reuse;
 - Notification/Authorization outbox replay/conflict;
 - 35d critical idempotency/dedup, >=365d audit;
-- NetworkPolicy/Istio positive/negative authorization including Identity-only platform-check access, deployment render/policy, PII-safe telemetry, load/failover/restore where applicable.
+- NetworkPolicy/Istio positive/negative authorization including Identity-only platform-check access, approved-BFF-only token-broker access, deployment render/policy, PII-safe telemetry, load/failover/restore where applicable.
