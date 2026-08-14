@@ -2,7 +2,7 @@
 
 ## 1. Ownership
 
-Identity owns global User, Tenant, TenantMembership, membership lifecycle, profile/contact methods, local credentials, external identities, MFA enrollments/recovery material, authentication, sessions, token signing, active-tenant selection, and platform-global data-subject erasure coordination. Authorization roles/permissions are separate and remain authoritative in Authorization.
+Identity owns global User, Tenant, TenantMembership, membership lifecycle, profile/contact methods, local credentials, external identities, MFA enrollments/recovery material, authentication, sessions, token signing, active-tenant selection, and platform-global data-subject erasure coordination. Authorization roles/permissions and platform capability assignments are separate and remain authoritative in Authorization.
 
 Base package: `com.sajtech.identity`.
 
@@ -91,7 +91,7 @@ Dispatcher baseline:
 
 After Notification `ACCEPTED`, caller handoff recipient/code material is irreversibly removed while authoritative Contact and one-way challenge state remain.
 
-## 5. Tenant, invitation, Membership, and last-owner safety
+## 5. Tenant, invitation, Membership, platform operations, and last-owner safety
 
 Tenant create is self-service or platform-admin. Creator becomes initial owner. Tenant remains `PROVISIONING` until idempotent Authorization owner-provisioning ACK, then activates transactionally.
 
@@ -106,6 +106,28 @@ DELETED
 ```
 
 Tenant + creator Membership + audit + stable owner-provisioning outbox commit in one local transaction without network I/O. Owner provisioning uses 900ms/one invocation/no wait-for-ready/no immediate retry and durable delays 1s, 5s, 30s, 2m, 10m, then <=10m ±20%. Fifteen minutes pending warns; one hour pages.
+
+Self-service tenant creation remains governed by Identity authentication/quota rules. Platform-admin tenant operations additionally require Authorization `CheckPlatformPermission` before the Identity mutation:
+
+| Identity operation | Required platform permission |
+| --- | --- |
+| platform-admin tenant create | `platform.tenant.create` |
+| suspend tenant | `platform.tenant.suspend` |
+| resume tenant | `platform.tenant.resume` |
+| restore tenant | `platform.tenant.restore` |
+
+Platform permission check uses the authenticated platform actor User ID and exact permission key. Identity never accepts caller-supplied platform-role/profile claims as authority. The call is outside every Identity DB transaction and uses:
+
+```text
+deadline:        300 ms maximum
+attempts:        1
+wait-for-ready:  off
+automatic retry: none
+cache/fallback:  none
+failure mode:    fail closed
+```
+
+Authoritative deny is `PERMISSION_DENIED / AUTHORIZATION_DENIED`; dependency failure is platform-authorization unavailable. `platform_admin` never bypasses tenant owner/domain invariants or ordinary resource `CheckPermission`.
 
 Invitation lifecycle:
 
@@ -129,11 +151,11 @@ Invitation targets an existing non-erased User through a verified Identity Conta
 
 Invitation is not a Membership. Acceptance creates one ACTIVE Membership, transitions the Invitation to ACCEPTED, records audit, and writes a durable Authorization outbox in the same local transaction. Authorization idempotently assigns the default `tenant_member` SYSTEM role. v1 Invitation carries no arbitrary role/permission; privilege elevation is a later Authorization-owned operation. Until provisioning ACK, Authorization default-deny remains safe authority.
 
-Tenant owner with authorized `tenant.delete` may begin deletion. Platform-admin may suspend/resume. `DELETING` rejects new Identity invitation, tenant-selection, and tenant/membership mutations and revokes pending invitations. Authorization tenant-lifecycle cleanup/deny is durable; Identity moves to `DELETED` only after ACK. Restore is platform-admin-only, allowed only before irreversible tenant purge/erasure begins, re-enters `PROVISIONING` for Authorization reconciliation, and never releases the slug/technical IDs.
+Tenant owner with authorized `tenant.delete` may begin deletion. Platform-authorized actor may suspend/resume only after the exact platform check above. `DELETING` rejects new Identity invitation, tenant-selection, and tenant/membership mutations and revokes pending invitations. Authorization tenant-lifecycle cleanup/deny is durable; Identity moves to `DELETED` only after ACK. Restore is platform-authorized only, allowed only before irreversible tenant purge/erasure begins, re-enters `PROVISIONING` for Authorization reconciliation, and never releases the slug/technical IDs.
 
 ### Last-owner-safe removal
 
-Authorization owns owner-role state. A read-only owner-count check is race-prone, so Identity uses the ADR-0012 `PrepareMembershipRemoval` reservation protocol.
+Authorization owns owner-role state. A read-only owner-count check is race-prone, so Identity uses the ADR-0012/ADR-0013 `PrepareMembershipRemoval` reservation protocol.
 
 Identity first commits a stable local removal intent in `PREPARING`, then calls Authorization outside the DB transaction:
 
@@ -147,7 +169,7 @@ fallback:       none
 failure:        fail closed
 ```
 
-Authorization atomically reserves the removal and evaluates effective owner capacity excluding existing reservations. If it could remove the last owner: `FAILED_PRECONDITION / LAST_TENANT_OWNER`. Reservations do not auto-expire into unsafe allow state.
+Authorization atomically reserves the removal and evaluates effective owner capacity excluding existing reservations. If it could remove the last owner: `FAILED_PRECONDITION / LAST_TENANT_OWNER`. Reservations do not auto-expire into unsafe allow state. Authorization local owner-role mutations share the same owner-safety serialization domain so a concurrent assignment/demotion/removal cannot race the Identity preparation.
 
 After prepare succeeds, one Identity transaction marks Membership REMOVED + audit + durable finalization outbox. `FinalizeMembershipRemoval` closes Authorization role state/reservation. If the local removal definitively fails, Identity durably resolves `CancelMembershipRemovalPreparation`. Crash between prepare and local commit is recovered by replaying the stable `PREPARING` intent/request ID. Finalize/cancel uses 900ms/one invocation/no immediate retry and durable retry outside transactions.
 
@@ -329,7 +351,7 @@ Aggregate boundaries:
 
 Cross-service lifecycle intents/outboxes are explicit coordination records. JPA is default aggregate CRUD; JDBC/jOOQ only for justified SQL-control/query paths such as `SKIP LOCKED`/outbox. One giant User graph is prohibited.
 
-No remote gRPC/HTTP/Kafka/Redis/provider I/O inside Identity DB transactions. DB locks never span remote I/O. Retry is outside failed transactions.
+No remote gRPC/HTTP/Kafka/Redis/provider I/O inside Identity DB transactions. DB locks never span remote I/O. Retry is outside failed transactions. This explicitly includes `CheckPlatformPermission`, compromised-password, Notification, semantic-quota Redis, and every Authorization lifecycle call.
 
 ## 13. Erasure and legal hold
 
@@ -337,9 +359,11 @@ ADR-0028 makes Identity coordinator of global User erasure. Required participant
 
 Self-erasure requires auth age <=5m and active MFA proof when applicable **and** no remaining ACTIVE/SUSPENDED Membership for a Tenant that is not already DELETED. The User must first leave Memberships, transfer last ownership, or complete tenant deletion. Every Membership exit still uses `PrepareMembershipRemoval`; erasure is not a last-owner bypass.
 
-Acceptance transaction sets User `DELETING`, revokes every RefreshFamily, revokes pending invitations targeted to that User, persists audit/request + outbox, and permits no new invitation acceptance. Legal hold may block irreversible progress but never re-enables authentication. Legal-hold create/release is platform/legal-authorized and audited. v1 exposes no normal self-service erasure undo; irreversible participant work can never be cancelled.
+Acceptance transaction sets User `DELETING`, revokes every RefreshFamily, revokes pending invitations targeted to that User, persists audit/request + outbox, and permits no new invitation acceptance.
 
-Security audit evidence remains >=365d unless stricter policy. Non-PII erasure receipts follow ADR-0028. Restore replays erasure/legal-hold before traffic.
+Legal hold may block irreversible progress but never re-enables authentication. Legal-hold create/release is not an ordinary tenant/user operation. A platform User entry point requires `CheckPlatformPermission(user_id, platform.legal_hold.manage)` under the same 300ms/one-attempt/no-cache/no-retry/no-fallback fail-closed contract as §5; any separate legal-authority workflow must be at least as privileged/audited and cannot bypass the Authorization authority silently. v1 exposes no normal self-service erasure undo; irreversible participant work can never be cancelled.
+
+Authorization erasure participation removes subject-linked Membership authorization and any platform profile assignment, so an erased User cannot retain tenant/global authority. Security audit evidence remains >=365d unless stricter policy. Non-PII erasure receipts follow ADR-0028. Restore replays erasure/legal-hold before traffic.
 
 ## 14. Runtime/deployment
 
@@ -370,7 +394,8 @@ Current Identity remote edges include:
 - Authorization owner/member provisioning — durable commands after local outbox commit;
 - Authorization `PrepareMembershipRemoval` — authoritative security, 300ms one attempt/no retry/cache/fallback;
 - Authorization membership-removal finalize/cancel — durable command resolution;
-- Authorization tenant lifecycle cleanup/reconciliation — durable commands.
+- Authorization tenant lifecycle cleanup/reconciliation — durable commands;
+- Authorization `CheckPlatformPermission` — authoritative security for platform tenant/legal-hold entry points, 300ms one attempt/no retry/cache/fallback, fail closed.
 
 Exact operation classes/failure actions are canonical in `../dependency-criticality.yaml`. Google is **not** an Identity dependency; Web BFF owns the Google edge.
 
@@ -386,7 +411,9 @@ Applicable tests include:
 - User lifecycle and authentication shutdown;
 - profile/contact CRUD + recent-auth/last-contact rules;
 - tenant/invitation/Membership lifecycles, default-member provisioning, slug tombstone, tenant delete/restore;
-- concurrent last-owner prepare reservations, crash/replay/finalize/cancel safety;
+- exact platform permission mapping for platform tenant create/suspend/resume/restore and legal-hold management, authoritative deny/outage fail-close, wrong workload/permission negatives, and no platform-profile/wildcard bypass;
+- proof `CheckPlatformPermission` and every other remote dependency executes outside Identity DB transactions;
+- concurrent last-owner prepare reservations, local owner-mutation conflict behavior, crash/replay/finalize/cancel safety;
 - tenantless onboarding, one/many membership selection, tenant switch;
 - JWT exact claims/audience/leeway, key rotation;
 - 20 RefreshFamily cap, logout/revocation/reuse/MFA-state-change revocation and <=5m+bounded-leeway token residual trade-off;
@@ -394,8 +421,8 @@ Applicable tests include:
 - compromised-password prefix-only SHA-256 protocol and deadline/fail-closed behavior;
 - BFF-only Google evidence 256-bit/2m/10m replay, signup/unverified-email/collision/no-auto-link/unlink, and active-TOTP Google MFA continuation;
 - TOTP 5m/five-proof gate, primary-proof replacement, timestep replay, recovery code, SMS no-downgrade and exact SMS proof semantics;
-- self-erasure Membership/last-owner precondition, invitation/session revocation and legal hold;
+- self-erasure Membership/last-owner precondition, invitation/session revocation, platform-profile erasure, and legal hold;
 - aggregate/transaction boundaries, forced RLS/pool reuse;
 - Notification/Authorization outbox replay/conflict;
 - 35d critical idempotency/dedup, >=365d audit;
-- NetworkPolicy/Istio positive/negative authorization, deployment render/policy, PII-safe telemetry, load/failover/restore where applicable.
+- NetworkPolicy/Istio positive/negative authorization including Identity-only platform-check access, deployment render/policy, PII-safe telemetry, load/failover/restore where applicable.
