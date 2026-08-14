@@ -10,6 +10,8 @@ Implementation: REQUIRED
 Evidence: NOT VERIFIED until executed/measured
 ```
 
+A capability explicitly marked `PLANNED` by its current ADR does not become a platform-wide release blocker merely because its executable implementation has not started. Once that capability is placed in an actual release/user-journey scope, every applicable gate for it becomes blocking.
+
 Production configuration MUST NOT bypass a failed gate.
 
 ## 1. Kubernetes active-cluster HA — ADR-0022
@@ -111,7 +113,7 @@ Required evidence per service with mutable relational business persistence:
 - upgrade waves stop on staging/production failure; reversible state only rolls back when supported; irreversible/major changes never use unsafe downgrade;
 - Notification acknowledged `DISPATCHING` survives every permitted automatic failover with no blind redispatch.
 
-ADR-0040's immutable read-only rebuildable SQLite reference dataset is not mutable business persistence and is covered by §5 instead; it does not weaken this gate for any mutable PostgreSQL service state.
+ADR-0040's immutable read-only rebuildable SQLite reference dataset is not mutable business persistence and is covered by §5 instead; ADR-0041 Reference Data has no database; neither weakens this gate for any mutable PostgreSQL service state.
 
 Status until verified: **platform/data production blocker**.
 
@@ -149,6 +151,36 @@ Required evidence:
 
 Status until verified: **password create/change/reset production blocker; unrelated authentication flows may proceed independently when their own gates pass**.
 
+### 5.1 Reference Data Service — ADR-0041
+
+Architecture status is `DECIDED`; executable implementation remains `PLANNED / NOT VERIFIED` until ADR-0041's trigger is met. Before implementation begins, evidence identifies either at least two independent consumers or one specific production user journey. Multiple endpoints of one integration layer are not automatically two consumers.
+
+Once the service/facade enters release scope, required evidence includes:
+
+- independent Java 25/Spring Boot service build, Gradle Wrapper, dependency verification, Spotless/SpotBugs/ArchUnit/Semgrep and Protobuf/Buf tasks;
+- exactly typed Country/Currency/TimeZone/SupportedLocale operations plus version; no generic dictionary/dataset/query/schema API;
+- ISO 3166-1 alpha-2 Country identity with bounded alpha-3/lossless numeric metadata; ISO 4217 currency alpha/numeric/minor-unit metadata; canonical IANA tzdb identifiers; BCP47 supported locales exactly `fa` and `en`;
+- reviewed offline ISO/IANA/stable-CLDR source revision/provenance/integrity/license/use-right evidence; draft/development CLDR excluded from production input;
+- deterministic canonicalization/dedup/order, ACTIVE/DEPRECATED/RETIRED lifecycle, no silent code reuse/removal, bounded/acyclic alias handling where source aliases are imported, and required fa/en display coverage;
+- immutable bundle manifest with format/bundle/build/source revisions/supported locales/record counts/content SHA-256 and deterministic build evidence;
+- invalid/incompatible/tampered bundle blocks readiness; startup bundle validation/memory remains bounded;
+- no PostgreSQL/CloudNativePG/Flyway/SQLite/Redis/Kafka datastore and no runtime ISO/IANA/Unicode/CLDR/provider Internet synchronization;
+- list pagination default100/max200, opaque family/bundle-bound token, deterministic order, <=128KiB response and stable sanitized errors;
+- BFF `/api/v1/reference` GET/HEAD routes may be anonymous but create no authenticated session/JWT/tenant authority; representation locale is explicit `fa|en`; no unsafe method side effects;
+- same-origin CORS remains; mandatory upstream mitigation -> Traefik -> WAF -> BFF path remains; no direct public Reference Data route exists;
+- deterministic `ETag`, conditional `304` and `Cache-Control: public, max-age=3600`; no BFF server-side stale/fabricated Reference Data fallback;
+- BFF->Reference Data is `AUTHORITATIVE_STATE`, <=1000ms and <=remaining parent budget, one attempt, wait-for-ready off, no automatic retry/fallback; cancellation/in-flight/queue bounds pass;
+- only approved Web BFF ServiceAccount initially reaches gRPC; wrong workload and arbitrary application/standards-source Internet egress are denied;
+- no User/Tenant/Membership/session/credential/permission/business-config state and no ADR-0028 erasure participation;
+- target >=3 replicas/PDB2/topology spread, hardened security context, HPA disabled until evidence;
+- Class-B availability>=99.95%, p95<=250ms, p99<=750ms and representative >=2x reference-route peak with validated headroom;
+- same signed immutable image/bundle digest is promoted staging->production and cold recovery redeploys/rebuilds the approved release with readiness blocked until validation passes;
+- dependency registry/generated matrix contains the exact BFF->Reference Data edge and current ADR/service references.
+
+Status before implementation trigger: **not a blocker for unrelated releases; capability remains intentionally deferred**.
+
+Status after Reference Data enters release scope and until verified: **Reference Data/public-reference feature production blocker**.
+
 ## 6. Kafka durability/rebuildable DR — ADR-0015
 
 Required evidence:
@@ -164,13 +196,15 @@ Required evidence:
 
 Status until verified: **critical async-flow blocker**.
 
-## 7. Browser/BFF security — ADR-0016
+## 7. Browser/BFF security — ADR-0016/0041
 
 Required evidence:
 
-- OpenAPI exposes only reviewed `/api/v1` public namespace/subspaces and does not mechanically publish internal gRPC method names;
-- public JSON <=256KiB, auth/OIDC/session body <=64KiB, headers/metadata <=16KiB, multipart/file upload rejected in v1, and oversized input is rejected before expensive downstream work;
-- RFC 9457 public profile is contract-tested for `type`/`title`/`status`/stable `code`/optional safe correlation and redacts tenant/membership/Contact/internal request IDs, provider/exception text, tokens and security internals;
+- OpenAPI exposes only reviewed `/api/v1` public namespace/subspaces including explicit `/reference` when ADR-0041 implementation is active and does not mechanically publish internal gRPC method names;
+- public JSON <=256KiB, auth/OIDC/session body <=64KiB, headers/metadata <=16KiB, multipart/file upload rejected in v1, and oversized input is rejected before expensive downstream work; Reference Data GET/HEAD has no request body;
+- RFC 9457 public profile is contract-tested for `type`/`title`/`status`/stable `code`/optional safe correlation and redacts tenant/membership/Contact/internal request IDs, provider/source/exception text, tokens and security internals;
+- Reference Data GET/HEAD may be anonymous, creates no session/JWT/tenant authority, uses explicit `fa|en` representation locale, remains same-origin/no credentialed cross-origin CORS, needs no CSRF proof only because methods are safe/side-effect free, and still traverses mandatory edge/WAF;
+- Reference Data successful representations use deterministic `ETag`, `304` and `Cache-Control: public, max-age=3600`; BFF has no server-side stale/fabricated reference fallback;
 - OIDC Authorization Code + PKCE S256; `state` exactly 256 CSPRNG bits, `nonce` exactly 256 CSPRNG bits, verifier exactly 32 random bytes Base64URL-no-padding;
 - `__Host-sajtech-preauth` has Secure/HttpOnly/SameSite=Lax/Path=/, no Domain and >=256-bit opaque ID; raw ID is absent from Redis keys/logs and purpose-HMAC locator is used;
 - pre-auth state <=10m/single-use/max five live transactions per browser; consumed/expired state cannot revive;
@@ -182,8 +216,9 @@ Required evidence:
 - active TOTP after Google proof enters same MFA pre-auth continuation as password and cannot establish completed BFF/Identity session before MFA;
 - browser never receives provider/Identity access/refresh credentials or arbitrary downstream-audience authority;
 - server-owned route->downstream mapping drives Identity `IssueAudienceAccessToken`; source Session/RefreshFamily must be active; exact audience is allow-listed; arbitrary browser audience is rejected; issuance remains five-minute exact-audience JWT and is not generic public token exchange;
-- `authenticated_onboarding` cannot obtain ordinary resource-service or `authorization-service` audience and cannot dispatch ordinary resource/Authorization-management calls;
+- `authenticated_onboarding` cannot obtain ordinary resource-service or `authorization-service` audience and cannot dispatch ordinary resource/Authorization-management calls; anonymous Reference Data does not grant resource authority;
 - BFF->Identity audience-token broker edge is 1500ms max, one attempt, wait-for-ready off, no automatic retry/fallback/security cache and fails closed;
+- BFF->Reference Data edge, when active, is <=1000ms/one attempt/wait-for-ready-off/no automatic retry/fallback and failure does not fabricate current reference data;
 - secure `__Host-sajtech-session`; raw session ID absent from Redis keys/logs; purpose-HMAC locator is used;
 - session state contains bounded Identity Session/RefreshFamily, tenant/membership/mode, CSRF digest, created/last-seen/idle/absolute state and encrypted refresh only where needed;
 - idle<=7d, absolute<=30d/immutable, Identity family expiry upper-bounds session and `last_seen` persists at most once per five-minute activity window;
@@ -195,14 +230,14 @@ Required evidence:
 - CSRF token exactly 256 CSPRNG bits/session-bound, only purpose-HMAC stored, constant-time compare, rotates with session/assurance, no separate CSRF cookie or persistent browser storage;
 - unsafe production browser request requires exact Origin + CSRF + `Sec-Fetch-Site:same-origin`; missing Fetch Metadata fails closed; safe methods are side-effect free;
 - cross-origin credentialed CORS is absent in v1/same-origin only;
-- exact CSP has no `unsafe-inline`/`unsafe-eval`; HSTS/nosniff/referrer/Permissions-Policy/frame checks pass; auth/OIDC/session/Authorization-admin responses are `Cache-Control: no-store`;
+- exact CSP has no `unsafe-inline`/`unsafe-eval`; HSTS/nosniff/referrer/Permissions-Policy/frame checks pass; auth/OIDC/session/Authorization-admin responses are `Cache-Control: no-store`, with only the ADR-0041 public Reference Data cache exception;
 - exact OIDC_START/OIDC_CALLBACK quotas and max-five-pre-auth rule pass outage/skew/atomicity tests;
 - browser/storage/service-worker inspection proves no provider/internal JWT/refresh leakage or private authenticated cache;
-- `dependency-criticality.yaml` contains current BFF session/quota/Google/evidence/audience-token/Authorization-management/resource-dispatch edges and generated Markdown matches;
-- BFF resource dispatch does not fabricate business data on downstream failure and final protected-resource `CheckPermission` remains in resource-owning service;
-- BFF erasure removes sessions/pre-auth/OIDC/encrypted refresh/User-session index/user-linked continuation and returns only non-PII idempotent evidence;
+- `dependency-criticality.yaml` contains current BFF session/quota/Google/evidence/audience-token/Authorization-management/Reference-Data/resource-dispatch edges and generated Markdown matches;
+- BFF resource dispatch does not fabricate business data on downstream failure and final protected-resource `CheckPermission` remains in resource-owning service; Reference Data existence is not business-acceptance authority;
+- BFF erasure removes sessions/pre-auth/OIDC/encrypted refresh/User-session index/user-linked continuation and returns only non-PII idempotent evidence; anonymous Reference Data adds no subject state;
 - runtime renders `platform-apps/web-bff`, HTTP 8080, separate management port, >=3 replicas, PDB minAvailable=2, HPA 3..12 only after load evidence, hardened security context;
-- deny-by-default NetworkPolicy/Istio egress permits only Identity, Authorization management, registered resource services, BFF/security Redis, configured Google OIDC endpoints and approved telemetry; arbitrary URL/Internet egress and wrong workload are denied.
+- deny-by-default NetworkPolicy/Istio egress permits only Identity, Authorization management, Reference Data typed read when active, registered resource services, BFF/security Redis, configured Google OIDC endpoints and approved telemetry; arbitrary URL/Internet egress and wrong workload are denied.
 
 Status until verified: **public-internet/Web-BFF production blocker**.
 
@@ -225,7 +260,8 @@ Required evidence:
 - expired exceptions stop promotion immediately and escalate production exposure;
 - transitive findings route to deployed-artifact owner; shared base/runtime findings route to Platform + consumers;
 - stale required feed/scanner state fails promotion closed;
-- final-image native components such as the Xerial-bundled SQLite engine are included in SBOM/advisory correlation and not treated as invisible Java-only dependency content.
+- final-image native components such as the Xerial-bundled SQLite engine are included in SBOM/advisory correlation and not treated as invisible Java-only dependency content;
+- ADR-0041 signed Reference Data image provenance binds the immutable bundle/source-revision manifest/content digest when that service is built.
 
 Status until verified: **production deployment-security blocker**.
 
@@ -266,7 +302,7 @@ Status until verified: **secret-platform blocker**.
 
 Required evidence:
 
-- only public application path is upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> edge-waf -> Web BFF;
+- only public application path is upstream L3/L4 mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> edge-waf -> Web BFF, including anonymous Reference Data routes;
 - direct bypass negative tests;
 - replicated WAF/placement according to current HA target;
 - >=7 representative DetectionOnly days + reviewed narrow exceptions;
@@ -295,7 +331,7 @@ Required evidence:
 
 Status until verified: **SMS-dependent feature blocker; unrelated Email-only capabilities may proceed independently**.
 
-## 13. Platform compatibility / CNI / immutable artifacts — ADR-0021/0040
+## 13. Platform compatibility / CNI / immutable artifacts — ADR-0021/0040/0041
 
 Required evidence:
 
@@ -304,12 +340,13 @@ Required evidence:
 - Kubernetes/Istio Ambient/Calico positive/negative flows including HBONE/health;
 - CloudNativePG/cert-manager/Kyverno/Traefik/Gateway API/WAF render/compatibility checks;
 - Xerial SQLite JDBC/embedded SQLite Java25/Linux native compatibility and current security/advisory relationship when Compromised Password is affected;
+- Reference Data immutable bundle/source-manifest compatibility/integrity and signed-image binding when that service is in release scope; exact standards-data revisions are bundle metadata, not runtime Technology Baseline pins;
 - `istioctl analyze`, Helm/Kustomize/Kubernetes policy checks;
 - staging/production desired state renders without secret values;
 - rollback artifacts/digests remain available;
 - unsupported/EOL components are replaced by supported compatible baseline before rollout.
 
-Status until verified: **platform release blocker**.
+Status until verified: **platform release blocker for applicable deployed components**.
 
 ## 14. JWT signing-key lifecycle — ADR-0023
 
@@ -330,7 +367,7 @@ Status until verified: **authentication-trust blocker**.
 
 ## 15. Java/source/build/CI — ADR-0039
 
-For each Java service:
+For each Java service included in implementation/release scope:
 
 - independent `settings.gradle.kts`/`build.gradle.kts`/Wrapper/dependency verification from clean checkout on Java 25;
 - applicable test/integration/contract/architecture tasks exist;
@@ -341,7 +378,7 @@ For each Java service:
 - promotion uses same previously built/signed digest;
 - mandatory checks are not disabled/`ignoreFailures`/blanket-excluded.
 
-Status until verified: **Java implementation/release blocker**.
+Status until verified: **Java implementation/release blocker for implemented Java services**.
 
 ## 16. Frontend/source/browser quality
 
@@ -349,11 +386,11 @@ For affected frontend releases:
 
 - Prettier/ESLint/type-aware strict TypeScript/typecheck pass;
 - no unsafe token storage or service-worker private caching;
-- generated OpenAPI client contract is current;
+- generated OpenAPI client contract is current, including Reference Data routes when active;
 - unit/component/accessibility tests pass;
 - critical Playwright flows pass without fixed-sleep/flaky-retry masking;
 - route bundle/performance budget passes;
-- browser security/headers/session behavior passes.
+- browser security/headers/session/reference-cache behavior passes as applicable.
 
 Status until verified: **frontend release blocker when applicable**.
 
@@ -397,6 +434,6 @@ Status until verified: **Identity repository implementation/evidence blocker; ex
 
 ## 18. Final release evidence
 
-The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/SQLite/WAF/provider capacity, node/replica/database/reference-artifact failure, security-negative/workload-identity, backup/PITR/restore/rebuild, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
+The exact candidate additionally passes applicable critical load/SLO, Authorization/Redis/PostgreSQL/Kafka/SQLite/Reference-Data/WAF/provider capacity, node/replica/database/reference-artifact failure, security-negative/workload-identity, backup/PITR/restore/rebuild, smoke/BDD/critical Playwright, rollback/fail-forward, and error-budget release-policy checks.
 
-Until actual service source/build/workflows/manifests and these checks exist/pass, implementation evidence remains **NOT VERIFIED**.
+Until actual in-scope service source/build/workflows/manifests and these checks exist/pass, implementation evidence remains **NOT VERIFIED**. ADR-0041 Reference Data remains intentionally `PLANNED / NOT VERIFIED` and non-blocking for unrelated releases until its explicit implementation trigger and release scope are present.
