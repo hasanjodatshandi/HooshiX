@@ -6,13 +6,33 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13
+2026-08-10; normalized to current-only documentation on 2026-08-14
 
 ## Decision
 
 Kafka is durable asynchronous transport, not the business source of truth. Production uses the approved Kafka 4.2.x KRaft line with exact patch/image identity in the Technology Baseline and deployment metadata.
 
-### Production topology
+### `production-single-server` topology
+
+The selected initial profile under ADR-0042 uses one Kafka process with combined KRaft broker/controller roles:
+
+```text
+1 broker
+1 controller combined with broker
+critical topic replication.factor=1
+critical min.insync.replicas=1
+producer acks=all
+idempotent producer enabled
+unclean leader election disabled
+```
+
+Internal Kafka topics/features that otherwise require a replication factor greater than one are explicitly configured for the one-broker topology when those features are enabled.
+
+This is a formal non-HA exception. Apache Kafka recommends separated/redundant broker/controller roles for critical deployments. In this profile, broker/node/disk loss stops asynchronous transport and can lose broker-local data. The exception is acceptable only because Kafka remains rebuildable transport and critical publication/consumer evidence exists outside broker-local storage.
+
+### `production-ha` topology
+
+When the HA profile is selected:
 
 ```text
 3 brokers
@@ -24,7 +44,11 @@ idempotent producer enabled
 unclean leader election disabled
 ```
 
-Brokers/controllers are spread across available failure domains. Native TLS, authenticated per-service principals, ACLs, quotas, bounded partitioning, and service/topic ownership remain mandatory even when clients participate in the mesh.
+Brokers/controllers are spread across available failure domains.
+
+### Security and ownership
+
+Both profiles require native TLS, authenticated per-service principals, ACLs, quotas, bounded partitioning, and service/topic ownership even when clients participate in the mesh.
 
 ### Event durability classes
 
@@ -54,8 +78,12 @@ Consumers assume at-least-once delivery. Retry/DLQ behavior is finite, explicit,
 
 ## Verification requirements
 
-Verify broker/controller loss, RF/minISR/acks/idempotence, ACL/TLS/quota controls, topic classifications, 35-day replay/dedup retention for critical flows, duplicate/restart consumer behavior, clean-cluster rebuild from GitOps, representative replay/reconstruction, and quarterly recovery exercise evidence.
+For `production-single-server`, verify combined KRaft operation, one-broker internal-topic settings, RF1/minISR1/acks-all/idempotence, ACL/TLS/quota controls, clean-broker rebuild, representative replay/reconstruction, and explicit outage/data-loss acceptance.
+
+For `production-ha`, verify broker/controller loss, RF3/minISR2/acks/idempotence, placement and quorum behavior.
+
+Both profiles verify topic classifications, 35-day replay/dedup retention for critical flows, duplicate/restart consumer behavior, clean-cluster rebuild from GitOps, representative replay/reconstruction, and quarterly recovery exercise evidence.
 
 ## Rollback considerations
 
-Rollback MUST NOT reduce critical replication/minISR/producer durability, enable unclean leader election, remove required replay/dedup evidence, turn Kafka into business source of truth, or introduce non-idempotent replay behavior.
+Rollback MUST NOT reduce the durability settings defined for the selected profile, enable unclean leader election, remove required replay/dedup evidence, turn Kafka into business source of truth, or introduce non-idempotent replay behavior. Moving to the single-server profile requires explicit non-HA acceptance and MUST NOT be described as broker-failure tolerant.
