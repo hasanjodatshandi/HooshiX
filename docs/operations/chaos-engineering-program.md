@@ -48,6 +48,7 @@ Each exercise records:
 - steady-state SLIs before/during/after;
 - expected vs actual failure mapping;
 - RTO/RPO when relevant;
+- abort criteria and whether triggered;
 - artifact/dataset version and integrity identity when an immutable reference artifact is under test;
 - evidence links/dashboards;
 - defects/actions and owners;
