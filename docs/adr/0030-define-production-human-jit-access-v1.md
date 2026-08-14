@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; normalized to current-only documentation on 2026-08-14
+2026-08-11; normalized to current-only documentation on 2026-08-14; single-server management-network binding clarified on 2026-08-15
 
 ## Decision
 
@@ -29,13 +29,33 @@ Production write/admin access requires:
 
 Read-only production access is separately scoped and may use a maximum one-hour session under an approved role policy.
 
-### `production-single-server`: hardened OpenSSH + FIDO2
+### `production-single-server`: WireGuard network admission + hardened OpenSSH/FIDO2
 
-ADR-0042 does not deploy Teleport in the selected single-server profile. Human host access uses the supported host OpenSSH package, hardened and managed as code.
+ADR-0042 does not deploy Teleport in the selected single-server profile. ADR-0043 defines the normal management network as a dedicated WireGuard overlay. Human host access then uses the supported host OpenSSH package, hardened and managed as code.
 
-Mandatory authentication/path rules:
+The controls are independent:
 
-- SSH is reachable only through the approved management network/path; no general public SSH exposure;
+```text
+WireGuard peer -> network reachability only
+OpenSSH FIDO2  -> attributable human authentication
+JIT elevation  -> bounded privileged authority
+```
+
+A valid WireGuard peer does not grant an SSH session. A valid FIDO2 SSH session does not itself grant root, Kubernetes, or database write authority.
+
+Mandatory network/path rules:
+
+- normal SSH reachability is only through the ADR-0043 WireGuard management overlay and host management address/interface;
+- public-interface/Internet TCP/22 is denied by host firewall plus provider firewall/security-group control where available;
+- each approved operator device has an independent attributable WireGuard peer key; shared peer keys are prohibited;
+- peer routes/`AllowedIPs` are minimal and do not grant broad application/workload-network access by default;
+- lost/retired WireGuard peers are revoked independently from FIDO2 credentials;
+- WireGuard private keys never enter Git;
+- management reachability does not depend on a workload-cluster pod/service that the operator may need to recover;
+- provider emergency console, if available, is break-glass only and is not the normal administration path.
+
+Mandatory OpenSSH authentication rules:
+
 - `PermitRootLogin no`, `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, and `PermitEmptyPasswords no` equivalent behavior is enforced for privileged human access;
 - shared accounts/shared SSH keys are prohibited;
 - privileged human authentication uses hardware-backed OpenSSH FIDO2 security-key algorithms and requires user presence plus user verification;
@@ -48,7 +68,7 @@ Mandatory authentication/path rules:
 
 FIDO key enrollment/revocation is attributable and managed as code or through a protected identity inventory. Lost/retired keys are removed promptly and, where OpenSSH KRLs are used, revocation state is protected and distributed before a replacement key is trusted.
 
-JIT elevation is separate from authentication. A successful FIDO2 SSH login does not itself grant root/Kubernetes/database write authority. Approved automation grants the minimum required `sudo`/Kubernetes/database privilege for the approved scope and expires it automatically at the defined deadline. Permanent manual `sudoers`, group, kubeconfig, or database-role edits are not an acceptable substitute for expiry automation.
+JIT elevation is separate from network admission and authentication. Approved automation grants the minimum required `sudo`/Kubernetes/database privilege for the approved scope and expires it automatically at the defined deadline. Permanent manual `sudoers`, group, kubeconfig, or database-role edits are not an acceptable substitute for expiry automation.
 
 ### Single-server session and audit
 
@@ -56,12 +76,13 @@ JIT elevation is separate from authentication. A successful FIDO2 SSH login does
 
 The single-server access path requires:
 
+- protected WireGuard peer inventory/change evidence without private key disclosure;
 - protected SSH authentication logs;
 - OS audit (`auditd` or reviewed equivalent) for authentication, process execution, privilege changes, and security-relevant configuration changes;
 - `sudo` I/O/session logging for privileged interactive activity where protocol/tooling supports it;
 - Kubernetes/database audit evidence for privileged operations at those boundaries;
 - off-host append-only/tamper-resistant retention of required access/audit records outside ordinary requester modification rights;
-- alerting for privileged-login, JIT-grant, break-glass, audit-pipeline failure, and unexpected root/administrator activity.
+- alerting for unexpected management-peer changes, privileged login, JIT grant, break-glass, audit-pipeline failure, and unexpected root/administrator activity.
 
 An audit export failure does not authorize disabling local protected audit or continuing privileged work indefinitely. Required audit evidence has explicit retention and incident handling.
 
@@ -79,16 +100,16 @@ When the HA profile is selected, production human infrastructure access uses Tel
 
 Both profiles maintain a separately protected hardware-backed break-glass identity only for recovery from the normal access path.
 
-Its use requires two-person custody/approval where operationally possible, short lifetime, immediate incident notification, protected audit, and post-use credential rotation/review. Break glass is not an ordinary administration path.
+Its use requires two-person custody/approval where operationally possible, short lifetime, immediate incident notification, protected audit, and post-use credential rotation/review. Break glass is not an ordinary administration path. For single-server, provider emergency console access may be part of break glass only when separately protected and incident-linked; it does not make public SSH an approved fallback.
 
 ## Verification requirements
 
 Both profiles verify no standing production admin roles, two-reviewer elevation, automatic expiry, denial of static/shared privileged credentials, protected audit evidence, and proof that application workloads continue to use Istio/ServiceAccount identity rather than human credentials.
 
-`production-single-server` additionally verifies management-path-only SSH; root/password/keyboard-interactive/shared/non-FIDO-key denial; accepted FIDO algorithm allow-list; `PubkeyAuthOptions` user-presence + user-verification positive/negative cases including attempted `no-touch-required` override; `sshd -t` and effective-config checks; forwarding/tunnel denial unless explicitly approved; key revocation/replacement; automatic JIT privilege expiry; `sudo` I/O/session audit; OS audit coverage; off-host audit integrity/access restrictions; audit-pipeline failure behavior; and break-glass exercise. Shell-history logging MUST NOT satisfy any audit test.
+`production-single-server` additionally verifies independent per-device WireGuard peer identity, shared-peer denial, peer revocation, minimal routes, management-address-only SSH, public-interface/Internet TCP/22 denial, proof that WireGuard alone grants no SSH/privilege, root/password/keyboard-interactive/shared/non-FIDO-key denial, accepted FIDO algorithm allow-list, `PubkeyAuthOptions` user-presence + user-verification positive/negative cases including attempted `no-touch-required` override, `sshd -t` and effective-config checks, forwarding/tunnel denial unless explicitly approved, key revocation/replacement, automatic JIT privilege expiry, `sudo` I/O/session audit, OS audit coverage, off-host audit integrity/access restrictions, audit-pipeline failure behavior, and break-glass exercise. Shell-history logging MUST NOT satisfy any audit test.
 
 `production-ha` additionally verifies Teleport SSO/MFA, Kubernetes/database/SSH access, session recording, management-plane outage, and break-glass behavior.
 
 ## Rollback considerations
 
-Rollback MUST preserve zero standing production privilege, phishing-resistant privileged authentication, bounded elevation, two-reviewer approval, durable protected audit evidence, and denial of static/shared privileged credentials. It MUST NOT replace real audit with shell history, enable password/root/keyboard-interactive/shared/non-FIDO-key production SSH, remove required FIDO presence/verification enforcement, replace workload identity with human credentials, or make break-glass access an ordinary administration path.
+Rollback MUST preserve zero standing production privilege, phishing-resistant privileged authentication, bounded elevation, two-reviewer approval, durable protected audit evidence, and denial of static/shared privileged credentials. In single-server it MUST also preserve management-only WireGuard reachability and public SSH denial. It MUST NOT replace real audit with shell history, enable public/password/root/keyboard-interactive/shared/non-FIDO-key production SSH, share management peer keys, remove required FIDO presence/verification enforcement, replace workload identity with human credentials, or make break-glass access an ordinary administration path.
