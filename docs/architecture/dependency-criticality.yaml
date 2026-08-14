@@ -6,299 +6,284 @@ classes:
   - EXTERNAL_SIDE_EFFECT
   - OPTIONAL_READ
   - OBSERVABILITY
+
 edges:
   - operation_id: protected-resource.check-permission
-    caller_owner: resource-owning-service
-    dependency_id: authorization.check-permission
+    caller_owner: resource-owning service
+    dependency_id: authorization.CheckPermission
     class: AUTHORITATIVE_SECURITY
-    failure_action: fail_closed_authorization_unavailable
+    failure_action: "UNAVAILABLE / AUTHORIZATION_UNAVAILABLE; fail closed"
     retry_owner: none
-    fallback: none
-    owner: platform-authorization
+    fallback: "none; no permission cache/stale allow"
+    owner: Platform Authorization
     policy_refs:
-      - ADR-0013
-      - ADR-0026
-      - ADR-0032
-      - ADR-0036
+      - docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md
+      - docs/adr/0026-harden-online-authorization-overload-and-slo-v1.md
+      - docs/adr/0032-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md
+      - docs/adr/0036-refine-authorization-breaker-recovery-and-dependency-policy-governance-v1.md
 
   - operation_id: identity.security-semantic-quota
-    caller_owner: identity-service
-    dependency_id: semantic-quota.redis
+    caller_owner: Identity
+    dependency_id: security-redis.semantic-quota
     class: AUTHORITATIVE_SECURITY
-    failure_action: fail_closed_security_dependency_unavailable
+    failure_action: "fail closed; distinguish quota denial from time/capacity/transport unavailability"
     retry_owner: none
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0024
+      - docs/adr/0024-harden-semantic-quota-time-safety-v1.md
+      - docs/architecture/services/identity-service.md
 
   - operation_id: identity.password-credential-write
-    caller_owner: identity-service
-    dependency_id: compromised-password.lookup-range
+    caller_owner: Identity
+    dependency_id: compromised-password.LookupCompromisedPasswordRange
     class: AUTHORITATIVE_SECURITY
-    failure_action: reject_unchecked_password
+    failure_action: "reject unchecked password; stale/corrupt/missing/incompatible dataset never becomes clean result"
     retry_owner: none
-    fallback: none
-    owner: identity
+    fallback: "none; no runtime HIBP/provider/Redis/PostgreSQL fallback"
+    owner: Identity
     policy_refs:
-      - ADR-0040
-      - docs/architecture/security-architecture.md#3-authentication-and-mfa--unchanged
-      - docs/architecture/services/identity-service.md#7-password-credential-and-compromised-password-baseline
-      - docs/architecture/services/compromised-password-service.md#2-internal-grpc-contract
+      - docs/adr/0040-define-self-contained-compromised-password-sqlite-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/compromised-password-service.md
 
   - operation_id: web-bff.authenticated-session-lookup
-    caller_owner: web-bff
-    dependency_id: bff-session.redis
+    caller_owner: Web BFF
+    dependency_id: security-redis.bff-session
     class: AUTHORITATIVE_SECURITY
-    failure_action: session_unavailable
+    failure_action: "session unavailable; never reconstruct authority from browser state"
     retry_owner: none
     fallback: none
-    owner: web-bff
+    owner: Web BFF
     policy_refs:
-      - ADR-0016
-      - docs/architecture/services/web-bff.md#5-completed-browser-session
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/web-bff.md
 
   - operation_id: web-bff.security-semantic-quota
-    caller_owner: web-bff
-    dependency_id: semantic-quota.redis
+    caller_owner: Web BFF
+    dependency_id: security-redis.semantic-quota
     class: AUTHORITATIVE_SECURITY
-    failure_action: fail_closed_security_dependency_unavailable
+    failure_action: "OIDC security operation unavailable; fail closed; distinguish denial from time/capacity/transport failure"
     retry_owner: none
     fallback: none
-    owner: web-bff
+    owner: Web BFF
     policy_refs:
-      - ADR-0024
-      - docs/architecture/services/web-bff.md#9-semantic-oidc-abuse-quotas
+      - docs/adr/0024-harden-semantic-quota-time-safety-v1.md
+      - docs/architecture/services/web-bff.md
 
   - operation_id: service.normal-transaction-or-query
-    caller_owner: owning-service
+    caller_owner: owning service
     dependency_id: owning-postgresql
     class: AUTHORITATIVE_STATE
-    failure_action: abort_or_unavailable
-    retry_owner: transaction-safe-owner-only
+    failure_action: "abort/unavailable; no fabricated state"
+    retry_owner: transaction-safe owner only
     fallback: none
-    owner: owning-service
+    owner: owning service
     policy_refs:
-      - ADR-0027
-      - docs/architecture/data-and-messaging.md#1-data-ownership-and-isolation
+      - docs/adr/0027-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md
+      - docs/architecture/data-and-messaging.md
 
   - operation_id: identity.notification-handoff-dispatch
-    caller_owner: identity-service
-    dependency_id: notification.submit-notification
+    caller_owner: Identity
+    dependency_id: notification.SubmitNotification
     class: DURABLE_COMMAND
-    failure_action: keep_local_outbox_pending
-    retry_owner: caller-durable-dispatcher
+    failure_action: "local outbox remains pending"
+    retry_owner: caller durable dispatcher
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0006
+      - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
 
   - operation_id: identity.authorization-owner-provisioning
-    caller_owner: identity-service
-    dependency_id: authorization.provision-tenant-owner
+    caller_owner: Identity
+    dependency_id: authorization.ProvisionTenantOwner
     class: DURABLE_COMMAND
-    failure_action: keep_tenant_provisioning_and_local_outbox_pending
-    retry_owner: caller-durable-dispatcher
+    failure_action: "keep tenant PROVISIONING/outbox pending"
+    retry_owner: caller durable dispatcher
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0012
-      - docs/architecture/services/authorization-service.md#10-identity-provisioning-and-tenant-lifecycle
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: identity.authorization-member-provisioning
-    caller_owner: identity-service
-    dependency_id: authorization.provision-tenant-member
+    caller_owner: Identity
+    dependency_id: authorization.ProvisionTenantMember
     class: DURABLE_COMMAND
-    failure_action: keep_member_provisioning_outbox_pending_and_default_deny
-    retry_owner: caller-durable-dispatcher
+    failure_action: "keep provisioning outbox pending; Authorization default deny"
+    retry_owner: caller durable dispatcher
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0012
-      - docs/architecture/services/authorization-service.md#10-identity-provisioning-and-tenant-lifecycle
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: identity.authorization-membership-removal-prepare
-    caller_owner: identity-service
-    dependency_id: authorization.prepare-membership-removal
+    caller_owner: Identity
+    dependency_id: authorization.PrepareMembershipRemoval
     class: AUTHORITATIVE_SECURITY
-    failure_action: fail_closed_membership_removal_unavailable
+    failure_action: "fail closed; Membership removal cannot commit"
     retry_owner: none
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0012
-      - docs/architecture/services/authorization-service.md#9-owner-safety-membership-and-role-mutation-protocol
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: identity.authorization-membership-removal-resolution
-    caller_owner: identity-service
-    dependency_id: authorization.finalize-or-cancel-membership-removal
+    caller_owner: Identity
+    dependency_id: authorization.FinalizeOrCancelMembershipRemoval
     class: DURABLE_COMMAND
-    failure_action: keep_owner_safety_reservation_and_resolution_outbox_pending
-    retry_owner: caller-durable-dispatcher
+    failure_action: "keep owner-safety reservation and resolution outbox pending"
+    retry_owner: caller durable dispatcher
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0012
-      - docs/architecture/services/authorization-service.md#9-owner-safety-membership-and-role-mutation-protocol
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: identity.authorization-tenant-lifecycle-sync
-    caller_owner: identity-service
-    dependency_id: authorization.apply-tenant-lifecycle
+    caller_owner: Identity
+    dependency_id: authorization.ApplyTenantLifecycle
     class: DURABLE_COMMAND
-    failure_action: keep_tenant_lifecycle_pending_without_fabricated_authorization_state
-    retry_owner: caller-durable-dispatcher
+    failure_action: "keep tenant lifecycle pending; never fabricate Authorization state"
+    retry_owner: caller durable dispatcher
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0012
-      - docs/architecture/services/authorization-service.md#10-identity-provisioning-and-tenant-lifecycle
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: identity.authorization-platform-permission-check
-    caller_owner: identity-service
-    dependency_id: authorization.check-platform-permission
+    caller_owner: Identity
+    dependency_id: authorization.CheckPlatformPermission
     class: AUTHORITATIVE_SECURITY
-    failure_action: fail_closed_platform_authorization_unavailable
+    failure_action: "platform-only operation unavailable; fail closed"
     retry_owner: none
     fallback: none
-    owner: identity
+    owner: Identity
     policy_refs:
-      - ADR-0013
-      - docs/architecture/services/authorization-service.md#11-platform-capability-authority
+      - docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: notification.result-callback-dispatch
-    caller_owner: notification-service
-    dependency_id: identity.report-notification-result
+    caller_owner: Notification
+    dependency_id: identity.ReportNotificationResult
     class: DURABLE_COMMAND
-    failure_action: keep_result_outbox_pending
-    retry_owner: notification-durable-callback-dispatcher
+    failure_action: "result outbox remains pending"
+    retry_owner: Notification durable callback dispatcher
     fallback: none
-    owner: notification
+    owner: Notification
     policy_refs:
-      - ADR-0006
-      - docs/architecture/services/notification-service.md#14-result-callback
+      - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
+      - docs/architecture/services/notification-service.md
 
   - operation_id: notification.provider-dispatch
-    caller_owner: notification-service
-    dependency_id: external-email-or-sms-provider
+    caller_owner: Notification
+    dependency_id: email-or-sms-provider
     class: EXTERNAL_SIDE_EFFECT
-    failure_action: preserve_ambiguity_and_reconcile
-    retry_owner: notification-worker-lifecycle
-    fallback: never_fabricate_acceptance_or_delivery
-    owner: notification
+    failure_action: "preserve ambiguity and reconcile"
+    retry_owner: Notification worker/lifecycle
+    fallback: "never fabricate ACCEPTED/DELIVERED"
+    owner: Notification
     policy_refs:
-      - ADR-0006
-      - ADR-0007
-      - ADR-0020
+      - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
+      - docs/adr/0007-define-notification-v1-runtime.md
+      - docs/adr/0020-select-ippanel-webservice-sms-for-iran.md
 
   - operation_id: web-bff.google-oidc-login
-    caller_owner: web-bff
-    dependency_id: google-oidc-endpoints
+    caller_owner: Web BFF
+    dependency_id: google-oidc
     class: AUTHORITATIVE_SECURITY
-    failure_action: login_unavailable
-    retry_owner: protocol-defined-safe-flow-only
-    fallback: no_alternate_identity_auto_link
-    owner: web-bff
+    failure_action: "login unavailable"
+    retry_owner: protocol-defined safe flow only
+    fallback: "no alternate identity auto-link"
+    owner: Web BFF
     policy_refs:
-      - ADR-0016
-      - docs/architecture/services/web-bff.md#3-oidc-and-pre-auth-browser-transaction
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
 
   - operation_id: web-bff.identity-oidc-evidence-submit
-    caller_owner: web-bff
-    dependency_id: identity.external-identity-establish
+    caller_owner: Web BFF
+    dependency_id: identity.ExternalIdentitySessionEstablishment
     class: AUTHORITATIVE_SECURITY
-    failure_action: login_unavailable
+    failure_action: "login unavailable"
     retry_owner: none
     fallback: none
-    owner: web-bff
+    owner: Web BFF
     policy_refs:
-      - ADR-0012
-      - ADR-0016
-      - docs/architecture/services/web-bff.md#3-oidc-and-pre-auth-browser-transaction
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
 
   - operation_id: web-bff.identity-audience-token-broker
-    caller_owner: web-bff
-    dependency_id: identity.issue-audience-access-token
+    caller_owner: Web BFF
+    dependency_id: identity.IssueAudienceAccessToken
     class: AUTHORITATIVE_SECURITY
-    failure_action: fail_closed_token_broker_unavailable
+    failure_action: "token brokerage unavailable; fail closed"
     retry_owner: none
     fallback: none
-    owner: web-bff
+    owner: Web BFF
     policy_refs:
-      - ADR-0016
-      - docs/architecture/services/web-bff.md#4-identity-audience-specific-token-brokerage
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/web-bff.md
 
   - operation_id: web-bff.authorization-tenant-management
-    caller_owner: web-bff
-    dependency_id: authorization.tenant-management
+    caller_owner: Web BFF
+    dependency_id: authorization.TenantManagement
     class: AUTHORITATIVE_SECURITY
-    failure_action: management_unavailable_fail_closed
+    failure_action: "management unavailable; fail closed; no fabricated local authority"
     retry_owner: none
     fallback: none
-    owner: web-bff
+    owner: Web BFF
     policy_refs:
-      - ADR-0013
-      - ADR-0016
-      - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
-      - docs/architecture/services/authorization-service.md#7-tenant-management-authentication-and-authorization
-
-  - operation_id: web-bff.reference-data-read
-    caller_owner: web-bff
-    dependency_id: reference-data.read
-    class: AUTHORITATIVE_STATE
-    failure_action: reference_data_unavailable_no_fabrication
-    retry_owner: none
-    fallback: none
-    owner: web-bff
-    policy_refs:
-      - ADR-0041
-      - docs/architecture/services/reference-data-service.md#9-bff-dependency-contract
-      - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
+      - docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/authorization-service.md
+      - docs/architecture/services/web-bff.md
 
   - operation_id: web-bff.resource-api-dispatch
-    caller_owner: web-bff
+    caller_owner: Web BFF
     dependency_id: registered-resource-service
     class: AUTHORITATIVE_STATE
-    failure_action: abort_request_or_resource_unavailable
+    failure_action: "abort request/resource unavailable; no fabricated business data"
     retry_owner: none
     fallback: none
-    owner: web-bff
+    owner: Web BFF
     policy_refs:
-      - ADR-0016
-      - docs/architecture/services/web-bff.md#10-internal-calls-and-tenant-authorization-administration
-      - docs/architecture/services/web-bff.md#11-final-authorization-boundary
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/web-bff.md
 
   - operation_id: business.optional-enrichment
-    caller_owner: owning-bounded-context
-    dependency_id: approved-enrichment-service
+    caller_owner: owning bounded context
+    dependency_id: explicitly-approved-enrichment-service
     class: OPTIONAL_READ
-    failure_action: use_explicit_bounded_degraded_result
+    failure_action: "use only explicit bounded degraded result"
     retry_owner: none
-    fallback: bounded_context_defined_only
-    owner: owning-bounded-context
+    fallback: "bounded-context-defined only"
+    owner: owning bounded context
     policy_refs:
-      - ADR-0033
-      - ADR-0036
+      - docs/adr/0033-define-operation-level-dependency-criticality-and-degradation-v1.md
+      - docs/adr/0036-refine-authorization-breaker-recovery-and-dependency-policy-governance-v1.md
 
   - operation_id: platform.non-audit-telemetry-export
-    caller_owner: any-service
-    dependency_id: observability-backend
+    caller_owner: any service
+    dependency_id: observability.otel-collector-or-metrics-scrape
     class: OBSERVABILITY
-    failure_action: bounded_buffer_or_drop
+    failure_action: "bounded buffer/drop; ordinary business request continues"
     retry_owner: exporter
-    fallback: bounded_loss_allowed
-    owner: platform-observability
+    fallback: "bounded ordinary telemetry loss allowed"
+    owner: Platform Observability
     policy_refs:
-      - ADR-0033
-      - docs/architecture/reliability-and-observability.md#12-observability-model
+      - docs/adr/0044-define-day-one-observability-runtime-v1.md
+      - docs/architecture/reliability-and-observability.md
 
   - operation_id: service.required-security-audit-evidence
-    caller_owner: owning-service
+    caller_owner: owning service
     dependency_id: audit-persistence-or-outbox
     class: AUTHORITATIVE_STATE
-    failure_action: do_not_silently_drop
-    retry_owner: owning-service
-    fallback: none_unless_explicit_current_decision
-    owner: owning-service
+    failure_action: "durable contract; do not silently drop or reclassify as ordinary telemetry"
+    retry_owner: owning service
+    fallback: "none unless explicit current decision"
+    owner: owning service
     policy_refs:
-      - ADR-0033
-      - docs/architecture/security-architecture.md#12-logging-pii-and-audit
+      - docs/adr/0033-define-operation-level-dependency-criticality-and-degradation-v1.md
+      - docs/architecture/security-architecture.md
