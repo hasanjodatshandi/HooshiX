@@ -21,13 +21,15 @@ This matrix records the production technology combinations that must remain comp
 | Kafka | 4.2.1 | approved 4.2.x line; Spring Kafka/client compatibility pinned/tested; single-server combined KRaft RF1/minISR1; HA profile RF3/minISR2 with dedicated controllers |
 | Redis | 8.2.8 | single-server: one TLS/ACL/noeviction instance with AOF `appendfsync everysec`; HA: Sentinel/replica topology; semantic quota fail-closed contract unchanged |
 | Gateway API | 1.5.1 | exact Standard version documented as supported by Traefik 3.7; repository Traefik/Istio route resources rendered and compatibility-tested; K3s bundled Traefik not used |
-| Traefik | 3.7.10 / chart 41.2.0 | chart supports/defaults to Proxy 3.7.10; Gateway API 1.5.1 routes validated; chart-41 logging/file-provider key migration and CRD/render changes must pass migration/render/policy tests before rollout |
+| Traefik | 3.7.10 / chart 41.2.0 | chart supports/defaults to Proxy 3.7.10; Gateway API 1.5.1 routes validated; ADR-0043 trusted PROXY-v2 source CIDRs and insecure-mode denial rendered/tested; chart-41 logging/file-provider key migration and CRD/render changes must pass migration/render/policy tests before rollout |
+| Caddy client-address handling | Caddy 2.11.4 | ADR-0043 trusted-proxy/strict parsing and internal client-IP overwrite tested with the selected Traefik/L4 path; caller forwarding headers never become authority |
 | Helm | 4.2.4 | current reviewed 4.2.x patch; chart rendering/schema/policy checks required |
 | Kyverno | 1.18.2 | stable policy/image-validation APIs; 1 replica allowed only in single-server non-HA profile while enforcement stays fail closed; >=3 replicas in HA profile; policy-authoring RBAC/SSRF controls remain valid on Kubernetes 1.35 |
-| `production-single-server` human access | host-supported OpenSSH + hardware FIDO2 + JIT privilege + protected audit | exact host OpenSSH package pinned in provisioning; user-presence/user-verification required; no password/root/shared-key SSH; `sudo` I/O + OS/boundary audit exported off-host |
+| `production-single-server` management overlay | host-supported WireGuard kernel/userspace implementation | compatible with selected production host OS/kernel/network firewall; exact package/kernel support pinned in provisioning; independent per-device peers; minimal routes; management-address-only SSH; public TCP/22 denied; overlay failure never enables public SSH |
+| `production-single-server` human access | host-supported OpenSSH + hardware FIDO2 + JIT privilege + protected audit | exact host OpenSSH package pinned in provisioning; WireGuard network admission remains separate; user-presence/user-verification required; no password/root/shared-key SSH; `sudo` I/O + OS/boundary audit exported off-host |
 | `production-ha` human access | Teleport 18.10.0 | JIT/SSO/WebAuthn/session-audit behavior exercised before rollout |
 | Cosign | 3.0.6 | signatures/attestations verify through current admission policy |
-| OpenBao | 2.6.1 | exact current secret-authority pin; External Secrets/Kubernetes Auth/local-key workflows validated; unchanged by ADR-0042 |
+| OpenBao | 2.6.1 | exact current secret-authority pin; External Secrets/Kubernetes Auth/local-key workflows validated; unchanged by ADR-0042/ADR-0043 |
 | Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0; WAF image/rules tested together |
 | Argo CD | 3.4.2 | current security-patched 3.4.x line; upgrades require rendered/reconciliation/rollback validation |
 | Prometheus / Alertmanager / Grafana | 3.13.2 / 0.33.1 / 13.1.3 | current reviewed patch lines; immutable GitOps artifacts; complete-stack sizing is benchmark-gated in single-server profile |
@@ -40,6 +42,8 @@ An upgrade or initial profile approval is complete only after the affected compa
 - rendered manifest/schema/policy compatibility;
 - service contract/build compatibility;
 - workload identity/mTLS positive and negative paths;
+- public client-address trust/anti-spoofing behavior when L4/Traefik/Caddy/BFF is affected;
+- management-only WireGuard/OpenSSH reachability and public-SSH denial when host/network components are affected;
 - staging smoke and critical security behavior;
 - admission-policy authoring least privilege and policy-engine egress/SSRF behavior where Kyverno is affected;
 - load/latency comparison for request-path components;
@@ -48,6 +52,6 @@ An upgrade or initial profile approval is complete only after the affected compa
 - backup/PITR/restore evidence when relevant;
 - vulnerability/advisory correlation for final artifacts, including bundled native components;
 - safe rollback or explicit fail-forward strategy;
-- for `production-single-server`, complete-stack CPU/memory/IO/latency evidence with >=30% validated headroom, no OOM/memory-pressure eviction, and benchmark-gated Ambient behavior.
+- for `production-single-server`, complete-stack CPU/memory/IO/network/latency evidence with >=30% validated headroom, no OOM/memory-pressure eviction, and benchmark-gated Ambient behavior.
 
-Do not independently upgrade tightly coupled components without evaluating the affected set. A newer release is not automatically preferred when it changes semantics or lacks staging evidence. Unsupported/EOL releases are not production-eligible solely because a previous baseline selected them. A failed single-server capacity/security benchmark requires more host capacity or migration to `production-ha`; it MUST NOT be resolved by disabling OpenBao, Kyverno enforcement, required backup/PITR, workload identity, or MFA controls.
+Do not independently upgrade tightly coupled components without evaluating the affected set. A newer release is not automatically preferred when it changes semantics or lacks staging evidence. Unsupported/EOL releases are not production-eligible solely because a previous baseline selected them. A failed single-server capacity/security benchmark requires more host capacity or migration to `production-ha`; it MUST NOT be resolved by disabling OpenBao, Kyverno enforcement, required backup/PITR, workload identity, MFA, trusted client-address enforcement, or management-network isolation.
