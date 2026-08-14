@@ -2,77 +2,221 @@
 
 ## Purpose
 
-This runbook defines the minimum production incident workflow. Service-specific
-runbooks may add detail but must not weaken these rules.
+This runbook defines the minimum production incident workflow. Service-specific runbooks may add detail but must not weaken these rules. ADR-0042 selects `production-single-server`; incident handling must distinguish expected non-HA outage from unsafe security/correctness behavior.
 
-## Severity
+## 1. Incident priorities
 
-- `SEV-1` — security compromise, widespread outage, known-exploited/Critical vulnerability with credible production exposure, confirmed cross-tenant data exposure, or material data-integrity risk.
-- `SEV-2` — major degraded production capability, sustained SLO burn, failed HA/failover, High vulnerability requiring urgent remediation, or isolated security-control failure without confirmed compromise.
-- `SEV-3` — bounded degradation with workaround and no immediate security/data integrity risk.
+Protect in this order:
 
-## Roles
+1. human safety/legal/security obligations;
+2. identity/authorization/tenant/privacy correctness;
+3. data durability/recoverability;
+4. containment of compromise or unsafe change;
+5. service availability/performance;
+6. restoration of ordinary delivery/developer velocity.
 
-Every SEV-1/SEV-2 assigns:
+Never restore availability by enabling a security/correctness bypass that the current architecture prohibits.
 
-- Incident Commander;
-- Technical Lead;
-- Communications owner;
-- Security Lead when security/privacy/supply-chain scope exists;
-- Scribe/evidence owner.
+## 2. Severity examples
 
-The same person may hold multiple roles only when team size requires it.
+**SEV-1** examples:
 
-## First actions
+- confirmed or credible credential/private-key/secret compromise;
+- cross-tenant authorization/data exposure;
+- unauthorized production administrator activity;
+- irreversible or widespread mutable business-data corruption/loss;
+- loss of recoverability/off-site backup evidence for critical mutable state;
+- single-server host/storage failure causing complete platform outage when recovery is not immediately within tested bounds;
+- failure that requires disabling OpenBao/Kyverno/Ambient/WAF/MFA/fail-closed controls to continue service — such bypass is not approved.
 
-1. Declare severity and start the incident record.
-2. Preserve logs/audit/evidence; do not expose secrets/PII in the incident channel.
-3. Stop risky releases and automation that can amplify impact.
-4. Identify affected services, tenants/environments, image digests, data stores, and dependency edges.
-5. Apply the safest bounded containment that preserves data integrity.
-6. Verify containment through production telemetry and contract-level checks.
-7. Communicate impact and next decision point.
+**SEV-2** examples include major service/dependency outage, significant SLO burn, PostgreSQL/Redis/Kafka partial failure, WAF/edge impact, or recovery degradation without confirmed security/data compromise.
 
-## Security / vulnerability branch
+Severity can increase as evidence changes.
 
-For ADR-0035/ADR-0038 findings:
+## 3. Immediate workflow
 
-- correlate the advisory/finding to deployed image digests and environments;
-- determine exploitability and CISA KEV/known-exploited status;
-- stop promotion of affected artifacts;
-- do not automatically kill healthy production pods merely because a finding exists;
-- build, scan, sign, attest, and promote a replacement artifact when patching;
-- use compensating controls only with explicit owner/expiry/approval.
+1. declare incident and assign incident commander;
+2. record start time, affected profile/services/users/regions/surfaces;
+3. preserve relevant logs/audit/evidence;
+4. stop unsafe deployments/migrations/automations;
+5. contain security/data-loss blast radius;
+6. identify whether the symptom is expected profile availability loss or a correctness/security failure;
+7. restore through the documented safe path;
+8. verify service/security/data state before reopening traffic;
+9. document timeline, decisions, evidence and follow-up owners.
 
-Expired Critical/KEV exceptions in production are SEV-1 unless Security records why exposure is not credible. Expired High exceptions are at least SEV-2 until triaged.
+Do not delete/rotate evidence until retention/forensics requirements are understood.
 
-## Database / recovery branch
+## 4. Single-server whole-host incident
 
-For PostgreSQL incidents:
+A host/node/kernel/storage failure in `production-single-server` can stop the complete platform. This is an accepted availability risk, not evidence that failover should have occurred.
 
-- preserve the dedicated service-cluster boundary;
-- stop unsafe upgrade waves;
-- distinguish reversible GitOps/operator state from irreversible database state;
-- do not perform an unsupported binary/data downgrade;
-- use the ADR-0037 restore evidence/runbook when restoration is required;
-- replay erasure/legal-hold requirements before re-enabling traffic where applicable.
+Recovery uses a tested dependency-safe sequence. Exact commands depend on host/provisioning, but the operator proves:
 
-## Temporary architecture/security deviations
+1. host hardware/storage/network/time baseline is healthy or a replacement host is available;
+2. exact pinned K3s/platform artifacts are restored/installed with verified integrity;
+3. K3s control plane, Calico and secrets encryption state are healthy;
+4. K3s datastore/token recovery is used only when safer than clean GitOps rebuild;
+5. OpenBao and External Secrets recover under their unchanged current runbook/ADR contract;
+6. PostgreSQL recovers through current physical backup/WAL/PITR rules if local state is unsafe/lost;
+7. Redis/Kafka recover with their single-server semantics;
+8. Istio/Kyverno/edge security controls are healthy before unsafe traffic/deployment paths open;
+9. applications become ready only when their local/security dependencies permit safe service;
+10. audit/observability confirms no fail-open bypass occurred.
 
-An incident workaround that deviates from current architecture/security is never an undocumented new normal. It requires an incident/change record with exact scope, owner, risk, approval, expiry/rollback condition, and compensating controls. It is removed as soon as the incident permits.
+If clean GitOps rebuild is safer/faster than restoring Kubernetes operational state, prefer the clean rebuild while restoring business persistence/secrets through their owning recovery procedures.
 
-If the deviation must remain after incident recovery, the normal PR-first architecture process applies: update current-state documentation and executable evidence, and create/update a retained ADR only when the durable decision warrants one under the current-only policy. A temporary workaround is not kept as historical ADR material merely because it existed during an incident.
+## 5. PostgreSQL incident handling
 
-## Resolution
+### Single-server
 
-Before resolving SEV-1/SEV-2:
+One PostgreSQL process/host/storage failure may affect all PostgreSQL-backed services.
 
-- user/security impact is bounded and verified;
-- temporary mitigations have explicit owner and expiry;
-- temporary architecture/security deviations are either removed or entered into the normal current-state review process;
-- affected SLO/error-budget state is recorded;
-- follow-up actions have owners and due dates.
+If physical recovery is required:
 
-## Post-incident review
+1. stop writes/traffic as required to preserve a consistent recovery boundary;
+2. select the approved Barman base backup/WAL target;
+3. restore the **complete shared physical cluster into an isolated recovery environment**;
+4. verify PostgreSQL integrity, every affected service Flyway version, roles, RLS and applicable erasure/legal-hold state;
+5. for service-specific recovery, extract only the required service database through the approved logical recovery procedure;
+6. import/restore it during controlled maintenance with compatibility checks;
+7. prove unrelated current service databases were not destructively restored;
+8. reopen traffic only after application/security validation.
 
-SEV-1 and material SEV-2 incidents require a blameless post-incident review with root cause, detection gap, containment effectiveness, recovery evidence, architecture/test/runbook improvements, and action-item closure tracking.
+`pg_dump + cron` is not the primary production recovery path.
+
+A failed shared-cluster restore triggers the ADR-0037 promotion freeze and reliability escalation.
+
+### HA
+
+Use current per-service CloudNativePG failover/restore runbooks and independent backup identities.
+
+## 6. Redis incident handling
+
+Single-server Redis has no failover. During Redis outage/corruption:
+
+- do not bypass semantic quota/session fail-closed behavior;
+- do not reconstruct authenticated authority from browser cookies;
+- use AOF/restart recovery when safe;
+- invalidate/re-authenticate sessions when authoritative state is lost/uncertain;
+- verify TLS/ACL/`noeviction`/time-source configuration after recovery;
+- investigate host/disk/AOF pressure as shared-host root cause.
+
+HA uses current Sentinel failover behavior.
+
+## 7. Kafka incident handling
+
+Single-server Kafka RF=1 has no broker/controller redundancy.
+
+During broker/node/disk loss:
+
+- treat Kafka as unavailable transport, not lost business truth;
+- keep application state/outbox records authoritative;
+- do not disable idempotency or skip Inbox/dedup checks to catch up faster;
+- rebuild broker/topic/ACL configuration from reviewed GitOps when required;
+- replay/reconstruct critical events from retained service-owned evidence;
+- verify consumer state/lag before reopening dependent async workflows;
+- record any broker-local data-loss window.
+
+HA uses current broker/controller quorum procedures.
+
+## 8. Istio/Kyverno incident handling
+
+If Ambient resource pressure or failure occurs:
+
+- preserve strict mTLS/workload identity semantics;
+- do not bypass service authorization by sending direct plaintext traffic;
+- reduce safe workload pressure/add host capacity/recover components;
+- if the single host cannot run required security controls safely, keep production blocked and escalate capacity/profile decision.
+
+If Kyverno is unavailable:
+
+- existing workloads may continue according to Kubernetes behavior;
+- protected new/updated workloads MUST NOT be admitted through an allow/bypass configuration;
+- restore admission health or use the separately reviewed signed emergency path if one exists;
+- do not switch production to audit-only merely to deploy.
+
+## 9. OpenBao incident handling — unchanged
+
+ADR-0042 does not change OpenBao.
+
+Use the existing OpenBao 2.6.1 Shamir/Raft/PVC/encrypted-snapshot/restore/unseal and External Secrets recovery procedures. Normal workloads continue only within their existing validated local-key/stale-source bounds.
+
+Never respond to an OpenBao outage by:
+
+- removing/replacing OpenBao without a separate current security decision;
+- placing secrets in Git/values/images/logs;
+- disabling key validation;
+- creating an unbounded plaintext fallback.
+
+## 10. Human privileged access during incidents
+
+### Single-server
+
+Use hardened OpenSSH/FIDO2 only through the approved management path.
+
+- no password/root/shared-key fallback;
+- emergency elevation remains attributable, incident-linked and time-bounded;
+- normal write elevation retains the required reviewers unless the separately protected break-glass condition applies;
+- break-glass use is explicitly declared, audited and reviewed/rotated after use;
+- `sudo`, OS, Kubernetes and database privileged activity remains audited;
+- required audit is exported off-host;
+- `.bashrc`/shell history is not accepted as incident-session evidence.
+
+If audit export is impaired, declare that as part of the incident and follow the approved continuity rule; do not silently abandon audit requirements.
+
+### HA
+
+Use current Teleport JIT/break-glass procedures.
+
+## 11. Security/privacy incident rules
+
+For suspected credential/token/private-key/PII/tenant-isolation compromise:
+
+- contain before broad recovery;
+- preserve relevant audit/forensics evidence;
+- rotate/revoke affected credentials/keys/sessions through owning authority;
+- do not log/attach raw secrets or unnecessary PII to incident systems;
+- verify cross-tenant/authorization/RLS boundaries after containment;
+- coordinate legal/privacy obligations through responsible owner;
+- use erasure/legal-hold rules when restoring historical data.
+
+## 12. Deployment/migration incident rules
+
+- stop further rollout;
+- preserve exact image/config/schema versions;
+- determine whether Git/config rollback is state-compatible;
+- never edit executed Flyway migrations;
+- never perform unsupported PostgreSQL downgrade for speed;
+- use expand/compatible rollback/fail-forward rules;
+- in single-server, a PostgreSQL/CloudNativePG upgrade is platform-wide maintenance and must validate every service database.
+
+## 13. Recovery verification before traffic
+
+Verify as applicable:
+
+- expected artifact/config/profile version;
+- health/readiness without dependency masking;
+- authentication/MFA/Authorization fail-closed behavior;
+- workload identity/mTLS/NetworkPolicy;
+- PostgreSQL integrity/Flyway/RLS/role isolation;
+- Redis/Kafka recovery semantics;
+- Kyverno admission and edge/WAF path;
+- OpenBao/secret delivery;
+- logging/audit/telemetry;
+- critical smoke/browser flows;
+- no unresolved data/replay/backlog corruption.
+
+## 14. Post-incident requirements
+
+Record:
+
+- root cause and contributing factors;
+- whether the event was expected non-HA availability loss or violated a correctness/security contract;
+- detected/actual RPO/RTO and downtime;
+- evidence of safe recovery;
+- missed alert/runbook/test/capacity assumption;
+- remediation owner/deadline;
+- whether the single-server profile remains acceptable.
+
+Repeated node incidents, unacceptable downtime, persistent shared IO/capacity pressure, or unacceptable recovery RTO trigger review/migration to `production-ha`.

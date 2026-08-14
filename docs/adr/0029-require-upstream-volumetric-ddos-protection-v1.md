@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; normalized to current-only documentation on 2026-08-13
+2026-08-11; normalized to current-only documentation and made profile-aware on 2026-08-14
 
 ## Decision
 
@@ -18,7 +18,7 @@ The exact provider is deployment-specific, but production readiness requires doc
 
 The origin additionally uses:
 
-- redundant L4 load-balancing capacity;
+- upstream/external L4 capacity with redundancy appropriate to the provider/deployment, even though the selected single-server origin itself remains non-HA;
 - bounded connection/handshake limits;
 - reviewed SYN-flood and conntrack controls;
 - emergency/coarse pre-WAF limits for volumetric pressure;
@@ -27,14 +27,24 @@ The origin additionally uses:
 
 NetworkPolicy and Istio protect cluster/east-west paths but are not described as Internet volumetric mitigation. Coraza/CRS remains bounded L7 application-layer inspection and does not replace upstream bandwidth/scrubbing capacity.
 
+### Profile interpretation
+
+`production-single-server` explicitly accepts that loss or maintenance of the only origin host can remove application availability. Redundant upstream mitigation/L4 capacity protects against volumetric/network-provider failures within its scope; it does not turn one origin into HA. During origin overload/outage, traffic MUST NOT be rerouted around Traefik/WAF/BFF security controls merely to recover availability.
+
+`production-ha` retains edge/workload redundancy and one-node/replica-loss availability tests under the current HA topology.
+
 ### Operations
 
-Telemetry separates packets/bytes/connections, load-balancer saturation, Traefik/WAF load, and application request rate. Emergency controls are documented, reversible, and MUST NOT disable authentication, WAF, authorization, tenant isolation, or semantic quotas to recover capacity.
+Telemetry separates packets/bytes/connections, load-balancer saturation, Traefik/WAF load, and application request rate. Emergency controls are documented, reversible, and MUST NOT disable authentication, WAF, authorization, tenant isolation, semantic quotas, workload identity, or signed-artifact controls to recover capacity.
 
 ## Verification requirements
 
-Verify provider capability/SLA and escalation contacts, origin-bypass negatives where restriction is available, authorized connection/HTTP flood tests, one edge replica/node loss under elevated load, link/LB/conntrack/WAF saturation alerting, and an incident exercise covering provider escalation, temporary coarse limits, containment, and rollback.
+Both profiles verify provider capability/SLA and escalation contacts, origin-bypass negatives where restriction is available, authorized connection/HTTP flood tests, link/LB/conntrack/WAF saturation alerting, and an incident exercise covering provider escalation, temporary coarse limits, containment, and rollback.
+
+`production-single-server` additionally verifies the complete approved edge path under representative load, records expected application outage when the only origin host is unavailable, and proves neither automation nor operator recovery creates a direct edge/WAF bypass.
+
+`production-ha` additionally verifies one edge workload/node loss under elevated load according to its HA target.
 
 ## Rollback considerations
 
-Rollback MUST NOT expose an origin bypass, remove required upstream mitigation, or substitute in-cluster WAF/mesh controls for volumetric protection.
+Rollback MUST NOT expose an origin bypass, remove required upstream mitigation, substitute in-cluster WAF/mesh controls for volumetric protection, or describe redundant upstream L4 as origin HA when the selected profile has one server.

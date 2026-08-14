@@ -8,6 +8,7 @@
 - **Web BFF v1 implementation contract finalized:** 2026-08-14
 - **Compromised Password v1 implementation contract finalized:** 2026-08-14
 - **Reference Data v1 architecture contract finalized:** 2026-08-14
+- **Production single-server profile finalized:** 2026-08-14
 
 This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
 
@@ -51,7 +52,7 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | ADR | Current scope |
 | --- | --- |
 | [ADR-0013](0013-use-online-authorization-without-cache-or-kafka-v1.md) | Complete Authorization v1 policy contract: exact permission catalog/lifecycle, tenant SYSTEM/custom Roles and direct overrides, one authoritative no-cache/no-Kafka/no-retry `CheckPermission`, BFF-backed tenant management with privilege-escalation prevention and bounded limits, platform capability profile/`CheckPlatformPermission`, atomic owner safety, idempotency/audit, jOOQ/RLS persistence, and erasure behavior |
-| [ADR-0024](0024-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: topology, atomicity, pseudonymization, anti-lockout, exact Identity registration policy values, Web BFF OIDC start/callback values, Authorization semantic-mutation cost, dual-clock/TTL safety |
+| [ADR-0024](0024-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: profile-aware Redis topology, atomicity, pseudonymization, anti-lockout, exact Identity registration policy values, Web BFF OIDC start/callback values, Authorization semantic-mutation cost, dual-clock/TTL safety |
 | [ADR-0025](0025-define-synchronous-dependency-failure-containment-v1.md) | Synchronous dependency timeout/bulkhead/breaker/fallback rules |
 | [ADR-0026](0026-harden-online-authorization-overload-and-slo-v1.md) | Authorization runtime SLO, capacity, deployment, safe prechecks, overload isolation, and fail-closed breaker baseline |
 | [ADR-0032](0032-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md) | Authorization SLI interpretation, paired burn alerts, breaker-opening criteria, and health-endpoint non-authority |
@@ -65,9 +66,9 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0001](0001-select-dedicated-caddy-coraza-edge-waf.md) | Dedicated Caddy/Coraza WAF topology |
 | [ADR-0002](0002-define-production-istio-trust-and-enrollment.md) | Istio trust domain/CA hierarchy/enrollment |
 | [ADR-0016](0016-define-web-bff-browser-oidc-and-session-security-v1.md) | Complete Web BFF v1 contract: `/api/v1` namespace/request/error bounds, exact OIDC/pre-auth entropy and redirect rules, trusted Identity evidence, server-owned audience token brokerage, HMAC-located Redis sessions, refresh AES-GCM/key lifecycle, atomic session rotation/index/revocation, tenantless onboarding, exact CSRF/Fetch-Metadata/same-origin CORS/CSP/cache policy, OIDC abuse quotas, erasure, runtime/egress and final resource-authorization boundary |
-| [ADR-0017](0017-enforce-signed-artifacts-and-provenance-at-admission-v1.md) | Signed image/provenance/SBOM admission plus admission-policy authoring and policy-engine network/SSRF safety |
+| [ADR-0017](0017-enforce-signed-artifacts-and-provenance-at-admission-v1.md) | Signed image/provenance/SBOM admission plus profile-aware Kyverno availability, admission-policy authoring, and policy-engine network/SSRF safety |
 | [ADR-0029](0029-require-upstream-volumetric-ddos-protection-v1.md) | Upstream L3/L4 volumetric-DDoS protection |
-| [ADR-0030](0030-define-production-human-jit-access-v1.md) | Teleport JIT privileged production access |
+| [ADR-0030](0030-define-production-human-jit-access-v1.md) | Zero-standing-privilege JIT access: Teleport for `production-ha`; hardened OpenSSH + hardware FIDO2 + durable system/privilege audit for `production-single-server` |
 | [ADR-0031](0031-enforce-pii-safe-logging-detection-pipeline-v1.md) | PII-safe logging/redaction/canary/runtime detection |
 | [ADR-0035](0035-automate-sbom-vulnerability-response-and-deployment-gates-v1.md) | Continuous SBOM/vulnerability response and deployment gates |
 | [ADR-0038](0038-harden-vulnerability-exceptions-threat-intelligence-and-ownership-v1.md) | Vulnerability exception expiry, threat intelligence, remediation ownership |
@@ -79,11 +80,11 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0003](0003-use-git-and-buf-without-runtime-schema-registry-in-v1.md) | Git + Buf contract compatibility; no runtime Schema Registry in v1 |
 | [ADR-0004](0004-define-initial-cold-disaster-recovery.md) | Cold-DR objectives/recovery model |
 | [ADR-0005](0005-define-production-slo-classes-and-error-budgets.md) | Production SLO classes, error budgets, release-freeze policy |
-| [ADR-0015](0015-define-kafka-production-durability-and-rebuildable-dr-v1.md) | Kafka KRaft durability and rebuildable DR |
-| [ADR-0019](0019-adopt-cloudnativepg-ha-and-barman-backups-v1.md) | CloudNativePG synchronous HA and Barman backup/PITR mechanics |
-| [ADR-0027](0027-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Complete current service database/cluster/role/Flyway/cross-service-SQL isolation + forced tenant RLS + pool-safe transaction-local tenant context + backup isolation |
-| [ADR-0034](0034-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable dedicated CloudNativePG fleet operations |
-| [ADR-0037](0037-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Restore evidence and DB upgrade/rollback safety |
+| [ADR-0015](0015-define-kafka-production-durability-and-rebuildable-dr-v1.md) | Kafka KRaft durability/rebuildable DR with HA and formally accepted single-broker profile topology |
+| [ADR-0019](0019-adopt-cloudnativepg-ha-and-barman-backups-v1.md) | Profile-aware CloudNativePG topology plus Barman backup/PITR mechanics |
+| [ADR-0027](0027-require-production-postgresql-physical-isolation-and-tenant-rls-v1.md) | Service database/role/Flyway/cross-service-SQL isolation + forced tenant RLS + pool-safe transaction-local tenant context; dedicated physical clusters in HA profile and explicitly shared physical cluster in single-server profile |
+| [ADR-0034](0034-standardize-dedicated-cloudnativepg-fleet-operations-v1.md) | Reusable CloudNativePG operations for dedicated HA fleet and shared single-server cluster |
+| [ADR-0037](0037-standardize-postgresql-restore-evidence-and-upgrade-safety-v1.md) | Profile-aware restore evidence and DB upgrade/rollback safety |
 
 The immutable read-only SQLite dataset in Compromised Password Service is the explicit ADR-0040 SQLite reference-data exception and is not mutable business/service relational persistence covered by the PostgreSQL fleet rules. ADR-0041 Reference Data uses no database at all; its immutable application bundle therefore does not create another persistence exception.
 
@@ -91,9 +92,10 @@ The immutable read-only SQLite dataset in Compromised Password Service is the ex
 
 | ADR | Current scope |
 | --- | --- |
-| [ADR-0011](0011-keep-v1-gitops-in-platform-and-pin-openbao.md) | Current in-repository GitOps + OpenBao topology/secret model |
+| [ADR-0011](0011-keep-v1-gitops-in-platform-and-pin-openbao.md) | Current in-repository GitOps + OpenBao topology/secret model; unchanged by single-server simplification |
 | [ADR-0021](0021-pin-production-platform-compatibility-and-cni-v1.md) | Production compatibility authority/upgrade governance and Calico selection |
-| [ADR-0022](0022-define-self-hosted-kubernetes-ha-topology-v1.md) | Self-hosted Kubernetes HA topology |
+| [ADR-0022](0022-define-self-hosted-kubernetes-ha-topology-v1.md) | Self-hosted Kubernetes topology profiles and cluster-state recovery |
+| [ADR-0042](0042-define-single-server-production-profile-v1.md) | Selected initial non-HA K3s single-server production profile; shared physical PostgreSQL with logical service isolation/PITR; one Redis; one Kafka KRaft broker/controller; benchmark-gated Ambient; retained Kyverno; hardened OpenSSH/FIDO2 audited JIT access; one service replica; unchanged MFA and OpenBao; evidence-based capacity gate |
 
 ## Java engineering
 

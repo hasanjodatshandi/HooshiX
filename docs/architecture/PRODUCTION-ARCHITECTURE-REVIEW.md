@@ -1,172 +1,205 @@
 # Production Architecture Review — Current State
 
 - **Reviewed:** 2026-08-14
-- **Status:** architecture target accepted; implementation evidence is not implied
+- **Status:** architecture target accepted; implementation/runtime evidence is not implied
 - **Documentation mode:** current-only
+- **Selected initial profile:** `production-single-server`
+- **Availability posture:** explicit non-HA
 
 ## Outcome
 
-The current v1 architecture is coherent as the repository production target, subject to the executable implementation/evidence gates in `PRODUCTION-READINESS-CHECKLIST.md`.
+The single-server simplification is architecturally acceptable **only** as a named non-HA production profile with security/correctness invariants preserved.
 
-The design favors strong correctness/security with bounded operational complexity: add redundancy where loss would violate user/security/data guarantees, and avoid extra synchronous services, request-path secret-manager RPCs, duplicate retry layers, generic shared registries, or bespoke distributed coordination without measured need.
+The following decisions are accepted:
 
-ADR-0041 Reference Data is a deliberate example of separating an **architecture decision** from a **deployment decision**: its boundary/contracts are finalized now, but executable service implementation remains `PLANNED / NOT VERIFIED` until the explicit independent-consumer or production-journey trigger is met.
+- one K3s server/workload node;
+- one physical PostgreSQL instance with distinct service databases/roles/Flyway histories;
+- one Redis instance with TLS/ACL/`noeviction`/AOF/fail-closed behavior;
+- one combined KRaft Kafka broker/controller with RF=1/minISR=1 and formal non-HA acceptance;
+- one application replica per service with HPA/availability PDB disabled by default;
+- Istio Ambient retained behind a complete-stack benchmark gate;
+- Kyverno retained with a smaller high-value policy set but blocking enforcement;
+- Teleport omitted only in this profile and replaced by hardened OpenSSH + hardware FIDO2 + real JIT privilege/audit controls;
+- evidence-based host sizing rather than assuming 2 vCPU / 3-4 GiB RAM.
 
-## Current architecture conclusions
+The following proposals are **not** accepted:
 
-- Identity owns registration, credential/MFA/session/token-signing concerns; external identities bind by issuer+subject and browser credentials remain BFF-managed. Identity also owns the internal exact-audience token-broker operation used only by authorized BFF workload against active Session/RefreshFamily state and server allow-listed audience.
-- Web BFF is the only browser-facing application API boundary. Its v1 contract explicitly fixes `/api/v1` public namespace including `/reference`, bounded request/error handling, exact OIDC state/nonce/PKCE/pre-auth/redirect rules, trusted provider evidence, server-owned audience brokerage, HMAC-located Redis session/pre-auth state, 7d-idle/30d-absolute sessions with five-minute last-seen write coalescing, atomic no-grace rotation, user-session revocation index, AES-256-GCM retained-refresh key lifecycle, tenantless onboarding isolation, exact CSRF+Origin+Fetch-Metadata enforcement for unsafe authenticated requests, same-origin-only CORS, exact CSP/private no-store policy, public Reference Data ETag/one-hour cache exception, OIDC quotas, erasure, runtime and deny-by-default egress.
-- Browser receives no provider/Identity/downstream access or refresh credentials and cannot choose arbitrary JWT audiences. `authenticated_onboarding` cannot obtain ordinary resource or Authorization-management audience. Anonymous Reference Data creates no tenant/resource authority.
-- Final protected-resource authorization remains in the resource-owning service; Web BFF tenant administration is transport/facade, not an authorization authority. Reference Data existence/lifecycle is also not business validation authority.
-- Authorization remains the online authoritative tenant-permission boundary with no permission cache/Kafka invalidation/stale fallback/retry. Its permission catalog is exact/versioned/non-reused; SYSTEM/custom Role and direct-override semantics are bounded; management is BFF-facaded but locally authorized in Authorization; privilege escalation is denied; owner-role mutation shares atomic safety with Identity Membership-removal reservations; platform capability checks are separate Identity-only fail-closed authority and never tenant/resource bypass.
-- Authorization uses jOOQ/JDBC with forced tenant RLS and bounded query plans; management/platform idempotency/audit and erased-subject authority removal are explicit current contracts.
-- Authorization has explicit SLOs, fair overload isolation, HA/capacity gates, burn alerts, and de-correlated real-contract breaker recovery.
-- Semantic security quotas remain service-owned and atomically enforced in isolated Redis; no quota microservice is introduced. Exact current policies include Identity registration, Web BFF OIDC start/callback, and Authorization bounded semantic-mutation administration cost.
-- Compromised Password remains an independent internal security reference-data bounded context. Identity computes SHA-256 locally and sends only the 20-bit/five-uppercase-hex prefix; Compromised Password performs one bounded exact indexed lookup against an immutable read-only embedded SQLite artifact and returns suffix/count candidates; Identity retains the full hash and final credential decision.
-- Compromised Password v1 has no HIBP/Pwned Passwords or other runtime external provider/API, no Redis/PostgreSQL/Kafka dataset path, no full-dataset JVM cache and no User/Tenant/Contact/session state. Dataset/source updates occur only through an offline reviewed compiler/release process.
-- The ADR-0040 SQLite artifact is deliberately classified as immutable, rebuildable reference data rather than mutable service business persistence. It is a narrow exception to PostgreSQL/Flyway/CloudNativePG rules only for this dataset and cannot be generalized to mutable SQLite business state without a new current decision.
-- Reference Data v1 is a closed global non-tenant capability for exactly Country, Currency, TimeZone and SupportedLocale. It is not a generic key/value/dictionary registry, product/tenant configuration store, authorization service or universal validation oracle.
-- Reference Data source material is imported only offline from approved ISO/IANA/stable-CLDR authorities with exact source revision/provenance/integrity/license evidence. The runtime has no standards-source Internet synchronization and no PostgreSQL/SQLite/Redis/Kafka datastore. The small deterministic immutable bundle is packaged inside the signed service image.
-- Reference Data typed gRPC is bounded (default page100/max200, <=128KiB) and the initial runtime caller is only Web BFF. BFF->Reference Data is `AUTHORITATIVE_STATE`, <=1000ms/one attempt/wait-for-ready-off/no retry/fallback; outage produces unavailable reference routes, not fabricated/stale server data.
-- Reference Data target runtime after its implementation trigger is >=3/PDB2/spread, Web-BFF-only ingress, Ambient strict mTLS/default-deny policy, Class-B SLO and evidence-gated HPA. It contains no subject/tenant state and is not an erasure participant.
-- Notification owns durable human-channel delivery. Sensitive retry state uses bounded local AES-GCM key rings rather than request-path OpenBao Transit. PostgreSQL-authoritative time and durable `DISPATCHING` commit replace bespoke clock/fence coordination.
-- Production Notification providers are Liara Transactional Email and IPPanel Webservice-mode Iran SMS. Provider ambiguity is explicit and never converted to fabricated success or blind resend.
-- Every production microservice with mutable relational business persistence owns distinct PostgreSQL database/credentials/Flyway history and dedicated CloudNativePG cluster; tenant-owned tables use forced RLS. ADR-0041 Reference Data has no database and creates no persistence exception.
-- Kafka is replicated rebuildable transport, with transactional outbox/idempotent consumer semantics and 35-day critical recovery evidence.
-- Browser traffic follows upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> Caddy/Coraza WAF -> Web BFF; internal traffic uses Istio Ambient strict mTLS + workload identity + least-privilege authorization. BFF egress is additionally restricted to its registered Identity/Authorization/Reference-Data/resource/Redis/Google/telemetry dependencies. Compromised Password accepts only Identity ingress and has no application provider/Internet lookup egress. Reference Data, when implemented, accepts only Web BFF initially and has no standards-source Internet egress.
-- GitOps, signed/provenanced immutable artifacts, admission verification with least-privilege policy authoring and bounded policy-engine egress/SSRF controls, continuous SBOM/advisory correlation including bundled native components, PII-safe telemetry, and JIT privileged access form production security/operations baseline. Reference Data source-manifest/content digest is bound to signed-image provenance when implemented.
-- Java/source quality uses canonical coding standard plus executable Spotless, SpotBugs, ArchUnit, Semgrep, dependency verification, contract, test, and GitHub Actions gates where implementation exists.
+- replacing physical WAL/PITR/off-site recovery with `pg_dump + cron`;
+- removing Kyverno enforcement;
+- using `.bashrc`/shell history as privileged-session audit;
+- allowing Email/SMS/TOTP as freely interchangeable MFA factors when current Identity policy requires active TOTP;
+- treating a one-node/one-broker/one-Redis/one-PostgreSQL profile as HA;
+- weakening fail-closed security/correctness controls to fit a smaller host.
 
-## Main bottlenecks and failure domains
+**OpenBao is unchanged and outside the simplification scope.**
 
-Highest-risk current runtime capacity/availability boundaries are:
+## 1. Why a named profile is required
 
-1. Authorization service + PostgreSQL query/pool path;
-2. Web BFF fan-out/session Redis/token-broker/crypto/downstream pool path;
-3. per-service PostgreSQL HA fleet capacity, synchronous-write latency, backup/restore load, and upgrade/operations overhead;
-4. security Redis latency/failover for semantic quotas and BFF session/pre-auth state;
-5. password-hash CPU/memory under login/credential attack load;
-6. Compromised Password SQLite disk-backed prefix lookup/storage I/O with multi-million-row datasets;
-7. WAF inspection cost on every public request;
-8. Kafka disk, broker, partition, consumer-lag, and replay capacity;
-9. Liara/IPPanel latency/throttling and IPPanel report polling/reconciliation;
-10. Kubernetes worker capacity/replica placement during node loss;
-11. external upstream DDoS/provider/identity dependencies outside cluster.
+The previous architecture expressed the high-availability target as one universal production topology. Replacing it silently with one node would make service docs, SLOs, failure tests and recovery assumptions misleading.
 
-Reference Data is not yet a runtime bottleneck because implementation is deliberately gated. If activated, its BFF read/startup-memory/serialization/cache-validator path is measured as a bounded P2 path before any cache/database/provider complexity is considered.
+ADR-0042 therefore defines two explicit profiles:
 
-Metric, mitigation, and scale/split triggers are maintained in `performance-and-bottlenecks.md`.
+- `production-single-server` — selected initial cost-optimized profile, non-HA;
+- `production-ha` — expansion profile for maintenance without full outage, redundancy and larger capacity.
 
-## Deliberately absent complexity
+This keeps service/domain/security contracts stable while making topology/availability trade-offs explicit.
 
-The current production target intentionally does **not** add:
+## 2. Kubernetes review
 
-- a duplicate routine Authorization check in BFF for ordinary protected resource calls;
-- a permission-result cache or Kafka invalidation path;
-- browser-selected arbitrary downstream audience or public generic token-exchange endpoint;
-- downstream access/refresh/provider token exposure to browser storage/cookies/URLs;
-- cross-origin credentialed CORS in v1, including for anonymous Reference Data;
-- a dual-valid grace window for BFF session rotation;
-- reconstruction of BFF authenticated state from browser cookies after Redis/session loss;
-- a separate CSRF cookie;
-- caller-supplied Role/permission/owner snapshots as authorization authority;
-- wildcard/custom Role inheritance or resource-expression policy in v1;
-- a successful `allowed=false` permission-result shape;
-- a public/admin permission-explanation endpoint;
-- a quota microservice;
-- a runtime Schema Registry in v1;
-- Notification per-message OpenBao RPCs;
-- a bespoke Notification clock-health agent, Chrony `hostPath` sidecar, or dispatch-fence coordinator;
-- per-request remote JWKS lookup for normal internal token verification;
-- BFF per-request OpenBao RPC for refresh-key use;
-- HIBP/Pwned Passwords or another external compromised-password lookup on production request path;
-- Redis/PostgreSQL/Kafka as a second Compromised Password dataset store/cache;
-- loading the complete Compromised Password corpus into application JVM heap or using a Bloom filter as final authority;
-- runtime mutation/migration/DDL of the Compromised Password SQLite artifact;
-- a generic Reference Data dictionary/dataset/query service;
-- Reference Data PostgreSQL/SQLite/Redis/Kafka datastore, server-side stale cache, runtime ISO/IANA/Unicode/CLDR synchronization, fuzzy-search engine, tenant/business configuration, or deployment before ADR-0041's implementation trigger;
-- PgBouncer/Redis Cluster/external etcd without measured need;
-- an Istio waypoint for every service/namespace;
-- retries in both application and mesh/client layers for one failure;
-- Argo CD/OpenBao request-path HA merely for symmetry when hot paths do not depend on them.
+K3s is appropriate for the selected one-server profile when the repository platform controls remain authoritative.
 
-These omissions are intentional current decisions, not unresolved historical alternatives.
+Required single-server shape:
 
-## Security review
+- K3s on the approved Kubernetes line;
+- embedded SQLite control-plane datastore;
+- secrets encryption;
+- Flannel and K3s network-policy controller disabled;
+- Calico retained;
+- bundled K3s Traefik/ServiceLB disabled;
+- repository Traefik/Gateway/WAF retained;
+- encrypted off-host recovery copy of K3s datastore + server token;
+- one application replica; no false availability PDB/HPA.
 
-Current security boundaries are coherent only when enforced together:
+Review conclusion: acceptable with explicit whole-platform downtime acceptance and tested clean rebuild/recovery.
 
-- trusted tenant/user/workload identity is derived/validated at correct boundary;
-- internal services are not directly Internet-exposed;
-- upstream volumetric protection and redundant external load balancing precede Traefik/WAF; no public route bypasses WAF;
-- WAF does not replace authentication/authorization/validation/semantic quotas or BFF body/header bounds;
-- BFF OIDC state/nonce/PKCE/pre-auth are server-bound/single-use and return redirects cannot become external/authority-relative through raw or encoded bypasses;
-- browser never obtains provider/Identity/downstream credentials or arbitrary audience authority;
-- BFF session/pre-auth Redis keys are purpose-HMAC locators, raw IDs are not logged, and refresh credentials are AES-GCM encrypted under bounded rotating local key ring;
-- unsafe cookie-authenticated production browser requests require exact Origin + CSRF + `Sec-Fetch-Site:same-origin`; v1 does not enable cross-origin credentialed CORS;
-- Reference Data GET/HEAD may be anonymous/no-CSRF only because they are side-effect-free global reads; they create no session/JWT/tenant authority, use explicit locale, remain same-origin/WAF-protected and are the only public-cache exception;
-- exact CSP forbids `unsafe-inline`/`unsafe-eval`; sensitive auth/session/admin responses are no-store;
-- BFF erasure/revocation removes usable user-linked authentication continuation and session index state;
-- Compromised Password receives only five uppercase SHA-256 prefix hex characters from Identity; raw password/full digest/subject identity never enters the service and exact full-hash matching remains in Identity;
-- Compromised Password SQLite path/JDBC/query/PRAGMA/extension/ATTACH authority is server-owned, runtime is read-only/query-only, result bounds are build-enforced, and any corrupt/unavailable/oversized lookup fails closed rather than becoming a false clean result;
-- Compromised Password workload accepts only Identity and has no arbitrary application Internet/provider egress; Xerial Java + bundled SQLite native engine remain SBOM/advisory inputs;
-- Reference Data offline source import validates provenance/integrity/license use, serving has no standards-source Internet egress, only Web BFF initially reaches gRPC, no generic registry exists and no subject/tenant state is stored;
-- Istio identity does not replace NetworkPolicy or native datastore authentication;
-- BFF egress is deny-by-default and cannot become arbitrary URL/Internet SSRF path;
-- local reject-only Authorization prechecks cannot grant permission;
-- Authorization permission identifiers are lifecycle-governed/non-reused; actors cannot grant authority they do not possess; platform capability is separate from tenant permission and cannot bypass resource/domain invariants;
-- last-owner protection is atomic across Identity removal reservations and local owner Role changes;
-- erased subjects cannot retain Membership/direct-override/platform-profile authority;
-- sensitive material never enters Kafka/logs/traces/metrics/raw provider/source telemetry;
-- production secrets are not committed to Git/Helm values/images;
-- production workloads use hardened security contexts and independent ServiceAccounts;
-- admission-policy authoring is least privilege and policy-engine external context cannot become unrestricted SSRF-capable egress;
-- signed artifact admission does not replace continuous vulnerability response;
-- no vulnerability feed/scanner is considered proof that unknown vulnerabilities do not exist.
+## 3. PostgreSQL review
 
-## Reliability review
+Physical consolidation is acceptable because logical ownership remains strict:
 
-- All synchronous dependencies have finite deadlines and bounded concurrency.
-- Retry is safe/idempotent and single-owner only.
-- Web BFF request budget remains 2600ms with stricter child ceilings; cancellation propagates and authoritative BFF dependencies do not gain hidden retry/fallback.
-- BFF session Redis failure does not reconstruct authentication; semantic-quota Redis failure does not disable OIDC abuse controls; token-broker/Authorization/Reference-Data/resource failures do not fabricate credentials/authority/reference/business state.
-- Valid Reference Data HTTP representation caching is distinct from server-side stale fallback; BFF does not hide Reference Data outage with a local cache.
-- BFF access-JWT reuse, if any, is bounded transport reuse only until token expiry/current session state and never replaces final resource Authorization.
-- BFF session `last_seen` write coalescing limits Redis amplification; user-session index bounds global revocation/erasure; HPA remains gated on representative downstream/Redis/crypto load evidence.
-- BFF last-valid refresh key-ring snapshot bridges source outage for <=1h only; after that key-dependent operations fail closed.
-- Authorization `CheckPermission` and `CheckPlatformPermission` are one-attempt fail-closed authority calls with no cache/retry/fallback; platform-check outage blocks only operations requiring platform authority rather than fabricating it.
-- Compromised Password is a one-attempt <=900ms authoritative-security dependency for password credential writes. Missing/corrupt/incompatible dataset, SQLite read/storage failure, malformed/oversized result, queue/concurrency saturation or deadline expiry rejects the unchecked password; no runtime provider/cache fallback exists.
-- Compromised Password availability uses >=3 replicas with identical approved immutable dataset version rather than mutable DB replication. Cold DR redeploys/rebuilds the artifact and withholds readiness until compatibility/integrity is valid.
-- Reference Data, after its trigger, is a one-attempt <=1000ms authoritative-state child dependency for BFF reference routes. Invalid/tampered bundle or service outage makes affected routes unavailable; recovery redeploys/rebuilds the approved signed bundle and readiness validates it locally without Internet source calls.
-- Remote I/O is not performed inside database transactions; Identity calls Compromised Password outside its DB transaction and Authorization administration quota is intentionally evaluated before PostgreSQL mutation transaction.
-- Kafka publication uses transactional outbox and at-least-once consumers are idempotent.
-- CloudNativePG failover must preserve required durable commits or refuse unsafe failover.
-- Restore evidence, not backup existence, proves recovery capability; immutable reference artifact/application-bundle recovery is separately proven by rebuild/redeploy evidence.
-- Release rollback is allowed only when schema/data/artifact/runtime state is backward compatible; unsafe database downgrade is not used to satisfy arbitrary rollback timer.
-- Error-budget/burn policy, chaos tests, and failover/load evidence remain production gates.
+- distinct service DB;
+- distinct runtime role;
+- distinct migration/owner role;
+- distinct Flyway history/release lifecycle;
+- forced tenant RLS where applicable;
+- no cross-service DB access/joins/FKs/shared models/credentials.
 
-## Delivery-speed guardrail
+The cost is a larger process/host/storage/superuser/recovery blast radius. The shared instance needs a global connection budget and noisy-neighbor IO/WAL/checkpoint evidence.
 
-Local development remains smaller than production. Pure Domain/Application work should run without Kubernetes/Istio/WAF/Kafka HA. Integration work uses pinned local kind/Ambient/Traefik/WAF foundation only when integration behavior is actually under test. Heavy load, failover, backup/PITR, DR, provider, certificate, and production-policy evidence belongs to staging/release/scheduled pipelines.
+Review conclusion: acceptable for the single-server profile; not a relaxation of service database ownership.
 
-Web BFF local/PR work can test OIDC/session/CSRF/audience/error/request-bound/reference-cache rules with deterministic adapters/Testcontainers and generated OpenAPI contracts; real mesh/WAF/HA/provider/load evidence remains staging/release/scheduled. Compromised Password local/PR work uses deterministic generated SQLite fixtures and offline compiler checks; production corpus/source material is not required for the inner loop. Reference Data importer/contract work, once triggered, uses deterministic offline source fixtures and never needs live standards endpoints in normal PR tests.
+## 4. PostgreSQL backup/recovery review
 
-## Coding-quality review
+`pg_dump + cron` is rejected as the primary recovery strategy because it does not preserve the current continuous WAL/PITR/off-site physical recovery model.
 
-Coding baseline incorporates feature-first/nature-separated packages, strict package naming, Domain/persistence separation, constructor injection, bounded files/responsibilities, no dumping-ground packages, explicit transaction/deadline/retry/idempotency rules, PII-safe telemetry, hardened container/Kubernetes settings, Helm migration discipline, and immutable same-digest staging-to-production promotion.
+The selected profile retains continuous WAL archive, daily physical base backup, <=5m RPO evidence, 35-day PITR, monthly retained artifacts, monthly restore exercises and quarterly cold DR.
 
-Authorization's jOOQ/JDBC-only implementation decision does not relax Hexagonal boundaries: generated SQL types remain Infrastructure-only and critical permission queries require plan/index evidence.
+Physical recovery now covers the shared cluster. Service-specific recovery therefore begins with an isolated whole-cluster PITR restore, then extracts/transfers only the required service DB through a controlled compatibility-aware procedure.
 
-Web BFF's audience-token/session/crypto/provider/reference adapters remain Infrastructure boundaries; browser transport DTOs/OpenAPI models do not become Identity/Authorization/Reference Data Domain models, and the BFF must not duplicate backend business invariants.
+Review conclusion: PITR/WAL/off-site recovery remains mandatory.
 
-Compromised Password's Xerial/JDBC/SQLite schema/query/native extraction details remain Infrastructure/offline-compiler concerns. Domain/Application code owns reference lookup meaning and bounds but does not depend on SQLite/JDBC. The immutable SQLite exception cannot become a general repository shortcut around PostgreSQL/Flyway rules.
+## 5. Redis review
 
-Reference Data's ISO/IANA/CLDR parsers/importers and bundle serialization are Infrastructure/tooling concerns. Domain/Application owns typed reference meaning/lifecycle but does not depend on live source/network/file parser libraries. Its no-database design cannot become a generic shared configuration shortcut.
+One Redis instance is acceptable only with:
 
-Machine-checkable rules should be executable. Documentation-only presence is not source compliance.
+- TLS;
+- independent ACL identities/key namespaces;
+- `noeviction`;
+- AOF `appendfsync everysec`;
+- fail-closed semantic quota/session behavior;
+- >=30% measured memory headroom;
+- explicit no-failover claim.
 
-## Evidence gap
+AOF is restart durability assistance, not HA. Lost session state causes re-authentication.
 
-The architecture review does **not** claim that implementation already satisfies these rules. Until in-scope service source/builds, Gradle wrappers/locks, workflows, manifests, policy tests, scans, dataset/reference-bundle compiler/artifact evidence, load tests, failover/rebuild/restore exercises, and deployment evidence exist and pass, those implementation dimensions remain `NOT VERIFIED`.
+Review conclusion: acceptable with explicit availability loss and unchanged security semantics.
 
-Reference Data specifically remains `PLANNED / NOT VERIFIED` and non-blocking for unrelated releases until ADR-0041's explicit implementation trigger and release scope are present.
+## 6. Kafka review
+
+One combined KRaft broker/controller is acceptable only as a formal non-HA exception:
+
+```text
+RF=1
+minISR=1
+acks=all
+producer idempotence enabled
+unclean leader election disabled
+```
+
+Kafka remains transport, not authority. Outbox/Inbox/idempotency, stable event identities and critical replay evidence remain mandatory.
+
+Review conclusion: acceptable when broker-local loss/outage is explicitly accepted and replay/rebuild evidence passes.
+
+## 7. Istio Ambient review
+
+Ambient is a security control because it provides workload identity/mTLS/authorization context. Removing it only for RAM savings would be a security-architecture change, not a topology simplification.
+
+Single-server production must benchmark the complete stack, including `istiod`, CNI and `ztunnel`, under representative traffic and storage load. Waypoints are absent by default.
+
+Review conclusion: retain Ambient and block production if the profile cannot fit it with >=30% validated resource headroom. Increase host capacity or approve a separate reviewed security design; do not silently disable it.
+
+## 8. Kyverno review
+
+Removing Kyverno is rejected. Reducing policy count is acceptable when the remaining set still blocks high-value supply-chain/workload-security failures.
+
+Mandatory single-server admission still covers digest, signature, provenance, signed SBOM and critical unsafe workload identity/security-context patterns. One Kyverno replica is permitted because same-host replicas do not create physical HA.
+
+Review conclusion: reduce policy inventory if evidence supports it; never reduce production enforcement to audit-only or bypass.
+
+## 9. Human access review
+
+Teleport may be omitted in the single-server profile only because equivalent security properties are preserved through a simpler implementation.
+
+Required replacement:
+
+- hardened OpenSSH;
+- hardware-backed FIDO2 with user presence + verification;
+- no root/password/shared-key access;
+- time-bounded JIT privilege separate from SSH authentication;
+- two reviewers for write/admin elevation;
+- `sudo` I/O + OS + Kubernetes/database audit;
+- off-host append-only/tamper-resistant retention;
+- protected break glass.
+
+`.bashrc`/shell history is rejected as authoritative audit because it is user-controlled/incomplete and does not provide equivalent tamper resistance/session evidence.
+
+Review conclusion: OpenSSH/FIDO2/JIT/audit replacement is acceptable only after executable evidence passes.
+
+## 10. OpenBao review
+
+**No OpenBao change is approved.**
+
+OpenBao 2.6.1 remains the production secret authority with the existing topology, Shamir/recovery, encrypted snapshots, External Secrets/Kubernetes Auth and mounted/local key workflows.
+
+Review conclusion: out of scope; profile simplification MUST NOT remove, replace, bypass or weaken it.
+
+## 11. MFA review
+
+Arbitrary user choice among Email/SMS/TOTP is rejected. The current model keeps active TOTP as the required factor where Identity requires it. Verification/recovery channels do not become a downgrade bypass.
+
+Review conclusion: no MFA change.
+
+## 12. Capacity review
+
+A fixed `2 vCPU / 3-4 GiB RAM` recommendation is not credible for the complete stack without evidence.
+
+One host must carry application JVMs, K3s system processes, PostgreSQL+WAL+backup, Redis+AOF, Kafka, Istio, Kyverno, edge/WAF and observability. Storage contention is as important as RAM.
+
+Production gate:
+
+- no OOM/sustained swap/MemoryPressure;
+- >=30% validated CPU+memory headroom at approved peak;
+- applicable >=2x projected peak evidence for critical/security paths;
+- safe WAL+AOF+Kafka+telemetry IO/free space;
+- safe reboot/recovery order;
+- no disabled security/backup control needed to pass.
+
+Review conclusion: host size remains `Not verified` until complete-stack benchmark exists.
+
+## 13. Key residual risks
+
+| Risk | Single-server consequence | Required mitigation/trigger |
+| --- | --- | --- |
+| Host/node loss | complete platform outage | tested rebuild/recovery; move to HA if downtime unacceptable |
+| Shared PostgreSQL failure | all PostgreSQL-backed services affected | WAL/PITR/off-site backup, isolation tests, noisy-neighbor monitoring |
+| Kafka broker loss | async transport outage/local data exposure | Outbox/replay/rebuild; move to HA if unacceptable |
+| Redis loss | session/quota availability impact | AOF, fail closed, re-authentication; move to HA if unacceptable |
+| Admission outage | new/updated workload blocked | fail closed; add capacity/HA, never bypass |
+| Ambient overhead | host resource pressure | benchmark; add resources/HA, never silently disable security |
+| Single-host audit loss | loss/tampering risk | off-host append-only/tamper-resistant audit |
+| Platform upgrade | larger maintenance window | tested rollback/fail-forward/recovery; move to HA if unacceptable |
+
+## 14. Production-readiness conclusion
+
+The architecture change is accepted. **Runtime production readiness is not yet proven by documentation.**
+
+Approval requires the profile-specific checklist: K3s/Calico render+recovery, shared PostgreSQL isolation/PITR, Redis AOF, Kafka RF1 rebuild/replay, Ambient benchmark, Kyverno blocking tests, OpenSSH/FIDO2/JIT/audit, unchanged OpenBao/MFA regressions, full-stack load/soak/reboot, security/vulnerability review and explicit non-HA risk sign-off.

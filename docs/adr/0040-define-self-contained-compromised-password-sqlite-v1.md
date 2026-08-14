@@ -101,7 +101,7 @@ The service has no remote dependency on its lookup path. SQLite reads use bounde
 
 The service remains within the current Class-B internal dependency objective: availability >=99.95%, p95 <=250 ms, p99 <=750 ms. Representative multi-million-row datasets must satisfy the objective before production; scaling/tuning is evidence-driven and must not replace exact-match correctness with probabilistic authority.
 
-### Runtime boundary
+### Runtime boundary and production profiles
 
 Production identity:
 
@@ -117,7 +117,18 @@ management:     separate configured port
 
 Only the approved `identity-service` workload may call the lookup RPC. The service is ClusterIP-only, Ambient-enrolled, strict-mTLS protected, deny-by-default, and has **no application Internet/provider egress**. Approved telemetry egress remains separate from application lookup semantics.
 
-Production uses >=3 replicas with `PDB minAvailable=2` and topology spread. Autoscaling is enabled only after representative SQLite storage/query/load evidence proves a safe signal and capacity envelope.
+`production-single-server` under ADR-0042 uses exactly one service replica, HPA disabled, and no availability PDB. The immutable dataset is local to the workload image/runtime artifact and the one-host profile explicitly accepts service outage on host/node loss. This does not weaken fail-closed password screening: an unavailable/corrupt/missing service or dataset never becomes `not compromised`.
+
+`production-ha` uses the replicated target:
+
+```text
+replicas:        >=3
+PDB:             minAvailable=2
+topology spread: required
+HPA:             evidence-gated only
+```
+
+All HA replicas use the exact same approved immutable dataset version. Autoscaling is enabled only after representative SQLite storage/query/load evidence proves a safe signal and capacity envelope.
 
 The dataset path is server-owned configuration and read-only. The workload keeps the normal hardened security context. Any narrowly required writable temporary path for the JDBC native library is a bounded `emptyDir`-style runtime mount, never the dataset path, and requires render/security verification.
 
@@ -152,12 +163,13 @@ Implementation/release evidence MUST cover:
 - corrupt/incompatible/missing dataset keeps readiness false or returns fail-closed availability result;
 - no HIBP/external provider call or arbitrary application Internet egress;
 - multi-million-row representative query/load tests within Class-B objectives and bounded concurrency/queue behavior;
-- replica/node loss with identical approved dataset version and no false clean result;
 - immutable artifact digest/provenance/SBOM/dependency/advisory checks;
 - SQLite/Xerial version/security compatibility tests on Java 25 and production Linux image;
 - hardened container/render/ServiceAccount/NetworkPolicy/Istio positive and negative tests;
-- DR redeploy/reconstruction from approved immutable dataset artifact.
+- DR redeploy/reconstruction from approved immutable dataset artifact;
+- `production-single-server`: one-replica/HPA-off/PDB-off render, whole-host outage/recovery, exact dataset recovery and fail-closed result with no false clean password;
+- `production-ha`: replica/node loss with identical approved dataset version and no false clean result.
 
 ## Rollback considerations
 
-Rollback selects a previously approved application + dataset format combination only when the older dataset remains current, integrity-verified, security-supported, and contract compatible. Rollback MUST NOT enable runtime dataset mutation, use stale/corrupt data as `not compromised`, add external provider fallback, expose password/full digest, broaden workload/network access, or silently convert the SQLite exception into general mutable relational persistence.
+Rollback selects a previously approved application + dataset format combination only when the older dataset remains current, integrity-verified, security-supported, and contract compatible. Rollback MUST NOT enable runtime dataset mutation, use stale/corrupt data as `not compromised`, add external provider fallback, expose password/full digest, broaden workload/network access, or silently convert the SQLite exception into general mutable relational persistence. Moving to the single-server profile MUST NOT be represented as retaining replica/node-failure availability.

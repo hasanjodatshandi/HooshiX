@@ -115,13 +115,29 @@ Immediately before provider I/O, Notification performs one short local transacti
 
 Provider I/O starts only after commit. No network I/O occurs inside the transaction.
 
-After `DISPATCHING`, worker crash, lease expiry, database failover, timeout, or unknown provider result never authorizes blind redispatch. The attempt enters reconciliation under the current ambiguity/evidence rules.
+After `DISPATCHING`, worker crash, lease expiry, database outage/recovery/failover, timeout, or unknown provider result never authorizes blind redispatch. The attempt enters reconciliation under the current ambiguity/evidence rules.
 
-## 9. PostgreSQL HA and persistence
+## 9. PostgreSQL persistence by production profile
 
-Notification owns database `notification` on its dedicated production CloudNativePG cluster. Notification-only runtime/migration roles have no privileges on another service database/cluster. ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define current HA/isolation/fleet/restore behavior.
+Notification owns database `notification`, its runtime role, migration/owner role, and Flyway history. Notification roles have no `CONNECT` or object privileges on another service database. ADR-0019, ADR-0027, ADR-0034, ADR-0037, and ADR-0042 define current profile-aware persistence/recovery behavior.
 
-The critical production cluster has three PostgreSQL instances with synchronous required durability and failover quorum. The `DISPATCHING` transaction is synchronously committed before provider I/O. Permitted automatic failover must retain acknowledged dispatch state; otherwise failover is refused in favor of durability.
+`production-single-server`:
+
+- database `notification` is a distinct database in the shared physical CloudNativePG/PostgreSQL instance;
+- runtime/migration roles and Flyway history remain Notification-only;
+- there is no PostgreSQL automatic failover claim;
+- committed `DISPATCHING` state is protected by the single-instance storage plus current continuous WAL/PITR/off-site recovery model;
+- process/host/storage uncertainty after commit never authorizes blind redispatch; it becomes a reconciliation case after recovery;
+- physical recovery starts with an isolated whole-shared-cluster PITR restore before any controlled service-specific transfer.
+
+`production-ha`:
+
+- Notification uses its dedicated critical CloudNativePG cluster;
+- the cluster has the current three-instance synchronous required-durability/failover model;
+- `DISPATCHING` is synchronously committed before provider I/O;
+- permitted automatic failover must retain acknowledged dispatch state; otherwise failover is refused in favor of durability.
+
+The single-server profile accepts lower database availability and a larger physical failure domain. It does not relax Notification database ownership or duplicate-safety semantics.
 
 Notification persistence uses jOOQ/JDBC without JPA. Core structures include Notification, attempts, provider receipt evidence, result outbox, template definition/version/activation/audit, and bounded retention metadata. A dispatch-fence table is not part of the current model.
 
@@ -193,9 +209,11 @@ Callback destination is the reviewed GitOps allow-list, never a caller-controlle
 
 ## 15. Observability and SLO
 
-`SubmitNotification` durable acceptance remains Class B. First provider-attempt scheduling is Class C: 99.9% of accepted intents begin their first provider attempt within five seconds.
+`SubmitNotification` durable acceptance remains Class B. First provider-attempt scheduling is Class C: 99.9% of accepted intents begin their first provider attempt within five seconds according to current SLO accounting.
 
-Bounded telemetry covers submit latency/outcomes, PostgreSQL availability/failover, dispatch-transaction latency, provider attempts, ambiguity/reconciliation, receipt lag, escrow age, and callback backlog.
+Bounded telemetry covers submit latency/outcomes, PostgreSQL availability and profile-specific recovery/failover state, dispatch-transaction latency, provider attempts, ambiguity/reconciliation, receipt lag, escrow age, and callback backlog.
+
+`production-single-server` does not claim PostgreSQL/node failover availability. Its actual downtime, shared-host resource pressure, restore/recovery duration, and ambiguous dispatch recovery are observed. `production-ha` keeps failover SLI/evidence.
 
 Infrastructure NTP/Chrony health is a platform/node signal, not an application dispatch protocol.
 
@@ -211,7 +229,8 @@ Notification changes require applicable tests for:
 - PostgreSQL-authoritative timestamp boundaries;
 - concurrent `SKIP LOCKED` claims and dispatch locking;
 - crash immediately before/after `DISPATCHING` commit;
-- CloudNativePG primary failover around dispatch commit and proof of no blind redispatch;
+- profile-specific PostgreSQL behavior: single-server process/host/storage loss plus isolated shared-cluster recovery/no blind redispatch, or HA primary failover with acknowledged-state durability;
+- distinct Notification database/runtime/migration role/Flyway ownership and cross-service privilege denial in both profiles;
 - jOOQ/Flyway/migration compatibility;
 - template versioning/activation/concurrency/rendering;
 - Liara SMTP STARTTLS/auth/outcome classification;
@@ -220,4 +239,4 @@ Notification changes require applicable tests for:
 - callback idempotency/destination allow-list;
 - PII-safe telemetry;
 - Istio/NetworkPolicy positive and negative authorization;
-- load/chaos behavior for critical paths.
+- profile-correct deployment/load/chaos behavior for critical paths.

@@ -231,16 +231,33 @@ Service:         reference-data-service
 ServiceAccount:  reference-data-service
 application:     gRPC 9090
 management:      separate configured port
-replicas:        >=3
-PDB:             minAvailable=2
-HPA:             evidence-gated only
 ```
 
 The service is ClusterIP-only and Ambient-enrolled. Initial application ingress is allowed only from the approved `web-bff` workload. NetworkPolicy and Istio authorization deny unregistered application callers.
 
 Application egress is deny-by-default. The serving process has no ISO/IANA/Unicode/CLDR/provider/Internet synchronization path. Only narrowly required platform DNS and approved telemetry paths may be allowed by deployment policy.
 
-The normal hardened workload baseline applies: immutable signed image digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources/probes, graceful shutdown, dedicated ServiceAccount, and topology spread.
+The normal hardened workload baseline applies: immutable signed image digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources/probes, graceful shutdown, dedicated ServiceAccount, and topology spread when multiple failure domains/replicas exist.
+
+Production deployment target is profile-specific:
+
+`production-single-server` under ADR-0042:
+
+```text
+replicas:          1
+HPA:               disabled
+availability PDB:  disabled
+node failover:     none
+```
+
+`production-ha`:
+
+```text
+replicas:          >=3
+PDB:               minAvailable=2
+topology spread:   required
+HPA:               evidence-gated only
+```
 
 Reference Data uses the current Class-B objective when implemented:
 
@@ -250,7 +267,7 @@ p95 <=250 ms
 p99 <=750 ms
 ```
 
-HPA is enabled only after representative route/load evidence proves an appropriate signal and confirms scaling does not hide an invalid bundle or multiply a downstream bottleneck.
+The single-server profile records real downtime and does not claim node-level availability. HPA is enabled only in a profile that supports it and only after representative route/load evidence proves an appropriate signal and confirms scaling does not hide an invalid bundle or multiply a downstream bottleneck.
 
 ## Security, privacy, and authority
 
@@ -323,11 +340,11 @@ When implementation starts, evidence MUST cover:
 - proof anonymous reference reads do not create/require authenticated session authority, while cross-origin credentialed CORS remains disabled and edge/WAF path remains mandatory;
 - exact BFF->Reference Data <=1000ms/one-attempt/no-retry/no-fallback semantics and cancellation propagation;
 - wrong-workload ingress denial and no arbitrary application Internet egress;
-- hardened >=3 replica/PDB2/topology-spread deployment and evidence-gated HPA;
+- profile-correct workload render: one replica/HPA off/PDB off in single-server; >=3/PDB2/topology-spread and evidence-gated HPA in HA;
 - Class-B load/SLO evidence before production;
 - PII-safe low-cardinality telemetry;
 - immutable same-digest staging->production promotion and rebuild/redeploy recovery.
 
 ## Rollback considerations
 
-Rollback uses a previously approved signed application image whose Reference Data bundle format/source revisions remain contract-compatible and supported. Rollback MUST NOT reintroduce a generic dictionary registry, mutate a deployed bundle, silently reuse retired codes, add a database/provider runtime dependency, relax workload/egress policy, fabricate stale reference data, or change a bounded context's business validation authority.
+Rollback uses a previously approved signed application image whose Reference Data bundle format/source revisions remain contract-compatible and supported. Rollback MUST NOT reintroduce a generic dictionary registry, mutate a deployed bundle, silently reuse retired codes, add a database/provider runtime dependency, relax workload/egress policy, fabricate stale reference data, or change a bounded context's business validation authority. Moving to `production-single-server` MUST NOT be represented as retaining replicated node-failure availability.

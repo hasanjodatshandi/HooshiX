@@ -1,4 +1,4 @@
-# ADR-0022: Self-Hosted Kubernetes HA Topology v1
+# ADR-0022: Self-Hosted Kubernetes Topology Profiles v1
 
 ## Status
 
@@ -6,44 +6,66 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13
+2026-08-10; normalized to current-only documentation on 2026-08-14
 
 ## Decision
 
-### Control plane
+Production has two explicit infrastructure profiles. `production-single-server` is the selected initial profile under ADR-0042. `production-ha` is the expansion profile for availability/capacity requirements.
 
-Production uses a kubeadm-compatible highly available stacked control-plane + etcd topology:
+Profile selection changes availability topology only. Calico NetworkPolicy, Istio workload identity/mTLS, signed-artifact admission, workload ServiceAccounts, security contexts, GitOps, backup/recovery, and application/domain isolation do not become optional.
+
+### `production-single-server`
+
+The selected initial profile uses one K3s server that is also the only schedulable workload node.
+
+- Kubernetes line: 1.35.6 through pinned `v1.35.6+k3s1`;
+- one control-plane/scheduler/workload failure domain;
+- embedded K3s SQLite control-plane datastore;
+- K3s secrets encryption enabled;
+- Flannel and the K3s network-policy controller disabled so Calico remains the authoritative CNI/NetworkPolicy implementation;
+- bundled K3s Traefik and ServiceLB disabled so the repository-pinned edge stack remains authoritative;
+- K3s datastore directory plus server token backed up encrypted off-host;
+- normal application/service replica count is one; HPA and availability PDBs are disabled by this profile unless a later measured revision says otherwise.
+
+This profile is deliberately non-HA. Loss or maintenance of the server can remove the Kubernetes API and all workloads. Multiple pods on the same host do not create physical availability.
+
+Git remains desired-state authority. K3s datastore backup is an operational recovery artifact, not business-data backup.
+
+### `production-ha`
+
+When the HA profile is selected, production uses a kubeadm-compatible highly available stacked control-plane + etcd topology:
 
 - exactly three control-plane nodes initially;
 - one local etcd member per control-plane node;
 - independent physical failure domains where available;
 - one stable redundant L4 `controlPlaneEndpoint` in front of all API servers;
 - loss of one API-server/control-plane node MUST NOT remove cluster management access;
-- normal application workloads do not schedule on control-plane nodes.
+- normal application workloads do not schedule on control-plane nodes;
+- at least three schedulable workers;
+- critical replicated workloads use topology spread/anti-affinity;
+- N+1 worker CPU/memory/storage headroom for critical request paths.
 
-External etcd is not part of v1. Introducing it requires measured isolation/compliance/availability evidence that justifies the additional hosts/operations.
+External etcd is not a default. Introducing it requires measured isolation/compliance/availability evidence that justifies additional hosts/operations.
 
-### Worker topology
+HA cluster-state recovery uses encrypted etcd snapshots every six hours, before control-plane upgrades, with at least seven days off-node retention and monthly isolated control-plane restore/rebuild evidence.
 
-Production has at least three schedulable workers. Critical replicated workloads use topology spread/anti-affinity so one worker loss does not intentionally remove the whole availability boundary.
+### Shared recovery rules
 
-The platform keeps N+1 worker CPU/memory/storage headroom for Class-A and Authorization projected critical-path capacity. Replica count alone is not HA evidence; placement and one-node-loss behavior must be proven.
+For both profiles:
 
-### Cluster-state recovery
-
-Git is the managed desired-state source of truth. Kubernetes etcd snapshots are encrypted operational recovery artifacts:
-
-- snapshot every six hours;
-- snapshot before control-plane upgrades;
-- encrypted off-node retention at least seven days;
-- monthly isolated control-plane restore/rebuild exercise or equivalent tested automation.
-
-Clean-cluster GitOps rebuild may be preferred for site loss when safer/faster. Application business data recovery follows service-owned datastore/secret/event recovery policy.
+- clean-cluster GitOps rebuild may be preferred for site/host loss when safer/faster;
+- application business data recovery follows service-owned datastore/secret/event policy;
+- control-plane recovery artifacts and tokens are protected from ordinary application identities;
+- production recovery is not considered proven until an isolated rebuild/restore exercise succeeds.
 
 ## Verification requirements
 
-Before production traffic verify all three control-plane/etcd members, API endpoint continuity through one control-plane loss, etcd quorum through one member loss, >=3 workers, critical replica placement, one-worker drain/loss with required capacity, CloudNativePG/Authorization/WAF/Redis/Kyverno/Kafka disruption behavior where applicable, encrypted snapshot creation/restore, and Calico/Istio policy behavior after rescheduling.
+For `production-single-server`, verify pinned K3s/Kubernetes identity, Calico custom-CNI configuration, bundled Flannel/network-policy/Traefik/ServiceLB disablement, secrets encryption, encrypted off-host K3s DB+token recovery artifact, clean GitOps rebuild, one-replica/HPA/PDB render, Calico/Istio policy behavior after reboot, and explicit operator acceptance of whole-platform downtime on node loss.
+
+For `production-ha`, verify all three control-plane/etcd members, API endpoint continuity through one control-plane loss, etcd quorum through one member loss, >=3 workers, critical replica placement, one-worker drain/loss with required capacity, applicable datastore/security-component disruption behavior, encrypted snapshot creation/restore, and Calico/Istio policy behavior after rescheduling.
 
 ## Rollback considerations
 
-Rollback MUST NOT collapse production to a single control-plane node while claiming the same HA posture, destroy quorum, co-locate all critical replicas on one worker, or reduce N+1 critical capacity without a revised current availability decision.
+Moving from `production-single-server` to `production-ha` is a topology expansion. It MUST preserve GitOps state, security controls, workload identities, service data ownership, and recovery evidence.
+
+Moving from `production-ha` to `production-single-server` requires explicit acceptance of whole-platform downtime and single-node failure risk. It MUST NOT be represented as preserving the HA posture or used to justify disabling Calico, Istio security, Kyverno admission, OpenBao, off-site recovery, or application data-isolation controls.

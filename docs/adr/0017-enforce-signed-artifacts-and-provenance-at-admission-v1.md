@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized and security-refreshed on 2026-08-13
+2026-08-10; normalized and security-refreshed on 2026-08-14
 
 ## Decision
 
@@ -21,9 +21,26 @@ Protected production workloads require:
 
 Signer trust uses exact OIDC issuer + subject constraints; broad wildcard trust is prohibited.
 
-Staging validates new policy in audit mode before production deny/fail-closed admission. Production admission failure blocks new/updated workload scheduling; it does not terminate already running pods merely because a registry later becomes unavailable.
+Staging validates new policy in audit mode before production deny/fail-closed admission. Production admission failure blocks new/updated workload scheduling; it does not terminate already running pods merely because a registry or policy dependency later becomes unavailable.
 
-Kyverno admission runs with at least 3 replicas, topology spread, and disruption protection. Bootstrap/control-plane exclusions are narrow, versioned, owned, and tested. Emergency deployment still requires a separately trusted audited signer; unsigned production deployment is prohibited.
+### Profile-aware availability
+
+`production-ha` runs Kyverno with at least 3 replicas, topology spread, and disruption protection.
+
+`production-single-server` under ADR-0042 may run one Kyverno replica because multiple replicas on one physical server do not provide node HA and consume additional memory. This is an explicit availability reduction, not an enforcement reduction. Admission unavailability MUST fail closed for protected production creates/updates and MUST NOT become an allow/bypass path.
+
+The single-server profile may reduce the number of active policies, but the retained high-value policy set MUST continue to enforce at least:
+
+- digest-only images;
+- approved signature/signer identity;
+- build provenance/attestation;
+- signed CycloneDX SBOM attestation;
+- prohibited privileged, unsafe host-network/`hostPath`, and unsafe security-context patterns unless a specific current exception exists;
+- dedicated ServiceAccount and critical deployment invariants that are reliable admission properties.
+
+Policy reduction requires an inventory proving that a removed policy is redundant, non-security-critical for the profile, or enforced by another blocking control. Removing Kyverno itself or changing production enforcement to audit-only is prohibited.
+
+Bootstrap/control-plane exclusions are narrow, versioned, owned, and tested. Emergency deployment still requires a separately trusted audited signer; unsigned production deployment is prohibited.
 
 ### Policy-engine network safety
 
@@ -42,8 +59,10 @@ The Technology Baseline must use an upstream-supported Kyverno minor compatible 
 
 ## Verification requirements
 
-Verify digest-only references, valid signer, wrong signer, unsigned image, missing/invalid provenance, missing/invalid SBOM, exact signer identity, audit-to-deny promotion, HA admission, narrow exemptions, policy-authoring RBAC, disabled/unneeded HTTP context, destination allow-list/blocklist behavior when HTTP context is approved, cloud-metadata/loopback/private-target SSRF negatives, credential non-forwarding, and fail-closed external-context behavior.
+Both profiles verify digest-only references, valid signer, wrong signer, unsigned image, missing/invalid provenance, missing/invalid SBOM, exact signer identity, audit-to-deny promotion, narrow exemptions, policy-authoring RBAC, disabled/unneeded HTTP context, destination allow-list/blocklist behavior when HTTP context is approved, cloud-metadata/loopback/private-target SSRF negatives, credential non-forwarding, and fail-closed external-context behavior.
+
+`production-ha` additionally proves admission remains available through one replica/node disruption. `production-single-server` proves the reduced policy inventory still covers all mandatory controls, one-replica admission fails closed when unavailable, and no removed policy creates an unsigned/privileged/identity bypass.
 
 ## Rollback considerations
 
-Rollback MUST preserve digest pinning, trusted signature/provenance/SBOM enforcement, narrow signer identity, admission HA, policy-authoring least privilege, and policy-engine network/SSRF controls. It MUST NOT restore deprecated policy types as new authority, broaden signer trust, enable unsigned emergency deployment, or enable unrestricted policy HTTP access.
+Rollback MUST preserve digest pinning, trusted signature/provenance/SBOM enforcement, narrow signer identity, profile-required admission behavior, policy-authoring least privilege, and policy-engine network/SSRF controls. It MUST NOT restore deprecated policy types as new authority, broaden signer trust, enable unsigned emergency deployment, enable unrestricted policy HTTP access, remove Kyverno, or weaken production enforcement to audit-only.

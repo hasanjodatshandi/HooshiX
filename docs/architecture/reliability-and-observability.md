@@ -4,323 +4,228 @@
 
 Reliability is built from bounded work, finite deadlines, durable local state, idempotency, explicit dependency semantics, and failure isolation. Blind retry or timeout inflation is not a reliability strategy.
 
-Avoid deep synchronous chains. Normal design allows at most two consecutive synchronous hops after the BFF; deeper chains require explicit architecture justification. N+1 service calls are prohibited.
+ADR-0042 selects `production-single-server` as the initial production topology. This profile deliberately accepts infrastructure availability loss. It does **not** weaken correctness, security, durability evidence, fail-closed behavior, or recovery requirements.
 
-Independent downstream calls may run concurrently when correctness permits, but Virtual Threads never make PostgreSQL connections, Redis capacity, provider quota, CPU, memory, crypto, SQLite I/O/connections, HTTP/gRPC pools, or queues unbounded.
+## 2. Dependency failure semantics
 
-## 2. Generic synchronous budgets
+`dependency-criticality.yaml` is the machine-readable authority for synchronous dependency criticality, deadlines, retry ownership, failure action and fallback policy. Its rendered matrix is generated evidence, not a second decision source.
 
-Generic ceilings:
+For every synchronous edge:
 
-```text
-Client/Gateway:       3000 ms
-BFF total budget:     2600 ms
-gRPC downstream:      1500 ms
-Database statement:    800 ms
-Pool acquisition:      200 ms
-```
+- caller deadline is finite;
+- child deadline fits the remaining parent budget;
+- cancellation propagates where the technology supports it;
+- retry is finite and owned by one layer only;
+- layered mesh + client/application retry for the same failure is prohibited;
+- bulkheads/queues/concurrency are bounded;
+- fallback exists only when the operation-level registry explicitly permits it;
+- security/authorization dependencies never fabricate success on error.
 
-A more-specific current contract/ADR overrides these generic values. Every network/database call has finite budget; child deadlines fit within remaining parent budget; cancellation propagates where supported.
+Authorization remains one authoritative online `CheckPermission`, one attempt, no stale permission cache/fallback/retry and fail closed.
 
-Retry is finite, safe/idempotent, jittered when appropriate, and owned by exactly one layer. Duplicate application + client + mesh/gateway retry for same failure is prohibited.
+## 3. Virtual Threads and bounded resources
 
-## 3. Web BFF critical paths
+Java Virtual Threads do not create downstream capacity. Hikari connections, Redis operations, Kafka IO, provider quotas, CPU-heavy work, cryptographic work and storage IOPS remain finite shared resources.
 
-Web BFF is the browser aggregation boundary and therefore owns bounded fan-out rather than hidden retry/reconstruction.
+Adapters use bounded concurrency/queues where required. CPU-heavy work uses bounded workers. Queue growth and pool wait are observable. `Thread.sleep` is not a coordination strategy.
 
-Current browser/session/application dependencies are registered individually:
+In `production-single-server`, all platform and application components compete for one host. Complete-stack CPU/RAM/storage pressure is therefore a first-class reliability signal, not a local component detail.
 
-```text
-session Redis lookup:          AUTHORITATIVE_SECURITY, no fallback
-semantic-quota Redis:          AUTHORITATIVE_SECURITY, 75 ms, one attempt, no retry
-Google OIDC protocol edge:     AUTHORITATIVE_SECURITY, protocol-safe handling only
-Identity OIDC evidence:        AUTHORITATIVE_SECURITY, one attempt, no fallback
-Identity audience token:       AUTHORITATIVE_SECURITY, <=1500 ms, one attempt, no retry/fallback
-Authorization management:      AUTHORITATIVE_SECURITY, <=1500 ms, one attempt, no retry/fallback
-Reference Data read:           AUTHORITATIVE_STATE, <=1000 ms, one attempt, no retry/fallback
-registered resource dispatch:  AUTHORITATIVE_STATE, bounded child deadline, no fabricated data
-```
+## 4. Production availability profiles
 
-The inbound BFF request retains the 2600ms outer budget. Child deadlines are capped by remaining parent budget even when their registered ceiling is larger than remaining time. HTTP client disconnect/deadline cancellation propagates through Redis/provider/gRPC work where supported and releases bounded in-flight permits.
+### 4.1 `production-single-server`
 
-Session Redis failure never reconstructs authenticated state from cookies/browser data. OIDC quota failure never bypasses abuse control. Identity token-broker failure never reuses an expired/stale/fabricated JWT. Authorization-management/resource-service outage never becomes local management allow or fabricated business response. Reference Data failure never becomes a locally reconstructed or stale server-side list.
+The selected initial profile has no infrastructure HA claim for:
 
-BFF session `last_seen` persistence is intentionally coalesced to at most once per five-minute activity window to reduce Redis write amplification; absolute expiry is immutable and Identity RefreshFamily validity remains an upper bound. The User->sessions index makes global revocation/erasure bounded rather than requiring a Redis-wide scan.
+- Kubernetes control plane/node;
+- workload rescheduling to another node;
+- PostgreSQL primary;
+- Redis;
+- Kafka broker/controller;
+- Kyverno admission plane;
+- host maintenance.
 
-BFF refresh-key handling is local. The last fully validated key-ring snapshot can bridge source outage for <=1h; after that, operations requiring refresh encrypt/decrypt fail closed. Reload is atomic so partial/corrupt replacement never poisons active keys. Key-source outage does not justify storing plaintext refresh credentials or making per-request OpenBao calls.
+A host/node/kernel/storage event may stop the complete platform. This is formally accepted only after operator sign-off and recovery evidence.
 
-Access JWT server-side retention, when used, ends no later than JWT `exp` and is invalidated by relevant session/tenant/assurance change. It is transport reuse only and never a permission-result cache; final resource authorization remains online in the resource-owning service.
+Security/correctness behavior remains fail closed. Examples:
 
-Public Reference Data representations are intentionally HTTP-cacheable under ADR-0041 using deterministic ETag and `Cache-Control: public, max-age=3600`. This is client/proxy representation caching after a valid response, not a BFF authoritative-state fallback. BFF does not maintain a stale server cache to hide Reference Data outage.
+- Authorization failure never becomes ALLOW;
+- Redis security decision failure never becomes local quota/session bypass;
+- Kafka outage does not change Outbox/Inbox/idempotency or turn Kafka into business truth;
+- PostgreSQL outage does not authorize unsafe state reconstruction;
+- Kyverno outage does not create an admission bypass;
+- Ambient resource pressure does not authorize disabling workload identity/mTLS;
+- OpenBao outage follows existing mounted/local-key/recovery contracts and does not authorize plaintext/Git fallback.
 
-BFF runtime/load evidence separately tracks auth/OIDC, session/bootstrap, Identity onboarding, Authorization-management, Reference Data and resource-dispatch route classes. HPA is enabled only after load evidence demonstrates a signal that does not amplify saturated Redis/downstreams.
+### 4.2 `production-ha`
 
-## 4. Authorization critical paths
+The expansion profile retains current redundant Kubernetes, dedicated PostgreSQL, Kafka, Redis, Kyverno and workload replica topology. Its failure tests prove one-component/node loss according to the applicable SLO and ADR.
 
-Tenant resource authorization contract:
+## 5. SLO and error-budget interpretation
 
-```text
-CheckPermission deadline: 300 ms
-attempts: 1
-wait-for-ready: off
-retry/cache/stale fallback: none
-availability: >=99.95% rolling 30d
-p95 <=100 ms
-p99 <=200 ms
-engineering target p95/p99 <=75/150 ms
-```
+ADR-0005 and service-specific ADRs remain the SLO authority.
 
-Resource services perform one final authoritative online check. Safe local validation may reject malformed/invalid traffic but never grant authority. Successful `CheckPermission` RPC completion means ALLOW; authoritative deny is a denial status, not successful `allowed=false`. Routine duplicate BFF resource permission checks are prohibited.
+Application SLIs continue to be measured in both profiles. The single-server profile MUST NOT claim that infrastructure redundancy-dependent availability is proven merely because an application-level percentage target is written in an ADR/service document.
 
-Identity platform-only tenant/legal-hold operations use separate authoritative edge:
+For `production-single-server`:
 
-```text
-CheckPlatformPermission deadline: 300 ms
-attempts: 1
-wait-for-ready: off
-retry/cache/fallback: none
-failure: fail closed
-```
+- record actual user-visible availability, latency, correctness and dependency error rates;
+- retain burn/error-budget observability where a service SLO is defined;
+- mark node-failover/replica-failover objectives `Not applicable to production-single-server` when physical redundancy is required to prove them;
+- production approval requires explicit acceptance of whole-platform node-failure/maintenance downtime;
+- repeated or unacceptable downtime is a trigger to move to `production-ha`.
 
-Only Identity may call this operation. Platform-check failure blocks platform-authorized operation and never fabricates `platform_admin` authority or falls back to tenant permission. Platform profile never changes tenant/resource authorization meaning.
+Security/correctness gates do not become N/A because the profile is non-HA.
 
-Authorization tenant-management RPCs are authenticated through BFF facade but authorization is evaluated locally in Authorization from locally verified exact-audience Identity JWT; no self-gRPC authorization dependency is introduced.
+## 6. PostgreSQL reliability and recovery
 
-Authorization `AUTH_ADMIN_WRITE` quota is evaluated before local PostgreSQL mutation transaction. Its cost equals actual bounded semantic mutation count; consumed quota is not refunded on later DB failure, while DB mutation itself remains all-or-none. This prevents abuse amplification without holding DB locks across Redis I/O.
+Both profiles retain continuous WAL archive, encrypted off-site physical backup, daily base backup, 35-day PITR, monthly retained recovery artifacts, monthly restore evidence and quarterly full cold-DR.
 
-Paging uses paired multi-window burn:
+`pg_dump + cron` is not the production recovery strategy.
 
-- 14.4x: 5m + 1h -> page;
-- 6x: 30m + 6h -> page;
-- 3x: 2h + 24h -> reliability/release-risk action.
+`production-single-server`:
 
-Breaker opening follows current ADR-0032 criteria. Repeated OPEN timing and HALF_OPEN behavior follow ADR-0036: de-correlated bounded reopen backoff, at most one real `CheckPermission` probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, and no tenant-tier variation.
+- one physical PostgreSQL process/host/storage failure domain for mutable service databases;
+- distinct DB/runtime role/migration role/Flyway/RLS boundaries remain;
+- no automatic primary failover claim;
+- physical PITR restores the whole shared cluster into an isolated recovery environment;
+- service-specific recovery then transfers only the required database through the approved controlled procedure;
+- a failed shared-cluster restore blocks ordinary promotion for affected PostgreSQL-backed services as defined by ADR-0037.
 
-Owner safety is correctness boundary rather than availability optimization. Identity Membership-removal reservations and local `tenant_owner` assignment/removal/demotion share same tenant-scoped serialization domain. Unresolved reservations remain fail-closed and never auto-expire into owner capacity.
+`production-ha` retains per-service dedicated physical clusters, failover and independent physical backup identities.
 
-## 5. Semantic quota dependency
+Restored data does not receive traffic until integrity, schema, RLS and applicable erasure/legal-hold reconciliation pass.
 
-ADR-0024 is the single current quota decision:
+## 7. Kafka reliability and replay
 
-```text
-Redis budget: 75 ms
-attempts: 1
-retry: none
-failure: fail closed
-```
+Kafka is rebuildable async transport, not business authority.
 
-Quota time uses trusted application time + Redis `TIME`, <=2s permitted skew, monotonic effective time, and no security-significant reset based only on TTL expiry.
+Single-server topology is one combined KRaft broker/controller, RF=1/minISR=1, `acks=all`, idempotence and unclean leader election disabled. Broker/node/disk outage may stop async transport and may lose broker-local data. That exposure is accepted only because critical event flows retain service-owned publication/reconstruction and Inbox/dedup evidence for the required recovery horizon.
 
-BFF OIDC protocol quotas are separate from Identity Google-login subject/network pressure. Both can apply because they protect different stages. Exact BFF values are `OIDC_START/network 60, refill 1/5s, 1h cleanup` and `OIDC_CALLBACK/network 120, refill 2/1s, 30m cleanup`, plus independent max five live pre-auth transactions/browser.
+HA topology retains RF=3/minISR=2 with the current broker/controller failure tests.
 
-## 6. Compromised Password critical path
+Both profiles require:
 
-Password create/change/reset uses the registered `identity.password-credential-write` authoritative-security edge:
+- Transactional Outbox for atomic state+publication business effects;
+- at-least-once consumer assumption;
+- idempotent/Inbox semantics where required;
+- finite retry/DLQ behavior;
+- stable event identities;
+- critical publication/dedup evidence for at least 35 days;
+- clean-cluster rebuild/replay/reconstruction tests.
 
-```text
-Identity -> Compromised Password `LookupCompromisedPasswordRange`
-deadline:        <=900 ms overall
-attempts:        1
-wait-for-ready:  off
-retry:           none
-fallback/cache:  none
-failure:         reject unchecked password
-```
+## 8. Redis reliability
 
-Identity computes the full SHA-256 locally and sends only the 20-bit/five-uppercase-hex prefix. Compromised Password performs one fixed indexed disk-backed read from the approved immutable SQLite dataset. It returns only the bounded suffix/count range and Identity performs exact full-digest comparison. Raw password/full digest/User identity never enters the service.
+Security Redis is ephemeral security state, not business source of truth.
 
-The serving process has no HIBP/external compromised-password provider dependency, no Redis/PostgreSQL/Kafka dataset dependency and no full-dataset JVM cache. SQLite database missing/corrupt/incompatible/read failure, storage saturation, bounded queue/concurrency saturation, malformed/oversized result, or deadline expiry fails closed. Runtime never truncates a prefix range into an empty/partial successful answer because that could create a false clean result.
+Single-server uses one TLS/ACL/`noeviction` Redis with AOF `appendfsync everysec`. AOF assists restart recovery but is not HA. If session state is lost, users reauthenticate. Covered semantic-quota/session decisions remain fail closed while Redis cannot produce a valid decision.
 
-The service uses the current Class-B objective:
+HA uses the current primary/replica/Sentinel topology and failover tests.
 
-```text
-availability >=99.95% rolling 30d
-p95 <=250 ms
-p99 <=750 ms
-```
+Memory headroom, eviction count, AOF/rewrite latency, time-source health and operation latency are observable without raw/high-cardinality subject labels.
 
-Representative multi-million-row load measures warm/cold storage conditions, prefix-cardinality distribution, SQLite read latency, I/O saturation, bounded in-flight/queue behavior, gRPC result size and replica/node loss. HPA remains evidence-gated.
+## 9. Istio/Kyverno reliability in the single-server profile
 
-The SQLite artifact is rebuildable reference data rather than mutable business state. A failed pod/node is replaced with the same approved dataset version. Cold DR restores/redeploys the immutable dataset artifact and keeps the service unready until compatible identity/schema/integrity checks pass. No stale/corrupt artifact becomes a fallback.
+Istio Ambient is retained and must fit the complete-stack capacity envelope. Track `istiod`, CNI and `ztunnel` CPU/RAM, request p95/p99 impact, connection pressure, restarts/OOM and Calico interaction. A failed benchmark blocks production approval.
 
-## 7. Reference Data critical path
+Kyverno may use one replica in the single-server profile. Admission availability is lower, but fail-closed enforcement remains. Track admission latency/errors/unavailability and policy-engine resource pressure. Existing workloads are not killed merely because admission later becomes unavailable.
 
-ADR-0041 defines an architecture-decided but implementation-gated service. Once the implementation trigger is met, the initial runtime edge is:
+The HA profile retains redundant Kyverno and node/failure-domain behavior.
 
-```text
-Web BFF -> Reference Data typed read
-deadline:        <=1000 ms and <= remaining parent budget
-attempts:        1
-wait-for-ready:  off
-retry:           none
-fallback/cache:  none on the server side
-failure:         affected reference route unavailable; no fabricated data
-```
+## 10. Human-access and audit reliability
 
-Reference Data owns only small global Country/Currency/TimeZone/SupportedLocale metadata. The serving process performs no ISO/IANA/Unicode/CLDR Internet synchronization and has no PostgreSQL/SQLite/Redis/Kafka data path. Its immutable versioned bundle is built offline and packaged into the signed application image; exact source revisions and content digest are bundle metadata.
+Required privileged-access audit is authoritative security evidence, not best-effort telemetry.
 
-The service uses Class B when implemented:
+Single-server uses hardened OpenSSH/FIDO2 + time-bounded privilege + OS/`sudo`/Kubernetes/database audit. Required records are exported off-host to append-only/tamper-resistant storage so loss or compromise of the single host does not erase the only audit copy. Shell history/`.bashrc` is not a recovery or audit substitute.
 
-```text
-availability >=99.95% rolling 30d
-p95 <=250 ms
-p99 <=750 ms
-```
+HA uses the current Teleport session/audit model.
 
-Public valid BFF representations may be cached by clients/proxies for one hour with deterministic ETag, but BFF does not keep a server-side stale fallback. Bundle invalidity/startup failure keeps the service unready; runtime does not fetch or synthesize a replacement.
+Audit pipeline failure is an incident condition with explicit operational handling; it MUST NOT silently downgrade privileged-session evidence requirements.
 
-Load evidence covers list/detail/pagination, <=128 KiB response bounds, startup bundle validation/memory, bounded in-flight/queue behavior, BFF conditional-cache behavior, and replica/node loss. HPA remains evidence-gated. Executable evidence remains `NOT VERIFIED` until ADR-0041's consumer/journey trigger and implementation occur.
+## 11. OpenBao reliability — unchanged
 
-## 8. Notification critical contracts
+ADR-0042 does not change OpenBao.
 
-```text
-SubmitNotification:        900 ms, one attempt, no transport retry
-ReportNotificationResult:  750 ms, one attempt, durable dispatcher retry outside RPC
-```
+OpenBao remains the current secret authority with the existing Raft/PVC, Shamir, encrypted snapshot, restore/unseal and External Secrets workflows. Normal hot paths use validated mounted/local material so OpenBao is not a per-request availability dependency.
 
-Unknown handoff outcomes recover through stable idempotent replay. Provider ambiguity remains unknown and is reconciled; it never authorizes blind resend.
+Secret-source recovery evidence remains mandatory. A profile capacity problem MUST NOT be solved by deleting/replacing OpenBao without a separate current security decision.
 
-Notification uses PostgreSQL-authoritative immutable deadlines and short durable `DISPATCHING` transaction before provider I/O. No application clock-health/fence control plane or request-path OpenBao RPC exists in current runtime.
+## 12. Observability model
 
-## 9. Dependency failure containment
+Use OpenTelemetry/Micrometer with structured, bounded telemetry.
 
-Canonical synchronous edge registry is `dependency-criticality.yaml`; its Markdown matrix is generated.
+Required signals include, where applicable:
 
-Every production synchronous edge has finite deadline, bounded in-flight work/queue, one retry owner, explicit fallback/failure action, stable error mapping, and test evidence. Criticality is operation->dependency, not whole-service label.
+- request rate, latency, errors and saturation by low-cardinality route/operation;
+- parent/child deadline exhaustion and cancellation;
+- bulkhead/queue/pool wait and rejection;
+- PostgreSQL pool/query/transaction/WAL/archive/backup/restore/storage pressure;
+- Redis latency/memory/eviction/AOF/time-source state;
+- Kafka produce/fetch/consumer lag/disk/rebuild/replay state;
+- Istio/Kyverno/edge control-plane health;
+- node CPU/memory/pressure/storage/free-space in single-server;
+- security/authentication/authorization/abuse signals without raw subject identifiers;
+- last successful backup/restore/DR evidence and overdue status;
+- audit export health.
 
-- authoritative security/state failure blocks according to the operation contract;
-- durable commands remain pending only after local durable intent exists;
-- external side effects preserve ambiguous outcome semantics;
-- optional reads degrade only through explicitly registered bounded fallback;
-- missing fallback means no fallback.
+Trace/log/metric dimensions never use unbounded tenant/user/session/request/resource identifiers.
 
-Circuit breakers are used when repeated dependency failures would otherwise consume scarce caller resources and OPEN behavior is semantically safe; they are not blanket annotations around every remote call. Database/Redis/SQLite correctness relies primarily on bounded connections/timeouts/storage/transaction or immutable-artifact semantics rather than generic breaker that obscures outcomes. Reference Data relies on immutable-bundle readiness plus bounded local serving; no generic breaker is allowed to invent stale data.
+## 13. Logging and PII
 
-## 10. PostgreSQL, Redis, SQLite, and immutable application reference data
+Logging is allow-list based, structured and injection-safe.
 
-Critical service PostgreSQL clusters use current three-instance CloudNativePG synchronous required-durability/failover model. Safe primary recovery target is <=60s for ordinary failover only when acknowledged durability can be preserved; unsafe promotion fails availability instead of acknowledged data.
+Do not log raw passwords, OTP/recovery codes, tokens, cookies, private keys/secrets/provider credentials, full request/response bodies, unreviewed SQL binds, complete gRPC metadata or unreviewed exception/provider payloads.
 
-Authorization uses jOOQ/JDBC and keeps permission queries bounded; critical plans/indexes are measured. No remote dependency is placed inside its DB transaction merely to improve policy composition.
+PII appears only for approved purpose with masking/tokenization or managed-key HMAC pseudonymization where correlation is required. Metric labels remain low-cardinality.
 
-Security Redis uses one primary + two replicas + three Sentinel voters. Failover tests cover quota/session semantics and fail-closed behavior where dependency is authoritative. Web BFF tests additionally prove HMAC session/pre-auth locators, User->sessions index integrity, no session resurrection, last-seen write coalescing, and max-five pre-auth behavior across failover/restart.
+Ordinary telemetry may use bounded buffering/sampling/drop according to its contract. Required audit/security evidence MUST NOT be silently dropped or reclassified as ordinary telemetry.
 
-If BFF sessions and quota workloads materially interfere, split Sentinel deployments before Redis Cluster. Failover/capacity pressure does not permit eviction, plaintext identifiers, or bypass of authoritative checks.
+## 14. Single-server recovery order
 
-ADR-0040 SQLite is not a mutable replicated database. Availability comes from >=3 service replicas using the same approved immutable local dataset artifact plus normal pod/node replacement. Dataset artifact integrity/version/readiness and rebuild/redeploy recovery are tested; PostgreSQL WAL/PITR and Redis failover semantics do not apply to it.
+A full-host recovery/reboot uses a tested dependency-safe order. Exact commands belong in runbooks, but evidence proves at least:
 
-ADR-0041 Reference Data uses no database. Its small immutable bundle is application content inside the signed image. Recovery/replacement uses the same approved image/bundle, and startup/readiness validates bundle identity before serving. PostgreSQL/Redis/SQLite recovery semantics do not apply.
+1. host/storage/network/time baseline is healthy;
+2. K3s control plane and Calico are healthy;
+3. OpenBao/secret delivery and required local mounted material can recover under their existing contract;
+4. PostgreSQL and required physical recovery state are healthy;
+5. Redis/Kafka recover with their profile-specific semantics;
+6. Istio/Kyverno/edge security controls are healthy before unsafe traffic/deployment paths open;
+7. applications become ready only after local/security dependencies permit safe service;
+8. audit/telemetry confirms recovery and no fail-open bypass occurred.
 
-## 11. SLO classes and error budgets
+The exact sequence is validated by reboot/recovery tests rather than assumed from startup ordering.
 
-ADR-0005 defines current generic classes:
+## 15. Capacity/recovery triggers for `production-ha`
 
-### Class A
+Move from single-server toward HA when any of these becomes material:
 
-Critical interactive security transactions:
+- business requirement for maintenance without full-platform outage;
+- repeated node/host incidents or unacceptable user downtime;
+- inability to keep >=30% validated CPU/memory headroom;
+- persistent PostgreSQL/Redis/Kafka/telemetry storage contention;
+- security/control-plane components cannot meet safe latency/capacity on one host;
+- shared PostgreSQL blast radius or upgrade window becomes unacceptable;
+- recovery tests show single-server RTO is no longer acceptable;
+- broker/session/security dependency availability needs exceed the non-HA profile.
 
-```text
-availability 99.90% rolling 30d
-p95 <=500 ms
-p99 <=1500 ms
-server timeout ceiling 2s
-```
+Do not mask these triggers by weakening correctness or security.
 
-### Class B
+## 16. Verification
 
-Generic critical internal dependency baseline:
+Required evidence includes the applicable dependency registry/schema/render checks, load/latency/bulkhead tests, restore/PITR/DR evidence, Kafka replay/idempotency tests, Redis failure/time tests, logging/PII controls, security negative tests and smoke/critical-journey evidence.
 
-```text
-availability >=99.95%
-p95 <=250 ms
-p99 <=750 ms
-```
+Single-server additionally requires:
 
-More-specific current contracts such as Authorization, semantic quotas, Notification handoff, BFF operation-specific edges, Compromised Password's 900ms caller ceiling, and Reference Data's <=1000ms BFF child deadline override generic latency envelope where stricter.
+- whole-host reboot/loss/rebuild exercise;
+- complete-stack >=2x projected critical-path/security-dependency load evidence where required;
+- >=30% validated CPU+memory headroom;
+- no OOM/sustained swap/node memory-pressure eviction;
+- storage/IO contention evidence including WAL/AOF/Kafka/telemetry;
+- isolated shared-PostgreSQL PITR and service-specific recovery evidence;
+- Redis AOF/restart/re-authentication behavior;
+- Kafka clean rebuild/replay under RF=1;
+- Ambient/Kyverno benchmark/fail-closed evidence;
+- off-host privileged-audit integrity;
+- explicit operator sign-off on whole-platform downtime risk.
 
-### Class C
-
-99.9% of durably accepted Notification intents begin first provider attempt within five seconds. External delivery is separate SLI.
-
-For a 99.90%/30d objective, approximate error budget is 43m12s:
-
-| Consumption | Response |
-| --- | --- |
-| <25% | normal delivery |
-| >=25% within 24h | reliability review; stop risky releases |
-| >=50% | freeze affected feature releases |
-| >=100% | security/incident/reliability changes only |
-
-Planned maintenance counts when users cannot obtain service. Real errors/latency are never hidden by ad-hoc grace periods.
-
-## 12. Disaster recovery
-
-Cold DR sequence:
-
-```text
-clean Kubernetes/GitOps foundation
--> restore OpenBao control plane
--> restore service CloudNativePG/PostgreSQL + PITR where mutable PostgreSQL relational business persistence exists
--> reconstruct Kafka + replay/reconstruct retained service evidence
--> restore/redeploy approved rebuildable reference artifacts such as ADR-0040 SQLite dataset
--> redeploy approved immutable application-bundled reference data such as ADR-0041 when implemented
--> reconcile erasure/legal-hold/data integrity
--> verify secrets/contracts/security
--> smoke/security checks
--> enable traffic
-```
-
-Targets:
-
-```text
-PostgreSQL RPO <=5m
-OpenBao RPO <=1h
-platform RTO <=4h
-PostgreSQL PITR 35d
-```
-
-Every applicable PostgreSQL backup cycle is verified; isolated PostgreSQL restore is monthly per applicable PostgreSQL-backed mutable-state service; full cold DR is quarterly. ADR-0037 requires queryable PostgreSQL recovery evidence and freezes ordinary affected-service promotion after failed restore until replacement evidence passes.
-
-Authorization restore reconciliation must not resurrect erased subject Membership/direct-override/platform-profile authority, reuse retired permission/Role identifiers, release unresolved owner-safety reservations unsafely, or discard required idempotency/audit evidence.
-
-Web BFF security Redis is ephemeral rather than cold-DR business truth. After loss/rebuild, authenticated browser state is not reconstructed from cookies: users reauthenticate. Restored/restarted BFF must not revive expired/consumed pre-auth state or erased/revoked sessions. Required erasure receipts remain in durable participant/coordinator evidence rather than depending on Redis survival.
-
-Compromised Password DR does not restore mutable subject state. It redeploys/rebuilds the approved immutable SQLite artifact and validates dataset version/schema/integrity before readiness. Service unavailability fails password writes closed until the reference dataset is usable.
-
-Reference Data DR, once implemented, redeploys the same approved signed service image/bundle or deterministically rebuilds an approved release from reviewed source/import evidence. There is no DB restore/runtime source download; service remains unready until bundle compatibility/integrity checks pass.
-
-## 13. Observability
-
-Every service emits:
-
-- structured JSON logs to stdout;
-- OpenTelemetry traces;
-- Micrometer/Prometheus-compatible metrics;
-- W3C trace propagation across REST/gRPC/Kafka/workers;
-- bounded low-cardinality dimensions;
-- relevant SLI/SLO/error-budget/burn and saturation signals.
-
-Base safe operational fields may include timestamp, level, service name/version, environment, trace/span/correlation identity, and stable event code. High-cardinality business/security identifiers are not metric labels.
-
-Logging is allow-list based. Raw credentials, passwords/PIN/OTP/recovery codes, tokens/API keys, authorization/cookie headers, session/pre-auth IDs, private keys/secrets, connection strings, payment/high-risk PII, full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, and unreviewed provider/source payload/exception text are prohibited.
-
-Input-derived fields are CR/LF-safe. Production debug elevation is time-bounded/audited and cannot enable sensitive body/bind/credential logging.
-
-Ordinary non-audit telemetry export follows `OBSERVABILITY` dependency class: bounded buffering/drop may keep primary business request serving, but sustained loss/backpressure is observable/alertable. **Required security/audit evidence is different**: when current operation contract classifies it as `AUTHORITATIVE_STATE`, it must be durably persisted/outboxed according to that contract and cannot be silently dropped merely because exporter/backend is unavailable. Log-store access is least privilege and audited.
-
-Authorization records bounded SLO/deny/unavailable/overload/queue/SQL/pool/breaker signals without user/tenant/Membership IDs as metric labels. Required management/platform audit stays in durable local evidence and is not replaced by ordinary telemetry export. Routine `CheckPermission` allow/deny does not synchronously append one durable audit row per request.
-
-Web BFF observability includes bounded route-class latency/error/in-flight, downstream dependency latency/outcome, Redis session/quota latency/failover, session write-coalescing effectiveness, pre-auth-limit/quota rejection counts, key-ring age/reload/staleness, token-broker failures, Reference Data dependency/cache-validator outcomes, body/header-limit rejections and egress/policy denials. It excludes raw URLs when cardinality/sensitivity is unbounded and never labels metrics with user/session/pre-auth/tenant/membership/provider-subject/token IDs.
-
-Compromised Password observability includes lookup latency/outcome, bounded in-flight/queue, SQLite open/query/I/O failure categories, safe dataset-version/format health, safe aggregate record-count/max-prefix-cardinality build evidence and storage saturation. It never logs or labels metrics with password material, SHA-256 prefix/suffix/full hash, returned rows, User/Tenant/Contact/session identifiers, caller metadata, or unreviewed SQLite/JDBC/native exception text.
-
-Reference Data observability, once implemented, includes typed family/operation, latency/outcome, bounded in-flight/queue, bundle readiness/integrity, bounded deployed bundle/format version and safe aggregate record counts. Page tokens, free-form caller values, raw source paths/URLs/files, unbounded source metadata and full response/source payloads are not metric labels or routine logs.
-
-## 14. Required failure evidence
-
-Critical components run applicable timeout/cancellation, overload/bulkhead, PostgreSQL primary loss, Redis Sentinel failover, Kafka broker/controller/replay, OpenBao restore/unseal, WAF/Istio/NetworkPolicy negative, Authorization tenant/platform fail-closed/recovery, owner-safety concurrency, admin-quota-before-DB/no-refund, erased-authority restore reconciliation, Notification provider ambiguity/crash/failover, backup/PITR/DR, ordinary telemetry-loss behavior, required-audit persistence failure behavior, and SLO/burn-alert correctness tests.
-
-Web BFF failure evidence additionally covers client cancellation, session/quota Redis outage/failover, Google/evidence/token-broker/Authorization-management/Reference Data/resource-service outage, no retry/fabrication, stale key snapshot <=1h then fail closed, session rotation/revocation/erasure during failures, OIDC replay/quota pressure, Reference Data cache/no-stale-server-fallback behavior, and deny-by-default egress/wrong-workload behavior.
-
-Compromised Password failure evidence covers malformed prefix, missing/incompatible/corrupt dataset, fixed-query/read failure, path/URI manipulation negatives, no-write/DDL/ATTACH/extension policy, storage latency/saturation, bounded concurrency/queue overload, deadline/cancellation, no response truncation/false clean result, replica/node loss with identical dataset version, no external provider/Internet egress, Java/native dependency compatibility, immutable-artifact rebuild/redeploy and PII/hash-safe telemetry.
-
-Reference Data failure evidence, when implementation starts, covers malformed identifiers/page tokens, unsupported locale, duplicate/source/alias-cycle compiler failures, invalid/incompatible/tampered bundle readiness, <=1000ms deadline/cancellation, bounded concurrency/queue overload, <=128 KiB response limit, replica/node loss, no database/broker/runtime-source dependency, no arbitrary Internet egress, no stale/fabricated BFF fallback, immutable-image rebuild/redeploy and low-cardinality telemetry.
+Production readiness remains blocked until required runtime evidence exists.

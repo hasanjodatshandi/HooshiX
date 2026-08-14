@@ -20,7 +20,9 @@ Initial production uses cold disaster recovery. A second continuously running pr
 | OpenBao RPO | <=1 hour |
 | Platform RTO | <=4 hours |
 
-Meeting these targets depends on current off-site artifact availability, GitOps reproducibility, backup/WAL integrity for PostgreSQL-backed mutable state, immutable reference-artifact availability/rebuildability where applicable, access to required OpenBao recovery material, capacity, and exercised runbooks.
+Meeting these targets depends on current off-site artifact availability, GitOps reproducibility, PostgreSQL backup/WAL integrity, immutable reference-artifact availability/rebuildability, OpenBao recovery material, capacity and exercised runbooks.
+
+ADR-0042 selects `production-single-server` as the initial topology. This changes physical recovery blast radius but not the RPO/RTO/recovery-evidence requirements.
 
 ### PostgreSQL recovery evidence
 
@@ -29,27 +31,38 @@ For production services that own mutable PostgreSQL relational business persiste
 - continuous WAL archive to encrypted off-site object storage;
 - daily online physical base backup;
 - 35-day PITR window;
-- monthly retained backup set for 12 months;
+- monthly retained recovery artifact for 12 months;
 - object versioning/immutability where supported;
 - automated verification each backup cycle;
-- isolated PostgreSQL restore every month per applicable service;
+- isolated PostgreSQL restore every month;
 - full DR exercise every quarter.
 
-Each PostgreSQL-backed mutable-state production service has an independent backup namespace/credential/encryption context under the current service-isolation/fleet decisions. Restore evidence records measured RPO/RTO/integrity rather than treating backup-job success as proof of recovery.
+`production-single-server` uses one shared physical PostgreSQL cluster, so physical backup/WAL identity is cluster-wide. Service database/runtime role/migration role/Flyway/RLS ownership remains separate. Physical PITR restores the complete shared cluster into an isolated recovery environment; service-specific recovery then transfers only the required database through the approved controlled procedure without destructively restoring unrelated current databases.
 
-ADR-0040 Compromised Password Service's immutable, read-only, rebuildable SQLite reference dataset is not PostgreSQL business persistence and does not receive fabricated WAL/PITR/monthly database-restore requirements. Its recovery evidence is the approved immutable dataset artifact or deterministic rebuild path, integrity/schema/version validation, and fail-closed readiness/serving behavior.
+`production-ha` retains independent physical backup namespace/credential/encryption context per service cluster.
 
-### OpenBao recovery
+Restore evidence records measured RPO/RTO/integrity rather than treating backup-job success as proof of recovery.
 
-OpenBao creates an encrypted Raft snapshot every hour and before significant upgrades/changes. Snapshot artifacts remain off the primary PVC with the current approved retention/recovery controls. Manual Shamir recovery remains available under the current OpenBao decision.
+ADR-0040 Compromised Password Service's immutable, read-only, rebuildable SQLite reference dataset is not PostgreSQL business persistence and does not receive fabricated WAL/PITR/database-restore requirements. Its recovery evidence is the approved immutable dataset artifact or deterministic rebuild path, integrity/schema/version validation and fail-closed readiness/serving behavior.
+
+ADR-0041 Reference Data similarly recovers from the approved immutable signed image/bundle rather than PostgreSQL.
+
+### OpenBao recovery — unchanged
+
+OpenBao creates an encrypted Raft snapshot every hour and before significant upgrades/changes. Snapshot artifacts remain off the primary PVC with the current approved retention/recovery controls. Manual Shamir recovery remains available under ADR-0011.
+
+ADR-0042 does not change OpenBao topology, secret authority, snapshot, unseal or restore semantics.
 
 ### Rebuildable/ephemeral state
 
-Security Redis quota/session state is ephemeral and is not treated as durable business truth or cold-DR RPO state. It is rebuilt/reset safely according to current security/session semantics.
+Security Redis quota/session state is ephemeral and is not durable business truth or cold-DR RPO state.
 
-Compromised-password datasets and other explicitly rebuildable reference data are reconstructed/redeployed from their approved immutable artifact or deterministic authoritative import/rebuild evidence and remain fail-safe while unavailable. For ADR-0040, traffic requiring password create/change/reset remains fail closed until the compatible SQLite dataset passes readiness/integrity gates.
+- single-server Redis uses one instance with AOF; loss may require session re-authentication and security operations remain fail closed until a valid decision is possible;
+- HA Redis uses the current Sentinel topology.
 
-Kafka is rebuilt from GitOps/configuration and recovered through retained service-owned publication/state evidence according to ADR-0015 rather than restored as business source of truth.
+Kafka is rebuilt from GitOps/configuration and recovered through retained service-owned publication/state evidence under ADR-0015 rather than restored as business source of truth. Single-server RF=1 may lose broker-local data; Outbox/Inbox/replay evidence remains the recovery authority.
+
+Compromised Password and Reference Data are reconstructed/redeployed from approved immutable artifacts and remain fail-safe while unavailable.
 
 ### Cold recovery sequence
 
@@ -57,32 +70,35 @@ Canonical ordering:
 
 ```text
 Disaster
--> provision clean Kubernetes/control plane
--> restore/validate required platform secret authority and access path
--> GitOps reconcile desired infrastructure/workloads
--> restore applicable PostgreSQL-backed mutable-state service clusters to approved recovery points
--> restore/redeploy approved rebuildable reference artifacts such as ADR-0040 SQLite dataset
--> replay erasure/legal-hold and other required post-restore correctness evidence
--> reconstruct Kafka/other rebuildable or ephemeral state as defined by its current contract
--> verify secrets, database/reference-artifact integrity, workload identity/policy, and critical application flows
+-> provision clean selected-profile Kubernetes/control plane
+-> restore/validate required platform secret authority and privileged access path
+-> GitOps reconcile desired infrastructure/security controls
+-> restore applicable PostgreSQL mutable state to approved recovery point
+-> restore/redeploy immutable reference artifacts
+-> replay erasure/legal-hold and required post-restore correctness evidence
+-> reconstruct Kafka/other rebuildable or ephemeral state
+-> verify secrets, database/reference integrity, workload identity/policy, edge/admission and critical application flows
 -> enable traffic only after gates pass
 ```
 
-Actual sequencing may interleave GitOps/platform operators, PostgreSQL restores, and immutable reference-artifact recovery where tooling requires it, but traffic remains disabled until integrity/security/recovery gates succeed.
+For single-server, clean K3s/GitOps rebuild may be safer/faster than restoring Kubernetes operational state. K3s datastore+token are operational recovery artifacts; business persistence and OpenBao recovery follow their owning procedures.
+
+Actual sequencing may interleave operators, PostgreSQL restores and immutable-reference recovery where tooling requires it, but traffic remains disabled until integrity/security/recovery gates succeed.
 
 ### Exercises
 
-- PostgreSQL backup verification: every backup cycle for applicable PostgreSQL-backed mutable-state services;
-- isolated PostgreSQL service restore: monthly for each applicable PostgreSQL-backed mutable-state service;
-- Compromised Password immutable dataset rebuild/redeploy + missing/corrupt fail-closed exercise: quarterly and before material dataset-format/storage changes;
-- Compromised Password replica/node loss with identical approved dataset version: quarterly or before material topology/storage changes;
+- PostgreSQL backup verification: every backup cycle;
+- isolated PostgreSQL restore: monthly according to selected profile;
+- single-server isolated shared-cluster PITR + service-specific non-destructive recovery: monthly/current restore cadence;
+- Compromised Password immutable dataset rebuild/redeploy + missing/corrupt fail-closed exercise: quarterly and before material dataset changes;
 - full cold-DR exercise: quarterly;
+- single-server host/K3s rebuild/recovery: quarterly or before material platform changes;
 - failed required recovery evidence freezes ordinary affected-capability promotion until remediation/revalidation.
 
 ## Verification requirements
 
-Prove, as applicable, PostgreSQL WAL/PITR RPO, monthly isolated PostgreSQL restore integrity/RTO and independent service backup permissions for mutable PostgreSQL state; ADR-0040 immutable SQLite artifact rebuild/redeploy/schema/version/integrity and fail-closed readiness; OpenBao snapshot recovery; clean-cluster GitOps reconstruction; Kafka reconstruction/replay; erasure/legal-hold replay before traffic; workload identity/policy restoration; critical smoke/transaction verification; and quarterly platform RTO <=4h under the documented exercise scope.
+Prove PostgreSQL WAL/PITR RPO, profile-aware isolated restore integrity/RTO, single-server non-destructive service-specific recovery or HA independent service backup permissions as applicable; immutable reference-artifact recovery; unchanged OpenBao snapshot recovery; clean selected-profile Kubernetes/GitOps reconstruction; Kafka reconstruction/replay; erasure/legal-hold replay before traffic; workload identity/admission/edge policy restoration; critical smoke/transaction verification; and quarterly platform RTO <=4h under the documented exercise scope.
 
 ## Rollback considerations
 
-Rollback MUST NOT shorten required recovery evidence/retention, disable PostgreSQL WAL archive for applicable mutable state, replace tested daily physical backups with an unverified scheme, merge service backup credentials, treat backup creation as restore proof, treat an unavailable/corrupt/incompatible immutable reference artifact as healthy, add runtime external fallback for ADR-0040, or enable traffic before integrity/security/post-restore erasure gates pass.
+Rollback MUST NOT shorten recovery evidence/retention, disable PostgreSQL WAL archive, replace tested physical backup/PITR with `pg_dump + cron`, restore unrelated current service databases destructively, merge service application credentials, treat backup creation as restore proof, treat an unavailable/corrupt immutable reference artifact as healthy, remove/change OpenBao through this topology decision, or enable traffic before integrity/security/post-restore gates pass.

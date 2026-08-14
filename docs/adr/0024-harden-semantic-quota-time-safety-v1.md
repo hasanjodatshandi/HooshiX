@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; consolidated to current-only documentation on 2026-08-13; Identity registration quota values, Authorization administration cost semantics, and Web BFF OIDC abuse quotas finalized on 2026-08-14
+2026-08-11; consolidated to current-only documentation on 2026-08-14; Identity registration quota values, Authorization administration cost semantics, Web BFF OIDC abuse quotas, and profile-aware Redis topology finalized on 2026-08-14
 
 ## Decision
 
@@ -14,16 +14,21 @@ Accepted — current effective decision
 
 There is no quota microservice. The operation-owning service owns its semantic security quota policy and isolated Redis namespace.
 
-Production uses approved `security-redis` infrastructure:
+Production uses approved `security-redis` infrastructure with topology selected by the production profile.
+
+Shared controls in both profiles:
 
 - Redis OSS 8.2.x, exact patch from Technology Baseline;
-- one primary + two replicas;
-- three Sentinel voters across failure domains;
 - TLS + per-service ACL identities/key namespaces;
 - `noeviction`;
-- quota state is ephemeral security state, not business source of truth and not part of cold-DR RPO.
+- quota/session state is ephemeral security state, not business source of truth and not part of cold-DR RPO;
+- no availability failure may be converted into an allow/bypass result.
 
-Redis Cluster is not a v1 default because one logical shard preserves atomic multi-dimension evaluation. If BFF-session and quota workloads materially interfere, split physical Sentinel deployments before adding cluster complexity.
+`production-single-server` under ADR-0042 uses one Redis instance with AOF persistence and `appendfsync everysec`. It has no Redis failover and explicitly accepts restart/host outage. AOF reduces restart loss; it does not make the instance HA. Covered security operations remain fail closed while Redis cannot produce a valid decision, and lost BFF session state results in re-authentication rather than authority reconstruction.
+
+`production-ha` uses one primary + two replicas with three Sentinel voters across failure domains.
+
+Redis Cluster is not a default because one logical shard preserves atomic multi-dimension evaluation. If BFF-session and quota workloads materially interfere, split physical Redis deployments or move to the HA profile before adding cluster complexity.
 
 ### Atomic limiter
 
@@ -149,9 +154,8 @@ Dependency/time-source failure is distinct availability error, never fabricated 
 
 ### SLO/capacity
 
-Semantic quota Redis is a Class-B internal security dependency:
+Shared security-dependency constraints in both profiles:
 
-- availability >=99.95% rolling 30d;
 - internal p95 <=10ms;
 - internal p99 <=25ms;
 - 75ms hard call ceiling;
@@ -160,10 +164,18 @@ Semantic quota Redis is a Class-B internal security dependency:
 - zero eviction;
 - bounded time-skew and memory-growth telemetry without raw/pseudonymous subject labels.
 
+`production-ha` retains availability >=99.95% rolling 30d and Redis failover evidence.
+
+`production-single-server` does not claim Sentinel/node failover availability. It records actual user-visible/dependency availability and must pass restart/reboot/fail-closed evidence plus complete-stack capacity tests before production approval. Failure to fit the security state safely on the host requires more capacity or migration to `production-ha`, not weaker quota semantics.
+
 ## Verification requirements
 
-Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, exact Web BFF OIDC_START/OIDC_CALLBACK capacity/refill/horizon behavior, separation from Identity GOOGLE_LOGIN keys, max-five-live-pre-auth composition, exact AUTH_ADMIN_WRITE semantic-mutation counting and 100-mutation bound, Role-permission set-delta charging, quota-before-DB ordering, no quota refund after later failed mutation, atomic actor+scope and tenant/platform cost consumption, Redis outage/failover fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
+Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, exact Web BFF OIDC_START/OIDC_CALLBACK capacity/refill/horizon behavior, separation from Identity GOOGLE_LOGIN keys, max-five-live-pre-auth composition, exact AUTH_ADMIN_WRITE semantic-mutation counting and 100-mutation bound, Role-permission set-delta charging, quota-before-DB ordering, no quota refund after later failed mutation, atomic actor+scope and tenant/platform cost consumption, Redis outage fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
+
+`production-single-server` additionally verifies TLS, `noeviction`, AOF enabled with `appendfsync everysec`, restart recovery, session invalidation semantics when state is lost, and explicit absence of failover claims.
+
+`production-ha` additionally verifies Sentinel failover and replica topology.
 
 ## Rollback considerations
 
-Rollback MUST NOT remove approved registration/Authorization/Web-BFF-OIDC quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, one-unit arbitrarily large admin mutations, quota refund on failed DB mutation, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled.
+Rollback MUST NOT remove approved registration/Authorization/Web-BFF-OIDC quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, one-unit arbitrarily large admin mutations, quota refund on failed DB mutation, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled. Moving to the single-server profile MUST preserve TLS/ACL/noeviction/AOF/fail-closed behavior and MUST NOT be presented as Redis HA.
