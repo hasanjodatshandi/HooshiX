@@ -41,7 +41,9 @@ Traefik requirements:
 - `forwardedHeaders.insecure` is prohibited;
 - public/client-supplied `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-HooshiX-Client-IP` MUST NOT become trusted client identity;
 - Traefik reconstructs downstream forwarding state from the validated connection/client address, not from arbitrary Internet-supplied header values;
-- direct non-L4 public access to the production Traefik application entry point is denied by provider/origin firewall controls where the deployment topology permits it.
+- the production Traefik application entry point accepts public application traffic only from the approved external-L4 source ranges; direct non-L4 Internet access is denied by provider/origin firewall, security-group, routing or an equivalently effective network control.
+
+A deployment that cannot restrict the Traefik application origin to the approved external-L4 path is not production-eligible without a revised current decision. Application-layer header checks do not substitute for this network restriction.
 
 Traefik supports `proxyProtocol.trustedIPs` and `forwardedHeaders.trustedIPs`; insecure forwarded-header trust is not a production setting. Deployment validation MUST use the exact pinned Traefik line from Technology Baseline.
 
@@ -93,7 +95,7 @@ Production verification includes at least:
 
 - client sends a forged `X-Forwarded-For` and the forged value does not become quota identity;
 - client sends forged `Forwarded`, `X-Real-IP`, and `X-HooshiX-Client-IP` values and none become authority;
-- direct request to a non-approved Traefik origin path is denied where origin restriction is available;
+- direct Internet/non-approved-source access to the Traefik application origin is denied before application routing;
 - PROXY protocol from an untrusted source is not trusted;
 - missing/misconfigured external-L4 source preservation is detected and a quota-required operation does not use the L4/Traefik/WAF address as the client;
 - IPv4, IPv6, IPv4-mapped IPv6, malformed, multi-value, and proxy-address cases produce the defined canonical/fail-closed result;
@@ -162,4 +164,4 @@ Client-address trust and management-network controls fail safe.
 
 ## Rollback considerations
 
-Rollback MUST NOT restore ambiguous client-IP authority, trust caller forwarding headers, use an untrusted proxy chain for semantic quota identity, make public SSH reachable, share management peer keys, or make network access a substitute for FIDO2/JIT privilege. If the production deployment cannot preserve the required client source address or management isolation, production traffic/privileged access remains blocked until a reviewed safe path exists.
+Rollback MUST NOT restore ambiguous client-IP authority, trust caller forwarding headers, use an untrusted proxy chain for semantic quota identity, make public SSH reachable, share management peer keys, or make network access a substitute for FIDO2/JIT privilege. If the production deployment cannot preserve the required client source address, restrict the origin to the external-L4 path, or preserve management isolation, production traffic/privileged access remains blocked until a reviewed safe path exists.
