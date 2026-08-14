@@ -9,6 +9,7 @@
 - **Compromised Password v1 implementation contract finalized:** 2026-08-14
 - **Reference Data v1 architecture contract finalized:** 2026-08-14
 - **Production single-server profile finalized:** 2026-08-14
+- **Production network trust boundaries finalized:** 2026-08-15
 
 This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
 
@@ -72,6 +73,7 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | [ADR-0031](0031-enforce-pii-safe-logging-detection-pipeline-v1.md) | PII-safe logging/redaction/canary/runtime detection |
 | [ADR-0035](0035-automate-sbom-vulnerability-response-and-deployment-gates-v1.md) | Continuous SBOM/vulnerability response and deployment gates |
 | [ADR-0038](0038-harden-vulnerability-exceptions-threat-intelligence-and-ownership-v1.md) | Vulnerability exception expiry, threat intelligence, remediation ownership |
+| [ADR-0043](0043-define-production-network-trust-boundaries-v1.md) | Production client-address trust from external-L4 PROXY v2 through Traefik/WAF/BFF, anti-spoofing/fail-closed network-quota context, and dedicated WireGuard management overlay for single-server SSH reachability |
 
 ## Data, Kafka, recovery, and PostgreSQL fleet
 
