@@ -12,10 +12,10 @@ This register contains only ADRs that still carry effective scope. Obsolete pred
 | ADR | Current scope |
 | --- | --- |
 | [ADR-0008](0008-persist-registration-locale-and-reuse-it-for-resend.md) | Registration locale persistence/resend behavior and locale migration safety |
-| [ADR-0009](0009-enable-identity-registration-runtime.md) | Identity EMAIL/PHONE registration runtime/composition, `PENDING -> ACTIVE` gate, profile/contact canonicalization, pending-contact reservation, primary-contact and fixed verification-challenge/quota integration invariants |
-| [ADR-0012](0012-define-identity-tenant-session-external-and-mfa-v1.md) | Complete Identity v1 feature-scoped contract: identifiers, User/profile/contact lifecycle, tenant/invitation/membership lifecycle, concurrency-safe last-owner removal, persistence boundaries, tenantless onboarding/selection, JWT/refresh/session revocation, password recovery/compromised-password protocol, Google signup/evidence/link/unlink, TOTP/SMS MFA, self-erasure entry, idempotency/audit |
+| [ADR-0009](0009-enable-identity-registration-runtime.md) | Identity EMAIL/PHONE local registration runtime/composition, local Credential + verified-Contact login identifiers, `PENDING -> ACTIVE` gate, profile/contact canonicalization, pending-contact reservation/expiry/non-overwrite, primary-contact and fixed verification-challenge/quota integration invariants |
+| [ADR-0012](0012-define-identity-tenant-session-external-and-mfa-v1.md) | Complete Identity v1 feature-scoped contract: identifiers, User/profile/contact lifecycle, tenant/invitation/membership lifecycle, concurrency-safe last-owner removal, persistence boundaries, password/Google primary authentication + MFA continuation, tenantless onboarding/selection, JWT/refresh/session revocation, password recovery/compromised-password protocol, Google signup/evidence/link/unlink, TOTP/SMS MFA, self-erasure entry, idempotency/audit |
 | [ADR-0023](0023-define-identity-jwt-signing-key-lifecycle-v1.md) | JWT signing/verifier key lifecycle, local verification, and <=30-second verifier clock leeway |
-| [ADR-0028](0028-define-data-subject-erasure-execution-and-evidence-v1.md) | Self-erasure authentication shutdown plus cross-service irreversible erasure execution/evidence, server-owned participant registry, async outbox/Kafka coordination, legal-hold ledger/authorization, logical-deletion/retention baseline |
+| [ADR-0028](0028-define-data-subject-erasure-execution-and-evidence-v1.md) | Self-erasure authentication shutdown with Membership/last-owner exit precondition and pending-invitation/session revocation, plus cross-service irreversible erasure execution/evidence, server-owned participant registry, async outbox/Kafka coordination, legal-hold ledger/authorization, logical-deletion/retention baseline |
 
 Core global-user/tenant-membership, logical deletion/legal hold, credential, and package rules are represented directly in current-state architecture/coding documents rather than predecessor ADRs.
 
@@ -48,7 +48,7 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 | --- | --- |
 | [ADR-0001](0001-select-dedicated-caddy-coraza-edge-waf.md) | Dedicated Caddy/Coraza WAF topology |
 | [ADR-0002](0002-define-production-istio-trust-and-enrollment.md) | Istio trust domain/CA hierarchy/enrollment |
-| [ADR-0016](0016-define-web-bff-browser-oidc-and-session-security-v1.md) | Browser OIDC/BFF session/CSRF/CORS security, exact trusted OIDC evidence handoff, Google signup metadata and tenantless `authenticated_onboarding` isolation |
+| [ADR-0016](0016-define-web-bff-browser-oidc-and-session-security-v1.md) | Browser OIDC/BFF session/CSRF/CORS security, exact trusted OIDC evidence handoff, Google signup metadata/unverified-email handling, active-TOTP continuation after Google proof, and tenantless `authenticated_onboarding` isolation |
 | [ADR-0017](0017-enforce-signed-artifacts-and-provenance-at-admission-v1.md) | Signed image/provenance/SBOM admission plus admission-policy authoring and policy-engine network/SSRF safety |
 | [ADR-0029](0029-require-upstream-volumetric-ddos-protection-v1.md) | Upstream L3/L4 volumetric-DDoS protection |
 | [ADR-0030](0030-define-production-human-jit-access-v1.md) | Teleport JIT privileged production access |

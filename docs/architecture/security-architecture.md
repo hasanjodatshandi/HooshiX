@@ -18,23 +18,42 @@ Every tenant-owned row has non-null `tenant_id` unless explicitly global. Produc
 
 Tenant lifecycle is `PROVISIONING`, `ACTIVE`, `SUSPENDED`, `DELETING`, `DELETED`. Creator becomes initial owner. Tenant + creator membership + audit + owner-provisioning Outbox commit locally; activation waits for idempotent Authorization acknowledgement.
 
+Authorization owns `tenant_owner` role state. Membership removal never uses a race-prone read-only owner count. Identity first durably records a removal intent, then calls Authorization `PrepareMembershipRemoval` outside the DB transaction with 300ms maximum, one attempt, no retry/cache/fallback. Authorization atomically creates an owner-safety reservation or returns `LAST_TENANT_OWNER`; reservations do not auto-expire into unsafe allow. Identity then commits removal + durable finalize outbox or durably cancels the preparation if removal does not commit. This protocol prevents simultaneous removals from deleting the final owner without duplicating role authority into Identity.
+
 ## 2. Logical deletion, retention, erasure, legal hold
 
 Logical deletion records `deleted_at`, `deleted_by`, and stable `deletion_reason`; `deleted_at` is authoritative. Normal queries exclude deleted rows by persistence contract. Restoration, include-deleted access, purge, and legal-hold actions are explicit, authorized, and audited.
 
 Default retention is 360 days; expiry creates eligibility, not automatic destruction. Physical purge is unavailable from ordinary repositories/APIs and must be authorized, idempotent, observable, tenant-safe, and blocked by legal hold. Generated technical/security/event/audit IDs are never reused. Domain `ON DELETE CASCADE` is prohibited by default unless a current aggregate decision proves safety.
 
-ADR-0028 governs irreversible data-subject erasure. Identity coordinates a non-PII `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. The required participant registry is server-owned/versioned and cannot be selected or reduced by the caller. Initial required participants are Identity, Authorization, Notification, and Web BFF.
+ADR-0028 governs irreversible data-subject erasure. Identity coordinates a non-PII UUIDv4 `erasure_request_id`; each service erases/anonymizes its owned copies and returns durable non-PII evidence. The required participant registry is server-owned/versioned and cannot be selected or reduced by the caller. Initial required participants are Identity, Authorization, Notification, and Web BFF.
+
+Self-erasure requires authentication age <=5m and active MFA proof when applicable. It is not accepted while the User retains an ACTIVE/SUSPENDED Membership for a non-DELETED Tenant. The User must first leave Memberships, transfer last ownership, or complete tenant deletion through the owner-safe protocol above; erasure never bypasses last-owner safety. Acceptance atomically makes the User `DELETING`, revokes all RefreshFamilies, revokes pending invitations targeting that User, records audit/request state, and creates the erasure outbox. No remote I/O occurs inside that transaction.
 
 Coordination uses local Transactional Outbox + versioned Kafka/Protobuf events and idempotent participant Inbox/receipt processing rather than availability-coupled synchronous fan-out. Critical publication/Inbox-dedup evidence follows the existing 35-day recovery horizon. Restore procedures replay erasure/legal-hold decisions and reconcile required participant receipts before traffic.
 
-Legal hold is an explicit durable audited ledger with `ACTIVE -> RELEASED`, actor, authority/reference, timestamps, policy version, and integrity evidence. Ordinary erasure callers cannot create, release, omit, or bypass a hold. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
+Legal hold is an explicit durable audited ledger with `ACTIVE -> RELEASED`, actor, authority/reference, timestamps, policy version, and integrity evidence. Ordinary erasure callers cannot create, release, omit, or bypass a hold. A hold may block irreversible progress but never reactivates the User or restores sessions. v1 exposes no ordinary self-service erasure undo; irreversible participant work is never cancellable. Crypto-shredding is valid only for separately key-enveloped material with destroyable keys and does not replace erasing ordinary relational PII.
 
 ## 3. Browser/BFF/OIDC security
 
 Browser login uses OIDC Authorization Code + PKCE S256 through Web BFF. BFF stores single-use `state`, `nonce`, and PKCE verifier server-side for <=10m, validates exact redirect, issuer/audience/signature/timestamps, and only permits bounded same-origin relative post-login destinations.
 
-BFF owns provider-protocol validation for browser login/link. Identity does not call Google on that path and does not receive provider authorization codes or provider tokens. After successful validation, BFF invokes the typed Identity gRPC contract over its authorized workload identity with a cryptographically random, short-lived, single-use `evidence_id`, validated canonical `(issuer, subject)`, stable request identity, and only explicitly versioned non-secret evidence metadata. Identity consumes the evidence atomically; email equality never auto-links.
+BFF owns provider-protocol validation for browser login/link/signup. Identity does not call Google on that path and does not receive provider authorization codes or provider tokens.
+
+After successful provider validation BFF creates trusted evidence:
+
+```text
+evidence_id        exactly 256 CSPRNG bits
+evidence_issued_at trusted BFF server time after provider validation
+request_id         canonical UUIDv4
+issuer             canonical validated issuer
+subject            validated provider subject
+metadata           versioned/bounded optional email + email_verified + name suggestions
+```
+
+Identity accepts it only from the authorized BFF workload, for exactly two minutes from `evidence_issued_at` subject to bounded clock tolerance, binds all evidence fields into the idempotency/security fingerprint, and retains spent/replay evidence for >=10m. Equal replay returns the original committed outcome; changed request/payload under the same `evidence_id` returns `OIDC_EVIDENCE_REPLAY`. Browser/provider input cannot extend evidence lifetime.
+
+External identities bind by stable `(issuer, subject)`. Email equality never auto-links. `email_verified=true` may create a verified Contact only if the canonical email is free; collision becomes `ACCOUNT_LINK_REQUIRED`. Missing or `email_verified=false` never creates a Contact automatically. Provider names are suggestions only and never silently complete the Identity profile.
 
 The browser receives no provider token, Identity access/refresh token, internal gRPC credential, trusted role list, or permission list.
 
@@ -49,9 +68,11 @@ Path=/
 no Domain
 ```
 
-Session ID rotates after login, MFA completion, tenant switch, recovery, and elevation. Server-side BFF session state uses an ACL-isolated Redis namespace; idle <=7d, absolute <=30d. Any retained Identity refresh credential is AES-256-GCM encrypted with a BFF-specific local key ring and never stored raw in browser/Redis/telemetry.
+Session ID has >=256 bits CSPRNG entropy and rotates after login, MFA completion, tenant switch, recovery, password reset/change where retained, privilege/assurance elevation, and observed MFA-state changes that preserve a current session. Server-side BFF session state uses an ACL-isolated Redis namespace; idle <=7d, absolute <=30d. Any retained Identity refresh credential is AES-256-GCM encrypted with a BFF-specific local key ring and never stored raw in browser/Redis/telemetry.
 
-A password-success response that requires MFA is only pre-auth state. BFF does not establish the completed authenticated browser session/cookie until Identity confirms the MFA challenge and corresponding session/token issuance.
+A successful primary proof that still requires MFA is only pre-auth state. This applies to password **and** trusted Google proof. BFF does not establish either a normal authenticated session or `authenticated_onboarding` until Identity confirms MFA and creates the corresponding Session/RefreshFamily.
+
+After all required factors, a User with no selected active Membership may have only `authenticated_onboarding`: no normal tenant-scoped resource JWT, only the reviewed Identity onboarding/profile/tenant-create/invitation-accept/tenant-selection allow-list. Zero Membership remains onboarding; one valid Membership selects automatically; multiple follow Identity last-valid/explicit selection. Tenant selection rotates BFF session identity.
 
 Unsafe cookie-authenticated requests require trusted Origin + session-bound synchronizer CSRF token. Fetch Metadata is defense in depth. Credentialed wildcard/reflected CORS is prohibited; same-origin is preferred. CSP/HSTS/nosniff/referrer/Permissions-Policy and frame protection are centrally tested.
 
@@ -67,11 +88,21 @@ m=19 MiB, t=2, p=1
 NFC before hashing
 ```
 
-No arbitrary composition rule or periodic forced rotation. Create/change/reset checks the compromised-password service and hashing/verification uses a bounded CPU/memory bulkhead.
+No arbitrary composition rule, password-history blacklist, or periodic forced rotation exists in v1. Local password login has no username: any active verified email or verified E.164 phone Contact may identify the User; primary status is not required. Unverified/removed Contacts do not authenticate, and unknown/no-local-Credential/wrong-password/blocked-account failures are non-enumerating.
 
-The compromised-password contract is k-anonymous/digest-prefix style: raw password never leaves Identity, including over mTLS. The remote check uses a 900ms overall deadline, one attempt, no automatic retry, finite cancellation/concurrency bounds, and fail-closed behavior. An unchecked password is not committed. The remote check occurs outside an Identity DB transaction and dependency failure remains a distinct availability/security error rather than fabricated “compromised” evidence.
+Create/change/reset checks the compromised-password service and hashing/verification uses a bounded CPU/memory bulkhead. The compromised-password protocol is an internal k-anonymous SHA-256-prefix contract:
 
-External identities bind by stable `(issuer, subject)`. Email equality alone never auto-links an identity. Provider validation/handoff follows the BFF-only evidence contract in §3 and ADR-0012.
+1. NFC normalize and UTF-8 encode inside Identity;
+2. compute SHA-256 locally;
+3. only the first 20 digest bits / five canonical hex characters leave Identity;
+4. parse a bounded suffix + non-negative occurrence-count response;
+5. compare the full digest locally.
+
+Raw password/full digest never leave Identity. The remote check uses a 900ms overall deadline, one attempt, no automatic retry, finite cancellation/concurrency bounds, and fail-closed behavior. Malformed/oversized/ambiguous response fails closed. An unchecked password is not committed. The remote check occurs outside an Identity DB transaction.
+
+Forgot/reset Password applies only when an active local Credential already exists and only through the primary verified Contact. Unknown/non-primary/no-local-Credential initiation is caller-visible non-enumerating. Reset cannot create the first local Credential for an external-only User. Recovery uses a purpose-separated eight-digit CSPRNG/HMAC-only challenge with 10m TTL, five failed tries, 60s resend, replacement invalidation and single use. Active TOTP additionally requires TOTP or a recovery code; there is no automated bypass if both password and MFA recovery are lost.
+
+External identity link/unlink requires recent authentication <=5m and current MFA assurance where applicable. Unlinking the last authentication method fails `LAST_AUTHENTICATION_METHOD`. Successful unlink rotates the retained current refresh/session and revokes other families.
 
 TOTP v1:
 
@@ -82,13 +113,17 @@ TOTP v1:
 - enroll/disable/replace/recovery requires authentication age <=5m;
 - no trusted-device bypass.
 
-When active TOTP exists, successful password verification issues only a short-lived pre-auth MFA challenge. No access or refresh credential is issued until the same challenge is successfully completed with TOTP or one valid single-use recovery code. MFA challenge completion is server-owned, single-use, semantic-quota protected, and non-enumerating.
+When active TOTP exists, **any** successful primary authentication proof—password or trusted Google evidence—creates only a five-minute, single-use pre-auth MFA challenge with maximum five failed proofs. No completed Session/access/refresh credential is issued until that same challenge is completed with TOTP or one valid recovery code. A new successful primary proof invalidates the previous live challenge. An accepted TOTP timestep cannot be replayed for the same enrollment.
 
-Iran SMS MFA uses IPPanel Webservice mode only after ADR-0024 quota evidence, provider contract/credentials, Notification encrypted exact-content lifecycle, MFA/session controls, and delivery/ambiguity tests pass. Local logging SMS is never a production fallback.
+Successful MFA enrollment/disable/replacement/recovery rotates the retained current session/refresh where applicable and revokes other families so sessions established under older assurance state do not silently survive.
+
+Iran SMS MFA uses IPPanel Webservice mode only after ADR-0024 quota evidence, provider contract/credentials, Notification encrypted exact-content lifecycle, MFA/session controls, and delivery/ambiguity tests pass. It is only available when active TOTP is absent; SMS never downgrades an active TOTP requirement.
+
+SMS MFA proof is purpose-separated from all other Identity challenges: exactly eight CSPRNG decimal digits, HMAC-SHA-256 verifier only, no plaintext durable persistence after safe handoff creation, expires no later than the enclosing five-minute pre-auth challenge, maximum five failed proofs across that challenge, 60s resend spacing, replacement invalidation, and single use. Local logging SMS is never a production fallback.
 
 ## 5. Authorization ownership and runtime
 
-Authorization Service owns roles, role permissions, membership-role assignments, direct grants/denies, evaluation, management audit, and private persistence. Permission meaning/resource/domain invariants remain owned by the protected bounded context.
+Authorization Service owns roles, role permissions, membership-role assignments, direct grants/denies, evaluation, management audit, membership-removal owner-safety reservations, Identity-driven tenant/member lifecycle projections, and private persistence. Permission meaning/resource/domain invariants remain owned by the protected bounded context.
 
 Evaluation:
 
@@ -118,7 +153,9 @@ Authoritative deny -> `PERMISSION_DENIED`; dependency/open-breaker failure -> `U
 
 Safe local JWT/claim/tenant/syntax prechecks may reject invalid traffic but never grant access. Bloom filters, signed permission lists, caches, stale allow, or duplicate routine BFF checks are not authoritative.
 
-Production target:
+Identity `PrepareMembershipRemoval` is a separate authoritative-security edge, also 300ms maximum/one attempt/no retry/cache/fallback/fail closed. Its safety result is persisted by Authorization as an idempotent reservation rather than cached/read-only state. Finalize/cancel and owner/member/tenant lifecycle synchronization are durable commands resolved after local Identity intent/Outbox commit.
+
+Production Authorization target:
 
 - >=3 replicas, PDB/topology spread;
 - global + per-caller-principal bounded concurrency;
@@ -129,7 +166,7 @@ Production target:
 
 Breaker opening follows ADR-0032; recovery follows ADR-0036: bounded de-correlated reopen backoff, one real half-open probe in flight, three consecutive infrastructure-successful probes to close, immediate reopen on infrastructure failure/overload, no health-endpoint-authorized closure, no commercial-tier variation.
 
-## 6. Token signing and local verification
+## 6. Token signing, sessions, and local verification
 
 Identity signs access tokens locally using RSA-3072/RS256 private keys sourced from OpenBao/External Secrets and mounted read-only. Key IDs are immutable random values; normal rotation is 90 days with next-key prepublication and >=24h previous public-key overlap.
 
@@ -142,7 +179,11 @@ private:  tenant_id, membership_id, sid
 
 Roles, permissions, `authorization_version`, or equivalent permission snapshots are not authorization authority in the token. `aud` is the exact intended service identifier; wildcard audiences are prohibited. The Identity issuer is typed deployment configuration, with initial production logical value `https://identity.sajtech.internal` unless the reviewed environment configuration supplies the final value before rollout.
 
-Verifiers use a bounded non-secret GitOps public JWK bundle locally. Normal verification makes no Identity/OpenBao/remote-JWKS call and accepts only approved algorithm/issuer/audience/key IDs. Unknown key, algorithm confusion, invalid issuer/audience/time/signature fail closed.
+Verifiers use a bounded non-secret GitOps public JWK bundle locally. Normal verification makes no Identity/OpenBao/remote-JWKS/introspection call and accepts only approved algorithm/issuer/audience/key IDs. Verifier clock leeway is typed configuration and cannot exceed 30 seconds. Unknown key, algorithm confusion, invalid issuer/audience/time/signature fail closed.
+
+Refresh credentials use exactly 32 CSPRNG bytes, Base64URL without padding when encoded, and only purpose-separated versioned HMAC-SHA-256 digests at rest. Idle lifetime is 7d; absolute 30d; rotation invalidates predecessor; reuse revokes the family. A User has at most 20 active RefreshFamilies; creating the 21st revokes the oldest deterministically.
+
+Current logout revokes current family; logout-all/password reset/User suspension/User `DELETING` revoke all; password change, ExternalIdentity unlink, and material MFA-state change rotate retained current credentials and revoke others as defined by Identity. Normal JWT verification has no blacklist/introspection, so a previously issued valid access JWT can remain cryptographically valid only for its remaining five-minute issuance lifetime plus the configured <=30s clock tolerance; online resource Authorization remains authoritative for permission.
 
 ## 7. Semantic security quotas
 
@@ -161,7 +202,7 @@ Atomic multi-dimension enforcement uses reviewed versioned Redis Function/Lua lo
 
 Authentication anti-lockout: source dimensions may block before credential work; subject/account failure pressure is charged on failed credentials but alone cannot reject a subsequently proven correct credential after source controls allow evaluation.
 
-Registration register/resend/confirm, login, external-identity login/link, tenant create/invite, and MFA lifecycle/recovery are all subject to versioned service-owned semantic policy where defined. Caller requests cannot choose quota capacity/refill/TTL/security policy.
+Registration exact current values are server-owned: REGISTER Contact 5/refill1 per15m/24h and network 60/refill1 per5s/1h; RESEND Contact 5/refill1 per10m/2h plus 60s challenge spacing and network 60/refill1 per5s/1h; CONFIRM network 120/refill2 per1s/30m plus challenge-local five-proof cap. Contact-management/recovery variants use distinct domain-separated namespaces even when reusing an approved numeric envelope.
 
 ## 8. Workload identity, mTLS, network security
 
@@ -169,13 +210,13 @@ Production application workloads use dedicated Kubernetes ServiceAccounts and Is
 
 Istio does not replace end-user authorization or native Kafka/PostgreSQL/Redis authentication/ACLs.
 
-Authentication dependency ownership follows the machine-readable registry: Web BFF owns the provider-protocol edge to Google and the trusted evidence/session edge to Identity; Identity does not own a direct Google login/link dependency.
+Authentication dependency ownership follows the machine-readable registry: Web BFF owns the provider-protocol edge to Google and the trusted evidence/session edge to Identity; Identity does not own a direct Google login/link dependency. Identity owns explicit edges to semantic-quota Redis, compromised-password service, Notification durable handoff, Authorization owner/member provisioning, owner-safe Membership-removal prepare/resolution, and tenant lifecycle synchronization.
 
 ## 9. Secrets and cryptographic material
 
 OpenBao 2.6.1 is the authoritative secret source; External Secrets is the normal Kubernetes materialization boundary. Secret values never enter Git, images, Helm/Kustomize values, logs, traces, or metrics.
 
-Rotating key rings are mounted read-only; key purposes are separated and key IDs never rebind to new bytes. Notification/BFF use purpose-specific local AES-256-GCM key rings. Normal application hot paths do not make routine OpenBao RPCs.
+Rotating key rings are mounted read-only; key purposes are separated and key IDs never rebind to new bytes. Notification/BFF/Identity use purpose-specific local key rings where current contracts require them. Normal application hot paths do not make routine OpenBao RPCs.
 
 ## 10. Public edge and DDoS
 
@@ -218,4 +259,4 @@ Human production access uses Teleport JIT SSO/WebAuthn, approvals, short TTL, le
 
 ## 14. Verification
 
-Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse, registration challenge/canonical-contact tests, authentication/OIDC evidence replay/provider-token isolation/MFA pre-auth/session tests, compromised-password raw-value non-egress/deadline/fail-closed tests, exact JWT claim/audience tests, Authorization deny/outage/overload/recovery, semantic-quota failure/time tests, erasure required-participant/legal-hold/Kafka-replay/restore tests, workload identity/mTLS/NetworkPolicy positives and negatives, WAF/bypass/DDoS controls, secret/key rotation/recovery, PII/log-injection canaries, artifact admission/vulnerability gates including policy-authoring RBAC and policy-engine SSRF negatives, privileged-access expiry/direct-access denial, and restore/erasure reconciliation.
+Security-impacting changes run applicable cross-tenant/RLS negatives including pooled-connection tenant-context reuse; local registration Contact reservation expiry/non-overwrite/login identifier/non-enumeration tests; password recovery/no-first-local-Credential tests; OIDC exact 256-bit/2m/10m evidence replay/provider-token/unverified-email/no-auto-link tests; active-TOTP after both password and Google proof; five-minute/five-proof/TOTP-replay/SMS no-downgrade and exact SMS challenge tests; MFA-state-change/session-family revocation; compromised-password 20-bit SHA-256 prefix/raw/full-digest non-egress/deadline/fail-closed tests; exact JWT claim/audience/<=30s leeway tests; Authorization deny/outage/overload/recovery plus concurrent owner-safety reservation/finalize/cancel; semantic-quota exact registration/time/failure tests; self-erasure Membership/last-owner/pending-invitation/session/legal-hold/Kafka-replay/restore tests; workload identity/mTLS/NetworkPolicy positives and negatives; WAF/bypass/DDoS controls; secret/key rotation/recovery; PII/log-injection canaries; artifact admission/vulnerability gates including policy-authoring RBAC/policy-engine SSRF negatives; privileged-access expiry/direct-access denial; and restore/erasure reconciliation.

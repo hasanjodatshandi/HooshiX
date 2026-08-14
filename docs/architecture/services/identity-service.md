@@ -8,7 +8,7 @@ Base package: `com.sajtech.identity`.
 
 The first executable implementation lives at `services/identity-service` and follows the independent-service build/release boundary from the engineering standards.
 
-## 2. Registration, User lifecycle, profile, and Contacts
+## 2. Registration, User lifecycle, profile, Contacts, and local login
 
 User lifecycle:
 
@@ -20,7 +20,9 @@ DELETING
 DELETED
 ```
 
-Local v1 registration supports both EMAIL and PHONE. A new User is `PENDING`. It becomes `ACTIVE` only when the required profile is complete, at least one Contact is verified, and no blocking security/deletion condition exists. The first verified Contact becomes the one active primary Contact automatically.
+Local v1 registration supports both EMAIL and PHONE and creates a User-level local Credential. Password syntax/Argon2id/compromised-password checks apply before that Credential commits; the compromised-password remote call occurs outside every Identity DB transaction.
+
+A new User is `PENDING`. It becomes `ACTIVE` only when the required profile is complete, at least one Contact is verified, the applicable local Credential is valid for local registration, and no blocking security/deletion condition exists. The first verified Contact becomes the one active primary Contact automatically.
 
 Phone registration is implemented but remains disabled in staging/production until ADR-0020 provider/Notification/SMS readiness gates pass. The gate is server-owned typed configuration. Local development may enable the path with the approved local-only SMS substitute.
 
@@ -34,7 +36,9 @@ ADR-0009 is authoritative for:
 - verified email/phone global uniqueness and logical-delete reservation;
 - at most one active primary Contact total;
 - one live pending registration reservation per canonical Contact, bound to the 10-minute challenge;
-- repeated same-live registration continuing the same pending registration non-enumeratingly;
+- repeated same-live registration continuing the same pending registration non-enumeratingly without overwriting already committed protected profile/Credential/security state;
+- reservation expiry releasing the unverified Contact value for a later fresh registration while never reviving the stale challenge;
+- stale PENDING/no-live-reservation state remaining non-authenticatable and becoming bounded cleanup/logical-deletion eligible;
 - no second User/challenge for an already verified/reserved Contact;
 - exactly eight-digit CSPRNG challenge, purpose-HMAC-only persistence, 10-minute TTL, five failed tries, 60-second resend spacing, replacement invalidation, and single use.
 
@@ -51,6 +55,10 @@ RemoveContact
 ```
 
 `UpdateProfile` applies registration name rules. `AddContact` applies the same canonicalization/uniqueness rules and uses a purpose-separated challenge namespace with the ADR-0009 challenge baseline. `SetPrimaryContact` accepts only an active verified Contact. Changing primary or removing a Contact requires authentication age <=5m. An ACTIVE User cannot remove the last verified Contact; removing the primary Contact requires another verified Contact to be made primary first. Account deletion/erasure is the only ordinary v1 path that may remove the last verified Contact.
+
+Local password authentication has no separate username. Any active verified email or active verified E.164 phone Contact identifies the User after canonicalization; primary status is not required, so a verified secondary Contact remains a valid login identifier until removed. Unverified/removed Contacts do not authenticate. Unknown Contact, no local Credential, wrong password, and blocked User states remain caller-visible non-enumerating failures.
+
+A PENDING local User cannot use password login to bypass Contact verification. A PENDING User that has a valid local Credential plus a verified Contact but still requires onboarding may receive only the restricted authenticated-onboarding continuation after all required MFA; normal tenant-scoped JWT issuance still requires the activation/tenant-selection rules below.
 
 `SUSPENDED` blocks new login/refresh. `DELETING`/`DELETED` are non-authenticatable and trigger the session revocation rules below.
 
@@ -145,9 +153,11 @@ After prepare succeeds, one Identity transaction marks Membership REMOVED + audi
 
 Production tenant-owned Identity tables use forced RLS with non-owner `NOSUPERUSER NOBYPASSRLS` runtime roles. Tenant context comes only from validated authenticated context and is installed through the canonical parameterized transaction-local mechanism. Session-scoped pooled tenant state is prohibited; missing/malformed context fails closed; pooled-connection cross-tenant reuse after commit/rollback is a mandatory negative test.
 
-## 6. Authentication, tenantless onboarding, sessions, and tokens
+## 6. Primary authentication, MFA continuation, tenantless onboarding, sessions, and tokens
 
-Successful password + required MFA proof can establish an Identity Session/RefreshFamily even when the User has no active Tenant. A normal access JWT is tenant-scoped and is not issued until a valid ACTIVE Membership/Tenant is selected.
+Primary authentication proof is either local password proof through an active verified Contact or trusted Google evidence through Web BFF. If active TOTP exists, **either** proof creates only the MFA pre-auth continuation; Google cannot bypass TOTP/recovery-code requirements.
+
+After all required factors succeed, Identity can establish a Session/RefreshFamily even when the User has no active Tenant. A normal access JWT is tenant-scoped and is not issued until a valid ACTIVE Membership/Tenant is selected.
 
 Selection:
 
@@ -189,7 +199,8 @@ Revocation:
 - password reset -> all families;
 - User suspension/DELETING -> all families and reject login/refresh;
 - password change -> rotate current session/refresh and revoke all other families;
-- successful ExternalIdentity unlink -> rotate current session/refresh and revoke all other families.
+- successful ExternalIdentity unlink -> rotate current session/refresh and revoke all other families;
+- successful MFA enroll/disable/replace/recovery that changes active MFA material -> rotate the retained current session/refresh when applicable and revoke all other families; a recovery flow may instead revoke all families when the current session is intentionally terminated.
 
 JWT verification stays local from the approved public bundle with no ordinary blacklist/introspection/JWKS network call. An already-issued signed access JWT can therefore remain cryptographically valid until its remaining five-minute lifetime plus only the configured <=30s clock tolerance. Online Authorization still decides resource permission; no permission snapshot is trusted from JWT.
 
@@ -211,9 +222,11 @@ Raw password/full digest never leave Identity. Malformed/oversized/ambiguous res
 
 Change Password requires current password + authentication age <=5m and, when MFA is active, MFA assurance <=5m. It checks compromised-password state before commit.
 
-Forgot/reset uses only primary verified Contact and is non-enumerating. Recovery challenge is purpose-separated but uses eight decimal digits, 10m TTL, five failed tries, 60s resend gap, HMAC-only storage, replacement invalidation and single use. If TOTP is active, reset additionally requires TOTP or one recovery code. Successful reset revokes all RefreshFamilies.
+Forgot/reset applies only to a User that already has an active local Credential and uses only the primary verified Contact. Initiation is non-enumerating for unknown/non-primary/no-local-Credential cases. It never creates the first local Credential for an external-only User.
 
-If both password access and active MFA/recovery material are unavailable, v1 has no automated bypass. Manual/support recovery requires a future security decision.
+Password-recovery challenge is purpose-separated but uses eight decimal digits, 10m TTL, five failed tries, 60s resend gap, HMAC-only storage, replacement invalidation and single use. If TOTP is active, reset additionally requires TOTP or one recovery code. Successful reset revokes all RefreshFamilies.
+
+If both password access and active MFA/recovery material are unavailable, v1 has no automated bypass. Manual/support recovery and first-local-Credential enrollment for external-only Users require a future reviewed security/product decision.
 
 ## 8. External identity and Google signup
 
@@ -238,9 +251,10 @@ Exact same replay returns the original committed result. Same `evidence_id` with
 
 Google may create a new User:
 
-- known `(issuer,subject)` -> existing User authentication;
+- known `(issuer,subject)` -> primary authentication proof for existing User, still subject to active TOTP/MFA before Session completion;
 - unknown -> new PENDING User permitted;
-- verified provider email may create a verified Contact only when canonical email is free;
+- `email_verified=true` provider email may create a verified Contact only when canonical email is free;
+- absent or `email_verified=false` provider email creates no Contact automatically; onboarding uses normal `AddContact` + verification;
 - verified email collision -> `FAILED_PRECONDITION / ACCOUNT_LINK_REQUIRED`, never auto-link;
 - provider email change does not silently change account binding;
 - provider names are suggestions only; user confirmation/update is required for Identity profile completion.
@@ -259,7 +273,7 @@ TOTP:
 - enroll/disable/replace/recover requires authentication age <=5m;
 - no trusted devices in v1.
 
-When TOTP is active, password success creates only a pre-auth challenge:
+When TOTP is active, any successful primary proof—password or Google—creates only a pre-auth challenge:
 
 ```text
 TTL: 5m
@@ -267,9 +281,13 @@ maximum failed proofs: 5
 single use: yes
 ```
 
-No Session/RefreshFamily/access token is completed until the same challenge receives valid TOTP or one valid recovery code. A new successful password proof invalidates the previous live pre-auth challenge. An accepted TOTP timestep cannot be reused for the same enrollment.
+No completed Session/RefreshFamily/access token is created until the same challenge receives valid TOTP or one valid recovery code. A new successful primary proof invalidates the previous live pre-auth challenge. An accepted TOTP timestep cannot be reused for the same enrollment.
+
+Successful MFA enrollment/disable/replacement/recovery changes session assurance state and therefore applies the rotation/revocation rules in §6.
 
 SMS cannot downgrade active TOTP. If TOTP is active, only TOTP/recovery code completes the gate. SMS MFA is available only to accounts without active TOTP and only after ADR-0020/Notification/quota/workload/telemetry production gates pass. `LoggingSmsProviderAdapter` remains local-only and is never production fallback.
+
+SMS MFA proof uses a distinct purpose/key namespace with exactly eight decimal CSPRNG digits, HMAC-only verifier persistence, no plaintext durable storage after safe handoff representation, expiry no later than the enclosing 5m pre-auth challenge, maximum five failed proofs across that challenge, 60s minimum resend spacing, replacement invalidation, and single use. Caller/provider input cannot extend those values.
 
 ## 10. Semantic quotas
 
@@ -291,7 +309,7 @@ Authentication anti-lockout remains mandatory: source gate before credential wor
 
 Identity does not expose internal tokens to React. BFF owns browser session, OIDC transaction/provider validation, PKCE, CSRF, CORS and secure cookies per ADR-0016.
 
-Pre-auth MFA is not an authenticated browser session. `authenticated_onboarding` is authenticated only after full required MFA/session creation, carries no normal resource JWT until tenant selection, and is BFF-allow-listed to Identity onboarding operations.
+Pre-auth MFA after password **or Google evidence** is not an authenticated browser session. `authenticated_onboarding` exists only after all required factors and Session/RefreshFamily creation, carries no normal resource JWT until tenant selection, and is BFF-allow-listed to Identity onboarding operations.
 
 ## 12. PostgreSQL, aggregates, and transactions
 
@@ -317,7 +335,9 @@ No remote gRPC/HTTP/Kafka/Redis/provider I/O inside Identity DB transactions. DB
 
 ADR-0028 makes Identity coordinator of global User erasure. Required participants initially: Identity, Authorization, Notification, Web BFF. Coordination is durable async Kafka + Transactional Outbox; critical publication/Inbox dedup evidence remains 35d and retry/DLQ evidence >=14d where used.
 
-Self-erasure requires auth age <=5m and active MFA proof when applicable. Acceptance transaction sets User `DELETING`, revokes every RefreshFamily, persists audit/request and outbox. Legal hold may block irreversible progress but never re-enables authentication. Legal-hold create/release is platform/legal-authorized and audited. v1 exposes no normal self-service erasure undo; irreversible participant work can never be cancelled.
+Self-erasure requires auth age <=5m and active MFA proof when applicable **and** no remaining ACTIVE/SUSPENDED Membership for a Tenant that is not already DELETED. The User must first leave Memberships, transfer last ownership, or complete tenant deletion. Every Membership exit still uses `PrepareMembershipRemoval`; erasure is not a last-owner bypass.
+
+Acceptance transaction sets User `DELETING`, revokes every RefreshFamily, revokes pending invitations targeted to that User, persists audit/request + outbox, and permits no new invitation acceptance. Legal hold may block irreversible progress but never re-enables authentication. Legal-hold create/release is platform/legal-authorized and audited. v1 exposes no normal self-service erasure undo; irreversible participant work can never be cancelled.
 
 Security audit evidence remains >=365d unless stricter policy. Non-PII erasure receipts follow ADR-0028. Restore replays erasure/legal-hold before traffic.
 
@@ -360,20 +380,21 @@ Repository-complete Identity means code, Protobuf contracts, Flyway migrations, 
 
 Applicable tests include:
 
-- EMAIL/PHONE registration gates, Contact reservation/canonicalization/uniqueness/primary/profile activation;
-- exact registration/contact/recovery challenge and semantic quota boundaries;
+- EMAIL/PHONE registration gates, local Credential/compromised-password registration dependency, Contact reservation expiry/reacquisition/non-overwrite/canonicalization/uniqueness/primary/profile activation;
+- local login through any verified primary/secondary email/phone Contact, removed/unverified Contact denial and non-enumeration;
+- exact registration/contact/password-recovery/SMS-MFA challenge and semantic quota boundaries;
 - User lifecycle and authentication shutdown;
 - profile/contact CRUD + recent-auth/last-contact rules;
 - tenant/invitation/Membership lifecycles, default-member provisioning, slug tombstone, tenant delete/restore;
 - concurrent last-owner prepare reservations, crash/replay/finalize/cancel safety;
 - tenantless onboarding, one/many membership selection, tenant switch;
 - JWT exact claims/audience/leeway, key rotation;
-- 20 RefreshFamily cap, logout/revocation/reuse and <=5m token residual trade-off;
-- password change/recovery, MFA-required reset, no automated password+MFA-loss bypass;
+- 20 RefreshFamily cap, logout/revocation/reuse/MFA-state-change revocation and <=5m+bounded-leeway token residual trade-off;
+- password change/recovery, no reset-first-local-Credential, MFA-required reset, no automated password+MFA-loss bypass;
 - compromised-password prefix-only SHA-256 protocol and deadline/fail-closed behavior;
-- BFF-only Google evidence 256-bit/2m/10m replay, signup/collision/no-auto-link/unlink;
-- TOTP 5m/five-proof gate, timestep replay, recovery code, SMS no-downgrade;
-- self-erasure/legal hold/session revocation;
+- BFF-only Google evidence 256-bit/2m/10m replay, signup/unverified-email/collision/no-auto-link/unlink, and active-TOTP Google MFA continuation;
+- TOTP 5m/five-proof gate, primary-proof replacement, timestep replay, recovery code, SMS no-downgrade and exact SMS proof semantics;
+- self-erasure Membership/last-owner precondition, invitation/session revocation and legal hold;
 - aggregate/transaction boundaries, forced RLS/pool reuse;
 - Notification/Authorization outbox replay/conflict;
 - 35d critical idempotency/dedup, >=365d audit;
