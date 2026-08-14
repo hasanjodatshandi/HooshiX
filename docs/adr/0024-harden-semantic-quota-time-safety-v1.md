@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; consolidated to current-only documentation on 2026-08-13; Identity registration quota values and Authorization administration cost semantics finalized on 2026-08-14
+2026-08-11; consolidated to current-only documentation on 2026-08-13; Identity registration quota values, Authorization administration cost semantics, and Web BFF OIDC abuse quotas finalized on 2026-08-14
 
 ## Decision
 
@@ -33,7 +33,7 @@ PostgreSQL is not used for ephemeral quota counters.
 
 ### Pseudonymous keys
 
-Raw email, phone, user ID, tenant ID, membership ID, provider subject, session ID, or IP address MUST NOT appear in Redis keys or telemetry.
+Raw email, phone, user ID, tenant ID, membership ID, provider subject, session ID, pre-auth identifier, or IP address MUST NOT appear in Redis keys or telemetry.
 
 Keys use domain-separated HMAC-SHA-256 over operation + dimension type + canonical value. IPv4 network dimensions normalize to `/24`; IPv6 to `/64` before HMAC.
 
@@ -102,6 +102,8 @@ Numeric tuning may change through a reviewed security-baseline PR without a new 
 | `GOOGLE_LOGIN` | network | 240 | 4 / 1s | 10m | 1 | pre-auth hard gate |
 | `GOOGLE_LINK` | authenticated user | 5 | 1 / 10m | 1h | 1 | hard gate |
 | `GOOGLE_LINK` | network | 60 | 1 / 10s | 1h | 1 | hard gate |
+| `OIDC_START` | network | 60 | 1 / 5s | 1h | 1 | Web BFF pre-auth hard gate; independent max five live pre-auth transactions/browser |
+| `OIDC_CALLBACK` | network | 120 | 2 / 1s | 30m | 1 | Web BFF callback hard gate before expensive provider/Identity work |
 | `TENANT_CREATE_SELF_SERVICE` | actor | 3 | 1 / 6h | 24h | 1 | hard gate |
 | `TENANT_CREATE_PLATFORM_ADMIN` | platform actor | 30 | 1 / 60s | 2h | 1 | hard gate |
 | `TENANT_INVITE` | actor + tenant | 30 | 1 / 20s | 1h | 1 | hard gate |
@@ -115,13 +117,15 @@ Numeric tuning may change through a reviewed security-baseline PR without a new 
 | `AUTH_ADMIN_WRITE` | actor + scope | 120 | 2 / 1s | 1h | `max(1, semantic_mutations)`, max 100 | hard gate before DB transaction |
 | `AUTH_ADMIN_WRITE` | tenant/platform scope | 600 | 5 / 1s | 1h | same request cost | hard gate before DB transaction |
 
-For `REGISTER`/resend, the contact dimension is the canonical email or E.164 phone after Identity validation and before HMAC pseudonymization. `CONFIRM_REGISTRATION` deliberately has no Redis subject hard-lock bucket; the single challenge's five-failed-proof limit is the subject proof authority so Redis pressure cannot create a separate permanent account/contact lockout.
+For `REGISTER`/resend, the contact dimension is canonical email or E.164 phone after Identity validation and before HMAC pseudonymization. `CONFIRM_REGISTRATION` deliberately has no Redis subject hard-lock bucket; the single challenge's five-failed-proof limit is subject proof authority so Redis pressure cannot create a separate permanent account/contact lockout.
 
-Authenticated `AddContact`/contact-verification add/resend/confirm reuses the corresponding registration numeric envelope under distinct domain-separated operation names and authenticated-user context; it never shares Redis keys with account registration.
+Authenticated `AddContact`/contact-verification add/resend/confirm reuses corresponding registration numeric envelope under distinct domain-separated operation names and authenticated-user context; it never shares Redis keys with account registration.
 
-Password-recovery proof and MFA pre-auth proof use the `MFA_RECOVERY` numeric envelope under distinct domain-separated operation names where Redis pressure is required, while their challenge-local proof-attempt limits remain independently authoritative. Reusing the numeric envelope does not reuse keys or challenge state.
+Password-recovery proof and MFA pre-auth proof use the `MFA_RECOVERY` numeric envelope under distinct domain-separated operation names where Redis pressure is required, while challenge-local proof-attempt limits remain independently authoritative. Reusing numeric envelope does not reuse keys or challenge state.
 
-For Authorization administration, `semantic_mutations` is the number of actual authority-affecting changes in the request. For `ReplaceRolePermissions` it is additions + removals (the set symmetric difference), not the final Role size. A request with more than 100 semantic mutations is rejected before quota/DB mutation. Both AUTH_ADMIN_WRITE dimensions consume the same computed request cost atomically. Quota is evaluated before the Authorization database transaction and consumed quota is **not refunded** when later domain validation/optimistic-concurrency/DB commit fails; this prevents failed-mutation loops from resetting abuse pressure. The database mutation itself remains all-or-nothing with no partial-success response.
+Web BFF `OIDC_START/network` and `OIDC_CALLBACK/network` are BFF-owned domain-separated keys. They do not reuse Identity `GOOGLE_LOGIN` keys: BFF quota protects browser protocol initiation/callback and provider/Identity fan-out, while Identity `GOOGLE_LOGIN` protects trusted identity semantics after provider validation. Both layers may therefore apply without one substituting for the other. The independent BFF maximum of five live pre-auth transactions per browser is not a Redis-token-bucket refill rule and remains enforced separately.
+
+For Authorization administration, `semantic_mutations` is number of actual authority-affecting changes in request. For `ReplaceRolePermissions` it is additions + removals (set symmetric difference), not final Role size. A request with >100 semantic mutations is rejected before quota/DB mutation. Both AUTH_ADMIN_WRITE dimensions consume same computed request cost atomically. Quota is evaluated before Authorization DB transaction and consumed quota is **not refunded** when later domain validation/optimistic-concurrency/DB commit fails. Database mutation remains all-or-nothing with no partial-success response.
 
 ### Failure contract
 
@@ -131,7 +135,7 @@ attempts:             1
 automatic retry:      none
 ```
 
-Covered operations fail closed when Redis cannot produce a valid semantic decision, subject to the anti-lockout sequencing above.
+Covered operations fail closed when Redis cannot produce a valid semantic decision, subject to anti-lockout sequencing above.
 
 Quota denial:
 
@@ -141,7 +145,7 @@ stable code: SEMANTIC_QUOTA_EXCEEDED
 BFF REST: 429
 ```
 
-Dependency/time-source failure is a distinct availability error, never fabricated quota denial. Exact counters/capacity are not disclosed to callers. No application may bypass a failed quota/time decision with local fallback.
+Dependency/time-source failure is distinct availability error, never fabricated quota denial. Exact counters/capacity are not disclosed to callers. No application may bypass a failed quota/time decision with local fallback.
 
 ### SLO/capacity
 
@@ -158,8 +162,8 @@ Semantic quota Redis is a Class-B internal security dependency:
 
 ## Verification requirements
 
-Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, exact AUTH_ADMIN_WRITE semantic-mutation counting and 100-mutation bound, Role-permission set-delta charging, quota-before-DB ordering, no quota refund after later failed mutation, atomic actor+scope and tenant/platform cost consumption, Redis outage/failover fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from a one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
+Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, exact Web BFF OIDC_START/OIDC_CALLBACK capacity/refill/horizon behavior, separation from Identity GOOGLE_LOGIN keys, max-five-live-pre-auth composition, exact AUTH_ADMIN_WRITE semantic-mutation counting and 100-mutation bound, Role-permission set-delta charging, quota-before-DB ordering, no quota refund after later failed mutation, atomic actor+scope and tenant/platform cost consumption, Redis outage/failover fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
 
 ## Rollback considerations
 
-Rollback MUST NOT remove approved registration/Authorization administration quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, one-unit arbitrarily large admin mutations, quota refund on failed DB mutation, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If the dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled.
+Rollback MUST NOT remove approved registration/Authorization/Web-BFF-OIDC quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, one-unit arbitrarily large admin mutations, quota refund on failed DB mutation, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled.
