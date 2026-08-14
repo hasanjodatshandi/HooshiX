@@ -10,24 +10,26 @@ Accepted — current effective decision
 
 ## Decision
 
-### One service -> one database -> one production cluster
+### Service ownership is invariant
 
-Every independently deployable microservice using PostgreSQL for mutable relational business persistence owns a distinct PostgreSQL database, independent credentials/roles, independent Flyway history, and a dedicated CloudNativePG cluster in production.
+Every independently deployable microservice using PostgreSQL for mutable relational business persistence owns a distinct PostgreSQL database, independent credentials/roles, independent Flyway history, and independent release lifecycle.
 
 ```text
 1 PostgreSQL-backed mutable-state service
--> 1 dedicated PostgreSQL database
--> 1 dedicated production CloudNativePG cluster
+-> 1 distinct PostgreSQL database
 -> independent runtime + migration/owner roles
--> independent WAL/PITR backup namespace and credentials
--> independent backup encryption context/key
+-> independent Flyway history
+-> no cross-service SQL/model/credential access
 ```
 
-A service may use multiple schemas inside its own database when technically justified; no schema/database/role is shared with another microservice. Non-production may consolidate physical clusters only while preserving separate databases, credentials, privileges, Flyway histories, and ownership.
+Physical CloudNativePG placement is profile-specific:
 
-Critical PostgreSQL service clusters use the current three-instance synchronous required-durability baseline. Fleet automation/restore/upgrade policy is defined by ADR-0034/ADR-0037.
+- `production-single-server` under ADR-0042: one shared physical CloudNativePG cluster/one PostgreSQL instance contains the separate service databases;
+- `production-ha`: one dedicated CloudNativePG cluster per mutable PostgreSQL service.
 
-ADR-0040 Compromised Password Service's immutable, read-only, rebuildable SQLite reference dataset is not mutable PostgreSQL business persistence and is outside this PostgreSQL/CloudNativePG rule. The exception does not authorize mutable SQLite persistence.
+Physical consolidation in the single-server profile is an explicit availability/blast-radius trade-off. It does not permit shared schemas, shared roles, cross-database access, shared Flyway history, or shared domain/persistence models.
+
+ADR-0040 Compromised Password Service's immutable, read-only, rebuildable SQLite reference dataset is not mutable PostgreSQL business persistence and is outside this PostgreSQL rule.
 
 ### Role and privilege separation
 
@@ -43,11 +45,11 @@ no cross-service database CONNECT/object privilege
 
 Migration/owner roles are separate from runtime and unavailable to normal application pods. Routine human access never uses PostgreSQL superuser; privileged access follows current JIT production-access controls.
 
-Public/default privileges are reviewed/revoked so database creation cannot accidentally create cross-service access.
+In the shared single-server instance, public/default privileges are explicitly revoked so creation or migration of one database cannot create access to another service database. Runtime and migration roles are scoped to their owning database only.
 
 ### Prohibited database integration
 
-The following are prohibited as cross-service integration mechanisms:
+The following are prohibited as cross-service integration mechanisms in both profiles:
 
 - cross-service SQL/cross-database joins;
 - cross-service foreign keys;
@@ -78,29 +80,33 @@ Tenant-scoped repository operations fail closed when required tenant context is 
 
 Global platform PostgreSQL tables are explicit reviewed exceptions; a table cannot silently omit tenant ownership merely for convenience.
 
-RLS is defense in depth against application/query defects. It is not claimed to defeat PostgreSQL superuser or `BYPASSRLS`; those principals are controlled through physical service isolation and privileged-access policy.
+RLS is defense in depth against application/query defects. It is not claimed to defeat PostgreSQL superuser or `BYPASSRLS`; those principals are controlled through role separation, JIT privilege, and, in `production-ha`, dedicated physical clusters. In `production-single-server`, the operator explicitly accepts that PostgreSQL-superuser or physical-host compromise has a larger cross-service blast radius, so those privileges receive stricter access/audit controls.
 
 ADR-0040's global compromised-password hash reference dataset has no tenant/subject linkage and is not a PostgreSQL tenant table; RLS does not apply to it.
 
 ### Backup and restore isolation
 
-Each PostgreSQL service cluster writes WAL/base backups to an independent object prefix/bucket with independent credentials/encryption context. Restore permissions are least privilege and service scoped. Cross-service bulk backup access is not granted to application teams by default.
+`production-ha` keeps an independent physical backup namespace/credentials/encryption context per service cluster.
 
-Recovery must demonstrate restoration of one PostgreSQL service without destructively restoring another service. Monthly PostgreSQL restore evidence and production upgrade/rollback safety follow ADR-0037.
+`production-single-server` uses cluster-wide physical WAL/base backups because all service databases share one physical PostgreSQL cluster. Physical backup isolation per service is therefore not claimed. Service-specific recovery MUST still avoid destructive restoration of unrelated current databases: restore the shared physical cluster into an isolated recovery environment, validate it, then transfer only the required service database through the approved recovery procedure.
+
+Application teams are not granted broad shared-cluster backup/recovery credentials. Recovery access is privileged, time-bounded, and audited.
 
 ADR-0040 uses immutable artifact rebuild/redeploy evidence instead of PostgreSQL WAL/PITR restore evidence.
 
 ### Capacity and pools
 
-Per-service application pool/HPA maxima remain inside the PostgreSQL service cluster connection budget. Aggregate application Hikari `maximumPoolSize` across production pods is capped at <=70% of PostgreSQL `max_connections`; >=30% remains for failover, replication, migrations, administration, and emergency headroom unless a later measured current decision changes the budget.
+`production-ha` keeps the per-service cluster connection budget.
+
+`production-single-server` uses one global connection budget: sum of all application Hikari `maximumPoolSize` values across all service pods is capped at <=70% of shared PostgreSQL `max_connections`; >=30% remains for migrations, backup/recovery, administration, and emergency headroom. One service MUST NOT consume another service's reserved operational capacity. Per-service pool ceilings are measured and versioned.
 
 ## Verification requirements
 
 For every production microservice using PostgreSQL for mutable relational business persistence:
 
-- distinct production database + CloudNativePG cluster;
+- distinct production database;
 - distinct runtime/migration credentials;
-- runtime role cannot connect/access another service DB/cluster;
+- runtime role cannot connect/access another service database;
 - runtime role is `NOSUPERUSER NOBYPASSRLS`, not owner, and cannot create roles;
 - every tenant-owned production PostgreSQL table has forced RLS + `USING`/`WITH CHECK` coverage;
 - deliberately missing application tenant predicate still cannot cross tenant in integration tests;
@@ -108,13 +114,17 @@ For every production microservice using PostgreSQL for mutable relational busine
 - pooled connections reused across tenants after commit/rollback do not retain prior tenant context;
 - migration role/owner credentials are absent from runtime pods;
 - no FK/FDW/dblink/view/grant/shared-model integration crosses service boundaries;
-- backup credentials cannot read another service backup namespace;
-- independent service restore/PITR evidence;
-- pool/HPA connection budgets remain safe during normal scale and failover;
+- pool budgets remain safe under the selected profile;
 - break-glass/JIT privileged DB access is audited/time-bounded.
 
-ADR-0040 immutable SQLite reference data is verified under its own read-only, rebuild/redeploy, dataset-integrity and no-cross-service-access gates rather than by fabricating a CloudNativePG requirement.
+`production-ha` additionally verifies dedicated physical clusters and independent physical backup identities.
+
+`production-single-server` verifies cross-database privilege negatives inside the shared instance, global connection-budget isolation, isolated whole-cluster PITR restore, service-specific recovery without destructive restoration of another current database, and explicit acceptance of shared process/host/storage failure domain.
+
+ADR-0040 immutable SQLite reference data remains under its own read-only, rebuild/redeploy, dataset-integrity and no-cross-service-access gates.
 
 ## Rollback considerations
 
-Rollback MUST NOT reconsolidate production PostgreSQL service databases/clusters, restore shared credentials/cross-service SQL, remove forced tenant RLS, restore session-scoped pooled tenant context, expose migration/owner roles to runtime pods, weaken backup isolation, or generalize ADR-0040 into mutable SQLite persistence. Physical/data migration remains forward and compatibility-aware with validation and no permanent cross-database bridge.
+Rollback MUST NOT restore shared credentials/cross-service SQL, remove forced tenant RLS, restore session-scoped pooled tenant context, expose migration/owner roles to runtime pods, weaken WAL/PITR recovery, or generalize ADR-0040 into mutable SQLite persistence.
+
+Physical consolidation is permitted only by `production-single-server` with its explicit shared-blast-radius and recovery controls. It MUST NOT be silently introduced into the HA profile.
