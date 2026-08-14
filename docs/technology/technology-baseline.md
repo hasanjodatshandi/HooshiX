@@ -62,16 +62,16 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | `production-single-server` distribution | K3s `v1.35.6+k3s1` | ADR-0042; exact binary checksum/signature metadata required; embedded SQLite control-plane datastore |
 | `production-ha` distribution | kubeadm-compatible Kubernetes 1.35.6 | ADR-0022 HA topology |
 | Primary CNI / NetworkPolicy | Calico OSS 3.32.1 | standard dataplane; Ambient-aware policy tests mandatory; K3s Flannel/network-policy controller disabled in single-server profile |
-| Helm | 4.2.3 | approved 4.2.x patch; chart/tool digests pinned |
-| GitOps | Argo CD 3.4.2 | desired state under repository `deploy/` |
+| Helm | 4.2.4 | current reviewed 4.2.x patch; chart/tool digests pinned |
+| GitOps | Argo CD 3.4.2 | current security-patched 3.4.x baseline; desired state under repository `deploy/` |
 | Edge gateway | Traefik 3.7.10 | chart 41.2.0; K3s bundled Traefik disabled; security-fixed 3.7.x patch; chart 41 logging/file-provider breaking-key migration must render and test before rollout |
-| Kubernetes routing API | Gateway API 1.5.1 | preferred for new public routes |
+| Kubernetes routing API | Gateway API 1.5.1 | Traefik 3.7-supported Standard version; preferred for new public routes |
 | WAF server | Caddy 2.11.4 | immutable image digest required |
 | WAF connector | coraza-caddy 2.5.0 | version/digest pinned |
 | WAF engine | Coraza 3.7.0 | v3 architecture choice |
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | Kubernetes compatibility matrix mandatory; single-server profile additionally requires complete-stack capacity benchmark |
-| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
+| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred; current security advisories patched before this line |
 | Secret authority | OpenBao 2.6.1 | exact current architecture pin; unchanged by ADR-0042 |
 | Admission policy | Kyverno 1.18.2 | stable `policies.kyverno.io/v1`; 1 replica allowed only in explicit non-HA single-server profile; enforcement remains fail closed |
 | Image signing | Cosign 3.0.6 | current supply-chain policy |
@@ -79,9 +79,9 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | Vulnerability correlation | Grype pinned in CI tools lock | final-image SBOM; owned/expiring exceptions |
 | `production-single-server` privileged human access | Supported host OpenSSH package + hardware-backed FIDO2 + JIT privilege + `sudo` I/O/system audit | exact host package/version pinned in provisioning; password/root/shared-key access prohibited; no `.bashrc` audit substitute |
 | `production-ha` privileged human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session audit exercised before rollout |
-| Metrics | Prometheus 3.13.1 LTS | GitOps digest pin |
-| Alerting | Alertmanager 0.33.1 | GitOps digest pin |
-| Dashboards | Grafana 13.1.0 | GitOps digest pin |
+| Metrics | Prometheus 3.13.2 LTS | current reviewed 3.13.x patch; GitOps digest pin |
+| Alerting | Alertmanager 0.33.1 | current upstream release; GitOps digest pin |
+| Dashboards | Grafana 13.1.3 | current reviewed 13.1.x patch; GitOps digest pin |
 | Email | Liara Transactional Email, authenticated SMTP + STARTTLS | current Notification provider decision |
 | SMS | IPPanel Edge Webservice mode for Iran | local logging adapter local-only |
 
