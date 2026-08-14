@@ -289,7 +289,7 @@ This initial edge is read-only. No other service is authorized to create a hidde
 
 ## 10. Runtime and deployment target
 
-When implementation trigger is met:
+When the implementation trigger is met, identity and transport defaults are profile-independent:
 
 ```text
 namespace:         platform-apps
@@ -299,9 +299,22 @@ ServiceAccount:    reference-data-service
 principal:         prod.sajtech.internal/ns/platform-apps/sa/reference-data-service
 application gRPC:  9090
 management:        separate configured port
-replicas:          >=3
-PDB minAvailable:  2
-HPA:               disabled until evidence permits it
+```
+
+Deployment topology follows the selected production profile:
+
+```text
+production-single-server:
+  replicas: 1
+  HPA: disabled
+  availability PDB: disabled
+  node-failover claim: none
+
+production-ha:
+  replicas: >=3
+  PDB minAvailable: 2
+  topology spread: required by the HA target
+  HPA: disabled until evidence permits it
 ```
 
 The service is ClusterIP-only and Ambient-enrolled under STRICT mTLS. NetworkPolicy and Istio authorization initially allow application gRPC ingress only from `platform-apps/web-bff` ServiceAccount. Wrong workloads are denied.
@@ -319,7 +332,7 @@ Normal workload hardening applies:
 - bounded CPU/memory/ephemeral resources;
 - startup/readiness/liveness separation;
 - graceful shutdown;
-- topology spread.
+- topology spread in `production-ha`; single-server has no cross-node spread claim.
 
 Liveness is local runtime progress only. Readiness requires a valid compatible bundle, successful bounded startup validation, and required security/configuration. It does not probe external source authorities.
 
@@ -341,7 +354,7 @@ Before production, representative load proves:
 - pagination and max-128-KiB response behavior;
 - startup bundle validation/memory footprint;
 - bounded in-flight/queue behavior;
-- one replica/node loss behavior;
+- profile-correct availability/recovery behavior: whole-host/reboot recovery without a failover claim for `production-single-server`, or replica/node-loss behavior for `production-ha`;
 - BFF cache/conditional request behavior;
 - >=2x projected reference-route peak with >=30% validated resource headroom where applicable.
 
@@ -389,7 +402,7 @@ reviewed Git/source-import identity
 -> readiness validates bundle
 ```
 
-There is no database backup/PITR/restore step. A lost pod/node is replaced from the same approved image/bundle. Cold DR rebuilds/redeploys the same approved release and keeps the workload unready until bundle compatibility/integrity passes.
+There is no database backup/PITR/restore step. A lost pod/node is replaced from the same approved image/bundle where capacity exists. In `production-single-server`, loss of the only host is a platform recovery/redeploy event rather than transparent rescheduling. Cold DR rebuilds/redeploys the same approved release and keeps the workload unready until bundle compatibility/integrity passes.
 
 Rollback selects a previously approved signed image/bundle only when contract and source-support policy remain compatible. Rollback never reuses a retired identifier for new meaning or silently downgrades business semantics owned by consumers.
 
@@ -409,9 +422,10 @@ Before production, prove:
 - same-origin CORS and mandatory edge/WAF path remain intact; reference routes do not create session/JWT/CSRF authority;
 - BFF->Reference Data <=1000ms/one-attempt/no-retry/no-fallback/cancellation behavior passes;
 - only Web BFF workload reaches application gRPC and arbitrary application Internet/source egress is denied;
-- >=3/PDB2/topology-spread hardened deployment renders safely and HPA remains evidence-gated;
+- profile-correct hardened deployment renders safely: single-server one replica/no HPA/no availability PDB, or HA >=3/PDB2/topology spread with HPA evidence-gated;
 - Class-B and >=2x expected-peak load evidence passes before production;
 - PII-safe low-cardinality telemetry and alerting passes;
-- same signed immutable digest promotion and rebuild/redeploy recovery pass.
+- same signed immutable digest promotion and rebuild/redeploy recovery pass;
+- single-server whole-host/reboot recovery has no node-failover claim; HA replica/node-loss behavior is verified where applicable.
 
 Documentation alone is not implementation evidence. Until the trigger, source, contracts, build, deployment, and tests exist and execute, implementation remains `PLANNED / NOT VERIFIED`.
