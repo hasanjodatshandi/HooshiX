@@ -189,18 +189,19 @@ Kyverno may run one replica in this non-HA profile. Admission unavailability MUS
 
 ## 9. Human production access without Teleport
 
-`production-single-server` does not deploy Teleport. It uses hardened OpenSSH plus hardware-backed FIDO2 authentication and real system/privilege auditing.
+`production-single-server` does not deploy Teleport. It uses hardened OpenSSH plus hardware-backed FIDO2 authentication and real system/privilege auditing under ADR-0030.
 
 This is not permission to use shell-history or `.bashrc` logging as an audit system. `.bashrc`, shell history, or equivalent user-controlled logging is explicitly insufficient and prohibited as the authoritative production-access audit trail.
 
 Mandatory controls are:
 
 - SSH is reachable only from the approved management path/network; no general public SSH exposure;
-- no direct root login;
-- password authentication is disabled;
-- shared accounts and shared SSH keys are prohibited;
+- direct root login, password authentication, keyboard-interactive authentication, empty passwords, shared accounts, and shared SSH keys are prohibited for privileged human access;
 - each human has an attributable identity;
-- privileged host authentication uses hardware-backed OpenSSH FIDO2 security keys and requires user presence plus user verification;
+- privileged host authentication accepts only the approved hardware-backed OpenSSH FIDO2 security-key algorithms and requires user presence plus user verification;
+- effective OpenSSH configuration enforces `PubkeyAuthOptions touch-required,verify-required` or a strictly equivalent reviewed control so per-key configuration cannot silently remove presence/verification;
+- unnecessary SSH agent/TCP/X11/tunnel/gateway-port forwarding is disabled for privileged human access unless a separately reviewed operation requires a narrowly scoped exception;
+- generated/effective `sshd` configuration must pass the pinned host `sshd -t` plus `sshd -T`/equivalent validation before activation;
 - no standing root, unrestricted Kubernetes, or PostgreSQL-superuser access;
 - production write/admin elevation has explicit reason/ticket, at least two authorized reviewers, maximum 30-minute lifetime, and automatic expiry;
 - read-only elevation is separately scoped and maximum one hour;
@@ -237,9 +238,13 @@ If evidence does not pass, increase CPU/RAM/SSD capacity or move to `production-
 
 ## 12. SLO and availability interpretation
 
-Security/correctness SLO semantics remain fail closed. The single-server profile does not claim node-loss, broker-loss, Redis-failover, PostgreSQL-primary-failover, or control-plane-quorum availability.
+Application/service SLOs and SLIs remain active in `production-single-server`. Real user-visible errors, latency, planned-maintenance downtime, and host/node outage remain in the applicable measurements and error-budget accounting under ADR-0005.
 
-Availability targets that depend on redundant infrastructure are `Not applicable to production-single-server` until measured profile-specific objectives are approved. Monitoring still records user-visible availability and error-budget evidence so the operator can decide when the cost of downtime justifies migration to `production-ha`.
+What is not claimed in this profile is **redundancy-dependent infrastructure failure tolerance**: node-loss failover, broker-loss tolerance, Redis failover, PostgreSQL-primary failover, control-plane quorum, or equivalent objectives that physically require an alternate node/process/replica.
+
+A missing redundancy-dependent failover objective never turns real service downtime into an exclusion. If a service/capability repeatedly cannot meet its applicable availability objective because the one-host topology lacks redundancy, that is evidence to increase capacity or migrate to `production-ha`; it is not permission to weaken security, inflate timeouts/retries, or relabel failures as unavailable evidence.
+
+Monitoring records user-visible availability, latency, error-budget burn, host resource pressure, and recovery evidence so the operator can decide when the cost of downtime justifies migration to `production-ha`.
 
 Triggers for moving to `production-ha` include any of:
 
@@ -265,14 +270,14 @@ Before `production-single-server` is production-ready, verify at minimum:
 - Kafka combined KRaft/RF1/minISR1/acks-all/idempotence/ACL/TLS/rebuild/replay tests;
 - Ambient full-stack capacity benchmark plus mTLS/workload-identity positive/negative tests and `istioctl analyze`;
 - reduced Kyverno policy render plus signature/provenance/SBOM/security-context negative admission tests;
-- OpenSSH FIDO2 user-presence/user-verification, no-password/no-root/shared-key negatives, JIT expiry, two-reviewer flow, sudo I/O audit, OS audit, off-host audit integrity, and break-glass exercise;
+- OpenSSH effective-config validation, approved-FIDO-only authentication, `touch-required` + `verify-required`, root/password/keyboard-interactive/shared/non-FIDO-key/forwarding negatives, JIT expiry, two-reviewer flow, key revocation, sudo I/O audit, OS audit, off-host audit integrity, and break-glass exercise;
 - unchanged OpenBao flows and proof that no profile change introduced a hot-path OpenBao dependency or Git secret;
 - unchanged Identity/MFA downgrade-prevention tests;
 - complete-stack load/soak/reboot/recovery test with >=30% validated resource headroom;
-- explicit operator sign-off accepting whole-platform downtime on server/node failure.
+- explicit operator sign-off accepting whole-platform downtime on server/node failure while retaining normal service SLI/error-budget accounting.
 
 ## Rollback considerations
 
 Rollback from `production-single-server` to `production-ha` is a topology expansion, not a semantic rollback. Preserve service database/Flyway ownership, RLS, WAL/PITR evidence, event identities/idempotency, OpenBao secret authority, signed-artifact enforcement, workload identity, MFA rules, and audit evidence.
 
-A rollback or cost reduction MUST NOT replace WAL/PITR with `pg_dump + cron`, disable Kyverno enforcement, replace real access auditing with shell history, permit password/root/shared-key SSH, weaken Redis fail-closed semantics, change MFA to a user-selectable downgrade, disable Ambient without a reviewed replacement security design, or remove/change OpenBao.
+A rollback or cost reduction MUST NOT replace WAL/PITR with `pg_dump + cron`, disable Kyverno enforcement, replace real access auditing with shell history, permit root/password/keyboard-interactive/shared/non-FIDO-key SSH or missing FIDO presence/verification enforcement, weaken Redis fail-closed semantics, change MFA to a user-selectable downgrade, disable Ambient without a reviewed replacement security design, or remove/change OpenBao.
