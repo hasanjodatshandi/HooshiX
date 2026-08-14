@@ -235,7 +235,7 @@ Because the runtime has no remote lookup dependency, no provider breaker/retry l
 
 ## 10. Deployment and workload identity
 
-Production defaults:
+Production identity and transport defaults are profile-independent:
 
 ```text
 namespace:         platform-apps
@@ -244,11 +244,25 @@ Service:           compromised-password-service
 ServiceAccount:    compromised-password-service
 application gRPC:  9090
 management:        separate configured port
-replicas:          >=3
-PDB minAvailable:  2
 ```
 
-Replicas use the same approved dataset version. Topology spread keeps the service available across worker loss. HPA may be enabled only after representative storage/query/load evidence identifies a safe scaling signal and proves downstream/caller behavior.
+Deployment topology follows the selected production profile:
+
+```text
+production-single-server:
+  replicas: 1
+  HPA: disabled
+  availability PDB: disabled
+  node-failover claim: none
+
+production-ha:
+  replicas: >=3
+  PDB minAvailable: 2
+  topology spread: required by the HA target
+  HPA: only after representative storage/query/load evidence
+```
+
+All replicas in an HA deployment use the same approved dataset version. `production-single-server` has no worker-loss availability claim; loss/reboot of the only worker is a recovery scenario, not failover.
 
 The service is ClusterIP-only and Ambient-enrolled. NetworkPolicy + Istio authorization permit lookup ingress only from the approved `identity-service` ServiceAccount. Wrong workloads are denied.
 
@@ -312,10 +326,11 @@ Before production, prove:
 - missing/corrupt/incompatible/oversized-prefix dataset fail-closed behavior;
 - no external provider call or arbitrary Internet egress;
 - multi-million-row warm/cold query load within Class-B SLO and bounded concurrency;
-- identical dataset version across replicas and one-replica/one-worker loss behavior;
 - Xerial/SQLite Java25/Linux native compatibility and hardened native extraction behavior;
 - SBOM/signature/provenance/current advisory correlation;
 - PII/password/hash-safe logging and telemetry;
-- rebuild/redeploy recovery from approved immutable dataset artifact.
+- rebuild/redeploy recovery from approved immutable dataset artifact;
+- `production-single-server`: one-replica/no-HPA/no-availability-PDB render, whole-host/reboot/recovery behavior, and no worker/node-failover claim;
+- `production-ha`: identical dataset version across replicas, replica/worker-loss behavior, PDB/topology-spread behavior, and any evidence-gated HPA behavior.
 
 Documentation does not prove these checks. Until service source/build/contracts/dataset compiler/manifests/tests execute and pass, implementation evidence remains **NOT VERIFIED**.
