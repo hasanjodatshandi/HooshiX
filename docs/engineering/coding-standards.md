@@ -17,9 +17,9 @@ configuration  -> application/domain + adapters for composition
 Mandatory:
 
 - Domain depends only on JDK/explicit approved domain primitives.
-- Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, HTTP clients, transport/generated/provider types, or concrete adapters.
+- Domain MUST NOT depend on Spring, JPA/Hibernate, jOOQ, Kafka, Redis, SQLite, gRPC, Protobuf, PostgreSQL, Kubernetes, Istio, HTTP clients, transport/generated/provider types, or concrete adapters.
 - Application depends on Domain + abstract ports only; no Infrastructure/Interfaces/concrete adapters/Spring context lookup/persistence entities/generated jOOQ/transport DTO dependencies.
-- Infrastructure implements persistence, messaging, cache, clients/providers, workers, security, observability, and other technical outbound concerns.
+- Infrastructure implements persistence, messaging, cache, clients/providers, workers, security, observability, local reference-dataset adapters, and other technical outbound concerns.
 - Interfaces contains inbound REST/gRPC/Kafka adapters, boundary validation/mapping/trusted-context extraction, and use-case invocation only.
 - Configuration composes real adapters/use cases and contains no business policy.
 - Business logic in controllers/gRPC handlers/Kafka listeners/repositories/mappers/configuration is prohibited.
@@ -71,6 +71,8 @@ com.sajtech.<service>/
 └── configuration/<feature>/
 ```
 
+A service with an explicitly approved non-JPA technical adapter such as ADR-0040 SQLite may place it under a feature-specific Infrastructure path such as `infrastructure/<feature>/dataset/sqlite`; this does not change dependency direction or create a second global package taxonomy.
+
 Rules:
 
 - create packages only for real code; no empty taxonomy trees/`.gitkeep` scaffolding;
@@ -79,7 +81,7 @@ Rules:
 - ambiguous business types such as `Manager`, `Helper`, `Util`, `GenericService` prohibited;
 - do not invent a competing global `adapters/in` / `adapters/out` taxonomy;
 - aggregate repository abstractions live in `domain/<feature>/repository`; do not duplicate the same contract under Application merely to fit a template;
-- JPA/Spring Data/generated query types stay Infrastructure-only;
+- JPA/Spring Data/generated query/SQLite JDBC types stay Infrastructure-only;
 - `config`/`di` is technical composition only.
 
 ## 3. Files/types/responsibility
@@ -88,7 +90,7 @@ A Java file normally contains one public top-level type. Distinct aggregate/enti
 
 Nested/private types are allowed only when they are true implementation details of the owning type.
 
-Persistence model shape follows aggregate/query needs; one-table/one-model mapping is never mandatory.
+Persistence/reference-adapter model shape follows aggregate/query/dataset needs; one-table/one-model mapping is never mandatory.
 
 Large constructor lists, unrelated giant switches, giant mapper/controller, god class, or multi-responsibility adapter trigger design review. Do not hide them behind vague helper/manager classes.
 
@@ -137,33 +139,36 @@ Every new/changed synchronous production edge is represented in `../architecture
 
 ## 7. Persistence and transaction coding rules
 
-Flyway is the only schema-change mechanism; JPA `ddl-auto=validate`; OSIV prohibited. Full SQL/Flyway rules live in `sql-and-flyway-coding-standards.md`.
+For **mutable service relational persistence**, Flyway is the only schema-change mechanism; JPA `ddl-auto=validate`; OSIV prohibited. Full SQL/Flyway rules live in `sql-and-flyway-coding-standards.md`.
+
+ADR-0040 is the current narrow exception: Compromised Password Service uses one embedded SQLite database only as an immutable, read-only, rebuildable reference-data artifact built offline as a complete version. Production runtime has no SQLite schema migration/write transaction, and the exception MUST NOT be reused for mutable business persistence without a new current decision.
 
 Java baseline:
 
-- Domain/JPA models separate;
-- JPA/Spring Data/generated jOOQ Infrastructure-only;
-- LAZY by default, broad EAGER prohibited;
-- explicit fetch plans/projections/entity graphs/join fetch/query design;
+- Domain/JPA/reference-dataset Infrastructure models separate;
+- JPA/Spring Data/generated jOOQ/SQLite JDBC types Infrastructure-only;
+- LAZY by default, broad EAGER prohibited where JPA applies;
+- explicit fetch plans/projections/entity graphs/join fetch/query design where JPA applies;
 - N+1 prohibited;
 - explicit production column lists; `SELECT *` prohibited;
 - multi-row query deterministic pagination/hard bound;
-- sensitive/expensive queries need reviewed index + representative plan evidence;
+- sensitive/expensive queries need reviewed index + representative plan/measurement evidence;
 - transactions short/explicit;
 - remote gRPC/HTTP/Kafka/Redis/provider I/O inside DB transaction prohibited;
 - DB locks never held across remote I/O;
 - retry outside failed transaction;
-- cascade/orphan removal reviewed against aggregate ownership;
+- cascade/orphan removal reviewed against aggregate ownership where ORM applies;
 - `equals`/`hashCode`/`toString` never unsafely traverse lazy associations;
 - batch/fetch/flush/bulk strategy measured on performance-sensitive paths;
-- released migrations immutable; evolve expand -> migrate -> contract;
-- application rollback remains compatible with expanded schema; automatic DB downgrade never assumed.
+- released mutable-persistence migrations immutable; evolve expand -> migrate -> contract;
+- application rollback remains compatible with expanded schema; automatic DB downgrade never assumed;
+- ADR-0040 runtime SQLite opens only server-owned approved path/URI read-only/query-only, uses fixed parameterized SQL, disables extension loading/attachment/runtime DDL, keeps the full dataset out of JVM collections/cache, and treats schema/version change as a new offline immutable artifact release rather than migration.
 
 ## 8. Concurrency and Virtual Threads
 
 Spring MVC + Virtual Threads is the backend request/blocking-I/O model.
 
-- Virtual Threads do not create DB connections, Redis/provider quota, CPU, memory, or network capacity;
+- Virtual Threads do not create DB/SQLite connections, Redis/provider quota, CPU, memory, storage IOPS, or network capacity;
 - constrained dependencies use explicit bounded in-flight concurrency/bulkheads and bounded/zero queues;
 - CPU-heavy work uses bounded workers/jobs;
 - `Thread.sleep` prohibited for coordination/polling/test synchronization; use scheduler/clock/event/test primitive;
@@ -182,7 +187,8 @@ Each independently deployable service owns `settings.gradle.kts`, `build.gradle.
 - production security controls have safe defaults and cannot be disabled by undocumented profile/property;
 - generated code lives in explicit generated directories with narrow exclusions;
 - release output identifies exact reviewed Git revision and immutable digest;
-- production promotes the exact signed digest validated in staging; production rebuild prohibited.
+- production promotes the exact signed digest validated in staging; production rebuild prohibited;
+- bundled native components such as Xerial's SQLite engine remain visible in dependency/SBOM/advisory/compatibility review rather than being treated as opaque Java-only implementation detail.
 
 ## 10. Logging and telemetry
 
@@ -194,13 +200,14 @@ Never log raw:
 - access/refresh/ID tokens, API keys, `Authorization`, `Cookie`, `Set-Cookie`, session IDs;
 - private/encryption keys/secrets/DB connection strings;
 - payment/bank/high-risk government/health/biometric data;
-- full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, unreviewed provider payloads.
+- full request/response bodies, SQL binds, complete gRPC metadata, Kafka headers, unreviewed provider payloads;
+- compromised-password SHA-256 prefix/suffix/full hash or returned dataset rows.
 
 Ordinary PII requires approved purpose and masking/tokenization or managed-key HMAC pseudonymization where correlation is needed; unsalted hashing is insufficient for guessable PII.
 
 - structured fields, not whole request/domain/payload string concatenation;
 - CR/LF/malicious-delimiter protection for input-derived values;
-- exception messages/nested causes/third-party text treated as sensitive/untrusted until reviewed;
+- exception messages/nested causes/third-party/JDBC/native text treated as sensitive/untrusted until reviewed;
 - stable event code + bounded safe context preferred;
 - production debug/trace off by default; temporary elevation time-bound/access-controlled/audited and cannot enable body/bind/credential logging;
 - MDC/context bounded/allow-listed;
@@ -230,7 +237,8 @@ Every materially changed log statement is tested/reviewed for PII/secret/token/c
 - flaky test has owner + remediation deadline; retries do not redefine pass;
 - test data avoids shared mutable global state;
 - Playwright uses role/label/accessibility locators, web-first assertions, auto-waiting, isolated data; fragile CSS/XPath/fixed waits prohibited when semantic alternative exists;
-- BDD covers critical shared business behavior, not implementation detail/trivial CRUD.
+- BDD covers critical shared business behavior, not implementation detail/trivial CRUD;
+- ADR-0040 tests use deterministic generated SQLite fixtures/offline compiler inputs and never require production plaintext source material for normal PR testing.
 
 ## 13. Container/Kubernetes/Helm/release-facing rules
 
@@ -256,14 +264,16 @@ Helm/GitOps:
 - chart/app versions independent;
 - `helm lint` + render + schema/policy + secret scan;
 - non-trivial migration hooks require explicit owner/idempotency/timeout/retry/failure/rollback/fail-forward/test evidence; prefer explicit migration workflow;
-- no direct unreviewed production cluster mutation.
+- no direct unreviewed production cluster mutation;
+- ADR-0040 dataset mount is read-only; any Xerial native-extraction writable temp mount is separate/bounded/ephemeral and contains no dataset/password/source/subject state.
 
 Promotion:
 
-- staging/production use identical signed immutable digest;
+- staging/production use identical signed immutable application digest;
 - no rebuild between environments;
 - artifact metadata includes source Git commit;
-- smoke failure stops progression; rollback only when schema/data safe.
+- immutable reference artifacts such as ADR-0040 dataset use reviewed version/digest/compatibility identity and are not mutated in production;
+- smoke failure stops progression; rollback only when schema/data/artifact-format state is safe.
 
 ## 14. Prohibited practices
 
@@ -277,6 +287,7 @@ Unless a current decision explicitly permits them:
 - shared cross-service business/domain/persistence models;
 - backend WebFlux/Reactor/`Mono`/`Flux`;
 - cross-service DB access/shared database/schema;
+- mutable SQLite business persistence under the ADR-0040 reference-data exception;
 - remote I/O in DB transaction/lock across remote I/O;
 - unbounded query/retry/timeout/queue;
 - broad EAGER/N+1/OSIV/`SELECT *`;
@@ -302,7 +313,7 @@ Unless a current decision explicitly permits them:
 | bytecode bug patterns | SpotBugs |
 | source security/logging/framework misuse | Semgrep/SAST |
 | dependency integrity | Gradle verification/locks |
-| contracts/migrations/tests | Gradle + Testcontainers + Buf/OpenAPI |
+| contracts/migrations/dataset/tests | Gradle + Testcontainers/SQLite fixture tests + Buf/OpenAPI |
 | container/Kubernetes/Helm | schema/policy CI |
 | digest/SBOM/signature/provenance | release pipeline/admission |
 | final required evidence | GitHub Actions + release gates |
@@ -314,11 +325,11 @@ Before implementation code changes, explicitly review:
 1. bounded context/capability/aggregate/use-case/final-enforcement owner;
 2. inbound/outbound ports before adapters;
 3. Domain/Application framework independence;
-4. transport/persistence/messaging/cache/provider placement;
+4. transport/persistence/messaging/cache/provider/reference-dataset placement;
 5. sync vs event-driven semantics + dependency class;
 6. Transactional Outbox need;
 7. deadlines, retry owner, cancellation, idempotency, concurrency/bulkhead/breaker, transaction boundary;
-8. migration/tests/metrics/logs/traces/SLO/alerts/runbook/evidence;
+8. migration/dataset-build/tests/metrics/logs/traces/SLO/alerts/runbook/evidence;
 9. ArchUnit/architecture tests for boundary changes;
 10. dependency/plugin/tool purpose/owner/compatibility/integrity/security/license;
 11. Dockerfile/Helm/GitOps/probes/resources/autoscaling/PDB/ServiceAccount/NetworkPolicy/securityContext/shutdown;
@@ -329,11 +340,11 @@ Before implementation code changes, explicitly review:
 16. constructor injection/ports/no runtime lookup;
 17. ServiceAccount/Ambient/NetworkPolicy/Istio authorization impact;
 18. operation-level dependency registry + positive/negative policy/contract failure tests;
-19. same immutable digest staging->production tied to Git commit;
-20. Kubernetes security-context + migration-workflow compliance.
+19. same immutable digest staging->production tied to Git commit plus compatible immutable reference-artifact identity where applicable;
+20. Kubernetes security-context + migration/dataset-release workflow compliance.
 
 Compilation alone is never completion evidence.
 
 ## 17. Task report
 
-Every non-trivial implementation report fills the fields required by `AGENTS.md` and `agent-communication-and-reporting.md`, including module/context, contracts, migration, transaction, deadline/retry/cancellation/concurrency, event/idempotency, security/Istio/logging, observability, build/CI enforcement, tests, deviations, and rollback.
+Every non-trivial implementation report fills the fields required by `AGENTS.md` and `agent-communication-and-reporting.md`, including module/context, contracts, migration/dataset artifact, transaction, deadline/retry/cancellation/concurrency, event/idempotency, security/Istio/logging, observability, build/CI enforcement, tests, deviations, and rollback.
