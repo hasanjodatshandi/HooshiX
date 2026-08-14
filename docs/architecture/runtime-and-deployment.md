@@ -1,6 +1,6 @@
 # Runtime and Deployment Architecture — Current State
 
-Exact supported patches belong in Technology Baseline/deployment metadata. This document defines runtime topology, security, deployment, and operational invariants.
+Exact supported patches belong in Technology Baseline/deployment metadata. This document defines runtime topology, deployment, security, and operational invariants. ADR-0042 selects `production-single-server` as the initial production profile. `production-ha` remains the expansion profile.
 
 ## 1. Production workload baseline
 
@@ -10,24 +10,54 @@ Production application workloads run as immutable OCI containers on Kubernetes a
 - provenance/source identity tied to reviewed Git commit;
 - non-root execution / `runAsNonRoot`;
 - `allowPrivilegeEscalation: false`;
-- Linux capabilities dropped by default; added capability is narrow reviewed exception;
+- Linux capabilities dropped by default;
 - `seccompProfile: RuntimeDefault`;
-- read-only root filesystem where approved image permits it;
-- CPU/memory requests and limits;
+- read-only root filesystem where compatible;
+- finite CPU/memory requests and limits;
 - distinct startup/readiness/liveness probes;
-- liveness does not fail merely because dependency is temporarily unavailable;
-- readiness only when workload can safely serve intended traffic;
+- liveness independent from ordinary downstream availability;
+- readiness only when the workload can safely serve intended traffic;
 - graceful shutdown aligned with `terminationGracePeriodSeconds`;
 - dedicated least-privilege ServiceAccount; Kubernetes `default` is prohibited for application workloads;
 - deny-by-default NetworkPolicy with explicit ingress/egress;
-- PDB/topology spread/anti-affinity according to availability target;
-- autoscaling from measured valid signals, never as substitute for capacity tests.
+- least-privilege Istio authorization;
+- profile-specific replica/HPA/PDB/topology settings backed by measured capacity.
 
-Privileged containers, host networking, `hostPath`, extra capabilities, or materially relaxed security context require explicit current security decision and automated policy evidence.
+Privileged containers, host networking, `hostPath`, extra capabilities, or materially relaxed security context require an explicit current security decision and automated policy evidence.
 
-## 2. Kubernetes active-cluster HA
+## 2. Production Kubernetes profiles
 
-ADR-0022 defines:
+### 2.1 Selected `production-single-server`
+
+The initial production platform uses one K3s server that is also the only schedulable workload node.
+
+```text
+Kubernetes: 1.35.6
+K3s:        v1.35.6+k3s1
+nodes:      1 server + workload node
+HA:         none
+app replicas: 1
+HPA:        disabled
+availability PDB: disabled
+```
+
+K3s profile rules:
+
+- embedded SQLite is the Kubernetes control-plane datastore;
+- K3s secrets encryption is enabled;
+- Flannel is disabled;
+- the K3s network-policy controller is disabled so Calico remains the NetworkPolicy authority;
+- bundled K3s Traefik and ServiceLB are disabled so the repository edge stack remains authoritative;
+- K3s datastore directory and server token are protected and copied encrypted off-host as operational recovery artifacts;
+- Git remains desired-state authority;
+- multiple pods on the same server MUST NOT be described as node HA;
+- host/node/kernel/storage/maintenance failure may stop the complete platform.
+
+A one-replica PDB MUST NOT block necessary maintenance while creating no real availability. Replica/HPA/PDB targets in service documents are the `production-ha` targets unless the service document explicitly states another profile rule.
+
+### 2.2 Expansion `production-ha`
+
+When availability/capacity requirements justify expansion:
 
 ```text
 3 dedicated stacked control-plane/etcd nodes
@@ -37,13 +67,13 @@ N+1 critical worker capacity
 6-hour encrypted off-node etcd snapshots + pre-upgrade snapshot
 ```
 
-Critical replicas spread across workers/failure domains. External etcd is not a v1 requirement.
+Critical replicas spread across workers/failure domains. External etcd is not a default.
 
 ## 3. Calico + Istio Ambient
 
-Calico OSS 3.32.x is primary CNI/NetworkPolicy family for Kubernetes 1.35.x; exact patches come from compatibility baseline. v1 uses standard Calico dataplane.
+Calico OSS 3.32.x is the primary CNI/NetworkPolicy family for Kubernetes 1.35.x; exact patches come from compatibility baseline. The single-server K3s profile uses Calico as a custom CNI and does not run the conflicting bundled Flannel/network-policy controller.
 
-Istio Ambient is service mesh. NetworkPolicy remains independent defense in depth and permits only required HBONE/health/application paths. Production application workloads use STRICT mTLS, dedicated ServiceAccount identities, default-deny/least-privilege authorization, and positive/negative policy tests.
+Istio Ambient is the production service mesh. NetworkPolicy remains independent defense in depth. Production application workloads use STRICT mTLS, dedicated ServiceAccount identities, default-deny/least-privilege authorization, and positive/negative policy tests.
 
 ```text
 trustDomain = prod.sajtech.internal
@@ -51,19 +81,11 @@ meshID      = platform-prod
 principal   = prod.sajtech.internal/ns/<namespace>/sa/<service-account>
 ```
 
-Waypoints are added only for explicit L7 policy/routing/telemetry needs. Mesh retry MUST NOT duplicate application/client retry ownership.
+Waypoints are absent by default and are added only for explicit L7 policy/routing/telemetry needs.
 
-Initial enrollment:
+For `production-single-server`, Ambient is a **production-readiness benchmark gate**. Measure `istiod`, Istio CNI and `ztunnel` idle/peak CPU/RAM, p95/p99 request impact, throughput, connection count, OOM/restart behavior, Calico interaction and complete-stack headroom. If the benchmark fails, increase host capacity or approve a reviewed replacement security architecture. Do not silently disable workload identity or strict mTLS to fit the server.
 
-| Namespace | State |
-| --- | --- |
-| `platform-edge` | enrolled |
-| `platform-apps` | enrolled |
-| `platform-data` | selective |
-| `istio-system` | control plane |
-| `argocd` | not initially enrolled |
-| `observability` | not initially enrolled |
-| `kube-system` | not enrolled |
+Mesh retry MUST NOT duplicate application/client retry ownership.
 
 ## 4. Istio trust hierarchy
 
@@ -77,13 +99,15 @@ Offline Root CA
 - intermediate: one year, rotate starting 90d before expiry with >=30d overlap, tightly controlled in `istio-system`;
 - workload certificate: 24h automatic rotation.
 
-## 5. Helm, Kustomize, GitOps, promotion
+ADR-0042 changes none of these trust rules.
 
-Helm 4 is packaging baseline. Shared organization deployment rules belong in one reviewed application/library chart rather than copied charts.
+## 5. Helm, GitOps, Argo CD and promotion
 
-Environment overlays/values are explicit; secret values never enter Git, Helm/Kustomize values, images, or rendered CI logs. CI runs lint/render/schema/policy/secret checks and target/deployed diffs where applicable.
+Helm 4 is the packaging baseline. Shared organization deployment rules belong in one reviewed application/library chart rather than copied charts.
 
-Complex migration Helm hooks are prohibited unless ownership, idempotency, timeout/retry, failure, rollback/fail-forward, and test semantics are explicit. Non-trivial database migrations SHOULD use controlled migration jobs/workflows.
+Environment overlays are explicit. Secret values never enter Git, Helm/Kustomize values, images, or rendered CI logs. CI runs lint/render/schema/policy/secret checks and target/deployed diffs where applicable.
+
+Complex migration hooks are prohibited unless ownership, idempotency, timeout/retry, failure, rollback/fail-forward and test semantics are explicit. Non-trivial database migrations SHOULD use controlled migration jobs/workflows.
 
 Current GitOps roots:
 
@@ -94,127 +118,87 @@ deploy/clusters/production
 
 Argo CD reconciles reviewed desired state with automated sync/self-heal/prune, `allowEmpty=false`, `PruneLast=true`, and explicit confirmation for destructive critical resources.
 
-Exact signed immutable image digest validated in staging is promoted to production. Rebuild between staging and production is prohibited. Rollback is reviewed Git state only when application/schema/data compatibility is safe; otherwise use approved fail-forward/incident path.
+The exact signed immutable image digest validated in staging is promoted to production. Rebuild between staging and production is prohibited. Rollback is reviewed Git state only when application/schema/data compatibility is safe; otherwise use the approved fail-forward/incident path.
 
-Immutable application reference bundles such as ADR-0041 are part of the signed service image identity; changing the bundle creates a new reviewed image/release and never mutates production content in place.
+## 6. Production PostgreSQL runtime
 
-## 6. Production PostgreSQL fleet
+ADR-0019/0027/0034/0037 define database ownership, backup and recovery. `data-and-messaging.md` is the implementation-facing data authority.
 
-ADR-0019, ADR-0027, ADR-0034, and ADR-0037 define current model for mutable relational service business state.
+### Single-server
 
-Every production microservice with mutable relational business persistence owns dedicated CloudNativePG 1.30.x cluster, PostgreSQL database, runtime/migration roles, Flyway history, storage/capacity budget, WAL/PITR backup identity/namespace, and restore evidence. Critical services use three PostgreSQL instances.
+- one physical CloudNativePG cluster;
+- one PostgreSQL instance;
+- distinct database/runtime role/migration role/Flyway history per mutable service;
+- forced RLS where applicable;
+- no cross-service SQL/credentials;
+- global application-pool budget <=70% of `max_connections`, with >=30% operational headroom;
+- no PostgreSQL primary failover claim;
+- one shared physical failure/recovery blast radius.
 
-Clusters use quorum synchronous required durability. Automatic failover is permitted only when acknowledged commits can be preserved; unsafe promotion fails availability rather than acknowledged data.
+### HA
 
-Aggregate application Hikari maxima across production pods stay <=70% of cluster `max_connections`, preserving >=30% for replication/failover, migration, monitoring, administration, and emergency work. PgBouncer is evidence-driven, not default.
-
-Fleet management uses one reusable GitOps baseline with bounded per-service overlays, common bounded alerts, independent backup trust boundaries, monthly service-specific restore evidence, and one-cluster-at-a-time upgrade waves. A failed wave stops remaining rollout. Production physical consolidation requires reviewed current architecture change.
-
-ADR-0040 Compromised Password's immutable rebuildable SQLite reference dataset is not mutable PostgreSQL business state and is outside this fleet. It does not weaken the fleet rule for any mutable service state. ADR-0041 Reference Data uses no database and therefore also has no CloudNativePG/Flyway runtime.
+Each mutable PostgreSQL service uses a dedicated CloudNativePG cluster; critical clusters use the current three-instance synchronous durability/failover model and independent backup identities.
 
 ### Backup/PITR
+
+Both profiles retain:
 
 - continuous encrypted off-site WAL archive;
 - daily online physical base backup;
 - PostgreSQL RPO <=5m;
 - 35-day PITR;
-- monthly retained recovery set for 12 months;
-- versioning/object-lock where supported;
-- verify every backup cycle;
-- isolated restore monthly per service;
-- full cold DR quarterly;
-- queryable RPO/RTO/integrity/RLS/erasure evidence.
+- monthly retained recovery artifact for 12 months;
+- verification every backup cycle;
+- monthly isolated restore evidence;
+- quarterly full cold DR.
 
-A failed restore freezes ordinary affected-service promotion until replacement evidence passes.
+`pg_dump + cron` is not the production backup strategy.
 
-## 7. Compromised Password runtime and immutable SQLite dataset
+In single-server, physical PITR restores the complete shared cluster into an isolated recovery environment. A service-specific recovery then transfers only the required service database through the approved controlled recovery procedure. It MUST NOT destructively restore unrelated current databases.
 
-ADR-0040 and `services/compromised-password-service.md` define the self-contained internal runtime:
+ADR-0040 Compromised Password's immutable SQLite dataset and ADR-0041 Reference Data bundle remain outside PostgreSQL PITR.
+
+## 7. Kafka runtime
+
+`production-single-server`:
 
 ```text
-base package:      com.sajtech.compromisedpassword
-namespace:         platform-apps
-Deployment:        compromised-password-service
-Service:           compromised-password-service
-ServiceAccount:    compromised-password-service
-application gRPC:  9090
-management:        separate configured port
-replicas:          >=3
-PDB minAvailable:  2
-HPA:               evidence-gated only
+1 Kafka 4.2.x combined KRaft broker/controller
+critical RF=1
+minISR=1
+acks=all
+idempotent producers
+unclean leader election disabled
+formal non-HA acceptance
 ```
 
-Only the approved `identity-service` workload may reach application gRPC. The service is ClusterIP-only and Ambient-enrolled under strict mTLS. NetworkPolicy + Istio authorization deny every other application caller.
-
-The production compromised-password dataset is a service-local immutable, read-only, rebuildable SQLite artifact. Runtime properties:
-
-- Xerial/SQLite version is exact Technology Baseline pin and final-image SBOM/advisory input;
-- dataset path/JDBC URI is server-owned and cannot be selected by request data;
-- dataset is opened read-only/query-only;
-- runtime INSERT/UPDATE/DELETE/DDL, `ATTACH`/`DETACH`, arbitrary PRAGMA and extension loading are prohibited;
-- full dataset is not loaded into JVM heap, application hash map, Bloom authority or Redis/PostgreSQL cache;
-- normal lookup is the fixed indexed 20-bit prefix query from ADR-0040;
-- no HIBP/external compromised-password provider/Internet lookup egress exists;
-- replicas use the same approved dataset version and immutable artifact identity;
-- missing/incompatible/corrupt dataset keeps unsafe service unready/fail closed.
-
-The normal root filesystem remains read-only. The dataset mount/path is read-only. If the Xerial native library requires runtime extraction, use only a separate bounded writable ephemeral mount (for example `emptyDir`) dedicated to native extraction/temp use. It contains no password/dataset/source/subject state and is constrained by security context/resource limits. A writable dataset path, `hostPath`, privileged container or arbitrary native-library path is prohibited.
-
-Liveness proves local process/runtime progress. Readiness validates bounded local prerequisites: expected dataset path, read-only open/query capability, supported metadata/schema/version, deployment artifact identity/integrity evidence and security configuration. It does not perform unbounded full-corpus verification on every probe; full integrity/compiler verification belongs to artifact build/release.
-
-Autoscaling is enabled only after representative multi-million-row warm/cold disk-backed load proves a safe signal, bounded SQLite read concurrency/queue and storage capacity. Replica scaling must not hide slow/corrupt storage or change exact-match security semantics.
-
-DR/recovery redeploys/reconstructs the approved immutable dataset artifact and validates it before readiness. SQLite WAL/PITR/runtime migration is not used for this read-only artifact.
-
-### 7.1 Reference Data runtime target and immutable application bundle
-
-ADR-0041 and `services/reference-data-service.md` define a target runtime only after the implementation trigger is met:
+`production-ha`:
 
 ```text
-service path:      services/reference-data-service
-base package:      com.sajtech.referencedata
-namespace:         platform-apps
-Deployment:        reference-data-service
-Service:           reference-data-service
-ServiceAccount:    reference-data-service
-application gRPC:  9090
-management:        separate configured port
-replicas:          >=3
-PDB minAvailable:  2
-HPA:               evidence-gated only
-```
-
-Until the trigger/source/deployment/build evidence exists, implementation status remains `PLANNED / NOT VERIFIED` and no deployment is implied by this document.
-
-When implemented, only the approved `web-bff` workload may initially reach application gRPC. Reference Data is ClusterIP-only and Ambient-enrolled under strict mTLS; NetworkPolicy + Istio authorization deny every other application caller unless a later caller-specific architecture/dependency decision registers it.
-
-The Country/Currency/TimeZone/SupportedLocale bundle is a small immutable read-only application resource inside the signed image. It has no PostgreSQL/CloudNativePG/Flyway/SQLite/Redis/Kafka or separately mutable production volume. Startup validates its format/version/source manifest/content digest and may build bounded immutable in-process indexes. A bundle failure keeps readiness false rather than downloading or fabricating data.
-
-Serving has no ISO/IANA/Unicode/CLDR Internet synchronization. Application egress is deny-by-default; only narrowly necessary DNS and approved telemetry may be permitted. Source acquisition occurs only in the reviewed offline release/import process.
-
-Liveness proves local runtime progress only. Readiness validates the locally packaged compatible bundle and security/configuration. It never probes standards-source Internet endpoints.
-
-Recovery/redeploy uses the same approved signed image/bundle or a deterministic approved rebuild; there is no database restore/runtime data repair. HPA remains disabled until representative reference-route load proves a safe signal and capacity envelope.
-
-## 8. Kafka
-
-Production critical Kafka uses ADR-0015:
-
-```text
-KRaft
 3 brokers + 3 dedicated controllers
-critical RF=3 / minISR=2 / acks=all
+critical RF=3
+minISR=2
+acks=all
 idempotent producers
 unclean leader election disabled
 ```
 
-Native TLS/authentication/ACL/quotas remain mandatory. Kafka is rebuildable transport, not business truth. Cold DR rebuilds configuration from GitOps and replays/reconstructs service-owned evidence. Critical publication/dedup evidence covers 35-day recovery horizon.
+Native TLS/authentication, per-service principals, ACLs, quotas and bounded partitioning are mandatory in both profiles. Kafka remains rebuildable async transport, not business authority. Outbox/Inbox/idempotency/replay requirements do not weaken under RF=1.
 
-Compromised Password v1 and Reference Data v1 have no Kafka runtime path.
+## 8. Security Redis runtime
 
-## 9. Security Redis
+`production-single-server`:
 
-Approved shared physical `security-redis` is restricted to security-ephemeral capabilities such as semantic quotas and BFF session/pre-auth state:
+```text
+1 Redis instance
+TLS + per-owner ACL/key namespaces
+noeviction
+AOF enabled
+appendfsync everysec
+no failover claim
+```
+
+`production-ha`:
 
 ```text
 1 primary + 2 replicas + 3 Sentinel voters
@@ -222,121 +206,134 @@ TLS + per-owner ACL/key namespaces
 noeviction
 ```
 
-Raw PII/business/session/pre-auth identifiers are not used as Redis keys where pseudonymous HMAC keys are required. BFF session/pre-auth locators use purpose/version HMAC. BFF session `last_seen` persistence is coalesced to at most once per five-minute activity window. If quota/session workloads interfere materially, split Sentinel deployments before introducing Redis Cluster complexity.
+Redis is restricted to security-ephemeral capabilities such as semantic quotas and BFF session/pre-auth state. It is not business source of truth. Covered security decisions fail closed on dependency/time-source failure. If session state is lost, the user reauthenticates; browser cookies never reconstruct server authority.
 
-Redis session/quota state is not cold-DR business truth. After state loss users reauthenticate; browser cookies never reconstruct authenticated server state.
+## 9. Kyverno admission
 
-Compromised Password and Reference Data v1 do not use Redis as a dataset store/cache/index. Reference Data's HTTP `ETag`/`Cache-Control` policy is representation caching, not Redis server-state fallback.
+Kyverno remains production admission authority for the signed-artifact/security policy set.
+
+`production-single-server` may run one Kyverno replica because same-host replicas do not create node HA. The policy inventory may be reduced only after proving removed rules are redundant/non-critical or enforced by another blocking control.
+
+The retained single-server policy set continues to block at least:
+
+- non-digest production images;
+- invalid/unapproved signatures;
+- invalid/missing provenance;
+- invalid/missing signed CycloneDX SBOM attestation;
+- unapproved privileged/host-network/unsafe `hostPath`/unsafe security-context patterns;
+- critical ServiceAccount/deployment identity violations that are reliable admission properties.
+
+Admission unavailability MUST NOT become an allow path. Audit-only production admission is not permitted.
+
+`production-ha` keeps >=3 Kyverno replicas/topology/disruption protection.
+
+Policy-authoring RBAC and policy-engine HTTP/SSRF restrictions remain unchanged.
 
 ## 10. Public edge
 
-Production path:
+Production request path remains:
 
 ```text
 Internet
 -> upstream L3/L4 volumetric mitigation/scrubbing
--> redundant external L4 load balancing
+-> external L4
 -> Traefik
 -> dedicated Caddy + Coraza WAF
 -> Web BFF
 ```
 
-Direct Internet -> BFF and Traefik -> BFF application paths are prohibited by route + NetworkPolicy + Istio authorization.
+The K3s bundled Traefik/ServiceLB is disabled in the single-server profile. The repository-pinned Traefik/Gateway API deployment remains authoritative.
 
-Traefik uses Gateway API by default; proprietary CRDs require explicit capability need. Dashboard/insecure API is not public. Wildcard/catch-all public routes are prohibited.
+Direct Internet -> BFF and Traefik -> BFF application paths that bypass WAF are prohibited by route + NetworkPolicy + Istio authorization. Traefik dashboard/insecure API is not public. Wildcard/catch-all public routes are prohibited.
 
-WAF uses approved Caddy/Coraza/CRS family, PL1, >=7 representative DetectionOnly days before reviewed blocking, narrow versioned exceptions, bounded body policy, no automatic rule updates, and PII-safe telemetry.
+WAF uses the approved Caddy/Coraza/CRS family, DetectionOnly tuning before reviewed blocking, narrow versioned exceptions, bounded body policy, no automatic rule updates, and PII-safe telemetry. Upstream volumetric protection remains mandatory.
 
-Upstream volumetric mitigation is mandatory; WAF is L7 inspection and is not bandwidth-saturation protection.
+## 11. Human privileged production access
 
-## 11. Web BFF runtime and egress
+ADR-0030 defines the invariant: zero standing privileged access, phishing-resistant authentication, explicit reason, two-reviewer write/admin approval, bounded elevation, durable audit and protected break glass.
 
-ADR-0016 and `services/web-bff.md` define exact browser runtime defaults:
+### Single-server
 
-```text
-base package:      com.sajtech.webbff
-namespace:         platform-apps
-Deployment:        web-bff
-Service:           web-bff
-ServiceAccount:    web-bff
-application HTTP:  8080
-management:        separate configured port
-replicas:          >=3
-PDB minAvailable:  2
-HPA range:         3..12 only after load/connection evidence
-```
+Teleport is not deployed. Human host access uses hardened OpenSSH plus hardware-backed FIDO2.
 
-`web-bff` uses same immutable/hardened production workload baseline above: non-root, no privilege escalation, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem except explicit writable mounts, bounded resources and graceful termination.
+Mandatory controls:
 
-Liveness proves local process/runtime progress only and does not fail on ordinary downstream unavailability. Readiness requires usable local BFF security/session/key configuration and entry-point prerequisites; it does not synchronously probe every Identity/Authorization/Reference Data/resource/provider dependency per health request.
+- SSH only from the approved management path/network;
+- no direct root login;
+- password authentication disabled;
+- no shared accounts/keys;
+- privileged human authentication requires FIDO2 user presence and user verification;
+- FIDO2 authentication alone does not grant root/Kubernetes/database write authority;
+- write/admin elevation maximum 30 minutes, with automatic expiry and at least two authorized reviewers;
+- read-only elevation maximum one hour;
+- no permanent `cluster-admin`, shared kubeconfig, shared DB password, or manual standing `sudoers` substitute;
+- SSH/auth/process/privilege/security-config events captured by OS audit;
+- `sudo` I/O/session logging for privileged interactive use where applicable;
+- Kubernetes/database privileged operations audited at those boundaries;
+- required audit exported off-host to append-only/tamper-resistant storage outside ordinary requester control;
+- `.bashrc`, shell history or `PROMPT_COMMAND` logging is not authoritative audit;
+- separately protected hardware-backed break-glass identity, incident-linked and reviewed/rotated after use.
 
-HPA is disabled until representative load evidence covers HTTP/gRPC connection pools, Redis session/quota throughput/failover, AES-GCM/token-broker CPU, Reference Data/resource downstream bulkheads and latency. Autoscaling that would only multiply saturated downstream load is not production-ready evidence.
+### HA
 
-NetworkPolicy + Istio authorization are deny-by-default. Production BFF egress is restricted to exact required destinations:
+Teleport Enterprise Self-Hosted remains the privileged human access plane with current SSO/WebAuthn/JIT/session-recording controls.
 
-- Identity Service;
-- Authorization tenant-management surface;
-- Reference Data typed read surface when ADR-0041 implementation is active;
-- registered resource services referenced by reviewed BFF routes;
-- BFF/security Redis;
-- configured Google OIDC endpoints;
-- approved telemetry backend/collector.
+## 12. OpenBao and External Secrets — unchanged
 
-Arbitrary Internet/URL egress is prohibited. Google endpoints are explicit provider-egress exception and must be configured/allow-listed rather than caller-controlled. Every additional synchronous downstream requires canonical dependency-registry entry and corresponding mesh/network policy review before production use.
+OpenBao is **not** simplified by ADR-0042.
 
-The browser public namespace is `/api/v1`; current subspaces are `/api/v1/auth`, `/api/v1/identity`, `/api/v1/authorization`, and `/api/v1/reference`. Reference Data v1 GET/HEAD may be anonymous but remains same-origin/edge/WAF protected and uses explicit locale plus deterministic ETag/public one-hour cache semantics. Public body/header bounds and the remaining same-origin/CSP/private-cache behavior are application contracts from ADR-0016/ADR-0041 and are tested independently of edge/WAF limits.
+OpenBao 2.6.1 remains the exact current secret-authority pin under ADR-0011. The existing v1 topology and recovery model remain unchanged, including its current Raft/PVC, Shamir, encrypted snapshot, restore/unseal and External Secrets/Kubernetes Auth workflows.
 
-## 12. OpenBao and External Secrets
+Normal application hot paths use validated mounted/local key material, not per-request OpenBao RPCs. OpenBao remains a security-sensitive control-plane dependency for secret refresh/rotation/recovery.
 
-OpenBao 2.6.1 is exact current secret-authority pin under ADR-0011. v1 uses one Raft instance/PVC, manual Shamir 3 shares/threshold 2, hourly encrypted off-PVC snapshots, and tested restore/unseal.
+Secret values never enter Git, ConfigMaps, normal logs/traces/metrics, or other unapproved durable surfaces. Rotating key material remains read-only mounted/local according to its owning service contract.
 
-Normal application hot paths use validated mounted/local key material, not per-request OpenBao RPCs. OpenBao remains security-sensitive control-plane dependency for secret refresh/rotation/recovery.
+ADR-0042 MUST NOT be used to remove, replace, bypass, or weaken OpenBao.
 
-External Secrets uses Kubernetes Auth and namespace-scoped stores where practical. Rotating key material is mounted read-only. Secret values never enter Git, ConfigMaps, ordinary env vars for rotating key rings, logs, traces, or metrics.
+## 13. MFA and browser security — unchanged
 
-BFF retained-refresh encryption key ring is a dedicated purpose-separated mounted secret. Normal rotation is 90d; old decrypt keys remain through dependent-session lifetime/rekey plus 7d. Reload is atomic. Last fully validated snapshot may bridge secret-source outage <=1h; after that refresh-crypto-dependent operations fail closed. This does not authorize per-request OpenBao RPC or plaintext refresh persistence.
+The infrastructure profile does not change end-user MFA/security semantics. Current Identity/BFF/OIDC/TOTP/SMS/recovery/session/CSRF/CORS rules remain owned by ADR-0012/0016 and service documents.
 
-Compromised Password v1 and Reference Data v1 need no runtime provider credential for their reference lookups. Reference Data source provenance/integrity/license evidence is release evidence, not a production source credential.
+Email/SMS verification or recovery is not a freely selectable weaker substitute for active TOTP where the current Identity rule requires TOTP.
 
-## 13. Browser security
+## 14. Observability and audit placement
 
-Browser production follows ADR-0016: same-origin-only v1; OIDC Authorization Code + PKCE S256; exact state/nonce/verifier/pre-auth rules; exact return redirects; server-side HMAC-located transaction/session state; secure `__Host-` cookies; server-owned downstream-audience brokerage; Origin + synchronizer-token CSRF + mandatory `Sec-Fetch-Site:same-origin` for unsafe production browser requests; exact CSP/security headers; auth/OIDC/session/admin `no-store`; bounded request/error profiles. ADR-0041 adds an explicit anonymous safe-method Reference Data facade with deterministic ETag and `Cache-Control: public, max-age=3600`; it does not relax same-origin CORS or unsafe-method controls.
+Application logs remain structured/PII-safe. Metrics/labels remain bounded. Required security/audit evidence is not silently dropped as ordinary telemetry.
 
-## 14. Supply-chain admission and continuous vulnerability response
+In single-server, observability running on the same host is a resource competitor and must be included in full-stack capacity evidence. Required privileged-access audit must additionally be exported off-host so loss/compromise of the server does not erase the only audit copy.
 
-Release images are immutable, signed, carry signed provenance and CycloneDX SBOM evidence, and are indexed by deployed digest. Production admission verifies approved registry/digest/signature/provenance/required attestations through HA Kyverno before fail-closed enforcement.
+## 15. Capacity and availability interpretation
 
-Admission-policy write access is restricted to tightly controlled GitOps/CI identities; application workloads and ordinary service identities cannot author cluster-scoped admission policy. Kyverno CEL HTTP context is disabled unless reviewed policy genuinely needs it. Approved external context lookups use explicit versioned destination/purpose allow-lists, deny loopback/link-local/cloud-metadata/unreviewed private/arbitrary caller-influenced targets, do not forward credentials to arbitrary destinations, and use bounded timeout/response/failure semantics. NetworkPolicy and positive/negative SSRF tests enforce egress contract; lookup failure never silently becomes allow.
+`production-single-server` is deliberately non-HA. It does not claim:
 
-Vulnerability inventory is continuously rescanned/correlated with approved threat/advisory inputs. Exceptions are exact, owned, reviewed, expiring; expiry stops new promotion and escalates production exposure. No scanner/feed proves absence of unknown vulnerabilities and no scan result authorizes unsigned artifact.
+- control-plane quorum;
+- node failover;
+- PostgreSQL primary failover;
+- Redis Sentinel failover;
+- Kafka broker/controller failover;
+- Kyverno node-level admission availability;
+- maintenance without platform downtime.
 
-For Compromised Password, final-image SBOM/advisory correlation includes both the Xerial Java artifact and its bundled native SQLite engine. Driver/native/dataset-format upgrades require compatibility evidence before rollout.
+A `2 vCPU / 3-4 GiB RAM` full-stack host is not approved without measured evidence. Production approval requires the complete-stack benchmark from ADR-0042/performance/readiness documents, including >=30% validated CPU+memory headroom and applicable >=2x projected peak evidence.
 
-For Reference Data, the signed image/provenance additionally binds the approved immutable reference-bundle identity/source-revision manifest/content digest. Source-data revision changes are reviewed release inputs even though they are not Technology Baseline runtime pins.
+If the host cannot pass, increase resources or move to `production-ha`. Do not weaken OpenBao, Kyverno, Ambient security, backup/PITR, MFA, WAF, workload identity, audit, or fail-closed behavior to make the host fit.
 
-## 15. Human production access
+## 16. Verification
 
-Teleport Enterprise Self-Hosted is privileged human access plane. No standing production admin/root/database-superuser credentials are permitted. Kubernetes/database/host access uses SSO, phishing-resistant MFA, JIT approval, short-lived roles, audit/session evidence, and automatic expiry. Privileged write elevation requires two reviewers and <=30-minute access.
+Before production approval, the selected profile proves at least:
 
-## 16. Deployment validation
+- exact pinned/verified platform artifacts and supported compatibility;
+- Kubernetes/K3s custom-CNI and bundled-component disablement where applicable;
+- workload security context, ServiceAccount, NetworkPolicy and Istio identity policies;
+- profile-correct replica/HPA/PDB render;
+- PostgreSQL database/role/Flyway/RLS isolation plus profile-specific backup/restore/failover semantics;
+- Kafka profile topology + TLS/ACL/rebuild/replay/idempotency;
+- Redis TLS/ACL/noeviction + single-server AOF/restart or HA Sentinel evidence;
+- Ambient workload-identity/mTLS positive/negative tests and `istioctl analyze`, plus single-server capacity benchmark;
+- Kyverno signature/provenance/SBOM/security admission negative tests;
+- single-server OpenSSH FIDO2/JIT/audit/break-glass tests or HA Teleport tests;
+- unchanged OpenBao secret/recovery flows;
+- unchanged MFA downgrade-prevention tests;
+- full-stack load/soak/reboot/recovery evidence and explicit single-server non-HA sign-off.
 
-Applicable pre-promotion evidence includes:
-
-- code/unit/integration/architecture/contract/schema/security checks;
-- dependency/secret/vulnerability verification;
-- Buf/OpenAPI compatibility;
-- Helm/Kustomize rendering and Kubernetes security/schema/policy checks;
-- rendered-secret and manifest-diff checks;
-- immutable digest/signature/provenance/SBOM verification;
-- Kyverno policy-authoring RBAC and policy-engine egress/SSRF positive/negative tests when applicable;
-- PostgreSQL/CloudNativePG backup/restore/upgrade-policy checks for mutable relational state;
-- Compromised Password dataset compiler/integrity/schema/bounds/read-only/path/no-write/no-external-egress/Xerial-native/load/rebuild checks when affected;
-- Reference Data implementation-trigger, offline source provenance/license/integrity/import determinism, bundle manifest/digest/canonicalization/locale/bounds, no-database/broker/runtime-source egress, typed gRPC/BFF cache, workload-policy/load/rebuild checks when affected and implementation exists;
-- Kafka durability/replay checks;
-- Gateway/Traefik/WAF route and blocking tests;
-- `istioctl analyze`, Ambient/STRICT mTLS/ServiceAccount/NetworkPolicy/authorization positive and negative tests;
-- Web BFF exact ingress/egress, request-bound, session/Redis/key-ring/token-broker/Reference Data/CSRF/CORS/Fetch-Metadata/CSP/cache/quota/erasure render+integration tests when affected;
-- staging smoke/acceptance/critical browser tests;
-- production-safe smoke/synthetic checks.
-
-A required predecessor failure stops downstream promotion. Documentation is not runtime evidence; detailed gates live in `PRODUCTION-READINESS-CHECKLIST.md`.
+Production readiness is blocked when required runtime evidence is absent.
