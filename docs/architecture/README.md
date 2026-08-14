@@ -1,82 +1,58 @@
 # Architecture Documentation
 
-This directory contains the **current-state architecture** of the platform. It is written for implementation, review, security analysis, and production-readiness work.
+This directory contains the **current-state implementation-facing architecture** of HooshiX.
 
-## How to read the architecture
+## How to read
 
 Start with:
 
-1. `../../AGENTS.md`
-2. `../engineering/current-only-documentation-policy.md`
-3. `../engineering/repository-change-workflow.md`
-4. `SOURCES.md`
-5. `TASK-REVIEW-MATRIX.md` for targeted navigation
-6. `../adr/decision-register.md`
-7. `implementation-status.md` when repository implementation/evidence presence matters
-8. ADR-0042 when production topology, capacity, availability, physical PostgreSQL placement, Redis/Kafka topology, Kyverno availability, or human infrastructure access is relevant
-9. ADR-0043 plus `network-architecture.md` when public client-address trust, proxy headers, management reachability, or network security is relevant
-10. `threat-model.md` for security-boundary/abuse-case review
-11. the current-state document(s) relevant to the task
-12. the retained current ADRs identified by the register/source map
+1. `../../AGENTS.md`;
+2. `../engineering/current-only-documentation-policy.md`;
+3. `../engineering/repository-change-workflow.md`;
+4. `SOURCES.md`;
+5. `../adr/decision-register.md`;
+6. `PRODUCTION-DECISION-SUMMARY.md`;
+7. applicable service/platform/security/data/reliability documents;
+8. `PRODUCTION-READINESS-CHECKLIST.md` for executable evidence.
 
-All repository changes follow the PR-first workflow: branch -> Draft PR -> task changes -> complete review against current `main` -> applicable verification -> merge. Normal work does not commit directly to `main`.
-
-For targeted implementation work, read only the current-state documents and retained current ADRs that are clearly applicable. For service-boundary, security, infrastructure, or architecture work, perform a full read of the applicable architecture set.
-
-## Current repository implementation state
-
-`implementation-status.md` is the canonical repository-level status view. Architecture documents can name planned implementation paths, but a path in a design document is not proof that source, deployment, CI, or runtime evidence exists.
-
-At this documentation revision, the executable `services/`, `deploy/`, `infrastructure/`, and `.github/workflows/` targets are not present. Production readiness therefore remains `NOT VERIFIED` until implementation and executable evidence exist.
+ADR IDs are stable after merge. Current-state documents remain current-only; a superseded ADR retained for provenance is not current implementation authority.
 
 ## Current production profile
 
-The selected initial production topology is `production-single-server` under ADR-0042. It is an explicit **non-HA** profile. The `production-ha` topology remains the expansion profile when downtime, capacity, recovery, or business requirements justify additional nodes.
+Initial profile is `production-single-server` under ADR-0042. `production-ha` remains the expansion profile.
 
-Profile selection changes infrastructure topology and availability only. It MUST NOT weaken service ownership, database/role/Flyway isolation, forced tenant RLS, Outbox/Inbox/idempotency, MFA, OpenBao secret authority, workload identity/mTLS, NetworkPolicy, signed-artifact admission, backup/PITR, or fail-closed security behavior.
+Single-server intentionally accepts one-host availability/failure-domain risk. It does not weaken MFA, Authorization, tenant RLS, OpenBao, WAF/client trust, admission/supply-chain, required audit, backup/PITR, or fail-closed security dependencies.
 
-ADR-0043 defines the production network trust boundary. Public client network identity comes only from the approved external-L4/Traefik/WAF chain. Caller forwarding headers are not authority. Normal single-server SSH is reachable only through the dedicated WireGuard management overlay and still requires ADR-0030 FIDO2 plus separate JIT privilege.
+## Current implementation-readiness decisions
 
-A replicated deployment target written in a service document remains the `production-ha` target unless that document says otherwise. For `production-single-server`, ADR-0042 and the profile-aware platform ADRs override only replica/HPA/PDB availability settings and physical infrastructure placement. They do not override business or security contracts.
+Before the first executable vertical slice, current architecture requires:
 
-A `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved production capacity statement. The single-server profile requires complete-stack capacity, recovery, and security evidence before it can be called production-ready.
+- ADR-0040: official offline HIBP Pwned Passwords SHA-1 corpus with provenance/freshness/full-corpus bounds; SHA-1 screening-only, Argon2id storage unchanged;
+- ADR-0024: exact-IP hard quota identity, aggregate-prefix pressure, common-mode wall-clock guard, and high-cardinality Redis allocation protection;
+- ADR-0041: Reference Data remains local immutable capability until an independent-service trigger is evidenced;
+- ADR-0044: structured logging, Micrometer metrics, OpenTelemetry tracing, Collector/Loki/Tempo/Prometheus/Grafana/Alertmanager integration, and external host-down detection from Day-1;
+- ADR-0017/build gates: Kyverno new production policies use stable CEL-based `policies.kyverno.io/v1` APIs;
+- stable merged ADR identifiers and coherent-change PR governance.
 
-## Current-state documents
+These are target decisions. `implementation-status.md` remains authoritative for whether code/deployment/CI/runtime evidence exists.
 
-- `platform-architecture.md` — system topology, service ownership, protocol boundaries, architectural principles.
-- `network-architecture.md` — production network zones, public client-address trust chain, management plane, egress and host-network capacity evidence.
-- `threat-model.md` — assets, actors, trust boundaries, STRIDE/abuse cases, residual risk and verification mapping.
-- `implementation-status.md` — canonical architecture/implementation/evidence presence for the current repository tree.
-- `backend-engineering.md` — Java/Spring, DDD/Hexagonal, package structure, DI, coding constraints.
-- `../engineering/coding-standards.md` — canonical implementation-level Java coding standard.
-- `../engineering/build-and-ci-quality-enforcement.md` — executable Gradle/Spotless/SpotBugs/ArchUnit/Semgrep/GitHub Actions enforcement baseline.
-- `../engineering/repository-change-workflow.md` — mandatory branch/PR/review/merge workflow.
-- `../engineering/current-only-documentation-policy.md` — active owner directive for keeping only effective documentation/decisions.
-- `../engineering/agent-communication-and-reporting.md` — mandatory evidence/reporting contract.
-- `security-architecture.md` — tenancy, deletion/retention, authentication, sessions, MFA, authorization, secrets, quotas.
-- `data-and-messaging.md` — PostgreSQL, Flyway, JPA/jOOQ, transactions, Kafka, Protobuf, Redis.
-- `reliability-and-observability.md` — deadlines, retries, Virtual Threads, SLOs, DR, telemetry, logging/PII.
-- `runtime-and-deployment.md` — Kubernetes, Helm, GitOps, Argo CD, Traefik, WAF, Istio, OpenBao and profile overlays.
-- `testing-and-quality-gates.md` — testing matrix, CI/CD ordering, architecture enforcement, Definition of Done.
-- `TASK-REVIEW-MATRIX.md` — task-to-source routing for targeted reviews.
-- `PRODUCTION-READINESS-CHECKLIST.md` — implementation/evidence production gates, including profile-specific gates.
-- `performance-and-bottlenecks.md` — current performance/operational bottleneck register and scale/split triggers.
-- `dependency-criticality.yaml` — canonical machine-readable operation/dependency criticality registry.
-- `dependency-criticality.schema.json` — CI validation schema for the registry.
-- `dependency-criticality-matrix.md` — generated human-readable view of the registry.
-- `PRODUCTION-DECISION-SUMMARY.md` — concise current production decision summary.
-- `PRODUCTION-ARCHITECTURE-REVIEW.md` — production review outcome and bottleneck summary.
-- `services/` — service-specific current architecture.
-- `../runbooks/production-cold-dr.md` — complete cold-recovery sequence and traffic-enable evidence gate.
+## Document map
 
-## Current-only ADR rule
+- `platform-architecture.md` — platform/service topology.
+- `network-architecture.md` — public/management/workload trust paths.
+- `security-architecture.md` / `threat-model.md` — security objectives, boundaries, threats.
+- `data-and-messaging.md` — data ownership/PostgreSQL/Redis/Kafka/reference datasets.
+- `reliability-and-observability.md` — reliability and Day-One telemetry runtime.
+- `performance-and-bottlenecks.md` — capacity/saturation/evidence triggers.
+- `runtime-and-deployment.md` — runtime/GitOps/profile behavior.
+- `testing-and-quality-gates.md` — executable verification portfolio.
+- `security-verification-matrix.md` / `architecture-fitness-functions.md` — traceable security/architecture properties.
+- `PRODUCTION-READINESS-CHECKLIST.md` — production traffic gate.
+- `implementation-status.md` — actual repository implementation/evidence presence.
+- `services/` — implementation-facing service contracts.
 
-The active repository-owner directive is defined in `../engineering/current-only-documentation-policy.md`.
+## Authority rule
 
-Only ADRs with still-effective scope are retained. Completely superseded ADRs and raw historical source material are removed after their still-current semantics are confirmed to exist in retained ADRs/current-state documents. Partially stale ADRs are normalized so obsolete alternatives are not presented as active architecture.
+Do not create a second normative copy merely for convenience. ADR/current architecture/standards have the precedence defined in Documentation Standards. Lower-level documents may add implementation context but cannot weaken higher-level decisions.
 
-When current-state documentation and a retained ADR disagree, inspect `../adr/decision-register.md` and correct the stale source in the same change rather than inferring a historical precedence chain.
-
-## Technology versions
-
-Do not encode patch-version decisions in current-state architecture unless the version itself is architecturally significant. Use `../technology/technology-baseline.md` for production/application pins, `../technology/local-development-baseline.md` for workstation/container/kind pins, `../technology/production-compatibility-matrix.md` for supported production combinations, and repository lock/wrapper/image/provisioning files for exact deployed artifacts. Local mesh/edge operations use `../runbooks/local-istio-ambient.md` and `../runbooks/local-traefik-edge.md`.
+A path or component name in documentation is not proof it exists. Only actual repository/runtime evidence may be reported as implemented/passed.
