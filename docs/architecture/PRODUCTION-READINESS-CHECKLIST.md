@@ -308,6 +308,7 @@ ADR-0042 MUST NOT change OpenBao.
 
 - [ ] upstream volumetric protection is active and evidenced;
 - [ ] external L4 -> repository Traefik -> Caddy/Coraza WAF -> BFF path is enforced;
+- [ ] the Traefik application origin accepts public application traffic only from the exact approved external-L4 source ranges; direct Internet/non-approved-source access is denied before application routing;
 - [ ] external L4 preserves the validated original client address with the approved PROXY-v2 contract;
 - [ ] Traefik `proxyProtocol.trustedIPs` contains only approved external-L4 source CIDRs;
 - [ ] Traefik `proxyProtocol.insecure` is disabled;

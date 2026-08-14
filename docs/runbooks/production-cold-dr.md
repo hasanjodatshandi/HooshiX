@@ -247,6 +247,7 @@ Application order follows dependency-safe readiness. Startup order alone is not 
 Before opening traffic, prove:
 
 - upstream mitigation/external L4 path is active;
+- the Traefik application origin accepts traffic only from the exact approved external-L4 source ranges and direct Internet/non-approved-source access is denied before application routing;
 - external L4 preserves client address with the approved PROXY-v2 contract;
 - Traefik trusts PROXY only from approved L4 CIDRs;
 - insecure forwarded/PROXY trust is disabled;
@@ -256,7 +257,7 @@ Before opening traffic, prove:
 - direct Internet -> BFF and Traefik -> BFF bypasses are denied;
 - WAF blocking configuration is the approved version.
 
-A missing client-address trust path blocks public quota-protected traffic.
+A missing client-address trust path or external-L4-only origin restriction blocks public quota-protected traffic.
 
 ## 15. Security and correctness gate
 
