@@ -12,12 +12,23 @@ Start with:
 4. `SOURCES.md`
 5. `TASK-REVIEW-MATRIX.md` for targeted navigation
 6. `../adr/decision-register.md`
-7. the current-state document(s) relevant to the task
-8. the retained current ADRs identified by the register/source map
+7. ADR-0042 when production topology, capacity, availability, physical PostgreSQL placement, Redis/Kafka topology, Kyverno availability, or human infrastructure access is relevant
+8. the current-state document(s) relevant to the task
+9. the retained current ADRs identified by the register/source map
 
 All repository changes follow the PR-first workflow: branch -> Draft PR -> task changes -> complete review against current `main` -> applicable verification -> merge. Normal work does not commit directly to `main`.
 
 For targeted implementation work, read only the current-state documents and retained current ADRs that are clearly applicable. For service-boundary, security, infrastructure, or architecture work, perform a full read of the applicable architecture set.
+
+## Current production profile
+
+The selected initial production topology is `production-single-server` under ADR-0042. It is an explicit **non-HA** profile. The `production-ha` topology remains the expansion profile when downtime, capacity, recovery, or business requirements justify additional nodes.
+
+Profile selection changes infrastructure topology and availability only. It MUST NOT weaken service ownership, database/role/Flyway isolation, forced tenant RLS, Outbox/Inbox/idempotency, MFA, OpenBao secret authority, workload identity/mTLS, NetworkPolicy, signed-artifact admission, backup/PITR, or fail-closed security behavior.
+
+A replicated deployment target written in a service document remains the `production-ha` target unless that document says otherwise. For `production-single-server`, ADR-0042 and the profile-aware platform ADRs override only replica/HPA/PDB availability settings and physical infrastructure placement. They do not override business or security contracts.
+
+A `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved production capacity statement. The single-server profile requires complete-stack capacity, recovery, and security evidence before it can be called production-ready.
 
 ## Current-state documents
 
@@ -31,10 +42,10 @@ For targeted implementation work, read only the current-state documents and reta
 - `security-architecture.md` — tenancy, deletion/retention, authentication, sessions, MFA, authorization, secrets, quotas.
 - `data-and-messaging.md` — PostgreSQL, Flyway, JPA/jOOQ, transactions, Kafka, Protobuf, Redis.
 - `reliability-and-observability.md` — deadlines, retries, Virtual Threads, SLOs, DR, telemetry, logging/PII.
-- `runtime-and-deployment.md` — Kubernetes, Helm, GitOps, Argo CD, Traefik, WAF, Istio, OpenBao.
+- `runtime-and-deployment.md` — Kubernetes, Helm, GitOps, Argo CD, Traefik, WAF, Istio, OpenBao and profile overlays.
 - `testing-and-quality-gates.md` — testing matrix, CI/CD ordering, architecture enforcement, Definition of Done.
 - `TASK-REVIEW-MATRIX.md` — task-to-source routing for targeted reviews.
-- `PRODUCTION-READINESS-CHECKLIST.md` — implementation/evidence production gates.
+- `PRODUCTION-READINESS-CHECKLIST.md` — implementation/evidence production gates, including profile-specific gates.
 - `performance-and-bottlenecks.md` — current performance/operational bottleneck register and scale/split triggers.
 - `dependency-criticality.yaml` — canonical machine-readable operation/dependency criticality registry.
 - `dependency-criticality.schema.json` — CI validation schema for the registry.
@@ -53,4 +64,4 @@ When current-state documentation and a retained ADR disagree, inspect `../adr/de
 
 ## Technology versions
 
-Do not encode patch-version decisions in current-state architecture unless the version itself is architecturally significant. Use `../technology/technology-baseline.md` for production/application pins, `../technology/local-development-baseline.md` for workstation/container/kind pins, `../technology/production-compatibility-matrix.md` for supported production combinations, and repository lock/wrapper/image files for exact deployed artifacts. Local mesh/edge operations use `../runbooks/local-istio-ambient.md` and `../runbooks/local-traefik-edge.md`.
+Do not encode patch-version decisions in current-state architecture unless the version itself is architecturally significant. Use `../technology/technology-baseline.md` for production/application pins, `../technology/local-development-baseline.md` for workstation/container/kind pins, `../technology/production-compatibility-matrix.md` for supported production combinations, and repository lock/wrapper/image/provisioning files for exact deployed artifacts. Local mesh/edge operations use `../runbooks/local-istio-ambient.md` and `../runbooks/local-traefik-edge.md`.
