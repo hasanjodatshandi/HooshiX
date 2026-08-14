@@ -16,17 +16,22 @@ Artifact: <CI run/report/manifest/test/restore record>
 
 Production traffic MUST NOT open while a mandatory applicable gate is `FAIL`, `NOT RUN` or materially `NOT VERIFIED`.
 
+`implementation-status.md` records repository implementation/evidence presence. A target path in an architecture document is not proof of implementation.
+
 ## 1. Profile selection and risk acceptance
 
 ### `production-single-server`
 
 - [ ] ADR-0042 is present in Decision Register/source/task maps.
+- [ ] ADR-0043 is present in Decision Register/source/task maps.
+- [ ] `threat-model.md` covers the selected profile, public edge/client-address trust, management path, privileged access, restore, and single-host residual risk.
 - [ ] Operator/business owner explicitly accepts that host/node/kernel/storage/maintenance failure can stop the complete platform.
+- [ ] Operator/security owner explicitly accepts the broader host/root compromise blast radius of one physical server.
 - [ ] No document/manifest/dashboard claims node/control-plane/PostgreSQL/Redis/Kafka/Kyverno HA for this profile.
 - [ ] Application replica count renders as one unless a separately reviewed local-concurrency exception exists.
 - [ ] HPA is disabled by default.
 - [ ] Availability PDBs do not block required one-node maintenance while creating no real availability.
-- [ ] Upgrade/recovery runbooks identify whole-platform maintenance/recovery implications.
+- [ ] `production-cold-dr.md` and applicable component recovery procedures identify whole-platform recovery implications.
 
 ### `production-ha`
 
@@ -47,6 +52,8 @@ Single-server mandatory evidence:
 - [ ] K3s datastore directory plus server token are encrypted and copied off-host;
 - [ ] clean K3s/GitOps rebuild from documented recovery artifacts passes;
 - [ ] host OS/kernel/filesystem/time/network hardening is versioned and reviewable;
+- [ ] exact host WireGuard package/kernel support and configuration are pinned in provisioning metadata;
+- [ ] host/provider firewall state separates public, management, and workload paths according to `network-architecture.md`;
 - [ ] reboot/restart ordering does not create a fail-open security window.
 
 ## 3. Workload hardening
@@ -150,8 +157,9 @@ Mandatory in both profiles:
 - [ ] monthly retained recovery artifact for 12 months;
 - [ ] backup verification every cycle;
 - [ ] monthly isolated restore exercise;
-- [ ] quarterly full cold-DR exercise;
-- [ ] restore evidence includes versions, Flyway, integrity, RPO/RTO, RLS and erasure/legal-hold checks where applicable.
+- [ ] quarterly full cold-DR exercise uses `../runbooks/production-cold-dr.md` or a stricter reviewed procedure;
+- [ ] restore evidence includes versions, Flyway, integrity, RPO/RTO, RLS and erasure/legal-hold checks where applicable;
+- [ ] quarterly platform evidence measures the ADR-0004 platform RTO <=4h rather than inferring it from backup success.
 
 `pg_dump + cron` MUST NOT be recorded as the primary production backup/PITR strategy.
 
@@ -195,6 +203,10 @@ Common:
 - [ ] per-owner ACL identities/key namespaces enforced;
 - [ ] `noeviction` configured and observed;
 - [ ] raw identifiers are absent where HMAC pseudonymization is required;
+- [ ] network quota identity comes only from the ADR-0043 trusted edge/BFF context;
+- [ ] forged forwarding/client-IP headers cannot create a different network budget;
+- [ ] IPv4, IPv6, and IPv4-mapped IPv6 canonicalization cannot create alias budgets;
+- [ ] missing/malformed/proxy-address network identity fails closed when the operation requires a network quota;
 - [ ] quota atomicity/anti-lockout/time-source/TTL rules pass;
 - [ ] covered operations fail closed on Redis/time-source failure;
 - [ ] memory headroom >=30% at approved peak.
@@ -222,7 +234,8 @@ ADR-0042 changes none of these gates.
 - [ ] CSRF + Fetch Metadata + Origin + same-origin CORS tests pass;
 - [ ] CSP/cache/security-header tests pass;
 - [ ] exact-audience BFF token brokerage cannot mint arbitrary audience authority;
-- [ ] tenantless/onboarding session cannot access ordinary protected resources.
+- [ ] tenantless/onboarding session cannot access ordinary protected resources;
+- [ ] HooshiX email identity comparison is intentionally case-insensitive while the mail-delivery representation preserves local-part case under ADR-0009.
 
 ## 11. Authorization
 
@@ -254,10 +267,17 @@ Common:
 
 Single-server:
 
-- [ ] SSH is reachable only from approved management path/network;
+- [ ] normal management path is the ADR-0043 WireGuard overlay;
+- [ ] public-interface/Internet TCP/22 is unreachable;
+- [ ] SSH is reachable only on the host management address/interface;
+- [ ] every approved operator device has an independent attributable WireGuard peer key;
+- [ ] shared WireGuard peer keys are denied;
+- [ ] revoked/unapproved peers cannot reach SSH;
+- [ ] peer `AllowedIPs` are minimal and do not grant broad workload/application network access by default;
+- [ ] WireGuard network admission alone grants no SSH or privileged authority;
 - [ ] root login denied;
 - [ ] password authentication denied;
-- [ ] shared accounts/keys denied;
+- [ ] shared SSH accounts/keys denied;
 - [ ] hardware-backed OpenSSH FIDO2 requires user presence + user verification;
 - [ ] FIDO2 login alone does not grant administrator authority;
 - [ ] JIT privilege automation expires without manual cleanup dependency;
@@ -266,7 +286,8 @@ Single-server:
 - [ ] Kubernetes/database privileged operations are audited at their boundary;
 - [ ] required audit is exported off-host to append-only/tamper-resistant storage;
 - [ ] `.bashrc`, shell history and `PROMPT_COMMAND` are not accepted as authoritative session audit;
-- [ ] audit export failure has incident/continuity handling.
+- [ ] audit export failure has incident/continuity handling;
+- [ ] provider console, if available, is tested only as protected incident-linked break glass.
 
 HA uses Teleport-specific SSO/WebAuthn/JIT/session-recording gates.
 
@@ -283,10 +304,19 @@ ADR-0042 MUST NOT change OpenBao.
 - [ ] no profile change removed/replaced/bypassed OpenBao;
 - [ ] OpenBao capacity issue is not solved by weakening secret authority.
 
-## 14. Public edge and WAF
+## 14. Public edge, WAF, and client address
 
 - [ ] upstream volumetric protection is active and evidenced;
 - [ ] external L4 -> repository Traefik -> Caddy/Coraza WAF -> BFF path is enforced;
+- [ ] external L4 preserves the validated original client address with the approved PROXY-v2 contract;
+- [ ] Traefik `proxyProtocol.trustedIPs` contains only approved external-L4 source CIDRs;
+- [ ] Traefik `proxyProtocol.insecure` is disabled;
+- [ ] Traefik `forwardedHeaders.insecure` is disabled;
+- [ ] Caddy trusted-proxy ranges are limited to the required Traefik source path and strict trusted-proxy parsing is enabled;
+- [ ] Caddy overwrites the internal `X-HooshiX-Client-IP`; caller-supplied values cannot pass through as authority;
+- [ ] Web BFF accepts one server-derived internal client IP only on the WAF-only ingress path;
+- [ ] forged `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, and `X-HooshiX-Client-IP` values do not affect client identity;
+- [ ] missing/misconfigured source-address preservation is detected before quota-protected traffic is accepted;
 - [ ] direct Internet/BFF and Traefik/BFF WAF-bypass paths fail negative tests;
 - [ ] K3s bundled Traefik/ServiceLB is absent in single-server;
 - [ ] WAF current CRS/rule version and DetectionOnly-to-blocking evidence pass;
@@ -298,6 +328,7 @@ ADR-0042 MUST NOT change OpenBao.
 - [ ] static logging/Semgrep rules pass;
 - [ ] sensitive credential/token/cookie/secret data cannot be logged in reviewed paths;
 - [ ] PII masking/HMAC pseudonymization rules pass;
+- [ ] raw client IP used for trusted network quota context is absent from ordinary logs/metrics/traces/Redis keys/Kafka/business state;
 - [ ] CR/LF/log injection tests pass for input-derived fields;
 - [ ] metric labels are bounded and exclude high-cardinality subject identifiers;
 - [ ] synthetic canary/runtime leak detection is active where required;
@@ -319,6 +350,11 @@ The following are measured **at the same time** under representative load/backgr
 - [ ] Traefik/WAF;
 - [ ] observability stack;
 - [ ] host filesystem/disk free-space/latency/IOPS;
+- [ ] effective MTU/PMTU behavior across public/pod/Ambient paths;
+- [ ] conntrack usage/high-water/drop counters;
+- [ ] file-descriptor/listen-queue usage;
+- [ ] ephemeral-port/TIME_WAIT pressure;
+- [ ] public/management interface packet/error/drop counters;
 - [ ] reboot/recovery behavior.
 
 Required pass criteria:
@@ -330,6 +366,7 @@ Required pass criteria:
 - [ ] >=30% validated memory headroom at approved peak;
 - [ ] applicable critical/security paths pass >=2x projected peak validation;
 - [ ] disk latency/free space stays inside tested thresholds while WAL+AOF+Kafka+telemetry coexist;
+- [ ] conntrack, file descriptors, sockets, and ephemeral ports retain measured safe headroom;
 - [ ] no security/admission/backup control must be disabled to pass;
 - [ ] restart/reboot does not create fail-open behavior.
 
@@ -344,7 +381,7 @@ Examples that remain mandatory when the service is in release scope:
 - Identity registration/authentication/MFA/session/token/erasure behavior;
 - Authorization permission/admin/platform/owner-safety behavior;
 - Notification durable acceptance/template/provider/reconciliation behavior;
-- Web BFF OIDC/session/CSRF/CORS/token-broker/public API behavior;
+- Web BFF OIDC/session/CSRF/CORS/token-broker/public API/client-network behavior;
 - Compromised Password immutable dataset/query/security/recovery behavior;
 - Reference Data importer/bundle/contract/runtime evidence only when its implementation trigger/release scope is active.
 
@@ -354,10 +391,12 @@ Production approval requires:
 
 ```text
 all applicable mandatory gates PASS
++ formal threat-model review current for the deployed topology
 + no unresolved security/correctness blocker
 + selected-profile capacity/recovery evidence PASS
++ quarterly cold-DR evidence current and platform RTO measured
 + current vulnerability/advisory/security-support review PASS
-+ explicit single-server downtime-risk sign-off
++ explicit single-server downtime/host-blast-radius sign-off
 ```
 
 If a mandatory gate is missing, report `NOT VERIFIED` and block production readiness. Do not convert missing evidence into an architectural assumption.

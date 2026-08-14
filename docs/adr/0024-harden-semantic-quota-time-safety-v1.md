@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; consolidated to current-only documentation on 2026-08-14; Identity registration quota values, Authorization administration cost semantics, Web BFF OIDC abuse quotas, and profile-aware Redis topology finalized on 2026-08-14
+2026-08-11; consolidated to current-only documentation on 2026-08-14; Identity registration quota values, Authorization administration cost semantics, Web BFF OIDC abuse quotas, and profile-aware Redis topology finalized on 2026-08-14; network-identity trust bound to ADR-0043 on 2026-08-15
 
 ## Decision
 
@@ -36,11 +36,24 @@ One reviewed/versioned Redis Function or Lua operation evaluates all dimensions 
 
 PostgreSQL is not used for ephemeral quota counters.
 
-### Pseudonymous keys
+### Pseudonymous keys and trusted network identity
 
 Raw email, phone, user ID, tenant ID, membership ID, provider subject, session ID, pre-auth identifier, or IP address MUST NOT appear in Redis keys or telemetry.
 
 Keys use domain-separated HMAC-SHA-256 over operation + dimension type + canonical value. IPv4 network dimensions normalize to `/24`; IPv6 to `/64` before HMAC.
+
+For public operations, the IP/network value is trusted only when it comes from the ADR-0043 edge contract. Browser/public `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, or equivalent caller-controlled headers are never quota authority.
+
+Web BFF derives one trusted client IP from the external-L4 -> Traefik -> Caddy/Coraza chain and, when a downstream service owns the network quota, sends only a server-created typed client-network context over the authenticated internal call. The receiving service accepts that context only from the approved BFF workload on the applicable operation.
+
+Canonical network input rules:
+
+- exactly one binary IPv4 or IPv6 address;
+- no hostname, port, CIDR string, zone identifier, or list;
+- IPv4-mapped IPv6 normalizes to IPv4 before `/24` processing;
+- IPv4/IPv6 prefix HMAC input is canonical binary data plus explicit family/domain separation;
+- missing/malformed/untrusted/proxy-address network context on an operation that requires the network dimension fails closed;
+- raw client IP is transient and is not logged, persisted, put in Kafka, or used as a metric label.
 
 Quota-HMAC rotation overlaps current/previous key identities for at least the longest active policy horizon; both pseudonyms participate in one decision during overlap so rotation cannot reset abuse pressure.
 
@@ -170,7 +183,7 @@ Shared security-dependency constraints in both profiles:
 
 ## Verification requirements
 
-Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, exact Web BFF OIDC_START/OIDC_CALLBACK capacity/refill/horizon behavior, separation from Identity GOOGLE_LOGIN keys, max-five-live-pre-auth composition, exact AUTH_ADMIN_WRITE semantic-mutation counting and 100-mutation bound, Role-permission set-delta charging, quota-before-DB ordering, no quota refund after later failed mutation, atomic actor+scope and tenant/platform cost consumption, Redis outage fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, IPv4/IPv6 canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
+Tests cover exact registration capacities/refill/cleanup boundaries, atomic contact+network races/no partial consumption, resend 60-second challenge spacing independent of Redis refill, confirmation network quota + five-challenge-attempt composition, distinct contact-registration/contact-management/password-recovery/MFA namespaces, exact Web BFF OIDC_START/OIDC_CALLBACK capacity/refill/horizon behavior, separation from Identity GOOGLE_LOGIN keys, max-five-live-pre-auth composition, exact AUTH_ADMIN_WRITE semantic-mutation counting and 100-mutation bound, Role-permission set-delta charging, quota-before-DB ordering, no quota refund after later failed mutation, atomic actor+scope and tenant/platform cost consumption, Redis outage fail-closed behavior, forward/backward jumps in both clocks, exact/beyond 2s skew, no refill from one-clock forward jump, no security reset from expiry, cleanup under time mismatch, long-idle refill capped at capacity, anti-lockout/non-enumeration, HMAC rotation without budget reset, trusted edge-derived network context, forged forwarding-header rejection, missing/proxy-address fail-closed behavior, IPv4/IPv6/IPv4-mapped canonicalization, NAT behavior, refill/cost dimensions, ACL isolation, memory-growth alerts, PII-safe telemetry, local/test profile bypass prevention, and >=2x peak load.
 
 `production-single-server` additionally verifies TLS, `noeviction`, AOF enabled with `appendfsync everysec`, restart recovery, session invalidation semantics when state is lost, and explicit absence of failover claims.
 
@@ -178,4 +191,4 @@ Tests cover exact registration capacities/refill/cleanup boundaries, atomic cont
 
 ## Rollback considerations
 
-Rollback MUST NOT remove approved registration/Authorization/Web-BFF-OIDC quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, one-unit arbitrarily large admin mutations, quota refund on failed DB mutation, raw identifiers in keys, retry/fallback, or remote-account-lockout behavior. If dual-clock/atomic fail-closed contract cannot be enforced, affected production semantic-quota entry points remain disabled. Moving to the single-server profile MUST preserve TLS/ACL/noeviction/AOF/fail-closed behavior and MUST NOT be presented as Redis HA.
+Rollback MUST NOT remove approved registration/Authorization/Web-BFF-OIDC quota coverage, restore sole Redis-wall-clock authority, security-significant TTL reset, partial multi-dimension consumption, one-unit arbitrarily large admin mutations, quota refund on failed DB mutation, raw identifiers in keys, caller-controlled network identity, retry/fallback, or remote-account-lockout behavior. If dual-clock/atomic fail-closed/trusted-network contract cannot be enforced, affected production semantic-quota entry points remain disabled. Moving to the single-server profile MUST preserve TLS/ACL/noeviction/AOF/fail-closed behavior and MUST NOT be presented as Redis HA.

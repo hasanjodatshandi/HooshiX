@@ -1,205 +1,145 @@
 # Production Architecture Review — Current State
 
-- **Reviewed:** 2026-08-14
+- **Reviewed:** 2026-08-15
 - **Status:** architecture target accepted; implementation/runtime evidence is not implied
 - **Documentation mode:** current-only
 - **Selected initial profile:** `production-single-server`
 - **Availability posture:** explicit non-HA
 
+This document records review conclusions. It does not duplicate the full normative rules from ADRs/current-state documents.
+
 ## Outcome
 
-The single-server simplification is architecturally acceptable **only** as a named non-HA production profile with security/correctness invariants preserved.
+The single-server architecture remains acceptable only as a named non-HA production profile with security/correctness/recovery invariants preserved.
 
-The following decisions are accepted:
+The follow-up review confirmed that the architecture already models the major single-server capacity, SLO, shared-PostgreSQL, Authorization, Redis/Kafka, OpenBao, MFA and implementation-evidence risks. It also identified cross-cutting gaps that are now represented by current authority:
+
+- **trusted public client-address authority** -> ADR-0043 + `network-architecture.md`;
+- **concrete single-server management network** -> ADR-0043 + ADR-0030;
+- **formal platform threat model** -> `threat-model.md`;
+- **full cold-DR procedure** -> `../runbooks/production-cold-dr.md`;
+- **repository implementation/evidence status** -> `implementation-status.md`;
+- **email product identity vs SMTP delivery representation** -> ADR-0009;
+- **dependency-registry authority ambiguity** -> corrected in `reliability-and-observability.md` to match ADR-0033;
+- **duplicated summary/source rules** -> source maps remain indexes and reference the authoritative owner instead of becoming a second specification.
+
+## Accepted production-profile decisions
+
+The existing ADR-0042 decisions remain accepted:
 
 - one K3s server/workload node;
-- one physical PostgreSQL instance with distinct service databases/roles/Flyway histories;
+- one physical PostgreSQL instance with distinct service databases/roles/Flyway histories/RLS;
 - one Redis instance with TLS/ACL/`noeviction`/AOF/fail-closed behavior;
 - one combined KRaft Kafka broker/controller with RF=1/minISR=1 and formal non-HA acceptance;
 - one application replica per service with HPA/availability PDB disabled by default;
 - Istio Ambient retained behind a complete-stack benchmark gate;
 - Kyverno retained with a smaller high-value policy set but blocking enforcement;
-- Teleport omitted only in this profile and replaced by hardened OpenSSH + hardware FIDO2 + real JIT privilege/audit controls;
-- evidence-based host sizing rather than assuming 2 vCPU / 3-4 GiB RAM.
+- evidence-based host sizing rather than an assumed 2 vCPU / 3-4 GiB production claim;
+- OpenBao and end-user MFA unchanged.
 
-The following proposals are **not** accepted:
+ADR-0043 additionally accepts:
+
+- external L4 as source-address authority with trusted PROXY protocol v2 to Traefik;
+- strict proxy/header trust through Traefik/Caddy/BFF; caller forwarding headers are not authority;
+- typed BFF-derived client-network context for downstream public security quotas;
+- dedicated WireGuard management overlay for normal single-server SSH reachability;
+- network admission separate from FIDO2 human authentication and JIT privilege;
+- public-interface TCP/22 denial.
+
+## Rejected shortcuts
+
+The review does not accept:
 
 - replacing physical WAL/PITR/off-site recovery with `pg_dump + cron`;
-- removing Kyverno enforcement;
+- removing or weakening Kyverno, Ambient, WAF, OpenBao, MFA, RLS, Authorization or fail-closed quota behavior to fit one host;
+- using caller `Forwarded`/`X-Forwarded-*`/`X-Real-IP` as security authority;
+- enabling Traefik insecure forwarding/PROXY trust in production;
+- falling back to a proxy address when trusted client identity is unavailable for a required network quota;
+- exposing normal SSH on the public interface;
+- using WireGuard as a substitute for human FIDO2 identity/JIT authorization;
 - using `.bashrc`/shell history as privileged-session audit;
-- allowing Email/SMS/TOTP as freely interchangeable MFA factors when current Identity policy requires active TOTP;
-- treating a one-node/one-broker/one-Redis/one-PostgreSQL profile as HA;
-- weakening fail-closed security/correctness controls to fit a smaller host.
+- claiming one-node/one-broker/one-Redis/one-PostgreSQL topology is HA;
+- claiming planned source/deployment paths are implemented without repository/runtime evidence.
 
-**OpenBao is unchanged and outside the simplification scope.**
+## Review of second-order complexity
 
-## 1. Why a named profile is required
+The platform intentionally keeps distributed bounded-context/service boundaries even though the selected first production profile is one physical server. This creates operational cost without node-level HA benefits.
 
-The previous architecture expressed the high-availability target as one universal production topology. Replacing it silently with one node would make service docs, SLOs, failure tests and recovery assumptions misleading.
+The follow-up review considered consolidation/modular-monolith alternatives but did **not** identify a correctness or security defect that requires changing the current bounded-context decisions. No service boundary is changed in this review. A future product/cost decision may revisit deployment consolidation through a separate architecture decision with contract/data/security migration analysis.
 
-ADR-0042 therefore defines two explicit profiles:
+Compromised Password remains an independent boundary under ADR-0040. Reference Data remains implementation-gated under ADR-0041.
 
-- `production-single-server` — selected initial cost-optimized profile, non-HA;
-- `production-ha` — expansion profile for maintenance without full outage, redundancy and larger capacity.
+## Network/security review
 
-This keeps service/domain/security contracts stable while making topology/availability trade-offs explicit.
+The prior architecture had the correct high-level public path but did not define one canonical source-address authority. This was material because ADR-0024 uses network identity for security quotas.
 
-## 2. Kubernetes review
-
-K3s is appropriate for the selected one-server profile when the repository platform controls remain authoritative.
-
-Required single-server shape:
-
-- K3s on the approved Kubernetes line;
-- embedded SQLite control-plane datastore;
-- secrets encryption;
-- Flannel and K3s network-policy controller disabled;
-- Calico retained;
-- bundled K3s Traefik/ServiceLB disabled;
-- repository Traefik/Gateway/WAF retained;
-- encrypted off-host recovery copy of K3s datastore + server token;
-- one application replica; no false availability PDB/HPA.
-
-Review conclusion: acceptable with explicit whole-platform downtime acceptance and tested clean rebuild/recovery.
-
-## 3. PostgreSQL review
-
-Physical consolidation is acceptable because logical ownership remains strict:
-
-- distinct service DB;
-- distinct runtime role;
-- distinct migration/owner role;
-- distinct Flyway history/release lifecycle;
-- forced tenant RLS where applicable;
-- no cross-service DB access/joins/FKs/shared models/credentials.
-
-The cost is a larger process/host/storage/superuser/recovery blast radius. The shared instance needs a global connection budget and noisy-neighbor IO/WAL/checkpoint evidence.
-
-Review conclusion: acceptable for the single-server profile; not a relaxation of service database ownership.
-
-## 4. PostgreSQL backup/recovery review
-
-`pg_dump + cron` is rejected as the primary recovery strategy because it does not preserve the current continuous WAL/PITR/off-site physical recovery model.
-
-The selected profile retains continuous WAL archive, daily physical base backup, <=5m RPO evidence, 35-day PITR, monthly retained artifacts, monthly restore exercises and quarterly cold DR.
-
-Physical recovery now covers the shared cluster. Service-specific recovery therefore begins with an isolated whole-cluster PITR restore, then extracts/transfers only the required service DB through a controlled compatibility-aware procedure.
-
-Review conclusion: PITR/WAL/off-site recovery remains mandatory.
-
-## 5. Redis review
-
-One Redis instance is acceptable only with:
-
-- TLS;
-- independent ACL identities/key namespaces;
-- `noeviction`;
-- AOF `appendfsync everysec`;
-- fail-closed semantic quota/session behavior;
-- >=30% measured memory headroom;
-- explicit no-failover claim.
-
-AOF is restart durability assistance, not HA. Lost session state causes re-authentication.
-
-Review conclusion: acceptable with explicit availability loss and unchanged security semantics.
-
-## 6. Kafka review
-
-One combined KRaft broker/controller is acceptable only as a formal non-HA exception:
+ADR-0043 closes that ambiguity:
 
 ```text
-RF=1
-minISR=1
-acks=all
-producer idempotence enabled
-unclean leader election disabled
+validated external-L4 client source
+-> trusted PROXY v2
+-> Traefik sanitized forwarding state
+-> Caddy strict trusted-proxy resolution
+-> server-derived BFF client IP
+-> typed internal network context
+-> /24 or /64 HMAC quota identity
 ```
 
-Kafka remains transport, not authority. Outbox/Inbox/idempotency, stable event identities and critical replay evidence remain mandatory.
+Missing/malformed/untrusted identity fails closed where a network quota is required. Raw client IP is not normal durable state or telemetry.
 
-Review conclusion: acceptable when broker-local loss/outage is explicitly accepted and replay/rebuild evidence passes.
+The single-server management path is now concrete:
 
-## 7. Istio Ambient review
+```text
+approved operator device
+-> WireGuard
+-> host management address
+-> OpenSSH/FIDO2
+-> JIT privilege
+```
 
-Ambient is a security control because it provides workload identity/mTLS/authorization context. Removing it only for RAM savings would be a security-architecture change, not a topology simplification.
+Provider console is break-glass only. Public SSH is not a recovery fallback.
 
-Single-server production must benchmark the complete stack, including `istiod`, CNI and `ztunnel`, under representative traffic and storage load. Waypoints are absent by default.
+## Recovery review
 
-Review conclusion: retain Ambient and block production if the profile cannot fit it with >=30% validated resource headroom. Increase host capacity or approve a separate reviewed security design; do not silently disable it.
+ADR-0004 remains RPO/RTO authority. The new cold-DR runbook turns the prior high-level recovery model into one ordered operator procedure without claiming it has executed.
 
-## 8. Kyverno review
+The sequence covers clean host/management access, K3s/Calico, unchanged OpenBao, GitOps security controls, shared PostgreSQL PITR, immutable reference artifacts, Redis, Kafka, erasure/legal-hold replay, services, trusted edge/client address, security checks and traffic enablement.
 
-Removing Kyverno is rejected. Reducing policy count is acceptable when the remaining set still blocks high-value supply-chain/workload-security failures.
+Backup success remains insufficient. Quarterly full cold-DR must measure the actual platform RTO and applicable component RPOs.
 
-Mandatory single-server admission still covers digest, signature, provenance, signed SBOM and critical unsafe workload identity/security-context patterns. One Kyverno replica is permitted because same-host replicas do not create physical HA.
+## Threat-model review
 
-Review conclusion: reduce policy inventory if evidence supports it; never reduce production enforcement to audit-only or bypass.
+`threat-model.md` now captures assets, actors, trust boundaries, STRIDE threats, abuse cases, mitigations, residual risk and verification mapping.
 
-## 9. Human access review
+The most important residual single-server security risk is host/root compromise: one host has a broad local blast radius. Workload/network policy is not presented as a security boundary against host root. Recovery therefore depends on off-host audit/recovery material, credential rotation/revocation, trusted rebuild artifacts and explicit risk acceptance.
 
-Teleport may be omitted in the single-server profile only because equivalent security properties are preserved through a simpler implementation.
+## Email identity review
 
-Required replacement:
+HooshiX keeps the existing product behavior that email identity equality is case-insensitive. ADR-0009 now states this explicitly as a product identity decision rather than an SMTP protocol claim.
 
-- hardened OpenSSH;
-- hardware-backed FIDO2 with user presence + verification;
-- no root/password/shared-key access;
-- time-bounded JIT privilege separate from SSH authentication;
-- two reviewers for write/admin elevation;
-- `sudo` I/O + OS + Kubernetes/database audit;
-- off-host append-only/tamper-resistant retention;
-- protected break glass.
+A case-preserving delivery representation is retained so outbound transport does not have to rewrite mailbox local-part spelling. Identity equality/uniqueness and delivery spelling cannot be mutated independently to bypass verification or uniqueness.
 
-`.bashrc`/shell history is rejected as authoritative audit because it is user-controlled/incomplete and does not provide equivalent tamper resistance/session evidence.
+## Dependency-policy review
 
-Review conclusion: OpenSSH/FIDO2/JIT/audit replacement is acceptable only after executable evidence passes.
+ADR-0033 remains unchanged: the machine-readable dependency registry owns operation-edge criticality/failure/retry-owner/fallback/policy references. Exact deadlines, breaker details, idempotency and concurrency remain in owning contracts/current policy.
 
-## 10. OpenBao review
+The review rejected copying all those values into the registry because that would create duplicate authority unless the architecture deliberately migrated ownership to the registry.
 
-**No OpenBao change is approved.**
+## Capacity and availability review
 
-OpenBao 2.6.1 remains the production secret authority with the existing topology, Shamir/recovery, encrypted snapshots, External Secrets/Kubernetes Auth and mounted/local key workflows.
+Existing requirements remain correct:
 
-Review conclusion: out of scope; profile simplification MUST NOT remove, replace, bypass or weaken it.
+- actual service SLO/SLI and downtime remain measured in single-server;
+- missing physical redundancy does not remove real downtime from error budgets;
+- complete-stack benchmark is simultaneous, not component-by-component only;
+- >=30% validated CPU/memory headroom and applicable >=2x peak evidence are required;
+- shared disk pressure includes PostgreSQL WAL/checkpoint/backup, Redis AOF/rewrite, Kafka and telemetry;
+- network capacity evidence now also covers MTU/PMTU, conntrack, file descriptors/listen queues, ephemeral ports/TIME_WAIT and interface errors/drops.
 
-## 11. MFA review
+Failure to fit requires larger capacity or `production-ha`, not security downgrades.
 
-Arbitrary user choice among Email/SMS/TOTP is rejected. The current model keeps active TOTP as the required factor where Identity requires it. Verification/recovery channels do not become a downgrade bypass.
+## Production-readiness conclusion
 
-Review conclusion: no MFA change.
+Architecture is more implementation-ready after these clarifications, but **runtime production readiness remains unproven**.
 
-## 12. Capacity review
-
-A fixed `2 vCPU / 3-4 GiB RAM` recommendation is not credible for the complete stack without evidence.
-
-One host must carry application JVMs, K3s system processes, PostgreSQL+WAL+backup, Redis+AOF, Kafka, Istio, Kyverno, edge/WAF and observability. Storage contention is as important as RAM.
-
-Production gate:
-
-- no OOM/sustained swap/MemoryPressure;
-- >=30% validated CPU+memory headroom at approved peak;
-- applicable >=2x projected peak evidence for critical/security paths;
-- safe WAL+AOF+Kafka+telemetry IO/free space;
-- safe reboot/recovery order;
-- no disabled security/backup control needed to pass.
-
-Review conclusion: host size remains `Not verified` until complete-stack benchmark exists.
-
-## 13. Key residual risks
-
-| Risk | Single-server consequence | Required mitigation/trigger |
-| --- | --- | --- |
-| Host/node loss | complete platform outage | tested rebuild/recovery; move to HA if downtime unacceptable |
-| Shared PostgreSQL failure | all PostgreSQL-backed services affected | WAL/PITR/off-site backup, isolation tests, noisy-neighbor monitoring |
-| Kafka broker loss | async transport outage/local data exposure | Outbox/replay/rebuild; move to HA if unacceptable |
-| Redis loss | session/quota availability impact | AOF, fail closed, re-authentication; move to HA if unacceptable |
-| Admission outage | new/updated workload blocked | fail closed; add capacity/HA, never bypass |
-| Ambient overhead | host resource pressure | benchmark; add resources/HA, never silently disable security |
-| Single-host audit loss | loss/tampering risk | off-host append-only/tamper-resistant audit |
-| Platform upgrade | larger maintenance window | tested rollback/fail-forward/recovery; move to HA if unacceptable |
-
-## 14. Production-readiness conclusion
-
-The architecture change is accepted. **Runtime production readiness is not yet proven by documentation.**
-
-Approval requires the profile-specific checklist: K3s/Calico render+recovery, shared PostgreSQL isolation/PITR, Redis AOF, Kafka RF1 rebuild/replay, Ambient benchmark, Kyverno blocking tests, OpenSSH/FIDO2/JIT/audit, unchanged OpenBao/MFA regressions, full-stack load/soak/reboot, security/vulnerability review and explicit non-HA risk sign-off.
+At this documentation revision, planned application/platform/CI targets are not present; see `implementation-status.md`. Production traffic remains blocked until all applicable `PRODUCTION-READINESS-CHECKLIST.md` gates have executable evidence.

@@ -1,6 +1,6 @@
 # Technology Baseline
 
-- **Baseline date:** 2026-08-14
+- **Baseline date:** 2026-08-15
 - **Status:** Active production/application baseline
 - **Update policy:** Reviewed compatible patch/minor updates may use the baseline process when permitted by the current architecture decision; architecture/security-semantic changes require a new or revised current ADR before implementation depends on them.
 - **Local companion:** `docs/technology/local-development-baseline.md`
@@ -72,12 +72,13 @@ Agents MUST NOT silently select newer versions merely because upstream has a new
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | Kubernetes compatibility matrix mandatory; single-server profile additionally requires complete-stack capacity benchmark |
 | Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred; upgrades require compatibility and current-advisory review |
-| Secret authority | OpenBao 2.6.1 | exact current architecture pin; unchanged by ADR-0042 |
+| Secret authority | OpenBao 2.6.1 | exact current architecture pin; unchanged by ADR-0042/ADR-0043 |
 | Admission policy | Kyverno 1.18.2 | stable `policies.kyverno.io/v1`; 1 replica allowed only in explicit non-HA single-server profile; enforcement remains fail closed |
 | Image signing | Cosign 3.0.6 | current supply-chain policy |
 | SBOM | CycloneDX JSON attestation; Syft pinned in CI tools lock | signed/indexed by image digest |
 | Vulnerability correlation | Grype pinned in CI tools lock | final-image SBOM; owned/expiring exceptions |
-| `production-single-server` privileged human access | Supported host OpenSSH package + hardware-backed FIDO2 + JIT privilege + `sudo` I/O/system audit | exact host package/version pinned in provisioning; password/root/shared-key access prohibited; no `.bashrc` audit substitute |
+| `production-single-server` management network | Host-supported WireGuard kernel/userspace implementation | ADR-0043; exact host package/kernel support and configuration pinned in provisioning metadata; independent per-device peers; network admission only; public TCP/22 denied |
+| `production-single-server` privileged human access | Supported host OpenSSH package + hardware-backed FIDO2 + JIT privilege + `sudo` I/O/system audit | ADR-0030/ADR-0043; exact host package/version pinned in provisioning; WireGuard reachability does not replace FIDO2/JIT; password/root/shared-key access prohibited; no `.bashrc` audit substitute |
 | `production-ha` privileged human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session audit exercised before rollout |
 | Metrics | Prometheus 3.13.2 LTS | current reviewed 3.13.x patch; GitOps digest pin |
 | Alerting | Alertmanager 0.33.1 | current upstream release; GitOps digest pin |
@@ -139,13 +140,15 @@ fail closed for authoritative security/session decisions
 no failover claim
 ```
 
-#### Security/control-plane profile
+#### Network/security/control-plane profile
 
+- public client network identity follows ADR-0043: external-L4 PROXY v2 -> trusted Traefik -> strict Caddy proxy parsing -> server-derived BFF context; insecure/caller-header trust is prohibited;
+- normal host management uses the ADR-0043 WireGuard overlay with independent per-device peer keys; public TCP/22 is denied;
+- WireGuard is network admission only; privileged access still requires hardened OpenSSH + hardware-backed FIDO2 + time-bounded two-reviewer JIT privilege + OS/`sudo`/boundary audit exported off-host;
 - Istio Ambient 1.30.3 retained; production promotion requires complete-stack benchmark with >=30% validated resource headroom and current workload-identity/mTLS tests;
 - waypoints absent unless an explicit L7 requirement is measured and approved;
 - Kyverno retained with one replica and reduced high-value policy inventory; digest/signature/provenance/SBOM/security-context enforcement remains blocking;
 - OpenBao 2.6.1 remains secret authority with no change;
-- human privileged access uses hardened OpenSSH + hardware-backed FIDO2 + time-bounded two-reviewer JIT privilege + OS/`sudo`/boundary audit exported off-host;
 - end-user MFA semantics are unchanged.
 
 A `2 vCPU / 3-4 GiB RAM` full-stack host is not an approved production capacity claim. Host sizing is approved only after complete-stack benchmark/load/recovery evidence from ADR-0042/performance/readiness rules.
@@ -174,6 +177,7 @@ Both production profiles preserve:
 - signed/provenanced immutable production artifacts verified at admission;
 - admission-policy authoring limited to controlled GitOps/CI identities; policy-engine external context/egress is bounded and SSRF-tested;
 - upstream L3/L4 volumetric mitigation/scrubbing -> external L4 -> Traefik -> Caddy/Coraza WAF -> Web BFF;
+- ADR-0043 trusted client-address derivation for network security quotas; caller forwarding headers are not authority;
 - Calico NetworkPolicy standard dataplane;
 - service-owned semantic quotas under ADR-0024;
 - one online fail-closed no-cache/no-retry `CheckPermission`;
@@ -182,15 +186,16 @@ Both production profiles preserve:
 - zero-standing-privilege JIT human access according to the selected production profile;
 - PII-safe structured telemetry with static/pipeline/canary/runtime controls.
 
-OpenBao and Identity/MFA semantics are not simplified by `production-single-server`.
+OpenBao and Identity/MFA semantics are not simplified by `production-single-server` or ADR-0043.
 
 ## 5. Compatibility authority
 
-Detailed support relationships live in `production-compatibility-matrix.md`. Any upgrade of a tightly coupled runtime/platform component reruns applicable official support, render/policy, security, workload-identity, load/failover/backup/restore, and rollback/fail-forward validation.
+Detailed support relationships live in `production-compatibility-matrix.md`. Any upgrade of a tightly coupled runtime/platform component reruns applicable official support, render/policy, security, workload-identity, network-trust, load/failover/backup/restore, and rollback/fail-forward validation.
 
 ## 6. Version governance
 
 - exact production images/artifacts/packages are immutable-digest/integrity/version pinned through their owning deployment/provisioning mechanism;
+- host-managed components such as WireGuard/OpenSSH are pinned with the production host kernel/package baseline in provisioning metadata before deployment;
 - services own Wrapper/dependency locks/verification metadata;
 - Spring Boot dependency management is default; overrides require rationale + alignment tests;
 - no agent guesses an unlisted patch;

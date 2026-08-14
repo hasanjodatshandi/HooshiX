@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13; registration invariants finalized on 2026-08-13; v1 registration/contact/authentication-entry lifecycle finalized on 2026-08-14
+2026-08-10; normalized to current-only documentation on 2026-08-13; registration invariants finalized on 2026-08-13; v1 registration/contact/authentication-entry lifecycle finalized on 2026-08-14; email canonicalization rationale clarified on 2026-08-15
 
 ## Decision
 
@@ -67,6 +67,10 @@ Email:
 - maximum length is 254 characters/code units under the validated transport/storage representation;
 - syntax is validated as one mailbox;
 - Gmail/provider-specific dot/plus rewriting is prohibited.
+
+The full-mailbox lowercase rule is an intentional **HooshiX product identity rule**, not a claim that SMTP local-parts are universally case-insensitive. SMTP defines mailbox local-part case as potentially significant and requires transport implementations to preserve it. HooshiX deliberately treats case-only variants such as `User@example.com` and `user@example.com` as one Contact identity for uniqueness, authentication lookup, registration reservation, and quota canonicalization. This avoids two HooshiX accounts that differ only by email case.
+
+Implementation MUST preserve a validated case-preserving delivery representation when the Notification/SMTP path needs the mailbox spelling originally supplied by the user. The lowercased canonical identity key is used for HooshiX equality/uniqueness/security policy. It MUST NOT force the outbound mail adapter to rewrite the mailbox local-part. The domain may be normalized according to DNS/mail transport rules. Canonical identity and delivery representation belong to one Contact and cannot be changed independently to bypass verification or uniqueness.
 
 Phone:
 
@@ -143,7 +147,7 @@ Tests prove:
 - EMAIL and PHONE registration composition, local password/compromised-password requirement, with staging/production phone registration impossible until the SMS gate is explicitly satisfied;
 - `PENDING -> ACTIVE` occurs only after required profile completion + at least one verified Contact + applicable local Credential and first verification establishes the primary Contact;
 - profile name trim/NFC/control-character/length behavior and case/internal-space preservation;
-- canonical email/provider-neutral behavior, E.164 phone behavior, verified-contact uniqueness, logical-delete reservation, and at-most-one active primary Contact per User under concurrent updates;
+- canonical email/provider-neutral behavior, deliberate case-insensitive HooshiX identity equality, case-preserving delivery representation, case-only uniqueness/login/reservation behavior, E.164 phone behavior, verified-contact uniqueness, logical-delete reservation, and at-most-one active primary Contact per User under concurrent updates;
 - one-live-registration reservation per canonical Contact, 10-minute expiry, concurrent acquisition, repeated same-pending continuation without protected-state overwrite, stale-pending cleanup eligibility, and no second User/challenge for an already verified/reserved Contact;
 - local password login by any verified email/phone Contact, secondary Contact login, removed/unverified Contact denial, and non-enumerating failure behavior;
 - exactly eight-digit CSPRNG challenge generation, HMAC-only persistence, constant-time verification, 10-minute TTL boundaries, five-attempt exhaustion, 60-second resend boundary, replacement invalidation, and single use;
@@ -160,4 +164,4 @@ Dependency locking/verification metadata covers the transport.
 
 Runtime exposure may be disabled with `IDENTITY_REGISTRATION_RUNTIME_ENABLED=false` without schema rollback. Phone registration may remain independently gated without removing its schema/contracts. Already committed handoffs remain durable, retain their stable `request_id`, and resume from the current lease/cutoff rules when dispatch is re-enabled.
 
-Rollback MUST preserve contact canonicalization/verified uniqueness, pending reservation uniqueness/non-overwrite, logical-delete reservation, verified-Contact local login semantics, the single active primary-Contact invariant, `PENDING -> ACTIVE` verification/profile/Credential gate, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.
+Rollback MUST preserve contact canonicalization/verified uniqueness, the deliberate case-insensitive HooshiX email identity rule plus case-preserving delivery representation, pending reservation uniqueness/non-overwrite, logical-delete reservation, verified-Contact local login semantics, the single active primary-Contact invariant, `PENDING -> ACTIVE` verification/profile/Credential gate, challenge HMAC-only storage, eight-digit/10-minute/five-attempt/60-second semantics, single-use/replacement invalidation, persisted locale, and stable idempotency behavior. Executed Flyway migrations are never edited or reversed.

@@ -1,6 +1,6 @@
 # Runtime and Deployment Architecture — Current State
 
-Exact supported patches belong in Technology Baseline/deployment metadata. This document defines runtime topology, deployment, security, and operational invariants. ADR-0042 selects `production-single-server` as the initial production profile. `production-ha` remains the expansion profile.
+Exact supported patches belong in Technology Baseline/deployment metadata. This document defines runtime topology, deployment, security, and operational invariants. ADR-0042 selects `production-single-server` as the initial production profile. `production-ha` remains the expansion profile. ADR-0043 defines public client-address trust and the single-server management network.
 
 ## 1. Production workload baseline
 
@@ -208,6 +208,8 @@ noeviction
 
 Redis is restricted to security-ephemeral capabilities such as semantic quotas and BFF session/pre-auth state. It is not business source of truth. Covered security decisions fail closed on dependency/time-source failure. If session state is lost, the user reauthenticates; browser cookies never reconstruct server authority.
 
+Network quota identity follows ADR-0043. Caller forwarding headers are not quota authority.
+
 ## 9. Kyverno admission
 
 Kyverno remains production admission authority for the signed-artifact/security policy set.
@@ -229,7 +231,7 @@ Admission unavailability MUST NOT become an allow path. Audit-only production ad
 
 Policy-authoring RBAC and policy-engine HTTP/SSRF restrictions remain unchanged.
 
-## 10. Public edge
+## 10. Public edge and client-address trust
 
 Production request path remains:
 
@@ -246,6 +248,18 @@ The K3s bundled Traefik/ServiceLB is disabled in the single-server profile. The 
 
 Direct Internet -> BFF and Traefik -> BFF application paths that bypass WAF are prohibited by route + NetworkPolicy + Istio authorization. Traefik dashboard/insecure API is not public. Wildcard/catch-all public routes are prohibited.
 
+ADR-0043 defines client-address authority:
+
+- external L4 preserves the validated original client source with PROXY protocol v2;
+- Traefik trusts PROXY only from exact external-L4 source CIDRs;
+- `proxyProtocol.insecure` and `forwardedHeaders.insecure` are prohibited;
+- caller-supplied forwarding/private client-IP headers are not authority;
+- Caddy uses explicit strict trusted-proxy parsing for the Traefik source path;
+- Caddy overwrites the internal `X-HooshiX-Client-IP` sent to BFF with its server-derived client IP;
+- BFF accepts one IP literal only from that WAF-only path and never trusts public forwarding headers;
+- backend public-operation network quotas receive only the typed BFF-derived client-network context;
+- missing/malformed/proxy-address identity fails closed when a network quota is required.
+
 WAF uses the approved Caddy/Coraza/CRS family, DetectionOnly tuning before reviewed blocking, narrow versioned exceptions, bounded body policy, no automatic rule updates, and PII-safe telemetry. Upstream volumetric protection remains mandatory.
 
 ## 11. Human privileged production access
@@ -254,14 +268,27 @@ ADR-0030 defines the invariant: zero standing privileged access, phishing-resist
 
 ### Single-server
 
-Teleport is not deployed. Human host access uses hardened OpenSSH plus hardware-backed FIDO2.
+ADR-0043 selects the normal management network path:
+
+```text
+approved operator device
+-> dedicated WireGuard management overlay
+-> host management address
+-> OpenSSH
+-> FIDO2 human authentication
+-> separate JIT privilege
+```
 
 Mandatory controls:
 
-- SSH only from the approved management path/network;
+- public-interface/Internet TCP/22 is denied;
+- SSH is reachable only on the approved management address/interface;
+- each operator device uses an independent WireGuard peer key; shared peer keys are prohibited;
+- peer routes/`AllowedIPs` are minimal and do not grant broad workload-network access by default;
+- WireGuard key possession grants network reachability only and does not grant SSH/root/Kubernetes/database authority;
 - no direct root login;
 - password authentication disabled;
-- no shared accounts/keys;
+- no shared SSH accounts/keys;
 - privileged human authentication requires FIDO2 user presence and user verification;
 - FIDO2 authentication alone does not grant root/Kubernetes/database write authority;
 - write/admin elevation maximum 30 minutes, with automatic expiry and at least two authorized reviewers;
@@ -272,7 +299,10 @@ Mandatory controls:
 - Kubernetes/database privileged operations audited at those boundaries;
 - required audit exported off-host to append-only/tamper-resistant storage outside ordinary requester control;
 - `.bashrc`, shell history or `PROMPT_COMMAND` logging is not authoritative audit;
-- separately protected hardware-backed break-glass identity, incident-linked and reviewed/rotated after use.
+- separately protected hardware-backed break-glass identity, incident-linked and reviewed/rotated after use;
+- provider console, if available, is a break-glass path and not normal management.
+
+The management path must remain usable when workload-cluster services need recovery. It therefore does not depend on a pod/service inside the cluster being recovered.
 
 ### HA
 
@@ -300,6 +330,8 @@ Email/SMS verification or recovery is not a freely selectable weaker substitute 
 
 Application logs remain structured/PII-safe. Metrics/labels remain bounded. Required security/audit evidence is not silently dropped as ordinary telemetry.
 
+Raw client IP used transiently for ADR-0043 network identity is not an ordinary log/metric/trace field and is not persisted into Redis keys/Kafka/business state.
+
 In single-server, observability running on the same host is a resource competitor and must be included in full-stack capacity evidence. Required privileged-access audit must additionally be exported off-host so loss/compromise of the server does not erase the only audit copy.
 
 ## 15. Capacity and availability interpretation
@@ -316,6 +348,8 @@ In single-server, observability running on the same host is a resource competito
 
 A `2 vCPU / 3-4 GiB RAM` full-stack host is not approved without measured evidence. Production approval requires the complete-stack benchmark from ADR-0042/performance/readiness documents, including >=30% validated CPU+memory headroom and applicable >=2x projected peak evidence.
 
+Host-network evidence also covers effective MTU/PMTU, conntrack, file descriptors/listen queues, ephemeral ports/TIME_WAIT, and public/management interface error/drop pressure.
+
 If the host cannot pass, increase resources or move to `production-ha`. Do not weaken OpenBao, Kyverno, Ambient security, backup/PITR, MFA, WAF, workload identity, audit, or fail-closed behavior to make the host fit.
 
 ## 16. Verification
@@ -331,9 +365,11 @@ Before production approval, the selected profile proves at least:
 - Redis TLS/ACL/noeviction + single-server AOF/restart or HA Sentinel evidence;
 - Ambient workload-identity/mTLS positive/negative tests and `istioctl analyze`, plus single-server capacity benchmark;
 - Kyverno signature/provenance/SBOM/security admission negative tests;
-- single-server OpenSSH FIDO2/JIT/audit/break-glass tests or HA Teleport tests;
+- external-L4/Traefik/WAF/BFF client-address anti-spoofing and fail-closed network-quota tests under ADR-0043;
+- single-server WireGuard public-SSH-denial/peer-revocation tests plus OpenSSH FIDO2/JIT/audit/break-glass tests, or HA Teleport tests;
 - unchanged OpenBao secret/recovery flows;
 - unchanged MFA downgrade-prevention tests;
-- full-stack load/soak/reboot/recovery evidence and explicit single-server non-HA sign-off.
+- full-stack load/soak/reboot/recovery evidence and explicit single-server non-HA sign-off;
+- quarterly cold-DR exercise under `../runbooks/production-cold-dr.md` with measured ADR-0004 RPO/RTO.
 
 Production readiness is blocked when required runtime evidence is absent.

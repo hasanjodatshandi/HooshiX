@@ -2,7 +2,7 @@
 
 ## 1. Architectural baseline
 
-The platform is an enterprise Java system built as independently deployable microservices. Service boundaries follow Domain-Driven Design and map to real business capabilities/bounded contexts.
+The platform is designed as an enterprise Java system of independently deployable microservices. Service boundaries follow Domain-Driven Design and map to real business capabilities/bounded contexts.
 
 Each backend service uses Hexagonal Architecture. Clean Architecture is used only to enforce inward dependency direction:
 
@@ -12,6 +12,8 @@ Interfaces     --> Application --> Domain
 ```
 
 Domain business logic MUST NOT depend on Spring, Kafka, PostgreSQL, Redis, SQLite, gRPC, Protobuf, JPA/Hibernate, jOOQ, Kubernetes, Istio, or other infrastructure technology.
+
+`implementation-status.md` is the repository-level authority for whether planned source/deployment/CI targets currently exist. Architecture target paths in this document are not implementation evidence.
 
 ## 2. Service ownership
 
@@ -36,11 +38,11 @@ A service is not created merely around a table, CRUD screen, UI page, entity, or
 
 Independently deployable services have independent builds/releases. Root Gradle build is repository governance only and does not aggregate independently deployable services as one release unit.
 
-Each service owns `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, dependency verification, contracts, source sets, container build, and deployment package.
+When implemented, each service owns `settings.gradle.kts`, `build.gradle.kts`, Gradle Wrapper, dependency verification, contracts, source sets, container build, and deployment package.
 
 Organization Java namespace/Gradle group: `com.sajtech`.
 
-Implementation layout follows the current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical.
+Implementation layout follows the current feature-first/nature-separated coding standard in `../engineering/coding-standards.md`; architecture/package boundaries are machine-enforced where practical after implementation exists.
 
 ## 4. High-level topology
 
@@ -54,12 +56,14 @@ Upstream L3/L4 volumetric mitigation/scrubbing
         v
 External L4
         |
+        | validated client source / PROXY v2
         v
 Traefik Gateway
         |
         v
 Dedicated Caddy + Coraza WAF
         |
+        | server-derived client-network identity
         v
 Java Web BFF
         |
@@ -72,9 +76,14 @@ Domain / Platform Microservices
         |
         +--> service-owned PostgreSQL database when mutable relational state exists
         +--> service-local immutable reference artifact only where explicitly decided
+
+Separate management path in production-single-server:
+approved operator device -> WireGuard -> host management address -> OpenSSH/FIDO2 -> JIT privilege
 ```
 
 Only BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace upstream volumetric protection, external L4, Traefik, or the dedicated WAF path.
+
+`network-architecture.md` is the implementation-facing network authority. ADR-0043 defines client-address and management-network trust. `threat-model.md` defines the current cross-cutting abuse/residual-risk analysis.
 
 ### Selected production profile
 
@@ -104,7 +113,8 @@ The `production-ha` topology remains the expansion profile. Service documents ca
 - Web BFF as browser-facing backend boundary;
 - v1 application namespace under `/api/v1` with reviewed `/auth`, `/identity`, `/authorization`, and public read-only `/reference` subspaces;
 - `/reference` GET/HEAD may be anonymous and cacheable under ADR-0041, but same-origin CORS and mandatory public edge/WAF path remain;
-- browser never receives provider/Identity/downstream access or refresh credentials.
+- browser never receives provider/Identity/downstream access or refresh credentials;
+- caller-provided forwarding headers are not client-network authority.
 
 ### Internal synchronous boundary
 
@@ -113,7 +123,8 @@ The `production-ha` topology remains the expansion profile. Service documents ca
 - cancellation propagation where supported;
 - one retry owner and only safe/idempotent retry;
 - Istio workload identity and least-privilege authorization;
-- operation-level dependency/fallback policy in `dependency-criticality.yaml`.
+- operation-level dependency class/failure/fallback policy in `dependency-criticality.yaml`;
+- detailed deadline/breaker/idempotency/concurrency semantics in the owning operation contract per ADR-0033.
 
 REST is not default for new internal service-to-service communication.
 
@@ -131,7 +142,7 @@ Kafka is used only when asynchronous semantics are appropriate; it is not reques
 
 ## 6. Bounded contexts and platform capabilities
 
-Current/approved boundaries include:
+Current approved boundaries include:
 
 - Identity Service;
 - Authorization Service;
@@ -141,15 +152,15 @@ Current/approved boundaries include:
 - Reference Data Service — architecture decided by ADR-0041; executable implementation remains planned/evidence-gated;
 - Workflow Service only as a future capability boundary that MUST NOT absorb business rules from owning contexts.
 
-The first executable backend service is `services/identity-service`; the second executable backend component is `services/web-bff`.
+Planned implementation targets include `services/identity-service`, `services/web-bff`, `services/authorization-service`, `services/notification-service`, and `services/compromised-password-service`. Their current presence/evidence state is defined only in `implementation-status.md`.
 
-Web BFF is an integration/browser security boundary rather than owner of backend business invariants. It owns public OpenAPI, browser OIDC/pre-auth/session/CSRF, exact-audience credential brokerage mechanics, browser-safe error/request bounds and route-to-downstream orchestration. Identity remains token/session identity authority, Authorization remains tenant permission/admin authority, and resource-owning service remains final protected-resource authorization/business-state authority.
+Web BFF is an integration/browser security boundary rather than owner of backend business invariants. It owns public OpenAPI, browser OIDC/pre-auth/session/CSRF, exact-audience credential brokerage mechanics, browser-safe error/request bounds, trusted edge-derived client-network context, and route-to-downstream orchestration. Identity remains token/session identity authority, Authorization remains tenant permission/admin authority, and resource-owning service remains final protected-resource authorization/business-state authority.
 
 Compromised Password Service is an internal security reference-data boundary. Identity computes SHA-256 locally and sends only the current 20-bit prefix; Compromised Password performs a bounded indexed lookup against its immutable read-only SQLite dataset and returns suffix/count candidates; Identity performs the exact full-hash match and owns the final credential decision. The service has no User/Tenant/Contact/session state and no runtime external compromised-password provider/API.
 
 Reference Data Service is the closed global standard-reference boundary for Country, Currency, TimeZone, and SupportedLocale. It owns canonical code/metadata/lifecycle and the offline deterministic immutable bundle, but it is not a generic dictionary, tenant/business configuration store, authorization service, or universal business validation service. ISO/IANA/stable-CLDR source material is imported only offline; production serving has no source-provider Internet dependency. The initial runtime consumer is Web BFF through the typed bounded read contract, and other callers require separate architecture/dependency review.
 
-## 7. Architecture-level technology baseline
+## 7. Architecture-level technology families
 
 - Java 25 LTS;
 - Spring Boot 4.1.x;
@@ -169,6 +180,7 @@ Reference Data Service is the closed global standard-reference boundary for Coun
 - Caddy + Coraza v3 + CRS 4.x LTS;
 - Istio Ambient 1.30.x;
 - External Secrets Operator + OpenBao 2.6.1;
+- WireGuard for selected single-server management network admission;
 - Liara Transactional Email + IPPanel Edge Webservice SMS for Iran;
 - JUnit 5 + Testcontainers + ArchUnit;
 - Cucumber-JVM for critical BDD;
@@ -179,54 +191,26 @@ Reference Data introduces no new runtime technology family. Exact approved patch
 
 ## 8. Production resilience and security boundaries
 
-### Shared invariants
+Shared invariants and profile-specific topology are owned by ADR-0042/current runtime, security, network, data and reliability documents. This platform summary does not duplicate the complete normative lists.
 
-Both profiles preserve:
+Key constraints are:
 
-- immutable hardened workloads, dedicated ServiceAccounts and deny-by-default NetworkPolicy;
-- Istio Ambient strict mTLS/workload identity and least-privilege authorization;
-- forced tenant RLS and strict service DB/role/Flyway boundaries;
-- physical WAL/PITR/off-site backup for mutable PostgreSQL state;
-- Kafka Outbox/Inbox/idempotency/replay semantics;
-- Redis TLS/ACL/`noeviction`/fail-closed security semantics;
-- signed image/provenance/SBOM Kyverno enforcement;
-- upstream volumetric protection -> Traefik -> Caddy/Coraza WAF -> BFF;
-- PII/secret-safe telemetry;
-- zero-standing-privilege human access;
-- **OpenBao 2.6.1 as unchanged secret authority**;
-- current Identity/MFA/browser/Authorization security semantics.
+- single-server is non-HA and cannot claim node/control-plane/PostgreSQL/Redis/Kafka failover;
+- mutable service ownership/RLS, Kafka idempotency, Redis fail-closed semantics, workload identity/mTLS, WAF path, signed-artifact admission, OpenBao, MFA and Authorization remain unchanged by topology simplification;
+- client network identity uses only ADR-0043 trusted edge derivation;
+- single-server human network admission is WireGuard and remains separate from FIDO2/JIT privilege;
+- insufficient host capacity requires more capacity or `production-ha`, not weaker security/recovery controls;
+- cold recovery follows ADR-0004 and `../runbooks/production-cold-dr.md`.
 
-### `production-single-server`
+## 9. OpenBao and MFA are outside topology/network simplification
 
-- **Kubernetes:** one K3s server/workload node; no quorum/node-failover claim; K3s Flannel/network-policy controller/bundled Traefik/ServiceLB disabled; Calico and repository edge stack retained.
-- **Application workloads:** exactly one replica by default; HPA and availability PDB disabled; host downtime explicitly accepted.
-- **PostgreSQL:** one physical CloudNativePG/PostgreSQL instance; distinct service databases/roles/Flyway/RLS; global connection budget; no primary failover; cluster-wide physical PITR restored first in isolation.
-- **Kafka:** one combined KRaft broker/controller; RF=1/minISR=1/acks=all/idempotence; non-HA acceptance; critical replay evidence retained.
-- **Security Redis:** one TLS/ACL/`noeviction` instance with AOF `appendfsync everysec`; no failover claim; session loss means re-authentication.
-- **Istio:** retained; complete-stack capacity benchmark required; no waypoints by default.
-- **Kyverno:** one replica allowed; reduced high-value policy set allowed; blocking digest/signature/provenance/SBOM/security enforcement retained.
-- **Human access:** hardened OpenSSH + hardware-backed FIDO2 + two-reviewer time-bounded privilege + OS/`sudo`/Kubernetes/database audit exported off-host; shell history is not authoritative audit.
-- **Capacity:** `2 vCPU / 3-4 GiB RAM` is not approved without full-stack evidence and >=30% validated CPU/memory headroom.
-
-### `production-ha`
-
-- 3 stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint and N+1 critical capacity;
-- replicated service workloads/PDB/topology spread according to service target;
-- dedicated service CloudNativePG clusters, critical three-instance synchronous durability/failover;
-- Kafka 3 brokers + 3 controllers, RF=3/minISR=2;
-- Redis primary + two replicas + three Sentinel voters;
-- Kyverno >=3 replicas;
-- Teleport Enterprise JIT privileged human access.
-
-## 9. OpenBao and MFA are outside topology simplification
-
-OpenBao remains exactly under ADR-0011 and Technology Baseline. ADR-0042 does not remove, replace, bypass or weaken it.
+OpenBao remains exactly under ADR-0011 and Technology Baseline. ADR-0042/ADR-0043 do not remove, replace, bypass or weaken it.
 
 End-user MFA remains under ADR-0012. Active TOTP is still required where the current Identity state requires it; Email/SMS verification/recovery is not a freely selectable weaker bypass.
 
 ## 10. Change and decision rule
 
-Implementation MUST NOT silently replace a platform technology, bounded-context boundary, data owner, security invariant, communication model, production profile or availability claim.
+Implementation MUST NOT silently replace a platform technology, bounded-context boundary, data owner, security invariant, communication model, production profile, network trust boundary, or availability claim.
 
 When architecture changes:
 
@@ -234,4 +218,5 @@ When architecture changes:
 2. create or update retained current ADR when durable decision value exists;
 3. remove or normalize obsolete decision text after confirming no current invariant/contract/security/SLO/operational rule is lost;
 4. update `../adr/decision-register.md`, `SOURCES.md`, executable architecture/security tests, readiness evidence and technology baselines when applicable;
-5. deliver and review the complete change through PR-first workflow.
+5. update `implementation-status.md` when repository implementation/evidence presence materially changes;
+6. deliver and review the complete change through PR-first workflow.

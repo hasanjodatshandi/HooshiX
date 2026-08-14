@@ -4,6 +4,8 @@
 
 This runbook defines the minimum production incident workflow. Service-specific runbooks may add detail but must not weaken these rules. ADR-0042 selects `production-single-server`; incident handling must distinguish expected non-HA outage from unsafe security/correctness behavior.
 
+`../runbooks/production-cold-dr.md` is the full-platform cold-recovery procedure. ADR-0043 and `../architecture/network-architecture.md` define trusted client-address and management-network behavior during incidents.
+
 ## 1. Incident priorities
 
 Protect in this order:
@@ -27,6 +29,8 @@ Never restore availability by enabling a security/correctness bypass that the cu
 - irreversible or widespread mutable business-data corruption/loss;
 - loss of recoverability/off-site backup evidence for critical mutable state;
 - single-server host/storage failure causing complete platform outage when recovery is not immediately within tested bounds;
+- forged/ambiguous client-address trust that can bypass required network abuse controls;
+- public exposure of the single-server SSH management port;
 - failure that requires disabling OpenBao/Kyverno/Ambient/WAF/MFA/fail-closed controls to continue service — such bypass is not approved.
 
 **SEV-2** examples include major service/dependency outage, significant SLO burn, PostgreSQL/Redis/Kafka partial failure, WAF/edge impact, or recovery degradation without confirmed security/data compromise.
@@ -51,18 +55,19 @@ Do not delete/rotate evidence until retention/forensics requirements are underst
 
 A host/node/kernel/storage failure in `production-single-server` can stop the complete platform. This is an accepted availability risk, not evidence that failover should have occurred.
 
-Recovery uses a tested dependency-safe sequence. Exact commands depend on host/provisioning, but the operator proves:
+For whole-host loss or a recovery that requires a replacement/clean host, use `../runbooks/production-cold-dr.md`. Do not maintain a second divergent whole-host sequence in this incident runbook.
 
-1. host hardware/storage/network/time baseline is healthy or a replacement host is available;
-2. exact pinned K3s/platform artifacts are restored/installed with verified integrity;
-3. K3s control plane, Calico and secrets encryption state are healthy;
-4. K3s datastore/token recovery is used only when safer than clean GitOps rebuild;
-5. OpenBao and External Secrets recover under their unchanged current runbook/ADR contract;
-6. PostgreSQL recovers through current physical backup/WAL/PITR rules if local state is unsafe/lost;
-7. Redis/Kafka recover with their single-server semantics;
-8. Istio/Kyverno/edge security controls are healthy before unsafe traffic/deployment paths open;
-9. applications become ready only when their local/security dependencies permit safe service;
-10. audit/observability confirms no fail-open bypass occurred.
+The cold-DR procedure must preserve at least:
+
+- clean host and management-only WireGuard reachability;
+- no public SSH fallback;
+- K3s/Calico/security-control reconstruction;
+- unchanged OpenBao recovery;
+- PostgreSQL physical PITR and service ownership/RLS validation;
+- Redis/Kafka profile-specific recovery/rebuild semantics;
+- edge/WAF/client-address trust restoration;
+- erasure/legal-hold reconciliation before traffic;
+- measured ADR-0004 RPO/RTO evidence.
 
 If clean GitOps rebuild is safer/faster than restoring Kubernetes operational state, prefer the clean rebuild while restoring business persistence/secrets through their owning recovery procedures.
 
@@ -97,6 +102,7 @@ Single-server Redis has no failover. During Redis outage/corruption:
 
 - do not bypass semantic quota/session fail-closed behavior;
 - do not reconstruct authenticated authority from browser cookies;
+- do not replace missing trusted client-network context with public forwarding headers or a proxy address;
 - use AOF/restart recovery when safe;
 - invalidate/re-authenticate sessions when authoritative state is lost/uncertain;
 - verify TLS/ACL/`noeviction`/time-source configuration after recovery;
@@ -136,9 +142,23 @@ If Kyverno is unavailable:
 - restore admission health or use the separately reviewed signed emergency path if one exists;
 - do not switch production to audit-only merely to deploy.
 
-## 9. OpenBao incident handling — unchanged
+## 9. Public edge/client-address incident handling
 
-ADR-0042 does not change OpenBao.
+If the external-L4/Traefik/WAF client-address chain is wrong or uncertain:
+
+- do not enable Traefik `proxyProtocol.insecure` or `forwardedHeaders.insecure`;
+- do not trust public `Forwarded`, `X-Forwarded-*`, `X-Real-IP`, or private client-IP headers;
+- do not route Traefik directly to BFF to bypass WAF;
+- verify the external-L4 source CIDRs and PROXY-v2 preservation;
+- verify Caddy strict trusted-proxy parsing and internal client-IP overwrite;
+- keep quota-required public operations blocked/fail closed until trusted client identity is valid;
+- preserve only PII-safe diagnostics; raw client IP is not copied into ordinary incident logs without an approved forensic need.
+
+A source-address trust failure is a security-control incident, not merely a telemetry defect.
+
+## 10. OpenBao incident handling — unchanged
+
+ADR-0042/ADR-0043 do not change OpenBao.
 
 Use the existing OpenBao 2.6.1 Shamir/Raft/PVC/encrypted-snapshot/restore/unseal and External Secrets recovery procedures. Normal workloads continue only within their existing validated local-key/stale-source bounds.
 
@@ -149,15 +169,23 @@ Never respond to an OpenBao outage by:
 - disabling key validation;
 - creating an unbounded plaintext fallback.
 
-## 10. Human privileged access during incidents
+## 11. Human privileged access during incidents
 
 ### Single-server
 
-Use hardened OpenSSH/FIDO2 only through the approved management path.
+Normal reachability remains:
 
-- no password/root/shared-key fallback;
+```text
+approved operator device -> WireGuard -> management address -> OpenSSH/FIDO2 -> JIT privilege
+```
+
+- public-interface/Internet TCP/22 stays denied;
+- WireGuard outage does not authorize public SSH;
+- no shared WireGuard peer, password/root/shared-SSH-key fallback;
+- WireGuard network admission alone is not human authentication or privilege;
 - emergency elevation remains attributable, incident-linked and time-bounded;
 - normal write elevation retains the required reviewers unless the separately protected break-glass condition applies;
+- provider emergency console, if available, is break-glass only and must be declared as such;
 - break-glass use is explicitly declared, audited and reviewed/rotated after use;
 - `sudo`, OS, Kubernetes and database privileged activity remains audited;
 - required audit is exported off-host;
@@ -169,19 +197,20 @@ If audit export is impaired, declare that as part of the incident and follow the
 
 Use current Teleport JIT/break-glass procedures.
 
-## 11. Security/privacy incident rules
+## 12. Security/privacy incident rules
 
-For suspected credential/token/private-key/PII/tenant-isolation compromise:
+For suspected credential/token/private-key/PII/tenant-isolation/host compromise:
 
 - contain before broad recovery;
 - preserve relevant audit/forensics evidence;
-- rotate/revoke affected credentials/keys/sessions through owning authority;
+- rotate/revoke affected WireGuard peers, SSH credentials, JIT grants, sessions, application credentials, tokens, or keys through their owning authority;
 - do not log/attach raw secrets or unnecessary PII to incident systems;
 - verify cross-tenant/authorization/RLS boundaries after containment;
+- treat a compromised single-server root as a broad local trust failure and rebuild from trusted artifacts rather than assuming workload isolation protected secrets;
 - coordinate legal/privacy obligations through responsible owner;
 - use erasure/legal-hold rules when restoring historical data.
 
-## 12. Deployment/migration incident rules
+## 13. Deployment/migration incident rules
 
 - stop further rollout;
 - preserve exact image/config/schema versions;
@@ -191,7 +220,7 @@ For suspected credential/token/private-key/PII/tenant-isolation compromise:
 - use expand/compatible rollback/fail-forward rules;
 - in single-server, a PostgreSQL/CloudNativePG upgrade is platform-wide maintenance and must validate every service database.
 
-## 13. Recovery verification before traffic
+## 14. Recovery verification before traffic
 
 Verify as applicable:
 
@@ -202,12 +231,17 @@ Verify as applicable:
 - PostgreSQL integrity/Flyway/RLS/role isolation;
 - Redis/Kafka recovery semantics;
 - Kyverno admission and edge/WAF path;
+- external-L4/Traefik/WAF/BFF client-address anti-spoofing contract;
 - OpenBao/secret delivery;
+- WireGuard management isolation/public-SSH denial and privileged access/audit;
 - logging/audit/telemetry;
+- erasure/legal-hold reconciliation where restored historical state is involved;
 - critical smoke/browser flows;
 - no unresolved data/replay/backlog corruption.
 
-## 14. Post-incident requirements
+For a full cold recovery, the traffic-enable record in `../runbooks/production-cold-dr.md` is mandatory.
+
+## 15. Post-incident requirements
 
 Record:
 
@@ -215,8 +249,8 @@ Record:
 - whether the event was expected non-HA availability loss or violated a correctness/security contract;
 - detected/actual RPO/RTO and downtime;
 - evidence of safe recovery;
-- missed alert/runbook/test/capacity assumption;
+- missed threat, alert, runbook, test, network-trust, or capacity assumption;
 - remediation owner/deadline;
 - whether the single-server profile remains acceptable.
 
-Repeated node incidents, unacceptable downtime, persistent shared IO/capacity pressure, or unacceptable recovery RTO trigger review/migration to `production-ha`.
+Repeated node incidents, unacceptable downtime, persistent shared IO/capacity pressure, broad host-compromise concerns, or unacceptable recovery RTO trigger review/migration to `production-ha`.
