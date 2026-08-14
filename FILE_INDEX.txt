@@ -42,6 +42,7 @@ docs/adr/0038-harden-vulnerability-exceptions-threat-intelligence-and-ownership-
 docs/adr/0039-standardize-java-coding-and-executable-quality-gates-v1.md
 docs/adr/0040-define-self-contained-compromised-password-sqlite-v1.md
 docs/adr/0041-define-reference-data-service-v1.md
+docs/adr/0042-define-single-server-production-profile-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
