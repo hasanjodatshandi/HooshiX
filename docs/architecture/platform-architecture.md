@@ -11,20 +11,22 @@ Infrastructure --> Application --> Domain
 Interfaces     --> Application --> Domain
 ```
 
-Domain business logic MUST NOT depend on Spring, Kafka, PostgreSQL, Redis, gRPC, Protobuf, JPA/Hibernate, jOOQ, Kubernetes, Istio, or other infrastructure technology.
+Domain business logic MUST NOT depend on Spring, Kafka, PostgreSQL, Redis, SQLite, gRPC, Protobuf, JPA/Hibernate, jOOQ, Kubernetes, Istio, or other infrastructure technology.
 
 ## 2. Service ownership
 
 Every microservice owns its:
 
 - domain model/business rules;
-- distinct service-owned PostgreSQL database and independent credentials when relational persistence is used;
-- independent Flyway history;
+- distinct service-owned PostgreSQL database and independent credentials when mutable relational business persistence is used;
+- independent Flyway history when mutable relational schema evolution is used;
 - synchronous and asynchronous contracts;
 - deployment/release lifecycle;
 - observability and service-level authorization enforcement.
 
-Every persistent production microservice also owns dedicated CloudNativePG cluster and independent backup identity/namespace. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, and shared business-model libraries are prohibited. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
+Every production microservice with mutable relational business persistence also owns a dedicated CloudNativePG cluster and independent backup identity/namespace. Direct cross-service database access, cross-database joins/foreign keys, shared ORM/jOOQ persistence models, and shared business-model libraries are prohibited. Tenant-owned relational tables use forced PostgreSQL RLS as defense in depth in addition to application tenant enforcement.
+
+ADR-0040 defines one narrow storage exception: Compromised Password Service uses a service-local **immutable, read-only, rebuildable SQLite reference-data artifact** for its compromised-password dataset. It is not mutable business persistence, receives no subject-owned application data, is not an integration database, has no runtime SQLite writes/Flyway/CloudNativePG requirement, and does not authorize mutable SQLite persistence for any other service. Future mutable state in that service returns to the normal persistence architecture review.
 
 A service is not created merely around a table, CRUD screen, UI page, entity, or framework component.
 
@@ -66,7 +68,8 @@ Domain / Platform Microservices
         |                 |
         |                 +--> Apache Kafka
         |
-        +--> service-owned PostgreSQL
+        +--> service-owned PostgreSQL when mutable relational state exists
+        +--> service-local immutable reference artifact only where explicitly decided
 ```
 
 Only BFF and explicitly approved public adapters/APIs are externally reachable. Internal microservices are ClusterIP-only and are not directly Internet-exposed. A CDN is deployment-specific and does not replace mandatory upstream volumetric protection, redundant load balancing, Traefik, or dedicated WAF path.
@@ -121,13 +124,16 @@ The first executable backend service is `services/identity-service`; the second 
 
 Web BFF is an integration/browser security boundary rather than owner of backend business invariants. It owns public OpenAPI, browser OIDC/pre-auth/session/CSRF, exact-audience credential brokerage mechanics, browser-safe error/request bounds and route-to-downstream orchestration. Identity remains token/session identity authority, Authorization remains tenant permission/admin authority, and resource-owning service remains final protected-resource authorization/business-state authority.
 
+Compromised Password Service is an internal security reference-data boundary. Identity computes SHA-256 locally and sends only the current 20-bit prefix; Compromised Password performs a bounded indexed lookup against its immutable read-only SQLite dataset and returns suffix/count candidates; Identity performs the exact full-hash match and owns the final credential decision. The service has no User/Tenant/Contact/session state and no runtime external compromised-password provider/API.
+
 ## 7. Architecture-level technology baseline
 
 - Java 25 LTS;
 - Spring Boot 4.1.x;
 - Spring MVC + Virtual Threads;
 - Gradle Kotlin DSL;
-- PostgreSQL 18.x / CloudNativePG 1.30.x;
+- PostgreSQL 18.x / CloudNativePG 1.30.x for mutable relational service persistence;
+- Xerial SQLite JDBC + embedded SQLite only for the ADR-0040 immutable Compromised Password reference dataset;
 - Flyway, HikariCP, jOOQ and/or Spring Data JPA according to service responsibility;
 - Kafka 4.2.x + Protobuf;
 - Redis 8.2.x with service ownership; shared `security-redis` only for approved ephemeral security/session state;
@@ -152,14 +158,15 @@ Exact approved patch versions belong in `../technology/technology-baseline.md` a
 
 - **Kubernetes:** three stacked control-plane/etcd nodes + >=3 workers, redundant API endpoint, N+1 critical-worker capacity.
 - **Workload hardening:** immutable digest, non-root, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, bounded resources/probes, dedicated ServiceAccounts, deny-by-default NetworkPolicy.
-- **PostgreSQL:** dedicated production CloudNativePG cluster per persistent service; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves.
+- **PostgreSQL:** dedicated production CloudNativePG cluster per service with mutable relational business persistence; critical services use three-instance synchronous required durability, forced tenant RLS, independent backups/restores, safe failover, and one-cluster upgrade waves. ADR-0040 immutable reference artifact is outside this mutable-state fleet.
+- **Compromised Password:** >=3 replicas/PDB2/spread; only Identity gRPC ingress; 900ms caller ceiling/one attempt/no retry/fallback; immutable read-only embedded SQLite dataset; no full-dataset JVM cache; no runtime external provider/Internet lookup; missing/corrupt/incompatible dataset fails closed and keeps unsafe serving unavailable.
 - **Kafka:** KRaft with three brokers + three controllers; critical RF=3/minISR=2/acks=all; cold DR reconstructs from service-owned evidence.
 - **Security Redis:** one primary + two replicas + three Sentinel voters with TLS/ACL isolation.
 - **Web BFF:** `platform-apps/web-bff`, HTTP 8080, >=3 replicas/PDB2; HPA 3..12 only after representative load evidence; HMAC-located server sessions/pre-auth, bounded OIDC/session quotas/crypto, atomic rotation/revocation, and deny-by-default egress only to registered Identity/Authorization/resource/Redis/Google/telemetry dependencies.
 - **Authorization:** >=3 replicas/PDB/spread; one final online no-cache/no-retry `CheckPermission`, safe local prechecks, fail-closed overload/breaker isolation, >=99.95% availability, p95<=100ms/p99<=200ms SLO.
 - **OpenBao:** lean single-Raft authoritative secret source with encrypted snapshots; normal application hot paths use mounted/local validated key material rather than per-request OpenBao calls.
 - **Notification:** PostgreSQL-authoritative deadlines + synchronously durable `DISPATCHING` + reconciliation; no bespoke clock/fence control plane.
-- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature verified by HA Kyverno, with continuous deployed-digest vulnerability/advisory correlation and bounded admission-policy authoring/egress controls.
+- **Supply chain:** immutable digest + signed CycloneDX SBOM/provenance/Cosign signature verified by HA Kyverno, with continuous deployed-digest vulnerability/advisory correlation and bounded admission-policy authoring/egress controls. Bundled native components such as SQLite remain part of final-image advisory correlation.
 - **Public edge:** upstream L3/L4 volumetric mitigation/scrubbing -> redundant external L4 load balancing -> Traefik -> dedicated Caddy/Coraza WAF -> Web BFF.
 - **Human access:** Teleport JIT SSO/WebAuthn access with approvals, short-lived privilege, and audit/session evidence.
 - **Telemetry:** PII/secret-safe structured telemetry with static rules, pipeline redaction, synthetic canaries, and runtime leak detection.
