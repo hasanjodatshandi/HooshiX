@@ -33,7 +33,7 @@ Use versioned ASVS identifiers (`v5.0.0-...`) in test/evidence systems so future
 | SEC-022 | Single-server Kafka security/correctness despite RF=1 | TLS/auth/ACL/quotas, RF1/minISR1/acks-all/idempotence, Outbox/Inbox, stable replay evidence, no business authority in broker | config + auth negatives + rebuild/replay/duplicate tests |
 | SEC-023 | Single-server capacity does not cause security downgrade | complete-stack load/soak/reboot with >=30% validated CPU/memory headroom, applicable >=2x critical/security peak, safe IO/conntrack/FD/ephemeral-port capacity; no disabling OpenBao/Kyverno/Ambient/PITR/MFA/WAF/fail-closed controls | release benchmark + rendered policy diff + host-network metrics + reboot/recovery evidence |
 | SEC-024 | MFA invariance across infrastructure profiles | active TOTP cannot be bypassed by user-selectable Email/SMS downgrade; infrastructure profile changes no factor-policy contract | Identity/MFA regression + profile-diff review |
-| SEC-025 | Public client-address authority: external L4 supplies validated client source through trusted PROXY v2; Traefik insecure proxy/header trust disabled; Caddy strict trusted-proxy parsing; BFF uses only server-derived internal client IP; backend network quotas use only typed BFF-derived context | forged `Forwarded`/`X-Forwarded-*`/`X-Real-IP`/private-header negatives + untrusted/missing PROXY tests + proxy-address fail-close + IPv4/IPv6/mapped-address canonicalization + raw-IP leak negatives |
+| SEC-025 | Public client-address authority: external L4 supplies validated client source through trusted PROXY v2; Traefik application origin accepts only approved external-L4 sources; Traefik insecure proxy/header trust disabled; Caddy strict trusted-proxy parsing; BFF uses only server-derived internal client IP; backend network quotas use only typed BFF-derived context | direct Internet/non-approved-source Traefik-origin denial + forged `Forwarded`/`X-Forwarded-*`/`X-Real-IP`/private-header negatives + untrusted/missing PROXY tests + proxy-address fail-close + IPv4/IPv6/mapped-address canonicalization + raw-IP leak negatives |
 | SEC-026 | Email identity vs SMTP representation: HooshiX intentionally uses case-insensitive canonical email identity while preserving a case-preserving delivery representation so product equality does not require outbound local-part rewriting | case-only registration/login/reservation uniqueness tests + delivery-address preservation tests + no independent mutation/bypass |
 
 ## Security-gate rule
@@ -53,7 +53,7 @@ ADR-0042 is an availability/topology decision. Its single-server exceptions do n
 - OpenBao remains unchanged;
 - MFA remains unchanged.
 
-ADR-0043 adds network trust boundaries without becoming an authentication/authorization shortcut. WireGuard grants network reachability only. Client forwarding headers are not security authority.
+ADR-0043 adds network trust boundaries without becoming an authentication/authorization shortcut. WireGuard grants network reachability only. Client forwarding headers are not security authority. The Traefik application origin is not directly Internet-accessible outside the approved external-L4 path.
 
 ADR-0041 implementation/security evidence is required only when its explicit implementation trigger is met and the Reference Data service/facade is included in release scope; architecture documentation alone is not such evidence.
 
