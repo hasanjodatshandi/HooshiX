@@ -62,9 +62,9 @@ release does not publish an image for the exact production patch.
 | Local cluster name | `platform-local` | Required |
 | kube context | `kind-platform-local` | Required |
 | CNI / NetworkPolicy | Calico OSS 3.32.1 | Pinned; kind default CNI disabled |
-| Helm | 4.2.3 | Pinned to production baseline |
+| Helm | 4.2.4 | Pinned to production baseline |
 | Istio Ambient | 1.30.3 | Pinned to production baseline |
-| Kubernetes Gateway API | 1.5.1 Standard channel | Pinned |
+| Kubernetes Gateway API | 1.5.1 Standard channel | Pinned to the Traefik 3.7-supported Standard version |
 | Traefik | Proxy 3.7.10; Helm chart 41.2.0 | Pinned; chart-41 logging/file-provider key migration must be reflected in repository values |
 | Local WAF | Caddy 2.11.4 + coraza-caddy 2.5.0 + Coraza 3.7.0 + OWASP CRS 4.25.1 LTS | Production-fidelity pin |
 
