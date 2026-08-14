@@ -37,6 +37,7 @@ Required evidence:
 - HMAC pseudonymous keying/rotation without budget reset;
 - exact registration policy tests: REGISTER contact `5, 1/15m, 24h`, REGISTER network `60, 1/5s, 1h`, RESEND contact `5, 1/10m, 2h` plus fixed 60s challenge gap, RESEND network `60, 1/5s, 1h`, CONFIRM network `120, 2/1s, 30m` plus challenge-local five-proof cap;
 - authenticated Contact verification/recovery/MFA operation namespaces cannot share quota keys with registration despite reusing approved numeric envelopes;
+- Authorization `AUTH_ADMIN_WRITE` uses actual semantic-mutation cost `max(1, count)` with count<=100, `ReplaceRolePermissions` cost is additions+removals, both dimensions consume the same cost atomically before DB work, and later DB failure does not refund quota;
 - authentication/MFA/recovery anti-lockout + non-enumeration tests;
 - Redis outage/failover fails protected operations closed without converting dependency failure into false quota denial;
 - production profiles cannot bypass the limiter;
@@ -48,22 +49,43 @@ Status until verified: **blocker for semantic-quota-protected production entry p
 
 Required evidence:
 
-- >=3 replicas, PDB `minAvailable=2`, topology spread;
-- availability >=99.95%; p95<=100ms/p99<=200ms at >=2x projected peak;
-- exact 300ms/one-attempt/wait-for-ready-off/no-cache/no-retry/no-fallback behavior for `CheckPermission`;
+- versioned Authorization Protobuf/Buf compatibility for `CheckPermission`, `CheckPlatformPermission`, bounded reads, tenant-management writes, and Identity provisioning/lifecycle/owner-safety commands;
+- Git-owned permission-catalog schema/path is present and validated; permission syntax `^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+$`, max 128, scope/owner/lifecycle are enforced; unknown/RETIRED fail closed, DEPRECATED cannot receive new grants, identifiers are never reused, and SYSTEM-role mappings remain compatible with retirement;
+- SYSTEM Roles are immutable with exact current semantics: `tenant_owner` all ACTIVE tenant permissions, `tenant_admin` all except `tenant.delete`/`membership.owner.assign`, `tenant_member` exactly `tenant.read`/`membership.read`/`role.read`;
+- custom Role UUIDv4, ACTIVE->ARCHIVED, no ordinary hard delete, trim+NFC name 1..80/control-free/case-insensitive per-tenant uniqueness, description<=500, SYSTEM-name reservation, optimistic version and no archived identity/name reuse;
+- exact hard limits: 100 custom Roles/tenant, 200 permissions/custom Role, 20 Roles/Membership, 100 direct overrides/Membership, max 100 semantic mutations/bulk, pagination default 50/max 200;
+- direct override scope is only Membership+exact permission with one GRANT/DENY, no resource conditions/expressions/TTL/expiry, explicit removal only;
+- exact `CheckPermission(tenant_id,membership_id,permission_key)` request shape, approved resource-workload identity, success means ALLOW, authoritative deny is `PERMISSION_DENIED / AUTHORIZATION_DENIED`, no `allowed=false`, no Role/permission snapshot;
+- exact 300ms/one-attempt/wait-for-ready-off/no-cache/no-retry/no-fallback behavior for `CheckPermission`; deny/outage/healthy-overload mapping remains stable;
+- browser tenant administration arrives through Web BFF with an Identity JWT whose exact audience is `authorization-service`; Authorization locally verifies `sub`/`tenant_id`/`membership_id`/`sid`, trusts no actor/role/permission payload authority, and performs no self-gRPC authorization call;
+- exact tenant-management permission mapping for Role/Membership operations and privilege-escalation negatives: an actor cannot add/grant/assign authority it lacks, direct-DENY removal requires possession of the permission, and owner assignment additionally requires `membership.owner.assign`;
+- `GetMembershipAuthorization` is bounded/paginated and explicitly non-authoritative for access decisions; no public/admin `ExplainPermission` surface exists;
+- `AUTH_ADMIN_WRITE` executes before PostgreSQL, uses actual semantic mutation count with max100, has no refund on later validation/optimistic-concurrency/DB failure, while the DB mutation itself commits all-or-none with no partial-success response;
+- all management/lifecycle/platform writes use lowercase UUIDv4 `request_id` + purpose/version HMAC-SHA-256 fingerprint; equal replay returns original, conflicting reuse -> `ALREADY_EXISTS / REQUEST_ID_CONFLICT`, idempotency/security evidence >=35d;
+- stable Authorization machine-code taxonomy is contract-tested and internal exception/SQL/provider details never leak;
+- durable audit exists for every management write, platform authority assignment/revocation and privilege-sensitive management/platform rejection; owner/direct-override/Role-permission/platform changes require trim+NFC control-free reason 1..500; audit fields are bounded/PII-safe and retained >=365d;
+- routine hot-path `CheckPermission` does not accidentally introduce a synchronous durable audit write;
 - Identity `PrepareMembershipRemoval` uses 300ms/one-attempt/no-cache/no-retry/no-fallback fail-closed semantics and Authorization-side durable owner-safety reservation;
-- concurrent last-owner prepares cannot both consume the final owner; reservation-vs-owner-assignment races are atomic; reservations do not auto-expire into unsafe allow;
+- Identity removal reservations and local `tenant_owner` assignment/removal/demotion share one tenant-scoped serialization domain; concurrent final-owner operations cannot both consume final capacity, reservations do not auto-expire into unsafe allow, and no force/caller-owner-count path exists;
 - Identity crash between prepare/local Membership commit recovers through stable request replay and idempotent finalize/cancel durable resolution;
 - default `tenant_member` provisioning and tenant lifecycle cleanup/reconciliation are idempotent durable commands and never fabricate permission while pending;
-- bounded global/per-caller concurrency and no unbounded queue;
+- `platform_admin` is a global explicit SYSTEM capability profile with exactly current platform permissions; `CheckPlatformPermission(user_id, permission_key)` is Identity-only, 300ms/one-attempt/no-cache/no-retry/no-fallback/fail-closed, and never bypasses tenant/resource/domain checks;
+- platform profile assignment/revocation is absent from ordinary tenant/BFF APIs and requires the separately privileged JIT-controlled audited workflow;
+- Authorization erasure removes subject-linked Membership Roles/direct overrides/projections and platform profile assignment while preserving tenant-owned Role definitions; retained audit removes/irreversibly pseudonymizes direct User linkage and receipts are non-PII;
+- Authorization uses jOOQ/JDBC only; no JPA/Hibernate persistence model or generated jOOQ type leaks into Domain/Application;
+- forced tenant RLS, non-owner `NOSUPERUSER NOBYPASSRLS` runtime role, transaction-local tenant context and pooled-context reuse negatives pass;
+- no remote Redis/gRPC/HTTP/Kafka/provider I/O occurs inside Authorization DB transactions; quota occurs before DB locks;
+- Hikari acquisition p99<25ms, acquisition ceiling<=50ms, permission SQL ceiling<=100ms and representative `EXPLAIN (ANALYZE, BUFFERS)`/index evidence pass;
+- >=3 replicas, PDB `minAvailable=2`, topology spread, HPA initial 3..12, app gRPC convention 9090, separate management port, 64KiB message/16KiB metadata caps, hardened pod/ServiceAccount/NetworkPolicy/Istio policy and safe readiness/liveness all render/test correctly;
+- bounded global/per-caller concurrency, <=25ms server queue wait and no unbounded queue;
 - current breaker opening/recovery behavior from ADR-0032/0036;
-- `dependency-criticality.yaml` schema/coverage/render checks pass including all Identity->Authorization lifecycle edges;
-- Hikari acquisition p99<25ms, acquisition ceiling<=50ms, permission SQL ceiling<=100ms;
-- no synchronous downstream other than Authorization-owned PostgreSQL;
+- `dependency-criticality.yaml` schema/coverage/render checks pass including platform permission and every Identity->Authorization lifecycle edge with current section references;
+- no synchronous downstream other than Authorization-owned PostgreSQL on the online permission path;
 - no routine duplicate BFF permission check;
-- one replica/node loss and PostgreSQL primary failover preserve fail-closed semantics/objectives.
+- one replica/node loss and PostgreSQL primary failover preserve fail-closed semantics/objectives;
+- availability >=99.95%; p95<=100ms/p99<=200ms at >=2x projected peak with >=30% validated resource/database headroom.
 
-Status until verified: **protected-operation production blocker**.
+Status until verified: **protected-operation and Authorization-management/platform-authority production blocker**.
 
 ## 4. PostgreSQL isolation/HA/recovery — ADR-0019/0027/0034/0037
 
@@ -292,6 +314,7 @@ Required repository/build evidence includes:
 - explicit aggregate/transaction boundaries, JPA aggregate CRUD plus justified JDBC/jOOQ SQL-control paths, no remote I/O in transactions;
 - tenant/invitation/Membership exact lifecycles, existing-user target/7d/single-pending, default `tenant_member` provisioning, no arbitrary invitation role;
 - concurrent last-owner `PrepareMembershipRemoval` durable reservation, 300ms/one-attempt/no-cache/no-retry/fallback, crash-safe local intent + idempotent finalize/cancel and no unsafe automatic reservation expiry;
+- exact platform mapping and fail-closed `CheckPlatformPermission` for platform tenant create/suspend/resume/restore and platform legal-hold management; approved Identity workload only, no caller-supplied platform profile/wildcard authority, 300ms/one-attempt/no-cache/no-retry/no-fallback, and all calls outside Identity DB transactions;
 - tenant delete/suspend/restore lifecycle, pending invitation revocation, Authorization cleanup/reconciliation, slug/ID non-reuse;
 - tenantless authenticated onboarding with no ordinary resource JWT, zero/one/many Membership selection, stale last-selection rejection and tenant-switch credential/session rotation;
 - exact JWT claim/audience rules, five-minute lifetime, <=30s verifier leeway and local-verification residual-token trade-off;
@@ -304,8 +327,9 @@ Required repository/build evidence includes:
 - TOTP pre-auth 5m/five-failed-proof/single-use, new-primary-proof invalidation, timestep replay rejection, recovery-code atomic use; MFA-state-change session revocation; no SMS downgrade of active TOTP;
 - exact SMS proof eight-digit/HMAC/no-plaintext/<=5m/five-proof/60s/replacement/single-use semantics and production gate;
 - self-erasure recent-auth + active MFA + no ACTIVE/SUSPENDED Membership for non-DELETED Tenant; last-owner-safe exit; pending-invitation + all-family revocation; server-owned participants; Kafka/outbox/inbox replay/non-PII receipts/legal hold; no self-service undo; restore-before-traffic;
+- Authorization erasure receipt/evidence proves subject-linked tenant authorization and platform capability assignments are removed without deleting tenant-owned Role policy;
 - purpose/version HMAC idempotency replay/conflict, 35d critical publication/Inbox-dedup evidence, >=14d retry/DLQ evidence when used, >=365d security audit evidence;
-- dependency registry includes semantic quota, compromised-password, Notification, owner/member provisioning, Membership removal prepare/resolution, tenant lifecycle, and Web BFF OIDC ownership with valid current policy refs;
+- dependency registry includes semantic quota, compromised-password, Notification, owner/member provisioning, Membership removal prepare/resolution, tenant lifecycle, platform permission check, and Web BFF OIDC ownership with valid current policy refs;
 - Identity Docker/Helm/GitOps/ServiceAccount/NetworkPolicy/Istio/probe/replica/PDB/topology/security-context/render checks and CI gates.
 
 Repository-complete does **not** equal production-ready. Registry/DNS/secret paths/provider credentials/Redis/CNPG/backup/alert destinations may remain typed environment placeholders, but actual staging/production provider, secret, cluster, load, failover, restore, and DR evidence remains `NOT VERIFIED` until executed.
