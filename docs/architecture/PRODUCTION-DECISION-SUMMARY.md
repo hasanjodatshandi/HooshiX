@@ -1,6 +1,6 @@
 # Production Decision Summary — Current State
 
-- **Reviewed:** 2026-08-13
+- **Reviewed:** 2026-08-14
 - **Mode:** current-only
 - **Status:** architecture target; implementation evidence remains subject to `PRODUCTION-READINESS-CHECKLIST.md`
 
@@ -22,20 +22,29 @@ This document summarizes the effective production architecture only. The current
 - The browser receives only the secure BFF session cookie, not provider/internal access tokens.
 - BFF session security includes fixation/rotation defense, strict CORS, Origin + synchronizer-token CSRF, and reviewed security headers.
 - Identity JWT signing uses local RSA-3072/RS256 key material with stable `kid`, planned rotation, and local GitOps verifier bundles.
+- Platform-admin Identity operations do not trust a platform-role claim from the browser/JWT; Identity uses Authorization's separate fail-closed `CheckPlatformPermission` authority for the exact platform tenant/legal-hold permission.
 
 ## Authorization
 
-- Protected resource services make one authoritative online `CheckPermission` call after safe local reject-only token/context/syntax checks.
-- There is no permission-result cache, Bloom-filter authorization, Kafka invalidation, retry, stale allow fallback, or BFF duplicate routine check.
+- Permission definitions are exact Git-owned contracts with TENANT/PLATFORM scope and `ACTIVE -> DEPRECATED -> RETIRED` lifecycle; unknown/retired keys fail closed, deprecated keys cannot receive new grants, and permission identifiers are never reused for new meaning.
+- Tenant authorization precedence is `Direct Deny > Direct Grant > Role Grant > Default Deny`. SYSTEM Roles are server-owned immutable; custom Roles are bounded/versioned `ACTIVE -> ARCHIVED`; v1 has no role inheritance, wildcard assignment, resource-condition policy, or TTL-based override.
+- Protected resource services make one authoritative online `CheckPermission(tenant_id,membership_id,permission_key)` call after safe local reject-only token/context/syntax checks. Successful RPC completion means ALLOW; authoritative denial is a denial status, not `allowed=false`.
+- There is no permission-result cache, Bloom-filter authorization, Kafka invalidation, retry, stale allow fallback, or BFF duplicate routine resource check.
+- Browser tenant administration is a BFF facade. Authorization locally verifies an Identity JWT with exact audience `authorization-service`, trusts no role/permission snapshot, evaluates management permission in-process, and prevents actors from introducing authority they do not possess.
+- Administration is bounded: 100 custom Roles/tenant, 200 permissions/custom Role, 20 Roles/Membership, 100 direct overrides/Membership, max 100 semantic mutations/bulk, pagination 50 default/200 maximum. `AUTH_ADMIN_WRITE` is charged by actual semantic mutation delta before the DB transaction and is not refunded after later DB failure; local mutation is all-or-none.
+- Every management/lifecycle/platform write has UUIDv4 idempotency + purpose/version HMAC intent fingerprinting; equal replay returns the original result, conflict is stable, and security idempotency evidence remains >=35d. Required management/platform audit is bounded/PII-safe and retained >=365d.
+- Identity owner-safe Membership removal and local `tenant_owner` changes share one tenant-scoped atomic owner-safety serialization domain; no read-only count race, force-last-owner flag, or reservation auto-expiry can remove the final effective owner.
+- `platform_admin` is a global explicit SYSTEM capability profile, not a tenant Role/wildcard. `CheckPlatformPermission` is Identity-only, 300ms/one attempt/no-cache/no-retry/no-fallback/fail-closed, and never bypasses tenant/resource/domain invariants. Platform-profile assignment/revocation is JIT-controlled/audited and absent from ordinary tenant APIs.
+- Authorization uses jOOQ/JDBC without JPA, forced tenant RLS, transaction-local tenant context, bounded SQL/query-plan evidence, and no remote I/O inside DB transactions. Erasure removes subject-linked tenant/platform authority while preserving tenant-owned Role definitions.
 - Production Authorization target: >=3 replicas, PDB/topology spread, >=99.95% rolling-30d availability, p95<=100ms, p99<=200ms, 300ms caller deadline, one attempt.
-- Authorization uses bounded global/per-caller concurrency, <=25ms server queue wait, bounded PostgreSQL pool/queries, explicit overload shedding, and fail-closed caller breakers.
-- Breaker recovery is de-correlated per caller instance and uses serialized real `CheckPermission` probes; a health endpoint cannot authorize breaker closure.
-- Dependency criticality/fallback semantics are registered per operation/dependency edge in `dependency-criticality.yaml`.
+- Authorization uses bounded global/per-caller concurrency, <=25ms server queue wait, bounded PostgreSQL pool/queries, explicit overload shedding, and fail-closed caller breakers. Breaker recovery is de-correlated and uses serialized real `CheckPermission` probes; a health endpoint cannot authorize breaker closure.
+- Dependency criticality/fallback semantics, including Identity's platform-permission edge, are registered per operation/dependency edge in `dependency-criticality.yaml`.
 
 ## Semantic security quotas
 
 - There is no quota microservice. The owning security service enforces its semantic quota atomically in service-owned ACL-isolated Redis.
 - Quotas are fail-safe, use pseudonymous keys, explicit anti-lockout sequencing, and the current trusted-application-time + Redis-time skew/TTL rules.
+- Authorization administration quota cost is proportional to the actual bounded semantic mutation count rather than one unit for an arbitrarily large mutation request.
 
 ## Notification
 
