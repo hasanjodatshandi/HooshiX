@@ -4,6 +4,7 @@
 - **Policy:** `../engineering/current-only-documentation-policy.md`
 - **Normalized:** 2026-08-13
 - **Identity v1 implementation contract finalized:** 2026-08-14
+- **Authorization v1 implementation contract finalized:** 2026-08-14
 
 This register contains only ADRs that still carry effective scope. Obsolete predecessor decisions and raw historical notes are intentionally absent. Current-state architecture/service/engineering documents are implementation-facing authority; retained ADRs capture durable current decisions useful for review.
 
@@ -34,8 +35,8 @@ Core global-user/tenant-membership, logical deletion/legal hold, credential, and
 
 | ADR | Current scope |
 | --- | --- |
-| [ADR-0013](0013-use-online-authorization-without-cache-or-kafka-v1.md) | One authoritative online no-cache/no-Kafka/no-retry `CheckPermission` model and tenant-role/last-owner invariants |
-| [ADR-0024](0024-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: topology, atomicity, pseudonymization, anti-lockout, exact registration policy values, dual-clock/TTL safety |
+| [ADR-0013](0013-use-online-authorization-without-cache-or-kafka-v1.md) | Complete Authorization v1 policy contract: exact permission catalog/lifecycle, tenant SYSTEM/custom Roles and direct overrides, one authoritative no-cache/no-Kafka/no-retry `CheckPermission`, BFF-backed tenant management with privilege-escalation prevention and bounded limits, platform capability profile/`CheckPlatformPermission`, atomic owner safety, idempotency/audit, jOOQ/RLS persistence, and erasure behavior |
+| [ADR-0024](0024-harden-semantic-quota-time-safety-v1.md) | Complete current service-owned semantic quota model: topology, atomicity, pseudonymization, anti-lockout, exact registration policy values, Authorization semantic-mutation cost, dual-clock/TTL safety |
 | [ADR-0025](0025-define-synchronous-dependency-failure-containment-v1.md) | Synchronous dependency timeout/bulkhead/breaker/fallback rules |
 | [ADR-0026](0026-harden-online-authorization-overload-and-slo-v1.md) | Authorization runtime SLO, capacity, deployment, safe prechecks, overload isolation, and fail-closed breaker baseline |
 | [ADR-0032](0032-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md) | Authorization SLI interpretation, paired burn alerts, breaker-opening criteria, and health-endpoint non-authority |
