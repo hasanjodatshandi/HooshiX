@@ -16,11 +16,12 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 | `web-bff.authenticated-session-lookup` | Web BFF | BFF session Redis | `AUTHORITATIVE_SECURITY` | session unavailable | none | none | Web BFF | ADR-0012, ADR-0016 |
 | `service.normal-transaction-or-query` | owning service | owning PostgreSQL | `AUTHORITATIVE_STATE` | abort/unavailable; no fabricated state | transaction-safe owner only | none | owning service | ADR-0027; `data-and-messaging.md` §1 |
 | `identity.notification-handoff-dispatch` | Identity | Notification `SubmitNotification` | `DURABLE_COMMAND` | local outbox remains pending | caller durable dispatcher | none | Identity | ADR-0006 |
-| `identity.authorization-owner-provisioning` | Identity | Authorization owner provisioning | `DURABLE_COMMAND` | keep tenant PROVISIONING/outbox pending | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §7 |
-| `identity.authorization-member-provisioning` | Identity | Authorization default-member provisioning | `DURABLE_COMMAND` | keep provisioning outbox pending; Authorization default deny | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §7 |
-| `identity.authorization-membership-removal-prepare` | Identity | Authorization `PrepareMembershipRemoval` | `AUTHORITATIVE_SECURITY` | fail closed; Membership removal cannot commit | none | none | Identity | ADR-0012; `authorization-service.md` §8 |
-| `identity.authorization-membership-removal-resolution` | Identity | Authorization finalize/cancel removal reservation | `DURABLE_COMMAND` | keep owner-safety reservation + resolution outbox pending | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §8 |
-| `identity.authorization-tenant-lifecycle-sync` | Identity | Authorization tenant lifecycle cleanup/reconciliation | `DURABLE_COMMAND` | keep tenant lifecycle pending; never fabricate Authorization state | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §7 |
+| `identity.authorization-owner-provisioning` | Identity | Authorization owner provisioning | `DURABLE_COMMAND` | keep tenant PROVISIONING/outbox pending | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §10 |
+| `identity.authorization-member-provisioning` | Identity | Authorization default-member provisioning | `DURABLE_COMMAND` | keep provisioning outbox pending; Authorization default deny | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §10 |
+| `identity.authorization-membership-removal-prepare` | Identity | Authorization `PrepareMembershipRemoval` | `AUTHORITATIVE_SECURITY` | fail closed; Membership removal cannot commit | none | none | Identity | ADR-0012; `authorization-service.md` §9 |
+| `identity.authorization-membership-removal-resolution` | Identity | Authorization finalize/cancel removal reservation | `DURABLE_COMMAND` | keep owner-safety reservation + resolution outbox pending | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §9 |
+| `identity.authorization-tenant-lifecycle-sync` | Identity | Authorization tenant lifecycle cleanup/reconciliation | `DURABLE_COMMAND` | keep tenant lifecycle pending; never fabricate Authorization state | caller durable dispatcher | none | Identity | ADR-0012; `authorization-service.md` §10 |
+| `identity.authorization-platform-permission-check` | Identity | Authorization `CheckPlatformPermission` | `AUTHORITATIVE_SECURITY` | platform-only operation unavailable; fail closed | none | none | Identity | ADR-0013; `authorization-service.md` §11 |
 | `notification.result-callback-dispatch` | Notification | Identity `ReportNotificationResult` | `DURABLE_COMMAND` | result outbox remains pending | Notification durable callback dispatcher | none | Notification | ADR-0006; `notification-service.md` §14 |
 | `notification.provider-dispatch` | Notification | email/SMS provider | `EXTERNAL_SIDE_EFFECT` | preserve ambiguity and reconcile | Notification worker/lifecycle | never fabricate ACCEPTED/DELIVERED | Notification | ADR-0006, ADR-0007, ADR-0020 |
 | `web-bff.google-oidc-login` | Web BFF | Google OIDC endpoints | `AUTHORITATIVE_SECURITY` | login unavailable | protocol-defined safe flow only | no alternate identity auto-link | Web BFF | ADR-0016; `services/web-bff.md` §3 |
@@ -38,6 +39,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 - `EXTERNAL_SIDE_EFFECT` preserves ambiguous outcomes and reconciles them.
 - Authoritative security checks SHOULD run before optional remote enrichment when practical.
 - Membership-removal preparation is deliberately a durable Authorization-side safety reservation rather than a race-prone read-only owner-count check.
+- Platform permission is a separate authoritative check and never converts `platform_admin` into tenant/resource fallback authority.
 - Missing fallback means **no fallback**.
 
 ## Maintenance and CI
