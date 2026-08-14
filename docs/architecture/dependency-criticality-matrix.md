@@ -26,6 +26,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 | `notification.provider-dispatch` | Notification | email/SMS provider | `EXTERNAL_SIDE_EFFECT` | preserve ambiguity and reconcile | Notification worker/lifecycle | never fabricate ACCEPTED/DELIVERED | Notification | ADR-0006, ADR-0007, ADR-0020 |
 | `web-bff.google-oidc-login` | Web BFF | Google OIDC endpoints | `AUTHORITATIVE_SECURITY` | login unavailable | protocol-defined safe flow only | no alternate identity auto-link | Web BFF | ADR-0016; `services/web-bff.md` §3 |
 | `web-bff.identity-oidc-evidence-submit` | Web BFF | Identity external-identity/session establishment | `AUTHORITATIVE_SECURITY` | login unavailable | none | none | Web BFF | ADR-0012, ADR-0016 |
+| `web-bff.authorization-tenant-management` | Web BFF | Authorization tenant-management gRPC | `AUTHORITATIVE_SECURITY` | management unavailable; fail closed; no fabricated local authority | none | none | Web BFF | ADR-0013; `services/web-bff.md` §6; `authorization-service.md` §7 |
 | `business.optional-enrichment` | owning bounded context | explicitly approved enrichment service | `OPTIONAL_READ` | use only explicit bounded degraded result | none | bounded-context-defined only | owning bounded context | ADR-0033, ADR-0036 |
 | `platform.non-audit-telemetry-export` | any service | observability backend | `OBSERVABILITY` | bounded buffer/drop; business request continues | exporter | bounded loss allowed | Platform Observability | ADR-0033; `reliability-and-observability.md` §10 |
 | `service.required-security-audit-evidence` | owning service | audit persistence/outbox | `AUTHORITATIVE_STATE` | durable contract; do not silently drop | owning service | none unless explicit current decision | owning service | ADR-0033; `security-architecture.md` §13 |
@@ -40,6 +41,7 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 - Authoritative security checks SHOULD run before optional remote enrichment when practical.
 - Membership-removal preparation is deliberately a durable Authorization-side safety reservation rather than a race-prone read-only owner-count check.
 - Platform permission is a separate authoritative check and never converts `platform_admin` into tenant/resource fallback authority.
+- BFF tenant-management transport is an authoritative-security edge because Authorization owns both the management authorization decision and state mutation; BFF outage/Authorization outage never converts into a local management allow.
 - Missing fallback means **no fallback**.
 
 ## Maintenance and CI
