@@ -11,7 +11,7 @@ Always read `../../AGENTS.md`, `../engineering/current-only-documentation-policy
 | Identity registration/password/MFA | `security-architecture.md`, `services/identity-service.md`, ADR-0008, ADR-0009, ADR-0012, ADR-0023, ADR-0024, applicable Notification ADRs |
 | Browser OIDC/session/CSRF/CORS | `security-architecture.md`, `services/web-bff.md`, ADR-0012, ADR-0016, ADR-0023 |
 | Tenancy/deletion/erasure | `security-architecture.md`, applicable service doc, ADR-0012, ADR-0027, ADR-0028 |
-| Authorization call/path | `services/authorization-service.md`, `security-architecture.md`, `dependency-criticality.yaml`, ADR-0013, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036 |
+| Authorization permission/admin/platform path | `services/authorization-service.md`, `security-architecture.md`, `security-verification-matrix.md`, `dependency-criticality.yaml`, ADR-0013, ADR-0024, ADR-0025, ADR-0026, ADR-0032, ADR-0033, ADR-0036 |
 | Semantic security quota | `security-architecture.md`, applicable service doc, ADR-0024 |
 | Notification handoff/callback | `services/notification-service.md`, `services/identity-service.md`, ADR-0006, ADR-0018 |
 | Notification lifecycle/retry/evidence | `services/notification-service.md`, ADR-0006, ADR-0007, ADR-0018 |
