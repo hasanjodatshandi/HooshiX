@@ -200,6 +200,19 @@ edges:
       - ADR-0012
       - ADR-0016
 
+  - operation_id: web-bff.authorization-tenant-management
+    caller_owner: web-bff
+    dependency_id: authorization.tenant-management
+    class: AUTHORITATIVE_SECURITY
+    failure_action: management_unavailable_fail_closed
+    retry_owner: none
+    fallback: none
+    owner: web-bff
+    policy_refs:
+      - ADR-0013
+      - docs/architecture/services/web-bff.md#6-internal-calls
+      - docs/architecture/services/authorization-service.md#7-tenant-management-authentication-and-authorization
+
   - operation_id: business.optional-enrichment
     caller_owner: owning-bounded-context
     dependency_id: approved-enrichment-service
