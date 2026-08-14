@@ -23,6 +23,18 @@ GitHub does not permit opening a pull request when the head branch has no commit
 
 Direct commits to `main` are prohibited for normal agent-driven work. Emergency exceptions require an explicit user instruction describing the emergency and must be documented after the fact in a follow-up pull request.
 
+## One-pull-request-per-prompt rule
+
+Normal agent-driven work may create at most one pull request for one user prompt.
+
+- Accumulate all coherent task changes and verification-driven fixes required to complete that prompt in the same task PR before it is marked ready.
+- When a PR is created for the prompt, review and merge it into `main` before completing the prompt, then verify the resulting `main` head and confirm that no task PR from that prompt remains open.
+- Do not create a second PR in the same prompt.
+- Do not begin a separate scope while the current prompt's PR remains open.
+- If new work is discovered only after the prompt's single PR has already merged and that work requires another PR, report it as remaining work for the next user prompt instead of opening another PR in the current prompt.
+
+This rule does not authorize mixing unrelated work into one PR. Keep the prompt scope coherent and continue to report unrelated findings separately unless they block the scoped task before merge.
+
 ## Review requirements
 
 Before merge, reviewers/agents MUST:
