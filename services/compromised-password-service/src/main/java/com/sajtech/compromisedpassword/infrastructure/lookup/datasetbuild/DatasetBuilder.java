@@ -3,7 +3,6 @@ package com.sajtech.compromisedpassword.infrastructure.lookup.datasetbuild;
 import com.google.protobuf.CodedOutputStream;
 import com.sajtech.compromisedpassword.contract.v1.LookupPrefixResponse;
 import java.io.BufferedInputStream;
-import java.io.DigestInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -91,6 +91,9 @@ public final class DatasetBuilder {
       publishedManifest = true;
       return manifest;
     } catch (DatasetBuildException exception) {
+      rollbackPublishedOutputs(request, publishedSqlite, publishedManifest);
+      throw exception;
+    } catch (RuntimeException exception) {
       rollbackPublishedOutputs(request, publishedSqlite, publishedManifest);
       throw exception;
     } catch (IOException exception) {
@@ -213,7 +216,8 @@ public final class DatasetBuilder {
       throw new DatasetBuildException(DatasetBuildException.Reason.EMPTY_SOURCE);
     }
     maxPrefixCardinality = Math.max(maxPrefixCardinality, currentPrefixCardinality);
-    maxSerializedResponseBytes = Math.max(maxSerializedResponseBytes, currentSerializedResponseBytes);
+    maxSerializedResponseBytes =
+        Math.max(maxSerializedResponseBytes, currentSerializedResponseBytes);
     return new BuildMetrics(
         recordCount,
         maxPrefixCardinality,
@@ -242,7 +246,8 @@ public final class DatasetBuilder {
       int high = hexValue(line[index * 2]);
       int low = hexValue(line[index * 2 + 1]);
       if (high < 0 || low < 0) {
-        throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
+        throw new DatasetBuildException(
+            DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
       }
       hash[index] = (byte) ((high << 4) | low);
     }
@@ -251,7 +256,8 @@ public final class DatasetBuilder {
     for (int index = 41; index < line.length; index++) {
       int digit = line[index] - '0';
       if (digit < 0 || digit > 9 || occurrenceCount > (Long.MAX_VALUE - digit) / 10) {
-        throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
+        throw new DatasetBuildException(
+            DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
       }
       occurrenceCount = occurrenceCount * 10 + digit;
     }
