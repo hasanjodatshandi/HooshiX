@@ -30,7 +30,7 @@ class DatasetBuilderTest {
   @TempDir Path tempDirectory;
 
   @Test
-  void buildsCanonicalSqliteAndReleaseManifestFromLocalCompleteDownload() throws Exception {
+  void buildsCanonicalSqliteAndReleaseManifestFromGeneratedFixture() throws Exception {
     Path source = tempDirectory.resolve("source.txt");
     String fixture =
         String.join(
@@ -47,6 +47,7 @@ class DatasetBuilderTest {
     DatasetReleaseManifest result =
         new DatasetBuilder().build(request(source, sqlite, manifest, sha256(source)));
 
+    assertThat(result.sourceKind()).isEqualTo(DatasetSourceKind.GENERATED_TEST_FIXTURE);
     assertThat(result.sourceLineCount()).isEqualTo(4);
     assertThat(result.recordCount()).isEqualTo(3);
     assertThat(result.duplicateLineCount()).isEqualTo(1);
@@ -55,9 +56,9 @@ class DatasetBuilderTest {
     assertThat(result.sqliteArtifactSha256()).isEqualTo(sha256(sqlite));
     assertThat(result.contentSha256()).matches("[0-9a-f]{64}");
     assertThat(Files.readString(manifest))
-        .contains("\"corpus_source\": \"HIBP_PWNED_PASSWORDS\"")
+        .contains("\"source_kind\": \"GENERATED_TEST_FIXTURE\"")
         .contains("\"hash_mode\": \"SHA1\"")
-        .contains("\"acquisition_mode\": \"COMPLETE_DOWNLOAD\"")
+        .doesNotContain("HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD")
         .contains("\"record_count\": 3")
         .contains("\"max_prefix_cardinality\": 2")
         .contains("\"sqlite_artifact_sha256\": \"" + sha256(sqlite) + "\"");
@@ -129,13 +130,14 @@ class DatasetBuilderTest {
   private DatasetBuildRequest request(
       Path source, Path sqlite, Path manifest, String expectedSourceSha256) {
     return new DatasetBuildRequest(
+        DatasetSourceKind.GENERATED_TEST_FIXTURE,
         source,
         sqlite,
         manifest,
         expectedSourceSha256,
         RETRIEVAL_START,
         RETRIEVAL_END,
-        "hibp-offline-acquisition",
+        "generated-test-fixture",
         "1.0.0",
         ACQUISITION_TOOL_SHA256,
         BUILD_GIT_REVISION);
