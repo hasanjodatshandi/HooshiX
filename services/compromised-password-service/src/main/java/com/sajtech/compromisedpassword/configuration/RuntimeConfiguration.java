@@ -22,69 +22,64 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(CompromisedPasswordProperties.class)
 public class RuntimeConfiguration {
-    @Bean
-    Clock clock() {
-        return Clock.systemUTC();
-    }
+  @Bean
+  Clock clock() {
+    return Clock.systemUTC();
+  }
 
-    @Bean
-    DatasetSettings datasetSettings(CompromisedPasswordProperties properties) {
-        CompromisedPasswordProperties.Dataset dataset = properties.dataset();
-        return new DatasetSettings(
-                dataset.path(),
-                dataset.expectedSha256(),
-                dataset.acquiredAt(),
-                dataset.formatVersion(),
-                dataset.maxPrefixCardinality());
-    }
+  @Bean
+  DatasetSettings datasetSettings(CompromisedPasswordProperties properties) {
+    CompromisedPasswordProperties.Dataset dataset = properties.dataset();
+    return new DatasetSettings(
+        dataset.path(),
+        dataset.expectedSha256(),
+        dataset.acquiredAt(),
+        dataset.formatVersion(),
+        dataset.maxPrefixCardinality());
+  }
 
-    @Bean
-    DatasetGuard datasetGuard(DatasetSettings settings, Clock clock) {
-        return new DatasetGuard(settings, clock);
-    }
+  @Bean
+  DatasetGuard datasetGuard(DatasetSettings settings, Clock clock) {
+    return new DatasetGuard(settings, clock);
+  }
 
-    @Bean
-    CompromisedPasswordRepository compromisedPasswordRepository(
-            DatasetGuard datasetGuard, DatasetSettings settings) {
-        return new SqliteCompromisedPasswordRepository(
-                datasetGuard, settings.maxPrefixCardinality());
-    }
+  @Bean
+  CompromisedPasswordRepository compromisedPasswordRepository(
+      DatasetGuard datasetGuard, DatasetSettings settings) {
+    return new SqliteCompromisedPasswordRepository(datasetGuard, settings.maxPrefixCardinality());
+  }
 
-    @Bean
-    LookupCompromisedPasswords lookupCompromisedPasswordsUseCase(
-            CompromisedPasswordRepository repository,
-            CompromisedPasswordProperties properties,
-            ObservationRegistry observationRegistry,
-            MeterRegistry meterRegistry) {
-        LookupCompromisedPasswords core = new LookupCompromisedPasswordsUseCase(repository);
-        return new BoundedLookupCompromisedPasswords(
-                core,
-                properties.maxConcurrentLookups(),
-                observationRegistry,
-                meterRegistry);
-    }
+  @Bean
+  LookupCompromisedPasswords lookupCompromisedPasswordsUseCase(
+      CompromisedPasswordRepository repository,
+      CompromisedPasswordProperties properties,
+      ObservationRegistry observationRegistry,
+      MeterRegistry meterRegistry) {
+    LookupCompromisedPasswords core = new LookupCompromisedPasswordsUseCase(repository);
+    return new BoundedLookupCompromisedPasswords(
+        core, properties.maxConcurrentLookups(), observationRegistry, meterRegistry);
+  }
 
-    @Bean
-    CompromisedPasswordGrpcService compromisedPasswordGrpcService(
-            LookupCompromisedPasswords lookup) {
-        return new CompromisedPasswordGrpcService(lookup);
-    }
+  @Bean
+  CompromisedPasswordGrpcService compromisedPasswordGrpcService(LookupCompromisedPasswords lookup) {
+    return new CompromisedPasswordGrpcService(lookup);
+  }
 
-    @Bean
-    SafeTracingServerInterceptor safeTracingServerInterceptor(OpenTelemetry openTelemetry) {
-        return new SafeTracingServerInterceptor(openTelemetry);
-    }
+  @Bean
+  SafeTracingServerInterceptor safeTracingServerInterceptor(OpenTelemetry openTelemetry) {
+    return new SafeTracingServerInterceptor(openTelemetry);
+  }
 
-    @Bean
-    GrpcServerLifecycle grpcServerLifecycle(
-            CompromisedPasswordProperties properties,
-            CompromisedPasswordGrpcService service,
-            SafeTracingServerInterceptor interceptor) {
-        return new GrpcServerLifecycle(properties.grpcPort(), service, interceptor);
-    }
+  @Bean
+  GrpcServerLifecycle grpcServerLifecycle(
+      CompromisedPasswordProperties properties,
+      CompromisedPasswordGrpcService service,
+      SafeTracingServerInterceptor interceptor) {
+    return new GrpcServerLifecycle(properties.grpcPort(), service, interceptor);
+  }
 
-    @Bean(name = "compromisedPasswordDatasetHealthIndicator")
-    DatasetHealthIndicator compromisedPasswordDatasetHealthIndicator(DatasetGuard datasetGuard) {
-        return new DatasetHealthIndicator(datasetGuard);
-    }
+  @Bean(name = "compromisedPasswordDatasetHealthIndicator")
+  DatasetHealthIndicator compromisedPasswordDatasetHealthIndicator(DatasetGuard datasetGuard) {
+    return new DatasetHealthIndicator(datasetGuard);
+  }
 }
