@@ -17,6 +17,7 @@ import org.springframework.context.SmartLifecycle;
 public final class GrpcServerLifecycle implements SmartLifecycle {
     private static final Logger LOGGER = LoggerFactory.getLogger(GrpcServerLifecycle.class);
     private static final int MAX_INBOUND_MESSAGE_BYTES = 16 * 1024;
+    private static final int MAX_INBOUND_METADATA_BYTES = 16 * 1024;
 
     private final Server server;
     private final ExecutorService requestExecutor;
@@ -33,6 +34,7 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
                 ServerBuilder.forPort(port)
                         .executor(requestExecutor)
                         .maxInboundMessageSize(MAX_INBOUND_MESSAGE_BYTES)
+                        .maxInboundMetadataSize(MAX_INBOUND_METADATA_BYTES)
                         .addService(ServerInterceptors.intercept(service, interceptor))
                         .build();
     }
