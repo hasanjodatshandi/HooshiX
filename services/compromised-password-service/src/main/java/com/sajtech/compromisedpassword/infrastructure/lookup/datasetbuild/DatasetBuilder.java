@@ -119,7 +119,8 @@ public final class DatasetBuilder {
       try (PreparedStatement upsert = connection.prepareStatement(UPSERT_SQL);
           InputStream fileInput = Files.newInputStream(request.sourcePath());
           DigestInputStream digestInput =
-              new DigestInputStream(new BufferedInputStream(fileInput, SOURCE_READ_BUFFER_BYTES), sourceDigest)) {
+              new DigestInputStream(
+                  new BufferedInputStream(fileInput, SOURCE_READ_BUFFER_BYTES), sourceDigest)) {
         CanonicalLineReader lineReader = new CanonicalLineReader(digestInput);
         int pendingBatch = 0;
         int lineLength;
