@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication(scanBasePackageClasses = RuntimeConfiguration.class)
 public class CompromisedPasswordApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(CompromisedPasswordApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(CompromisedPasswordApplication.class, args);
+  }
 }
