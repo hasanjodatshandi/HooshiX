@@ -50,7 +50,8 @@ public final class CompromisedPasswordGrpcService
                           .build()));
       LookupPrefixResponse built = response.build();
       if (built.getSerializedSize() > maxSerializedResponseBytes) {
-        throw new LookupUnavailableException("Lookup response exceeds approved compatibility bound");
+        throw new LookupUnavailableException(
+            "Lookup response exceeds approved compatibility bound");
       }
       responseObserver.onNext(built);
       responseObserver.onCompleted();
