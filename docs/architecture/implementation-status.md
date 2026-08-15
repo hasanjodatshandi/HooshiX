@@ -22,7 +22,9 @@ scripts/baseline/
 
 The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, and selected guarded structure rules.
 
-The Compromised Password service repository implementation includes service-owned Java/Gradle source and wrapper, Protobuf/gRPC contract, immutable SQLite lookup adapter, deterministic tests, dependency locks/verification metadata, container definition, Helm/security policy package, Day-One service telemetry code, and service CI/static/architecture/deployment gates. This is repository implementation evidence only; it is not production corpus, staging runtime, load, recovery, artifact-signing, admission, or production-readiness evidence.
+The Compromised Password service repository implementation includes service-owned Java/Gradle source and wrapper, Protobuf/gRPC contract, immutable SQLite lookup adapter, deterministic tests, dependency locks/verification metadata, container definition, Helm/security policy package, Day-One service telemetry code, and service CI/static/architecture/deployment gates. It also includes the service-owned offline/local SHA-1 source-to-SQLite dataset builder, release-manifest schema, generated-fixture integration/CLI verification, raw-corpus/generated-database Git guards, and a runtime-JAR exclusion that keeps builder tooling out of the deployed application artifact. The builder has no URL/network/downloader path and normal PR CI uses only generated fixtures marked `GENERATED_TEST_FIXTURE`.
+
+This is repository implementation evidence only. It is not proof of approved production HIBP acquisition/provenance/licensing, current corpus freshness, real complete-corpus cardinality/response measurements, staging runtime, load, recovery, artifact signing, admission, or production readiness.
 
 These root implementation areas are still not present:
 
@@ -41,18 +43,18 @@ Other application services remain absent. No production platform runtime, comple
 | Authorization Service | DESIGNED | NOT PRESENT | NOT VERIFIED | NOT VERIFIED | `services/authorization-service` |
 | Notification Service | DESIGNED | NOT PRESENT | NOT VERIFIED | NOT VERIFIED | `services/notification-service` |
 | Web BFF | DESIGNED | NOT PRESENT | NOT VERIFIED | NOT VERIFIED | `services/web-bff` |
-| Compromised Password Service | DESIGNED | IMPLEMENTED | CI evidence is commit-specific; production HIBP corpus/runtime evidence NOT VERIFIED | NOT VERIFIED | `services/compromised-password-service` |
+| Compromised Password Service | DESIGNED | IMPLEMENTED | repository service/builder CI evidence is commit-specific; production HIBP corpus/runtime evidence NOT VERIFIED | NOT VERIFIED | `services/compromised-password-service` |
 | Reference Data capability | DESIGNED | local immutable adapter permitted when needed | NOT VERIFIED | NOT VERIFIED | owning deployable bundle/module |
 | Reference Data independent service | DESIGNED / GATED | PLANNED / GATED | NOT VERIFIED | NOT VERIFIED | `services/reference-data-service` only after ADR-0041 trigger |
 
-`IMPLEMENTED` means the repository artifacts for the implemented slice exist. It does not mean the service or production corpus has been deployed or approved.
+`IMPLEMENTED` means the repository artifacts for the implemented slice exist. It does not mean the service, production corpus, or release artifact has been deployed or approved.
 
 ## Platform status
 
 | Platform area | Architecture | Implementation | Evidence |
 | --- | --- | --- | --- |
 | Repository governance baseline | DESIGNED | IMPLEMENTED | CI evidence is commit-specific; `make baseline-verify` is the local entry point |
-| Compromised Password service CI/architecture/security gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
+| Compromised Password service CI/architecture/security/dataset-build gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
 | K3s/Kubernetes/Calico | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Istio Ambient runtime | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Kyverno CEL policy set | DESIGNED | NOT PRESENT | NOT VERIFIED |
@@ -84,16 +86,17 @@ The bootstrap baseline makes these current repository invariants executable:
 - the ADR-0041-gated `services/reference-data-service` path is rejected until the architecture/trigger evidence is intentionally revised;
 - root `services/common` and `services/shared` dumping grounds are rejected.
 
-Service-specific CI adds stricter checks for implemented code and deployment artifacts. Repository governance does not replace runtime/staging/release evidence.
+Service-specific CI adds stricter checks for implemented code, offline dataset-build tooling, and deployment artifacts. Repository governance does not replace runtime/staging/release evidence.
 
 ## Implementation/release gates still not evidenced
 
 Current architecture still requires evidence that this repository slice does not create by itself:
 
-- official complete HIBP Pwned Passwords SHA-1 corpus acquisition/provenance, positive-count validation, full-corpus cardinality/serialized-size measurement, freshness <=35 days, and reviewed dataset release artifact;
+- approved official complete HIBP Pwned Passwords SHA-1 acquisition/provenance/tool/licensing evidence, current freshness <=35 days, and a reviewed production dataset release artifact built from that local source;
+- real complete-corpus row count, maximum prefix cardinality, exact serialized-response measurements and reviewed runtime compatibility limits with safety margin;
 - representative complete-corpus disk-backed p95/p99, saturation, and profile-specific runtime/recovery evidence for Compromised Password;
 - real Collector/Loki/Tempo/Prometheus integration, telemetry canary/privacy evidence, and telemetry-backend fault evidence beyond service-level code/tests;
-- signed final image, CycloneDX SBOM, final-image vulnerability correlation, provenance, admission validation, and staging-to-production digest promotion;
+- signed final image/dataset release artifacts as applicable, CycloneDX SBOM, final-artifact vulnerability correlation, provenance, admission validation, and staging-to-production digest promotion;
 - K3s/Calico/Istio/Kyverno/OpenBao/edge/observability platform implementation and complete-stack capacity evidence;
 - ADR-0024 quota implementation/evidence when a quota-owning service is implemented;
 - Reference Data deployable trigger evidence before any independent Reference Data service creation.
