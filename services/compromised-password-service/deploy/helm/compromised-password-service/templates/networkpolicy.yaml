@@ -18,14 +18,14 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.service.grpcPort }}
-    {{- if .Values.observability.networkPolicy.enabled }}
+    {{- if .Values.observability.metrics.enabled }}
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ required "observability.networkPolicy.namespace is required when enabled" .Values.observability.networkPolicy.namespace | quote }}
+              kubernetes.io/metadata.name: {{ required "observability.metrics.prometheus.namespace is required when metrics are enabled" .Values.observability.metrics.prometheus.namespace | quote }}
           podSelector:
             matchLabels:
-              {{- toYaml .Values.observability.networkPolicy.podLabels | nindent 14 }}
+              {{- toYaml .Values.observability.metrics.prometheus.podLabels | nindent 14 }}
       ports:
         - protocol: TCP
           port: {{ .Values.service.managementPort }}
@@ -40,12 +40,15 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    {{- if .Values.observability.networkPolicy.enabled }}
+    {{- if .Values.observability.tracing.enabled }}
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.observability.networkPolicy.namespace | quote }}
+              kubernetes.io/metadata.name: {{ required "observability.tracing.collector.namespace is required when tracing is enabled" .Values.observability.tracing.collector.namespace | quote }}
           podSelector:
             matchLabels:
-              {{- toYaml .Values.observability.networkPolicy.podLabels | nindent 14 }}
+              {{- toYaml .Values.observability.tracing.collector.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.observability.tracing.collector.port }}
     {{- end }}
