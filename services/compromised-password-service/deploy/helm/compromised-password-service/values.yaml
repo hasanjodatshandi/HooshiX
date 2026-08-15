@@ -29,10 +29,10 @@ resources:
 dataset:
   existingClaim: ""
   filename: corpus.sqlite
-  expectedSha256: ""
-  acquiredAt: ""
-  formatVersion: 1
+  manifestFilename: release-manifest.json
+  requiredSourceKind: HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD
   maxPrefixCardinality: 0
+  maxSerializedResponseBytes: 0
 
 identity:
   namespace: platform-apps
@@ -42,14 +42,14 @@ identity:
 
 observability:
   tracing:
-    enabled: false
+    enabled: true
     otlpEndpoint: ""
     collector:
       namespace: ""
       podLabels: {}
       port: 4318
   metrics:
-    enabled: false
+    enabled: true
     prometheus:
       namespace: ""
       podLabels: {}
