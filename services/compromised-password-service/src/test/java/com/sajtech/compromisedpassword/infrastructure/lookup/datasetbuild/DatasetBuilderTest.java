@@ -51,13 +51,9 @@ class DatasetBuilderTest {
     int expectedMaxResponseBytes =
         LookupPrefixResponse.newBuilder()
             .addMatches(
-                CompromisedHashMatch.newBuilder()
-                    .setSuffix("1".repeat(35))
-                    .setOccurrenceCount(5))
+                CompromisedHashMatch.newBuilder().setSuffix("1".repeat(35)).setOccurrenceCount(5))
             .addMatches(
-                CompromisedHashMatch.newBuilder()
-                    .setSuffix("2".repeat(35))
-                    .setOccurrenceCount(7))
+                CompromisedHashMatch.newBuilder().setSuffix("2".repeat(35)).setOccurrenceCount(7))
             .build()
             .getSerializedSize();
 
