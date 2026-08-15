@@ -20,7 +20,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Objects;
 
@@ -28,7 +27,8 @@ public final class DatasetBuilder {
   private static final int FORMAT_VERSION = 1;
   private static final int SQLITE_SCHEMA_VERSION = 1;
   private static final int MAX_SOURCE_LINE_BYTES = 96;
-  private static final int INSERT_BATCH_SIZE = 10_000;
+  private static final int SOURCE_READ_BUFFER_BYTES = 64 * 1024;
+  private static final int TRANSACTION_CHUNK_SIZE = 10_000;
   private static final HexFormat UPPER_HEX = HexFormat.of().withUpperCase();
   private static final HexFormat LOWER_HEX = HexFormat.of();
   private static final String CREATE_TABLE_SQL =
@@ -119,26 +119,23 @@ public final class DatasetBuilder {
       try (PreparedStatement upsert = connection.prepareStatement(UPSERT_SQL);
           InputStream fileInput = Files.newInputStream(request.sourcePath());
           DigestInputStream digestInput =
-              new DigestInputStream(new BufferedInputStream(fileInput, 64 * 1024), sourceDigest)) {
+              new DigestInputStream(new BufferedInputStream(fileInput, SOURCE_READ_BUFFER_BYTES), sourceDigest)) {
         CanonicalLineReader lineReader = new CanonicalLineReader(digestInput);
-        byte[] line;
-        int pendingBatch = 0;
-        while ((line = lineReader.readLine()) != null) {
+        byte[] hash = new byte[20];
+        int transactionRows = 0;
+        int lineLength;
+        while ((lineLength = lineReader.readLine()) >= 0) {
           sourceLineCount++;
-          ParsedRecord record = parseRecord(line, sourceLineCount);
-          upsert.setInt(1, record.prefix());
-          upsert.setBytes(2, record.hash());
-          upsert.setLong(3, record.occurrenceCount());
-          upsert.addBatch();
-          pendingBatch++;
-          if (pendingBatch == INSERT_BATCH_SIZE) {
-            upsert.executeBatch();
+          parseAndBindRecord(
+              lineReader.lineBuffer(), lineLength, sourceLineCount, hash, upsert);
+          upsert.executeUpdate();
+          transactionRows++;
+          if (transactionRows == TRANSACTION_CHUNK_SIZE) {
             connection.commit();
-            pendingBatch = 0;
+            transactionRows = 0;
           }
         }
-        if (pendingBatch > 0) {
-          upsert.executeBatch();
+        if (transactionRows > 0) {
           connection.commit();
         }
       }
@@ -239,11 +236,16 @@ public final class DatasetBuilder {
     }
   }
 
-  private static ParsedRecord parseRecord(byte[] line, long lineNumber) {
-    if (line.length < 42 || line.length > 60 || line[40] != ':') {
+  private static void parseAndBindRecord(
+      byte[] line,
+      int lineLength,
+      long lineNumber,
+      byte[] hash,
+      PreparedStatement upsert)
+      throws SQLException {
+    if (lineLength < 42 || lineLength > 60 || line[40] != ':') {
       throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
     }
-    byte[] hash = new byte[20];
     for (int index = 0; index < hash.length; index++) {
       int high = hexValue(line[index * 2]);
       int low = hexValue(line[index * 2 + 1]);
@@ -255,7 +257,7 @@ public final class DatasetBuilder {
     }
 
     long occurrenceCount = 0;
-    for (int index = 41; index < line.length; index++) {
+    for (int index = 41; index < lineLength; index++) {
       int digit = line[index] - '0';
       if (digit < 0 || digit > 9 || occurrenceCount > (Long.MAX_VALUE - digit) / 10) {
         throw new DatasetBuildException(
@@ -266,7 +268,10 @@ public final class DatasetBuilder {
     if (occurrenceCount <= 0) {
       throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
     }
-    return new ParsedRecord(prefixFromHash(hash), hash, occurrenceCount);
+
+    upsert.setInt(1, prefixFromHash(hash));
+    upsert.setBytes(2, hash);
+    upsert.setLong(3, occurrenceCount);
   }
 
   private static int hexValue(byte value) {
@@ -311,7 +316,7 @@ public final class DatasetBuilder {
   private static String digestFile(Path path) {
     MessageDigest digest = sha256Digest();
     try (InputStream input = Files.newInputStream(path)) {
-      byte[] buffer = new byte[64 * 1024];
+      byte[] buffer = new byte[SOURCE_READ_BUFFER_BYTES];
       int read;
       while ((read = input.read(buffer)) != -1) {
         digest.update(buffer, 0, read);
@@ -359,8 +364,6 @@ public final class DatasetBuilder {
     }
   }
 
-  private record ParsedRecord(int prefix, byte[] hash, long occurrenceCount) {}
-
   private record BuildInputResult(long sourceLineCount, String sourceArtifactSha256) {}
 
   private record BuildMetrics(
@@ -371,35 +374,53 @@ public final class DatasetBuilder {
 
   private static final class CanonicalLineReader {
     private final InputStream input;
+    private final byte[] inputBuffer = new byte[SOURCE_READ_BUFFER_BYTES];
+    private final byte[] lineBuffer = new byte[MAX_SOURCE_LINE_BYTES];
+    private int inputPosition;
+    private int inputLimit;
 
     private CanonicalLineReader(InputStream input) {
       this.input = input;
     }
 
-    private byte[] readLine() throws IOException {
-      byte[] buffer = new byte[MAX_SOURCE_LINE_BYTES];
+    private byte[] lineBuffer() {
+      return lineBuffer;
+    }
+
+    private int readLine() throws IOException {
       int length = 0;
       boolean sawByte = false;
       while (true) {
-        int value = input.read();
+        int value = nextByte();
         if (value == -1) {
-          return sawByte ? Arrays.copyOf(buffer, length) : null;
+          return sawByte ? length : -1;
         }
         sawByte = true;
         if (value == '\n') {
-          return Arrays.copyOf(buffer, length);
+          return length;
         }
         if (value == '\r') {
-          if (input.read() != '\n') {
+          if (nextByte() != '\n') {
             throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE);
           }
-          return Arrays.copyOf(buffer, length);
+          return length;
         }
-        if (length == buffer.length || value > 0x7F) {
+        if (length == lineBuffer.length || value > 0x7F) {
           throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE);
         }
-        buffer[length++] = (byte) value;
+        lineBuffer[length++] = (byte) value;
       }
+    }
+
+    private int nextByte() throws IOException {
+      if (inputPosition == inputLimit) {
+        inputLimit = input.read(inputBuffer);
+        inputPosition = 0;
+        if (inputLimit == -1) {
+          return -1;
+        }
+      }
+      return inputBuffer[inputPosition++] & 0xFF;
     }
   }
 }
