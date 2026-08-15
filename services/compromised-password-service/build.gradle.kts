@@ -49,8 +49,8 @@ protobuf {
         }
     }
     generateProtoTasks {
-        all().configureEach {
-            plugins {
+        all().configureEach { task ->
+            task.plugins {
                 id("grpc")
             }
         }
@@ -92,7 +92,7 @@ tasks.test {
     }
 }
 
-val integrationTest by tasks.registering(Test::class) {
+val integrationTest = tasks.register<Test>("integrationTest") {
     description = "Runs integration tests."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     testClassesDirs = sourceSets.test.get().output.classesDirs
@@ -103,7 +103,7 @@ val integrationTest by tasks.registering(Test::class) {
     shouldRunAfter(tasks.test)
 }
 
-val architectureTest by tasks.registering(Test::class) {
+val architectureTest = tasks.register<Test>("architectureTest") {
     description = "Runs architecture tests."
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     testClassesDirs = sourceSets.test.get().output.classesDirs
