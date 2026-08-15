@@ -2,6 +2,10 @@
 .gitattributes
 .github/workflows/repository-baseline.yml
 .gitignore
+.markdownlint.json
+.sdkmanrc
+.shellcheckrc
+.vscode/settings.json
 AGENTS.md
 FILE_INDEX.txt
 Makefile
