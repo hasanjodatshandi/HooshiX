@@ -1,0 +1,10 @@
+{
+  "MD013": {
+    "code_blocks": false,
+    "tables": false,
+    "line_length": 1000
+  },
+  "MD046": {
+    "style": "fenced"
+  }
+}
