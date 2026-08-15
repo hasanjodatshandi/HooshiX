@@ -1,5 +1,4 @@
 import com.github.spotbugs.snom.SpotBugsExtension
-import com.google.protobuf.gradle.id
 
 plugins {
     java
@@ -48,9 +47,7 @@ protobuf {
     }
     generateProtoTasks {
         all().forEach { task ->
-            task.plugins {
-                id("grpc")
-            }
+            task.plugins.maybeCreate("grpc")
         }
     }
 }
