@@ -1,33 +1,69 @@
-# Operating-system and editor noise
-.DS_Store
-Thumbs.db
+# IDE
 .idea/
-.vscode/
-*.swp
-
-# Local environment and secret files
-.env
-.env.*
-!.env.example
-*.pem
-*.key
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # Java and Gradle
 .gradle/
-**/build/
+build/
+out/
+target/
 *.class
-hs_err_pid*
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+!services/*/gradle/wrapper/gradle-wrapper.jar
 
-# Python verification cache
-__pycache__/
-*.py[cod]
-.pytest_cache/
-
-# Frontend/tooling output
+# Node
 node_modules/
 dist/
 coverage/
+playwright-report/
+test-results/
 
-# Local temporary output
-.tmp/
-tmp/
+# Local configuration
+.env
+.env.*
+!.env.example
+*.local
+*.override
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Kubernetes and Helm local output
+kubeconfig*
+*.rendered.yaml
+*.rendered.yml
+charts/
+*.tgz
+
+# Terraform, if introduced through an ADR
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Secrets and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials/
+secrets/
+
+.repair-backup/
+
+!infrastructure/traefik/chart/40.2.0/traefik-40.2.0.tgz
+
+!infrastructure/istio/chart/1.30.3/*.tgz
