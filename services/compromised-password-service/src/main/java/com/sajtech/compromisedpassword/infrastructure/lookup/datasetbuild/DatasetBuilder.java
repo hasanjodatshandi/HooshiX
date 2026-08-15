@@ -28,7 +28,7 @@ public final class DatasetBuilder {
   private static final int SQLITE_SCHEMA_VERSION = 1;
   private static final int MAX_SOURCE_LINE_BYTES = 96;
   private static final int SOURCE_READ_BUFFER_BYTES = 64 * 1024;
-  private static final int TRANSACTION_CHUNK_SIZE = 10_000;
+  private static final int INSERT_BATCH_SIZE = 10_000;
   private static final HexFormat UPPER_HEX = HexFormat.of().withUpperCase();
   private static final HexFormat LOWER_HEX = HexFormat.of();
   private static final String CREATE_TABLE_SQL =
@@ -121,21 +121,20 @@ public final class DatasetBuilder {
           DigestInputStream digestInput =
               new DigestInputStream(new BufferedInputStream(fileInput, SOURCE_READ_BUFFER_BYTES), sourceDigest)) {
         CanonicalLineReader lineReader = new CanonicalLineReader(digestInput);
-        byte[] hash = new byte[20];
-        int transactionRows = 0;
+        int pendingBatch = 0;
         int lineLength;
         while ((lineLength = lineReader.readLine()) >= 0) {
           sourceLineCount++;
-          parseAndBindRecord(
-              lineReader.lineBuffer(), lineLength, sourceLineCount, hash, upsert);
-          upsert.executeUpdate();
-          transactionRows++;
-          if (transactionRows == TRANSACTION_CHUNK_SIZE) {
+          parseAndAddBatchRecord(lineReader.lineBuffer(), lineLength, sourceLineCount, upsert);
+          pendingBatch++;
+          if (pendingBatch == INSERT_BATCH_SIZE) {
+            upsert.executeBatch();
             connection.commit();
-            transactionRows = 0;
+            pendingBatch = 0;
           }
         }
-        if (transactionRows > 0) {
+        if (pendingBatch > 0) {
+          upsert.executeBatch();
           connection.commit();
         }
       }
@@ -236,16 +235,12 @@ public final class DatasetBuilder {
     }
   }
 
-  private static void parseAndBindRecord(
-      byte[] line,
-      int lineLength,
-      long lineNumber,
-      byte[] hash,
-      PreparedStatement upsert)
-      throws SQLException {
+  private static void parseAndAddBatchRecord(
+      byte[] line, int lineLength, long lineNumber, PreparedStatement upsert) throws SQLException {
     if (lineLength < 42 || lineLength > 60 || line[40] != ':') {
       throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
     }
+    byte[] hash = new byte[20];
     for (int index = 0; index < hash.length; index++) {
       int high = hexValue(line[index * 2]);
       int low = hexValue(line[index * 2 + 1]);
@@ -272,6 +267,7 @@ public final class DatasetBuilder {
     upsert.setInt(1, prefixFromHash(hash));
     upsert.setBytes(2, hash);
     upsert.setLong(3, occurrenceCount);
+    upsert.addBatch();
   }
 
   private static int hexValue(byte value) {
