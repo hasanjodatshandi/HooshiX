@@ -66,7 +66,7 @@ public final class DatasetBuilder {
               1,
               FORMAT_VERSION,
               SQLITE_SCHEMA_VERSION,
-              "HIBP_PWNED_PASSWORDS",
+              request.sourceKind(),
               "SHA1",
               request.retrievalStartedAtUtc(),
               request.retrievalCompletedAtUtc(),
