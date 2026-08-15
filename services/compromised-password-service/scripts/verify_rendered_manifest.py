@@ -58,6 +58,11 @@ def main() -> int:
         r"prod\.sajtech\.internal/ns/platform-observability/sa/prometheus",
         "Prometheus management principal is missing",
     )
+    require(
+        text,
+        r"name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT\n\s+value: http://otel-collector\.platform-observability\.svc:4318/v1/traces",
+        "trace-specific OTLP endpoint is missing",
+    )
 
     for kind in ("HorizontalPodAutoscaler", "PodDisruptionBudget", "Ingress", "Gateway"):
         forbid(text, rf"^kind: {kind}$", f"{kind} is prohibited in this single-server service package")
@@ -67,6 +72,11 @@ def main() -> int:
     forbid(text, r"privileged: true", "privileged containers are prohibited")
     forbid(text, r"hostPath:", "hostPath is prohibited for this workload")
     forbid(text, r"^\s*- \{\}\s*$", "unrestricted NetworkPolicy peers are prohibited")
+    forbid(
+        text,
+        r"name: OTEL_EXPORTER_OTLP_ENDPOINT",
+        "generic OTLP endpoint is prohibited because metrics use Prometheus scrape",
+    )
 
     print("Rendered compromised-password manifest verification PASSED")
     return 0
