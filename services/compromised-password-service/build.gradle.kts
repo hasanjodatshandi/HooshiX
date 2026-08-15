@@ -49,7 +49,7 @@ protobuf {
         }
     }
     generateProtoTasks {
-        all().configureEach { task ->
+        all().forEach { task ->
             task.plugins {
                 id("grpc")
             }
