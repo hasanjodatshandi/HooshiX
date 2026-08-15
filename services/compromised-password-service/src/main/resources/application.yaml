@@ -27,6 +27,10 @@ management:
           include: livenessState
         readiness:
           include: readinessState,compromisedPasswordDataset
+  otlp:
+    metrics:
+      export:
+        enabled: false
   opentelemetry:
     tracing:
       export:
