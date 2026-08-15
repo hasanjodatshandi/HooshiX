@@ -28,6 +28,8 @@ class DatasetBuilderTest {
   private static final Instant RETRIEVAL_END = Instant.parse("2026-08-14T10:30:00Z");
   private static final String ACQUISITION_TOOL_SHA256 = "b".repeat(64);
   private static final String BUILD_GIT_REVISION = "c".repeat(40);
+  private static final int PREFIX_BOUND = 64;
+  private static final long RESPONSE_BOUND = 16_384;
 
   @TempDir Path tempDirectory;
 
@@ -57,20 +59,26 @@ class DatasetBuilderTest {
             .build()
             .getSerializedSize();
 
+    assertThat(result.manifestVersion()).isEqualTo(2);
     assertThat(result.sourceKind()).isEqualTo(DatasetSourceKind.GENERATED_TEST_FIXTURE);
     assertThat(result.sourceLineCount()).isEqualTo(4);
     assertThat(result.recordCount()).isEqualTo(3);
     assertThat(result.duplicateLineCount()).isEqualTo(1);
     assertThat(result.maxPrefixCardinality()).isEqualTo(2);
     assertThat(result.maxSerializedResponseBytes()).isEqualTo(expectedMaxResponseBytes);
+    assertThat(result.prefixCardinalityBound()).isEqualTo(PREFIX_BOUND);
+    assertThat(result.serializedResponseBytesBound()).isEqualTo(RESPONSE_BOUND);
     assertThat(result.sqliteArtifactSha256()).isEqualTo(sha256(sqlite));
     assertThat(result.contentSha256()).matches("[0-9a-f]{64}");
     assertThat(Files.readString(manifest))
+        .contains("\"manifest_version\": 2")
         .contains("\"source_kind\": \"GENERATED_TEST_FIXTURE\"")
         .contains("\"hash_mode\": \"SHA1\"")
         .doesNotContain("HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD")
         .contains("\"record_count\": 3")
         .contains("\"max_prefix_cardinality\": 2")
+        .contains("\"prefix_cardinality_bound\": " + PREFIX_BOUND)
+        .contains("\"serialized_response_bytes_bound\": " + RESPONSE_BOUND)
         .contains("\"sqlite_artifact_sha256\": \"" + sha256(sqlite) + "\"");
 
     try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + sqlite);
@@ -87,6 +95,45 @@ class DatasetBuilderTest {
       assertThat(rows.getLong(2)).isEqualTo(7);
       assertThat(rows.next()).isFalse();
     }
+  }
+
+  @Test
+  void rejectsMeasuredPrefixCardinalityAboveApprovedBoundWithoutPublishingOutputs()
+      throws Exception {
+    Path source = tempDirectory.resolve("too-many-prefix-rows.txt");
+    Files.writeString(
+        source,
+        "ABCDE" + "1".repeat(35) + ":1\n" + "ABCDE" + "2".repeat(35) + ":1\n",
+        StandardCharsets.US_ASCII);
+    Path sqlite = tempDirectory.resolve("too-many-prefix.sqlite");
+    Path manifest = tempDirectory.resolve("too-many-prefix.json");
+
+    assertThatThrownBy(
+            () ->
+                new DatasetBuilder()
+                    .build(request(source, sqlite, manifest, sha256(source), 1, RESPONSE_BOUND)))
+        .isInstanceOf(DatasetBuildException.class)
+        .extracting(exception -> ((DatasetBuildException) exception).reason())
+        .isEqualTo(DatasetBuildException.Reason.COMPATIBILITY_BOUND_EXCEEDED);
+    assertThat(sqlite).doesNotExist();
+    assertThat(manifest).doesNotExist();
+  }
+
+  @Test
+  void rejectsMeasuredResponseSizeAboveApprovedBoundWithoutPublishingOutputs() throws Exception {
+    Path source = tempDirectory.resolve("too-large-response.txt");
+    Files.writeString(
+        source, "ABCDE" + "1".repeat(35) + ":1\n", StandardCharsets.US_ASCII);
+    Path sqlite = tempDirectory.resolve("too-large-response.sqlite");
+    Path manifest = tempDirectory.resolve("too-large-response.json");
+
+    assertThatThrownBy(
+            () -> new DatasetBuilder().build(request(source, sqlite, manifest, sha256(source), 64, 1)))
+        .isInstanceOf(DatasetBuildException.class)
+        .extracting(exception -> ((DatasetBuildException) exception).reason())
+        .isEqualTo(DatasetBuildException.Reason.COMPATIBILITY_BOUND_EXCEEDED);
+    assertThat(sqlite).doesNotExist();
+    assertThat(manifest).doesNotExist();
   }
 
   @Test
@@ -139,6 +186,17 @@ class DatasetBuilderTest {
 
   private DatasetBuildRequest request(
       Path source, Path sqlite, Path manifest, String expectedSourceSha256) {
+    return request(
+        source, sqlite, manifest, expectedSourceSha256, PREFIX_BOUND, RESPONSE_BOUND);
+  }
+
+  private DatasetBuildRequest request(
+      Path source,
+      Path sqlite,
+      Path manifest,
+      String expectedSourceSha256,
+      int prefixBound,
+      long responseBound) {
     return new DatasetBuildRequest(
         DatasetSourceKind.GENERATED_TEST_FIXTURE,
         source,
@@ -150,7 +208,9 @@ class DatasetBuilderTest {
         "generated-test-fixture",
         "1.0.0",
         ACQUISITION_TOOL_SHA256,
-        BUILD_GIT_REVISION);
+        BUILD_GIT_REVISION,
+        prefixBound,
+        responseBound);
   }
 
   private static String sha256(Path path) throws IOException {
