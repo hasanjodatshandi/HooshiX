@@ -4,6 +4,10 @@
 {{- fail "image.digest must match sha256:<64 lowercase hex>" -}}
 {{- end -}}
 {{- $claim := required "dataset.existingClaim is required" .Values.dataset.existingClaim -}}
+{{- $manifestDigest := required "dataset.expectedManifestSha256 is required" .Values.dataset.expectedManifestSha256 -}}
+{{- if not (regexMatch "^[0-9a-f]{64}$" $manifestDigest) -}}
+{{- fail "dataset.expectedManifestSha256 must be 64 lowercase hex characters" -}}
+{{- end -}}
 {{- $sourceKind := required "dataset.requiredSourceKind is required" .Values.dataset.requiredSourceKind -}}
 {{- if lt (int .Values.dataset.maxPrefixCardinality) 1 -}}
 {{- fail "dataset.maxPrefixCardinality must be positive and come from reviewed release evidence" -}}
@@ -78,6 +82,8 @@ spec:
               value: "/var/lib/hooshix/compromised-password/{{ .Values.dataset.filename }}"
             - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MANIFEST_PATH
               value: "/var/lib/hooshix/compromised-password/{{ .Values.dataset.manifestFilename }}"
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_EXPECTED_MANIFEST_SHA256
+              value: {{ $manifestDigest | quote }}
             - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_REQUIRED_SOURCE_KIND
               value: {{ $sourceKind | quote }}
             - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_PREFIX_CARDINALITY
