@@ -6,9 +6,8 @@
     "manifest_version",
     "format_version",
     "sqlite_schema_version",
-    "corpus_source",
+    "source_kind",
     "hash_mode",
-    "acquisition_mode",
     "retrieval_started_at_utc",
     "retrieval_completed_at_utc",
     "source_artifact_sha256",
@@ -26,9 +25,13 @@
     "manifest_version": {"const": 1},
     "format_version": {"const": 1},
     "sqlite_schema_version": {"const": 1},
-    "corpus_source": {"const": "HIBP_PWNED_PASSWORDS"},
+    "source_kind": {
+      "enum": [
+        "GENERATED_TEST_FIXTURE",
+        "HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD"
+      ]
+    },
     "hash_mode": {"const": "SHA1"},
-    "acquisition_mode": {"const": "COMPLETE_DOWNLOAD"},
     "retrieval_started_at_utc": {"type": "string", "format": "date-time"},
     "retrieval_completed_at_utc": {"type": "string", "format": "date-time"},
     "source_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
