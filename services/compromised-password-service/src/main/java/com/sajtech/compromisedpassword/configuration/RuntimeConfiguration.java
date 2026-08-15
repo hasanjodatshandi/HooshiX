@@ -35,6 +35,7 @@ public class RuntimeConfiguration {
     return new DatasetSettings(
         dataset.path(),
         dataset.manifestPath(),
+        dataset.expectedManifestSha256(),
         dataset.requiredSourceKind(),
         dataset.maxPrefixCardinality(),
         dataset.maxSerializedResponseBytes());
