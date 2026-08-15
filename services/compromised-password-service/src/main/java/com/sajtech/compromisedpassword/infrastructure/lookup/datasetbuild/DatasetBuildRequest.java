@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 public record DatasetBuildRequest(
+    DatasetSourceKind sourceKind,
     Path sourcePath,
     Path sqliteOutputPath,
     Path manifestOutputPath,
@@ -28,6 +29,7 @@ public record DatasetBuildRequest(
   private static final Pattern TOOL_TOKEN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}");
   private static final Set<String> REQUIRED_OPTIONS =
       Set.of(
+          "--source-kind",
           "--input",
           "--output",
           "--manifest",
@@ -40,6 +42,7 @@ public record DatasetBuildRequest(
           "--build-git-revision");
 
   public DatasetBuildRequest {
+    Objects.requireNonNull(sourceKind, "sourceKind");
     Objects.requireNonNull(sourcePath, "sourcePath");
     Objects.requireNonNull(sqliteOutputPath, "sqliteOutputPath");
     Objects.requireNonNull(manifestOutputPath, "manifestOutputPath");
@@ -99,6 +102,7 @@ public record DatasetBuildRequest(
 
     try {
       return new DatasetBuildRequest(
+          DatasetSourceKind.valueOf(options.get("--source-kind")),
           Path.of(options.get("--input")),
           Path.of(options.get("--output")),
           Path.of(options.get("--manifest")),
@@ -109,8 +113,8 @@ public record DatasetBuildRequest(
           options.get("--acquisition-tool-version"),
           options.get("--acquisition-tool-sha256"),
           options.get("--build-git-revision"));
-    } catch (InvalidPathException | DateTimeParseException exception) {
-      throw new IllegalArgumentException("Invalid dataset-build path or timestamp");
+    } catch (InvalidPathException | DateTimeParseException | IllegalArgumentException exception) {
+      throw new IllegalArgumentException("Invalid dataset-build option value");
     }
   }
 
