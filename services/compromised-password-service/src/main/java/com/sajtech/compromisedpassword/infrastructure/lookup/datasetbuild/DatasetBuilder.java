@@ -53,8 +53,7 @@ public final class DatasetBuilder {
     Path manifestParent =
         Objects.requireNonNull(request.manifestOutputPath().getParent(), "Manifest output parent");
     try {
-      temporarySqlite =
-          Files.createTempFile(sqliteParent, ".compromised-password-", ".sqlite.tmp");
+      temporarySqlite = Files.createTempFile(sqliteParent, ".compromised-password-", ".sqlite.tmp");
       temporaryManifest =
           Files.createTempFile(manifestParent, ".compromised-password-", ".json.tmp");
 
