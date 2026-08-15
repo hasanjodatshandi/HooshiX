@@ -46,7 +46,8 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  Gauge compromisedPasswordDatasetReadyGauge(DatasetGuard datasetGuard, MeterRegistry meterRegistry) {
+  Gauge compromisedPasswordDatasetReadyGauge(
+      DatasetGuard datasetGuard, MeterRegistry meterRegistry) {
     return Gauge.builder(
             "compromised_password.dataset.ready",
             datasetGuard,
