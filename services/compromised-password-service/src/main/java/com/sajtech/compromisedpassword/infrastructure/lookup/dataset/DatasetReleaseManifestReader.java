@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 final class DatasetReleaseManifestReader {
   private static final long MAX_MANIFEST_BYTES = 64 * 1024;
   private static final Pattern SCALAR =
-      Pattern.compile("\\s*\\\"([a-z0-9_]+)\\\"\\s*:\\s*(?:\\\"([^\\\"\\r\\n]*)\\\"|([0-9]+))\\s*,?\\s*");
+      Pattern.compile(
+          "\\s*\\\"([a-z0-9_]+)\\\"\\s*:\\s*(?:\\\"([^\\\"\\r\\n]*)\\\"|([0-9]+))\\s*,?\\s*");
   private static final Set<String> REQUIRED =
       Set.of(
           "manifest_version",
