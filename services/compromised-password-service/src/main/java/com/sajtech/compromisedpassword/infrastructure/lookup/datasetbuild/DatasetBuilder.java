@@ -108,8 +108,7 @@ public final class DatasetBuilder {
     }
   }
 
-  private static void verifyCompatibilityBounds(
-      DatasetBuildRequest request, BuildMetrics metrics) {
+  private static void verifyCompatibilityBounds(DatasetBuildRequest request, BuildMetrics metrics) {
     if (metrics.maxPrefixCardinality() > request.maxPrefixCardinalityBound()
         || metrics.maxSerializedResponseBytes() > request.maxSerializedResponseBytesBound()) {
       throw new DatasetBuildException(DatasetBuildException.Reason.COMPATIBILITY_BOUND_EXCEEDED);
