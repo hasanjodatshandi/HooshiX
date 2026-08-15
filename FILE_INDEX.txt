@@ -151,6 +151,7 @@ services/compromised-password-service/src/main/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuilder.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuilderCli.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetReleaseManifest.java
+services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetSourceKind.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/BoundedLookupCompromisedPasswords.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/LookupCapacityExceededException.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/observability/health/DatasetHealthIndicator.java
