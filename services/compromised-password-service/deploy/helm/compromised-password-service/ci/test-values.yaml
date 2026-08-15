@@ -4,9 +4,12 @@ image:
 
 dataset:
   existingClaim: compromised-password-test-dataset
-  expectedSha256: "1111111111111111111111111111111111111111111111111111111111111111"
-  acquiredAt: "2026-08-15T00:00:00Z"
+  filename: corpus.sqlite
+  manifestFilename: release-manifest.json
+  expectedManifestSha256: "1111111111111111111111111111111111111111111111111111111111111111"
+  requiredSourceKind: HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD
   maxPrefixCardinality: 64
+  maxSerializedResponseBytes: 16384
 
 observability:
   tracing:
