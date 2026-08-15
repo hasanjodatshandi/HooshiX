@@ -3,7 +3,7 @@
 - **Reviewed:** 2026-08-15
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** NOT VERIFIED; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL — repository source/build/deployment-package evidence exists for the Compromised Password service; deployed runtime/staging/release evidence remains `NOT VERIFIED`; see `implementation-status.md`
 
 ## 1. Selected single-server topology
 
