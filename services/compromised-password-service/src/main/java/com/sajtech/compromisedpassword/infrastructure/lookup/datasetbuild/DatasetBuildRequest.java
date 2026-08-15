@@ -1,7 +1,6 @@
 package com.sajtech.compromisedpassword.infrastructure.lookup.datasetbuild;
 
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -113,7 +112,7 @@ public record DatasetBuildRequest(
           options.get("--acquisition-tool-version"),
           options.get("--acquisition-tool-sha256"),
           options.get("--build-git-revision"));
-    } catch (InvalidPathException | DateTimeParseException | IllegalArgumentException exception) {
+    } catch (DateTimeParseException | IllegalArgumentException exception) {
       throw new IllegalArgumentException("Invalid dataset-build option value");
     }
   }
