@@ -1,0 +1,26 @@
+image:
+  repository: registry.invalid/hooshix/compromised-password-service
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+dataset:
+  existingClaim: compromised-password-test-dataset
+  expectedSha256: "1111111111111111111111111111111111111111111111111111111111111111"
+  acquiredAt: "2026-08-15T00:00:00Z"
+  maxPrefixCardinality: 64
+
+observability:
+  tracing:
+    enabled: true
+    otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces
+    collector:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: otel-collector
+      port: 4318
+  metrics:
+    enabled: true
+    prometheus:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: prometheus
+      principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus

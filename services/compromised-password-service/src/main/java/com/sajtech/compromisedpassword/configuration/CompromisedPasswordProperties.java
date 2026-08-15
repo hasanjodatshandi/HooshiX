@@ -1,0 +1,27 @@
+package com.sajtech.compromisedpassword.configuration;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import java.nio.file.Path;
+import java.time.Instant;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+@ConfigurationProperties(prefix = "hooshix.compromised-password")
+@Validated
+public record CompromisedPasswordProperties(
+    @Min(1) @Max(65_535) int grpcPort,
+    @Min(1) @Max(512) int maxConcurrentLookups,
+    @Valid @NotNull Dataset dataset) {
+
+  public record Dataset(
+      @NotNull Path path,
+      @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String expectedSha256,
+      @NotNull Instant acquiredAt,
+      @Min(1) int formatVersion,
+      @Min(1) int maxPrefixCardinality) {}
+}

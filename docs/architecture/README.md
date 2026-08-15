@@ -25,7 +25,7 @@ Single-server intentionally accepts one-host availability/failure-domain risk. I
 
 ## Current implementation-readiness decisions
 
-Before the first executable vertical slice, current architecture requires:
+Executable vertical slices must preserve these current architecture requirements:
 
 - ADR-0040: official offline HIBP Pwned Passwords SHA-1 corpus with provenance/freshness/full-corpus bounds; SHA-1 screening-only, Argon2id storage unchanged;
 - ADR-0024: exact-IP hard quota identity, aggregate-prefix pressure, common-mode wall-clock guard, and high-cardinality Redis allocation protection;

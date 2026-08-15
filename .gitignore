@@ -16,6 +16,7 @@ target/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 !services/*/gradle/wrapper/gradle-wrapper.jar
+**/.runtime-jdk/
 
 # Node
 node_modules/

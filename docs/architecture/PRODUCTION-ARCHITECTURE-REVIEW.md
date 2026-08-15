@@ -9,7 +9,7 @@ This document records review conclusions and points to current authority. It doe
 
 ## Outcome
 
-The architecture remains acceptable as a named single-server production profile only with security/correctness/recovery invariants preserved. The latest pre-implementation review resolved the remaining material gaps that should be decided before the first executable vertical slice:
+The architecture remains acceptable as a named single-server production profile only with security/correctness/recovery invariants preserved. The latest pre-implementation review resolved the remaining material gaps that should be decided before executable vertical slices:
 
 - Day-One observability runtime/evidence -> ADR-0044;
 - Compromised Password source/hash/freshness/provenance -> ADR-0040;
@@ -149,8 +149,8 @@ Still rejected:
 
 ## Production-readiness conclusion
 
-Architecture is ready to move from design toward implementation, but production readiness is **not** proven.
+Architecture has moved from design into its first executable service implementation, but production readiness is **not** proven.
 
-The repository now has a repository-governance workflow under `.github/workflows/`, but still lacks executable `services/`, `deploy/`, and `infrastructure/` implementation roots. The governance workflow is not service/runtime/release evidence. The next value comes from an executable vertical slice with Day-One telemetry and negative evidence, not additional speculative architecture.
+The repository now contains repository-governance CI and the first executable Compromised Password service slice under `services/compromised-password-service/`. It still lacks root `deploy/` and `infrastructure/` platform implementation, other application services, production corpus/release evidence, and deployed observability/platform runtime. Repository source and CI evidence are not staging/runtime/release evidence.
 
 Production traffic remains blocked until applicable readiness gates have executed evidence, including quota fault/cardinality tests, HIBP corpus build evidence, Kyverno CEL policy checks, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.
