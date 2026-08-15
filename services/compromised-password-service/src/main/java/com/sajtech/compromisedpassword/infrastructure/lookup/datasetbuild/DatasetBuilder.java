@@ -22,6 +22,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Objects;
 
 public final class DatasetBuilder {
   private static final int FORMAT_VERSION = 1;
@@ -47,13 +48,15 @@ public final class DatasetBuilder {
     Path temporaryManifest = null;
     boolean publishedSqlite = false;
     boolean publishedManifest = false;
+    Path sqliteParent =
+        Objects.requireNonNull(request.sqliteOutputPath().getParent(), "SQLite output parent");
+    Path manifestParent =
+        Objects.requireNonNull(request.manifestOutputPath().getParent(), "Manifest output parent");
     try {
       temporarySqlite =
-          Files.createTempFile(
-              request.sqliteOutputPath().getParent(), ".compromised-password-", ".sqlite.tmp");
+          Files.createTempFile(sqliteParent, ".compromised-password-", ".sqlite.tmp");
       temporaryManifest =
-          Files.createTempFile(
-              request.manifestOutputPath().getParent(), ".compromised-password-", ".json.tmp");
+          Files.createTempFile(manifestParent, ".compromised-password-", ".json.tmp");
 
       BuildInputResult inputResult = buildSqlite(request, temporarySqlite);
       BuildMetrics metrics = inspectSqlite(temporarySqlite);
