@@ -8,14 +8,14 @@ import java.util.List;
 import java.util.Objects;
 
 public final class LookupCompromisedPasswordsUseCase implements LookupCompromisedPasswords {
-    private final CompromisedPasswordRepository repository;
+  private final CompromisedPasswordRepository repository;
 
-    public LookupCompromisedPasswordsUseCase(CompromisedPasswordRepository repository) {
-        this.repository = Objects.requireNonNull(repository, "repository");
-    }
+  public LookupCompromisedPasswordsUseCase(CompromisedPasswordRepository repository) {
+    this.repository = Objects.requireNonNull(repository, "repository");
+  }
 
-    @Override
-    public List<CompromisedHashMatch> lookup(Sha1Prefix prefix) {
-        return repository.findByPrefix(Objects.requireNonNull(prefix, "prefix"));
-    }
+  @Override
+  public List<CompromisedHashMatch> lookup(Sha1Prefix prefix) {
+    return repository.findByPrefix(Objects.requireNonNull(prefix, "prefix"));
+  }
 }
