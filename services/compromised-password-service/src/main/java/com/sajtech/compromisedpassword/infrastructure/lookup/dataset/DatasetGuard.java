@@ -66,7 +66,7 @@ public final class DatasetGuard {
                 }
                 try (ResultSet schemaCheck =
                         statement.executeQuery("SELECT 1 FROM compromised_password LIMIT 1")) {
-                    if (schemaCheck.next() && schemaCheck.getInt(1) != 1) {
+                    if (!schemaCheck.next() || schemaCheck.getInt(1) != 1) {
                         return DatasetState.INCOMPATIBLE;
                     }
                 }
@@ -83,13 +83,21 @@ public final class DatasetGuard {
         config.enableLoadExtension(false);
         config.setSharedCache(false);
         String jdbcUrl = "jdbc:sqlite:file:" + settings.path() + "?immutable=1&mode=ro";
+        Connection connection = null;
         try {
-            Connection connection = config.createConnection(jdbcUrl);
+            connection = config.createConnection(jdbcUrl);
             try (Statement statement = connection.createStatement()) {
                 statement.execute("PRAGMA query_only=ON");
             }
             return connection;
         } catch (SQLException exception) {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException closeFailure) {
+                    exception.addSuppressed(closeFailure);
+                }
+            }
             throw new DatasetUnavailableException("Unable to open approved dataset", exception);
         }
     }
