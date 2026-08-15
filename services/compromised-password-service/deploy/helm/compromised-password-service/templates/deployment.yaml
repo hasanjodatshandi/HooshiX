@@ -12,6 +12,12 @@
 {{- if lt (int .Values.dataset.maxPrefixCardinality) 1 -}}
 {{- fail "dataset.maxPrefixCardinality must be positive and come from release evidence" -}}
 {{- end -}}
+{{- if .Values.observability.tracing.enabled -}}
+{{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required when tracing is enabled" .Values.observability.tracing.otlpEndpoint -}}
+{{- if not (regexMatch "^https?://[^[:space:]]+/v1/traces$" $traceEndpoint) -}}
+{{- fail "observability.tracing.otlpEndpoint must be an explicit HTTP(S) /v1/traces endpoint" -}}
+{{- end -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -76,8 +82,8 @@ spec:
             - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_PREFIX_CARDINALITY
               value: {{ .Values.dataset.maxPrefixCardinality | quote }}
             {{- if .Values.observability.tracing.enabled }}
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ required "observability.tracing.otlpEndpoint is required when tracing is enabled" .Values.observability.tracing.otlpEndpoint | quote }}
+            - name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+              value: {{ .Values.observability.tracing.otlpEndpoint | quote }}
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
