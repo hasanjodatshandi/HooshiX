@@ -104,6 +104,7 @@ docs/technology/production-compatibility-matrix.md
 docs/technology/technology-baseline.md
 scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
+services/compromised-password-service/.dockerignore
 services/compromised-password-service/Dockerfile
 services/compromised-password-service/buf.yaml
 services/compromised-password-service/build.gradle.kts
@@ -155,3 +156,4 @@ services/compromised-password-service/src/test/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/dataset/SqliteCompromisedPasswordRepositoryIntegrationTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/BoundedLookupCompromisedPasswordsTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/interfaces/lookup/grpc/CompromisedPasswordGrpcServiceTest.java
+services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/runtime/CompromisedPasswordRuntimeIntegrationTest.java
