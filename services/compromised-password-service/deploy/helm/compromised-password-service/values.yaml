@@ -30,6 +30,7 @@ dataset:
   existingClaim: ""
   filename: corpus.sqlite
   manifestFilename: release-manifest.json
+  expectedManifestSha256: ""
   requiredSourceKind: HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD
   maxPrefixCardinality: 0
   maxSerializedResponseBytes: 0
