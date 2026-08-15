@@ -12,9 +12,15 @@ observability:
   tracing:
     enabled: true
     otlpEndpoint: http://otel-collector.platform-observability.svc:4318
-  networkPolicy:
+    collector:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: otel-collector
+      port: 4318
+  metrics:
     enabled: true
-    namespace: platform-observability
-    podLabels:
-      app.kubernetes.io/name: otel-collector
-  principal: prod.sajtech.internal/ns/platform-observability/sa/otel-collector
+    prometheus:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: prometheus
+      principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus
