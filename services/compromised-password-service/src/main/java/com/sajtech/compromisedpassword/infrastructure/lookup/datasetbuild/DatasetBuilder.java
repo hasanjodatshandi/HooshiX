@@ -29,7 +29,7 @@ public final class DatasetBuilder {
   private static final int MAX_SOURCE_LINE_BYTES = 96;
   private static final int SOURCE_READ_BUFFER_BYTES = 64 * 1024;
   private static final int INSERT_BATCH_SIZE = 10_000;
-  private static final HexFormat UPPER_HEX = HexFormat.of().withUpperCase();
+  private static final int SHA1_SUFFIX_ASCII_BYTES = 35;
   private static final HexFormat LOWER_HEX = HexFormat.of();
   private static final String CREATE_TABLE_SQL =
       "CREATE TABLE compromised_password ("
@@ -199,8 +199,7 @@ public final class DatasetBuilder {
           currentPrefixCardinality++;
           currentSerializedResponseBytes =
               Math.addExact(
-                  currentSerializedResponseBytes,
-                  serializedMatchContribution(hash, occurrenceCount));
+                  currentSerializedResponseBytes, serializedMatchContribution(occurrenceCount));
           updateCanonicalDigest(contentDigest, prefix, hash, occurrenceCount);
           recordCount++;
         }
@@ -285,14 +284,17 @@ public final class DatasetBuilder {
     return ((hash[0] & 0xFF) << 12) | ((hash[1] & 0xFF) << 4) | ((hash[2] & 0xF0) >>> 4);
   }
 
-  private static long serializedMatchContribution(byte[] hash, long occurrenceCount) {
-    String suffix = UPPER_HEX.formatHex(hash).substring(5);
-    com.sajtech.compromisedpassword.contract.v1.CompromisedHashMatch match =
-        com.sajtech.compromisedpassword.contract.v1.CompromisedHashMatch.newBuilder()
-            .setSuffix(suffix)
-            .setOccurrenceCount(occurrenceCount)
-            .build();
-    int matchSize = match.getSerializedSize();
+  private static long serializedMatchContribution(long occurrenceCount) {
+    int matchSize =
+        CodedOutputStream.computeTagSize(
+                com.sajtech.compromisedpassword.contract.v1.CompromisedHashMatch
+                    .SUFFIX_FIELD_NUMBER)
+            + CodedOutputStream.computeUInt32SizeNoTag(SHA1_SUFFIX_ASCII_BYTES)
+            + SHA1_SUFFIX_ASCII_BYTES
+            + CodedOutputStream.computeTagSize(
+                com.sajtech.compromisedpassword.contract.v1.CompromisedHashMatch
+                    .OCCURRENCE_COUNT_FIELD_NUMBER)
+            + CodedOutputStream.computeUInt64SizeNoTag(occurrenceCount);
     return (long) CodedOutputStream.computeTagSize(LookupPrefixResponse.MATCHES_FIELD_NUMBER)
         + CodedOutputStream.computeUInt32SizeNoTag(matchSize)
         + matchSize;
