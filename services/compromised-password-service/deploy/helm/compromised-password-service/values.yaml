@@ -47,6 +47,7 @@ observability:
     collector:
       namespace: ""
       podLabels: {}
+      port: 4318
   metrics:
     enabled: false
     prometheus:
