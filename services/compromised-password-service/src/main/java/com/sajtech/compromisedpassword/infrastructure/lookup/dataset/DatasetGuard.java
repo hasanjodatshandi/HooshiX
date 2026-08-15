@@ -3,6 +3,7 @@ package com.sajtech.compromisedpassword.infrastructure.lookup.dataset;
 import com.sajtech.compromisedpassword.application.lookup.LookupUnavailableException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.security.MessageDigest;
@@ -63,6 +64,9 @@ public final class DatasetGuard {
       return new Verification(DatasetState.MISSING, null);
     }
     try {
+      if (!constantTimeEquals(settings.expectedManifestSha256(), digest(settings.manifestPath()))) {
+        return new Verification(DatasetState.CORRUPT, null);
+      }
       DatasetReleaseMetadata release =
           new DatasetReleaseManifestReader().read(settings.manifestPath());
       if (!settings.requiredSourceKind().equals(release.sourceKind())
@@ -72,7 +76,7 @@ public final class DatasetGuard {
           || release.serializedResponseBytesBound() > settings.maxSerializedResponseBytes()) {
         return new Verification(DatasetState.INCOMPATIBLE, release);
       }
-      if (!digest().equals(release.sqliteArtifactSha256())) {
+      if (!constantTimeEquals(release.sqliteArtifactSha256(), digest(settings.path()))) {
         return new Verification(DatasetState.CORRUPT, release);
       }
       try (Connection connection = openConnection();
@@ -157,10 +161,13 @@ public final class DatasetGuard {
     }
   }
 
-  private String digest() throws IOException {
+  private static String digest(Path path) throws IOException {
+    if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(path)) {
+      throw new IOException("Approved artifact is unavailable");
+    }
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      try (InputStream input = Files.newInputStream(settings.path())) {
+      try (InputStream input = Files.newInputStream(path)) {
         byte[] buffer = new byte[64 * 1024];
         int read;
         while ((read = input.read(buffer)) != -1) {
@@ -171,6 +178,11 @@ public final class DatasetGuard {
     } catch (NoSuchAlgorithmException impossible) {
       throw new IllegalStateException("SHA-256 is unavailable", impossible);
     }
+  }
+
+  private static boolean constantTimeEquals(String expected, String actual) {
+    return MessageDigest.isEqual(
+        expected.getBytes(StandardCharsets.US_ASCII), actual.getBytes(StandardCharsets.US_ASCII));
   }
 
   private record Verification(DatasetState state, DatasetReleaseMetadata metadata) {}
