@@ -14,46 +14,43 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 
 class BoundedLookupCompromisedPasswordsTest {
-    @Test
-    void rejectsExcessConcurrencyWithoutQueueingOrSensitiveMetricLabels() throws Exception {
-        CountDownLatch entered = new CountDownLatch(1);
-        CountDownLatch release = new CountDownLatch(1);
-        LookupCompromisedPasswords blockingDelegate =
-                prefix -> {
-                    entered.countDown();
-                    try {
-                        release.await();
-                    } catch (InterruptedException exception) {
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException("Interrupted", exception);
-                    }
-                    return List.of();
-                };
-        SimpleMeterRegistry meters = new SimpleMeterRegistry();
-        BoundedLookupCompromisedPasswords bounded =
-                new BoundedLookupCompromisedPasswords(
-                        blockingDelegate, 1, ObservationRegistry.create(), meters);
+  @Test
+  void rejectsExcessConcurrencyWithoutQueueingOrSensitiveMetricLabels() throws Exception {
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    LookupCompromisedPasswords blockingDelegate =
+        prefix -> {
+          entered.countDown();
+          try {
+            release.await();
+          } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted", exception);
+          }
+          return List.of();
+        };
+    SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    BoundedLookupCompromisedPasswords bounded =
+        new BoundedLookupCompromisedPasswords(
+            blockingDelegate, 1, ObservationRegistry.create(), meters);
 
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            Future<?> first = executor.submit(() -> bounded.lookup(Sha1Prefix.parse("ABCDE")));
-            entered.await();
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      Future<?> first = executor.submit(() -> bounded.lookup(Sha1Prefix.parse("ABCDE")));
+      entered.await();
 
-            assertThatThrownBy(() -> bounded.lookup(Sha1Prefix.parse("12345")))
-                    .isInstanceOf(LookupCapacityExceededException.class);
+      assertThatThrownBy(() -> bounded.lookup(Sha1Prefix.parse("12345")))
+          .isInstanceOf(LookupCapacityExceededException.class);
 
-            release.countDown();
-            first.get();
-        }
-
-        assertThat(meters.get("compromised_password.lookup.rejected").counter().count())
-                .isEqualTo(1.0);
-        assertThat(meters.getMeters())
-                .allSatisfy(
-                        meter ->
-                                assertThat(meter.getId().getTags())
-                                        .allSatisfy(
-                                                tag ->
-                                                        assertThat(tag.getKey())
-                                                                .doesNotContainIgnoringCase("prefix")));
+      release.countDown();
+      first.get();
     }
+
+    assertThat(meters.get("compromised_password.lookup.rejected").counter().count()).isEqualTo(1.0);
+    assertThat(meters.getMeters())
+        .allSatisfy(
+            meter ->
+                assertThat(meter.getId().getTags())
+                    .allSatisfy(
+                        tag -> assertThat(tag.getKey()).doesNotContainIgnoringCase("prefix")));
+  }
 }
