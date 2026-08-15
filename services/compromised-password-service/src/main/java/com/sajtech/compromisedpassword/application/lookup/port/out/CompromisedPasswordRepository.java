@@ -5,5 +5,5 @@ import com.sajtech.compromisedpassword.domain.lookup.valueobject.Sha1Prefix;
 import java.util.List;
 
 public interface CompromisedPasswordRepository {
-    List<CompromisedHashMatch> findByPrefix(Sha1Prefix prefix);
+  List<CompromisedHashMatch> findByPrefix(Sha1Prefix prefix);
 }
