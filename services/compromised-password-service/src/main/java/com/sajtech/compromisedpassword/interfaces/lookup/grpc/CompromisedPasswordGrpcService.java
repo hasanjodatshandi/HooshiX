@@ -25,7 +25,7 @@ public final class CompromisedPasswordGrpcService
         final Sha1Prefix prefix;
         try {
             prefix = Sha1Prefix.parse(request.getPrefix());
-        } catch (IllegalArgumentException | NullPointerException exception) {
+        } catch (IllegalArgumentException exception) {
             responseObserver.onError(
                     Status.INVALID_ARGUMENT.withDescription("invalid prefix").asRuntimeException());
             return;
