@@ -121,6 +121,7 @@ tasks.register<JavaExec>("buildCompromisedPasswordDataset") {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     exclude("com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/**")
+    exclude("BOOT-INF/classes/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/**")
 }
 
 tasks.check {
