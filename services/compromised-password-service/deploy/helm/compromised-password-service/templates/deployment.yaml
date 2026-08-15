@@ -4,7 +4,7 @@
 {{- fail "image.digest must match sha256:<64 lowercase hex>" -}}
 {{- end -}}
 {{- $claim := required "dataset.existingClaim is required" .Values.dataset.existingClaim -}}
-{{- $datasetSha := required "dataset.expectedSha256 is required" .Values.dataset.expectedSha256 -}}
+{{- $datasetSha := required "dataset.expectedSha256 is required" .Values.dataset.expectedSha256 | toString -}}
 {{- if not (regexMatch "^[0-9a-f]{64}$" $datasetSha) -}}
 {{- fail "dataset.expectedSha256 must be 64 lowercase hex characters" -}}
 {{- end -}}
