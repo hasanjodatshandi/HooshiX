@@ -1,0 +1,33 @@
+# Operating-system and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Java and Gradle
+.gradle/
+**/build/
+*.class
+hs_err_pid*
+
+# Python verification cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend/tooling output
+node_modules/
+dist/
+coverage/
+
+# Local temporary output
+.tmp/
+tmp/
