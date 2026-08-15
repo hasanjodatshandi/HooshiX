@@ -27,11 +27,11 @@ spec:
         - operation:
             ports:
               - {{ .Values.service.grpcPort | quote }}
-    {{- if .Values.observability.networkPolicy.enabled }}
+    {{- if .Values.observability.metrics.enabled }}
     - from:
         - source:
             principals:
-              - {{ required "observability.principal is required when observability network policy is enabled" .Values.observability.principal | quote }}
+              - {{ required "observability.metrics.prometheus.principal is required when metrics are enabled" .Values.observability.metrics.prometheus.principal | quote }}
       to:
         - operation:
             ports:
