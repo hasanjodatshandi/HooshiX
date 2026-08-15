@@ -32,14 +32,22 @@ def main() -> int:
         r'image: "registry\.invalid/hooshix/compromised-password-service@sha256:[0-9a-f]{64}"',
         "workload image must use an immutable digest",
     )
-    require(text, r"serviceAccountName: compromised-password-service", "dedicated ServiceAccount is missing")
+    require(
+        text,
+        r'serviceAccountName: "compromised-password-service"',
+        "dedicated ServiceAccount is missing",
+    )
     require(text, r"automountServiceAccountToken: false", "ServiceAccount token automount must be disabled")
     require(text, r"runAsNonRoot: true", "runAsNonRoot must be enabled")
     require(text, r"allowPrivilegeEscalation: false", "privilege escalation must be disabled")
     require(text, r"readOnlyRootFilesystem: true", "root filesystem must be read-only")
     require(text, r"type: RuntimeDefault", "RuntimeDefault seccomp must be configured")
     require(text, r'drop: \["ALL"\]', "all Linux capabilities must be dropped")
-    require(text, r"claimName: compromised-password-test-dataset", "dataset PVC is missing")
+    require(
+        text,
+        r'claimName: "compromised-password-test-dataset"',
+        "dataset PVC is missing",
+    )
     require(text, r"readOnly: true", "dataset must be mounted read-only")
     require(text, r"emptyDir:\n\s+sizeLimit: 256Mi", "bounded temporary storage is missing")
     require(text, r"^  type: ClusterIP$", "service must remain ClusterIP-only")
@@ -60,13 +68,13 @@ def main() -> int:
     )
     require(
         text,
-        r"name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT\n\s+value: http://otel-collector\.platform-observability\.svc:4318/v1/traces",
+        r'name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT\n\s+value: "http://otel-collector\.platform-observability\.svc:4318/v1/traces"',
         "trace-specific OTLP endpoint is missing",
     )
 
     for kind in ("HorizontalPodAutoscaler", "PodDisruptionBudget", "Ingress", "Gateway"):
         forbid(text, rf"^kind: {kind}$", f"{kind} is prohibited in this single-server service package")
-    forbid(text, r"serviceAccountName: default", "default ServiceAccount is prohibited")
+    forbid(text, r'serviceAccountName: "?default"?', "default ServiceAccount is prohibited")
     forbid(text, r"image: .*:latest(?:\s|$)", "latest image tags are prohibited")
     forbid(text, r"hostNetwork: true", "host networking is prohibited")
     forbid(text, r"privileged: true", "privileged containers are prohibited")
