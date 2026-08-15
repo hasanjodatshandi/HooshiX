@@ -14,6 +14,12 @@ public record DatasetSettings(
         Objects.requireNonNull(path, "path");
         Objects.requireNonNull(expectedSha256, "expectedSha256");
         Objects.requireNonNull(acquiredAt, "acquiredAt");
+        String configuredPath = path.toString();
+        if (configuredPath.indexOf('\0') >= 0
+                || configuredPath.contains("?")
+                || configuredPath.contains("#")) {
+            throw new IllegalArgumentException("Dataset path must not contain SQLite URI controls");
+        }
         if (!expectedSha256.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("Expected SHA-256 must be lowercase hexadecimal");
         }
