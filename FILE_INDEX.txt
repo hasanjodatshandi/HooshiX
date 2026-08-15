@@ -110,6 +110,8 @@ services/compromised-password-service/buf.yaml
 services/compromised-password-service/build.gradle.kts
 services/compromised-password-service/config/spotbugs/exclude.xml
 services/compromised-password-service/container/pins.env
+services/compromised-password-service/dataset/README.md
+services/compromised-password-service/dataset/dataset-release-manifest.schema.json
 services/compromised-password-service/deploy/helm/compromised-password-service/Chart.yaml
 services/compromised-password-service/deploy/helm/compromised-password-service/ci/test-values.yaml
 services/compromised-password-service/deploy/helm/compromised-password-service/templates/_helpers.tpl
@@ -144,6 +146,11 @@ services/compromised-password-service/src/main/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/dataset/DatasetState.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/dataset/DatasetUnavailableException.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/dataset/SqliteCompromisedPasswordRepository.java
+services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuildException.java
+services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuildRequest.java
+services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuilder.java
+services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuilderCli.java
+services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetReleaseManifest.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/BoundedLookupCompromisedPasswords.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/LookupCapacityExceededException.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/observability/health/DatasetHealthIndicator.java
@@ -157,6 +164,7 @@ services/compromised-password-service/src/test/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/domain/lookup/valueobject/Sha1PrefixTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/dataset/DatasetSettingsTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/dataset/SqliteCompromisedPasswordRepositoryIntegrationTest.java
+services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuilderTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/BoundedLookupCompromisedPasswordsTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/interfaces/lookup/grpc/CompromisedPasswordGrpcServiceTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/runtime/CompromisedPasswordRuntimeIntegrationTest.java
