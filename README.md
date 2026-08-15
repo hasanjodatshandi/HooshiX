@@ -10,6 +10,14 @@ Start with:
 4. `docs/architecture/SOURCES.md`;
 5. `docs/adr/decision-register.md`.
 
+The repository bootstrap provides a real governance entry point:
+
+```bash
+make baseline-verify
+```
+
+It verifies repository/file-index consistency, ADR identifier/register invariants, canonical dependency-registry/Markdown operation parity, current source references, and selected guarded structure rules. `.github/workflows/repository-baseline.yml` runs the same gate on pull requests and `main`. This baseline does **not** mean any application service, deployment, observability runtime, or production control is implemented.
+
 The selected initial production topology is the explicit non-HA `production-single-server` profile in ADR-0042. ADR-0043 defines production client-address trust and the single-server WireGuard management path. ADR-0044 makes structured logging, Micrometer metrics, OpenTelemetry tracing, and the approved telemetry path Day-One implementation requirements. `production-ha` remains the expansion profile.
 
 Before the first executable vertical slice, current decisions also require the ADR-0040 offline HIBP SHA-1 compromised-password corpus contract, ADR-0024 common-clock/cardinality/exact-IP quota hardening, ADR-0041 evidence-gated Reference Data service boundary, and greenfield Kyverno CEL policy gates.

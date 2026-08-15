@@ -29,7 +29,6 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 | `web-bff.identity-oidc-evidence-submit` | Web BFF | Identity external-identity/session establishment | `AUTHORITATIVE_SECURITY` | login unavailable | none | none | Web BFF | ADR-0012, ADR-0016; `services/web-bff.md` §3 |
 | `web-bff.identity-audience-token-broker` | Web BFF | Identity `IssueAudienceAccessToken` | `AUTHORITATIVE_SECURITY` | token brokerage unavailable; fail closed | none | none | Web BFF | ADR-0016; `services/web-bff.md` §4 |
 | `web-bff.authorization-tenant-management` | Web BFF | Authorization tenant-management gRPC | `AUTHORITATIVE_SECURITY` | management unavailable; fail closed; no fabricated local authority | none | none | Web BFF | ADR-0013, ADR-0016; `services/web-bff.md` §10; `authorization-service.md` §7 |
-| `web-bff.reference-data-read` | Web BFF | Reference Data typed read gRPC | `AUTHORITATIVE_STATE` | reference route unavailable; no fabricated/stale server-side data | none | none | Web BFF | ADR-0041; `services/reference-data-service.md` §9; `services/web-bff.md` §10 |
 | `web-bff.resource-api-dispatch` | Web BFF | registered resource service | `AUTHORITATIVE_STATE` | abort request/resource unavailable; no fabricated business data | none | none | Web BFF | ADR-0016; `services/web-bff.md` §§10-11 |
 | `business.optional-enrichment` | owning bounded context | explicitly approved enrichment service | `OPTIONAL_READ` | use only explicit bounded degraded result | none | bounded-context-defined only | owning bounded context | ADR-0033, ADR-0036 |
 | `platform.non-audit-telemetry-export` | any service | observability backend | `OBSERVABILITY` | bounded buffer/drop; business request continues | exporter | bounded loss allowed | Platform Observability | ADR-0033; `reliability-and-observability.md` §12 |
@@ -48,7 +47,6 @@ The Markdown view MUST be regenerated/checked by CI and MUST NOT become an indep
 - Platform permission is a separate authoritative check and never converts `platform_admin` into tenant/resource fallback authority.
 - BFF tenant-management transport is an authoritative-security edge because Authorization owns both management authorization and state mutation; BFF/Authorization outage never becomes local allow.
 - BFF audience-token brokerage is an authoritative-security edge; browser input never selects arbitrary audience and no stale/fabricated JWT is a fallback.
-- BFF Reference Data reads are authoritative-state transport for the requested current bundle representation; BFF does not fabricate a list or use a server-side stale fallback when the service is unavailable.
 - BFF business dispatch is authoritative state transport; downstream failure never becomes fabricated business data.
 - BFF OIDC quota Redis is separate from session lookup semantics even when infrastructure is shared; failure does not disable abuse control.
 - Missing fallback means **no fallback**.

@@ -151,6 +151,6 @@ Still rejected:
 
 Architecture is ready to move from design toward implementation, but production readiness is **not** proven.
 
-The repository still lacks `services/`, `deploy/`, `infrastructure/`, and `.github/workflows/` implementation roots. The next value comes from an executable vertical slice with Day-One telemetry and negative evidence, not additional speculative architecture.
+The repository now has a repository-governance workflow under `.github/workflows/`, but still lacks executable `services/`, `deploy/`, and `infrastructure/` implementation roots. The governance workflow is not service/runtime/release evidence. The next value comes from an executable vertical slice with Day-One telemetry and negative evidence, not additional speculative architecture.
 
 Production traffic remains blocked until applicable readiness gates have executed evidence, including quota fault/cardinality tests, HIBP corpus build evidence, Kyverno CEL policy checks, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.

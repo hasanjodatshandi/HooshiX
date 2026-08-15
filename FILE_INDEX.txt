@@ -1,5 +1,14 @@
+.editorconfig
+.gitattributes
+.github/workflows/repository-baseline.yml
+.gitignore
+.markdownlint.json
+.sdkmanrc
+.shellcheckrc
+.vscode/settings.json
 AGENTS.md
 FILE_INDEX.txt
+Makefile
 README.md
 docs/adr/0001-select-dedicated-caddy-coraza-edge-waf.md
 docs/adr/0002-define-production-istio-trust-and-enrollment.md
@@ -91,3 +100,5 @@ docs/runbooks/production-cold-dr.md
 docs/technology/local-development-baseline.md
 docs/technology/production-compatibility-matrix.md
 docs/technology/technology-baseline.md
+scripts/baseline/tests/test_verify_repository.py
+scripts/baseline/verify_repository.py
