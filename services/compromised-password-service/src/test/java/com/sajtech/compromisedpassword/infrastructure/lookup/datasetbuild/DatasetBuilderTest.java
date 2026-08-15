@@ -81,8 +81,7 @@ class DatasetBuilderTest {
   @Test
   void rejectsZeroCountWithoutPublishingOutputs() throws Exception {
     Path source = tempDirectory.resolve("zero-count.txt");
-    Files.writeString(
-        source, "ABCDE" + "3".repeat(35) + ":0\r\n", StandardCharsets.US_ASCII);
+    Files.writeString(source, "ABCDE" + "3".repeat(35) + ":0\r\n", StandardCharsets.US_ASCII);
     Path sqlite = tempDirectory.resolve("zero-count.sqlite");
     Path manifest = tempDirectory.resolve("zero-count.json");
 
@@ -98,8 +97,7 @@ class DatasetBuilderTest {
   @Test
   void rejectsNonCanonicalLowercaseHashWithoutPublishingOutputs() throws Exception {
     Path source = tempDirectory.resolve("lowercase.txt");
-    Files.writeString(
-        source, "abcde" + "4".repeat(35) + ":1\n", StandardCharsets.US_ASCII);
+    Files.writeString(source, "abcde" + "4".repeat(35) + ":1\n", StandardCharsets.US_ASCII);
     Path sqlite = tempDirectory.resolve("lowercase.sqlite");
     Path manifest = tempDirectory.resolve("lowercase.json");
 
@@ -115,8 +113,7 @@ class DatasetBuilderTest {
   @Test
   void rejectsSourceDigestMismatchWithoutPublishingOutputs() throws Exception {
     Path source = tempDirectory.resolve("digest.txt");
-    Files.writeString(
-        source, "ABCDE" + "5".repeat(35) + ":1\r\n", StandardCharsets.US_ASCII);
+    Files.writeString(source, "ABCDE" + "5".repeat(35) + ":1\r\n", StandardCharsets.US_ASCII);
     Path sqlite = tempDirectory.resolve("digest.sqlite");
     Path manifest = tempDirectory.resolve("digest.json");
 
