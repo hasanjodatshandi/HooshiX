@@ -3,6 +3,8 @@ package com.sajtech.compromisedpassword.infrastructure.lookup.datasetbuild;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sajtech.compromisedpassword.contract.v1.CompromisedHashMatch;
+import com.sajtech.compromisedpassword.contract.v1.LookupPrefixResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -46,13 +48,25 @@ class DatasetBuilderTest {
 
     DatasetReleaseManifest result =
         new DatasetBuilder().build(request(source, sqlite, manifest, sha256(source)));
+    int expectedMaxResponseBytes =
+        LookupPrefixResponse.newBuilder()
+            .addMatches(
+                CompromisedHashMatch.newBuilder()
+                    .setSuffix("1".repeat(35))
+                    .setOccurrenceCount(5))
+            .addMatches(
+                CompromisedHashMatch.newBuilder()
+                    .setSuffix("2".repeat(35))
+                    .setOccurrenceCount(7))
+            .build()
+            .getSerializedSize();
 
     assertThat(result.sourceKind()).isEqualTo(DatasetSourceKind.GENERATED_TEST_FIXTURE);
     assertThat(result.sourceLineCount()).isEqualTo(4);
     assertThat(result.recordCount()).isEqualTo(3);
     assertThat(result.duplicateLineCount()).isEqualTo(1);
     assertThat(result.maxPrefixCardinality()).isEqualTo(2);
-    assertThat(result.maxSerializedResponseBytes()).isPositive();
+    assertThat(result.maxSerializedResponseBytes()).isEqualTo(expectedMaxResponseBytes);
     assertThat(result.sqliteArtifactSha256()).isEqualTo(sha256(sqlite));
     assertThat(result.contentSha256()).matches("[0-9a-f]{64}");
     assertThat(Files.readString(manifest))
