@@ -50,19 +50,33 @@ V1 source authority is official HIBP Pwned Passwords SHA-1 corpus acquired offli
 
 Production request handling never calls HIBP.
 
-Build pipeline records at least source/hash mode, retrieval start/end, downloader/importer identity, row count, observed maximum prefix cardinality, canonical content SHA-256, schema/format version, and build Git revision.
+Repository implementation contains a service-owned offline/local builder that accepts a local canonical SHA-1/count file and emits only the HooshiX immutable SQLite artifact plus a bounded release manifest. The builder has no URL, HTTP, provider, shell-downloader, or runtime acquisition path. Raw source data stays outside Git, the runtime image, and the deployed service.
+
+Build inputs identify their evidence kind explicitly:
+
+```text
+GENERATED_TEST_FIXTURE
+HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD
+```
+
+Normal PR CI uses only `GENERATED_TEST_FIXTURE`. `HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD` is valid only when a separate approved acquisition record proves that the local input is the complete official HIBP SHA-1 download. The builder validates the file it reads and its supplied SHA-256; it does not independently prove upstream completeness, licensing, or provenance approval.
+
+Build pipeline records at least source evidence kind/hash mode, retrieval start/end, acquisition-tool identity/digest, source-file SHA-256, row count, observed maximum prefix cardinality, exact maximum serialized Protobuf response size, canonical content SHA-256, SQLite artifact SHA-256, schema/format version, and build Git revision.
 
 Rules:
 
-- all official prefix ranges or equivalent complete-download evidence are required;
+- all official prefix ranges or equivalent complete-download evidence are required for production release;
 - count must be positive; HIBP padding count `0` is rejected;
 - records are canonical/deduplicated/validated;
+- source is streamed with bounded buffers and bounded SQLite batches; no full-corpus JVM cache exists;
 - release build measures full-corpus prefix cardinality and serialized response size;
-- build fails when observed data exceeds reviewed runtime compatibility bounds;
+- build fails when observed data exceeds reviewed runtime compatibility bounds once those bounds are selected from real complete-corpus evidence plus safety margin;
 - no runtime truncation is permitted;
 - dataset age <=35 days at production readiness/deployment;
 - acquisition/build verification at least every 30 days;
 - source/tool licensing/use-right/security review is recorded with the release.
+
+Repository CI additionally rejects tracked raw HIBP/generated SQLite artifacts, verifies the actual builder CLI with a generated fixture, keeps fixture evidence distinct from production HIBP evidence, and verifies that builder classes are absent from the runtime Spring Boot JAR.
 
 ## 4. SQLite runtime
 
@@ -172,4 +186,6 @@ Implementation/release evidence includes:
 - telemetry-backend outage does not alter screening result;
 - profile-correct deployment/recovery evidence.
 
-Repository source/build/deployment-package evidence for the implemented slice is present, and commit-specific CI execution is recorded by GitHub Actions and `../implementation-status.md`. Production HIBP corpus acquisition/release, deployed runtime/staging, signed supply-chain/admission, complete-corpus performance, recovery, and production-readiness evidence remain `NOT VERIFIED` until their owning checks execute.
+Repository source/build/deployment-package evidence for the implemented slice includes the offline/local dataset builder, release-manifest schema, deterministic generated-fixture tests, actual CLI fixture execution, source SHA-256/integrity validation, observed cardinality/exact Protobuf-size measurement, raw-corpus/generated-database Git guards, no-network/process-exec static gates, and runtime-JAR exclusion. Commit-specific CI remains the evidence source for whether those gates passed.
+
+Production HIBP complete acquisition/provenance/licensing, current freshness, real full-corpus measurements and reviewed compatibility bounds, deployed runtime/staging, signed supply-chain/admission, complete-corpus performance, recovery, and production-readiness evidence remain `NOT VERIFIED` until their owning checks execute.
