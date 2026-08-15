@@ -172,4 +172,4 @@ Implementation/release evidence includes:
 - telemetry-backend outage does not alter screening result;
 - profile-correct deployment/recovery evidence.
 
-Implementation/runtime/build/staging evidence remains `NOT VERIFIED` until source/build/deploy artifacts exist and checks execute.
+Repository source/build/deployment-package evidence for the implemented slice is present, and commit-specific CI execution is recorded by GitHub Actions and `../implementation-status.md`. Production HIBP corpus acquisition/release, deployed runtime/staging, signed supply-chain/admission, complete-corpus performance, recovery, and production-readiness evidence remain `NOT VERIFIED` until their owning checks execute.
