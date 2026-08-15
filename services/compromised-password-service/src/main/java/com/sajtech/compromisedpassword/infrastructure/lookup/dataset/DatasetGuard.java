@@ -75,7 +75,8 @@ public final class DatasetGuard {
       if (!digest().equals(release.sqliteArtifactSha256())) {
         return new Verification(DatasetState.CORRUPT, release);
       }
-      try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
+      try (Connection connection = openConnection();
+          Statement statement = connection.createStatement()) {
         if (!integrityIsValid(statement)) {
           return new Verification(DatasetState.CORRUPT, release);
         }
@@ -118,7 +119,8 @@ public final class DatasetGuard {
   }
 
   private static boolean matchesColumn(
-      ResultSet columns, String name, String type, int notNull, int primaryKey) throws SQLException {
+      ResultSet columns, String name, String type, int notNull, int primaryKey)
+      throws SQLException {
     return columns.next()
         && name.equals(columns.getString("name"))
         && type.equalsIgnoreCase(columns.getString("type"))
