@@ -32,13 +32,15 @@ class DatasetBuilderTest {
   @Test
   void buildsCanonicalSqliteAndReleaseManifestFromLocalCompleteDownload() throws Exception {
     Path source = tempDirectory.resolve("source.txt");
-    Files.writeString(
-        source,
-        "ABCDE" + "1".repeat(35) + ":2\r\n"
-            + "ABCDE" + "1".repeat(35) + ":3\r\n"
-            + "ABCDE" + "2".repeat(35) + ":7\r\n"
-            + "12345" + "A".repeat(35) + ":11\r\n",
-        StandardCharsets.US_ASCII);
+    String fixture =
+        String.join(
+                "\r\n",
+                "ABCDE" + "1".repeat(35) + ":2",
+                "ABCDE" + "1".repeat(35) + ":3",
+                "ABCDE" + "2".repeat(35) + ":7",
+                "12345" + "A".repeat(35) + ":11")
+            + "\r\n";
+    Files.writeString(source, fixture, StandardCharsets.US_ASCII);
     Path sqlite = tempDirectory.resolve("compromised-password.sqlite");
     Path manifest = tempDirectory.resolve("compromised-password.manifest.json");
 
