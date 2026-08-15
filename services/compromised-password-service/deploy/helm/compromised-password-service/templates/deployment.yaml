@@ -1,0 +1,117 @@
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $digest := required "image.digest is required and must be an immutable sha256 digest" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+{{- fail "image.digest must match sha256:<64 lowercase hex>" -}}
+{{- end -}}
+{{- $claim := required "dataset.existingClaim is required" .Values.dataset.existingClaim -}}
+{{- $datasetSha := required "dataset.expectedSha256 is required" .Values.dataset.expectedSha256 -}}
+{{- if not (regexMatch "^[0-9a-f]{64}$" $datasetSha) -}}
+{{- fail "dataset.expectedSha256 must be 64 lowercase hex characters" -}}
+{{- end -}}
+{{- $acquiredAt := required "dataset.acquiredAt is required" .Values.dataset.acquiredAt -}}
+{{- if lt (int .Values.dataset.maxPrefixCardinality) 1 -}}
+{{- fail "dataset.maxPrefixCardinality must be positive and come from release evidence" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "compromised-password-service.name" . }}
+  labels:
+    {{- include "compromised-password-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      {{- include "compromised-password-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "compromised-password-service.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | quote }}
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: application
+          image: "{{ $repository }}@{{ $digest }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+              protocol: TCP
+            - name: management
+              containerPort: {{ .Values.service.managementPort }}
+              protocol: TCP
+          env:
+            - name: HOOSHIX_COMPROMISED_PASSWORD_GRPC_PORT
+              value: {{ .Values.service.grpcPort | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_MAX_CONCURRENT_LOOKUPS
+              value: {{ .Values.runtime.maxConcurrentLookups | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_PATH
+              value: "/var/lib/hooshix/compromised-password/{{ .Values.dataset.filename }}"
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_EXPECTED_SHA256
+              value: {{ $datasetSha | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_ACQUIRED_AT
+              value: {{ $acquiredAt | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_FORMAT_VERSION
+              value: {{ .Values.dataset.formatVersion | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_PREFIX_CARDINALITY
+              value: {{ .Values.dataset.maxPrefixCardinality | quote }}
+            {{- if .Values.observability.tracing.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ required "observability.tracing.otlpEndpoint is required when tracing is enabled" .Values.observability.tracing.otlpEndpoint | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            - name: dataset
+              mountPath: /var/lib/hooshix/compromised-password
+              readOnly: true
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: dataset
+          persistentVolumeClaim:
+            claimName: {{ $claim | quote }}
+            readOnly: true
+        - name: temporary
+          emptyDir:
+            sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}

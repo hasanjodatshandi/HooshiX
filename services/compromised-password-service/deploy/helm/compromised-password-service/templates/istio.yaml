@@ -1,0 +1,39 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "compromised-password-service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "compromised-password-service.selectorLabels" . | nindent 6 }}
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "compromised-password-service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "compromised-password-service.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - {{ .Values.identity.principal | quote }}
+      to:
+        - operation:
+            ports:
+              - {{ .Values.service.grpcPort | quote }}
+    {{- if .Values.observability.networkPolicy.enabled }}
+    - from:
+        - source:
+            principals:
+              - {{ required "observability.principal is required when observability network policy is enabled" .Values.observability.principal | quote }}
+      to:
+        - operation:
+            ports:
+              - {{ .Values.service.managementPort | quote }}
+    {{- end }}

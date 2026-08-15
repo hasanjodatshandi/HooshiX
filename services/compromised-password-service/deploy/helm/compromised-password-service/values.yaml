@@ -1,0 +1,51 @@
+replicaCount: 1
+
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: compromised-password-service
+
+service:
+  grpcPort: 9090
+  managementPort: 9091
+
+runtime:
+  maxConcurrentLookups: 32
+  temporaryStorageLimit: 256Mi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 64Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+    ephemeral-storage: 512Mi
+
+dataset:
+  existingClaim: ""
+  filename: corpus.sqlite
+  expectedSha256: ""
+  acquiredAt: ""
+  formatVersion: 1
+  maxPrefixCardinality: 0
+
+identity:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: identity-service
+  principal: prod.sajtech.internal/ns/platform-apps/sa/identity-service
+
+observability:
+  tracing:
+    enabled: false
+    otlpEndpoint: ""
+  networkPolicy:
+    enabled: false
+    namespace: ""
+    podLabels: {}
+  principal: ""

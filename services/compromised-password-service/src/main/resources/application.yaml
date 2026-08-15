@@ -27,6 +27,21 @@ management:
           include: livenessState
         readiness:
           include: readinessState,compromisedPasswordDataset
+  opentelemetry:
+    tracing:
+      export:
+        max-queue-size: 512
+        max-batch-size: 128
+        schedule-delay: 5s
+        timeout: 2s
+        otlp:
+          connect-timeout: 1s
+          timeout: 2s
+      limits:
+        max-attributes: 32
+        max-attribute-value-length: 128
+        max-events: 32
+        max-links: 16
 
 logging:
   structured:
