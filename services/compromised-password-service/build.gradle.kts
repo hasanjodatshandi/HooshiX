@@ -109,6 +109,20 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     shouldRunAfter(tasks.test)
 }
 
+tasks.register<JavaExec>("buildCompromisedPasswordDataset") {
+    description = "Builds an immutable Compromised Password SQLite dataset from an approved local source."
+    group = "dataset"
+    dependsOn(tasks.classes)
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set(
+        "com.sajtech.compromisedpassword.infrastructure.lookup.datasetbuild.DatasetBuilderCli"
+    )
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    exclude("com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/**")
+}
+
 tasks.check {
     dependsOn(integrationTest, architectureTest, tasks.named("spotbugsMain"), tasks.named("spotlessCheck"))
 }

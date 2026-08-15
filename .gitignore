@@ -40,6 +40,9 @@ test-results/
 .DS_Store
 Thumbs.db
 
+# Local Compromised Password source/release artifacts
+services/compromised-password-service/dataset/local/
+
 # Kubernetes and Helm local output
 kubeconfig*
 *.rendered.yaml

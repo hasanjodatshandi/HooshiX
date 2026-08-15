@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HooshiX Compromised Password dataset release manifest",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "format_version",
+    "sqlite_schema_version",
+    "corpus_source",
+    "hash_mode",
+    "acquisition_mode",
+    "retrieval_started_at_utc",
+    "retrieval_completed_at_utc",
+    "source_artifact_sha256",
+    "acquisition_tool",
+    "builder_git_revision",
+    "source_line_count",
+    "record_count",
+    "duplicate_line_count",
+    "max_prefix_cardinality",
+    "max_serialized_response_bytes",
+    "content_sha256",
+    "sqlite_artifact_sha256"
+  ],
+  "properties": {
+    "manifest_version": {"const": 1},
+    "format_version": {"const": 1},
+    "sqlite_schema_version": {"const": 1},
+    "corpus_source": {"const": "HIBP_PWNED_PASSWORDS"},
+    "hash_mode": {"const": "SHA1"},
+    "acquisition_mode": {"const": "COMPLETE_DOWNLOAD"},
+    "retrieval_started_at_utc": {"type": "string", "format": "date-time"},
+    "retrieval_completed_at_utc": {"type": "string", "format": "date-time"},
+    "source_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "acquisition_tool": {
+      "type": "object",
+      "required": ["name", "version", "sha256"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}$"},
+        "version": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "builder_git_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_line_count": {"type": "integer", "minimum": 1},
+    "record_count": {"type": "integer", "minimum": 1},
+    "duplicate_line_count": {"type": "integer", "minimum": 0},
+    "max_prefix_cardinality": {"type": "integer", "minimum": 1},
+    "max_serialized_response_bytes": {"type": "integer", "minimum": 1},
+    "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sqlite_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
