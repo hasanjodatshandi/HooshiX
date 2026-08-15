@@ -6,7 +6,7 @@ public record DatasetReleaseManifest(
     int manifestVersion,
     int formatVersion,
     int sqliteSchemaVersion,
-    String corpusSource,
+    DatasetSourceKind sourceKind,
     String hashMode,
     Instant retrievalStartedAtUtc,
     Instant retrievalCompletedAtUtc,
@@ -34,13 +34,12 @@ public record DatasetReleaseManifest(
         + "  \"sqlite_schema_version\": "
         + sqliteSchemaVersion
         + ",\n"
-        + "  \"corpus_source\": \""
-        + corpusSource
+        + "  \"source_kind\": \""
+        + sourceKind.name()
         + "\",\n"
         + "  \"hash_mode\": \""
         + hashMode
         + "\",\n"
-        + "  \"acquisition_mode\": \"COMPLETE_DOWNLOAD\",\n"
         + "  \"retrieval_started_at_utc\": \""
         + retrievalStartedAtUtc
         + "\",\n"
