@@ -13,9 +13,22 @@ The only publishable dataset outputs from this step are:
 
 Production source acquisition remains a separate approved offline activity. Record the acquisition tool name, version, digest, source-file SHA-256, and UTC retrieval interval before invoking the builder.
 
+## Source evidence kind
+
+Every build explicitly identifies what the local file represents:
+
+```text
+GENERATED_TEST_FIXTURE
+HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD
+```
+
+Normal PR CI uses only `GENERATED_TEST_FIXTURE`. It must never claim that a generated fixture is a complete HIBP acquisition.
+
+Use `HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD` only for a release build whose separate approved acquisition record proves that the local input is the complete official HIBP Pwned Passwords SHA-1 download. The builder validates the file it receives, but it does not independently prove source completeness or licensing/provenance approval.
+
 ## Input contract
 
-Use the complete SHA-1 download from the approved HIBP source. The builder accepts canonical records only:
+The builder accepts canonical records only:
 
 ```text
 40 uppercase hexadecimal SHA-1 characters:positive decimal occurrence count
@@ -25,12 +38,13 @@ Both CRLF and LF line endings are accepted. Count `0`, lowercase/non-hex hashes,
 
 The source file is read with bounded buffers. It is never copied into the repository or the final service image and is not cached in JVM memory.
 
-## Build command
+## Production build command
 
 From `services/compromised-password-service`:
 
 ```bash
 ./gradlew buildCompromisedPasswordDataset --args="\
+--source-kind HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD \
 --input /approved-local-source/pwnedpasswords.txt \
 --output /approved-local-release/compromised-password.sqlite \
 --manifest /approved-local-release/compromised-password.manifest.json \
@@ -56,7 +70,7 @@ Before publication, the builder:
 5. streams the final table in `(prefix, hash)` order and re-validates prefix/hash/count consistency;
 6. measures unique `record_count`, duplicate-line aggregation, observed maximum prefix cardinality, and exact Protobuf response bytes per prefix;
 7. computes a canonical logical `content_sha256` and exact `sqlite_artifact_sha256`;
-8. publishes the SQLite file and release manifest only after all checks pass.
+8. publishes the manifest and then the SQLite artifact only after all checks pass, with SQLite as the final publish step.
 
 `content_sha256` is SHA-256 over each final row in `(prefix, hash)` order using fixed binary encoding:
 
@@ -70,9 +84,16 @@ The observed cardinality and response-size values are evidence inputs. They do n
 
 ## Repository verification
 
-Normal PR CI uses generated deterministic fixtures only. It does not download or commit the production HIBP corpus.
+Normal PR CI generates deterministic source records locally and marks their manifest as `GENERATED_TEST_FIXTURE`. It does not download or commit the production HIBP corpus.
 
-The service workflow also verifies that the dataset-builder package is absent from the runtime Spring Boot JAR. Runtime therefore retains only the immutable SQLite reader and has no build/download path.
+The service workflow also verifies that:
+
+- no raw corpus or generated SQLite database is tracked in Git;
+- the real Gradle dataset-builder command works against the generated fixture;
+- the dataset-builder package is absent from the runtime Spring Boot JAR;
+- Semgrep blocks network APIs inside the builder package.
+
+Runtime therefore retains only the immutable SQLite reader and has no build/download path.
 
 ## Production evidence still required
 
