@@ -34,10 +34,10 @@ public class RuntimeConfiguration {
     CompromisedPasswordProperties.Dataset dataset = properties.dataset();
     return new DatasetSettings(
         dataset.path(),
-        dataset.expectedSha256(),
-        dataset.acquiredAt(),
-        dataset.formatVersion(),
-        dataset.maxPrefixCardinality());
+        dataset.manifestPath(),
+        dataset.requiredSourceKind(),
+        dataset.maxPrefixCardinality(),
+        dataset.maxSerializedResponseBytes());
   }
 
   @Bean
@@ -74,8 +74,9 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  CompromisedPasswordGrpcService compromisedPasswordGrpcService(LookupCompromisedPasswords lookup) {
-    return new CompromisedPasswordGrpcService(lookup);
+  CompromisedPasswordGrpcService compromisedPasswordGrpcService(
+      LookupCompromisedPasswords lookup, DatasetSettings settings) {
+    return new CompromisedPasswordGrpcService(lookup, settings.maxSerializedResponseBytes());
   }
 
   @Bean
