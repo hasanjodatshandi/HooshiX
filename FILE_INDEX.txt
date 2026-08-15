@@ -126,6 +126,9 @@ services/compromised-password-service/gradle/wrapper/gradle-wrapper.jar
 services/compromised-password-service/gradle/wrapper/gradle-wrapper.properties
 services/compromised-password-service/gradlew
 services/compromised-password-service/gradlew.bat
+services/compromised-password-service/observability/README.md
+services/compromised-password-service/observability/alerts/compromised-password-service.yaml
+services/compromised-password-service/observability/grafana/compromised-password-service.json
 services/compromised-password-service/scripts/verify_rendered_manifest.py
 services/compromised-password-service/settings.gradle.kts
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/application/lookup/port/in/LookupCompromisedPasswords.java
