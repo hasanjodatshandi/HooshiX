@@ -5,12 +5,14 @@ import com.sajtech.compromisedpassword.application.lookup.port.out.CompromisedPa
 import com.sajtech.compromisedpassword.application.lookup.usecase.LookupCompromisedPasswordsUseCase;
 import com.sajtech.compromisedpassword.infrastructure.lookup.dataset.DatasetGuard;
 import com.sajtech.compromisedpassword.infrastructure.lookup.dataset.DatasetSettings;
+import com.sajtech.compromisedpassword.infrastructure.lookup.dataset.DatasetState;
 import com.sajtech.compromisedpassword.infrastructure.lookup.dataset.SqliteCompromisedPasswordRepository;
 import com.sajtech.compromisedpassword.infrastructure.lookup.runtime.BoundedLookupCompromisedPasswords;
 import com.sajtech.compromisedpassword.infrastructure.observability.health.DatasetHealthIndicator;
 import com.sajtech.compromisedpassword.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.compromisedpassword.interfaces.lookup.grpc.CompromisedPasswordGrpcService;
 import com.sajtech.compromisedpassword.interfaces.observability.grpc.SafeTracingServerInterceptor;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
@@ -41,6 +43,16 @@ public class RuntimeConfiguration {
   @Bean
   DatasetGuard datasetGuard(DatasetSettings settings, Clock clock) {
     return new DatasetGuard(settings, clock);
+  }
+
+  @Bean
+  Gauge compromisedPasswordDatasetReadyGauge(DatasetGuard datasetGuard, MeterRegistry meterRegistry) {
+    return Gauge.builder(
+            "compromised_password.dataset.ready",
+            datasetGuard,
+            guard -> guard.state() == DatasetState.READY ? 1.0 : 0.0)
+        .description("Whether the approved compromised-password dataset is ready")
+        .register(meterRegistry);
   }
 
   @Bean
