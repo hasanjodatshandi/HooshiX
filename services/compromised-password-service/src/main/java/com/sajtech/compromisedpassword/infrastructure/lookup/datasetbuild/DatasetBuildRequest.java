@@ -22,7 +22,9 @@ public record DatasetBuildRequest(
     String acquisitionToolName,
     String acquisitionToolVersion,
     String acquisitionToolSha256,
-    String builderGitRevision) {
+    String builderGitRevision,
+    int maxPrefixCardinalityBound,
+    long maxSerializedResponseBytesBound) {
   private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
   private static final Pattern GIT_REVISION = Pattern.compile("[0-9a-f]{40}");
   private static final Pattern TOOL_TOKEN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}");
@@ -38,7 +40,9 @@ public record DatasetBuildRequest(
           "--acquisition-tool-name",
           "--acquisition-tool-version",
           "--acquisition-tool-sha256",
-          "--build-git-revision");
+          "--build-git-revision",
+          "--max-prefix-cardinality",
+          "--max-serialized-response-bytes");
 
   public DatasetBuildRequest {
     Objects.requireNonNull(sourceKind, "sourceKind");
@@ -81,6 +85,9 @@ public record DatasetBuildRequest(
     if (retrievalStartedAtUtc.isAfter(retrievalCompletedAtUtc)) {
       throw new IllegalArgumentException("Retrieval start must not be after retrieval completion");
     }
+    if (maxPrefixCardinalityBound <= 0 || maxSerializedResponseBytesBound <= 0) {
+      throw new IllegalArgumentException("Compatibility bounds must be positive");
+    }
   }
 
   public static DatasetBuildRequest fromArgs(String[] args) {
@@ -111,7 +118,9 @@ public record DatasetBuildRequest(
           options.get("--acquisition-tool-name"),
           options.get("--acquisition-tool-version"),
           options.get("--acquisition-tool-sha256"),
-          options.get("--build-git-revision"));
+          options.get("--build-git-revision"),
+          Integer.parseInt(options.get("--max-prefix-cardinality")),
+          Long.parseLong(options.get("--max-serialized-response-bytes")));
     } catch (DateTimeParseException | IllegalArgumentException exception) {
       throw new IllegalArgumentException("Invalid dataset-build option value");
     }
