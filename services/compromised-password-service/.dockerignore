@@ -1,0 +1,7 @@
+*
+!Dockerfile
+!.runtime-jdk/
+!.runtime-jdk/**
+!build/
+!build/libs/
+!build/libs/compromised-password-service-0.1.0-SNAPSHOT.jar
