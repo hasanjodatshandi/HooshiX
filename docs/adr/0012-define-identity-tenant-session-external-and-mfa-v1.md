@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-13; Identity implementation contracts finalized on 2026-08-13; remaining v1 Identity lifecycle/security contracts finalized on 2026-08-14
+2026-08-10; normalized to current-only documentation on 2026-08-13; Identity implementation contracts finalized on 2026-08-13; remaining v1 Identity lifecycle/security contracts finalized on 2026-08-14; compromised-password hash contract normalized to ADR-0040 on 2026-08-15
 
 ## Decision
 
@@ -312,17 +312,17 @@ Creating the **first** local Credential for an external-identity-only User is ou
 
 ### Compromised-password protocol
 
-The compromised-password dependency is an internal k-anonymous/prefix service, not a claim that Identity directly uses a third-party HIBP wire protocol.
+ADR-0040 is authoritative for the compromised-password lookup contract. The dependency is an internal HIBP-derived prefix service; production request handling does not call HIBP.
 
 For create/change/reset checks:
 
 1. Identity applies the password's required NFC normalization;
-2. Identity encodes the normalized value as UTF-8 and computes SHA-256 locally;
-3. only the first 20 digest bits (five hexadecimal characters in the canonical contract representation) leave Identity;
-4. the service returns a bounded set of remaining SHA-256 suffixes with non-negative occurrence counts;
-5. Identity compares the full local digest against returned suffixes locally and makes the compromised/not-compromised decision.
+2. Identity encodes the normalized value as UTF-8 and computes SHA-1 locally only for HIBP screening;
+3. only the first 20 digest bits leave Identity as exactly five canonical uppercase hexadecimal characters;
+4. the service returns the complete bounded set of canonical 35-hex SHA-1 suffixes with positive occurrence counts for that prefix;
+5. Identity reconstructs/compares the full local SHA-1 against returned suffixes locally and makes the compromised/not-compromised decision.
 
-Raw password and full SHA-256 digest never leave Identity. Response parsing is bounded and malformed/oversized/ambiguous data fails closed as dependency unavailability. The existing 900ms overall deadline, one attempt, no automatic retry, cancellation, bounded concurrency, and fail-closed semantics remain authoritative. The remote call occurs outside any Identity DB transaction.
+Raw password and full SHA-1 digest never leave Identity. SHA-1 is screening-only; Argon2id remains credential-storage authority. Malformed, oversized, truncated, stale, corrupt, incompatible, or unavailable results fail closed as dependency unavailability. The 900ms overall deadline, one attempt, no automatic retry/fallback, cancellation, bounded concurrency, and fail-closed semantics remain authoritative. The remote call occurs outside any Identity DB transaction.
 
 ### Google OIDC/external identity handoff and signup
 
@@ -357,7 +357,6 @@ Stable external identity is only `(issuer, subject)`:
 Provider credentials and Google client secret are delivered only through the approved OpenBao/External Secrets boundary and never through Git, chat, browser storage, Identity payloads, or telemetry.
 
 Linking an ExternalIdentity requires authenticated account settings plus authentication age <=5 minutes (and current MFA assurance where applicable) or another future reviewed flow with equivalent assurance. Email equality never authorizes linking.
-
 Unlink requires authentication age <=5 minutes. Identity rejects unlink when the target ExternalIdentity is the User's last remaining authentication method with `FAILED_PRECONDITION / LAST_AUTHENTICATION_METHOD`. Successful unlink rotates the current session/refresh credential and revokes all other RefreshFamilies.
 
 ### MFA login gate
@@ -421,7 +420,7 @@ Acceptance transitions the User to non-authenticatable `DELETING`, revokes all R
 
 ### Idempotency and security evidence
 
-Security-sensitive idempotency/intent fingerprints use purpose-separated, versioned HMAC-SHA-256 with locally available key material delivered through the approved secret boundary. Plain unsalted SHA-256 is not used for guessable security/business intent fingerprints; the local SHA-256 digest used by compromised-password k-anonymity is not an idempotency fingerprint.
+Security-sensitive idempotency/intent fingerprints use purpose-separated, versioned HMAC-SHA-256 with locally available key material delivered through the approved secret boundary. Plain unsalted SHA-256 is not used for guessable security/business intent fingerprints; the local SHA-1 digest used only for compromised-password screening is not an idempotency fingerprint.
 
 For an idempotent command:
 
@@ -450,7 +449,7 @@ Tests cover:
 - exact JWT claim allow-list, wildcard-audience rejection, bounded <=30s clock leeway, prohibited permission/role snapshot claims, signing-key compatibility;
 - 20-family cap, deterministic oldest-family revocation, logout-current/logout-all, password-change/reset/suspension/deleting/ExternalIdentity-unlink/MFA-change revocation, refresh rotation/reuse, and explicit <=5m plus bounded clock-leeway already-issued access-token residual lifetime;
 - password change/recovery recent-auth/MFA requirements, primary-contact-only/non-local-Credential non-enumerating recovery, challenge boundaries, no first-local-Credential creation through reset, no automated password+MFA-loss bypass, and no password-history policy;
-- compromised-password SHA-256 prefix-only egress, full digest/raw password non-egress, suffix matching, malformed/oversized response, deadline/cancellation/fail-closed behavior;
+- compromised-password SHA-1 five-hex-prefix-only egress, full digest/raw password non-egress, 35-hex positive-count suffix matching, malformed/oversized/truncated/stale/corrupt/incompatible response handling, deadline/cancellation/no-retry/no-fallback/fail-closed behavior;
 - OIDC BFF-only provider validation, provider-token absence from Identity, exact 256-bit evidence, two-minute expiry, >=10-minute spent/replay evidence, replay/conflict/workload-identity negatives, Google signup/profile suggestion behavior, unverified-email no-Contact behavior, verified-email collision `ACCOUNT_LINK_REQUIRED`, and no-auto-link;
 - active TOTP after both password and Google primary proof proving no Session/access/refresh issuance before MFA completion;
 - ExternalIdentity unlink recent-auth/last-authentication-method/session-revocation rules;
