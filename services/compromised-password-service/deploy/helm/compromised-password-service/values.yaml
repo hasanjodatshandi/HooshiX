@@ -44,8 +44,12 @@ observability:
   tracing:
     enabled: false
     otlpEndpoint: ""
-  networkPolicy:
+    collector:
+      namespace: ""
+      podLabels: {}
+  metrics:
     enabled: false
-    namespace: ""
-    podLabels: {}
-  principal: ""
+    prometheus:
+      namespace: ""
+      podLabels: {}
+      principal: ""
