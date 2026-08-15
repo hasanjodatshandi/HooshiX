@@ -10,37 +10,37 @@ import org.junit.jupiter.api.Test;
 
 @Tag("architecture")
 class ArchitectureRulesTest {
-    private final JavaClasses classes =
-            new ClassFileImporter()
-                    .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-                    .importPackages("com.sajtech.compromisedpassword");
+  private final JavaClasses classes =
+      new ClassFileImporter()
+          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+          .importPackages("com.sajtech.compromisedpassword");
 
-    @Test
-    void domainDependsOnlyOnJavaAndDomain() {
-        noClasses()
-                .that()
-                .resideInAPackage("..domain..")
-                .should()
-                .dependOnClassesThat()
-                .resideOutsideOfPackages("java..", "..domain..")
-                .check(classes);
-    }
+  @Test
+  void domainDependsOnlyOnJavaAndDomain() {
+    noClasses()
+        .that()
+        .resideInAPackage("..domain..")
+        .should()
+        .dependOnClassesThat()
+        .resideOutsideOfPackages("java..", "..domain..")
+        .check(classes);
+  }
 
-    @Test
-    void applicationDoesNotDependOnAdaptersOrFrameworks() {
-        noClasses()
-                .that()
-                .resideInAPackage("..application..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                        "..infrastructure..",
-                        "..interfaces..",
-                        "..configuration..",
-                        "org.springframework..",
-                        "org.sqlite..",
-                        "io.grpc..",
-                        "io.opentelemetry..")
-                .check(classes);
-    }
+  @Test
+  void applicationDoesNotDependOnAdaptersOrFrameworks() {
+    noClasses()
+        .that()
+        .resideInAPackage("..application..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "..infrastructure..",
+            "..interfaces..",
+            "..configuration..",
+            "org.springframework..",
+            "org.sqlite..",
+            "io.grpc..",
+            "io.opentelemetry..")
+        .check(classes);
+  }
 }
