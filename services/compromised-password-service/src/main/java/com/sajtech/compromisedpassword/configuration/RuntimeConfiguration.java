@@ -29,13 +29,13 @@ public class RuntimeConfiguration {
 
     @Bean
     DatasetSettings datasetSettings(CompromisedPasswordProperties properties) {
-        CompromisedPasswordProperties.Dataset dataset = properties.getDataset();
+        CompromisedPasswordProperties.Dataset dataset = properties.dataset();
         return new DatasetSettings(
-                dataset.getPath(),
-                dataset.getExpectedSha256(),
-                dataset.getAcquiredAt(),
-                dataset.getFormatVersion(),
-                dataset.getMaxPrefixCardinality());
+                dataset.path(),
+                dataset.expectedSha256(),
+                dataset.acquiredAt(),
+                dataset.formatVersion(),
+                dataset.maxPrefixCardinality());
     }
 
     @Bean
@@ -59,7 +59,7 @@ public class RuntimeConfiguration {
         LookupCompromisedPasswords core = new LookupCompromisedPasswordsUseCase(repository);
         return new BoundedLookupCompromisedPasswords(
                 core,
-                properties.getMaxConcurrentLookups(),
+                properties.maxConcurrentLookups(),
                 observationRegistry,
                 meterRegistry);
     }
@@ -80,7 +80,7 @@ public class RuntimeConfiguration {
             CompromisedPasswordProperties properties,
             CompromisedPasswordGrpcService service,
             SafeTracingServerInterceptor interceptor) {
-        return new GrpcServerLifecycle(properties.getGrpcPort(), service, interceptor);
+        return new GrpcServerLifecycle(properties.grpcPort(), service, interceptor);
     }
 
     @Bean(name = "compromisedPasswordDatasetHealthIndicator")
