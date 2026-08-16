@@ -12,7 +12,7 @@ Covers:
 - service-to-service identity;
 - PostgreSQL/Redis/Kafka/reference datasets;
 - OpenBao/secrets;
-- Git/CI/supply chain;
+- Git/CI/source-secret/supply-chain controls;
 - Day-One logging/metrics/tracing;
 - privileged access;
 - backup/restore/erasure/DR;
@@ -22,16 +22,17 @@ Covers:
 
 1. only authenticated/authorized actors gain authority;
 2. tenant data/authority do not cross tenants;
-3. credentials/secrets/MFA/private keys remain confidential;
+3. credentials/secrets/MFA/private keys remain confidential, including in Git history and CI/security-tool output;
 4. mutable business state remains correct/recoverable;
 5. security dependencies fail closed instead of fabricating success;
 6. audit/recovery evidence remains attributable/durable;
-7. artifacts are reviewed/immutable/signed/traceable;
+7. artifacts are reviewed/immutable/signed/traceable with digest-bound SBOM/vulnerability/provenance evidence;
 8. public traffic cannot bypass approved edge/WAF/BFF;
 9. restored history cannot revive erased/legally blocked authority;
 10. non-HA availability trade-offs never become security downgrades;
 11. observability cannot become a new security authority or secret-exfiltration path;
-12. abuse controls remain safe under clock faults and adversarial state cardinality.
+12. abuse controls remain safe under clock faults and adversarial state cardinality;
+13. source/secret/scanner failures cannot silently bypass required merge/promotion controls.
 
 ## 3. High-value assets
 
@@ -39,6 +40,7 @@ Covers:
 | --- | --- |
 | Password/MFA/recovery material | confidentiality + integrity |
 | Sessions/refresh/signing keys | confidentiality + revocation correctness |
+| Git/CI credentials and committed-secret exposure state | confidentiality + detection + revocation correctness |
 | Tenant Membership/Authorization state | integrity + isolation |
 | PostgreSQL business state | confidentiality + integrity + recovery |
 | OpenBao/recovery material | confidentiality + integrity + recovery |
@@ -46,7 +48,7 @@ Covers:
 | Trusted client address/quota identity | integrity + privacy |
 | HIBP-derived compromised-password corpus/release evidence | integrity + freshness + provenance |
 | Kafka publication/replay evidence | integrity + reconstructability |
-| Signed images/provenance/SBOM/GitOps | integrity + provenance |
+| Final image/SBOM/vulnerability decision/signature/provenance/GitOps | integrity + provenance + digest binding |
 | Logs/metrics/traces | confidentiality + bounded integrity/availability |
 | Security/privileged audit | integrity + durability + attribution |
 | Backups/WAL/snapshots | confidentiality + integrity + recoverability |
@@ -93,7 +95,15 @@ ADR-0044 permits a narrow read-only mount to exact pod/container log paths. A co
 
 ### TB-09 Git/CI -> production
 
-PR/build inputs are untrusted until reviewed/verified. Privileged workflows cannot execute unreviewed PR-controlled code with production-capable privilege. Production uses signed immutable artifacts.
+PR/build inputs, current source, Git history, dependency metadata, scanner databases, generated SBOMs, signatures, provenance, and CI-produced security evidence are untrusted until their owning controls verify them.
+
+- Gitleaks scans current tree and protected Git history and must not reveal discovered secret values in output;
+- a deleted latest-tree secret remains an exposure until the real credential is revoked/rotated and history/incident handling is complete;
+- Semgrep owns first-party source SAST/repository policy;
+- Syft/Grype/Cosign/Kyverno evidence stays bound to the exact final image digest;
+- privileged workflows cannot execute unreviewed PR-controlled code with production-capable privilege;
+- scanner/feed/tool failure or stale evidence cannot silently permit promotion beyond current policy;
+- production uses the exact staged, signed, provenance-bound, SBOM-attested immutable artifact.
 
 ### TB-10 Human operator -> management plane
 
@@ -110,11 +120,12 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 - Malicious tenant user/admin: horizontal/vertical escalation attempts.
 - Compromised workload/service credential: lateral DB/Redis/Kafka/OpenBao/provider/telemetry access attempts.
 - Compromised telemetry component: attempts secret collection, host-file access, or data manipulation.
-- Compromised CI/GitHub identity: artifact/GitOps manipulation.
+- Compromised CI/GitHub identity: source/history/artifact/GitOps/security-evidence manipulation.
+- Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log output.
 - Compromised operator device: may hold WireGuard key but not necessarily FIDO2/JIT.
 - Privileged insider: time-bounded legitimate capability with misuse risk.
 - Compromised host/root: broad single-server process/storage visibility.
-- Compromised provider/source: malformed/replayed/delayed/false data within protocol scope.
+- Compromised provider/source/scanner feed: malformed/replayed/delayed/false data within protocol scope.
 - Storage/backup attacker: tamper/delete/exfiltrate recovery artifacts.
 
 ## 6. Representative STRIDE mapping
@@ -126,8 +137,11 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 | Spoofing | wrong workload calls internal service/Collector | strict mTLS + SA + NetworkPolicy/Istio | connectivity/authz negatives |
 | Tampering | tenant context changes on pooled DB | transaction-local context + FORCE RLS | cross-tenant pool tests |
 | Tampering | build/deploy artifact changes | digest/signature/provenance/SBOM/admission | wrong-artifact negatives |
+| Tampering | image/SBOM/vulnerability/signature evidence refers to different digests | Syft/Grype/Cosign/Kyverno exact-digest binding | cross-digest/mismatch negatives |
 | Tampering | compromised-password corpus/source altered/stale | HIBP source identity + manifest/digest/freshness/full-corpus validation | dataset release tests |
 | Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
+| Information disclosure | real secret is committed then deleted but remains in Git history/clones | Gitleaks tree+history + revoke/rotate + incident/history remediation | commit-delete fixture + rotation evidence |
+| Information disclosure | scanner/log output republishes discovered secret | Gitleaks redaction + CI output policy | redaction fixture |
 | Information disclosure | secrets/PII in telemetry | source allow-list + Collector redaction + canary | Loki/Tempo/Prometheus/Grafana negatives |
 | Information disclosure | Collector reads arbitrary host files | exact read-only pod-log mount; no broad host privilege | render/runtime mount negatives |
 | DoS | Authorization/Redis failure blocks work | bounded deadlines/bulkheads + fail closed | overload/failure tests |
@@ -136,6 +150,7 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 | DoS | host clock jumps app+Redis together and refills tokens | wall-vs-monotonic guard + Redis TIME + host sync gate | common-mode jump tests |
 | DoS | telemetry consumes single-host resources | finite queues/retention/cardinality + complete-stack benchmark | pressure/load tests |
 | DoS | total host loss also removes local monitoring | independent external black-box signal | host-loss exercise |
+| DoS | scanner/feed outage is used to bypass release policy | fail-closed freshness/promotion gates under ADR-0035/0038/0045 | stale/unavailable scanner/feed negatives |
 | Elevation | tenant admin grants stronger authority | Authorization privilege-escalation/owner safety | admin concurrency negatives |
 | Elevation | network access becomes root | WireGuard != FIDO2 != JIT | separation tests |
 
@@ -215,9 +230,13 @@ Required: ordinary business path is not synchronously dependent on telemetry exp
 
 Required: no public OTLP, wrong-workload denial, dedicated SA/RBAC, restricted egress, exact read-only pod-log mount, no host network/privilege/general hostPath.
 
-### TM-14 Supply-chain substitution
+### TM-14 Supply-chain substitution/evidence mismatch
 
-Required: PR review, locks, static checks, signed provenance/SBOM/digest admission and Kyverno CEL policies.
+Attacker or compromised CI substitutes source/dependency/tool/final image/SBOM/vulnerability/signature/provenance evidence or binds valid evidence to the wrong image digest.
+
+Required: repository review, pinned tools/actions/dependencies, Gradle verification/locks, Semgrep static checks, final-image Syft CycloneDX, Grype exact-image/SBOM decision, Cosign exact-digest signature/provenance/signed-SBOM, Kyverno CEL admission, and same-digest staging->production promotion.
+
+A vulnerability exception cannot authorize missing signature/provenance/SBOM evidence. A scanner outage cannot become a release bypass.
 
 ### TM-15 Privileged access compromise
 
@@ -237,6 +256,22 @@ Total host loss also removes local telemetry; independent external monitoring de
 
 Required: provider-specific validation/idempotency/ambiguity handling. HIBP is offline dataset source only; production requests never depend on HIBP availability.
 
+### TM-19 Committed-secret persistence
+
+A developer, automation, generated fixture, or compromised actor commits a real API key/token/password/private key and later deletes it from the latest tree. The secret remains available in Git history, clones/forks, caches, CI logs/artifacts, or downstream mirrors.
+
+Required:
+
+- blocking Gitleaks current-tree and protected Git-history scans;
+- a synthetic commit-then-delete fixture that proves history detection;
+- fully redacted scanner output;
+- revoke/rotate the credential when exposure is plausible before treating source/history cleanup as remediation;
+- preserve forensic evidence without copying the secret value into incident systems;
+- approved Git-history remediation when required;
+- verify replacement credentials do not enter Git/CI/logs/images/values.
+
+Residual: a history rewrite cannot recall an already copied credential. Rotation/revocation is therefore the primary containment action for real exposed secrets.
+
 ## 8. Single-server residual risks
 
 - one host failure can stop complete platform and local observability;
@@ -247,7 +282,7 @@ Required: provider-specific validation/idempotency/ambiguity handling. HIBP is o
 - fail-closed security capacity exhaustion can cause user-visible outage;
 - maintenance can consume error budget.
 
-These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
+These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, source/secret scanning, signed final-artifact admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
 
 ## 9. Verification mapping
 
@@ -255,6 +290,8 @@ Material threats map to executable service/security/database/network/CI/observab
 
 - TM-02/03/04 -> ADR-0024 tests + Redis load/chaos;
 - TM-11/12/13 -> ADR-0031/0044 tests + Collector/render/canary/fault evidence;
+- TM-14 -> ADR-0017/0035/0038/0039/0045 + Semgrep/Syft/Grype/Cosign/Kyverno digest/evidence/failure fixtures;
+- TM-19 -> ADR-0045 Gitleaks current-tree/history/redaction + incident revoke/rotate/history-remediation evidence;
 - TM-17 -> external host-down monitor + cold DR;
 - compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;
 - policy-engine migration risk -> Kyverno CEL manifest gate.
@@ -263,4 +300,4 @@ A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
 ## 10. Change triggers
 
-Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
