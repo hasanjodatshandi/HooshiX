@@ -37,6 +37,34 @@ edges:
         self.assertEqual("sample.Dependency", registry.edges[0].dependency_id)
         self.assertEqual(("docs/adr/0001-sample.md",), registry.edges[0].policy_refs)
 
+    def test_dependency_parser_rejects_duplicate_scalar_fields(self) -> None:
+        text = """version: 2
+classes:
+  - AUTHORITATIVE_SECURITY
+edges:
+  - operation_id: sample.operation
+    caller_owner: Sample
+    caller_owner: ConflictingSample
+"""
+
+        with self.assertRaisesRegex(ValueError, "duplicate field: caller_owner"):
+            verifier.parse_dependency_registry(text)
+
+    def test_dependency_parser_rejects_duplicate_policy_ref_sections(self) -> None:
+        text = """version: 2
+classes:
+  - AUTHORITATIVE_SECURITY
+edges:
+  - operation_id: sample.operation
+    policy_refs:
+      - docs/adr/0001-sample.md
+    policy_refs:
+      - docs/adr/0002-sample.md
+"""
+
+        with self.assertRaisesRegex(ValueError, "duplicate field: policy_refs"):
+            verifier.parse_dependency_registry(text)
+
     def test_file_index_detects_missing_and_stale_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
