@@ -2,6 +2,7 @@ package com.sajtech.notification.infrastructure.persistence;
 
 import com.sajtech.notification.application.submit.port.out.NotificationTemplateCatalog;
 import com.sajtech.notification.application.template.model.NotificationTemplateVersion;
+import com.sajtech.notification.application.template.service.TemplateContentDigest;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import com.sajtech.notification.domain.notification.model.NotificationSemanticType;
 import java.util.Optional;
@@ -10,9 +11,11 @@ import org.jooq.DSLContext;
 
 public final class JooqNotificationTemplateCatalog implements NotificationTemplateCatalog {
   private final DSLContext dsl;
+  private final TemplateContentDigest contentDigest;
 
-  public JooqNotificationTemplateCatalog(DSLContext dsl) {
+  public JooqNotificationTemplateCatalog(DSLContext dsl, TemplateContentDigest contentDigest) {
     this.dsl = dsl;
+    this.contentDigest = contentDigest;
   }
 
   @Override
@@ -32,15 +35,23 @@ public final class JooqNotificationTemplateCatalog implements NotificationTempla
             semanticType.name(),
             locale)
         .map(
-            record ->
-                new NotificationTemplateVersion(
-                    record.get("version_id", UUID.class),
-                    NotificationChannel.valueOf(record.get("channel", String.class)),
-                    NotificationSemanticType.valueOf(record.get("semantic_type", String.class)),
-                    record.get("locale", String.class),
-                    record.get("content_sha256", String.class).trim(),
-                    record.get("subject_template", String.class),
-                    record.get("text_template", String.class),
-                    record.get("html_template", String.class)));
+            record -> {
+              String expectedDigest = record.get("content_sha256", String.class).trim();
+              String subject = record.get("subject_template", String.class);
+              String text = record.get("text_template", String.class);
+              String html = record.get("html_template", String.class);
+              if (!contentDigest.matches(expectedDigest, subject, text, html)) {
+                throw new IllegalStateException("Active notification template digest mismatch");
+              }
+              return new NotificationTemplateVersion(
+                  record.get("version_id", UUID.class),
+                  NotificationChannel.valueOf(record.get("channel", String.class)),
+                  NotificationSemanticType.valueOf(record.get("semantic_type", String.class)),
+                  record.get("locale", String.class),
+                  expectedDigest,
+                  subject,
+                  text,
+                  html);
+            });
   }
 }
