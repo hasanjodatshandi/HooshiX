@@ -7,6 +7,7 @@ This matrix records production technology combinations that must remain compatib
 | Java | 25 LTS | Spring Boot/application libraries support Java 25 |
 | Spring Boot | 4.1.0 | Java 25; Gradle 9.x; Spring MVC/Virtual Threads; Micrometer Observation/Tracing |
 | Gradle | 9.6.1 | selected Spring Boot build plugin/toolchain |
+| gRPC Java | 1.83.1 | Java 25; Protobuf/runtime/stubs/codegen/testing aligned; Netty transport stream-limit enforcement retained and bounded server concurrency configured where applicable |
 | HIBP Pwned Passwords | SHA-1 offline corpus | ADR-0040: official Pwned Password source/range semantics; SHA-1 only for screening; complete acquisition/provenance/freshness/full-corpus cardinality evidence |
 | Xerial SQLite JDBC / SQLite | 3.53.2.1 / 3.53.2 | Java 25/Linux native compatibility; 20-byte SHA-1 immutable read-only dataset; no runtime provider/mutable persistence; SBOM/advisory review |
 | Kubernetes API/minor | 1.35.6 | selected Istio 1.30.x, CloudNativePG 1.30.x, cert-manager 1.20.x, Kyverno 1.18.x, Calico 3.32.x |
