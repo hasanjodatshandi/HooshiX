@@ -2,7 +2,7 @@
 
 This checklist tracks **implementation and executable evidence**, not architecture discovery. Current ADRs/current-state documents define the target. A missing/failed gate is never permission to bypass or weaken the architecture.
 
-Selected initial profile: `production-single-server` under ADR-0042.
+Selected initial profile: `production-single-server` under ADR-0042. ADR-0045 defines source/secret/final-artifact DevSecOps responsibilities.
 
 For each applicable item record:
 
@@ -19,7 +19,7 @@ Production traffic MUST NOT open while a mandatory applicable gate is `FAIL`, `N
 ## 1. Profile and repository status
 
 - [ ] ADR-0042 selected profile is present in current Decision Register/source/task maps.
-- [ ] ADR-0043 network trust and ADR-0044 Day-One Observability are present.
+- [ ] ADR-0043 network trust, ADR-0044 Day-One Observability, and ADR-0045 DevSecOps tool responsibilities are present.
 - [ ] `implementation-status.md` matches actual repository tree/evidence.
 - [ ] operator/business owner accepts single-host outage/maintenance risk.
 - [ ] operator/security owner accepts single-host root/blast-radius risk.
@@ -55,7 +55,30 @@ Every production workload:
 - [ ] deny-by-default NetworkPolicy and least-privilege Istio authorization.
 - [ ] secrets absent from image/manifests/rendered logs/traces/metrics.
 
-## 4. Istio/Kyverno/supply chain
+## 4. DevSecOps, Istio, Kyverno, and supply chain
+
+Source/repository security:
+
+- [ ] Gitleaks 8.30.1 exact native tool artifact/checksum or immutable tool digest is pinned and verified.
+- [ ] Gitleaks current-tree scan passes.
+- [ ] Gitleaks protected Git-history scan passes, including a commit-then-delete positive fixture.
+- [ ] Gitleaks output is fully redacted and does not publish discovered secret material to logs/annotations/artifacts.
+- [ ] no unresolved real committed credential remains; plausible exposed credentials have revoke/rotate evidence.
+- [ ] Semgrep blocking source-policy/SAST rules pass with applicable positive/negative fixtures.
+- [ ] Gradle dependency verification/locks and vulnerability scanning are proven as separate failure classes.
+
+Final-artifact security:
+
+- [ ] Syft 1.51.0 exact tool integrity is verified and generates CycloneDX JSON from the exact final releasable image digest.
+- [ ] Grype 0.117.0 exact tool integrity is verified and scans that exact final image/SBOM.
+- [ ] Grype advisory database/feed freshness, Critical/High policy, VEX/exception expiry, ownership, and continuous rescanning meet ADR-0035/0038.
+- [ ] Cosign 3.0.6 exact tool integrity is verified.
+- [ ] image signature, build provenance, and signed CycloneDX SBOM are bound to the exact final image digest.
+- [ ] correct signer/wrong signer/unsigned/missing or invalid provenance/SBOM negatives pass.
+- [ ] Trivy and OWASP Dependency-Check have not been silently introduced as competing authorities without ADR-0045 distinct-coverage review.
+- [ ] separate Semgrep Secrets/Supply Chain/hosted product capabilities are not claimed from Semgrep CLI presence alone.
+
+Runtime/admission security:
 
 - [ ] Ambient strict mTLS positive/plaintext/wrong-SA negatives pass.
 - [ ] `istioctl analyze` has no blocking error and no duplicate retry layer exists.
@@ -63,10 +86,11 @@ Every production workload:
 - [ ] Kyverno exact version matches baseline.
 - [ ] new production policy manifests use stable `policies.kyverno.io/v1` CEL types.
 - [ ] CI/render gate rejects legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy/ClusterCleanupPolicy for new controls.
-- [ ] digest/signature/provenance/signed-SBOM positives and missing/wrong negatives pass.
+- [ ] Kyverno verifies required digest/signature/provenance/signed-SBOM evidence and missing/wrong negatives fail closed.
 - [ ] privileged/host-network/unsafe-hostPath/security-context negatives pass.
 - [ ] policy-authoring RBAC and external-context SSRF controls pass.
 - [ ] one-replica single-server Kyverno outage does not create admission bypass.
+- [ ] required scanner/feed/signing/admission outage or stale evidence cannot silently permit affected promotion.
 
 ## 5. PostgreSQL ownership/RLS/recovery
 
@@ -266,7 +290,9 @@ Before opening traffic:
 - [ ] full cold DR/restore evidence meets or honestly records RPO/RTO result.
 - [ ] critical browser/service journey works through real edge and security controls.
 - [ ] external host-down monitor is tested.
+- [ ] no unresolved real committed-secret exposure remains.
 - [ ] no known Critical/High security blocker remains.
+- [ ] final production digest is the same staging-validated signed/provenanced/SBOM-attested digest.
 - [ ] no required evidence is claimed from documentation alone.
 
 `implementation-status.md` remains repository-presence status. This checklist is the traffic gate.

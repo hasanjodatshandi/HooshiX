@@ -38,6 +38,8 @@ Organization namespace: `com.sajtech`.
 
 Coding/package/DI rules live in Engineering standards and are machine-enforced where feasible.
 
+ADR-0045 DevSecOps controls are repository/CI/release/admission concerns. Semgrep, Gitleaks, OSV-Scanner, Syft, Grype, and Cosign are not application runtime dependencies and do not create service-to-service edges.
+
 ## 4. High-level topology
 
 ```text
@@ -73,6 +75,18 @@ approved device -> WireGuard -> OpenSSH/FIDO2 -> JIT privilege
 
 Only approved public BFF/edge surfaces are Internet reachable. Internal services are ClusterIP-only/deny-by-default.
 
+DevSecOps is outside this request/runtime topology:
+
+```text
+Git/source
+ -> Gitleaks + Semgrep + Gradle integrity + OSV dependency advisory + build/test gates
+ -> final image
+ -> Syft -> Grype -> Cosign
+ -> Kyverno admission
+ -> staging
+ -> same signed digest in production
+```
+
 ## 5. Selected production profile
 
 ADR-0042 selects `production-single-server`:
@@ -91,7 +105,7 @@ local ordinary observability stack, explicitly non-HA
 
 HA expansion retains current redundant topology.
 
-Single-server changes infrastructure availability only. It does not weaken authentication/MFA, Authorization, RLS, OpenBao, WAF/client trust, quota fail-closed safety, supply chain/admission, required audit, backup/PITR, idempotency, or data ownership.
+Single-server changes infrastructure availability only. It does not weaken authentication/MFA, Authorization, RLS, OpenBao, WAF/client trust, quota fail-closed safety, source/secret/dependency-advisory/final-artifact security, supply chain/admission, required audit, backup/PITR, idempotency, or data ownership.
 
 ## 6. Protocol boundaries
 
@@ -112,6 +126,10 @@ Kafka + Protobuf only where asynchronous semantics justify it. Transactional Out
 ### Telemetry
 
 Micrometer/OpenTelemetry/OTLP/log forwarding is observability transport only. Trace/baggage/log correlation does not define authN/authZ/tenant/quota/idempotency/business/audit identity.
+
+### DevSecOps
+
+Scanner/SBOM/signing/admission evidence is build/release control data only. It is never transported as application authority on a user request path. Runtime services do not call Gitleaks, Semgrep, OSV-Scanner, Syft, Grype, Cosign, or vulnerability feeds.
 
 ## 7. Current capabilities/deployables
 
@@ -170,24 +188,45 @@ Required security/privileged audit remains a separate durable off-host authority
 
 Observability components compete for the same host resources and are included in complete-stack capacity evidence.
 
-## 10. Technology families
+## 10. DevSecOps security chain
 
-Architecture families include Java 25/Spring Boot 4.1/Spring MVC/Virtual Threads, Gradle Kotlin DSL, PostgreSQL/CNPG/Flyway, Xerial SQLite only for ADR-0040, Kafka, Redis, Resilience4j, Micrometer/OpenTelemetry, Prometheus/Loki/Tempo/Grafana/Alertmanager/Collector, Kubernetes/K3s/Calico/Helm/Argo CD, Kyverno CEL policies/Cosign, Traefik/Caddy/Coraza, Istio Ambient, ESO/OpenBao, WireGuard/OpenSSH/FIDO2, and current Notification providers/testing stack.
+ADR-0045 standardizes the pre-runtime control chain:
 
-Exact pins live only in Technology Baseline and deployment/dependency locks.
+- Semgrep — first-party source SAST and repository policy;
+- Gitleaks — current-tree and Git-history secret detection;
+- Gradle dependency verification/locks — dependency integrity/reproducibility, not vulnerability authority;
+- OSV-Scanner — early declared/locked dependency advisory feedback; implemented for the current Compromised Password service security suite;
+- Syft — CycloneDX JSON software inventory of the exact final image;
+- Grype — exact final-image/SBOM release/deployed-artifact vulnerability correlation under ADR-0035/0038;
+- Cosign — exact-digest image signature, provenance, and signed SBOM attestation;
+- Kyverno — production admission verification.
 
-## 11. Security/resilience constraints
+OSV-Scanner and Grype are complementary, not competing authorities. OSV gives early dependency feedback; Grype owns final-image release/deployed-artifact evidence.
+
+Trivy and OWASP Dependency-Check are not selected default controls. A future addition must identify a distinct uncovered failure class rather than duplicate the selected authorities.
+
+This chain is implementation/release infrastructure. It does not create a new bounded context, service, datastore, network edge, or runtime availability dependency.
+
+## 11. Technology families
+
+Architecture families include Java 25/Spring Boot 4.1/Spring MVC/Virtual Threads, Gradle Kotlin DSL, PostgreSQL/CNPG/Flyway, Xerial SQLite only for ADR-0040, Kafka, Redis, Resilience4j, Micrometer/OpenTelemetry, Prometheus/Loki/Tempo/Grafana/Alertmanager/Collector, Gitleaks/Semgrep/OSV-Scanner/Syft/Grype/Cosign DevSecOps controls, Kubernetes/K3s/Calico/Helm/Argo CD, Kyverno CEL policies, Traefik/Caddy/Coraza, Istio Ambient, ESO/OpenBao, WireGuard/OpenSSH/FIDO2, and current Notification providers/testing stack.
+
+Exact pins live only in Technology Baseline and deployment/build/dependency/security-tool locks.
+
+## 12. Security/resilience constraints
 
 - single-server is non-HA and cannot claim node/data/control-plane/telemetry failover;
 - trusted client identity uses ADR-0043 only;
 - quota failure never becomes fail-open;
+- committed-secret, source/static, or required dependency-advisory gate failure cannot be ignored to obtain a merge/promotion;
+- scanner/feed/signature/provenance/SBOM/admission failure or stale required evidence cannot silently permit production promotion;
 - new Kyverno production controls use stable CEL-based v1 APIs and legacy policy types are gate-rejected;
 - OpenBao and end-user MFA remain unchanged;
 - insufficient host capacity means safe tuning/more capacity/externalizing ordinary telemetry/HA, not weaker controls;
 - cold recovery follows current DR runbook and restores observability before declaring recovery complete.
 
-## 12. Change rule
+## 13. Change rule
 
 Architecture changes update the applicable current authority, Decision Register/Sources/Task Matrix/evidence/baseline/status maps in one coherent PR. Merged ADR IDs are stable and are never renumbered/reused.
 
-Implementation MUST NOT silently replace a bounded context, data owner, security invariant, communication model, profile, network trust, telemetry authority, or availability claim.
+Implementation MUST NOT silently replace a bounded context, data owner, security invariant, communication model, profile, network trust, telemetry authority, DevSecOps control authority, or availability claim.

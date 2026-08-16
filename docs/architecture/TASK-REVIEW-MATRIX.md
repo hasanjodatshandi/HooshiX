@@ -17,11 +17,12 @@ Always read `../../AGENTS.md`, `../engineering/current-only-documentation-policy
 | Day-One application observability | ADR-0044; ADR-0031; reliability/observability; coding/build standards; service doc; Technology Baseline/compatibility; security/testing/readiness/fitness; performance |
 | Collector/Loki/Tempo/Prometheus/Grafana/Alertmanager | ADR-0044; runtime/deployment; platform/reliability/performance/security/testing/readiness; Technology Baseline/compatibility; threat model; chaos/DR |
 | Logging/PII/security audit | ADR-0031; ADR-0044; coding standard; security architecture/matrix; service doc; testing; incident/chaos when failure behavior changes |
-| Kyverno/admission policy | ADR-0017; ADR-0021; Technology Baseline/compatibility; build/CI; testing/security/readiness; platform/runtime; performance |
+| DevSecOps source/secret/SBOM/vulnerability/signing tools | ADR-0045; ADR-0017/0035/0038/0039; `devsecops-security-toolchain.md`; security architecture/matrix/threat model; build/CI; testing/readiness; Technology Baseline/compatibility; implementation status |
+| Kyverno/admission policy | ADR-0017; ADR-0045 when artifact-evidence/toolchain behavior changes; ADR-0021; Technology Baseline/compatibility; build/CI; testing/security/readiness; platform/runtime; performance |
 | K3s/Calico/Istio/edge/platform profile | ADR-0021/0022/0042/0043 as applicable; platform/runtime/network; Technology Baseline/compatibility; performance/security/testing/readiness; runbooks |
 | PostgreSQL/RLS/Flyway/backup | ADR-0019/0027/0034/0037/0042; data/messaging; SQL standard; testing/readiness/recovery |
 | Kafka/events | ADR-0015/0042; data/messaging; dependency/event contracts; testing/performance/recovery |
-| OpenBao/secrets | ADR-0011 plus affected key/security ADR; security/runtime; Technology Baseline; recovery; OpenBao invariance checks |
+| OpenBao/secrets | ADR-0011 plus affected key/security ADR; ADR-0045 when Git/CI secret-scanning policy changes; security/runtime; Technology Baseline; recovery; OpenBao invariance checks |
 | Human production access | ADR-0030/0043; network/security/runtime; readiness; incident/chaos/DR |
 | ADR/documentation governance | current-only policy; documentation standard; repository workflow; Decision Register; Sources; FILE_INDEX; all inbound references affected by the decision |
 | CI/repository workflow | repository-change-workflow; build/CI; developer workflow; AGENTS; affected checks/fitness/readiness |

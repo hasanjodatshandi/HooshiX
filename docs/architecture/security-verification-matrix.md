@@ -14,12 +14,12 @@ This matrix maps material security properties to executable evidence. A document
 | SEC-005 | Tenant authority/data does not cross tenant boundary | JWT/context + Authorization + forced-RLS/cross-tenant pool negatives |
 | SEC-006 | Authorization failure never fabricates ALLOW | deny/error/timeout/breaker/overload tests; no cache/retry/stale fallback |
 | SEC-007 | Service database/credential isolation | cross-service CONNECT/object/role negatives |
-| SEC-008 | Secrets stay out of Git/image/values/log/trace/metric/CI | secret/render/static/runtime canary scans |
+| SEC-008 | Secrets stay out of Git/image/values/log/trace/metric/CI | Gitleaks current-tree/history scan + secret/render/static/runtime canaries; real exposed credentials revoked/rotated |
 | SEC-009 | Workload identity/mTLS/NetworkPolicy least privilege | wrong-SA/plaintext/unapproved-edge negatives |
 | SEC-010 | Edge/WAF path cannot be bypassed | direct origin/BFF/Traefik->BFF negatives |
 | SEC-011 | Trusted client address cannot be forged | external-L4 PROXY v2 + exact trusted CIDRs + forged header/untrusted PROXY/proxy-address negatives |
 | SEC-012 | Human privileged access is attributable/JIT/phishing resistant | WireGuard/FIDO2/JIT/audit/break-glass tests |
-| SEC-013 | Supply chain admits only reviewed signed/provenanced/SBOM artifacts | wrong digest/signer/attestation/SBOM/admission negatives |
+| SEC-013 | Supply chain admits only reviewed signed/provenanced/SBOM artifacts | Syft final-image CycloneDX + Grype final-artifact decision + Cosign wrong digest/signer/provenance/SBOM negatives + Kyverno admission negatives |
 | SEC-014 | OpenBao remains secret authority | snapshot/restore/unseal/ESO/local-key tests; no plaintext/Git fallback |
 | SEC-015 | Notification ambiguity does not create blind duplicate send | provider ambiguity/reconciliation/idempotency tests |
 | SEC-016 | Restored data does not revive erased/illegal authority | PITR + erasure/legal-hold reconciliation before traffic |
@@ -36,11 +36,16 @@ This matrix maps material security properties to executable evidence. A document
 | SEC-027 | Total single-host loss is externally detectable | independent external black-box monitor remains alert-capable while local stack is unavailable |
 | SEC-028 | Single-server capacity does not force security downgrade | simultaneous app+DB+Redis+Kafka+mesh+WAF+Kyverno+OpenBao+observability load with >=30% headroom and no bypass |
 | SEC-029 | Email identity comparison/delivery representation remains current product rule | case-only uniqueness/login/reservation + delivery-preservation tests |
+| SEC-030 | A committed secret remains detectable after deletion from the latest tree | Gitleaks synthetic commit-then-delete history fixture + fully redacted CI output |
+| SEC-031 | Dependency integrity, early dependency advisory, and final-artifact vulnerability authority cannot be conflated | separate Gradle verification failure, OSV locked-dependency advisory finding, and Syft/Grype vulnerable final-artifact fixture |
+| SEC-032 | Required DevSecOps evidence cannot be bypassed by scanner/feed outage or stale data | Gitleaks/Semgrep/OSV/Grype/Cosign/Kyverno failure/freshness negatives under ADR-0035/0038/0045 |
 
 ## Security-gate rule
 
-`production-single-server` lowers infrastructure availability only. It does not weaken MFA, Authorization, RLS, OpenBao, WAF, trusted client identity, semantic quota safety, admission, supply-chain, audit, or telemetry privacy.
+`production-single-server` lowers infrastructure availability only. It does not weaken MFA, Authorization, RLS, OpenBao, WAF, trusted client identity, semantic quota safety, source/secret/dependency-advisory scanning, final-artifact vulnerability policy, signing/provenance/SBOM admission, audit, or telemetry privacy.
 
 ADR-0044 ordinary telemetry is best-effort/bounded. Required security/privileged audit is separate authoritative evidence and cannot be silently reclassified as Loki/Collector telemetry.
 
-A failed applicable security gate blocks the dependent production promotion until remediation and revalidation.
+ADR-0045 owns the selected DevSecOps tool responsibility map. OSV-Scanner is early declared/locked dependency advisory feedback; Syft+Grype own final-image release/deployed-artifact vulnerability evidence. Trivy and OWASP Dependency-Check are not missing required controls in the current baseline; introducing them requires a reviewed distinct-coverage decision.
+
+A failed applicable security gate blocks the dependent merge/promotion boundary until remediation and revalidation.

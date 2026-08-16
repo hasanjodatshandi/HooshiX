@@ -49,7 +49,9 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Architecture test | ArchUnit | mandatory Java architecture rules |
 | Formatting | Spotless + one approved pinned formatter | exact plugin/formatter in build metadata |
 | Java bug analysis | SpotBugs | blocking production-code gate |
-| Source policy/SAST | repository Semgrep rules + approved SAST | exact rules/tools pinned in CI |
+| Source policy/SAST | repository Semgrep CLI/rules | ADR-0039/0045; exact Semgrep image/tool and rules pinned in CI; separate Semgrep products are not implied |
+| Secret scanning | Gitleaks CLI 8.30.1 | ADR-0045; current-tree + Git-history scan; native release artifact integrity pinned in CI; no raw secret output |
+| Dependency advisory scan | OSV-Scanner 2.4.0 | ADR-0045; early declared/locked dependency advisory feedback; exact Linux/x64 artifact SHA-256 pinned in implemented service CI; not final-image authority |
 | CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
 | BDD | Cucumber-JVM + Gherkin | critical behavior only |
 | Frontend unit/component | Vitest + React Testing Library | frontend lockfile |
@@ -74,11 +76,11 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
 | Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
-| Secret authority | OpenBao 2.6.1 | unchanged by ADR-0042/0043/0044 |
+| Secret authority | OpenBao 2.6.1 | unchanged by ADR-0042/0043/0044/0045 |
 | Admission policy | Kyverno 1.18.2 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
-| Image signing | Cosign 3.0.6 | admission verification |
-| SBOM | CycloneDX JSON attestation; Syft pinned in CI | signed/indexed by image digest |
-| Vulnerability correlation | Grype pinned in CI | final-image SBOM + owned exceptions |
+| Image signing | Cosign 3.0.6 | ADR-0017/0045; exact image signature + provenance + signed SBOM attestation |
+| SBOM | Syft 1.51.0 -> CycloneDX JSON | ADR-0035/0045; generated from exact final releasable image; signed/indexed by image digest |
+| Final-artifact vulnerability correlation | Grype 0.117.0 | ADR-0035/0038/0045; final-image/SBOM findings + owned exceptions; scanner/feed freshness is release authority |
 | OpenTelemetry Collector | `otelcol-contrib` 0.157.0 | ADR-0044; internal OTLP + node-local log collection; exact image digest pinned in GitOps |
 | Metrics | Prometheus 3.13.2 LTS | application scrape + platform metrics |
 | Alerting | Alertmanager 0.33.1 | alert routing |
@@ -150,7 +152,7 @@ external black-box host-down signal required before production
 
 All observability components share the host failure/capacity domain and do not create HA. Their CPU/RAM/IO/disk/cardinality is included in the complete-stack benchmark. Required privileged/security audit remains separately durable/off-host.
 
-Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, FIDO2/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.1, and unchanged end-user MFA.
+Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, FIDO2/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.1, unchanged end-user MFA, and ADR-0045 pre-runtime DevSecOps gates.
 
 A `2 vCPU / 3-4 GiB RAM` host is not an approved capacity claim. Sizing requires complete-stack evidence with >=30% validated resource headroom.
 
@@ -165,6 +167,7 @@ Both profiles preserve:
 - BFF-only browser OAuth/OIDC and server-side session/token custody;
 - strict workload identity/mTLS and deny-by-default NetworkPolicy;
 - OpenBao -> External Secrets -> local mounted secrets/keys;
+- blocking source/secret/dependency-advisory checks and final-artifact SBOM/vulnerability/signing/provenance gates under ADR-0045;
 - signed/provenanced immutable artifacts and SBOM admission;
 - Kyverno CEL-based v1 production policy APIs;
 - trusted public client-address chain and ADR-0024 exact/aggregate quota semantics;
@@ -175,13 +178,17 @@ Both profiles preserve:
 
 ## 6. Version governance
 
-- exact deployed images/artifacts/packages are digest/integrity pinned by owning deployment/provisioning mechanism;
+- exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
+- Gitleaks 8.30.1 native release artifact, OSV-Scanner 2.4.0, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
 - services own Wrapper/dependency locks/verification metadata;
 - Spring Boot dependency management is default; overrides require rationale/alignment tests;
 - no agent guesses an unlisted patch;
 - security patches update one bounded compatibility set at a time;
 - platform upgrades use staging/rollback evidence;
 - safe patch/minor changes inside an approved family require current compatibility/security evidence;
+- OSV-Scanner owns early declared/locked dependency advisory feedback; Syft+Grype own final-image release/deployed-artifact vulnerability evidence;
+- Trivy and OWASP Dependency-Check are not selected current baseline tools; adding them requires ADR-0045 distinct-coverage evidence and a reviewed baseline change;
+- Semgrep CLI selection does not imply separate Semgrep Secrets/Supply Chain/hosted-product adoption;
 - Collector/Loki/Tempo upgrades must preserve OTLP/log format/storage/query compatibility and the security/cardinality controls in ADR-0044;
 - Xerial SQLite remains under Java + bundled-native advisory review;
 - unsupported/EOL versions are not production-eligible because an older baseline once named them.

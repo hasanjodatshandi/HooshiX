@@ -2,9 +2,9 @@
 
 Security is layered and fails closed when identity assurance, authorization, or security-significant dependency state cannot be proven. Reduced infrastructure availability never justifies reduced security assurance.
 
-ADR-0042 selects `production-single-server`. OpenBao, end-user MFA, tenant isolation, workload identity, signed-artifact admission, semantic-quota correctness, WAF/DDoS controls, Authorization semantics, and required audit remain invariants.
+ADR-0042 selects `production-single-server`. OpenBao, end-user MFA, tenant isolation, workload identity, signed-artifact admission, semantic-quota correctness, WAF/DDoS controls, Authorization semantics, required audit, and ADR-0045 DevSecOps source/secret/dependency-advisory/final-artifact gates remain invariants.
 
-`threat-model.md`, `security-verification-matrix.md`, and Production Readiness define threat/evidence mapping. ADR-0043 owns network/client-address trust. ADR-0044 owns ordinary observability security.
+`threat-model.md`, `security-verification-matrix.md`, and Production Readiness define threat/evidence mapping. ADR-0043 owns network/client-address trust. ADR-0044 owns ordinary observability security. ADR-0045 and `devsecops-security-toolchain.md` own the source/secret/dependency-advisory/SBOM/final-artifact-vulnerability/signing/admission tool responsibility map.
 
 ## 1. Identity/tenant isolation
 
@@ -127,13 +127,37 @@ WAF/application quotas complement upstream volumetric protection; none replaces 
 OpenBao 2.6.1 remains unchanged production secret authority with current Raft/PVC/Shamir/snapshot/restore/Kubernetes Auth/External Secrets workflows.
 
 - secrets never enter Git/images/values/logs/traces/metrics/unapproved CI;
+- ADR-0045 requires blocking Gitleaks current-tree and Git-history detection for committed secret material when implemented;
+- a real committed credential is revoked/rotated when exposure is plausible; deleting it from the latest tree is not sufficient remediation;
+- scanner output never republishes the secret into logs, annotations, or artifacts;
 - normal hot paths use validated local mounted material, not per-request OpenBao RPC;
 - key-ring reload/rotation/stale-source behavior stays fail-closed per owning service;
 - no plaintext/Git fallback under outage/capacity pressure.
 
-## 10. Supply chain/Kyverno
+## 10. DevSecOps supply chain/Kyverno
 
 Production artifacts are immutable digest-only, signed, provenance-bound, SBOM-attested, advisory-correlated, and fail-closed at admission.
+
+The current control chain is:
+
+```text
+Gitleaks -> Semgrep/static/integrity -> OSV-Scanner dependency advisory -> tests -> final image -> Syft -> Grype -> Cosign -> Kyverno -> staging -> same-digest production promotion
+```
+
+Responsibilities are distinct:
+
+- Semgrep: first-party source SAST/repository policy;
+- Gitleaks: current-tree and Git-history secret detection;
+- Gradle verification/locks: dependency integrity/reproducibility, not CVE authority;
+- OSV-Scanner: early declared/locked dependency advisory scanning on PR/push/scheduled security verification;
+- Syft: CycloneDX SBOM from the final releasable image;
+- Grype: final-image/SBOM release/deployed-artifact vulnerability correlation under ADR-0035/0038;
+- Cosign: exact-digest signature, provenance, and signed SBOM attestation;
+- Kyverno: production admission verification.
+
+A passing OSV lockfile scan is not final-image vulnerability evidence. Final-image OS/runtime/JDK/native/transitive visibility belongs to Syft+Grype.
+
+Trivy and OWASP Dependency-Check are not selected current default tools. A later addition requires ADR-0045 distinct-coverage evidence rather than tool-count duplication. Separate Semgrep Secrets/Supply Chain/hosted product capabilities are also not implied by the repository Semgrep CLI decision.
 
 Kyverno 1.18.2 remains production admission engine. New greenfield production controls use stable CEL-based `policies.kyverno.io/v1` policy types. CI/render gates reject new legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy/ClusterCleanupPolicy except a narrow migration-only exception with owner/removal deadline.
 
@@ -195,6 +219,7 @@ Single-server accepts outages but never weaker decisions:
 - Redis/time/capacity failure -> fail-closed availability, not local quota bypass;
 - missing trusted client identity -> fail closed, no caller-header fallback;
 - Authorization unavailable -> no ALLOW;
+- mandatory Gitleaks/Semgrep/OSV/Syft/Grype/Cosign/Kyverno evidence unavailable or stale beyond the policy that owns that gate -> no affected merge/promotion/bypass;
 - Kyverno unavailable -> no protected admission bypass;
 - OpenBao unavailable -> no plaintext/Git secret fallback;
 - Ambient pressure -> production gate fails, mTLS not disabled;
@@ -204,6 +229,6 @@ Single-server accepts outages but never weaker decisions:
 
 ## 14. Verification
 
-Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, and complete-stack capacity/DR.
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, and complete-stack capacity/DR.
 
 Documentation alone remains `NOT VERIFIED`.

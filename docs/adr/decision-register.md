@@ -50,6 +50,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0042 | selected single-server production profile + HA expansion profile |
 | ADR-0043 | production network/client-address/management trust boundaries |
 | ADR-0044 | Day-One observability runtime: Micrometer/OpenTelemetry/Prometheus/Loki/Tempo/Grafana/external host-down signal |
+| ADR-0045 | DevSecOps responsibility map: Semgrep, Gitleaks, OSV-Scanner, Syft, Grype, Cosign, and Kyverno |
 
 ## Superseded ADR identifiers
 
