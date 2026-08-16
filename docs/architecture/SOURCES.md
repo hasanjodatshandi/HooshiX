@@ -17,6 +17,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Semantic quota | ADR-0024 |
 | Day-One observability | ADR-0044 + `reliability-and-observability.md` |
 | PII-safe logging | ADR-0031 |
+| DevSecOps source/secret/SBOM/vulnerability/signing/admission | ADR-0045 + `devsecops-security-toolchain.md`; ADR-0017/0035/0038/0039 remain owning decisions for their scopes |
 | Compromised Password corpus/runtime | ADR-0040 + `services/compromised-password-service.md` |
 | Reference Data capability/service trigger | ADR-0041 + `services/reference-data-service.md` |
 | Authorization | ADR-0013/0026/0032/0036 + service doc |
@@ -32,6 +33,17 @@ This file is a routing/source index. It does not duplicate normative architectur
 ## External primary sources used by current decisions
 
 Use upstream/official primary sources for version, protocol, API, and support claims.
+
+### DevSecOps security toolchain
+
+- Gitleaks repository/releases: `https://github.com/gitleaks/gitleaks`
+- Gitleaks release assets/checksums: `https://github.com/gitleaks/gitleaks/releases`
+- Syft repository/releases: `https://github.com/anchore/syft`
+- Grype repository/releases: `https://github.com/anchore/grype`
+- Cosign documentation/releases: `https://docs.sigstore.dev/cosign/` and `https://github.com/sigstore/cosign/releases`
+- Kyverno image verification: `https://kyverno.io/docs/policy-types/image-validating-policy/`
+
+ADR-0045 converts these tool capabilities into the HooshiX responsibility map. Upstream tool capability does not prove that the corresponding repository gate exists or passed.
 
 ### Compromised Password
 
