@@ -3,7 +3,7 @@
 - **Reviewed:** 2026-08-16
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL — repository source/build/deployment-package evidence exists for the Compromised Password service; deployed runtime/staging/release evidence and the ADR-0045 Gitleaks/Syft/Grype/Cosign/Kyverno release chain remain `NOT VERIFIED`; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL — repository source/build/deployment-package evidence plus Semgrep and OSV locked-dependency advisory evidence exists for the Compromised Password service; deployed runtime/staging/release evidence and the ADR-0045 Gitleaks/Syft/Grype/Cosign/Kyverno release chain remain `NOT VERIFIED`; see `implementation-status.md`
 
 ## 1. Selected single-server topology
 
@@ -111,33 +111,38 @@ Single-server Loki is single-binary/non-HA; Tempo monolithic/non-HA. Collector i
 
 Trace/baggage/correlation is telemetry only, never authN/authZ/tenant/quota/idempotency/audit authority. Metric labels remain low-cardinality/PII-safe.
 
-Because local monitoring shares the host failure domain, production requires an independent external black-box availability signal outside that host. Provider remains TBD until environment selection.
+Because local monitoring shares the single-host failure domain, production requires an independent external black-box availability signal outside that host. Provider remains TBD until environment selection.
 
 Required security/privileged audit remains separate durable/off-host authority.
 
-## 7. DevSecOps source, secret, and artifact security
+## 7. DevSecOps source, secret, dependency advisory, and artifact security
 
 ADR-0045 fixes one responsibility per control:
 
 ```text
-Gitleaks -> Semgrep/static/tests -> final image -> Syft -> Grype -> Cosign -> Kyverno -> staging -> same signed digest in production
+Gitleaks -> Semgrep/static + Gradle integrity -> OSV-Scanner dependency advisory -> tests -> final image -> Syft -> Grype -> Cosign -> Kyverno -> staging -> same signed digest in production
 ```
 
 Current exact selected versions include:
 
 - Gitleaks CLI 8.30.1 for current-tree and Git-history secret scanning;
+- OSV-Scanner 2.4.0 for early declared/locked dependency advisory scanning;
 - Syft 1.51.0 for final-image CycloneDX JSON SBOM;
-- Grype 0.117.0 for final-image/SBOM vulnerability correlation;
+- Grype 0.117.0 for final-image/SBOM release/deployed-artifact vulnerability correlation;
 - Cosign 3.0.6 for signature/provenance/signed-SBOM evidence;
 - Kyverno 1.18.2 for production admission.
 
 Semgrep remains first-party source SAST/repository policy. Gradle dependency verification/locks remain dependency-integrity controls, not CVE authority.
 
-Trivy and OWASP Dependency-Check are not selected current default tools because their default roles overlap the chosen chain. They require evidence of a distinct uncovered failure class before adoption. Repository Semgrep CLI also does not imply separate Semgrep Secrets/Supply Chain products.
+OSV-Scanner 2.4.0 is already implemented for the Compromised Password service: its exact Linux/x64 artifact checksum is pinned and the Gradle lockfile scan runs in PR/push security verification and the scheduled repository security workflow. This is early dependency-advisory evidence only.
+
+Syft+Grype remain mandatory for exact final-image release/deployed-artifact vulnerability evidence because OS packages, the JDK/runtime, native libraries, and packaged transitive content may not be represented by the lockfile.
+
+Trivy and OWASP Dependency-Check are not selected current default tools because their default roles overlap the chosen OSV+Syft+Grype chain. They require evidence of a distinct uncovered failure class before adoption. Repository Semgrep CLI also does not imply separate Semgrep Secrets/Supply Chain products.
 
 A real committed secret requires revoke/rotate handling when exposure is plausible; deleting the latest line is not sufficient. Scanner output must stay redacted.
 
-The toolchain is architecture target only until corresponding CI/release gates exist and pass.
+The complete ADR-0045 chain is not implemented yet: Gitleaks/Syft/Grype/Cosign/Kyverno release/admission evidence remains `NOT VERIFIED`.
 
 ## 8. Kyverno
 
@@ -157,4 +162,4 @@ Production admission verifies mandatory digest/signature/provenance/SBOM evidenc
 
 No documentation above is runtime proof.
 
-Production approval still requires complete-stack simultaneous benchmark, >=30% CPU/RAM headroom, safe WAL+AOF+Kafka+telemetry IO, security/admission/network/quota negatives, blocking source/secret/final-artifact release evidence, real observability/alerting, external host-loss detection, restore/PITR/cold-DR evidence, and all mandatory readiness gates `PASS`.
+Production approval still requires complete-stack simultaneous benchmark, >=30% CPU/RAM headroom, safe WAL+AOF+Kafka+telemetry IO, security/admission/network/quota negatives, blocking source/secret/dependency-advisory/final-artifact release evidence, real observability/alerting, external host-loss detection, restore/PITR/cold-DR evidence, and all mandatory readiness gates `PASS`.
