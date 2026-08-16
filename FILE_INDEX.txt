@@ -1,6 +1,5 @@
 .editorconfig
 .gitattributes
-.github/workflows/apply-reviewed-dependency-metadata.yml
 .github/workflows/compromised-password-service.yml
 .github/workflows/repository-baseline.yml
 .gitignore
