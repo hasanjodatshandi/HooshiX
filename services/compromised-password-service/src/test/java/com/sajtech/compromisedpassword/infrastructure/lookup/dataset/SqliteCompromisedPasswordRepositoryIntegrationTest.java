@@ -89,7 +89,8 @@ class SqliteCompromisedPasswordRepositoryIntegrationTest {
     DatasetGuard guard = new DatasetGuard(invalid, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(guard.state()).isEqualTo(DatasetState.CORRUPT);
-    assertThatThrownBy(guard::openReadOnlyConnection).isInstanceOf(LookupUnavailableException.class);
+    assertThatThrownBy(guard::openReadOnlyConnection)
+        .isInstanceOf(LookupUnavailableException.class);
   }
 
   @Test
@@ -97,22 +98,15 @@ class SqliteCompromisedPasswordRepositoryIntegrationTest {
     Path dataset = createDataset("ABCDE" + "4".repeat(35), 1L);
     Path manifest = tempDirectory.resolve("malformed-manifest.json");
     Files.writeString(
-        manifest,
-        "{\n  \"manifest_version\": 2,\n  \"unknown\": 1\n}\n",
-        StandardCharsets.UTF_8);
+        manifest, "{\n  \"manifest_version\": 2,\n  \"unknown\": 1\n}\n", StandardCharsets.UTF_8);
     DatasetSettings settings =
-        new DatasetSettings(
-            dataset,
-            manifest,
-            sha256(manifest),
-            "GENERATED_TEST_FIXTURE",
-            1,
-            4096);
+        new DatasetSettings(dataset, manifest, sha256(manifest), "GENERATED_TEST_FIXTURE", 1, 4096);
 
     DatasetGuard guard = new DatasetGuard(settings, Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(guard.state()).isEqualTo(DatasetState.INCOMPATIBLE);
-    assertThatThrownBy(guard::openReadOnlyConnection).isInstanceOf(LookupUnavailableException.class);
+    assertThatThrownBy(guard::openReadOnlyConnection)
+        .isInstanceOf(LookupUnavailableException.class);
   }
 
   @Test
