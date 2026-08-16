@@ -122,13 +122,14 @@ class DatasetBuilderTest {
   @Test
   void rejectsMeasuredResponseSizeAboveApprovedBoundWithoutPublishingOutputs() throws Exception {
     Path source = tempDirectory.resolve("too-large-response.txt");
-    Files.writeString(
-        source, "ABCDE" + "1".repeat(35) + ":1\n", StandardCharsets.US_ASCII);
+    Files.writeString(source, "ABCDE" + "1".repeat(35) + ":1\n", StandardCharsets.US_ASCII);
     Path sqlite = tempDirectory.resolve("too-large-response.sqlite");
     Path manifest = tempDirectory.resolve("too-large-response.json");
 
     assertThatThrownBy(
-            () -> new DatasetBuilder().build(request(source, sqlite, manifest, sha256(source), 64, 1)))
+            () ->
+                new DatasetBuilder()
+                    .build(request(source, sqlite, manifest, sha256(source), 64, 1)))
         .isInstanceOf(DatasetBuildException.class)
         .extracting(exception -> ((DatasetBuildException) exception).reason())
         .isEqualTo(DatasetBuildException.Reason.COMPATIBILITY_BOUND_EXCEEDED);
@@ -186,8 +187,7 @@ class DatasetBuilderTest {
 
   private DatasetBuildRequest request(
       Path source, Path sqlite, Path manifest, String expectedSourceSha256) {
-    return request(
-        source, sqlite, manifest, expectedSourceSha256, PREFIX_BOUND, RESPONSE_BOUND);
+    return request(source, sqlite, manifest, expectedSourceSha256, PREFIX_BOUND, RESPONSE_BOUND);
   }
 
   private DatasetBuildRequest request(
