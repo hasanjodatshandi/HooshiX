@@ -9,8 +9,9 @@ This matrix records production technology combinations that must remain compatib
 | Gradle | 9.6.1 | selected Spring Boot build plugin/toolchain |
 | Gitleaks CLI | 8.30.1 | ADR-0045 native CLI current-tree + Git-history secret scan; redacted output; exact release artifact integrity pinned in CI |
 | Semgrep | repository-pinned CLI/image + rules | ADR-0039/0045 first-party SAST/source policy; separate Semgrep Secrets/Supply Chain products are not implied |
+| OSV-Scanner | 2.4.0 | ADR-0045 early declared/locked dependency advisory scan; exact Linux/x64 artifact checksum pinned; complements but does not replace final-image Grype authority |
 | Syft | 1.51.0 | ADR-0035/0045 final releasable image -> CycloneDX JSON SBOM bound to exact image digest |
-| Grype | 0.117.0 | ADR-0035/0038/0045 scans exact final image/Syft SBOM; approved advisory DB/feed freshness and exception policy |
+| Grype | 0.117.0 | ADR-0035/0038/0045 scans exact final image/Syft SBOM; approved advisory DB/feed freshness and exception policy; release/deployed-artifact vulnerability authority |
 | Cosign | 3.0.6 | exact image digest signature + provenance + signed CycloneDX SBOM attestation; compatible with Kyverno verification policy |
 | HIBP Pwned Passwords | SHA-1 offline corpus | ADR-0040: official Pwned Password source/range semantics; SHA-1 only for screening; complete acquisition/provenance/freshness/full-corpus cardinality evidence |
 | Xerial SQLite JDBC / SQLite | 3.53.2.1 / 3.53.2 | Java 25/Linux native compatibility; 20-byte SHA-1 immutable read-only dataset; no runtime provider/mutable persistence; SBOM/advisory review |
@@ -57,6 +58,7 @@ An upgrade or initial profile approval is complete only after the affected set p
 - service contract/build compatibility;
 - Gitleaks current-tree/Git-history behavior remains blocking and redacted;
 - Semgrep rule compatibility and positive/negative fixtures remain high signal;
+- OSV-Scanner declared/locked dependency parsing/advisory behavior remains compatible with the owning service's dependency evidence and remains separate from final-artifact authority;
 - Syft final-image CycloneDX output remains consumable by the selected Grype/Cosign/Kyverno chain;
 - Grype scanner/feed freshness and ADR-0035/0038 severity/exception behavior remain correct;
 - Cosign signature/provenance/signed-SBOM evidence remains verifiable by Kyverno;
@@ -70,7 +72,7 @@ An upgrade or initial profile approval is complete only after the affected set p
 - selected-profile Kafka/Redis/PostgreSQL failure/recovery behavior without false HA claims;
 - HIBP corpus acquisition/hash/freshness and Xerial/native/dataset-format compatibility when Compromised Password changes;
 - backup/PITR/restore evidence where relevant;
-- final-artifact vulnerability/advisory correlation;
+- early OSV dependency advisory + final-artifact Grype vulnerability/advisory correlation remain distinct and operational;
 - safe rollback or explicit fail-forward;
 - for single-server, simultaneous CPU/memory/IO/network/cardinality/storage evidence with >=30% validated headroom and no security/observability bypass.
 
