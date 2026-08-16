@@ -57,22 +57,25 @@ jobs:
       - name: Apply only reviewed generated files
         run: |
           set -euo pipefail
-          cp /tmp/generated-dependency-metadata/gradle.lockfile \
-            services/compromised-password-service/gradle.lockfile
-          cp /tmp/generated-dependency-metadata/gradle/verification-metadata.xml \
-            services/compromised-password-service/gradle/verification-metadata.xml
+          lock_path='services/compromised-password-service/gradle.lockfile'
+          metadata_path='services/compromised-password-service/gradle/verification-metadata.xml'
+          cp /tmp/generated-dependency-metadata/gradle.lockfile "${lock_path}"
+          cp /tmp/generated-dependency-metadata/gradle/verification-metadata.xml "${metadata_path}"
           git diff --check
-          git diff --exit-code --quiet && {
-            echo 'No dependency metadata changes were produced.' >&2
-            exit 1
-          }
           changed="$(git diff --name-only)"
-          expected=$'services/compromised-password-service/gradle.lockfile\nservices/compromised-password-service/gradle/verification-metadata.xml'
-          test "${changed}" = "${expected}"
+          test -n "${changed}"
+          while IFS= read -r path; do
+            case "${path}" in
+              "${lock_path}"|"${metadata_path}") ;;
+              *)
+                printf 'Unexpected generated-file change: %s\n' "${path}" >&2
+                exit 1
+                ;;
+            esac
+          done <<< "${changed}"
+          grep -Fxq "${lock_path}" <<< "${changed}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            services/compromised-password-service/gradle.lockfile \
-            services/compromised-password-service/gradle/verification-metadata.xml
+          git add "${lock_path}" "${metadata_path}"
           git commit -m 'Regenerate gRPC dependency verification metadata'
           git push origin HEAD:agent/security-performance-freshness-audit
