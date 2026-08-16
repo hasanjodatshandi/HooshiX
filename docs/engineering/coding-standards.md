@@ -2,7 +2,7 @@
 
 This is the canonical implementation standard for Java backend services. Current architecture/ADRs own product boundaries; SQL/Flyway details are in `sql-and-flyway-coding-standards.md`; executable build/CI gates are in `build-and-ci-quality-enforcement.md`.
 
-Machine-checkable rules SHOULD be enforced by ArchUnit, Spotless, SpotBugs, Semgrep, Gitleaks, dependency verification, contract/schema checks, final-artifact SBOM/vulnerability/signing checks, render/policy checks, or CI rather than agent memory.
+Machine-checkable rules SHOULD be enforced by ArchUnit, Spotless, SpotBugs, Semgrep, Gitleaks, Gradle dependency verification, OSV-Scanner, contract/schema checks, final-artifact Syft/Grype/Cosign checks, render/policy checks, or CI rather than agent memory.
 
 ## 1. Architecture and dependency direction
 
@@ -150,7 +150,9 @@ Each independent service owns Wrapper/Kotlin DSL build, dependency verification/
 - scanner output must remain redacted and must not republish discovered secret values;
 - Semgrep remains first-party source SAST/repository policy; its CLI presence does not imply separate Semgrep Secrets/Supply Chain products;
 - Gradle verification/locks prove dependency integrity/reproducibility, not vulnerability/CVE status;
+- OSV-Scanner provides early declared/locked dependency advisory feedback on applicable CI/scheduled checks and is not final-image vulnerability authority;
 - the exact final releasable image is inventoried by Syft, vulnerability-correlated by Grype, signed/provenance/SBOM-attested by Cosign, and verified at production admission by Kyverno under ADR-0017/0035/0038/0045;
+- OSV-Scanner and Grype are complementary: OSV finds advisory issues early in declared/locked dependencies; Syft+Grype own exact final-image release/deployed-artifact evidence;
 - Trivy and OWASP Dependency-Check are not selected baseline tools unless a later reviewed distinct-coverage decision changes that;
 - production security controls have safe defaults;
 - generated code has explicit narrow paths;
@@ -269,6 +271,7 @@ Unless a current decision explicitly permits them:
 - broad suppressions/disabled tests/`ignoreFailures`;
 - suppressing a real committed credential instead of revoke/rotate remediation;
 - treating dependency locks as vulnerability evidence;
+- treating OSV-Scanner lockfile results as final-image vulnerability evidence;
 - adding duplicate security scanners without ADR-0045 distinct-coverage justification;
 - public Traefik dashboard/insecure trust/direct BFF bypass;
 - default ServiceAccount/allow-all Istio/permanent PERMISSIVE;
@@ -286,6 +289,7 @@ Unless a current decision explicitly permits them:
 | source security/logging/framework misuse | Semgrep/SAST |
 | committed/current-tree/Git-history secrets | Gitleaks |
 | dependency integrity | Gradle verification/locks |
+| declared/locked dependency advisory feedback | OSV-Scanner |
 | contracts/migrations/datasets | Gradle + Testcontainers/fixtures + Buf/OpenAPI |
 | observability privacy/cardinality/context | unit/integration/canary/static + Collector config tests |
 | quota time/cardinality/network safety | Redis/integration/clock/chaos/load tests |
@@ -317,7 +321,7 @@ Before implementation code changes, review:
 16. constructor injection/ports/no lookup;
 17. Ambient/workload-identity/policy impact;
 18. dependency registry and negative failure/auth tests;
-19. same immutable digest staging->prod tied to Git revision plus Syft/Grype/Cosign/Kyverno evidence when release-relevant;
+19. same immutable digest staging->prod tied to Git revision plus OSV early advisory and Syft/Grype/Cosign/Kyverno release evidence where applicable;
 20. migration/reference-dataset/observability/security-context workflow compliance.
 
 Compilation alone is never completion evidence.
