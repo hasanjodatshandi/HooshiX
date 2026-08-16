@@ -19,7 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class BoundedLookupCompromisedPasswords implements LookupCompromisedPasswords {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BoundedLookupCompromisedPasswords.class);
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(BoundedLookupCompromisedPasswords.class);
   private static final String TELEMETRY_FAILURE_EVENT = "compromised_password_telemetry_failure";
 
   private final LookupCompromisedPasswords delegate;
