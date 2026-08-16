@@ -40,7 +40,7 @@ The source file is read with bounded buffers. It is never copied into the reposi
 
 ## Production build command
 
-From `services/compromised-password-service`:
+Select the reviewed compatibility bounds from real complete-corpus release evidence plus the approved safety margin before the production build. From `services/compromised-password-service`:
 
 ```bash
 ./gradlew buildCompromisedPasswordDataset --args="\
@@ -54,7 +54,9 @@ From `services/compromised-password-service`:
 --acquisition-tool-name <safe-token> \
 --acquisition-tool-version <safe-token> \
 --acquisition-tool-sha256 <64-lowercase-hex> \
---build-git-revision <40-lowercase-hex>"
+--build-git-revision <40-lowercase-hex> \
+--max-prefix-cardinality <reviewed-positive-integer> \
+--max-serialized-response-bytes <reviewed-positive-integer>"
 ```
 
 The output paths must not already exist. Source, SQLite output, and manifest must be distinct regular local paths.
@@ -69,8 +71,9 @@ Before publication, the builder:
 4. runs `PRAGMA integrity_check`;
 5. streams the final table in `(prefix, hash)` order and re-validates prefix/hash/count consistency;
 6. measures unique `record_count`, duplicate-line aggregation, observed maximum prefix cardinality, and exact Protobuf response bytes per prefix;
-7. computes a canonical logical `content_sha256` and exact `sqlite_artifact_sha256`;
-8. publishes the manifest and then the SQLite artifact only after all checks pass, with SQLite as the final publish step.
+7. fails before publication if either measured maximum exceeds its reviewed compatibility bound;
+8. computes a canonical logical `content_sha256` and exact `sqlite_artifact_sha256`;
+9. publishes the version-2 manifest and then the SQLite artifact only after all checks pass, with SQLite as the final publish step.
 
 `content_sha256` is SHA-256 over each final row in `(prefix, hash)` order using fixed binary encoding:
 
@@ -80,7 +83,9 @@ hash:             20 raw SHA-1 bytes
 occurrence_count: 8-byte positive big-endian integer
 ```
 
-The observed cardinality and response-size values are evidence inputs. They do not invent production compatibility limits. Production limits still require review against a real complete-corpus run plus safety margin.
+The version-2 manifest records both measured maxima and the reviewed compatibility bounds used by the build. Production bounds are not invented by the builder; they require review against a real complete-corpus run plus safety margin.
+
+At runtime, deployment supplies the exact SHA-256 of the approved manifest and the approved source kind/bounds. The service verifies the manifest digest before trusting its fields, then verifies source kind, format/schema versions, freshness, declared bounds, the SQLite artifact SHA-256, SQLite schema/integrity, and measured compatibility. Any mismatch fails closed. Runtime does not truncate a response to fit a bound.
 
 ## Repository verification
 
@@ -89,9 +94,10 @@ Normal PR CI generates deterministic source records locally and marks their mani
 The service workflow also verifies that:
 
 - no raw corpus or generated SQLite database is tracked in Git;
-- the real Gradle dataset-builder command works against the generated fixture;
+- the real Gradle dataset-builder command works against the generated fixture with explicit compatibility bounds;
 - the dataset-builder package is absent from the runtime Spring Boot JAR;
-- Semgrep blocks network APIs inside the builder package.
+- Semgrep blocks network APIs inside the builder package;
+- the runtime release path rejects invalid manifest/dataset identity and compatibility evidence.
 
 Runtime therefore retains only the immutable SQLite reader and has no build/download path.
 
@@ -101,7 +107,7 @@ Repository implementation of the builder does not by itself prove:
 
 - approved real HIBP source acquisition/provenance or licensing review;
 - current <=35-day production freshness;
-- real complete-corpus cardinality/response measurements;
+- real complete-corpus cardinality/response measurements and reviewed production bounds;
 - disk-backed production p95/p99/saturation;
 - signing, SBOM/provenance, admission, deployment, or recovery evidence.
 
