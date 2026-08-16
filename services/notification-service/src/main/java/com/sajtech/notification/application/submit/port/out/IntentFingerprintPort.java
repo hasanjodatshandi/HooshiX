@@ -5,5 +5,9 @@ import com.sajtech.notification.application.submit.model.FingerprintDigest;
 public interface IntentFingerprintPort {
   FingerprintDigest compute(byte[] canonicalMaterial);
 
-  boolean constantTimeEquals(byte[] left, byte[] right);
+  boolean verify(
+      byte[] canonicalMaterial,
+      String fingerprintVersion,
+      String fingerprintKeyId,
+      byte[] expectedDigest);
 }
