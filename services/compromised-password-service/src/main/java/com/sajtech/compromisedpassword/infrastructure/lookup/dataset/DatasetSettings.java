@@ -39,6 +39,7 @@ public record DatasetSettings(
   private static void validatePath(Path path, String label) {
     String configuredPath = path.toString();
     if (configuredPath.indexOf('\0') >= 0
+        || configuredPath.contains("%")
         || configuredPath.contains("?")
         || configuredPath.contains("#")) {
       throw new IllegalArgumentException(label + " path must not contain SQLite URI controls");
