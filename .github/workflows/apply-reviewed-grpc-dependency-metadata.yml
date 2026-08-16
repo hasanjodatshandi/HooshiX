@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s  %s\n' \
-            '4d0e7ca702e76dc7c737724c52295cbd4688024cc752b5167352e3693ed17cfe' \
+            '9e142981e0d00a96cf5420af5f279fc69ef19ee0345ae2a36971d5ae9da1ef7d' \
             '/tmp/generated-dependency-metadata/gradle.lockfile' | sha256sum --check --strict -
           printf '%s  %s\n' \
             'dd1ee3904abaabcbb3f34a0e4c4a284d931bd60ce2aea5703895217503e5f8d6' \
