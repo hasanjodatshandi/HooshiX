@@ -49,11 +49,16 @@ This catalog defines properties that should be continuously verified. A row is n
 | AFF-043 | Repository implementation/evidence status is honest | tree/evidence checks | PR | block misleading claim |
 | AFF-044 | Merged ADR IDs are immutable/non-reused | governance check against main history/register | PR | block |
 | AFF-045 | One PR represents one coherent engineering change | diff/scope review | PR | split or re-scope |
+| AFF-046 | Current-tree and committed Git-history secrets are blocked without secret disclosure in scanner output | Gitleaks current-tree/history + commit-then-delete fixture + redaction test | PR | block |
+| AFF-047 | Dependency integrity and vulnerability scanning remain distinct authorities | Gradle verification failure + Syft/Grype vulnerable final-artifact fixture | PR/release | block misleading/bypassed evidence |
+| AFF-048 | Final releasable image has digest-bound Syft SBOM, Grype decision, Cosign signature/provenance/signed-SBOM evidence | release pipeline + artifact verification | release | block promotion |
+| AFF-049 | DevSecOps scanner/feed/signing/admission failure or stale evidence cannot silently permit promotion | failure/freshness/negative fixtures under ADR-0035/0038/0045 | PR/release | block promotion |
 
 ## Interpretation
 
 - Fitness functions do not create implementation evidence by existing in this table.
 - Single-server availability exceptions never weaken security/correctness functions.
-- A capacity problem is not permission to disable OpenBao, Kyverno, Ambient, WAF, PITR, MFA, fail-closed quota/Authorization, required audit, or client-address trust.
+- A capacity problem is not permission to disable OpenBao, Kyverno, Ambient, WAF, PITR, MFA, fail-closed quota/Authorization, required audit, client-address trust, secret scanning, or signed final-artifact gates.
 - ADR-0044 ordinary telemetry is best-effort/bounded; privileged/security audit remains separate authority.
+- ADR-0045 owns the selected DevSecOps tool roles. Trivy/OWASP Dependency-Check remain unselected unless a distinct coverage gap is reviewed.
 - Blocking functions need concrete executable CI/release/scheduled jobs before compliance is claimed.
