@@ -14,7 +14,7 @@ The architecture remains acceptable as a named single-server production profile 
 - Day-One observability runtime/evidence -> ADR-0044;
 - Compromised Password source/hash/freshness/provenance -> ADR-0040;
 - quota common-mode clock/cardinality/collateral network behavior -> ADR-0024;
-- DevSecOps source/secret/final-artifact tool responsibilities -> ADR-0045;
+- DevSecOps source/secret/dependency-advisory/final-artifact tool responsibilities -> ADR-0045;
 - stable post-merge ADR identifiers -> current-only/documentation standards;
 - coherent-change PR governance -> repository workflow;
 - stricter Reference Data independent-service trigger -> ADR-0041;
@@ -120,7 +120,7 @@ Local telemetry shares the single-host failure domain, so production requires in
 ADR-0045 standardizes one authority per failure class:
 
 ```text
-Gitleaks -> Semgrep/static/tests -> final image -> Syft -> Grype -> Cosign -> Kyverno -> staging -> same signed digest in production
+Gitleaks -> Semgrep/static + Gradle integrity -> OSV-Scanner dependency advisory -> tests -> final image -> Syft -> Grype -> Cosign -> Kyverno -> staging -> same signed digest in production
 ```
 
 Current selected roles:
@@ -128,22 +128,27 @@ Current selected roles:
 - Gitleaks 8.30.1: committed/current-tree and protected Git-history secret detection;
 - Semgrep: first-party SAST/repository-owned source policy;
 - Gradle verification/locks: dependency integrity/reproducibility only;
+- OSV-Scanner 2.4.0: early declared/locked dependency advisory scanning;
 - Syft 1.51.0: final-image CycloneDX JSON SBOM;
-- Grype 0.117.0: final-image/SBOM vulnerability correlation under ADR-0035/0038;
+- Grype 0.117.0: final-image/SBOM release/deployed-artifact vulnerability correlation under ADR-0035/0038;
 - Cosign 3.0.6: exact-digest signature, provenance, and signed SBOM attestation;
 - Kyverno 1.18.2: production admission.
 
+The current Compromised Password CI already implements OSV-Scanner 2.4.0 with an exact Linux/x64 SHA-256 and scans the Gradle lockfile. The scheduled repository security workflow reuses that service security suite, so declared/locked dependency advisory scanning also runs without a source change. This is early dependency feedback only.
+
+Final-image vulnerability authority remains Syft+Grype because the final image can contain OS packages, JDK/runtime files, native libraries, and packaged transitive components outside the lockfile.
+
 A real committed credential requires revoke/rotate handling when exposure is plausible; removing the latest-tree line alone is not remediation. Scanner output remains redacted.
 
-Trivy and OWASP Dependency-Check are intentionally not selected default controls because their expected default roles overlap the current chain. They can be proposed later only for a distinct measured coverage gap. Repository Semgrep CLI similarly does not imply separate Semgrep Secrets/Supply Chain product enablement.
+Trivy and OWASP Dependency-Check are intentionally not selected default controls because their expected default roles overlap the current OSV+Syft+Grype chain. They can be proposed later only for a distinct measured coverage gap. Repository Semgrep CLI similarly does not imply separate Semgrep Secrets/Supply Chain product enablement.
 
-This is an architecture decision, not executable evidence. Current repository implementation status remains: service-specific Semgrep exists; Gitleaks/Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
+This is an architecture decision, not executable evidence. Current repository implementation status is: service-specific Semgrep and OSV locked-dependency scanning exist; Gitleaks/Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
 
 ## Kyverno review
 
 The current Kyverno 1.18.2 line uses stable CEL-based `policies.kyverno.io/v1` policy types for greenfield HooshiX production controls. CI/render gates reject new legacy ClusterPolicy/CleanupPolicy families unless a narrow migration-only exception exists.
 
-Production admission remains separate from vulnerability database lookup. Grype promotion decisions and continuous rescanning own vulnerability freshness; Kyverno verifies required immutable artifact identity/evidence.
+Production admission remains separate from vulnerability database lookup. Grype promotion decisions and continuous rescanning own final-artifact vulnerability freshness; Kyverno verifies required immutable artifact identity/evidence.
 
 ## Governance review
 
@@ -173,6 +178,7 @@ Still rejected:
 - public OTLP/management endpoints or broad Collector host access;
 - suppressing a real committed credential instead of revoke/rotate remediation;
 - treating Gradle dependency verification/locks as vulnerability evidence;
+- treating OSV-Scanner lockfile results as final-image vulnerability evidence;
 - adding Trivy/OWASP Dependency-Check merely to increase scanner count without a distinct coverage objective;
 - treating repository Semgrep CLI as proof of separate Semgrep Secrets/Supply Chain product coverage;
 - bypassing stale/unavailable required scanner/feed/signature/provenance/SBOM/admission evidence;
@@ -183,6 +189,6 @@ Still rejected:
 
 Architecture has moved from design into its first executable service implementation, but production readiness is **not** proven.
 
-The repository contains repository-governance CI and the first executable Compromised Password service slice under `services/compromised-password-service/`. It still lacks root `deploy/` and `infrastructure/` platform implementation, other application services, production corpus/release evidence, complete ADR-0045 DevSecOps release-chain implementation, and deployed observability/platform runtime. Repository source and CI evidence are not staging/runtime/release evidence.
+The repository contains repository-governance CI and the first executable Compromised Password service slice under `services/compromised-password-service/`. It also has service-specific Semgrep and OSV locked-dependency security gates. It still lacks root `deploy/` and `infrastructure/` platform implementation, other application services, production corpus/release evidence, complete ADR-0045 DevSecOps release-chain implementation, and deployed observability/platform runtime. Repository source and CI evidence are not staging/runtime/release evidence.
 
-Production traffic remains blocked until applicable readiness gates have executed evidence, including Gitleaks tree/history scanning, final-image Syft/Grype/Cosign evidence, Kyverno admission negatives, quota fault/cardinality tests, HIBP corpus build evidence, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.
+Production traffic remains blocked until applicable readiness gates have executed evidence, including Gitleaks tree/history scanning, current OSV dependency-advisory state, final-image Syft/Grype/Cosign evidence, Kyverno admission negatives, quota fault/cardinality tests, HIBP corpus build evidence, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.
