@@ -55,6 +55,7 @@ docs/adr/0041-define-reference-data-service-v1.md
 docs/adr/0042-define-single-server-production-profile-v1.md
 docs/adr/0043-define-production-network-trust-boundaries-v1.md
 docs/adr/0044-define-day-one-observability-runtime-v1.md
+docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -68,6 +69,7 @@ docs/architecture/data-and-messaging.md
 docs/architecture/dependency-criticality-matrix.md
 docs/architecture/dependency-criticality.schema.json
 docs/architecture/dependency-criticality.yaml
+docs/architecture/devsecops-security-toolchain.md
 docs/architecture/implementation-status.md
 docs/architecture/network-architecture.md
 docs/architecture/performance-and-bottlenecks.md
