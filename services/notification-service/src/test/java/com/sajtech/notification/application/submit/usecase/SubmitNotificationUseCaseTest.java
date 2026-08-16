@@ -41,10 +41,11 @@ class SubmitNotificationUseCaseTest {
   private final MutableDatabaseTime databaseTime =
       new MutableDatabaseTime(Instant.parse("2026-08-16T00:00:00Z"));
   private final InMemoryRepository repository = new InMemoryRepository();
+  private final Sha256Fingerprint fingerprints = new Sha256Fingerprint();
   private final SubmitNotificationUseCase useCase = createUseCase();
 
   @Test
-  void equalReplayReturnsOriginalAcceptedResultBeforeCurrentExpiryEvaluation() {
+  void equalReplayReturnsOriginalAcceptedResultBeforeFreshWork() {
     var first = useCase.submit(command("12345678"));
     databaseTime.now = Instant.parse("2026-08-17T00:00:00Z");
 
@@ -54,10 +55,12 @@ class SubmitNotificationUseCaseTest {
     assertThat(replay.acceptedAt()).isEqualTo(first.acceptedAt());
     assertThat(replay.replay()).isTrue();
     assertThat(databaseTime.reads).isEqualTo(1);
+    assertThat(fingerprints.computes).isEqualTo(1);
+    assertThat(fingerprints.verifications).isEqualTo(1);
   }
 
   @Test
-  void conflictingReplayFailsBeforeCurrentExpiryEvaluation() {
+  void conflictingReplayFailsBeforeFreshWork() {
     useCase.submit(command("12345678"));
     databaseTime.now = Instant.parse("2026-08-17T00:00:00Z");
 
@@ -66,6 +69,8 @@ class SubmitNotificationUseCaseTest {
         .extracting(exception -> ((NotificationSubmissionException) exception).error())
         .isEqualTo(NotificationSubmissionError.REQUEST_ID_CONFLICT);
     assertThat(databaseTime.reads).isEqualTo(1);
+    assertThat(fingerprints.computes).isEqualTo(1);
+    assertThat(fingerprints.verifications).isEqualTo(1);
   }
 
   private SubmitNotificationUseCase createUseCase() {
@@ -77,7 +82,7 @@ class SubmitNotificationUseCaseTest {
     return new SubmitNotificationUseCase(
         intentFactory,
         new FingerprintMaterialEncoder(),
-        new Sha256Fingerprint(),
+        fingerprints,
         new ImmediateTransactionRunner(),
         repository,
         templates(),
@@ -123,8 +128,12 @@ class SubmitNotificationUseCaseTest {
   }
 
   private static final class Sha256Fingerprint implements IntentFingerprintPort {
+    private int computes;
+    private int verifications;
+
     @Override
     public FingerprintDigest compute(byte[] canonicalMaterial) {
+      computes++;
       return new FingerprintDigest("test-v1", "test-key", sha256(canonicalMaterial));
     }
 
@@ -134,6 +143,7 @@ class SubmitNotificationUseCaseTest {
         String fingerprintVersion,
         String fingerprintKeyId,
         byte[] expectedDigest) {
+      verifications++;
       return "test-v1".equals(fingerprintVersion)
           && "test-key".equals(fingerprintKeyId)
           && MessageDigest.isEqual(expectedDigest, sha256(canonicalMaterial));
