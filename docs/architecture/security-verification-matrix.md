@@ -37,15 +37,15 @@ This matrix maps material security properties to executable evidence. A document
 | SEC-028 | Single-server capacity does not force security downgrade | simultaneous app+DB+Redis+Kafka+mesh+WAF+Kyverno+OpenBao+observability load with >=30% headroom and no bypass |
 | SEC-029 | Email identity comparison/delivery representation remains current product rule | case-only uniqueness/login/reservation + delivery-preservation tests |
 | SEC-030 | A committed secret remains detectable after deletion from the latest tree | Gitleaks synthetic commit-then-delete history fixture + fully redacted CI output |
-| SEC-031 | Dependency integrity and vulnerability authority cannot be conflated | separate Gradle verification failure fixture and Syft/Grype vulnerable final-artifact fixture |
-| SEC-032 | Required DevSecOps evidence cannot be bypassed by scanner/feed outage or stale data | Gitleaks/Semgrep/Grype/Cosign/Kyverno failure/freshness negatives under ADR-0035/0038/0045 |
+| SEC-031 | Dependency integrity, early dependency advisory, and final-artifact vulnerability authority cannot be conflated | separate Gradle verification failure, OSV locked-dependency advisory finding, and Syft/Grype vulnerable final-artifact fixture |
+| SEC-032 | Required DevSecOps evidence cannot be bypassed by scanner/feed outage or stale data | Gitleaks/Semgrep/OSV/Grype/Cosign/Kyverno failure/freshness negatives under ADR-0035/0038/0045 |
 
 ## Security-gate rule
 
-`production-single-server` lowers infrastructure availability only. It does not weaken MFA, Authorization, RLS, OpenBao, WAF, trusted client identity, semantic quota safety, source/secret scanning, final-artifact vulnerability policy, signing/provenance/SBOM admission, audit, or telemetry privacy.
+`production-single-server` lowers infrastructure availability only. It does not weaken MFA, Authorization, RLS, OpenBao, WAF, trusted client identity, semantic quota safety, source/secret/dependency-advisory scanning, final-artifact vulnerability policy, signing/provenance/SBOM admission, audit, or telemetry privacy.
 
 ADR-0044 ordinary telemetry is best-effort/bounded. Required security/privileged audit is separate authoritative evidence and cannot be silently reclassified as Loki/Collector telemetry.
 
-ADR-0045 owns the selected DevSecOps tool responsibility map. Trivy and OWASP Dependency-Check are not missing required controls in the current baseline; introducing them requires a reviewed distinct-coverage decision.
+ADR-0045 owns the selected DevSecOps tool responsibility map. OSV-Scanner is early declared/locked dependency advisory feedback; Syft+Grype own final-image release/deployed-artifact vulnerability evidence. Trivy and OWASP Dependency-Check are not missing required controls in the current baseline; introducing them requires a reviewed distinct-coverage decision.
 
-A failed applicable security gate blocks the dependent production promotion until remediation and revalidation.
+A failed applicable security gate blocks the dependent merge/promotion boundary until remediation and revalidation.
