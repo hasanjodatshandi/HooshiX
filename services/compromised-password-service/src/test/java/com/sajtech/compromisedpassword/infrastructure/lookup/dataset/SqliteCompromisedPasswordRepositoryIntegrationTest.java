@@ -110,6 +110,46 @@ class SqliteCompromisedPasswordRepositoryIntegrationTest {
   }
 
   @Test
+  void manifestMissingRequiredCommaFailsClosed() throws Exception {
+    Path dataset = createDataset("ABCDE" + "7".repeat(35), 1L);
+    DatasetSettings valid = createSettings(dataset, NOW, 1, 4096, 1, 128, "missing-comma-source");
+    Path manifest = tempDirectory.resolve("missing-comma-manifest.json");
+    String malformed =
+        Files.readString(valid.manifestPath(), StandardCharsets.UTF_8)
+            .replace("  \"format_version\": 1,\n", "  \"format_version\": 1\n");
+    Files.writeString(manifest, malformed, StandardCharsets.UTF_8);
+    DatasetSettings settings =
+        new DatasetSettings(dataset, manifest, sha256(manifest), "GENERATED_TEST_FIXTURE", 1, 4096);
+
+    DatasetGuard guard = new DatasetGuard(settings, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    assertThat(guard.state()).isEqualTo(DatasetState.INCOMPATIBLE);
+    assertThatThrownBy(guard::openReadOnlyConnection)
+        .isInstanceOf(LookupUnavailableException.class);
+  }
+
+  @Test
+  void manifestDuplicateFieldFailsClosed() throws Exception {
+    Path dataset = createDataset("ABCDE" + "8".repeat(35), 1L);
+    DatasetSettings valid = createSettings(dataset, NOW, 1, 4096, 1, 128, "duplicate-source");
+    Path manifest = tempDirectory.resolve("duplicate-field-manifest.json");
+    String malformed =
+        Files.readString(valid.manifestPath(), StandardCharsets.UTF_8)
+            .replace(
+                "  \"format_version\": 1,\n",
+                "  \"format_version\": 1,\n  \"format_version\": 1,\n");
+    Files.writeString(manifest, malformed, StandardCharsets.UTF_8);
+    DatasetSettings settings =
+        new DatasetSettings(dataset, manifest, sha256(manifest), "GENERATED_TEST_FIXTURE", 1, 4096);
+
+    DatasetGuard guard = new DatasetGuard(settings, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    assertThat(guard.state()).isEqualTo(DatasetState.INCOMPATIBLE);
+    assertThatThrownBy(guard::openReadOnlyConnection)
+        .isInstanceOf(LookupUnavailableException.class);
+  }
+
+  @Test
   void runtimeCardinalityGuardFailsClosedInsteadOfTruncating() throws Exception {
     Path dataset = createDataset("ABCDE" + "5".repeat(35), 1L);
     append(dataset, "ABCDE" + "6".repeat(35), 2L);
