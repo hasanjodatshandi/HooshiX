@@ -17,8 +17,7 @@ import java.util.regex.Pattern;
 final class DatasetReleaseManifestReader {
   private static final long MAX_MANIFEST_BYTES = 64 * 1024;
   private static final Pattern TOP_LEVEL_SCALAR =
-      Pattern.compile(
-          "  \\\"([a-z0-9_]+)\\\": (?:\\\"([^\\\"\\r\\n]*)\\\"|([0-9]+))(,?)");
+      Pattern.compile("  \\\"([a-z0-9_]+)\\\": (?:\\\"([^\\\"\\r\\n]*)\\\"|([0-9]+))(,?)");
   private static final Pattern NESTED_SCALAR =
       Pattern.compile("    \\\"([a-z0-9_]+)\\\": \\\"([^\\\"\\r\\n]*)\\\"(,?)");
   private static final Set<String> REQUIRED_TOP_LEVEL =
