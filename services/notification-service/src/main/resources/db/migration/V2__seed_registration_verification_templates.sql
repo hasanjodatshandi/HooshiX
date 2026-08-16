@@ -13,7 +13,7 @@ INSERT INTO notification_template_version(
         '11111111-1111-4111-8111-111111111101',
         1,
         'PUBLISHED',
-        '4dea370bd1dfc981055c6d9ca4f4a41644189f002ca9db54f149898ecd4c7ad1',
+        '8b9fd6864ad48cfcb74fdea0a56a500245545e7a40092623cd41be7cbf34c81d',
         'Verify your SajTech account',
         'Your verification code is {code}. It expires in {expires_minutes} minutes.',
         '<p>Your verification code is <strong>{code}</strong>.</p><p>It expires in {expires_minutes} minutes.</p>'
@@ -23,7 +23,7 @@ INSERT INTO notification_template_version(
         '11111111-1111-4111-8111-111111111102',
         1,
         'PUBLISHED',
-        'bf699110b73489187ced6cbd4cf709b81f777219c2a0093d2890424a0451d6a2',
+        'd9ce4d1c4cb2406c5a7faaaf3400c6d2ca102dad6fbb790c25d5057773b9eac5',
         'تأیید حساب SajTech',
         'کد تأیید شما {code} است. این کد تا {expires_minutes} دقیقه معتبر است.',
         '<p>کد تأیید شما <strong>{code}</strong> است.</p><p>این کد تا {expires_minutes} دقیقه معتبر است.</p>'
@@ -33,7 +33,7 @@ INSERT INTO notification_template_version(
         '11111111-1111-4111-8111-111111111103',
         1,
         'PUBLISHED',
-        '49a5f9a76884bc5fc289b1bf3a8fd71647290fa55ff99596e1aa5824719fbd0e',
+        '5eb6de082d7de40183c7903c861466617b5d4da5722bd70d72d1d36b68d6acd1',
         NULL,
         'Your SajTech verification code is {code}. It expires in {expires_minutes} minutes.',
         NULL
@@ -43,7 +43,7 @@ INSERT INTO notification_template_version(
         '11111111-1111-4111-8111-111111111104',
         1,
         'PUBLISHED',
-        '76c5d6d65f3d60de926fd2c003a5ae6d0d9dcd5370b71c07f84a7622120cfd34',
+        'a6f0da70a11c2e530c26ddbf7ad28f3d1212a7e25acfbc1b0f6ea0db8cd24bc6',
         NULL,
         'کد تأیید SajTech شما {code} است. اعتبار: {expires_minutes} دقیقه.',
         NULL
