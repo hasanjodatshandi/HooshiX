@@ -1,0 +1,148 @@
+name: Apply reviewed dependency metadata
+
+on:
+  workflow_run:
+    workflows:
+      - Refresh Compromised Password dependency locks
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  apply:
+    name: Validate and apply generated metadata
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_branch == 'agent/security-code-audit-remediation' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out audited PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/security-code-audit-remediation
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Download generated dependency metadata
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: compromised-password-dependency-metadata
+          path: /tmp/generated-dependency-metadata
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Validate generated changes
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          from collections import Counter
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          root = Path('services/compromised-password-service')
+          generated = Path('/tmp/generated-dependency-metadata')
+          old_lock = root.joinpath('gradle.lockfile').read_text(encoding='utf-8').splitlines()
+          new_lock = generated.joinpath('gradle.lockfile').read_text(encoding='utf-8').splitlines()
+
+          classpaths = 'compileClasspath,compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath'
+          expected_removed = Counter({
+              f'org.apache.logging.log4j:log4j-api:2.25.4={classpaths}': 1,
+              f'tools.jackson.core:jackson-core:3.1.4={classpaths}': 1,
+              f'tools.jackson.core:jackson-databind:3.1.4={classpaths}': 1,
+              f'tools.jackson:jackson-bom:3.1.4={classpaths}': 1,
+          })
+          expected_added = Counter({
+              f'org.apache.logging.log4j:log4j-api:2.25.5={classpaths}': 1,
+              f'tools.jackson.core:jackson-core:3.1.5={classpaths}': 1,
+              f'tools.jackson.core:jackson-databind:3.1.5={classpaths}': 1,
+              f'tools.jackson:jackson-bom:3.1.5={classpaths}': 1,
+          })
+          removed = Counter(old_lock) - Counter(new_lock)
+          added = Counter(new_lock) - Counter(old_lock)
+          if removed != expected_removed or added != expected_added:
+              raise SystemExit(f'unexpected lockfile diff: removed={removed}, added={added}')
+
+          namespace = {'v': 'https://schema.gradle.org/dependency-verification'}
+
+          def load(path: Path):
+              tree = ET.parse(path)
+              root_element = tree.getroot()
+              config = ET.tostring(root_element.find('v:configuration', namespace), encoding='unicode')
+              components = {}
+              for component in root_element.findall('v:components/v:component', namespace):
+                  key = (component.attrib['group'], component.attrib['name'], component.attrib['version'])
+                  artifacts = {}
+                  for artifact in component.findall('v:artifact', namespace):
+                      hashes = tuple(
+                          sorted(
+                              checksum.attrib['value']
+                              for checksum in artifact.findall('v:sha256', namespace)
+                          )
+                      )
+                      artifacts[artifact.attrib['name']] = hashes
+                  components[key] = artifacts
+              return config, components
+
+          old_config, old_components = load(root / 'gradle/verification-metadata.xml')
+          new_config, new_components = load(generated / 'gradle/verification-metadata.xml')
+          if old_config != new_config:
+              raise SystemExit('dependency verification configuration changed unexpectedly')
+          for key, artifacts in old_components.items():
+              if new_components.get(key) != artifacts:
+                  raise SystemExit(f'existing verification component changed unexpectedly: {key}')
+
+          expected_new = {
+              ('org.apache.logging.log4j', 'log4j-api', '2.25.5'): {
+                  'log4j-api-2.25.5.jar': ('64777f73ea0b3104c04eb82befbdccc30a425a19e83ad06cb2f93aa303511863',),
+                  'log4j-api-2.25.5.module': ('f517309a3a8a22c67a1627aa1c0b7b0e61ef67a0f06c6505de6e817b46eb6f2f',),
+              },
+              ('tools.jackson', 'jackson-bom', '3.1.5'): {
+                  'jackson-bom-3.1.5.pom': ('14fdbdcbb6a6023cadbffaadc878d66c5cf94f51c8162b9ffefc257e742412f4',),
+              },
+              ('tools.jackson.core', 'jackson-core', '3.1.5'): {
+                  'jackson-core-3.1.5.jar': ('9431b7fa2673bbb618c11d865fe15e13222fd182a214ff998cb7e56afd8f35d2',),
+                  'jackson-core-3.1.5.module': ('d4be61d9e818ce8654cb76fa938f05c2f7166b32bca3f937a799e1ea7a7f9d2b',),
+              },
+              ('tools.jackson.core', 'jackson-databind', '3.1.5'): {
+                  'jackson-databind-3.1.5.jar': ('3a2338d996fd3056791df8d335fa9ba8a62a706ed4245ecf81b3e583df37d08a',),
+                  'jackson-databind-3.1.5.module': ('a02dcd8c23e4762b286fe34881e107362c223dfa8b5de6b3236e63f5873de014',),
+              },
+          }
+          added_keys = set(new_components) - set(old_components)
+          if added_keys != set(expected_new):
+              raise SystemExit(f'unexpected verification components added: {added_keys}')
+          for key, artifacts in expected_new.items():
+              if new_components.get(key) != artifacts:
+                  raise SystemExit(f'unexpected verification hashes for {key}')
+          PY
+
+      - name: Apply generated files to audited PR branch
+        run: |
+          set -euo pipefail
+          cp /tmp/generated-dependency-metadata/gradle.lockfile \
+            services/compromised-password-service/gradle.lockfile
+          cp /tmp/generated-dependency-metadata/gradle/verification-metadata.xml \
+            services/compromised-password-service/gradle/verification-metadata.xml
+          git diff --check
+          git diff --exit-code --quiet && {
+            echo 'No dependency metadata changes were produced.' >&2
+            exit 1
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            services/compromised-password-service/gradle.lockfile \
+            services/compromised-password-service/gradle/verification-metadata.xml
+          git commit -m 'Regenerate patched dependency verification metadata'
+          git push origin HEAD:agent/security-code-audit-remediation
