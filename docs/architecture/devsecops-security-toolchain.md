@@ -2,9 +2,9 @@
 
 ## 1. Purpose and authority
 
-This document is the implementation-facing map for pre-runtime source, secret, dependency-integrity, SBOM, vulnerability, signing/provenance, and admission controls.
+This document is the implementation-facing map for pre-runtime source, secret, dependency-integrity, dependency-advisory, SBOM, final-artifact vulnerability, signing/provenance, and admission controls.
 
-ADR-0045 owns the selected tool responsibility model. ADR-0017 owns signed artifact/provenance/admission semantics. ADR-0035 and ADR-0038 own vulnerability correlation, feed freshness, severity, exceptions/VEX, ownership, and response. ADR-0039 owns executable Java quality gates.
+ADR-0045 owns the selected tool responsibility model. ADR-0017 owns signed artifact/provenance/admission semantics. ADR-0035 and ADR-0038 own release/deployed-artifact vulnerability correlation, feed freshness, severity, exceptions/VEX, ownership, and response. ADR-0039 owns executable Java quality gates.
 
 These controls operate in developer/CI/release/admission paths. They are not application runtime dependencies and do not change service business authority.
 
@@ -14,10 +14,12 @@ These controls operate in developer/CI/release/admission paths. They are not app
 Git/source
   -> Gitleaks: current tree + Git-history secret detection
   -> Semgrep: first-party SAST + repository source policy
-  -> ArchUnit/SpotBugs/format/tests/contract/dependency-integrity gates
+  -> Gradle verification/locks: dependency integrity
+  -> OSV-Scanner: locked/source dependency advisory feedback
+  -> ArchUnit/SpotBugs/format/tests/contracts
   -> build final immutable OCI image
   -> Syft: CycloneDX JSON SBOM for exact final image digest
-  -> Grype: final-image/SBOM vulnerability correlation
+  -> Grype: final-image/SBOM vulnerability release decision
   -> Cosign: image signature + provenance + signed SBOM attestation
   -> Helm/Kubernetes/Istio/Kyverno policy verification
   -> staging
@@ -63,20 +65,28 @@ A real committed credential is not remediated merely by deleting the latest line
 
 Allow-list/ignore entries are exact, justified, owned, reviewed, and bounded. A live credential cannot be made acceptable through an ignore rule.
 
-## 5. Dependency integrity is not vulnerability scanning
+## 5. Dependency integrity — Gradle
 
 Gradle dependency verification and lock files remain mandatory for expected dependency integrity/reproducibility.
 
-They do not answer whether a dependency has a known vulnerability. Vulnerability authority is the final-artifact/SBOM pipeline under ADR-0035/0038.
+They answer whether the build resolved the expected dependency bytes/metadata. They do not answer whether that version has a known vulnerability.
 
-This distinction is mandatory in review and reporting:
+## 6. Early dependency advisory scanning — OSV-Scanner
+
+OSV-Scanner is the selected early advisory scanner for supported declared/locked dependency evidence.
+
+Current repository implementation for the Compromised Password service pins OSV-Scanner 2.4.0 and the official Linux/x64 SHA-256, scans the Gradle lockfile during the blocking service security suite, and re-runs that security suite from the scheduled repository workflow.
+
+This is useful fast feedback, but it is not the final-artifact vulnerability authority:
 
 ```text
-Gradle verification/locks -> did we resolve the expected artifact?
-Syft + Grype               -> what is in the final artifact and what known findings affect it?
+OSV-Scanner -> declared/locked dependency advisory feedback
+Syft+Grype  -> exact final releasable/deployed artifact inventory and vulnerability decision
 ```
 
-## 6. SBOM — Syft
+A passing OSV result does not cover OS packages, JDK/runtime files, native libraries, or other image content absent from the lockfile.
+
+## 7. SBOM — Syft
 
 Syft generates CycloneDX JSON from the final releasable image, not only from Gradle manifests or source dependency metadata.
 
@@ -84,9 +94,9 @@ The SBOM is indexed/bound to the exact image digest and becomes part of the sign
 
 Technology Baseline owns the approved Syft version. Exact release artifact integrity is pinned in CI metadata.
 
-## 7. Vulnerability correlation — Grype
+## 8. Final-artifact vulnerability correlation — Grype
 
-Grype scans the exact final image/SBOM.
+Grype scans the exact final image/SBOM and owns the release/deployed-artifact vulnerability decision.
 
 ADR-0035/0038 remain authoritative for:
 
@@ -99,7 +109,9 @@ ADR-0035/0038 remain authoritative for:
 
 A scanner/feed outage cannot silently disable a required promotion gate or reuse evidence beyond its approved freshness window.
 
-## 8. Signing and attestations — Cosign
+OSV-Scanner remains complementary early feedback and does not replace this release boundary.
+
+## 9. Signing and attestations — Cosign
 
 Cosign binds release evidence to the exact final image digest.
 
@@ -111,7 +123,7 @@ Required production evidence includes:
 
 Signer trust is exact and narrow. An advisory exception never authorizes an unsigned or unprovenanced artifact.
 
-## 9. Admission — Kyverno
+## 10. Admission — Kyverno
 
 Kyverno remains the production admission enforcement point for digest/signature/provenance/SBOM and applicable workload-security controls.
 
@@ -119,21 +131,21 @@ New production policies use stable `policies.kyverno.io/v1` CEL APIs under curre
 
 Kyverno does not synchronously query the vulnerability database. Promotion CI and continuous digest-indexed rescanning own vulnerability freshness.
 
-## 10. Tools intentionally not selected
+## 11. Tools intentionally not selected
 
 ### Trivy
 
-Trivy is not a default HooshiX scanner in the current baseline. Its image/dependency/SBOM/IaC coverage substantially overlaps the selected Syft + Grype + Kubernetes/Helm/Kyverno verification chain.
+Trivy is not a default HooshiX scanner in the current baseline. Its image/dependency/SBOM/IaC coverage substantially overlaps the selected OSV-Scanner + Syft + Grype + Kubernetes/Helm/Kyverno verification chain.
 
 Reconsider only after evidence identifies a distinct high-value failure class that current controls do not adequately detect. The proposal must define owner, expected signal, false-positive/exception behavior, CI cost, and interaction with existing authorities.
 
 ### OWASP Dependency-Check
 
-OWASP Dependency-Check is not a default HooshiX Java SCA gate in the current baseline. Final-artifact/SBOM vulnerability correlation belongs to Syft + Grype while Gradle verification/locks own dependency integrity.
+OWASP Dependency-Check is not a default HooshiX Java SCA gate in the current baseline. Early declared/locked dependency advisory scanning belongs to OSV-Scanner; final-artifact/SBOM vulnerability correlation belongs to Syft + Grype; Gradle verification/locks own dependency integrity.
 
-Reconsider only after evidence shows a JVM/ecosystem advisory-identification gap that the selected pipeline does not adequately cover.
+Reconsider only after evidence shows a JVM/ecosystem advisory-identification gap that the selected controls do not adequately cover.
 
-## 11. Tool-selection rule
+## 12. Tool-selection rule
 
 Security depth comes from distinct failure-class coverage, not scanner count.
 
@@ -148,13 +160,14 @@ A second or replacement scanner requires:
 - runtime/CI operational cost;
 - proof that the new tool does not weaken or create ambiguous ownership with current controls.
 
-## 12. Current implementation status
+## 13. Current implementation status
 
 Architecture selection is not implementation evidence.
 
 At the current repository state:
 
 - repository Semgrep rules exist for the implemented Compromised Password service;
+- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for the Compromised Password service and is exercised by PR/push/scheduled repository security workflow evidence;
 - Gitleaks CI/repository-history scanning is **NOT PRESENT / NOT VERIFIED**;
 - final-image Syft SBOM generation is **NOT PRESENT / NOT VERIFIED**;
 - final-image/SBOM Grype vulnerability gating is **NOT PRESENT / NOT VERIFIED**;
@@ -164,20 +177,21 @@ At the current repository state:
 
 `implementation-status.md` is the repository-level status authority and must stay aligned with actual files/checks.
 
-## 13. Verification
+## 14. Verification
 
-Before the selected DevSecOps chain is reported as implemented, executable evidence covers:
+Before the selected DevSecOps chain is reported as complete, executable evidence covers:
 
 - Gitleaks current-tree and Git-history positive/negative fixtures with redacted output;
 - a committed-then-deleted synthetic secret that is still detected in history;
 - Semgrep custom-rule positive/negative fixtures;
+- OSV-Scanner exact binary/checksum pin plus blocking declared/locked dependency scan and scheduled execution;
 - final-image Syft CycloneDX generation bound to exact image digest;
 - Grype final-image/SBOM scan with ADR-0035/0038 policy behavior;
-- separate dependency-integrity vs vulnerability-finding failure cases;
+- separate Gradle-integrity, OSV dependency-advisory, and Grype final-artifact failure cases;
 - Cosign correct/wrong signer, unsigned, provenance, and signed-SBOM cases;
 - Kyverno admission positives/negatives for mandatory artifact evidence;
 - immutable tool/action pins and verified checksums/digests;
 - no secret values in scanner logs/artifacts;
 - no bypass from scanner/feed outage or stale evidence.
 
-Documentation-only completion remains `NOT VERIFIED` for executable controls.
+Documentation-only completion remains `NOT VERIFIED` for executable controls that do not yet exist.
