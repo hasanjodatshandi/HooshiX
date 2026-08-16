@@ -112,7 +112,7 @@ jobs:
             'fcdbdd77eafe0982f69d1970a8c5d23aed94ff5bae65e467459dafb2f09f7730' \
             '/tmp/notification-dependency-metadata/gradle/verification-metadata.xml' | sha256sum --check --strict -
 
-      - name: Commit only reviewed Gradle metadata
+      - name: Commit reviewed metadata and tracked-file index
         run: |
           set -euo pipefail
           cp /tmp/notification-dependency-metadata/gradle.lockfile \
@@ -120,13 +120,15 @@ jobs:
           mkdir -p services/notification-service/gradle
           cp /tmp/notification-dependency-metadata/gradle/verification-metadata.xml \
             services/notification-service/gradle/verification-metadata.xml
-          git diff --check
-          changed="$(git diff --name-only)"
-          expected=$'services/notification-service/gradle.lockfile\nservices/notification-service/gradle/verification-metadata.xml'
+          git add services/notification-service/gradle.lockfile \
+            services/notification-service/gradle/verification-metadata.xml
+          git ls-files | LC_ALL=C sort > FILE_INDEX.txt
+          git add FILE_INDEX.txt
+          git diff --cached --check
+          changed="$(git diff --cached --name-only)"
+          expected=$'FILE_INDEX.txt\nservices/notification-service/gradle.lockfile\nservices/notification-service/gradle/verification-metadata.xml'
           test "${changed}" = "${expected}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add services/notification-service/gradle.lockfile \
-            services/notification-service/gradle/verification-metadata.xml
           git commit -m 'Add reviewed Notification dependency metadata'
           git push origin HEAD:agent/notification-service-vertical-slice
