@@ -17,9 +17,10 @@ import java.util.regex.Pattern;
 final class DatasetReleaseManifestReader {
   private static final long MAX_MANIFEST_BYTES = 64 * 1024;
   private static final Pattern TOP_LEVEL_SCALAR =
-      Pattern.compile("  \\\"([a-z0-9_]+)\\\": (?:\\\"([^\\\"\\r\\n]*)\\\"|([0-9]+)),?");
+      Pattern.compile(
+          "  \\\"([a-z0-9_]+)\\\": (?:\\\"([^\\\"\\r\\n]*)\\\"|([0-9]+))(,?)");
   private static final Pattern NESTED_SCALAR =
-      Pattern.compile("    \\\"([a-z0-9_]+)\\\": \\\"([^\\\"\\r\\n]*)\\\",?");
+      Pattern.compile("    \\\"([a-z0-9_]+)\\\": \\\"([^\\\"\\r\\n]*)\\\"(,?)");
   private static final Set<String> REQUIRED_TOP_LEVEL =
       Set.of(
           "manifest_version",
@@ -85,6 +86,12 @@ final class DatasetReleaseManifestReader {
       }
       String key = matcher.group(1);
       String value = matcher.group(2) != null ? matcher.group(2) : matcher.group(3);
+      String comma = matcher.group(inAcquisition ? 3 : 4);
+      boolean commaRequired =
+          inAcquisition ? !"sha256".equals(key) : !"sqlite_artifact_sha256".equals(key);
+      if (commaRequired != ",".equals(comma)) {
+        throw new IOException("Dataset release manifest punctuation is invalid");
+      }
       Map<String, String> target = inAcquisition ? acquisition : values;
       Set<String> allowed = inAcquisition ? REQUIRED_ACQUISITION : REQUIRED_TOP_LEVEL;
       if (!allowed.contains(key) || target.putIfAbsent(key, value) != null) {
