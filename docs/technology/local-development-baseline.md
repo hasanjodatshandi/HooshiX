@@ -23,6 +23,7 @@ Production Technology Baseline remains authoritative for production versions.
 | Docker Buildx | 0.34.1 |
 | Docker cgroup | v2 + systemd driver |
 | Secret scanner | Gitleaks CLI 8.30.1; same rule/config intent as CI |
+| Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 
@@ -34,13 +35,16 @@ Preferred local path:
 
 ```text
 Gitleaks current-tree check
--> unit/ArchUnit/Semgrep/static
+-> unit/ArchUnit/Semgrep/static + Gradle integrity
+-> OSV-Scanner declared/locked dependency advisory
 -> focused adapter tests
 -> Testcontainers/contract/dataset/quota tests
 -> service runtime + local/test telemetry exporter
 ```
 
 Local Git-history secret scanning should run before push/review when history changes; protected CI/release history scanning remains authoritative.
+
+Local OSV-Scanner is fast feedback. Protected CI/scheduled scanning remains authoritative for the implemented service gate, and neither local nor CI OSV lockfile scanning replaces final-image Syft/Grype release evidence.
 
 Local fakes/substitutes are allowed only where architecture permits and must be impossible in staging/production.
 
@@ -164,16 +168,19 @@ Every Java service exposes repository-defined equivalents of:
 - Semgrep/SAST;
 - Gitleaks current-tree/Git-history secret scanning;
 - Gradle dependency verification/locks;
+- OSV-Scanner declared/locked dependency advisory scanning;
 - unit/focused integration/contract/dataset/quota/observability tests.
 
 Release tooling follows ADR-0045 and Technology Baseline:
 
 - Syft 1.51.0 produces final-image CycloneDX SBOM;
-- Grype 0.117.0 performs final-image/SBOM vulnerability correlation;
+- Grype 0.117.0 performs final-image/SBOM release vulnerability correlation;
 - Cosign 3.0.6 signs/attests the exact release digest;
 - Kyverno remains production admission authority.
 
 Normal local edits do not need to run full signing/admission/release promotion. They do not replace CI/staging/release evidence.
+
+OSV-Scanner 2.4.0 provides earlier dependency feedback; Syft+Grype remain required for exact final-image release evidence.
 
 Trivy and OWASP Dependency-Check are not selected baseline tools. Semgrep CLI does not imply separate Semgrep Secrets/Supply Chain products.
 
@@ -208,7 +215,7 @@ Service dependencies such as Xerial SQLite are pinned in service build/verificat
 
 Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/Helm and installed cluster component versions/digests where applicable.
 
-DevSecOps local/pre-push checks should report tool versions and pass/fail status without emitting discovered secret content.
+DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and pass/fail status without emitting discovered secret content. Release verification separately reports Syft/Grype/Cosign/Kyverno evidence when that boundary is active.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 
