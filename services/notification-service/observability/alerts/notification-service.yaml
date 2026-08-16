@@ -1,0 +1,23 @@
+groups:
+  - name: notification-service
+    rules:
+      - alert: NotificationSubmitUnavailableRateHigh
+        expr: |
+          sum(rate(notification_submit_duration_seconds_count{outcome=~"NOTIFICATION_UNAVAILABLE|TEMPLATE_NOT_ACTIVE"}[5m]))
+          /
+          clamp_min(sum(rate(notification_submit_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: notification-service
+        annotations:
+          summary: Notification durable handoff unavailable rate is above 1%
+      - alert: NotificationSubmitSaturationHigh
+        expr: notification_submit_in_flight > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: notification-service
+        annotations:
+          summary: Notification submission in-flight work is near the transport concurrency bound

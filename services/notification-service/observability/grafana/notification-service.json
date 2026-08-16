@@ -1,0 +1,33 @@
+{
+  "title": "Notification Service",
+  "uid": "notification-service",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Submit rate by outcome",
+      "targets": [
+        {"expr": "sum by (outcome) (rate(notification_submit_duration_seconds_count[5m]))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Submit p99 latency",
+      "targets": [
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(notification_submit_duration_seconds_bucket[5m])))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "In-flight submissions",
+      "targets": [
+        {"expr": "notification_submit_in_flight", "refId": "A"}
+      ]
+    }
+  ]
+}
