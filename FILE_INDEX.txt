@@ -170,4 +170,5 @@ services/compromised-password-service/src/test/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/datasetbuild/DatasetBuilderTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/infrastructure/lookup/runtime/BoundedLookupCompromisedPasswordsTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/interfaces/lookup/grpc/CompromisedPasswordGrpcServiceTest.java
+services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/interfaces/observability/grpc/SafeTracingServerInterceptorTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/runtime/CompromisedPasswordRuntimeIntegrationTest.java
