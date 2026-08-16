@@ -68,14 +68,27 @@ jobs:
           }
           JSON
 
-          curl --fail-with-body --silent --show-error \
-            --request PUT \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            --data-binary @/tmp/branch-protection.json \
-            "https://api.github.com/repos/${REPOSITORY}/branches/main/protection" \
-            > /tmp/applied-protection.json
+          status="$({
+            curl --silent --show-error \
+              --request PUT \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --data-binary @/tmp/branch-protection.json \
+              --dump-header /tmp/protection-headers.txt \
+              --output /tmp/applied-protection.json \
+              --write-out '%{http_code}' \
+              "https://api.github.com/repos/${REPOSITORY}/branches/main/protection"
+          } 2>/tmp/protection-curl-error.txt)"
+
+          if [ "${status}" != '200' ]; then
+            echo "GitHub branch-protection update failed with HTTP ${status}." >&2
+            grep -i '^x-accepted-github-permissions:' /tmp/protection-headers.txt >&2 || true
+            grep -i '^x-oauth-scopes:' /tmp/protection-headers.txt >&2 || true
+            cat /tmp/protection-curl-error.txt >&2
+            cat /tmp/applied-protection.json >&2
+            exit 1
+          fi
 
           curl --fail-with-body --silent --show-error \
             --header "Accept: application/vnd.github+json" \
