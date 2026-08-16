@@ -49,6 +49,10 @@ management:
           include: livenessState
         readiness:
           include: readinessState,notificationReadiness
+  metrics:
+    distribution:
+      percentiles-histogram:
+        notification.submit.duration: true
   otlp:
     metrics:
       export:
