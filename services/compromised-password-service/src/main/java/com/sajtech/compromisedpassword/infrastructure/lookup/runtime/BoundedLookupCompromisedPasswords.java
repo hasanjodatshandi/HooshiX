@@ -1,5 +1,6 @@
 package com.sajtech.compromisedpassword.infrastructure.lookup.runtime;
 
+import com.sajtech.compromisedpassword.application.lookup.LookupOverloadedException;
 import com.sajtech.compromisedpassword.application.lookup.port.in.LookupCompromisedPasswords;
 import com.sajtech.compromisedpassword.domain.lookup.valueobject.CompromisedHashMatch;
 import com.sajtech.compromisedpassword.domain.lookup.valueobject.Sha1Prefix;
@@ -40,7 +41,7 @@ public final class BoundedLookupCompromisedPasswords implements LookupCompromise
       meterRegistry
           .counter("compromised_password.lookup.rejected", "reason", "capacity")
           .increment();
-      throw new LookupCapacityExceededException();
+      throw new LookupOverloadedException();
     }
 
     inFlight.incrementAndGet();

@@ -10,6 +10,7 @@ import io.grpc.ManagedChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -32,7 +33,8 @@ import org.springframework.test.context.DynamicPropertySource;
 class CompromisedPasswordRuntimeIntegrationTest {
   private static final String HASH = "ABCDE" + "9".repeat(35);
   private static final Path DATASET = createDataset();
-  private static final String DATASET_SHA256 = sha256(DATASET);
+  private static final Path MANIFEST = createManifest(DATASET);
+  private static final String MANIFEST_SHA256 = sha256(MANIFEST);
   private static final int GRPC_PORT = availablePort();
 
   @DynamicPropertySource
@@ -40,10 +42,14 @@ class CompromisedPasswordRuntimeIntegrationTest {
     registry.add("hooshix.compromised-password.grpc-port", () -> GRPC_PORT);
     registry.add("hooshix.compromised-password.max-concurrent-lookups", () -> 4);
     registry.add("hooshix.compromised-password.dataset.path", DATASET::toString);
-    registry.add("hooshix.compromised-password.dataset.expected-sha256", () -> DATASET_SHA256);
-    registry.add("hooshix.compromised-password.dataset.acquired-at", Instant.now()::toString);
-    registry.add("hooshix.compromised-password.dataset.format-version", () -> 1);
+    registry.add("hooshix.compromised-password.dataset.manifest-path", MANIFEST::toString);
+    registry.add(
+        "hooshix.compromised-password.dataset.expected-manifest-sha256", () -> MANIFEST_SHA256);
+    registry.add(
+        "hooshix.compromised-password.dataset.required-source-kind",
+        () -> "GENERATED_TEST_FIXTURE");
     registry.add("hooshix.compromised-password.dataset.max-prefix-cardinality", () -> 16);
+    registry.add("hooshix.compromised-password.dataset.max-serialized-response-bytes", () -> 4096);
     registry.add("management.server.port", () -> 0);
     registry.add(
         "management.opentelemetry.tracing.export.otlp.endpoint",
@@ -80,7 +86,8 @@ class CompromisedPasswordRuntimeIntegrationTest {
             "CREATE TABLE compromised_password ("
                 + "prefix INTEGER NOT NULL CHECK (prefix BETWEEN 0 AND 1048575),"
                 + "hash BLOB NOT NULL CHECK (length(hash) = 20),"
-                + "occurrence_count INTEGER NOT NULL CHECK (occurrence_count > 0),"
+                + "occurrence_count INTEGER NOT NULL CHECK "
+                + "(typeof(occurrence_count) = 'integer' AND occurrence_count > 0),"
                 + "PRIMARY KEY (prefix, hash)) WITHOUT ROWID");
       }
       try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + path);
@@ -94,6 +101,58 @@ class CompromisedPasswordRuntimeIntegrationTest {
       }
       return path;
     } catch (IOException | java.sql.SQLException exception) {
+      throw new ExceptionInInitializerError(exception);
+    }
+  }
+
+  private static Path createManifest(Path dataset) {
+    try {
+      Path path = Files.createTempFile("compromised-password-runtime-", ".manifest.json");
+      path.toFile().deleteOnExit();
+      Instant completed = Instant.now();
+      String manifest =
+          "{\n"
+              + "  \"manifest_version\": 2,\n"
+              + "  \"format_version\": 1,\n"
+              + "  \"sqlite_schema_version\": 1,\n"
+              + "  \"source_kind\": \"GENERATED_TEST_FIXTURE\",\n"
+              + "  \"hash_mode\": \"SHA1\",\n"
+              + "  \"retrieval_started_at_utc\": \""
+              + completed.minusSeconds(60)
+              + "\",\n"
+              + "  \"retrieval_completed_at_utc\": \""
+              + completed
+              + "\",\n"
+              + "  \"source_artifact_sha256\": \""
+              + "a".repeat(64)
+              + "\",\n"
+              + "  \"acquisition_tool\": {\n"
+              + "    \"name\": \"runtime-integration-fixture\",\n"
+              + "    \"version\": \"1.0.0\",\n"
+              + "    \"sha256\": \""
+              + "b".repeat(64)
+              + "\"\n"
+              + "  },\n"
+              + "  \"builder_git_revision\": \""
+              + "c".repeat(40)
+              + "\",\n"
+              + "  \"source_line_count\": 1,\n"
+              + "  \"record_count\": 1,\n"
+              + "  \"duplicate_line_count\": 0,\n"
+              + "  \"max_prefix_cardinality\": 1,\n"
+              + "  \"max_serialized_response_bytes\": 64,\n"
+              + "  \"prefix_cardinality_bound\": 16,\n"
+              + "  \"serialized_response_bytes_bound\": 4096,\n"
+              + "  \"content_sha256\": \""
+              + "d".repeat(64)
+              + "\",\n"
+              + "  \"sqlite_artifact_sha256\": \""
+              + sha256(dataset)
+              + "\"\n"
+              + "}\n";
+      Files.writeString(path, manifest, StandardCharsets.UTF_8);
+      return path;
+    } catch (IOException exception) {
       throw new ExceptionInInitializerError(exception);
     }
   }

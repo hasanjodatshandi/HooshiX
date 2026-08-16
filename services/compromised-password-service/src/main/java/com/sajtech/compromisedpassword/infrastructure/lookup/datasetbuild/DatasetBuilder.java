@@ -56,13 +56,13 @@ public final class DatasetBuilder {
       temporarySqlite = Files.createTempFile(sqliteParent, ".compromised-password-", ".sqlite.tmp");
       temporaryManifest =
           Files.createTempFile(manifestParent, ".compromised-password-", ".json.tmp");
-
       BuildInputResult inputResult = buildSqlite(request, temporarySqlite);
       BuildMetrics metrics = inspectSqlite(temporarySqlite);
+      verifyCompatibilityBounds(request, metrics);
       String sqliteArtifactSha256 = digestFile(temporarySqlite);
       DatasetReleaseManifest manifest =
           new DatasetReleaseManifest(
-              1,
+              2,
               FORMAT_VERSION,
               SQLITE_SCHEMA_VERSION,
               request.sourceKind(),
@@ -79,9 +79,10 @@ public final class DatasetBuilder {
               inputResult.sourceLineCount() - metrics.recordCount(),
               metrics.maxPrefixCardinality(),
               metrics.maxSerializedResponseBytes(),
+              request.maxPrefixCardinalityBound(),
+              request.maxSerializedResponseBytesBound(),
               metrics.contentSha256(),
               sqliteArtifactSha256);
-
       Files.writeString(
           temporaryManifest,
           manifest.toJson(),
@@ -104,6 +105,13 @@ public final class DatasetBuilder {
     } finally {
       deleteIfPresent(temporarySqlite);
       deleteIfPresent(temporaryManifest);
+    }
+  }
+
+  private static void verifyCompatibilityBounds(DatasetBuildRequest request, BuildMetrics metrics) {
+    if (metrics.maxPrefixCardinality() > request.maxPrefixCardinalityBound()
+        || metrics.maxSerializedResponseBytes() > request.maxSerializedResponseBytesBound()) {
+      throw new DatasetBuildException(DatasetBuildException.Reason.COMPATIBILITY_BOUND_EXCEEDED);
     }
   }
 
@@ -162,7 +170,6 @@ public final class DatasetBuilder {
     int currentPrefix = -1;
     int currentPrefixCardinality = 0;
     long currentSerializedResponseBytes = 0;
-
     try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + sqlitePath);
         Statement statement = connection.createStatement()) {
       try (ResultSet integrity = statement.executeQuery("PRAGMA integrity_check")) {
@@ -172,8 +179,7 @@ public final class DatasetBuilder {
       }
       try (ResultSet rows =
           statement.executeQuery(
-              "SELECT prefix, hash, occurrence_count FROM compromised_password "
-                  + "ORDER BY prefix, hash")) {
+              "SELECT prefix, hash, occurrence_count FROM compromised_password ORDER BY prefix, hash")) {
         while (rows.next()) {
           int prefix = rows.getInt("prefix");
           byte[] hash = rows.getBytes("hash");
@@ -184,7 +190,6 @@ public final class DatasetBuilder {
               || prefix != prefixFromHash(hash)) {
             throw new DatasetBuildException(DatasetBuildException.Reason.CONTENT_INVALID);
           }
-
           if (prefix != currentPrefix) {
             maxPrefixCardinality = Math.max(maxPrefixCardinality, currentPrefixCardinality);
             maxSerializedResponseBytes =
@@ -209,7 +214,6 @@ public final class DatasetBuilder {
     } catch (ArithmeticException | SQLException exception) {
       throw new DatasetBuildException(DatasetBuildException.Reason.CONTENT_INVALID);
     }
-
     if (recordCount == 0) {
       throw new DatasetBuildException(DatasetBuildException.Reason.EMPTY_SOURCE);
     }
@@ -250,7 +254,6 @@ public final class DatasetBuilder {
       }
       hash[index] = (byte) ((high << 4) | low);
     }
-
     long occurrenceCount = 0;
     for (int index = 41; index < lineLength; index++) {
       int digit = line[index] - '0';
@@ -263,7 +266,6 @@ public final class DatasetBuilder {
     if (occurrenceCount <= 0) {
       throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
     }
-
     upsert.setInt(1, prefixFromHash(hash));
     upsert.setBytes(2, hash);
     upsert.setLong(3, occurrenceCount);

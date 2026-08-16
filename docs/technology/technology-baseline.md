@@ -15,7 +15,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 
 | Area | Approved baseline | Authority / notes |
 | --- | --- | --- |
-| JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | image pinned by digest in repo |
+| JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | official runtime archive SHA-256 and runtime base-image digest pinned by owning service; CI verifies exact runtime build |
 | Framework | Spring Boot 4.1.0 | current stable project baseline |
 | HTTP model | Spring MVC | WebFlux/Reactor prohibited without revised decision |
 | Request/I/O concurrency | Virtual Threads | `spring.threads.virtual.enabled=true` |

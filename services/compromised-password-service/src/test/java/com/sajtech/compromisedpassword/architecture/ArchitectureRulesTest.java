@@ -43,4 +43,26 @@ class ArchitectureRulesTest {
             "io.opentelemetry..")
         .check(classes);
   }
+
+  @Test
+  void interfacesDependOnlyInward() {
+    noClasses()
+        .that()
+        .resideInAPackage("..interfaces..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("..infrastructure..", "..configuration..")
+        .check(classes);
+  }
+
+  @Test
+  void infrastructureDoesNotDependOnInterfaces() {
+    noClasses()
+        .that()
+        .resideInAPackage("..infrastructure..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("..interfaces..")
+        .check(classes);
+  }
 }

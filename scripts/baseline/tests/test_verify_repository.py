@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 import sys
 import tempfile
 import unittest
@@ -76,6 +77,12 @@ edges:
             errors = verifier.validate_guarded_structure(root)
 
             self.assertTrue(any("ADR-0041 trigger" in error for error in errors))
+
+    def test_compromised_password_gradle_wrapper_is_executable(self) -> None:
+        repository_root = Path(__file__).resolve().parents[3]
+        wrapper = repository_root / "services/compromised-password-service/gradlew"
+
+        self.assertTrue(wrapper.stat().st_mode & stat.S_IXUSR)
 
 
 if __name__ == "__main__":

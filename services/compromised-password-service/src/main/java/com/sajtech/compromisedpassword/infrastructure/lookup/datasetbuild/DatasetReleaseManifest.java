@@ -20,6 +20,8 @@ public record DatasetReleaseManifest(
     long duplicateLineCount,
     int maxPrefixCardinality,
     long maxSerializedResponseBytes,
+    int prefixCardinalityBound,
+    long serializedResponseBytesBound,
     String contentSha256,
     String sqliteArtifactSha256) {
 
@@ -77,6 +79,12 @@ public record DatasetReleaseManifest(
         + ",\n"
         + "  \"max_serialized_response_bytes\": "
         + maxSerializedResponseBytes
+        + ",\n"
+        + "  \"prefix_cardinality_bound\": "
+        + prefixCardinalityBound
+        + ",\n"
+        + "  \"serialized_response_bytes_bound\": "
+        + serializedResponseBytesBound
         + ",\n"
         + "  \"content_sha256\": \""
         + contentSha256

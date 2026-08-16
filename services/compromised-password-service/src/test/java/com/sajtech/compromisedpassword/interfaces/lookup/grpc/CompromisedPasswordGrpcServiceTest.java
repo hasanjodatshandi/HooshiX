@@ -12,11 +12,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class CompromisedPasswordGrpcServiceTest {
+  private static final long SAFE_RESPONSE_BOUND = 4096;
+
   @Test
   void mapsDomainMatchesWithoutReturningThePrefix() {
     CompromisedPasswordGrpcService service =
         new CompromisedPasswordGrpcService(
-            prefix -> List.of(new CompromisedHashMatch("A".repeat(35), 3)));
+            prefix -> List.of(new CompromisedHashMatch("A".repeat(35), 3)), SAFE_RESPONSE_BOUND);
     CapturingObserver observer = new CapturingObserver();
 
     service.lookupPrefix(LookupPrefixRequest.newBuilder().setPrefix("ABCDE").build(), observer);
@@ -30,7 +32,7 @@ class CompromisedPasswordGrpcServiceTest {
   @Test
   void rejectsNonCanonicalPrefixWithoutEchoingIt() {
     CompromisedPasswordGrpcService service =
-        new CompromisedPasswordGrpcService(prefix -> List.of());
+        new CompromisedPasswordGrpcService(prefix -> List.of(), SAFE_RESPONSE_BOUND);
     CapturingObserver observer = new CapturingObserver();
 
     service.lookupPrefix(LookupPrefixRequest.newBuilder().setPrefix("abcde").build(), observer);
@@ -38,6 +40,21 @@ class CompromisedPasswordGrpcServiceTest {
     Status status = Status.fromThrowable(observer.error.get());
     assertThat(status.getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
     assertThat(status.getDescription()).isEqualTo("invalid prefix");
+  }
+
+  @Test
+  void failsClosedWhenSerializedResponseExceedsApprovedBound() {
+    CompromisedPasswordGrpcService service =
+        new CompromisedPasswordGrpcService(
+            prefix -> List.of(new CompromisedHashMatch("A".repeat(35), 3)), 1);
+    CapturingObserver observer = new CapturingObserver();
+
+    service.lookupPrefix(LookupPrefixRequest.newBuilder().setPrefix("ABCDE").build(), observer);
+
+    Status status = Status.fromThrowable(observer.error.get());
+    assertThat(status.getCode()).isEqualTo(Status.Code.UNAVAILABLE);
+    assertThat(status.getDescription()).isEqualTo("dataset unavailable");
+    assertThat(observer.response.get()).isNull();
   }
 
   private static final class CapturingObserver implements StreamObserver<LookupPrefixResponse> {

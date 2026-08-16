@@ -1,5 +1,6 @@
 package com.sajtech.compromisedpassword.infrastructure.lookup.dataset;
 
+import com.sajtech.compromisedpassword.application.lookup.LookupUnavailableException;
 import com.sajtech.compromisedpassword.application.lookup.port.out.CompromisedPasswordRepository;
 import com.sajtech.compromisedpassword.domain.lookup.valueobject.CompromisedHashMatch;
 import com.sajtech.compromisedpassword.domain.lookup.valueobject.Sha1Prefix;
@@ -37,7 +38,7 @@ public final class SqliteCompromisedPasswordRepository implements CompromisedPas
         List<CompromisedHashMatch> matches = new ArrayList<>();
         while (results.next()) {
           if (matches.size() >= maxPrefixCardinality) {
-            throw new DatasetUnavailableException("Dataset exceeds approved response bound");
+            throw new LookupUnavailableException("Dataset exceeds approved response bound");
           }
           matches.add(
               new CompromisedHashMatch(
@@ -46,7 +47,7 @@ public final class SqliteCompromisedPasswordRepository implements CompromisedPas
         return List.copyOf(matches);
       }
     } catch (SQLException exception) {
-      throw new DatasetUnavailableException("Dataset lookup failed", exception);
+      throw new LookupUnavailableException("Dataset lookup failed", exception);
     }
   }
 }

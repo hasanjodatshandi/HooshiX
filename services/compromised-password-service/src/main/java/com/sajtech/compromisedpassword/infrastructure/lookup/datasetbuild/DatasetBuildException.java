@@ -8,6 +8,7 @@ public final class DatasetBuildException extends RuntimeException {
     SQLITE_FAILURE,
     INTEGRITY_FAILURE,
     CONTENT_INVALID,
+    COMPATIBILITY_BOUND_EXCEEDED,
     PUBLISH_FAILURE
   }
 

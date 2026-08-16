@@ -1,12 +1,12 @@
 package com.sajtech.compromisedpassword.interfaces.lookup.grpc;
 
+import com.sajtech.compromisedpassword.application.lookup.LookupOverloadedException;
+import com.sajtech.compromisedpassword.application.lookup.LookupUnavailableException;
 import com.sajtech.compromisedpassword.application.lookup.port.in.LookupCompromisedPasswords;
 import com.sajtech.compromisedpassword.contract.v1.CompromisedPasswordServiceGrpc;
 import com.sajtech.compromisedpassword.contract.v1.LookupPrefixRequest;
 import com.sajtech.compromisedpassword.contract.v1.LookupPrefixResponse;
 import com.sajtech.compromisedpassword.domain.lookup.valueobject.Sha1Prefix;
-import com.sajtech.compromisedpassword.infrastructure.lookup.dataset.DatasetUnavailableException;
-import com.sajtech.compromisedpassword.infrastructure.lookup.runtime.LookupCapacityExceededException;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.Objects;
@@ -14,9 +14,15 @@ import java.util.Objects;
 public final class CompromisedPasswordGrpcService
     extends CompromisedPasswordServiceGrpc.CompromisedPasswordServiceImplBase {
   private final LookupCompromisedPasswords lookup;
+  private final long maxSerializedResponseBytes;
 
-  public CompromisedPasswordGrpcService(LookupCompromisedPasswords lookup) {
+  public CompromisedPasswordGrpcService(
+      LookupCompromisedPasswords lookup, long maxSerializedResponseBytes) {
     this.lookup = Objects.requireNonNull(lookup, "lookup");
+    if (maxSerializedResponseBytes <= 0) {
+      throw new IllegalArgumentException("Maximum serialized response bytes must be positive");
+    }
+    this.maxSerializedResponseBytes = maxSerializedResponseBytes;
   }
 
   @Override
@@ -42,12 +48,17 @@ public final class CompromisedPasswordGrpcService
                           .setSuffix(match.suffix())
                           .setOccurrenceCount(match.occurrenceCount())
                           .build()));
-      responseObserver.onNext(response.build());
+      LookupPrefixResponse built = response.build();
+      if (built.getSerializedSize() > maxSerializedResponseBytes) {
+        throw new LookupUnavailableException(
+            "Lookup response exceeds approved compatibility bound");
+      }
+      responseObserver.onNext(built);
       responseObserver.onCompleted();
-    } catch (LookupCapacityExceededException exception) {
+    } catch (LookupOverloadedException exception) {
       responseObserver.onError(
           Status.RESOURCE_EXHAUSTED.withDescription("lookup overloaded").asRuntimeException());
-    } catch (DatasetUnavailableException exception) {
+    } catch (LookupUnavailableException exception) {
       responseObserver.onError(
           Status.UNAVAILABLE.withDescription("dataset unavailable").asRuntimeException());
     } catch (RuntimeException exception) {

@@ -7,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.nio.file.Path;
-import java.time.Instant;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -20,8 +19,9 @@ public record CompromisedPasswordProperties(
 
   public record Dataset(
       @NotNull Path path,
-      @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String expectedSha256,
-      @NotNull Instant acquiredAt,
-      @Min(1) int formatVersion,
-      @Min(1) int maxPrefixCardinality) {}
+      @NotNull Path manifestPath,
+      @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String expectedManifestSha256,
+      @NotBlank @Pattern(regexp = "[A-Z0-9_]{1,64}") String requiredSourceKind,
+      @Min(1) int maxPrefixCardinality,
+      @Min(1) long maxSerializedResponseBytes) {}
 }

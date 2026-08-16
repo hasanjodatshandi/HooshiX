@@ -3,6 +3,7 @@ package com.sajtech.compromisedpassword.infrastructure.lookup.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sajtech.compromisedpassword.application.lookup.LookupOverloadedException;
 import com.sajtech.compromisedpassword.application.lookup.port.in.LookupCompromisedPasswords;
 import com.sajtech.compromisedpassword.domain.lookup.valueobject.Sha1Prefix;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -39,7 +40,7 @@ class BoundedLookupCompromisedPasswordsTest {
       entered.await();
 
       assertThatThrownBy(() -> bounded.lookup(Sha1Prefix.parse("12345")))
-          .isInstanceOf(LookupCapacityExceededException.class);
+          .isInstanceOf(LookupOverloadedException.class);
 
       release.countDown();
       first.get();

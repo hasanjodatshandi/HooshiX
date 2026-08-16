@@ -4,19 +4,26 @@
 {{- fail "image.digest must match sha256:<64 lowercase hex>" -}}
 {{- end -}}
 {{- $claim := required "dataset.existingClaim is required" .Values.dataset.existingClaim -}}
-{{- $datasetSha := required "dataset.expectedSha256 is required" .Values.dataset.expectedSha256 | toString -}}
-{{- if not (regexMatch "^[0-9a-f]{64}$" $datasetSha) -}}
-{{- fail "dataset.expectedSha256 must be 64 lowercase hex characters" -}}
+{{- $manifestDigest := required "dataset.expectedManifestSha256 is required" .Values.dataset.expectedManifestSha256 -}}
+{{- if not (regexMatch "^[0-9a-f]{64}$" $manifestDigest) -}}
+{{- fail "dataset.expectedManifestSha256 must be 64 lowercase hex characters" -}}
 {{- end -}}
-{{- $acquiredAt := required "dataset.acquiredAt is required" .Values.dataset.acquiredAt -}}
+{{- $sourceKind := required "dataset.requiredSourceKind is required" .Values.dataset.requiredSourceKind -}}
 {{- if lt (int .Values.dataset.maxPrefixCardinality) 1 -}}
-{{- fail "dataset.maxPrefixCardinality must be positive and come from release evidence" -}}
+{{- fail "dataset.maxPrefixCardinality must be positive and come from reviewed release evidence" -}}
 {{- end -}}
-{{- if .Values.observability.tracing.enabled -}}
-{{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required when tracing is enabled" .Values.observability.tracing.otlpEndpoint -}}
+{{- if lt (int64 .Values.dataset.maxSerializedResponseBytes) 1 -}}
+{{- fail "dataset.maxSerializedResponseBytes must be positive and come from reviewed release evidence" -}}
+{{- end -}}
+{{- if not .Values.observability.tracing.enabled -}}
+{{- fail "Day-One tracing must remain enabled" -}}
+{{- end -}}
+{{- if not .Values.observability.metrics.enabled -}}
+{{- fail "Day-One metrics must remain enabled" -}}
+{{- end -}}
+{{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
 {{- if not (regexMatch "^https?://[^[:space:]]+/v1/traces$" $traceEndpoint) -}}
 {{- fail "observability.tracing.otlpEndpoint must be an explicit HTTP(S) /v1/traces endpoint" -}}
-{{- end -}}
 {{- end -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -73,18 +80,18 @@ spec:
               value: {{ .Values.runtime.maxConcurrentLookups | quote }}
             - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_PATH
               value: "/var/lib/hooshix/compromised-password/{{ .Values.dataset.filename }}"
-            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_EXPECTED_SHA256
-              value: {{ $datasetSha | quote }}
-            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_ACQUIRED_AT
-              value: {{ $acquiredAt | quote }}
-            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_FORMAT_VERSION
-              value: {{ .Values.dataset.formatVersion | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MANIFEST_PATH
+              value: "/var/lib/hooshix/compromised-password/{{ .Values.dataset.manifestFilename }}"
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_EXPECTED_MANIFEST_SHA256
+              value: {{ $manifestDigest | quote }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_REQUIRED_SOURCE_KIND
+              value: {{ $sourceKind | quote }}
             - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_PREFIX_CARDINALITY
               value: {{ .Values.dataset.maxPrefixCardinality | quote }}
-            {{- if .Values.observability.tracing.enabled }}
+            - name: HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_SERIALIZED_RESPONSE_BYTES
+              value: {{ .Values.dataset.maxSerializedResponseBytes | quote }}
             - name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
-              value: {{ .Values.observability.tracing.otlpEndpoint | quote }}
-            {{- end }}
+              value: {{ $traceEndpoint | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           startupProbe:

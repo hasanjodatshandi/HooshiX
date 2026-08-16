@@ -18,11 +18,13 @@
     "duplicate_line_count",
     "max_prefix_cardinality",
     "max_serialized_response_bytes",
+    "prefix_cardinality_bound",
+    "serialized_response_bytes_bound",
     "content_sha256",
     "sqlite_artifact_sha256"
   ],
   "properties": {
-    "manifest_version": {"const": 1},
+    "manifest_version": {"const": 2},
     "format_version": {"const": 1},
     "sqlite_schema_version": {"const": 1},
     "source_kind": {
@@ -51,6 +53,8 @@
     "duplicate_line_count": {"type": "integer", "minimum": 0},
     "max_prefix_cardinality": {"type": "integer", "minimum": 1},
     "max_serialized_response_bytes": {"type": "integer", "minimum": 1},
+    "prefix_cardinality_bound": {"type": "integer", "minimum": 1},
+    "serialized_response_bytes_bound": {"type": "integer", "minimum": 1},
     "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "sqlite_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
   },
