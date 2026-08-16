@@ -90,8 +90,7 @@ class SafeTracingServerInterceptorTest {
                     service, new SafeTracingServerInterceptor(openTelemetry)))
             .build()
             .start();
-    ManagedChannel channel =
-        InProcessChannelBuilder.forName(serverName).directExecutor().build();
+    ManagedChannel channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
     return new TraceHarness(server, channel, tracerProvider);
   }
 
@@ -116,7 +115,8 @@ class SafeTracingServerInterceptorTest {
   }
 
   private record TraceHarness(
-      Server server, ManagedChannel channel, SdkTracerProvider tracerProvider) implements AutoCloseable {
+      Server server, ManagedChannel channel, SdkTracerProvider tracerProvider)
+      implements AutoCloseable {
     @Override
     public void close() throws InterruptedException {
       channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
