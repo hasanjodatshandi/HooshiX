@@ -90,7 +90,8 @@ public class RuntimeConfiguration {
       CompromisedPasswordProperties properties,
       CompromisedPasswordGrpcService service,
       SafeTracingServerInterceptor interceptor) {
-    return new GrpcServerLifecycle(properties.grpcPort(), service, interceptor);
+    return new GrpcServerLifecycle(
+        properties.grpcPort(), properties.maxConcurrentLookups(), service, interceptor);
   }
 
   @Bean(name = "compromisedPasswordDatasetHealthIndicator")
