@@ -6,7 +6,11 @@ import com.sajtech.notification.application.delivery.port.out.NotificationProvid
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
 
+@Component
+@Profile("local & !staging & !production")
 public final class LoggingEmailProviderAdapter implements NotificationProviderGateway {
   private static final Logger LOGGER = LoggerFactory.getLogger(LoggingEmailProviderAdapter.class);
 
