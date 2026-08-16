@@ -69,6 +69,8 @@ spec:
           env:
             - name: NOTIFICATION_DATABASE_URL
               value: {{ $jdbcUrl | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: migration-db-credentials
               mountPath: /run/secrets/notification-db-migration
