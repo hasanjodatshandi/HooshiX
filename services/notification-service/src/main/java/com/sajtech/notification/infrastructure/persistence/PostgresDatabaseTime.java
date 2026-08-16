@@ -3,7 +3,7 @@ package com.sajtech.notification.infrastructure.persistence;
 import com.sajtech.notification.application.submit.port.out.DatabaseTimePort;
 import java.time.OffsetDateTime;
 import org.jooq.DSLContext;
-import org.jooq.Record1;
+import org.jooq.Record;
 
 public final class PostgresDatabaseTime implements DatabaseTimePort {
   private final DSLContext dsl;
@@ -14,11 +14,12 @@ public final class PostgresDatabaseTime implements DatabaseTimePort {
 
   @Override
   public java.time.Instant now() {
-    Record1<OffsetDateTime> record =
-        dsl.fetchOne("SELECT clock_timestamp()::timestamptz", OffsetDateTime.class);
-    if (record == null || record.value1() == null) {
+    Record record = dsl.fetchOne("SELECT clock_timestamp() AS authoritative_now");
+    OffsetDateTime value =
+        record == null ? null : record.get("authoritative_now", OffsetDateTime.class);
+    if (value == null) {
       throw new IllegalStateException("PostgreSQL did not return authoritative time");
     }
-    return record.value1().toInstant();
+    return value.toInstant();
   }
 }
