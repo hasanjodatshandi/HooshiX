@@ -65,24 +65,21 @@ public final class SubmitNotificationUseCase implements SubmitNotification {
   public SubmitNotificationResult submit(SubmitNotificationCommand command) {
     CanonicalNotificationIntent intent = intentFactory.create(command);
     byte[] fingerprintMaterial = fingerprintEncoder.encode(intent);
-    FingerprintDigest fingerprint = fingerprintPort.compute(fingerprintMaterial);
     try {
-      return transactions.required(
-          () -> acceptInTransaction(intent, fingerprintMaterial, fingerprint));
+      return transactions.required(() -> acceptInTransaction(intent, fingerprintMaterial));
     } catch (DuplicateNotificationRequestException concurrentDuplicate) {
       return transactions.required(() -> resolveExisting(intent, fingerprintMaterial));
     }
   }
 
   private SubmitNotificationResult acceptInTransaction(
-      CanonicalNotificationIntent intent,
-      byte[] fingerprintMaterial,
-      FingerprintDigest fingerprint) {
+      CanonicalNotificationIntent intent, byte[] fingerprintMaterial) {
     var existing = notifications.findByCallerAndRequestId(intent.callerService(), intent.requestId());
     if (existing.isPresent()) {
       return replayOrConflict(existing.get(), fingerprintMaterial);
     }
 
+    FingerprintDigest fingerprint = fingerprintPort.compute(fingerprintMaterial);
     Instant acceptedAt = databaseTime.now();
     validateDeadline(intent, acceptedAt);
     NotificationTemplateVersion template =
