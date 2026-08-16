@@ -1,6 +1,7 @@
 .editorconfig
 .gitattributes
 .github/workflows/compromised-password-service.yml
+.github/workflows/refresh-compromised-password-dependency-locks.yml
 .github/workflows/repository-baseline.yml
 .gitignore
 .markdownlint.json
