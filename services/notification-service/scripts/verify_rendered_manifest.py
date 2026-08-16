@@ -32,6 +32,8 @@ def main() -> int:
     require(text, r'secretName: "notification-db-migration"', "migration DB Secret is missing")
     require(text, r'secretName: "notification-fingerprint"', "fingerprint key-ring Secret is missing")
     require(text, r'secretName: "notification-delivery"', "delivery key-ring Secret is missing")
+    if text.count("defaultMode: 0440") != 4:
+        raise AssertionError("all Notification Secret volumes must use defaultMode 0440")
     require(text, r'serviceAccountName: "notification-service"', "dedicated ServiceAccount is missing")
     require(text, r"automountServiceAccountToken: false", "ServiceAccount token automount must be disabled")
     require(text, r"runAsNonRoot: true", "runAsNonRoot must be enabled")
