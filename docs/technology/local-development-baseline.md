@@ -1,6 +1,6 @@
 # Local Development Baseline
 
-- **Baseline date:** 2026-08-15
+- **Baseline date:** 2026-08-16
 - **Status:** Active local-development baseline
 - **Scope:** developer host/tooling, fast service loop, and optional production-fidelity kind integration foundation.
 - **Evidence rule:** a pin is a repository target, not proof it is installed.
@@ -22,6 +22,7 @@ Production Technology Baseline remains authoritative for production versions.
 | Docker Compose | 5.1.4 |
 | Docker Buildx | 0.34.1 |
 | Docker cgroup | v2 + systemd driver |
+| Secret scanner | Gitleaks CLI 8.30.1; same rule/config intent as CI |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 
@@ -32,11 +33,14 @@ Normal edit/test work does **not** require a full local cluster.
 Preferred local path:
 
 ```text
-unit/ArchUnit/static
+Gitleaks current-tree check
+-> unit/ArchUnit/Semgrep/static
 -> focused adapter tests
 -> Testcontainers/contract/dataset/quota tests
 -> service runtime + local/test telemetry exporter
 ```
+
+Local Git-history secret scanning should run before push/review when history changes; protected CI/release history scanning remains authoritative.
 
 Local fakes/substitutes are allowed only where architecture permits and must be impossible in staging/production.
 
@@ -150,7 +154,7 @@ The local profile verifies:
 
 Local development does not need the production external host-down provider. That check is production/staging environment evidence.
 
-## 7. Code-quality tooling
+## 7. Code-quality and DevSecOps tooling
 
 Every Java service exposes repository-defined equivalents of:
 
@@ -158,8 +162,20 @@ Every Java service exposes repository-defined equivalents of:
 - SpotBugs;
 - ArchUnit;
 - Semgrep/SAST;
+- Gitleaks current-tree/Git-history secret scanning;
 - Gradle dependency verification/locks;
 - unit/focused integration/contract/dataset/quota/observability tests.
+
+Release tooling follows ADR-0045 and Technology Baseline:
+
+- Syft 1.51.0 produces final-image CycloneDX SBOM;
+- Grype 0.117.0 performs final-image/SBOM vulnerability correlation;
+- Cosign 3.0.6 signs/attests the exact release digest;
+- Kyverno remains production admission authority.
+
+Normal local edits do not need to run full signing/admission/release promotion. They do not replace CI/staging/release evidence.
+
+Trivy and OWASP Dependency-Check are not selected baseline tools. Semgrep CLI does not imply separate Semgrep Secrets/Supply Chain products.
 
 GitHub Actions remains required CI target. Documentation alone is not executed evidence.
 
@@ -191,6 +207,8 @@ Service dependencies such as Xerial SQLite are pinned in service build/verificat
 ## 9. Verification/governance
 
 Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/Helm and installed cluster component versions/digests where applicable.
+
+DevSecOps local/pre-push checks should report tool versions and pass/fail status without emitting discovered secret content.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 
