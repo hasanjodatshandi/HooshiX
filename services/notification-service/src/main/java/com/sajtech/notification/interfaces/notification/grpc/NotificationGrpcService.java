@@ -13,6 +13,7 @@ import com.sajtech.notification.contract.v1.NotificationServiceGrpc;
 import com.sajtech.notification.contract.v1.SubmitNotificationRequest;
 import com.sajtech.notification.contract.v1.SubmitNotificationResponse;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
+import com.sajtech.notification.domain.notification.model.NotificationLifecycle;
 import com.sajtech.notification.domain.notification.model.NotificationSemanticType;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -128,11 +129,39 @@ public final class NotificationGrpcService
   private static SubmitNotificationResponse toResponse(SubmitNotificationResult result) {
     return SubmitNotificationResponse.newBuilder()
         .setNotificationId(result.notificationId().toString())
-        .setLifecycle(
-            com.sajtech.notification.contract.v1.NotificationLifecycle
-                .NOTIFICATION_LIFECYCLE_ACCEPTED)
+        .setLifecycle(contractLifecycle(result.lifecycle()))
         .setAcceptedAt(timestamp(result.acceptedAt()))
         .build();
+  }
+
+  private static com.sajtech.notification.contract.v1.NotificationLifecycle contractLifecycle(
+      NotificationLifecycle lifecycle) {
+    return switch (lifecycle) {
+      case ACCEPTED ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_ACCEPTED;
+      case DISPATCHING ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_DISPATCHING;
+      case RETRY_WAIT ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_RETRY_WAIT;
+      case PROVIDER_ACCEPTED ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_PROVIDER_ACCEPTED;
+      case DELIVERED ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_DELIVERED;
+      case FAILED_PERMANENT ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_FAILED_PERMANENT;
+      case EXPIRED ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_EXPIRED;
+      case DELIVERY_STATUS_UNKNOWN ->
+          com.sajtech.notification.contract.v1.NotificationLifecycle
+              .NOTIFICATION_LIFECYCLE_DELIVERY_STATUS_UNKNOWN;
+    };
   }
 
   private static Timestamp timestamp(Instant instant) {
