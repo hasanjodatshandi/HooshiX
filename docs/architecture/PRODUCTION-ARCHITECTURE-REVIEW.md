@@ -1,6 +1,6 @@
 # Production Architecture Review — Current State
 
-- **Reviewed:** 2026-08-15
+- **Reviewed:** 2026-08-16
 - **Status:** architecture target accepted; implementation/runtime evidence not implied
 - **Selected profile:** `production-single-server`
 - **Availability posture:** explicit non-HA
@@ -9,11 +9,12 @@ This document records review conclusions and points to current authority. It doe
 
 ## Outcome
 
-The architecture remains acceptable as a named single-server production profile only with security/correctness/recovery invariants preserved. The latest pre-implementation review resolved the remaining material gaps that should be decided before executable vertical slices:
+The architecture remains acceptable as a named single-server production profile only with security/correctness/recovery invariants preserved. Current material architecture decisions include:
 
 - Day-One observability runtime/evidence -> ADR-0044;
 - Compromised Password source/hash/freshness/provenance -> ADR-0040;
 - quota common-mode clock/cardinality/collateral network behavior -> ADR-0024;
+- DevSecOps source/secret/final-artifact tool responsibilities -> ADR-0045;
 - stable post-merge ADR identifiers -> current-only/documentation standards;
 - coherent-change PR governance -> repository workflow;
 - stricter Reference Data independent-service trigger -> ADR-0041;
@@ -35,7 +36,7 @@ ADR-0042 remains selected:
 - evidence-based host sizing;
 - OpenBao and end-user MFA unchanged.
 
-No service boundary is changed by this review. Compromised Password remains independent. Reference Data independent deployment is deferred/gated more strictly.
+No service boundary is changed by this review. Compromised Password remains independent. Reference Data independent deployment is deferred/gated more strictly. ADR-0045 scanner/SBOM/signing tools are pre-runtime CI/release controls and create no application service or request-path dependency.
 
 ## Quota/client-address review
 
@@ -50,7 +51,7 @@ external-L4 validated source
 -> typed exact internal context
 ```
 
-ADR-0024 now separates:
+ADR-0024 separates:
 
 ```text
 hard v1 network quota identity:
@@ -62,9 +63,9 @@ aggregate abuse/allocation pressure:
   IPv6 /64
 ```
 
-Aggregate prefix is no longer the sole hard user-denial identity. NAT/campus/VPN/IPv6 collateral behavior is an explicit test class.
+Aggregate prefix is not the sole hard user-denial identity. NAT/campus/VPN/IPv6 collateral behavior is an explicit test class.
 
-Single-server app wall time and Redis TIME share a host failure domain, so skew-only detection was insufficient for common-mode clock steps. A local wall-vs-monotonic Clock Safety Guard now detects abrupt host-clock discontinuity, with host-sync readiness and 60-second stable re-arm.
+Single-server app wall time and Redis TIME share a host failure domain, so skew-only detection is insufficient for common-mode clock steps. A local wall-vs-monotonic Clock Safety Guard detects abrupt host-clock discontinuity, with host-sync readiness and 60-second stable re-arm.
 
 `noeviction` plus non-expiring security state can be attacked through high-cardinality new-key creation. New security-state allocation is therefore bounded with low-cardinality capacity controls and fails as `QUOTA_CAPACITY_UNHEALTHY` before eviction/OOM. This remains fail closed and distinct from normal user quota denial.
 
@@ -114,13 +115,39 @@ Trace/baggage/correlation is telemetry only, never authN/authZ/tenant/quota/idem
 
 Local telemetry shares the single-host failure domain, so production requires independent external total-host detection. Required privileged/security audit remains separate durable/off-host authority.
 
+## DevSecOps security review
+
+ADR-0045 standardizes one authority per failure class:
+
+```text
+Gitleaks -> Semgrep/static/tests -> final image -> Syft -> Grype -> Cosign -> Kyverno -> staging -> same signed digest in production
+```
+
+Current selected roles:
+
+- Gitleaks 8.30.1: committed/current-tree and protected Git-history secret detection;
+- Semgrep: first-party SAST/repository-owned source policy;
+- Gradle verification/locks: dependency integrity/reproducibility only;
+- Syft 1.51.0: final-image CycloneDX JSON SBOM;
+- Grype 0.117.0: final-image/SBOM vulnerability correlation under ADR-0035/0038;
+- Cosign 3.0.6: exact-digest signature, provenance, and signed SBOM attestation;
+- Kyverno 1.18.2: production admission.
+
+A real committed credential requires revoke/rotate handling when exposure is plausible; removing the latest-tree line alone is not remediation. Scanner output remains redacted.
+
+Trivy and OWASP Dependency-Check are intentionally not selected default controls because their expected default roles overlap the current chain. They can be proposed later only for a distinct measured coverage gap. Repository Semgrep CLI similarly does not imply separate Semgrep Secrets/Supply Chain product enablement.
+
+This is an architecture decision, not executable evidence. Current repository implementation status remains: service-specific Semgrep exists; Gitleaks/Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
+
 ## Kyverno review
 
-The current Kyverno 1.18.2 line already supports stable CEL-based `policies.kyverno.io/v1` policy types. Greenfield HooshiX production controls use those APIs. CI/render gates reject new legacy ClusterPolicy/CleanupPolicy families unless a narrow migration-only exception exists.
+The current Kyverno 1.18.2 line uses stable CEL-based `policies.kyverno.io/v1` policy types for greenfield HooshiX production controls. CI/render gates reject new legacy ClusterPolicy/CleanupPolicy families unless a narrow migration-only exception exists.
+
+Production admission remains separate from vulnerability database lookup. Grype promotion decisions and continuous rescanning own vulnerability freshness; Kyverno verifies required immutable artifact identity/evidence.
 
 ## Governance review
 
-Current-state documentation remains current-only, but ADR IDs are now stable after merge:
+Current-state documentation remains current-only, but ADR IDs are stable after merge:
 
 - no renumber;
 - no reuse;
@@ -144,6 +171,11 @@ Still rejected:
 - runtime HIBP fallback or SHA-1 password storage;
 - observability headers/baggage as business/security authority;
 - public OTLP/management endpoints or broad Collector host access;
+- suppressing a real committed credential instead of revoke/rotate remediation;
+- treating Gradle dependency verification/locks as vulnerability evidence;
+- adding Trivy/OWASP Dependency-Check merely to increase scanner count without a distinct coverage objective;
+- treating repository Semgrep CLI as proof of separate Semgrep Secrets/Supply Chain product coverage;
+- bypassing stale/unavailable required scanner/feed/signature/provenance/SBOM/admission evidence;
 - legacy Kyverno policy types for new greenfield production controls;
 - false HA claims or production-readiness claims from documentation.
 
@@ -151,6 +183,6 @@ Still rejected:
 
 Architecture has moved from design into its first executable service implementation, but production readiness is **not** proven.
 
-The repository now contains repository-governance CI and the first executable Compromised Password service slice under `services/compromised-password-service/`. It still lacks root `deploy/` and `infrastructure/` platform implementation, other application services, production corpus/release evidence, and deployed observability/platform runtime. Repository source and CI evidence are not staging/runtime/release evidence.
+The repository contains repository-governance CI and the first executable Compromised Password service slice under `services/compromised-password-service/`. It still lacks root `deploy/` and `infrastructure/` platform implementation, other application services, production corpus/release evidence, complete ADR-0045 DevSecOps release-chain implementation, and deployed observability/platform runtime. Repository source and CI evidence are not staging/runtime/release evidence.
 
-Production traffic remains blocked until applicable readiness gates have executed evidence, including quota fault/cardinality tests, HIBP corpus build evidence, Kyverno CEL policy checks, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.
+Production traffic remains blocked until applicable readiness gates have executed evidence, including Gitleaks tree/history scanning, final-image Syft/Grype/Cosign evidence, Kyverno admission negatives, quota fault/cardinality tests, HIBP corpus build evidence, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.
