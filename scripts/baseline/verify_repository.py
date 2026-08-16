@@ -189,10 +189,12 @@ def parse_dependency_registry(text: str) -> DependencyRegistry:
     current_operation: str | None = None
     current_fields: dict[str, str] = {}
     current_policy_refs: list[str] = []
+    current_policy_refs_declared = False
     edges: list[DependencyEdge] = []
 
     def finish_edge() -> None:
         nonlocal current_operation, current_fields, current_policy_refs
+        nonlocal current_policy_refs_declared
         if current_operation is None:
             return
         edges.append(
@@ -205,6 +207,7 @@ def parse_dependency_registry(text: str) -> DependencyRegistry:
         current_operation = None
         current_fields = {}
         current_policy_refs = []
+        current_policy_refs_declared = False
 
     for line in text.splitlines():
         if line == "classes:":
@@ -243,8 +246,16 @@ def parse_dependency_registry(text: str) -> DependencyRegistry:
         field_match = EDGE_FIELD_RE.match(line)
         if field_match:
             key = field_match.group("key")
-            if key != "policy_refs":
-                current_fields[key] = _strip_scalar(field_match.group("value"))
+            if key == "policy_refs":
+                if current_policy_refs_declared:
+                    raise ValueError(
+                        f"{current_operation} contains duplicate field: policy_refs"
+                    )
+                current_policy_refs_declared = True
+                continue
+            if key in current_fields:
+                raise ValueError(f"{current_operation} contains duplicate field: {key}")
+            current_fields[key] = _strip_scalar(field_match.group("value"))
 
     finish_edge()
     return DependencyRegistry(

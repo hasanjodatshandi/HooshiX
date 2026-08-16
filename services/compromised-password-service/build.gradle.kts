@@ -31,6 +31,15 @@ dependencies {
     runtimeOnly("io.grpc:grpc-netty-shaded:1.81.0")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
+    constraints {
+        implementation("org.apache.logging.log4j:log4j-api:2.25.5") {
+            because("CVE-2026-49844 is fixed in Log4j API 2.25.5")
+        }
+        implementation("tools.jackson.core:jackson-databind:3.1.5") {
+            because("CVE-2026-59889 is fixed in jackson-databind 3.1.5")
+        }
+    }
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
     testImplementation("io.grpc:grpc-inprocess:1.81.0")

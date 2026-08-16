@@ -88,10 +88,10 @@ public final class DatasetBuilder {
           manifest.toJson(),
           StandardCharsets.UTF_8,
           StandardOpenOption.TRUNCATE_EXISTING);
-      publish(temporaryManifest, request.manifestOutputPath());
-      publishedManifest = true;
       publish(temporarySqlite, request.sqliteOutputPath());
       publishedSqlite = true;
+      publish(temporaryManifest, request.manifestOutputPath());
+      publishedManifest = true;
       return manifest;
     } catch (DatasetBuildException exception) {
       rollbackPublishedOutputs(request, publishedSqlite, publishedManifest);

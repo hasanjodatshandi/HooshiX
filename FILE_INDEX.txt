@@ -7,7 +7,6 @@
 .sdkmanrc
 .semgrep/compromised-password-service.yml
 .shellcheckrc
-.vscode/settings.json
 AGENTS.md
 FILE_INDEX.txt
 Makefile
