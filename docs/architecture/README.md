@@ -31,6 +31,7 @@ Executable vertical slices must preserve these current architecture requirements
 - ADR-0024: exact-IP hard quota identity, aggregate-prefix pressure, common-mode wall-clock guard, and high-cardinality Redis allocation protection;
 - ADR-0041: Reference Data remains local immutable capability until an independent-service trigger is evidenced;
 - ADR-0044: structured logging, Micrometer metrics, OpenTelemetry tracing, Collector/Loki/Tempo/Prometheus/Grafana/Alertmanager integration, and external host-down detection from Day-1;
+- ADR-0045: Gitleaks secret scanning + Semgrep source SAST + Syft/Grype/Cosign/Kyverno final-artifact security chain, with distinct tool responsibilities and no duplicate scanner by default;
 - ADR-0017/build gates: Kyverno new production policies use stable CEL-based `policies.kyverno.io/v1` APIs;
 - stable merged ADR identifiers and coherent-change PR governance.
 
@@ -41,6 +42,7 @@ These are target decisions. `implementation-status.md` remains authoritative for
 - `platform-architecture.md` — platform/service topology.
 - `network-architecture.md` — public/management/workload trust paths.
 - `security-architecture.md` / `threat-model.md` — security objectives, boundaries, threats.
+- `devsecops-security-toolchain.md` — selected source/secret/SBOM/vulnerability/signing/admission control chain.
 - `data-and-messaging.md` — data ownership/PostgreSQL/Redis/Kafka/reference datasets.
 - `reliability-and-observability.md` — reliability and Day-One telemetry runtime.
 - `performance-and-bottlenecks.md` — capacity/saturation/evidence triggers.
