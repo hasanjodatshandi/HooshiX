@@ -2,9 +2,11 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics.
+
 ## 1. Required Java PR gates
 
-Every Java service exposes repository-defined tasks for applicable:
+Every Java service exposes repository-defined tasks/checks for applicable:
 
 ```text
 compile
@@ -14,11 +16,14 @@ architectureTest
 spotlessCheck
 spotbugsMain
 repository Semgrep/SAST
+Gitleaks current-tree/history secret scan
 dependency verification/lock checks
 contract/schema checks
 ```
 
 Additional gates apply by changed capability. A mandatory check is not changed to warning/`ignoreFailures` merely to obtain a green pipeline.
+
+Gitleaks and Semgrep protect different failure classes. Semgrep is source SAST/policy; Gitleaks is dedicated committed-secret detection. Neither is a replacement for the other.
 
 ## 2. Architecture/code gates
 
@@ -32,16 +37,34 @@ CI enforces at least:
 - no production local/test backdoor profile;
 - service boundary and contract ownership checks.
 
-## 3. Dependency, supply-chain, and artifact gates
+## 3. Secret, dependency, supply-chain, and artifact gates
 
-- Gradle dependencies/plugins/tools pinned/verified; dynamic versions prohibited;
-- final image built once from reviewed source;
-- SBOM generated for final image;
-- vulnerability/advisory correlation uses final artifact/SBOM;
-- image signed and provenance/attestation created;
-- deployment promotes exact signed digest from staging to production;
+### Secret scanning
+
+- Gitleaks CLI version comes from Technology Baseline and the exact downloaded native artifact/checksum or immutable image digest is pinned in CI metadata;
+- current repository files/tree are scanned;
+- protected Git history is scanned so deleting a secret from the latest tree does not erase detection evidence;
+- scanner output is fully redacted and must not publish the detected secret in logs/annotations/artifacts;
+- a real exposed credential is revoked/rotated before the finding can be considered remediated;
+- ignore/allow-list entries are exact, justified, owned, reviewed, and bounded; a real active credential is not suppressible as a false positive.
+
+### Dependency integrity
+
+- Gradle dependencies/plugins/tools are pinned/verified; dynamic versions are prohibited;
+- dependency verification/locks prove expected artifact integrity/reproducibility; they are not vulnerability/CVE authority.
+
+### Final artifact
+
+- final image is built once from reviewed source;
+- Syft generates the required CycloneDX JSON SBOM from the exact final releasable image digest;
+- Grype performs final-image/SBOM vulnerability correlation under ADR-0035/0038 severity, freshness, ownership, and exception policy;
+- Cosign signs the exact image digest and creates the required provenance and signed SBOM attestation;
+- deployment promotes the exact signed digest from staging to production;
+- Kyverno verifies required digest/signature/provenance/SBOM and workload policy at admission;
 - privileged workflow contexts never execute unreviewed PR-controlled code/config with write secrets/tokens;
-- downloaded/vendored platform artifacts verify digest/signature/checksum before use.
+- downloaded/vendored platform and security-tool artifacts verify digest/signature/checksum before use.
+
+Trivy and OWASP Dependency-Check are not current default HooshiX gates. They may be introduced only through the ADR-0045 distinct-coverage review. Semgrep CLI use does not imply separate Semgrep Secrets/Supply Chain product enablement.
 
 ## 4. Contract and persistence gates
 
@@ -169,6 +192,7 @@ CI SHOULD enforce when implemented:
 Not every edit runs full platform work. Release/scheduled gates retain:
 
 - staging critical journeys/Playwright;
+- deployed-digest Grype rescanning with refreshed approved data at the ADR-0035 cadence;
 - load/soak and complete-stack single-server benchmark;
 - chaos/failure behavior;
 - backup/PITR/restore/cold DR;
@@ -178,6 +202,27 @@ Not every edit runs full platform work. Release/scheduled gates retain:
 
 Heavy checks may move out of every-PR cadence only when a faster deterministic PR gate protects the regression class and the heavy gate remains mandatory before the release/evidence boundary that depends on it.
 
-## 11. CI result language
+## 11. DevSecOps gate ordering and evidence
+
+Logical authority order is:
+
+```text
+Gitleaks
+-> Semgrep/static/architecture/format/dependency integrity
+-> tests/contracts/security
+-> final immutable image
+-> Syft CycloneDX SBOM
+-> Grype vulnerability decision
+-> Cosign signature/provenance/signed SBOM
+-> Helm/Kubernetes/Istio/Kyverno
+-> staging
+-> same-digest promotion
+```
+
+Parallel execution is allowed only when dependency ordering/evidence remains correct.
+
+Executable verification includes positive and negative Gitleaks history fixtures, Semgrep fixtures, Syft final-image binding, Grype policy/freshness behavior, Cosign signer/provenance/SBOM cases, and Kyverno missing/wrong evidence rejection.
+
+## 12. CI result language
 
 A check is `Passed` only when it ran and succeeded. Empty/unconfigured status, missing workflow, documentation assertion, or unavailable environment is `Not run`/`Not verified`, never green CI.
