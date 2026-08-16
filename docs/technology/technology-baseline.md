@@ -26,7 +26,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Compromised-password dataset runtime | Xerial SQLite JDBC 3.53.2.1 / embedded SQLite 3.53.2 | immutable read-only local dataset; exact artifact/native dependency verified; upgrade when compatible reviewed Xerial bundles required newer SQLite/security fix |
 | Access-token signing | RS256 / RSA-3072 / 90-day rotation | ADR-0023 |
 | Internal synchronous API | gRPC + Protobuf | current architecture |
-| gRPC Java | 1.81.0 | runtime/stubs/codegen aligned in locks |
+| gRPC Java | 1.83.1 | runtime/Netty/stubs/codegen/testing aligned in locks; includes upstream Netty server stream-limit bypass fix |
 | External/browser API | REST + OpenAPI through BFF | current architecture |
 | Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0015 profile-aware durability |
 | Event/API schema | Protobuf | Git + Buf governance |
