@@ -138,18 +138,22 @@ spec:
         - name: runtime-db-credentials
           secret:
             secretName: {{ $runtimeDbSecret | quote }}
+            defaultMode: 0440
         - name: migration-db-credentials
           secret:
             secretName: {{ $migrationDbSecret | quote }}
+            defaultMode: 0440
         - name: fingerprint-key-ring
           secret:
             secretName: {{ $fingerprintSecret | quote }}
+            defaultMode: 0440
             items:
               - key: fingerprint.properties
                 path: fingerprint.properties
         - name: delivery-key-ring
           secret:
             secretName: {{ $deliverySecret | quote }}
+            defaultMode: 0440
             items:
               - key: delivery.properties
                 path: delivery.properties
