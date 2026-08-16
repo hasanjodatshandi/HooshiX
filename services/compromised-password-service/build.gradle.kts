@@ -23,12 +23,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("io.grpc:grpc-netty-shaded:1.83.1")
     implementation("io.grpc:grpc-protobuf:1.83.1")
     implementation("io.grpc:grpc-stub:1.83.1")
     implementation("io.opentelemetry:opentelemetry-api")
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
     compileOnly("javax.annotation:javax.annotation-api:1.3.2")
-    runtimeOnly("io.grpc:grpc-netty-shaded:1.83.1")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     constraints {
