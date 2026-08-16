@@ -127,7 +127,7 @@ jobs:
           git add FILE_INDEX.txt
           git diff --cached --check
           changed="$(git diff --cached --name-only)"
-          expected=$'.github/workflows/refresh-notification-dependency-metadata.yml\nFILE_INDEX.txt\nservices/notification-service/gradle.lockfile\nservices/notification-service/gradle/verification-metadata.xml'
+          expected=$'.github/workflows/refresh-notification-dependency-metadata.yml\nservices/notification-service/gradle/verification-metadata.xml'
           test "${changed}" = "${expected}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
