@@ -61,7 +61,7 @@ HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD
 
 Normal PR CI uses only `GENERATED_TEST_FIXTURE`. `HIBP_PWNED_PASSWORDS_COMPLETE_DOWNLOAD` is valid only when a separate approved acquisition record proves that the local input is the complete official HIBP SHA-1 download. The builder validates the file it reads and its supplied SHA-256; it does not independently prove upstream completeness, licensing, or provenance approval.
 
-Build pipeline records at least source evidence kind/hash mode, retrieval start/end, acquisition-tool identity/digest, source-file SHA-256, row count, observed maximum prefix cardinality, exact maximum serialized Protobuf response size, canonical content SHA-256, SQLite artifact SHA-256, schema/format version, and build Git revision.
+Build pipeline records at least source evidence kind/hash mode, retrieval start/end, acquisition-tool identity/digest, source-file SHA-256, row count, observed maximum prefix cardinality, exact maximum serialized Protobuf response size, reviewed prefix/serialized-size compatibility bounds, canonical content SHA-256, SQLite artifact SHA-256, schema/format version, and build Git revision.
 
 Rules:
 
@@ -70,7 +70,7 @@ Rules:
 - records are canonical/deduplicated/validated;
 - source is streamed with bounded buffers and bounded SQLite batches; no full-corpus JVM cache exists;
 - release build measures full-corpus prefix cardinality and serialized response size;
-- build fails when observed data exceeds reviewed runtime compatibility bounds once those bounds are selected from real complete-corpus evidence plus safety margin;
+- build fails when observed data exceeds reviewed runtime compatibility bounds selected from real complete-corpus evidence plus safety margin;
 - no runtime truncation is permitted;
 - dataset age <=35 days at production readiness/deployment;
 - acquisition/build verification at least every 30 days;
@@ -101,6 +101,8 @@ Runtime:
 - no caller-selected PRAGMA/path/URI/query;
 - no full-corpus JVM cache;
 - bounded connection/concurrency/queue behavior.
+
+The release manifest is part of the runtime dataset identity. Deployment pins the exact approved manifest SHA-256. Runtime verifies that digest before trusting manifest fields, then validates source kind, manifest/format/schema versions, freshness, compatibility measurements/bounds, SQLite artifact SHA-256, SQLite schema/integrity, and runtime reviewed bounds. Any mismatch is unavailable/fail-closed. Runtime never truncates a valid dataset response to fit a compatibility limit.
 
 Xerial/embedded SQLite exact versions are in Technology Baseline. Native extraction temp storage, if required, is separate bounded ephemeral storage and never contains source/password/subject data.
 
@@ -163,7 +165,7 @@ OTLP/telemetry outage is not a lookup fallback and does not change fail-closed p
 
 Dataset is recovered by redeploying the exact approved immutable artifact or rebuilding a reviewed equivalent from approved HIBP acquisition evidence. No PostgreSQL PITR exists for this reference artifact.
 
-Service remains unready until dataset source identity, digest, schema, integrity, freshness, and compatibility bounds validate.
+Service remains unready until dataset source identity, manifest digest, SQLite digest, schema, integrity, freshness, and compatibility bounds validate.
 
 ## 9. Verification
 
@@ -176,6 +178,7 @@ Implementation/release evidence includes:
 - zero-count padding rejection;
 - <=35-day freshness and release metadata;
 - full-corpus cardinality/serialized-size measurement and configured build/runtime bounds;
+- manifest-digest -> manifest metadata -> SQLite-digest runtime identity binding;
 - read-only/query-only SQLite and path/DDL/ATTACH/extension negatives;
 - corrupt/missing/stale/incompatible dataset fail close;
 - no HIBP/provider runtime call or arbitrary Internet egress;
@@ -186,6 +189,6 @@ Implementation/release evidence includes:
 - telemetry-backend outage does not alter screening result;
 - profile-correct deployment/recovery evidence.
 
-Repository source/build/deployment-package evidence for the implemented slice includes the offline/local dataset builder, release-manifest schema, deterministic generated-fixture tests, actual CLI fixture execution, source SHA-256/integrity validation, observed cardinality/exact Protobuf-size measurement, raw-corpus/generated-database Git guards, no-network/process-exec static gates, and runtime-JAR exclusion. Commit-specific CI remains the evidence source for whether those gates passed.
+Repository source/build/deployment-package evidence for the implemented slice includes the offline/local dataset builder, version-2 release-manifest schema, deterministic generated-fixture tests, actual CLI fixture execution, source SHA-256/integrity validation, observed cardinality/exact Protobuf-size measurement with explicit compatibility bounds, runtime manifest/dataset digest binding, raw-corpus/generated-database Git guards, no-network/process-exec static gates, architecture/privacy regression tests, runtime-JAR exclusion, and digest verification of the exact Temurin runtime archive used to construct the service image. Commit-specific CI remains the evidence source for whether those gates passed.
 
 Production HIBP complete acquisition/provenance/licensing, current freshness, real full-corpus measurements and reviewed compatibility bounds, deployed runtime/staging, signed supply-chain/admission, complete-corpus performance, recovery, and production-readiness evidence remain `NOT VERIFIED` until their owning checks execute.
