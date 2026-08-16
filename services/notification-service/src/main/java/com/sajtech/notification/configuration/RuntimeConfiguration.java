@@ -13,6 +13,7 @@ import com.sajtech.notification.application.submit.service.NotificationLocaleNor
 import com.sajtech.notification.application.submit.service.NotificationRecipientCanonicalizer;
 import com.sajtech.notification.application.submit.usecase.SubmitNotificationUseCase;
 import com.sajtech.notification.application.template.service.BoundedTemplateRenderer;
+import com.sajtech.notification.application.template.service.TemplateContentDigest;
 import com.sajtech.notification.infrastructure.observability.NotificationKeyRingRefresher;
 import com.sajtech.notification.infrastructure.observability.NotificationReadinessHealthIndicator;
 import com.sajtech.notification.infrastructure.observability.ObservedSubmitNotification;
@@ -91,8 +92,14 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  NotificationTemplateCatalog notificationTemplateCatalog(DSLContext dsl) {
-    return new JooqNotificationTemplateCatalog(dsl);
+  TemplateContentDigest templateContentDigest() {
+    return new TemplateContentDigest();
+  }
+
+  @Bean
+  NotificationTemplateCatalog notificationTemplateCatalog(
+      DSLContext dsl, TemplateContentDigest contentDigest) {
+    return new JooqNotificationTemplateCatalog(dsl, contentDigest);
   }
 
   @Bean
