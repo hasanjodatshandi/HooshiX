@@ -19,7 +19,7 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
   private static final int MAX_INBOUND_MESSAGE_BYTES = 16 * 1024;
   private static final int MAX_INBOUND_METADATA_BYTES = 16 * 1024;
   private static final long SERVER_SHUTDOWN_GRACE_SECONDS = 10;
-  private static final long EXECUTOR_SHUTDOWN_GRACE_SECONDS = 2;
+  private static final long EXECUTOR_SHUTDOWN_GRACE_SECONDS = 1;
 
   private final Server server;
   private final ExecutorService requestExecutor;
@@ -34,7 +34,8 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
       throw new IllegalArgumentException("Invalid gRPC port");
     }
     if (maxConcurrentCallsPerConnection <= 0) {
-      throw new IllegalArgumentException("Maximum concurrent calls per connection must be positive");
+      throw new IllegalArgumentException(
+          "Maximum concurrent calls per connection must be positive");
     }
     Objects.requireNonNull(service, "service");
     Objects.requireNonNull(interceptor, "interceptor");
