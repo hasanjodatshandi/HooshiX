@@ -17,6 +17,7 @@ import com.sajtech.notification.application.submit.port.out.DeliveryEscrowPort;
 import com.sajtech.notification.application.submit.port.out.IntentFingerprintPort;
 import com.sajtech.notification.application.submit.port.out.NotificationAcceptanceRepository;
 import com.sajtech.notification.application.submit.port.out.NotificationTemplateCatalog;
+import com.sajtech.notification.application.submit.port.out.TransactionRunner;
 import com.sajtech.notification.application.submit.service.FingerprintMaterialEncoder;
 import com.sajtech.notification.application.submit.service.NotificationIntentFactory;
 import com.sajtech.notification.application.submit.service.NotificationLocaleNormalizer;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 class SubmitNotificationUseCaseTest {
@@ -76,7 +78,7 @@ class SubmitNotificationUseCaseTest {
         intentFactory,
         new FingerprintMaterialEncoder(),
         new Sha256Fingerprint(),
-        work -> work.get(),
+        new ImmediateTransactionRunner(),
         repository,
         templates(),
         databaseTime,
@@ -123,17 +125,33 @@ class SubmitNotificationUseCaseTest {
   private static final class Sha256Fingerprint implements IntentFingerprintPort {
     @Override
     public FingerprintDigest compute(byte[] canonicalMaterial) {
+      return new FingerprintDigest("test-v1", "test-key", sha256(canonicalMaterial));
+    }
+
+    @Override
+    public boolean verify(
+        byte[] canonicalMaterial,
+        String fingerprintVersion,
+        String fingerprintKeyId,
+        byte[] expectedDigest) {
+      return "test-v1".equals(fingerprintVersion)
+          && "test-key".equals(fingerprintKeyId)
+          && MessageDigest.isEqual(expectedDigest, sha256(canonicalMaterial));
+    }
+
+    private static byte[] sha256(byte[] material) {
       try {
-        return new FingerprintDigest(
-            "test-v1", "test-key", MessageDigest.getInstance("SHA-256").digest(canonicalMaterial));
+        return MessageDigest.getInstance("SHA-256").digest(material);
       } catch (NoSuchAlgorithmException impossible) {
         throw new IllegalStateException(impossible);
       }
     }
+  }
 
+  private static final class ImmediateTransactionRunner implements TransactionRunner {
     @Override
-    public boolean constantTimeEquals(byte[] left, byte[] right) {
-      return MessageDigest.isEqual(left, right);
+    public <T> T required(Supplier<T> work) {
+      return work.get();
     }
   }
 
