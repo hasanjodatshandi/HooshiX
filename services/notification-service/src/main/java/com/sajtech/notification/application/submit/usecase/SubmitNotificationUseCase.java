@@ -64,19 +64,23 @@ public final class SubmitNotificationUseCase implements SubmitNotification {
   @Override
   public SubmitNotificationResult submit(SubmitNotificationCommand command) {
     CanonicalNotificationIntent intent = intentFactory.create(command);
-    FingerprintDigest fingerprint = fingerprintPort.compute(fingerprintEncoder.encode(intent));
+    byte[] fingerprintMaterial = fingerprintEncoder.encode(intent);
+    FingerprintDigest fingerprint = fingerprintPort.compute(fingerprintMaterial);
     try {
-      return transactions.required(() -> acceptInTransaction(intent, fingerprint));
+      return transactions.required(
+          () -> acceptInTransaction(intent, fingerprintMaterial, fingerprint));
     } catch (DuplicateNotificationRequestException concurrentDuplicate) {
-      return transactions.required(() -> resolveExisting(intent, fingerprint));
+      return transactions.required(() -> resolveExisting(intent, fingerprintMaterial));
     }
   }
 
   private SubmitNotificationResult acceptInTransaction(
-      CanonicalNotificationIntent intent, FingerprintDigest fingerprint) {
+      CanonicalNotificationIntent intent,
+      byte[] fingerprintMaterial,
+      FingerprintDigest fingerprint) {
     var existing = notifications.findByCallerAndRequestId(intent.callerService(), intent.requestId());
     if (existing.isPresent()) {
-      return replayOrConflict(existing.get(), fingerprint);
+      return replayOrConflict(existing.get(), fingerprintMaterial);
     }
 
     Instant acceptedAt = databaseTime.now();
@@ -114,7 +118,7 @@ public final class SubmitNotificationUseCase implements SubmitNotification {
   }
 
   private SubmitNotificationResult resolveExisting(
-      CanonicalNotificationIntent intent, FingerprintDigest fingerprint) {
+      CanonicalNotificationIntent intent, byte[] fingerprintMaterial) {
     StoredAcceptedNotification existing =
         notifications
             .findByCallerAndRequestId(intent.callerService(), intent.requestId())
@@ -123,12 +127,16 @@ public final class SubmitNotificationUseCase implements SubmitNotification {
                     new NotificationSubmissionException(
                         NotificationSubmissionError.NOTIFICATION_UNAVAILABLE,
                         "Notification idempotency resolution failed"));
-    return replayOrConflict(existing, fingerprint);
+    return replayOrConflict(existing, fingerprintMaterial);
   }
 
   private SubmitNotificationResult replayOrConflict(
-      StoredAcceptedNotification existing, FingerprintDigest fingerprint) {
-    if (!fingerprintPort.constantTimeEquals(existing.fingerprint(), fingerprint.value())) {
+      StoredAcceptedNotification existing, byte[] fingerprintMaterial) {
+    if (!fingerprintPort.verify(
+        fingerprintMaterial,
+        existing.fingerprintVersion(),
+        existing.fingerprintKeyId(),
+        existing.fingerprint())) {
       throw new NotificationSubmissionException(
           NotificationSubmissionError.REQUEST_ID_CONFLICT,
           "Notification request identity was reused for different intent");
