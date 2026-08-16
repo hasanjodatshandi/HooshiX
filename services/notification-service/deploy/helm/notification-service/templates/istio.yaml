@@ -1,0 +1,39 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "notification-service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "notification-service.selectorLabels" . | nindent 6 }}
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "notification-service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "notification-service.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - {{ required "identity.principal is required" .Values.identity.principal | quote }}
+      to:
+        - operation:
+            ports:
+              - {{ .Values.service.grpcPort | quote }}
+    {{- if .Values.observability.metrics.enabled }}
+    - from:
+        - source:
+            principals:
+              - {{ required "observability.metrics.prometheus.principal is required" .Values.observability.metrics.prometheus.principal | quote }}
+      to:
+        - operation:
+            ports:
+              - {{ .Values.service.managementPort | quote }}
+    {{- end }}

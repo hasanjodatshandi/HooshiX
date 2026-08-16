@@ -1,0 +1,26 @@
+image:
+  repository: registry.invalid/hooshix/notification-service
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+database:
+  jdbcUrl: jdbc:postgresql://notification-postgresql.platform-data.svc:5432/notification
+  runtimeSecretName: notification-db-runtime
+  migrationSecretName: notification-db-migration
+
+secrets:
+  fingerprintSecretName: notification-fingerprint
+  deliverySecretName: notification-delivery
+
+observability:
+  tracing:
+    otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces
+    collector:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: otel-collector
+  metrics:
+    prometheus:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: prometheus
+      principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus

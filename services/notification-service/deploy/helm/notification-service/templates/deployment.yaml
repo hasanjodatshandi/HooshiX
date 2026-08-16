@@ -1,0 +1,158 @@
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $digest := required "image.digest is required" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+{{- fail "image.digest must be an immutable sha256 digest" -}}
+{{- end -}}
+{{- if ne (int .Values.replicaCount) 1 -}}
+{{- fail "Notification single-server profile must render exactly one replica" -}}
+{{- end -}}
+{{- $jdbcUrl := required "database.jdbcUrl is required" .Values.database.jdbcUrl -}}
+{{- $runtimeDbSecret := required "database.runtimeSecretName is required" .Values.database.runtimeSecretName -}}
+{{- $migrationDbSecret := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
+{{- $fingerprintSecret := required "secrets.fingerprintSecretName is required" .Values.secrets.fingerprintSecretName -}}
+{{- $deliverySecret := required "secrets.deliverySecretName is required" .Values.secrets.deliverySecretName -}}
+{{- if eq $runtimeDbSecret $migrationDbSecret -}}
+{{- fail "runtime and migration database credentials must use distinct Secrets" -}}
+{{- end -}}
+{{- if not .Values.observability.tracing.enabled -}}
+{{- fail "Day-One tracing must remain enabled" -}}
+{{- end -}}
+{{- if not .Values.observability.metrics.enabled -}}
+{{- fail "Day-One metrics must remain enabled" -}}
+{{- end -}}
+{{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
+{{- if not (regexMatch "^https?://[^[:space:]]+/v1/traces$" $traceEndpoint) -}}
+{{- fail "observability tracing endpoint must be an explicit /v1/traces endpoint" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "notification-service.name" . }}
+  labels:
+    {{- include "notification-service.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      {{- include "notification-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "notification-service.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | quote }}
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 15
+      initContainers:
+        - name: migrate
+          image: "{{ $repository }}@{{ $digest }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--spring.profiles.active=migration"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: NOTIFICATION_DATABASE_URL
+              value: {{ $jdbcUrl | quote }}
+          volumeMounts:
+            - name: migration-db-credentials
+              mountPath: /run/secrets/notification-db-migration
+              readOnly: true
+            - name: temporary
+              mountPath: /tmp
+      containers:
+        - name: application
+          image: "{{ $repository }}@{{ $digest }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+              protocol: TCP
+            - name: management
+              containerPort: {{ .Values.service.managementPort }}
+              protocol: TCP
+          env:
+            - name: NOTIFICATION_DATABASE_URL
+              value: {{ $jdbcUrl | quote }}
+            - name: NOTIFICATION_GRPC_PORT
+              value: {{ .Values.service.grpcPort | quote }}
+            - name: NOTIFICATION_MAX_CONCURRENT_CALLS_PER_CONNECTION
+              value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}
+            - name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+              value: {{ $traceEndpoint | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            - name: runtime-db-credentials
+              mountPath: /run/secrets/notification-db-runtime
+              readOnly: true
+            - name: fingerprint-key-ring
+              mountPath: /run/secrets/notification-fingerprint
+              readOnly: true
+            - name: delivery-key-ring
+              mountPath: /run/secrets/notification-delivery
+              readOnly: true
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: runtime-db-credentials
+          secret:
+            secretName: {{ $runtimeDbSecret | quote }}
+        - name: migration-db-credentials
+          secret:
+            secretName: {{ $migrationDbSecret | quote }}
+        - name: fingerprint-key-ring
+          secret:
+            secretName: {{ $fingerprintSecret | quote }}
+            items:
+              - key: fingerprint.properties
+                path: fingerprint.properties
+        - name: delivery-key-ring
+          secret:
+            secretName: {{ $deliverySecret | quote }}
+            items:
+              - key: delivery.properties
+                path: delivery.properties
+        - name: temporary
+          emptyDir:
+            sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}
