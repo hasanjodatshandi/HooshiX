@@ -15,34 +15,34 @@ jobs:
   apply:
     name: Validate and apply generated gRPC metadata
     if: >-
-      github.event.workflow_run.id == 31950623366 &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.head_sha == 'e1d2b013020b8a59b965ce448994687e3d7170f4' &&
       github.event.workflow_run.head_branch == 'agent/security-performance-freshness-audit' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Check out exact audited PR head
+      - name: Check out exact audited workflow head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: agent/security-performance-freshness-audit
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
           persist-credentials: true
 
-      - name: Verify audited PR head
+      - name: Verify exact audited workflow head
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 'e1d2b013020b8a59b965ce448994687e3d7170f4'
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
 
-      - name: Download exact generated dependency metadata
+      - name: Download generated dependency metadata from triggering run
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: compromised-password-dependency-metadata
           path: /tmp/generated-dependency-metadata
           github-token: ${{ github.token }}
-          run-id: '31950623366'
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Verify exact reviewed artifact contents
         run: |
