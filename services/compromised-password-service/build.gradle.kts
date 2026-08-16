@@ -23,12 +23,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("io.grpc:grpc-protobuf:1.81.0")
-    implementation("io.grpc:grpc-stub:1.81.0")
+    implementation("io.grpc:grpc-netty-shaded:1.83.1")
+    implementation("io.grpc:grpc-protobuf:1.83.1")
+    implementation("io.grpc:grpc-stub:1.83.1")
     implementation("io.opentelemetry:opentelemetry-api")
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
     compileOnly("javax.annotation:javax.annotation-api:1.3.2")
-    runtimeOnly("io.grpc:grpc-netty-shaded:1.81.0")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     constraints {
@@ -42,8 +42,8 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
-    testImplementation("io.grpc:grpc-inprocess:1.81.0")
-    testImplementation("io.grpc:grpc-testing:1.81.0")
+    testImplementation("io.grpc:grpc-inprocess:1.83.1")
+    testImplementation("io.grpc:grpc-testing:1.83.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -52,7 +52,7 @@ protobuf {
         artifact = "com.google.protobuf:protoc:3.25.8"
     }
     plugins {
-        maybeCreate("grpc").artifact = "io.grpc:protoc-gen-grpc-java:1.81.0"
+        maybeCreate("grpc").artifact = "io.grpc:protoc-gen-grpc-java:1.83.1"
     }
     generateProtoTasks {
         all().forEach { task ->
