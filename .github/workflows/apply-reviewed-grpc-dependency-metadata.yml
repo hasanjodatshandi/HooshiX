@@ -1,0 +1,78 @@
+name: Apply reviewed gRPC dependency metadata
+
+on:
+  workflow_run:
+    workflows:
+      - Refresh Compromised Password dependency locks
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  apply:
+    name: Validate and apply generated gRPC metadata
+    if: >-
+      github.event.workflow_run.id == 31950623366 &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_sha == 'e1d2b013020b8a59b965ce448994687e3d7170f4' &&
+      github.event.workflow_run.head_branch == 'agent/security-performance-freshness-audit' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact audited PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/security-performance-freshness-audit
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Verify audited PR head
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'e1d2b013020b8a59b965ce448994687e3d7170f4'
+
+      - name: Download exact generated dependency metadata
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: compromised-password-dependency-metadata
+          path: /tmp/generated-dependency-metadata
+          github-token: ${{ github.token }}
+          run-id: '31950623366'
+
+      - name: Verify exact reviewed artifact contents
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' \
+            '4d0e7ca702e76dc7c737724c52295cbd4688024cc752b5167352e3693ed17cfe' \
+            '/tmp/generated-dependency-metadata/gradle.lockfile' | sha256sum --check --strict -
+          printf '%s  %s\n' \
+            'dd1ee3904abaabcbb3f34a0e4c4a284d931bd60ce2aea5703895217503e5f8d6' \
+            '/tmp/generated-dependency-metadata/gradle/verification-metadata.xml' | sha256sum --check --strict -
+
+      - name: Apply only reviewed generated files
+        run: |
+          set -euo pipefail
+          cp /tmp/generated-dependency-metadata/gradle.lockfile \
+            services/compromised-password-service/gradle.lockfile
+          cp /tmp/generated-dependency-metadata/gradle/verification-metadata.xml \
+            services/compromised-password-service/gradle/verification-metadata.xml
+          git diff --check
+          git diff --exit-code --quiet && {
+            echo 'No dependency metadata changes were produced.' >&2
+            exit 1
+          }
+          changed="$(git diff --name-only)"
+          expected=$'services/compromised-password-service/gradle.lockfile\nservices/compromised-password-service/gradle/verification-metadata.xml'
+          test "${changed}" = "${expected}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            services/compromised-password-service/gradle.lockfile \
+            services/compromised-password-service/gradle/verification-metadata.xml
+          git commit -m 'Regenerate gRPC dependency verification metadata'
+          git push origin HEAD:agent/security-performance-freshness-audit
