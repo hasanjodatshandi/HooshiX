@@ -17,6 +17,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamRecorder;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +45,7 @@ class NotificationGrpcServiceTest {
 
     service.submitNotification(validRequest(), recorder);
 
-    assertThat(recorder.awaitCompletion(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
     assertThat(recorder.getError()).isNull();
     assertThat(recorder.getValues()).hasSize(1);
     assertThat(recorder.getValues().getFirst().getNotificationId())
@@ -53,6 +54,28 @@ class NotificationGrpcServiceTest {
         .isEqualTo(NotificationLifecycle.NOTIFICATION_LIFECYCLE_ACCEPTED);
     assertThat(captured.get().locale()).isEqualTo("en-US");
     assertThat(captured.get().messageNotAfter()).isEqualTo(Instant.parse("2026-08-16T00:10:00Z"));
+  }
+
+  @Test
+  void replayReturnsStoredLifecycleInsteadOfForcingAccepted() throws Exception {
+    NotificationGrpcService service =
+        new NotificationGrpcService(
+            command ->
+                new SubmitNotificationResult(
+                    UUID.fromString("d9428888-122b-41e1-b85c-61c0c552a118"),
+                    com.sajtech.notification.domain.notification.model.NotificationLifecycle
+                        .PROVIDER_ACCEPTED,
+                    Instant.parse("2026-08-16T00:00:00Z"),
+                    true));
+    StreamRecorder<com.sajtech.notification.contract.v1.SubmitNotificationResponse> recorder =
+        StreamRecorder.create();
+
+    service.submitNotification(validRequest(), recorder);
+
+    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
+    assertThat(recorder.getError()).isNull();
+    assertThat(recorder.getValues().getFirst().getLifecycle())
+        .isEqualTo(NotificationLifecycle.NOTIFICATION_LIFECYCLE_PROVIDER_ACCEPTED);
   }
 
   @Test
@@ -69,7 +92,7 @@ class NotificationGrpcServiceTest {
 
     service.submitNotification(validRequest(), recorder);
 
-    assertThat(recorder.awaitCompletion(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
     StatusRuntimeException error = (StatusRuntimeException) recorder.getError();
     assertThat(error.getStatus().getCode()).isEqualTo(Status.Code.ALREADY_EXISTS);
     assertThat(error.getStatus().getDescription()).isEqualTo("REQUEST_ID_CONFLICT");
@@ -93,7 +116,7 @@ class NotificationGrpcServiceTest {
 
     service.submitNotification(request, recorder);
 
-    assertThat(recorder.awaitCompletion(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
     assertThat(Status.fromThrowable(recorder.getError()).getCode())
         .isEqualTo(Status.Code.INVALID_ARGUMENT);
   }
