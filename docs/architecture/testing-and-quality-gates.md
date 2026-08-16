@@ -2,7 +2,7 @@
 
 Testing proves current contracts and failure semantics at the cheapest trustworthy layer. Documentation/configuration is not evidence until the corresponding executable check exists and passes.
 
-ADR-0042 selects `production-single-server`; profile-specific tests supplement, not replace, service/security/data tests. ADR-0044 makes observability part of the first executable service Definition of Done.
+ADR-0042 selects `production-single-server`; profile-specific tests supplement, not replace, service/security/data tests. ADR-0044 makes observability part of the first executable service Definition of Done. ADR-0045 defines the current DevSecOps source/secret/final-artifact toolchain.
 
 ## 1. Test portfolio
 
@@ -13,19 +13,22 @@ Use the smallest trustworthy layer:
 - focused adapter/Testcontainers tests for PostgreSQL/Redis/Kafka/SQLite/protocol behavior;
 - gRPC/Protobuf/OpenAPI/provider contract tests;
 - Flyway/RLS/security tests;
+- Gitleaks current-tree/Git-history secret-scanning tests;
 - Kubernetes/Helm/Istio/Kyverno/NetworkPolicy render/policy tests;
 - static + runtime logging/PII/cardinality tests;
 - observability propagation/export/failure tests;
 - BDD only for critical shared behavior;
 - Playwright only for critical browser journeys;
 - load/soak/chaos/recovery at staging/release/scheduled cadence;
-- final-image SBOM/signature/provenance/advisory tests.
+- final-image Syft/Grype/Cosign/SBOM/signature/provenance/advisory tests.
 
 Do not duplicate the same assertion at every layer without a distinct failure class.
 
 ## 2. Java/build gates
 
-Applicable Java services require compile, unit/integration tests, ArchUnit, Spotless, SpotBugs, Semgrep/SAST, Gradle dependency verification/locks, dependency/security/license checks, contract/migration/security tests, and Day-One observability tests.
+Applicable Java services require compile, unit/integration tests, ArchUnit, Spotless, SpotBugs, Semgrep/SAST, Gitleaks current-tree/history scanning, Gradle dependency verification/locks, dependency/security/license checks, contract/migration/security tests, and Day-One observability tests.
+
+Semgrep and Gitleaks protect different failure classes. Gradle dependency verification/locks are integrity/reproducibility controls, not vulnerability scanners.
 
 Do not disable a gate, broaden suppression, or set `ignoreFailures` merely to pass CI.
 
@@ -117,9 +120,23 @@ Single-server proves exact K3s artifact/version/integrity, embedded SQLite, secr
 
 Istio proves STRICT mTLS, exact ServiceAccount identity, least-privilege authorization positives/negatives, NetworkPolicy/HBONE compatibility, `istioctl analyze`, no duplicate retry ownership, and single-server complete-stack resource impact.
 
-## 11. Kyverno CEL/supply-chain tests
+## 11. DevSecOps/Kyverno supply-chain tests
 
-New production policy manifests use stable `policies.kyverno.io/v1` CEL types.
+ADR-0045 evidence includes:
+
+- Gitleaks detects a synthetic secret in the current tree;
+- Gitleaks detects a synthetic committed secret after it is removed from the latest tree;
+- Gitleaks output is fully redacted and a real exposed credential follows revoke/rotate handling rather than suppression;
+- Semgrep custom rules have positive/negative fixtures and remain blocking;
+- Gradle dependency-integrity failure and vulnerability-scan failure are proven as separate failure classes;
+- Syft generates CycloneDX JSON from the exact final releasable image digest;
+- Grype scans that exact final image/SBOM and applies ADR-0035/0038 severity/freshness/exception behavior;
+- Cosign correct-signer/wrong-signer/unsigned/provenance/signed-SBOM positives and negatives pass;
+- scanner/tool downloads verify immutable version/checksum/digest/signature metadata as applicable;
+- scanner/feed unavailability or stale evidence does not silently permit promotion;
+- Trivy/OWASP Dependency-Check are not silently added as competing authorities without a distinct-coverage review.
+
+New production Kyverno policy manifests use stable `policies.kyverno.io/v1` CEL types.
 
 CI/render tests reject legacy production policy declarations such as:
 
@@ -199,19 +216,22 @@ Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memo
 Recommended authority order:
 
 ```text
-format/static/architecture/governance
+Gitleaks secret scan
+-> Semgrep/format/static/architecture/governance/dependency integrity
 -> unit
 -> contract/schema/dataset
 -> focused integration/security/quota/observability
--> image + SBOM/sign/provenance/advisory
+-> final image -> Syft CycloneDX -> Grype vulnerability decision -> Cosign sign/provenance/SBOM attestation
 -> Helm/Kubernetes/Istio/Kyverno CEL/render/secret
 -> staging smoke/critical browser/telemetry correlation
 -> profile-specific load/recovery/chaos
--> production approval
+-> production approval of the same signed digest
 ```
+
+Independent checks may execute in parallel only when required input/evidence ordering remains correct.
 
 ## 17. Definition of Done
 
-A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
+A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, source/secret/final-artifact security, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
 
 Documentation-only work establishes target decisions only; it never proves runtime production readiness.
