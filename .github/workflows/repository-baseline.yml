@@ -112,7 +112,7 @@ jobs:
             'fcdbdd77eafe0982f69d1970a8c5d23aed94ff5bae65e467459dafb2f09f7730' \
             '/tmp/notification-dependency-metadata/gradle/verification-metadata.xml' | sha256sum --check --strict -
 
-      - name: Commit reviewed metadata and tracked-file index
+      - name: Commit reviewed metadata and remove temporary generator
         run: |
           set -euo pipefail
           cp /tmp/notification-dependency-metadata/gradle.lockfile \
@@ -122,11 +122,12 @@ jobs:
             services/notification-service/gradle/verification-metadata.xml
           git add services/notification-service/gradle.lockfile \
             services/notification-service/gradle/verification-metadata.xml
+          git rm .github/workflows/refresh-notification-dependency-metadata.yml
           git ls-files | LC_ALL=C sort > FILE_INDEX.txt
           git add FILE_INDEX.txt
           git diff --cached --check
           changed="$(git diff --cached --name-only)"
-          expected=$'FILE_INDEX.txt\nservices/notification-service/gradle.lockfile\nservices/notification-service/gradle/verification-metadata.xml'
+          expected=$'.github/workflows/refresh-notification-dependency-metadata.yml\nFILE_INDEX.txt\nservices/notification-service/gradle.lockfile\nservices/notification-service/gradle/verification-metadata.xml'
           test "${changed}" = "${expected}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
