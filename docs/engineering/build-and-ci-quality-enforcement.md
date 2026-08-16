@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics.
 
 ## 1. Required Java PR gates
 
@@ -17,13 +17,21 @@ spotlessCheck
 spotbugsMain
 repository Semgrep/SAST
 Gitleaks current-tree/history secret scan
-dependency verification/lock checks
+Gradle dependency verification/lock checks
+OSV-Scanner declared/locked dependency advisory scan
 contract/schema checks
 ```
 
 Additional gates apply by changed capability. A mandatory check is not changed to warning/`ignoreFailures` merely to obtain a green pipeline.
 
-Gitleaks and Semgrep protect different failure classes. Semgrep is source SAST/policy; Gitleaks is dedicated committed-secret detection. Neither is a replacement for the other.
+Gitleaks, Semgrep, Gradle verification, and OSV-Scanner protect different failure classes:
+
+- Semgrep — first-party source SAST/policy;
+- Gitleaks — committed-secret detection;
+- Gradle verification/locks — expected dependency integrity/reproducibility;
+- OSV-Scanner — early known-vulnerability advisory feedback for declared/locked dependencies.
+
+None replaces final-image Syft/Grype release evidence.
 
 ## 2. Architecture/code gates
 
@@ -52,6 +60,14 @@ CI enforces at least:
 
 - Gradle dependencies/plugins/tools are pinned/verified; dynamic versions are prohibited;
 - dependency verification/locks prove expected artifact integrity/reproducibility; they are not vulnerability/CVE authority.
+
+### Early dependency advisory scanning
+
+- OSV-Scanner version comes from Technology Baseline and the exact downloaded binary/checksum is pinned in CI metadata;
+- applicable declared/locked dependency evidence is scanned on blocking service CI;
+- repository scheduled security verification reruns the implemented service advisory scan so newly disclosed dependency findings can surface without a source change;
+- a passing lockfile scan is early feedback, not final-image vulnerability proof;
+- OSV-Scanner does not replace Syft/Grype final-artifact coverage.
 
 ### Final artifact
 
@@ -191,6 +207,7 @@ CI SHOULD enforce when implemented:
 
 Not every edit runs full platform work. Release/scheduled gates retain:
 
+- scheduled OSV-Scanner locked-dependency advisory scan for implemented services;
 - staging critical journeys/Playwright;
 - deployed-digest Grype rescanning with refreshed approved data at the ADR-0035 cadence;
 - load/soak and complete-stack single-server benchmark;
@@ -200,7 +217,7 @@ Not every edit runs full platform work. Release/scheduled gates retain:
 - provider integration evidence;
 - external host-down monitoring exercise.
 
-Heavy checks may move out of every-PR cadence only when a faster deterministic PR gate protects the regression class and the heavy gate remains mandatory before the release/evidence boundary that depends on it.
+OSV scheduled dependency scanning is not a replacement for deployed-digest Grype rescanning. Heavy checks may move out of every-PR cadence only when a faster deterministic PR gate protects the regression class and the heavy gate remains mandatory before the release/evidence boundary that depends on it.
 
 ## 11. DevSecOps gate ordering and evidence
 
@@ -209,10 +226,11 @@ Logical authority order is:
 ```text
 Gitleaks
 -> Semgrep/static/architecture/format/dependency integrity
+-> OSV-Scanner dependency advisory
 -> tests/contracts/security
 -> final immutable image
 -> Syft CycloneDX SBOM
--> Grype vulnerability decision
+-> Grype final-artifact vulnerability decision
 -> Cosign signature/provenance/signed SBOM
 -> Helm/Kubernetes/Istio/Kyverno
 -> staging
@@ -221,7 +239,7 @@ Gitleaks
 
 Parallel execution is allowed only when dependency ordering/evidence remains correct.
 
-Executable verification includes positive and negative Gitleaks history fixtures, Semgrep fixtures, Syft final-image binding, Grype policy/freshness behavior, Cosign signer/provenance/SBOM cases, and Kyverno missing/wrong evidence rejection.
+Executable verification includes positive and negative Gitleaks history fixtures, Semgrep fixtures, pinned OSV locked-dependency scanning, separate Gradle/OSV/Grype failure classes, Syft final-image binding, Grype policy/freshness behavior, Cosign signer/provenance/SBOM cases, and Kyverno missing/wrong evidence rejection.
 
 ## 12. CI result language
 
