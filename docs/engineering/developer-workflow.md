@@ -24,10 +24,11 @@ Use the smallest trustworthy scope:
 2. Domain/Application unit tests without Spring;
 3. focused adapter tests;
 4. Testcontainers for real dependency behavior;
-5. contract/architecture/Semgrep/static checks;
-6. service runtime tests including Day-One observability;
-7. staging/system/mesh/WAF/security checks;
-8. scheduled/release load/chaos/DR/full-stack evidence.
+5. contract/architecture/Semgrep/static + Gradle dependency-integrity checks;
+6. OSV-Scanner declared/locked dependency advisory feedback;
+7. service runtime tests including Day-One observability;
+8. staging/system/mesh/WAF/security checks;
+9. scheduled/release final-artifact/load/chaos/DR/full-stack evidence.
 
 Pure Domain/Application work does not require a complete Kubernetes stack.
 
@@ -48,7 +49,7 @@ When a service/critical path is first implemented, the same coherent change incl
 
 Do not merge a feature with TODO text such as “add observability later” when the path already needs logs/metrics/traces for diagnosis or evidence.
 
-For local development, telemetry backends may be optional when the code path is testable with an in-memory/test exporter or local Collector fixture. This does not remove staging/release evidence against the real Collector/backends.
+For local development, telemetry backends may be optional when the code path is testable with an in-memory/test OTLP exporter or local Collector fixture. This does not remove staging/release evidence against the real Collector/backends.
 
 ## 4. Local-only substitutions
 
@@ -65,7 +66,7 @@ Compromised Password normal PR tests use deterministic generated SHA-1 corpus fi
 Independent checks SHOULD run in parallel where safe, such as:
 
 - Gitleaks + Semgrep + unit + ArchUnit + static analysis;
-- contract + dependency verification;
+- contract + Gradle dependency verification + OSV-Scanner advisory scan;
 - independent integration shards;
 - quota clock/cardinality tests separate from unrelated service tests;
 - observability config/privacy/context tests separate from heavy telemetry storage/load tests;
@@ -76,6 +77,8 @@ Supply-chain checks retain logical dependency ordering even when jobs are parall
 ```text
 final image -> Syft -> Grype -> Cosign -> Kyverno/staging promotion evidence
 ```
+
+OSV-Scanner is earlier dependency feedback. It does not replace final-image Syft/Grype evidence or scheduled deployed-digest rescanning.
 
 Use Gradle build/configuration cache and secure reproducible CI caching where compatible. Never skip a mandatory gate to reduce duration.
 
@@ -94,7 +97,22 @@ If Gitleaks finds a likely real credential:
 
 Deleting a line from the latest tree does not by itself remediate a committed credential.
 
-## 7. Heavy verification
+## 7. Dependency advisory workflow
+
+ADR-0045 selects OSV-Scanner for early declared/locked dependency advisory feedback.
+
+When OSV-Scanner finds a vulnerability:
+
+1. keep the exact package/version/advisory evidence and owner;
+2. distinguish it from Gradle integrity failure;
+3. assess/update the dependency according to current security/compatibility policy;
+4. do not claim final-image safety from the lockfile scan alone;
+5. retain Syft/Grype final-artifact vulnerability evidence at release;
+6. do not add a second SCA scanner only to bypass or dilute the current finding.
+
+Scheduled OSV scanning is useful for newly disclosed dependency findings even without a source change. ADR-0035/0038 final-artifact Grype rescanning remains the production/deployed-digest vulnerability authority.
+
+## 8. Heavy verification
 
 These are not every-edit requirements unless the change directly demands them:
 
@@ -105,17 +123,17 @@ These are not every-edit requirements unless the change directly demands them:
 - provider integration;
 - full observability storage/cardinality pressure;
 - external total-host-loss detection;
-- full release signing/admission/promotion when the local change has not yet reached the release boundary.
+- full final-image Syft/Grype/Cosign/Kyverno release evidence when the local change has not yet reached the release boundary.
 
 They remain mandatory at the current release/scheduled cadence. A fast gate may protect a regression class at PR time, but it does not delete the heavy evidence gate.
 
-## 8. Service startup discipline
+## 9. Service startup discipline
 
 Do not start unrelated services for a narrow task. Use explicit contracts/test doubles for unit/application tests and real downstreams when integration behavior is the subject under test.
 
 Do not create a new network service merely to make local composition look uniform. ADR-0041 Reference Data remains local until its deployable trigger is evidenced.
 
-## 9. Performance guardrails
+## 10. Performance guardrails
 
 Virtual Threads do not remove downstream resource limits. Keep DB pools, gRPC concurrency, Kafka consumers, Redis work, telemetry queues, workers, and provider calls bounded/observable.
 
@@ -123,7 +141,7 @@ Do not add cache/broker/proxy/retry/service/distributed coordination as speculat
 
 Semantic quota development also measures new security-bucket cardinality and common-mode clock behavior; normal-traffic latency alone is not enough.
 
-## 10. Local code-quality baseline
+## 11. Local code-quality baseline
 
 Java pre-push SHOULD run the repository-defined equivalent of:
 
@@ -131,23 +149,24 @@ Java pre-push SHOULD run the repository-defined equivalent of:
 gitleaks dir --redact=100 .
 gitleaks git --redact=100
 ./gradlew spotlessCheck test architectureTest spotbugsMain
-# focused integration/contract/schema/dataset/quota/observability tasks
 # repository Semgrep blocking rules
+# repository-pinned OSV-Scanner against applicable declared/locked dependency evidence
+# focused integration/contract/schema/dataset/quota/observability tasks
 ```
 
-The exact Gitleaks version/configuration comes from Technology Baseline/repository CI. Local commands are convenience feedback; protected CI remains authoritative.
+Exact Gitleaks/OSV versions and configuration come from Technology Baseline/repository CI. Local commands are convenience feedback; protected CI remains authoritative.
 
 Use `spotlessApply` only for formatting. Do not weaken gates for speed.
 
-## 11. Code-generation preflight
+## 12. Code-generation preflight
 
 Before implementation, complete the mandatory preflight in `AGENTS.md` and `coding-standards.md`.
 
-Decide ownership/ports, sync-vs-event, transactions, deadlines/retry/idempotency/cancellation/concurrency, workload identity, migrations/reference datasets, logs/metrics/traces/alerts, deployment/securityContext, artifact promotion, PII/cardinality, DevSecOps source/secret/final-artifact gates, and required tests before concrete adapter code.
+Decide ownership/ports, sync-vs-event, transactions, deadlines/retry/idempotency/cancellation/concurrency, workload identity, migrations/reference datasets, logs/metrics/traces/alerts, deployment/securityContext, artifact promotion, PII/cardinality, DevSecOps source/secret/dependency-advisory/final-artifact gates, and required tests before concrete adapter code.
 
 AI-generated and handwritten code use the same gates. Compilation alone is not completion evidence.
 
-## 12. Local platform foundation
+## 13. Local platform foundation
 
 Use the pinned local foundation only when real mesh/edge/Gateway/NetworkPolicy/telemetry integration is under test.
 
