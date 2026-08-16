@@ -38,7 +38,7 @@ Organization namespace: `com.sajtech`.
 
 Coding/package/DI rules live in Engineering standards and are machine-enforced where feasible.
 
-ADR-0045 DevSecOps controls are repository/CI/release/admission concerns. Semgrep, Gitleaks, Syft, Grype, and Cosign are not application runtime dependencies and do not create service-to-service edges.
+ADR-0045 DevSecOps controls are repository/CI/release/admission concerns. Semgrep, Gitleaks, OSV-Scanner, Syft, Grype, and Cosign are not application runtime dependencies and do not create service-to-service edges.
 
 ## 4. High-level topology
 
@@ -79,7 +79,7 @@ DevSecOps is outside this request/runtime topology:
 
 ```text
 Git/source
- -> Gitleaks + Semgrep + build/test/integrity gates
+ -> Gitleaks + Semgrep + Gradle integrity + OSV dependency advisory + build/test gates
  -> final image
  -> Syft -> Grype -> Cosign
  -> Kyverno admission
@@ -105,7 +105,7 @@ local ordinary observability stack, explicitly non-HA
 
 HA expansion retains current redundant topology.
 
-Single-server changes infrastructure availability only. It does not weaken authentication/MFA, Authorization, RLS, OpenBao, WAF/client trust, quota fail-closed safety, source/secret/final-artifact security, supply chain/admission, required audit, backup/PITR, idempotency, or data ownership.
+Single-server changes infrastructure availability only. It does not weaken authentication/MFA, Authorization, RLS, OpenBao, WAF/client trust, quota fail-closed safety, source/secret/dependency-advisory/final-artifact security, supply chain/admission, required audit, backup/PITR, idempotency, or data ownership.
 
 ## 6. Protocol boundaries
 
@@ -129,7 +129,7 @@ Micrometer/OpenTelemetry/OTLP/log forwarding is observability transport only. Tr
 
 ### DevSecOps
 
-Scanner/SBOM/signing/admission evidence is build/release control data only. It is never transported as application authority on a user request path. Runtime services do not call Gitleaks, Semgrep, Syft, Grype, Cosign, or vulnerability feeds.
+Scanner/SBOM/signing/admission evidence is build/release control data only. It is never transported as application authority on a user request path. Runtime services do not call Gitleaks, Semgrep, OSV-Scanner, Syft, Grype, Cosign, or vulnerability feeds.
 
 ## 7. Current capabilities/deployables
 
@@ -195,10 +195,13 @@ ADR-0045 standardizes the pre-runtime control chain:
 - Semgrep — first-party source SAST and repository policy;
 - Gitleaks — current-tree and Git-history secret detection;
 - Gradle dependency verification/locks — dependency integrity/reproducibility, not vulnerability authority;
+- OSV-Scanner — early declared/locked dependency advisory feedback; implemented for the current Compromised Password service security suite;
 - Syft — CycloneDX JSON software inventory of the exact final image;
-- Grype — exact final-image/SBOM vulnerability correlation under ADR-0035/0038;
+- Grype — exact final-image/SBOM release/deployed-artifact vulnerability correlation under ADR-0035/0038;
 - Cosign — exact-digest image signature, provenance, and signed SBOM attestation;
 - Kyverno — production admission verification.
+
+OSV-Scanner and Grype are complementary, not competing authorities. OSV gives early dependency feedback; Grype owns final-image release/deployed-artifact evidence.
 
 Trivy and OWASP Dependency-Check are not selected default controls. A future addition must identify a distinct uncovered failure class rather than duplicate the selected authorities.
 
@@ -206,7 +209,7 @@ This chain is implementation/release infrastructure. It does not create a new bo
 
 ## 11. Technology families
 
-Architecture families include Java 25/Spring Boot 4.1/Spring MVC/Virtual Threads, Gradle Kotlin DSL, PostgreSQL/CNPG/Flyway, Xerial SQLite only for ADR-0040, Kafka, Redis, Resilience4j, Micrometer/OpenTelemetry, Prometheus/Loki/Tempo/Grafana/Alertmanager/Collector, Gitleaks/Semgrep/Syft/Grype/Cosign DevSecOps controls, Kubernetes/K3s/Calico/Helm/Argo CD, Kyverno CEL policies, Traefik/Caddy/Coraza, Istio Ambient, ESO/OpenBao, WireGuard/OpenSSH/FIDO2, and current Notification providers/testing stack.
+Architecture families include Java 25/Spring Boot 4.1/Spring MVC/Virtual Threads, Gradle Kotlin DSL, PostgreSQL/CNPG/Flyway, Xerial SQLite only for ADR-0040, Kafka, Redis, Resilience4j, Micrometer/OpenTelemetry, Prometheus/Loki/Tempo/Grafana/Alertmanager/Collector, Gitleaks/Semgrep/OSV-Scanner/Syft/Grype/Cosign DevSecOps controls, Kubernetes/K3s/Calico/Helm/Argo CD, Kyverno CEL policies, Traefik/Caddy/Coraza, Istio Ambient, ESO/OpenBao, WireGuard/OpenSSH/FIDO2, and current Notification providers/testing stack.
 
 Exact pins live only in Technology Baseline and deployment/build/dependency/security-tool locks.
 
@@ -215,7 +218,7 @@ Exact pins live only in Technology Baseline and deployment/build/dependency/secu
 - single-server is non-HA and cannot claim node/data/control-plane/telemetry failover;
 - trusted client identity uses ADR-0043 only;
 - quota failure never becomes fail-open;
-- committed-secret or source/static gate failure cannot be ignored to obtain a merge/promotion;
+- committed-secret, source/static, or required dependency-advisory gate failure cannot be ignored to obtain a merge/promotion;
 - scanner/feed/signature/provenance/SBOM/admission failure or stale required evidence cannot silently permit production promotion;
 - new Kyverno production controls use stable CEL-based v1 APIs and legacy policy types are gate-rejected;
 - OpenBao and end-user MFA remain unchanged;
