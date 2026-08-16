@@ -4,7 +4,7 @@
 
 This runbook defines minimum production incident behavior. Service-specific runbooks may add detail but cannot weaken it. ADR-0042 selects `production-single-server`; incidents distinguish expected non-HA outage from unsafe security/correctness behavior.
 
-Full-host recovery uses `../runbooks/production-cold-dr.md`. ADR-0043 owns network/client trust. ADR-0044 owns ordinary observability behavior. ADR-0045 owns DevSecOps secret/source/final-artifact security control responsibilities.
+Full-host recovery uses `../runbooks/production-cold-dr.md`. ADR-0043 owns network/client trust. ADR-0044 owns ordinary observability behavior. ADR-0045 owns DevSecOps secret/source/dependency-advisory/final-artifact security control responsibilities.
 
 ## 1. Incident priorities
 
@@ -213,16 +213,20 @@ A Gitleaks allow-list is not remediation for a live credential.
 
 ## 15. DevSecOps/supply-chain incident
 
-If Semgrep/Gitleaks/Syft/Grype/Cosign/Kyverno required evidence is unavailable, stale, corrupt, or inconsistent:
+If Semgrep, Gitleaks, OSV-Scanner, Syft, Grype, Cosign, or Kyverno required evidence is unavailable, stale where freshness applies, corrupt, or inconsistent:
 
-- stop the affected merge/promotion/release boundary;
+- stop the merge/promotion/release boundary that depends on the failed evidence;
 - do not disable the required gate, broaden suppression, or substitute stale evidence beyond policy;
-- preserve exact tool version/checksum/digest, scanner/feed version/timestamp, image digest, SBOM digest, signature/provenance, and finding/exception records;
-- use ADR-0035/0038 for vulnerability-feed/scanner exceptions and response;
+- preserve exact tool version/checksum/digest, scanner/feed/database version/timestamp, dependency evidence, image digest, SBOM digest, signature/provenance, and finding/exception records;
+- distinguish an OSV declared/locked dependency finding from a Grype final-image finding; both route to the owning artifact/service team, but Grype remains the release/deployed-artifact vulnerability authority under ADR-0035/0038;
+- use ADR-0035/0038 for final-artifact vulnerability-feed/scanner exceptions and response;
 - use ADR-0017 for signature/provenance/SBOM/admission failures;
-- use ADR-0045 for tool responsibility and secret/SAST/final-artifact chain;
+- use ADR-0045 for tool responsibility and secret/SAST/dependency-advisory/final-artifact chain;
+- do not claim final-image safety because OSV lockfile scanning passed;
 - do not add Trivy/OWASP Dependency-Check as an emergency competing authority without a reviewed distinct-coverage decision;
 - do not infer Semgrep Secrets/Supply Chain product coverage from repository Semgrep CLI.
+
+A newly disclosed OSV dependency finding can block the applicable source/merge boundary or trigger remediation even when the source did not change. It does not remove the requirement for final-image Syft/Grype release evidence and continuous deployed-digest correlation.
 
 ## 16. Deployment/migration incident
 
@@ -244,7 +248,7 @@ Verify applicable:
 - workload identity/mTLS/NetworkPolicy;
 - PostgreSQL/Flyway/RLS/role isolation;
 - Redis/Kafka + quota time/capacity/network semantics;
-- Gitleaks/Semgrep source-secret gates and final-image Syft/Grype/Cosign evidence when a release is involved;
+- Gitleaks/Semgrep source-secret gates, current OSV declared/locked dependency advisory state, and final-image Syft/Grype/Cosign evidence when a release is involved;
 - Kyverno admission + edge/WAF/client-address anti-spoofing;
 - OpenBao/secret delivery;
 - HIBP corpus freshness/integrity;
@@ -261,4 +265,4 @@ Full cold recovery requires the traffic-enable record in the cold-DR runbook.
 
 Record root cause/contributors, expected non-HA outage vs contract violation, detected/actual RPO/RTO/downtime, detection source, safe recovery evidence, missed threat/alert/runbook/test/network/quota/telemetry/capacity/supply-chain assumption, remediation owner/deadline, and whether single-server remains acceptable.
 
-Repeated host incidents, unacceptable downtime, unsafe quota/telemetry capacity pressure, broad root risk, repeated secret/supply-chain control failures, or unacceptable recovery RTO trigger architecture/process/capacity review.
+Repeated host incidents, unacceptable downtime, unsafe quota/telemetry capacity pressure, broad root risk, repeated secret/dependency-advisory/supply-chain control failures, or unacceptable recovery RTO trigger architecture/process/capacity review.
