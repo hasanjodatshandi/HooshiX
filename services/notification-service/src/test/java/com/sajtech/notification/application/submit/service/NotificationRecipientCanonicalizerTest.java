@@ -3,7 +3,6 @@ package com.sajtech.notification.application.submit.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.sajtech.notification.application.submit.NotificationSubmissionException;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import org.junit.jupiter.api.Test;
 
@@ -12,20 +11,20 @@ class NotificationRecipientCanonicalizerTest {
       new NotificationRecipientCanonicalizer();
 
   @Test
-  void canonicalizesProviderNeutralEmailWithoutMailboxRewriting() {
-    assertThat(canonicalizer.canonicalize(NotificationChannel.EMAIL, "User+tag@EXAMPLE.com"))
-        .isEqualTo("User+tag@example.com");
+  void lowercasesOnlyEmailDomain() {
+    assertThat(canonicalizer.canonicalize(NotificationChannel.EMAIL, "User@Example.COM"))
+        .isEqualTo("User@example.com");
   }
 
   @Test
-  void rejectsDisplayNameAndNonE164Phone() {
-    assertThatThrownBy(
-            () ->
-                canonicalizer.canonicalize(
-                    NotificationChannel.EMAIL, "Person <person@example.com>"))
-        .isInstanceOf(NotificationSubmissionException.class);
-    assertThatThrownBy(
-            () -> canonicalizer.canonicalize(NotificationChannel.SMS, "09121234567"))
-        .isInstanceOf(NotificationSubmissionException.class);
+  void normalizesPresentationSeparatorsInE164Phone() {
+    assertThat(canonicalizer.canonicalize(NotificationChannel.SMS, "+98 (912) 345-6789"))
+        .isEqualTo("+989123456789");
+  }
+
+  @Test
+  void rejectsNonCanonicalPhonePrefix() {
+    assertThatThrownBy(() -> canonicalizer.canonicalize(NotificationChannel.SMS, "00989123456789"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

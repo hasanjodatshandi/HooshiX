@@ -1,23 +1,23 @@
 package com.sajtech.notification.application.delivery.model;
 
-import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
+import com.sajtech.notification.domain.notification.model.ProviderOutcomeClassification;
 
 public record ProviderDispatchOutcome(
-    boolean liveProviderOutcome,
-    ProviderAttemptClassification classification,
+    boolean dispatched,
+    ProviderOutcomeClassification classification,
     String providerCode,
     String providerCorrelationId) {
-  private static final int MAX_PROVIDER_CODE_LENGTH = 64;
+  private static final int MAX_PROVIDER_CODE_LENGTH = 128;
   private static final int MAX_CORRELATION_ID_LENGTH = 256;
 
   public ProviderDispatchOutcome {
-    if (liveProviderOutcome != (classification != null)) {
-      throw new IllegalArgumentException(
-          "Only live provider outcomes may carry canonical provider classification");
+    if (dispatched && classification == null) {
+      throw new IllegalArgumentException("Dispatched provider outcome requires classification");
     }
     providerCode = bounded(providerCode, MAX_PROVIDER_CODE_LENGTH, "provider code");
     providerCorrelationId =
-        bounded(providerCorrelationId, MAX_CORRELATION_ID_LENGTH, "provider correlation identifier");
+        bounded(
+            providerCorrelationId, MAX_CORRELATION_ID_LENGTH, "provider correlation identifier");
   }
 
   public static ProviderDispatchOutcome simulated() {
@@ -25,23 +25,26 @@ public record ProviderDispatchOutcome(
   }
 
   public static ProviderDispatchOutcome live(
-      ProviderAttemptClassification classification,
+      ProviderOutcomeClassification classification,
       String providerCode,
       String providerCorrelationId) {
     if (classification == null) {
       throw new IllegalArgumentException("Live provider classification is required");
     }
-    return new ProviderDispatchOutcome(
-        true, classification, providerCode, providerCorrelationId);
+    return new ProviderDispatchOutcome(true, classification, providerCode, providerCorrelationId);
   }
 
   private static String bounded(String value, int maximum, String field) {
     if (value == null) {
       return null;
     }
-    if (value.length() > maximum || value.codePoints().anyMatch(Character::isISOControl)) {
-      throw new IllegalArgumentException("Invalid " + field);
+    String trimmed = value.trim();
+    if (trimmed.isEmpty()) {
+      return null;
     }
-    return value;
+    if (trimmed.length() > maximum) {
+      throw new IllegalArgumentException(field + " exceeds maximum length");
+    }
+    return trimmed;
   }
 }

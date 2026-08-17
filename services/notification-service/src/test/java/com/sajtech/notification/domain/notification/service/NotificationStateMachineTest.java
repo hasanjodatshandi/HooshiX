@@ -1,6 +1,6 @@
 package com.sajtech.notification.domain.notification.service;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sajtech.notification.domain.notification.model.NotificationLifecycle;
@@ -10,32 +10,27 @@ class NotificationStateMachineTest {
   private final NotificationStateMachine stateMachine = new NotificationStateMachine();
 
   @Test
-  void allowsCanonicalDispatchAndDeliveryTransitions() {
-    assertThatCode(
-            () ->
-                stateMachine.requireTransition(
-                    NotificationLifecycle.ACCEPTED, NotificationLifecycle.DISPATCHING))
-        .doesNotThrowAnyException();
-    assertThatCode(
-            () ->
-                stateMachine.requireTransition(
-                    NotificationLifecycle.DISPATCHING,
-                    NotificationLifecycle.PROVIDER_ACCEPTED))
-        .doesNotThrowAnyException();
-    assertThatCode(
-            () ->
-                stateMachine.requireTransition(
-                    NotificationLifecycle.PROVIDER_ACCEPTED, NotificationLifecycle.DELIVERED))
-        .doesNotThrowAnyException();
+  void permitsCanonicalAcceptedToSendingProgression() {
+    assertThat(
+            stateMachine.transition(
+                NotificationLifecycle.ACCEPTED, NotificationLifecycle.SENDING))
+        .isEqualTo(NotificationLifecycle.SENDING);
   }
 
   @Test
-  void terminalStateCannotTransition() {
+  void permitsAmbiguousToReconciliationProgression() {
+    assertThat(
+            stateMachine.transition(
+                NotificationLifecycle.AMBIGUOUS, NotificationLifecycle.RECONCILING))
+        .isEqualTo(NotificationLifecycle.RECONCILING);
+  }
+
+  @Test
+  void rejectsTerminalStateMutation() {
     assertThatThrownBy(
             () ->
-                stateMachine.requireTransition(
-                    NotificationLifecycle.DELIVERED, NotificationLifecycle.DISPATCHING))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Terminal");
+                stateMachine.transition(
+                    NotificationLifecycle.DELIVERED, NotificationLifecycle.SENDING))
+        .isInstanceOf(IllegalStateException.class);
   }
 }

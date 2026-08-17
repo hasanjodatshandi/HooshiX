@@ -3,9 +3,8 @@ package com.sajtech.notification.application.delivery.service;
 import com.sajtech.notification.application.delivery.model.ProviderAttemptAction;
 import com.sajtech.notification.application.delivery.model.ProviderAttemptDecision;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
-import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
+import com.sajtech.notification.domain.notification.model.ProviderOutcomeClassification;
 import com.sajtech.notification.domain.notification.service.ProviderRetryPolicy;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.random.RandomGenerator;
 
@@ -16,10 +15,10 @@ public final class ProviderAttemptPlanner {
     this.retryPolicy = retryPolicy;
   }
 
-  public ProviderAttemptDecision plan(
+  public ProviderAttemptDecision afterOutcome(
       NotificationChannel channel,
       int completedAttemptNumber,
-      ProviderAttemptClassification classification,
+      ProviderOutcomeClassification classification,
       Instant databaseNow,
       Instant effectiveDeliveryDeadline,
       RandomGenerator random) {
@@ -28,33 +27,24 @@ public final class ProviderAttemptPlanner {
         || databaseNow == null
         || effectiveDeliveryDeadline == null
         || random == null) {
-      throw new IllegalArgumentException("Provider attempt planning input is incomplete");
+      throw new IllegalArgumentException("Provider attempt planning input is required");
+    }
+    if (completedAttemptNumber <= 0) {
+      throw new IllegalArgumentException("Completed attempt number must be positive");
     }
     if (!databaseNow.isBefore(effectiveDeliveryDeadline)) {
       return ProviderAttemptDecision.action(ProviderAttemptAction.EXPIRE);
     }
+
     return switch (classification) {
-      case DEFINITIVE_ACCEPTED ->
-          ProviderAttemptDecision.action(ProviderAttemptAction.MARK_PROVIDER_ACCEPTED);
+      case ACCEPTED -> ProviderAttemptDecision.action(ProviderAttemptAction.ACCEPT_PROVIDER_RESULT);
       case DEFINITIVE_PERMANENT_FAILURE ->
-          ProviderAttemptDecision.action(ProviderAttemptAction.FAIL_PERMANENT);
+          ProviderAttemptDecision.action(ProviderAttemptAction.FAIL_PERMANENTLY);
       case AMBIGUOUS -> ProviderAttemptDecision.action(ProviderAttemptAction.RECONCILE);
       case DEFINITIVE_TRANSIENT_FAILURE ->
           transientFailure(
-              channel,
-              completedAttemptNumber,
-              databaseNow,
-              effectiveDeliveryDeadline,
-              random);
+              channel, completedAttemptNumber, databaseNow, effectiveDeliveryDeadline, random);
     };
-  }
-
-  public boolean observationWindowClosed(
-      NotificationChannel channel, Instant providerAcceptedAt, Instant databaseNow) {
-    if (channel == null || providerAcceptedAt == null || databaseNow == null) {
-      throw new IllegalArgumentException("Reconciliation timing input is incomplete");
-    }
-    return !databaseNow.isBefore(providerAcceptedAt.plus(channel.observationWindow()));
   }
 
   private ProviderAttemptDecision transientFailure(
@@ -63,16 +53,14 @@ public final class ProviderAttemptPlanner {
       Instant databaseNow,
       Instant effectiveDeliveryDeadline,
       RandomGenerator random) {
-    if (!retryPolicy.shouldRetry(
-        channel,
-        completedAttemptNumber,
-        ProviderAttemptClassification.DEFINITIVE_TRANSIENT_FAILURE)) {
-      return ProviderAttemptDecision.action(ProviderAttemptAction.FAIL_PERMANENT);
+    var delay = retryPolicy.nextDelay(channel, completedAttemptNumber, random);
+    if (delay.isEmpty()) {
+      return ProviderAttemptDecision.action(ProviderAttemptAction.FAIL_PERMANENTLY);
     }
-    Duration delay = retryPolicy.nextDelay(channel, completedAttemptNumber, random);
-    if (!databaseNow.plus(delay).isBefore(effectiveDeliveryDeadline)) {
+    Instant retryAt = databaseNow.plus(delay.get());
+    if (!retryAt.isBefore(effectiveDeliveryDeadline)) {
       return ProviderAttemptDecision.action(ProviderAttemptAction.EXPIRE);
     }
-    return ProviderAttemptDecision.retryAfter(delay);
+    return ProviderAttemptDecision.retryAt(retryAt);
   }
 }

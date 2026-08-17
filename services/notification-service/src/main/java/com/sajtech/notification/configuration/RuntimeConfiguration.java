@@ -1,5 +1,6 @@
 package com.sajtech.notification.configuration;
 
+import com.sajtech.notification.application.delivery.service.ProviderAttemptPlanner;
 import com.sajtech.notification.application.submit.port.in.SubmitNotification;
 import com.sajtech.notification.application.submit.port.out.DatabaseTimePort;
 import com.sajtech.notification.application.submit.port.out.DeliveryEscrowPort;
@@ -13,77 +14,52 @@ import com.sajtech.notification.application.submit.service.NotificationLocaleNor
 import com.sajtech.notification.application.submit.service.NotificationRecipientCanonicalizer;
 import com.sajtech.notification.application.submit.usecase.SubmitNotificationUseCase;
 import com.sajtech.notification.application.template.service.BoundedTemplateRenderer;
-import com.sajtech.notification.application.template.service.TemplateContentDigest;
+import com.sajtech.notification.domain.notification.service.NotificationStateMachine;
+import com.sajtech.notification.domain.notification.service.ProviderRetryPolicy;
 import com.sajtech.notification.infrastructure.observability.NotificationKeyRingRefresher;
-import com.sajtech.notification.infrastructure.observability.NotificationReadinessHealthIndicator;
-import com.sajtech.notification.infrastructure.observability.ObservedSubmitNotification;
 import com.sajtech.notification.infrastructure.persistence.JooqNotificationAcceptanceRepository;
 import com.sajtech.notification.infrastructure.persistence.JooqNotificationTemplateCatalog;
+import com.sajtech.notification.infrastructure.persistence.JooqTransactionRunner;
 import com.sajtech.notification.infrastructure.persistence.PostgresDatabaseTime;
-import com.sajtech.notification.infrastructure.persistence.SpringTransactionRunner;
-import com.sajtech.notification.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrow;
 import com.sajtech.notification.infrastructure.security.fingerprint.FileBackedHmacIntentFingerprint;
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
-import com.sajtech.notification.interfaces.notification.grpc.NotificationGrpcService;
-import com.sajtech.notification.interfaces.observability.grpc.SafeTracingServerInterceptor;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.observation.ObservationRegistry;
-import io.opentelemetry.api.OpenTelemetry;
-import java.security.SecureRandom;
-import java.time.Clock;
+import javax.sql.DataSource;
 import org.jooq.DSLContext;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.jooq.impl.DSL;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
-@Configuration
-@Profile("!migration")
+@Configuration(proxyBeanMethods = false)
 public class RuntimeConfiguration {
   @Bean
-  Clock notificationClock() {
-    return Clock.systemUTC();
-  }
-
-  @Bean("fingerprintKeyRing")
-  FileBackedKeyRing fingerprintKeyRing(NotificationProperties properties, Clock clock) {
-    return new FileBackedKeyRing(
-        properties.fingerprintKeyRingPath(),
-        "HmacSHA256",
-        32,
-        clock,
-        properties.keyRingMaximumStaleness());
-  }
-
-  @Bean("deliveryKeyRing")
-  FileBackedKeyRing deliveryKeyRing(NotificationProperties properties, Clock clock) {
-    return new FileBackedKeyRing(
-        properties.deliveryKeyRingPath(),
-        "AES",
-        32,
-        clock,
-        properties.keyRingMaximumStaleness());
+  DataSource dataSource(
+      @Value("${notification.database.url}") String url,
+      @Value("${notification.database.username}") String username,
+      @Value("${notification.database.password}") String password) {
+    return DataSourceBuilder.create().url(url).username(username).password(password).build();
   }
 
   @Bean
-  NotificationKeyRingRefresher notificationKeyRingRefresher(
-      @Qualifier("fingerprintKeyRing") FileBackedKeyRing fingerprintKeyRing,
-      @Qualifier("deliveryKeyRing") FileBackedKeyRing deliveryKeyRing) {
-    return new NotificationKeyRingRefresher(fingerprintKeyRing, deliveryKeyRing);
+  DSLContext dslContext(DataSource dataSource) {
+    return DSL.using(dataSource, org.jooq.SQLDialect.POSTGRES);
   }
 
   @Bean
-  IntentFingerprintPort intentFingerprintPort(
-      @Qualifier("fingerprintKeyRing") FileBackedKeyRing keyRing) {
-    return new FileBackedHmacIntentFingerprint(keyRing);
+  PlatformTransactionManager transactionManager(DataSource dataSource) {
+    return new JdbcTransactionManager(dataSource);
   }
 
   @Bean
-  DeliveryEscrowPort deliveryEscrowPort(@Qualifier("deliveryKeyRing") FileBackedKeyRing keyRing) {
-    return new AesGcmDeliveryEscrow(keyRing, new SecureRandom());
+  TransactionRunner transactionRunner(PlatformTransactionManager transactionManager) {
+    return new JooqTransactionRunner(new TransactionTemplate(transactionManager));
   }
 
   @Bean
@@ -92,24 +68,13 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  TemplateContentDigest templateContentDigest() {
-    return new TemplateContentDigest();
-  }
-
-  @Bean
-  NotificationTemplateCatalog notificationTemplateCatalog(
-      DSLContext dsl, TemplateContentDigest contentDigest) {
-    return new JooqNotificationTemplateCatalog(dsl, contentDigest);
+  NotificationTemplateCatalog notificationTemplateCatalog(DSLContext dsl) {
+    return new JooqNotificationTemplateCatalog(dsl);
   }
 
   @Bean
   DatabaseTimePort databaseTimePort(DSLContext dsl) {
     return new PostgresDatabaseTime(dsl);
-  }
-
-  @Bean
-  TransactionRunner transactionRunner(PlatformTransactionManager transactionManager) {
-    return new SpringTransactionRunner(transactionManager);
   }
 
   @Bean
@@ -124,10 +89,10 @@ public class RuntimeConfiguration {
 
   @Bean
   NotificationIntentFactory notificationIntentFactory(
-      NotificationProperties properties,
       NotificationRecipientCanonicalizer recipients,
-      NotificationLocaleNormalizer locales) {
-    return new NotificationIntentFactory(properties.callerService(), recipients, locales);
+      NotificationLocaleNormalizer locales,
+      @Value("${notification.caller-service}") String callerService) {
+    return new NotificationIntentFactory(callerService, recipients, locales);
   }
 
   @Bean
@@ -136,12 +101,29 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  FileBackedKeyRing fileBackedKeyRing(
+      @Value("${notification.key-ring.directory}") java.nio.file.Path keyRingDirectory,
+      @Value("${notification.key-ring.max-staleness}") java.time.Duration maxStaleness) {
+    return new FileBackedKeyRing(keyRingDirectory, maxStaleness);
+  }
+
+  @Bean
+  IntentFingerprintPort intentFingerprintPort(FileBackedKeyRing keyRing) {
+    return new FileBackedHmacIntentFingerprint(keyRing);
+  }
+
+  @Bean
+  DeliveryEscrowPort deliveryEscrowPort(FileBackedKeyRing keyRing) {
+    return new AesGcmDeliveryEscrow(keyRing);
+  }
+
+  @Bean
   BoundedTemplateRenderer boundedTemplateRenderer() {
     return new BoundedTemplateRenderer();
   }
 
-  @Bean("submitNotificationCore")
-  SubmitNotification submitNotificationCore(
+  @Bean
+  SubmitNotification submitNotification(
       NotificationIntentFactory intentFactory,
       FingerprintMaterialEncoder fingerprintEncoder,
       IntentFingerprintPort fingerprintPort,
@@ -164,40 +146,35 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  @Primary
-  SubmitNotification observedSubmitNotification(
-      @Qualifier("submitNotificationCore") SubmitNotification delegate,
-      ObservationRegistry observations,
-      MeterRegistry meters) {
-    return new ObservedSubmitNotification(delegate, observations, meters);
+  ProviderRetryPolicy providerRetryPolicy() {
+    return new ProviderRetryPolicy();
   }
 
   @Bean
-  NotificationGrpcService notificationGrpcService(SubmitNotification submitNotification) {
-    return new NotificationGrpcService(submitNotification);
+  ProviderAttemptPlanner providerAttemptPlanner(ProviderRetryPolicy retryPolicy) {
+    return new ProviderAttemptPlanner(retryPolicy);
   }
 
   @Bean
-  SafeTracingServerInterceptor safeTracingServerInterceptor(OpenTelemetry openTelemetry) {
-    return new SafeTracingServerInterceptor(openTelemetry);
+  NotificationStateMachine notificationStateMachine() {
+    return new NotificationStateMachine();
   }
 
   @Bean
-  GrpcServerLifecycle grpcServerLifecycle(
-      NotificationProperties properties,
-      NotificationGrpcService service,
-      SafeTracingServerInterceptor interceptor) {
-    return new GrpcServerLifecycle(
-        properties.grpcPort(), properties.maxConcurrentCallsPerConnection(), service, interceptor);
+  NotificationKeyRingRefresher notificationKeyRingRefresher(
+      FileBackedKeyRing keyRing,
+      MeterRegistry meterRegistry,
+      @Value("${notification.key-ring.refresh-interval}") java.time.Duration refreshInterval) {
+    return new NotificationKeyRingRefresher(keyRing, meterRegistry, refreshInterval);
   }
 
-  @Bean("notificationReadiness")
-  NotificationReadinessHealthIndicator notificationReadinessHealthIndicator(
-      DSLContext dsl,
-      NotificationTemplateCatalog templates,
-      @Qualifier("fingerprintKeyRing") FileBackedKeyRing fingerprintKeyRing,
-      @Qualifier("deliveryKeyRing") FileBackedKeyRing deliveryKeyRing) {
-    return new NotificationReadinessHealthIndicator(
-        dsl, templates, fingerprintKeyRing, deliveryKeyRing);
+  @Bean(name = "notificationKeyRing")
+  HealthIndicator notificationKeyRingHealthIndicator(FileBackedKeyRing keyRing) {
+    return () ->
+        keyRing.isFresh()
+            ? org.springframework.boot.actuate.health.Health.up().build()
+            : org.springframework.boot.actuate.health.Health.down()
+                .withDetail("reason", "key-ring-stale")
+                .build();
   }
 }

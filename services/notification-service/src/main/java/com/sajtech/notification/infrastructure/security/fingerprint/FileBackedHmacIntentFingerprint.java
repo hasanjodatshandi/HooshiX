@@ -3,15 +3,14 @@ package com.sajtech.notification.infrastructure.security.fingerprint;
 import com.sajtech.notification.application.submit.model.FingerprintDigest;
 import com.sajtech.notification.application.submit.port.out.IntentFingerprintPort;
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
-import com.sajtech.notification.infrastructure.security.keyring.KeyRingMaterial;
+import com.sajtech.notification.infrastructure.security.keyring.FingerprintKey;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import javax.crypto.Mac;
-import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 public final class FileBackedHmacIntentFingerprint implements IntentFingerprintPort {
-  public static final String VERSION = "fingerprint-v1";
-
+  private static final String VERSION = "hmac-sha256-v1";
   private final FileBackedKeyRing keyRing;
 
   public FileBackedHmacIntentFingerprint(FileBackedKeyRing keyRing) {
@@ -20,9 +19,8 @@ public final class FileBackedHmacIntentFingerprint implements IntentFingerprintP
 
   @Override
   public FingerprintDigest compute(byte[] canonicalMaterial) {
-    KeyRingMaterial active = keyRing.activeKey();
-    return new FingerprintDigest(
-        VERSION, active.keyId(), hmac(active.key(), canonicalMaterial));
+    FingerprintKey key = keyRing.activeFingerprintKey();
+    return new FingerprintDigest(VERSION, key.keyId(), digest(canonicalMaterial, key));
   }
 
   @Override
@@ -31,24 +29,20 @@ public final class FileBackedHmacIntentFingerprint implements IntentFingerprintP
       String fingerprintVersion,
       String fingerprintKeyId,
       byte[] expectedDigest) {
-    if (!VERSION.equals(fingerprintVersion)
-        || fingerprintKeyId == null
-        || expectedDigest == null
-        || expectedDigest.length != 32) {
+    if (!VERSION.equals(fingerprintVersion) || fingerprintKeyId == null || expectedDigest == null) {
       return false;
     }
-    SecretKey verificationKey = keyRing.key(fingerprintKeyId);
-    byte[] actual = hmac(verificationKey, canonicalMaterial);
-    return MessageDigest.isEqual(expectedDigest, actual);
+    FingerprintKey key = keyRing.fingerprintKey(fingerprintKeyId);
+    return MessageDigest.isEqual(expectedDigest, digest(canonicalMaterial, key));
   }
 
-  private static byte[] hmac(SecretKey key, byte[] canonicalMaterial) {
+  private static byte[] digest(byte[] canonicalMaterial, FingerprintKey key) {
     try {
       Mac hmac = Mac.getInstance("HmacSHA256");
-      hmac.init(key);
+      hmac.init(new SecretKeySpec(key.keyBytes(), "HmacSHA256"));
       return hmac.doFinal(canonicalMaterial);
-    } catch (GeneralSecurityException exception) {
-      throw new IllegalStateException("HMAC-SHA-256 is unavailable", exception);
+    } catch (GeneralSecurityException failure) {
+      throw new IllegalStateException("Notification intent fingerprinting failed", failure);
     }
   }
 }

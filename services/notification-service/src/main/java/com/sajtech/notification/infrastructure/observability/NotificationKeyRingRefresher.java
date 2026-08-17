@@ -1,33 +1,50 @@
 package com.sajtech.notification.infrastructure.observability;
 
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class NotificationKeyRingRefresher {
-  private static final Logger LOGGER = LoggerFactory.getLogger(NotificationKeyRingRefresher.class);
-
-  private final FileBackedKeyRing fingerprint;
-  private final FileBackedKeyRing delivery;
+public final class NotificationKeyRingRefresher implements Runnable {
+  private final FileBackedKeyRing keyRing;
+  private final Duration refreshInterval;
+  private final Counter refreshFailures;
+  private final AtomicBoolean started = new AtomicBoolean();
 
   public NotificationKeyRingRefresher(
-      FileBackedKeyRing fingerprint, FileBackedKeyRing delivery) {
-    this.fingerprint = fingerprint;
-    this.delivery = delivery;
+      FileBackedKeyRing keyRing, MeterRegistry meterRegistry, Duration refreshInterval) {
+    this.keyRing = keyRing;
+    this.refreshInterval = refreshInterval;
+    this.refreshFailures =
+        Counter.builder("notification.keyring.refresh.failures").register(meterRegistry);
   }
 
-  @Scheduled(fixedDelayString = "PT30S")
-  public void refresh() {
-    refreshOne(fingerprint, "NOTIFICATION_FINGERPRINT_KEY_RING_REFRESH_FAILED");
-    refreshOne(delivery, "NOTIFICATION_DELIVERY_KEY_RING_REFRESH_FAILED");
+  @Override
+  public void run() {
+    if (!started.compareAndSet(false, true)) {
+      return;
+    }
+    Thread.ofVirtual().name("notification-keyring-refresh").start(this::loop);
   }
 
-  private static void refreshOne(FileBackedKeyRing keyRing, String eventCode) {
-    try {
-      keyRing.refresh();
-    } catch (RuntimeException ignored) {
-      LOGGER.atWarn().addKeyValue("eventCode", eventCode).log("Notification key-ring refresh failed");
+  private void loop() {
+    while (!Thread.currentThread().isInterrupted()) {
+      try {
+        keyRing.reload();
+        Thread.sleep(refreshInterval);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return;
+      } catch (RuntimeException refreshFailure) {
+        refreshFailures.increment();
+        try {
+          Thread.sleep(refreshInterval);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
     }
   }
 }
