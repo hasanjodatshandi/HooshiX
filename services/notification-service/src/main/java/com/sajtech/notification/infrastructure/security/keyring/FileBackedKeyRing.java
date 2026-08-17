@@ -48,12 +48,14 @@ public final class FileBackedKeyRing {
       if (name.startsWith("fingerprint.key.")) {
         String keyId = name.substring("fingerprint.key.".length());
         fingerprintKeys.put(
-            keyId, new FingerprintKey(keyId, decode(required(properties, name), 32, "fingerprint")));
+            keyId,
+            new FingerprintKey(keyId, decode(required(properties, name), 32, "fingerprint")));
       }
       if (name.startsWith("delivery.key.")) {
         String keyId = name.substring("delivery.key.".length());
         deliveryKeys.put(
-            keyId, new DeliveryEncryptionKey(keyId, decode(required(properties, name), 32, "delivery")));
+            keyId,
+            new DeliveryEncryptionKey(keyId, decode(required(properties, name), 32, "delivery")));
       }
     }
     if (!fingerprintKeys.containsKey(activeFingerprintKeyId)) {
@@ -120,7 +122,8 @@ public final class FileBackedKeyRing {
       }
       return decoded;
     } catch (IllegalArgumentException invalidBase64) {
-      throw new IllegalStateException("Notification " + usage + " key is not valid base64", invalidBase64);
+      throw new IllegalStateException(
+          "Notification " + usage + " key is not valid base64", invalidBase64);
     }
   }
 
