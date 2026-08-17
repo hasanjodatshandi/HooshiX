@@ -22,9 +22,9 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @Testcontainers(disabledWithoutDocker = true)
 class NotificationPersistenceIntegrationTest {
