@@ -6,7 +6,7 @@ Architecture documents describe approved targets. A target path named in documen
 
 ## Current repository state
 
-At this revision the repository contains architecture documentation, the repository-governance baseline, and the first executable service implementation under:
+At this revision the repository contains architecture documentation, the repository-governance baseline, the Git-native Agent Context Engine under `context/` + `scripts/context/`, and the first executable service implementation under:
 
 ```text
 services/compromised-password-service/
@@ -16,11 +16,15 @@ Implemented repository-governance artifacts are:
 
 ```text
 Makefile
+context/
 scripts/baseline/
+scripts/context/
 .github/workflows/repository-baseline.yml
 ```
 
-The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, and selected guarded structure rules. It also invokes the reusable Compromised Password service security suite on PR/push and on the scheduled repository security cadence.
+The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, selected guarded structure rules, and ADR-0046 Context Engine contracts/tests. Context verification covers current bootstrap/source paths, canonical task-routing/generation parity, commit-bound checkpoint shape, tracked-file bounded retrieval/provenance, conservative full-read escalation, and read-only MCP behavior. It also invokes the reusable Compromised Password service security suite on PR/push and on the scheduled repository security cadence.
+
+The Agent Context Engine implementation is developer/repository tooling only. It has no application runtime service, datastore, HTTP/network listener, production dependency, or cross-project memory database. V1 uses Python standard library + Git CLI, local bounded tracked-file lexical/path retrieval, commit-bound historical checkpoints, and a read-only stdio MCP adapter. Current Git authority remains above every derived context/checkpoint/model memory result.
 
 The Compromised Password service repository implementation includes service-owned Java/Gradle source and wrapper, Protobuf/gRPC contract, immutable SQLite lookup adapter, deterministic tests, dependency locks/verification metadata, container definition, Helm/security policy package, Day-One service telemetry code, and service CI/static/architecture/deployment gates. It also includes the service-owned offline/local SHA-1 source-to-SQLite dataset builder, version-2 release-manifest schema, generated-fixture integration/CLI verification, explicit build/runtime prefix-cardinality and serialized-response compatibility bounds, exact runtime manifest SHA-256 binding to the SQLite artifact digest, raw-corpus/generated-database Git guards, privacy/architecture regression enforcement, and a runtime-JAR exclusion that keeps builder tooling out of the deployed application artifact. The builder has no URL/network/downloader path and normal PR CI uses only generated fixtures marked `GENERATED_TEST_FIXTURE`. Runtime image construction verifies the exact official Temurin 25.0.4+7 Linux/x64 archive SHA-256 before placing that JDK in the image.
 
@@ -32,6 +36,7 @@ ADR-0045 defines the repository target for DevSecOps source/secret/dependency-ad
 
 Current repository evidence is:
 
+- Agent Context Engine source/contracts/tests are present; CI evidence remains commit-specific;
 - service-specific Semgrep enforcement exists;
 - OSV-Scanner locked-dependency advisory scanning exists for Compromised Password and runs in PR/push/scheduled security verification;
 - Gitleaks is not present;
@@ -68,6 +73,8 @@ Other application services remain absent. No production platform runtime, comple
 | Platform/control area | Architecture | Implementation | Evidence |
 | --- | --- | --- | --- |
 | Repository governance baseline | DESIGNED | IMPLEMENTED | CI evidence is commit-specific; `make baseline-verify` is the local entry point |
+| Git-native Agent Context Engine | DESIGNED under ADR-0046 | IMPLEMENTED | bootstrap/router/checkpoint/retrieval/MCP source + deterministic tests present; protected CI evidence is commit-specific |
+| Cross-project/central agent memory service | NOT SELECTED / GATED under ADR-0046 | NOT APPLICABLE | NOT APPLICABLE until evidence trigger + new ADR |
 | Compromised Password service CI/architecture/security/dataset-build gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
 | Semgrep source SAST/policy | DESIGNED under ADR-0039/0045 | PARTIAL | implemented for Compromised Password; cross-service coverage NOT VERIFIED |
 | Gitleaks current-tree/Git-history secret scanning | DESIGNED under ADR-0045 | NOT PRESENT | NOT VERIFIED |
@@ -104,6 +111,10 @@ The bootstrap baseline makes these current repository invariants executable:
 - dependency-registry version/classes/required edge fields/policy references must match the current schema constraints enforced by the bootstrap verifier;
 - the dependency Markdown operation list must match canonical YAML exactly and in canonical order;
 - current architecture source references checked by the baseline must resolve to repository files;
+- `context/bootstrap.json`, `context/routes.json`, and checkpoint contracts resolve to current tracked repository authorities;
+- `docs/architecture/TASK-REVIEW-MATRIX.md` must exactly match canonical `context/routes.json` generation;
+- Context Engine targeted review trust fails safe when configured authority state is dirty/invalid or routing is ambiguous;
+- Context Engine retrieval remains tracked-file/local/bounded/provenance-bearing and MCP remains read-only/stdio-only;
 - the ADR-0041-gated `services/reference-data-service` path is rejected until the architecture/trigger evidence is intentionally revised;
 - root `services/common` and `services/shared` dumping grounds are rejected;
 - the Compromised Password Gradle wrapper must retain executable state.
