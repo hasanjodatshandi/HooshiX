@@ -74,7 +74,8 @@ public final class SubmitNotificationUseCase implements SubmitNotification {
 
   private SubmitNotificationResult acceptInTransaction(
       CanonicalNotificationIntent intent, byte[] fingerprintMaterial) {
-    var existing = notifications.findByCallerAndRequestId(intent.callerService(), intent.requestId());
+    var existing =
+        notifications.findByCallerAndRequestId(intent.callerService(), intent.requestId());
     if (existing.isPresent()) {
       return replayOrConflict(existing.get(), fingerprintMaterial);
     }

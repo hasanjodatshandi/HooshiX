@@ -42,7 +42,8 @@ public final class AesGcmDeliveryEscrow implements DeliveryEscrowPort {
     return new EncryptedDeliveryPayload(
         FORMAT_VERSION,
         active.keyId(),
-        encryptField(active, notificationId, intent, template, "recipient", intent.canonicalRecipient()),
+        encryptField(
+            active, notificationId, intent, template, "recipient", intent.canonicalRecipient()),
         encryptOptional(active, notificationId, intent, template, "subject", rendered.subject()),
         encryptField(active, notificationId, intent, template, "text", rendered.text()),
         encryptOptional(active, notificationId, intent, template, "html", rendered.html()));

@@ -27,8 +27,7 @@ class FileBackedHmacIntentFingerprintTest {
     Arrays.fill(v2, (byte) 11);
     Files.writeString(path, properties("v1", v1, null), StandardCharsets.UTF_8);
     FileBackedKeyRing ring =
-        new FileBackedKeyRing(
-            path, "HmacSHA256", 32, Clock.systemUTC(), Duration.ofMinutes(2));
+        new FileBackedKeyRing(path, "HmacSHA256", 32, Clock.systemUTC(), Duration.ofMinutes(2));
     FileBackedHmacIntentFingerprint fingerprints = new FileBackedHmacIntentFingerprint(ring);
     byte[] canonicalIntent = "canonical-intent".getBytes(StandardCharsets.UTF_8);
     var stored = fingerprints.compute(canonicalIntent);
@@ -39,8 +38,7 @@ class FileBackedHmacIntentFingerprintTest {
 
     assertThat(current.keyId()).isEqualTo("v2");
     assertThat(
-            fingerprints.verify(
-                canonicalIntent, stored.version(), stored.keyId(), stored.value()))
+            fingerprints.verify(canonicalIntent, stored.version(), stored.keyId(), stored.value()))
         .isTrue();
     assertThat(
             fingerprints.verify(
@@ -60,8 +58,7 @@ class FileBackedHmacIntentFingerprintTest {
     Arrays.fill(v2, (byte) 11);
     Files.writeString(path, properties("v1", v1, null), StandardCharsets.UTF_8);
     FileBackedKeyRing ring =
-        new FileBackedKeyRing(
-            path, "HmacSHA256", 32, Clock.systemUTC(), Duration.ofMinutes(2));
+        new FileBackedKeyRing(path, "HmacSHA256", 32, Clock.systemUTC(), Duration.ofMinutes(2));
     FileBackedHmacIntentFingerprint fingerprints = new FileBackedHmacIntentFingerprint(ring);
     byte[] canonicalIntent = "canonical-intent".getBytes(StandardCharsets.UTF_8);
     var stored = fingerprints.compute(canonicalIntent);

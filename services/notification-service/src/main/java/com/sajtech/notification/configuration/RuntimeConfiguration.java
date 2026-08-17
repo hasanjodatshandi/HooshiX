@@ -61,11 +61,7 @@ public class RuntimeConfiguration {
   @Bean("deliveryKeyRing")
   FileBackedKeyRing deliveryKeyRing(NotificationProperties properties, Clock clock) {
     return new FileBackedKeyRing(
-        properties.deliveryKeyRingPath(),
-        "AES",
-        32,
-        clock,
-        properties.keyRingMaximumStaleness());
+        properties.deliveryKeyRingPath(), "AES", 32, clock, properties.keyRingMaximumStaleness());
   }
 
   @Bean

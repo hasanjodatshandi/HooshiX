@@ -13,7 +13,8 @@ public record SubmitNotificationCommand(
     SemanticContent semanticContent) {
   public SubmitNotificationCommand {
     if (requestId == null || channel == null || semanticContent == null) {
-      throw new IllegalArgumentException("Notification request identity, channel and content are required");
+      throw new IllegalArgumentException(
+          "Notification request identity, channel and content are required");
     }
   }
 }

@@ -11,8 +11,7 @@ public final class NotificationKeyRingRefresher {
   private final FileBackedKeyRing fingerprint;
   private final FileBackedKeyRing delivery;
 
-  public NotificationKeyRingRefresher(
-      FileBackedKeyRing fingerprint, FileBackedKeyRing delivery) {
+  public NotificationKeyRingRefresher(FileBackedKeyRing fingerprint, FileBackedKeyRing delivery) {
     this.fingerprint = fingerprint;
     this.delivery = delivery;
   }
@@ -27,7 +26,10 @@ public final class NotificationKeyRingRefresher {
     try {
       keyRing.refresh();
     } catch (RuntimeException ignored) {
-      LOGGER.atWarn().addKeyValue("eventCode", eventCode).log("Notification key-ring refresh failed");
+      LOGGER
+          .atWarn()
+          .addKeyValue("eventCode", eventCode)
+          .log("Notification key-ring refresh failed");
     }
   }
 }

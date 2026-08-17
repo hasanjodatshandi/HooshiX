@@ -65,11 +65,15 @@ public final class NotificationRecipientCanonicalizer {
   }
 
   private static boolean containsControlOrWhitespace(String value) {
-    return value.codePoints().anyMatch(codePoint -> Character.isISOControl(codePoint) || Character.isWhitespace(codePoint));
+    return value
+        .codePoints()
+        .anyMatch(
+            codePoint -> Character.isISOControl(codePoint) || Character.isWhitespace(codePoint));
   }
 
   private static NotificationSubmissionException invalidRecipient() {
     return new NotificationSubmissionException(
-        NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST, "Notification recipient is invalid");
+        NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST,
+        "Notification recipient is invalid");
   }
 }

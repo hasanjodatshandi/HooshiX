@@ -25,11 +25,7 @@ public final class FileBackedKeyRing {
   private final AtomicReference<Snapshot> snapshot = new AtomicReference<>();
 
   public FileBackedKeyRing(
-      Path path,
-      String algorithm,
-      int expectedKeyBytes,
-      Clock clock,
-      Duration maximumStaleness) {
+      Path path, String algorithm, int expectedKeyBytes, Clock clock, Duration maximumStaleness) {
     if (path == null
         || algorithm == null
         || algorithm.isBlank()
@@ -69,7 +65,8 @@ public final class FileBackedKeyRing {
       try {
         decoded = Base64.getDecoder().decode(properties.getProperty(name).trim());
       } catch (IllegalArgumentException exception) {
-        throw new IllegalStateException("Notification key material is not canonical Base64", exception);
+        throw new IllegalStateException(
+            "Notification key material is not canonical Base64", exception);
       }
       if (decoded.length != expectedKeyBytes) {
         throw new IllegalStateException("Notification key material has invalid length");
@@ -99,14 +96,12 @@ public final class FileBackedKeyRing {
 
   public boolean isFresh() {
     Snapshot current = snapshot.get();
-    return current != null
-        && !current.loadedAt().plus(maximumStaleness).isBefore(clock.instant());
+    return current != null && !current.loadedAt().plus(maximumStaleness).isBefore(clock.instant());
   }
 
   private Snapshot requireFreshSnapshot() {
     Snapshot current = snapshot.get();
-    if (current == null
-        || current.loadedAt().plus(maximumStaleness).isBefore(clock.instant())) {
+    if (current == null || current.loadedAt().plus(maximumStaleness).isBefore(clock.instant())) {
       throw new IllegalStateException("Notification key-ring snapshot is stale");
     }
     return current;

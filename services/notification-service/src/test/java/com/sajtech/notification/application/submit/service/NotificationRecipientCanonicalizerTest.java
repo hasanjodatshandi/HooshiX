@@ -24,8 +24,7 @@ class NotificationRecipientCanonicalizerTest {
                 canonicalizer.canonicalize(
                     NotificationChannel.EMAIL, "Person <person@example.com>"))
         .isInstanceOf(NotificationSubmissionException.class);
-    assertThatThrownBy(
-            () -> canonicalizer.canonicalize(NotificationChannel.SMS, "09121234567"))
+    assertThatThrownBy(() -> canonicalizer.canonicalize(NotificationChannel.SMS, "09121234567"))
         .isInstanceOf(NotificationSubmissionException.class);
   }
 }

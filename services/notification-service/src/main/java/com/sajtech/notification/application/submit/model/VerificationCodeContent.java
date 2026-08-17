@@ -10,7 +10,8 @@ public record VerificationCodeContent(
       throw new IllegalArgumentException("Verification code requires a time-bound semantic type");
     }
     if (code == null || !code.matches("[0-9]{8}")) {
-      throw new IllegalArgumentException("Verification code must contain exactly eight decimal digits");
+      throw new IllegalArgumentException(
+          "Verification code must contain exactly eight decimal digits");
     }
     if (expiresMinutes < 1 || expiresMinutes > 60) {
       throw new IllegalArgumentException("Verification expiry minutes must be between 1 and 60");

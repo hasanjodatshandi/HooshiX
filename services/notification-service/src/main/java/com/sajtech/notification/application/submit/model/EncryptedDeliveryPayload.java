@@ -8,7 +8,11 @@ public record EncryptedDeliveryPayload(
     EncryptedField text,
     EncryptedField html) {
   public EncryptedDeliveryPayload {
-    if (formatVersion != 1 || keyId == null || keyId.isBlank() || recipient == null || text == null) {
+    if (formatVersion != 1
+        || keyId == null
+        || keyId.isBlank()
+        || recipient == null
+        || text == null) {
       throw new IllegalArgumentException("Encrypted delivery payload is incomplete");
     }
   }

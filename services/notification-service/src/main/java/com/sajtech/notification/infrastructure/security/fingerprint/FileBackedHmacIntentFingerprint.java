@@ -21,8 +21,7 @@ public final class FileBackedHmacIntentFingerprint implements IntentFingerprintP
   @Override
   public FingerprintDigest compute(byte[] canonicalMaterial) {
     KeyRingMaterial active = keyRing.activeKey();
-    return new FingerprintDigest(
-        VERSION, active.keyId(), hmac(active.key(), canonicalMaterial));
+    return new FingerprintDigest(VERSION, active.keyId(), hmac(active.key(), canonicalMaterial));
   }
 
   @Override

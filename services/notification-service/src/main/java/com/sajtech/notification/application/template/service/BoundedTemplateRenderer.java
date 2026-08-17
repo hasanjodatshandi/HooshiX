@@ -20,7 +20,8 @@ public final class BoundedTemplateRenderer {
   public RenderedNotification render(
       NotificationTemplateVersion template, SemanticContent semanticContent) {
     Map<String, String> parameters = parameters(semanticContent);
-    String subject = renderOptional(template.subjectTemplate(), parameters, false, MAX_SUBJECT_CHARS);
+    String subject =
+        renderOptional(template.subjectTemplate(), parameters, false, MAX_SUBJECT_CHARS);
     String text = renderRequired(template.textTemplate(), parameters, false, MAX_TEXT_CHARS);
     String html = renderOptional(template.htmlTemplate(), parameters, true, MAX_HTML_CHARS);
     return new RenderedNotification(subject, text, html);

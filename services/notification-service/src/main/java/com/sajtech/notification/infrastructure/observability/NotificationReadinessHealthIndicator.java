@@ -37,8 +37,7 @@ public final class NotificationReadinessHealthIndicator implements HealthIndicat
       for (NotificationChannel channel : NotificationChannel.values()) {
         for (String locale : new String[] {"en", "fa"}) {
           if (templates
-              .findActive(
-                  channel, NotificationSemanticType.REGISTRATION_VERIFICATION_CODE, locale)
+              .findActive(channel, NotificationSemanticType.REGISTRATION_VERIFICATION_CODE, locale)
               .isEmpty()) {
             return Health.down().withDetail("category", "TEMPLATE_NOT_ACTIVE").build();
           }

@@ -14,7 +14,8 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.exception.DataAccessException;
 
-public final class JooqNotificationAcceptanceRepository implements NotificationAcceptanceRepository {
+public final class JooqNotificationAcceptanceRepository
+    implements NotificationAcceptanceRepository {
   private final DSLContext dsl;
 
   public JooqNotificationAcceptanceRepository(DSLContext dsl) {

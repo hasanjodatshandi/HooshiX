@@ -17,7 +17,8 @@ public record ProviderDispatchOutcome(
     }
     providerCode = bounded(providerCode, MAX_PROVIDER_CODE_LENGTH, "provider code");
     providerCorrelationId =
-        bounded(providerCorrelationId, MAX_CORRELATION_ID_LENGTH, "provider correlation identifier");
+        bounded(
+            providerCorrelationId, MAX_CORRELATION_ID_LENGTH, "provider correlation identifier");
   }
 
   public static ProviderDispatchOutcome simulated() {
@@ -31,8 +32,7 @@ public record ProviderDispatchOutcome(
     if (classification == null) {
       throw new IllegalArgumentException("Live provider classification is required");
     }
-    return new ProviderDispatchOutcome(
-        true, classification, providerCode, providerCorrelationId);
+    return new ProviderDispatchOutcome(true, classification, providerCode, providerCorrelationId);
   }
 
   private static String bounded(String value, int maximum, String field) {

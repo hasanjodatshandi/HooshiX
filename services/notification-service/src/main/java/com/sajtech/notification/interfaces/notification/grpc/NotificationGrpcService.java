@@ -121,7 +121,8 @@ public final class NotificationGrpcService
         || timestamp.getNanos() < 0
         || timestamp.getNanos() > 999_999_999
         || timestamp.getNanos() % 1_000 != 0) {
-      throw new IllegalArgumentException("Timestamp must be valid at canonical microsecond precision");
+      throw new IllegalArgumentException(
+          "Timestamp must be valid at canonical microsecond precision");
     }
     return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
   }
@@ -156,8 +157,7 @@ public final class NotificationGrpcService
           com.sajtech.notification.contract.v1.NotificationLifecycle
               .NOTIFICATION_LIFECYCLE_FAILED_PERMANENT;
       case EXPIRED ->
-          com.sajtech.notification.contract.v1.NotificationLifecycle
-              .NOTIFICATION_LIFECYCLE_EXPIRED;
+          com.sajtech.notification.contract.v1.NotificationLifecycle.NOTIFICATION_LIFECYCLE_EXPIRED;
       case DELIVERY_STATUS_UNKNOWN ->
           com.sajtech.notification.contract.v1.NotificationLifecycle
               .NOTIFICATION_LIFECYCLE_DELIVERY_STATUS_UNKNOWN;
@@ -171,7 +171,8 @@ public final class NotificationGrpcService
         .build();
   }
 
-  private static io.grpc.StatusRuntimeException toStatus(NotificationSubmissionException exception) {
+  private static io.grpc.StatusRuntimeException toStatus(
+      NotificationSubmissionException exception) {
     return switch (exception.error()) {
       case INVALID_NOTIFICATION_REQUEST, UNSUPPORTED_LOCALE ->
           status(Status.INVALID_ARGUMENT, exception.error().name());

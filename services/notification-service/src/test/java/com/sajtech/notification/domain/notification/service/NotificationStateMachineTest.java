@@ -19,8 +19,7 @@ class NotificationStateMachineTest {
     assertThatCode(
             () ->
                 stateMachine.requireTransition(
-                    NotificationLifecycle.DISPATCHING,
-                    NotificationLifecycle.PROVIDER_ACCEPTED))
+                    NotificationLifecycle.DISPATCHING, NotificationLifecycle.PROVIDER_ACCEPTED))
         .doesNotThrowAnyException();
     assertThatCode(
             () ->

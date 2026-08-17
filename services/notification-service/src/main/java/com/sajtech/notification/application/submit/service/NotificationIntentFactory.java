@@ -23,7 +23,8 @@ public final class NotificationIntentFactory {
   }
 
   public CanonicalNotificationIntent create(SubmitNotificationCommand command) {
-    if (command.semanticContent().semanticType().isTimeBound() && command.messageNotAfter() == null) {
+    if (command.semanticContent().semanticType().isTimeBound()
+        && command.messageNotAfter() == null) {
       throw new NotificationSubmissionException(
           NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST,
           "Time-bound notification requires message_not_after");

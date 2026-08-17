@@ -96,7 +96,8 @@ class NotificationGrpcServiceTest {
     StatusRuntimeException error = (StatusRuntimeException) recorder.getError();
     assertThat(error.getStatus().getCode()).isEqualTo(Status.Code.ALREADY_EXISTS);
     assertThat(error.getStatus().getDescription()).isEqualTo("REQUEST_ID_CONFLICT");
-    assertThat(Status.trailersFromThrowable(error).get(ERROR_CODE)).isEqualTo("REQUEST_ID_CONFLICT");
+    assertThat(Status.trailersFromThrowable(error).get(ERROR_CODE))
+        .isEqualTo("REQUEST_ID_CONFLICT");
     assertThat(error.getMessage()).doesNotContain("sensitive", "recipient");
   }
 

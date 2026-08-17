@@ -65,9 +65,7 @@ class ProviderAttemptPlannerTest {
         .isTrue();
     assertThat(
             planner.observationWindowClosed(
-                NotificationChannel.EMAIL,
-                accepted,
-                accepted.plusSeconds(60)))
+                NotificationChannel.EMAIL, accepted, accepted.plusSeconds(60)))
         .isFalse();
   }
 

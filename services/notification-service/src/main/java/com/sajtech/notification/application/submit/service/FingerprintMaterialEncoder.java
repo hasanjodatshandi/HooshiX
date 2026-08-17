@@ -47,7 +47,9 @@ public final class FingerprintMaterialEncoder {
     if (instant == null) {
       return "";
     }
-    long micros = Math.addExact(Math.multiplyExact(instant.getEpochSecond(), 1_000_000L), instant.getNano() / 1_000L);
+    long micros =
+        Math.addExact(
+            Math.multiplyExact(instant.getEpochSecond(), 1_000_000L), instant.getNano() / 1_000L);
     return Long.toString(micros);
   }
 }

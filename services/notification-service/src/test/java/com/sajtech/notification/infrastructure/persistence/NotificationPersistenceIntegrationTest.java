@@ -110,7 +110,8 @@ class NotificationPersistenceIntegrationTest {
                 "SELECT text_ciphertext FROM notification WHERE notification_id = ?",
                 first.notificationId())
             .get("text_ciphertext", byte[].class);
-    assertThat(encryptedRecipient).doesNotContain("person@example.com".getBytes(StandardCharsets.UTF_8));
+    assertThat(encryptedRecipient)
+        .doesNotContain("person@example.com".getBytes(StandardCharsets.UTF_8));
     assertThat(encryptedText).doesNotContain("12345678".getBytes(StandardCharsets.UTF_8));
   }
 
@@ -135,8 +136,7 @@ class NotificationPersistenceIntegrationTest {
     writeKeyRing(deliveryPath, (byte) 11);
     Clock clock = Clock.systemUTC();
     FileBackedKeyRing fingerprintKeys =
-        new FileBackedKeyRing(
-            fingerprintPath, "HmacSHA256", 32, clock, Duration.ofHours(1));
+        new FileBackedKeyRing(fingerprintPath, "HmacSHA256", 32, clock, Duration.ofHours(1));
     FileBackedKeyRing deliveryKeys =
         new FileBackedKeyRing(deliveryPath, "AES", 32, clock, Duration.ofHours(1));
     NotificationIntentFactory intentFactory =

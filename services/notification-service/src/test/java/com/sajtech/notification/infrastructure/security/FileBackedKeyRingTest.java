@@ -24,8 +24,7 @@ class FileBackedKeyRingTest {
     String key = Base64.getEncoder().encodeToString(new byte[32]);
     Files.writeString(path, "active_key_id=v1\nkey.v1=" + key + "\n", StandardCharsets.UTF_8);
     MutableClock clock = new MutableClock(Instant.parse("2026-08-16T00:00:00Z"));
-    FileBackedKeyRing ring =
-        new FileBackedKeyRing(path, "AES", 32, clock, Duration.ofHours(1));
+    FileBackedKeyRing ring = new FileBackedKeyRing(path, "AES", 32, clock, Duration.ofHours(1));
 
     assertThat(ring.activeKey().keyId()).isEqualTo("v1");
     clock.advance(Duration.ofHours(1).plusMillis(1));

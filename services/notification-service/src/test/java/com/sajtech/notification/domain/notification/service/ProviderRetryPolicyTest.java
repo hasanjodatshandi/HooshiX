@@ -21,11 +21,12 @@ class ProviderRetryPolicyTest {
         .isTrue();
     assertThat(
             policy.shouldRetry(
-                NotificationChannel.SMS, 4, ProviderAttemptClassification.DEFINITIVE_TRANSIENT_FAILURE))
+                NotificationChannel.SMS,
+                4,
+                ProviderAttemptClassification.DEFINITIVE_TRANSIENT_FAILURE))
         .isFalse();
     assertThat(
-            policy.shouldRetry(
-                NotificationChannel.SMS, 1, ProviderAttemptClassification.AMBIGUOUS))
+            policy.shouldRetry(NotificationChannel.SMS, 1, ProviderAttemptClassification.AMBIGUOUS))
         .isFalse();
     assertThat(policy.requiresReconciliation(ProviderAttemptClassification.AMBIGUOUS)).isTrue();
   }

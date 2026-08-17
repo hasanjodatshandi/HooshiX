@@ -41,11 +41,7 @@ public final class ProviderAttemptPlanner {
       case AMBIGUOUS -> ProviderAttemptDecision.action(ProviderAttemptAction.RECONCILE);
       case DEFINITIVE_TRANSIENT_FAILURE ->
           transientFailure(
-              channel,
-              completedAttemptNumber,
-              databaseNow,
-              effectiveDeliveryDeadline,
-              random);
+              channel, completedAttemptNumber, databaseNow, effectiveDeliveryDeadline, random);
     };
   }
 
