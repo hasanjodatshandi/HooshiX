@@ -67,10 +67,10 @@ public final class AesGcmDeliveryEscrow implements DeliveryEscrowPort {
           new SecretKeySpec(key.keyBytes(), "AES"),
           new GCMParameterSpec(TAG_BITS, nonce));
       cipher.updateAAD(associatedData);
-      return new EncryptedField(
-          nonce, cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8)));
+      return new EncryptedField(nonce, cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8)));
     } catch (GeneralSecurityException encryptionFailure) {
-      throw new IllegalStateException("Notification delivery payload encryption failed", encryptionFailure);
+      throw new IllegalStateException(
+          "Notification delivery payload encryption failed", encryptionFailure);
     }
   }
 
