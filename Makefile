@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: baseline-test baseline-verify context-test context-verify context-bootstrap context-matrix-check
+.PHONY: baseline-test baseline-verify context-test context-verify context-bootstrap context-matrix-check context-post-merge-verify
 
 baseline-test:
 	$(PYTHON) -m unittest discover -s scripts/baseline/tests -p 'test_*.py'
@@ -8,8 +8,12 @@ baseline-test:
 context-test:
 	$(PYTHON) -m unittest discover -s scripts/context/tests -p 'test_*.py'
 
+context-post-merge-verify:
+	$(PYTHON) scripts/context/post_merge_checkpoint.py verify
+
 context-verify:
 	$(PYTHON) scripts/context/context_engine.py verify
+	$(PYTHON) scripts/context/post_merge_checkpoint.py verify
 
 context-bootstrap:
 	$(PYTHON) scripts/context/context_engine.py bootstrap

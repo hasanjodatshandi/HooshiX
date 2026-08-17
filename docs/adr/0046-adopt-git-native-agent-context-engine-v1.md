@@ -25,7 +25,7 @@ current Git repository authority
 -> verified bootstrap
 -> machine-readable task routing
 -> task context compilation / Git-aware retrieval
--> non-authoritative work checkpoints
+-> non-authoritative work/post-merge checkpoints
 -> read-only MCP adapter
 ```
 
@@ -90,23 +90,40 @@ Routing is conservative:
 
 The router is an aid to select current sources. It is not architectural decision authority.
 
-## 4. Work checkpoints
+## 4. Work and post-merge checkpoints
 
-`context/checkpoint.schema.json` defines append-only, commit-bound work checkpoint records under `context/checkpoints/`.
+`context/checkpoint.schema.json` defines append-only, commit-bound checkpoint records under `context/checkpoints/`.
 
-Checkpoint creation is automated by repository tooling from an explicit work receipt plus Git state. The tool derives branch, subject commit, base commit, and changed paths rather than asking an agent to restate them as unverifiable prose.
+A normal work checkpoint is created from an explicit bounded receipt plus Git state. The tool derives branch, subject commit, base commit, and changed paths rather than asking an agent to restate them as unverifiable prose. A work checkpoint records a coherent implementation/review state and remains immutable historical evidence even if later CI, reconciliation, or merge work completes its recorded `next_actions`.
 
-A checkpoint records bounded fields such as objective, scope, completed work, current decisions with authority references, changed paths, verification outcomes, risks, unfinished work, and next actions.
+A post-merge checkpoint closes that continuity gap without rewriting the work checkpoint. It has `checkpoint_kind=post-merge`, references the earlier work record through `source_checkpoint`, carries the same pull-request identity, and binds final evidence to the exact merged `main` commit.
+
+Post-merge creation derives and verifies:
+
+- `base_commit` as the exact pre-merge `main` commit supplied to the tool;
+- `subject_commit` as the exact merged `main` commit;
+- the base is an ancestor of the merge subject;
+- the merge subject is reachable from current `main`;
+- `source_checkpoint` is a valid non-post-merge checkpoint for the same pull request;
+- `changed_paths` exactly matches the Git-derived `base..subject` diff, excluding `context/checkpoints/` transport files.
+
+Post-merge evidence records final merge/CI/diff-review outcomes, remaining risks, unfinished work, and real next actions. Completed pre-merge actions are not carried forward merely because they existed in the source checkpoint.
+
+For a non-trivial task PR with a work checkpoint, the post-merge record is transported through a focused checkpoint-only follow-up PR after the task merge is verified. That checkpoint-only follow-up does not recursively require another post-merge checkpoint. If substantive implementation, architecture, security, or governance work is added to the follow-up, the exemption no longer applies.
+
+Checkpoint records use bounded fields such as objective, scope, completed work, current decisions with authority references, changed paths, verification outcomes, risks, unfinished work, and next actions.
 
 Mandatory rules:
 
-- checkpoint `subject_commit` must be an explicit Git revision;
+- checkpoint `subject_commit` must be an explicit full Git commit revision;
 - authority references must be repository paths that exist for the recorded work;
 - secret/private-key/token/credential material is prohibited;
 - checkpoints do not copy large source/document bodies;
 - a later checkpoint does not mutate an older checkpoint into different historical evidence;
 - `latest checkpoint` means newest valid checkpoint record, not current architecture authority;
-- context consumers compare checkpoint revision with current `HEAD` and inspect intervening Git changes before relying on it for continuity.
+- context consumers compare checkpoint revision with current `HEAD` and inspect intervening Git changes before relying on it for continuity;
+- legacy work checkpoints without `checkpoint_kind` remain valid as v1 historical records;
+- post-merge records require explicit source-checkpoint and pull-request linkage.
 
 The Context Engine does not claim that schema validation detects every possible secret. Current Gitleaks/secret-handling policy remains authoritative.
 
@@ -162,7 +179,8 @@ Security controls include:
 - no network listener in v1;
 - bounded input/output and file sizes;
 - commit/blob/worktree provenance on derived context;
-- fail-safe targeted-review trust when configured authority inputs are dirty or invalid.
+- fail-safe targeted-review trust when configured authority inputs are dirty or invalid;
+- post-merge source-path confinement, same-PR linkage, main-reachability validation, and Git-derived diff verification.
 
 A Context Engine defect cannot authorize weaker authentication, Authorization, tenant isolation, secrets handling, supply-chain policy, production access, or any other product/runtime security control.
 
@@ -176,13 +194,15 @@ Repository baseline verification covers at least:
 - global full-read triggers are non-empty;
 - generated `TASK-REVIEW-MATRIX.md` exactly matches canonical `context/routes.json`;
 - checkpoint fixtures/current records validate and contain required commit/provenance shape;
+- post-merge records reference valid same-PR work checkpoints and recompute to the recorded `base..merge` changed paths;
+- post-merge subjects are reachable from current `main` and bases are ancestors of their subjects;
 - targeted routing escalates on unknown/ambiguous/full-read-trigger input;
 - dirty authority state cannot be reported as verified targeted-review context;
 - search bounds/sensitive-file exclusions/provenance behavior;
 - MCP modern discovery/tools and legacy initialize compatibility;
 - MCP exposes no write/mutation tool.
 
-Context-engine checks are part of `make baseline-verify`. Documentation alone is not implementation evidence.
+Repository structure CI fetches the Git history needed to re-verify post-merge main provenance. Context-engine checks are part of `make baseline-verify`. Documentation alone is not implementation evidence.
 
 ## 9. Cross-agent memory service trigger
 
@@ -196,10 +216,12 @@ Before such a service exists, a new ADR must define at least authority/ownership
 
 Executable evidence must prove the CI/governance requirements above, plus one end-to-end example in which a clean current repository bootstrap selects a targeted route, returns commit/blob provenance, and serves the same information through MCP without repository mutation.
 
+Checkpoint evidence must also prove a work checkpoint can remain immutable while a later post-merge checkpoint references it, binds to an exact reachable `main` merge commit, derives the exact non-checkpoint changed paths from Git, and rejects source-PR mismatch, non-main subjects, tampered changed paths, path traversal, and shell-like revision input.
+
 Negative evidence must prove unknown/ambiguous tasks, dirty authority files, malformed config/checkpoints, sensitive-file search attempts, oversized MCP input, unsupported protocol version, and unknown/write-like MCP tool requests fail safely.
 
 ## Rollback considerations
 
 Rollback may remove the Context Engine only if repository/agent workflow returns to the previous mandatory reading rules without losing authoritative architecture or historical Git evidence.
 
-Rollback MUST NOT leave `TASK-REVIEW-MATRIX.md` claiming machine authority after its canonical registry is removed, preserve stale generated context as authority, make checkpoints normative, expose a write-capable/unbounded/network MCP endpoint, or introduce a central memory service without the trigger/review above.
+Rollback MUST NOT leave `TASK-REVIEW-MATRIX.md` claiming machine authority after its canonical registry is removed, preserve stale generated context as authority, make checkpoints normative, rewrite an older work checkpoint to imitate post-merge evidence, expose a write-capable/unbounded/network MCP endpoint, or introduce a central memory service without the trigger/review above.

@@ -203,6 +203,7 @@ CI SHOULD enforce when implemented:
 - no stale baseline version copies outside permitted contexts;
 - dependency YAML/schema/render consistency;
 - `context/bootstrap.json`, `context/routes.json`, and checkpoint contracts are valid/current and all referenced authority/source paths exist;
+- post-merge checkpoints have path-confined standalone work sources, same-PR linkage, main-reachable subject commits, and Git-derived `base..merge` changed paths; repository CI fetches the history needed to re-verify this evidence;
 - `docs/architecture/TASK-REVIEW-MATRIX.md` exactly matches canonical `context/routes.json` generation;
 - unknown/ambiguous/full-read-trigger task routing cannot silently become targeted review;
 - dirty configured authority state cannot be reported as verified targeted-review context;
