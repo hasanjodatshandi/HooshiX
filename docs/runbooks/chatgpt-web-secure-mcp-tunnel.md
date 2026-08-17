@@ -160,13 +160,29 @@ Do not select broad `All` access when the restricted tunnel permissions are suff
 
 Do not use `OPENAI_ADMIN_KEY` for `doctor` or the long-lived `run` daemon. Admin credentials are only for explicit tunnel-management CRUD.
 
-Set the runtime key only on the local host. For the first foreground test, use a process-scoped PowerShell environment variable:
+The official tunnel-client configuration supports secret-bearing values through `env:VARNAME` or `file:/path/to/secret` references. Prefer one of these references so the real API key is not placed in argv or profile YAML.
+
+For an interactive foreground test, load the environment variable without typing the secret as part of a PowerShell command line. One Windows PowerShell-compatible pattern is:
 
 ```powershell
-$env:CONTROL_PLANE_API_KEY = '<set locally; never paste the real value into chat>'
+$secure = Read-Host 'CONTROL_PLANE_API_KEY' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+  $env:CONTROL_PLANE_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+}
 ```
 
-Do not store the real key in this repository, shell transcripts committed to Git, screenshots, or ChatGPT messages.
+The key is then present only in the current process environment for this test. Clear it when finished:
+
+```powershell
+Remove-Item Env:CONTROL_PLANE_API_KEY -ErrorAction SilentlyContinue
+```
+
+For persistent operation, prefer the tunnel-client supported `file:` or protected secret-reference mechanism rather than storing a plaintext literal in a startup command, scheduled-task argument, profile, or Git file.
+
+Do not store the real key in this repository, shell transcripts, screenshots, logs, support bundles, or ChatGPT messages.
 
 ## 7. Configure the stdio MCP profile
 
@@ -190,6 +206,8 @@ Then initialize a dedicated profile. Replace placeholders locally with the real 
 ```
 
 If either local path contains spaces, use the quoting form shown by the installed `tunnel-client` help/profile sample rather than guessing a different command encoding.
+
+The generated profile must keep `control_plane.api_key` as an `env:` or `file:` secret reference. Do not replace it with a literal key.
 
 The HooshiX MCP entry point resolves the repository root from its own script path. The tunnel-client service working directory is therefore not repository authority.
 
@@ -258,13 +276,13 @@ For persistent operation, preserve these invariants:
 - same reviewed tunnel-client binary/version;
 - same dedicated profile and tunnel ID;
 - same dedicated clean HooshiX checkout;
-- runtime key supplied through a protected supported secret mechanism, not a command-line literal or Git file;
+- runtime key supplied through a protected supported `env:` or `file:` secret reference, not a command-line literal or Git file;
 - service account/user has only the filesystem/network permissions needed for the checkout and outbound tunnel;
 - no public inbound firewall rule is added;
 - tunnel-client local health/admin surface remains loopback-only;
 - startup/restart failure remains visible through local health/readiness and does not silently fall back to a public listener.
 
-Use the persistent-runtime mechanism documented by the installed OpenAI tunnel-client version. Do not invent `nohup`/background wrappers that lose health/readiness ownership.
+Use the persistent-runtime mechanism documented by the installed OpenAI tunnel-client version. Do not invent background wrappers that lose health/readiness ownership.
 
 ## 11. Normal operating procedure
 
@@ -295,7 +313,7 @@ Check:
 
 ### `doctor` reports missing runtime key
 
-Set `CONTROL_PLANE_API_KEY` locally with the restricted runtime key. Do not substitute an admin key.
+Provide `CONTROL_PLANE_API_KEY` through the approved local `env:`/`file:` secret reference with the restricted runtime key. Do not substitute an admin key and do not paste the key into ChatGPT.
 
 ### MCP child fails to start
 
