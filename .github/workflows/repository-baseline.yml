@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Refresh Notification Testcontainers metadata
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -15,6 +20,7 @@ permissions:
 jobs:
   repository-structure:
     name: Repository structure verify
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -32,11 +38,12 @@ jobs:
 
   service-security:
     name: Compromised Password security suite
+    if: github.event_name != 'workflow_run'
     uses: ./.github/workflows/compromised-password-service.yml
 
   baseline:
     name: Baseline verify
-    if: ${{ always() }}
+    if: ${{ always() && github.event_name != 'workflow_run' }}
     needs:
       - repository-structure
       - service-security
@@ -58,3 +65,74 @@ jobs:
             exit 1
           fi
           echo 'Required repository and service security verification passed.'
+
+  apply-notification-testcontainers-metadata:
+    name: Apply reviewed Notification Testcontainers metadata
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_branch == 'agent/notification-service-vertical-slice' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    permissions:
+      actions: read
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact audited branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/notification-service-vertical-slice
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Verify workflow head did not move
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
+
+      - name: Download generated dependency metadata
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: notification-testcontainers-metadata
+          path: /tmp/notification-testcontainers-metadata
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify exact reviewed metadata hashes
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' \
+            'cf5c2d7f15992ad39b551e7658c30ea5705a8f391e43f25ccc88eb8f030acb40' \
+            '/tmp/notification-testcontainers-metadata/gradle.lockfile' | sha256sum --check --strict -
+          printf '%s  %s\n' \
+            '22fe384953c8588c2008fdad4e490d4f5365421d0833ce09ad8e2a137365c683' \
+            '/tmp/notification-testcontainers-metadata/gradle/verification-metadata.xml' | sha256sum --check --strict -
+
+      - name: Apply exact metadata and remove generator
+        run: |
+          set -euo pipefail
+          cp /tmp/notification-testcontainers-metadata/gradle.lockfile \
+            services/notification-service/gradle.lockfile
+          cp /tmp/notification-testcontainers-metadata/gradle/verification-metadata.xml \
+            services/notification-service/gradle/verification-metadata.xml
+          git add services/notification-service/gradle.lockfile \
+            services/notification-service/gradle/verification-metadata.xml
+          git rm .github/workflows/refresh-notification-testcontainers-metadata.yml
+          git diff --cached --check
+          git ls-files | LC_ALL=C sort > /tmp/current-file-index.txt
+          diff -u FILE_INDEX.txt /tmp/current-file-index.txt
+          git diff --cached --name-only | LC_ALL=C sort > /tmp/changed.txt
+          cat > /tmp/expected-changed.txt <<'FILES'
+          .github/workflows/refresh-notification-testcontainers-metadata.yml
+          services/notification-service/gradle.lockfile
+          services/notification-service/gradle/verification-metadata.xml
+          FILES
+          diff -u /tmp/expected-changed.txt /tmp/changed.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Add reviewed Notification Testcontainers metadata'
+          git push origin HEAD:agent/notification-service-vertical-slice
