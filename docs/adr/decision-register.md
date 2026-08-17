@@ -51,6 +51,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0043 | production network/client-address/management trust boundaries |
 | ADR-0044 | Day-One observability runtime: Micrometer/OpenTelemetry/Prometheus/Loki/Tempo/Grafana/external host-down signal |
 | ADR-0045 | DevSecOps responsibility map: Semgrep, Gitleaks, OSV-Scanner, Syft, Grype, Cosign, and Kyverno |
+| ADR-0046 | Git-native Agent Context Engine: verified bootstrap, task routing, commit-bound checkpoints, bounded retrieval, read-only MCP |
 
 ## Superseded ADR identifiers
 

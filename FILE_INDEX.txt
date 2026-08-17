@@ -13,6 +13,13 @@ AGENTS.md
 FILE_INDEX.txt
 Makefile
 README.md
+context/bootstrap.json
+context/bootstrap.schema.json
+context/checkpoint.schema.json
+context/checkpoints/20260817T062054Z-implement-git-native-agent-context-engine-v1.json
+context/checkpoints/README.md
+context/routes.json
+context/routes.schema.json
 docs/adr/0001-select-dedicated-caddy-coraza-edge-waf.md
 docs/adr/0002-define-production-istio-trust-and-enrollment.md
 docs/adr/0003-use-git-and-buf-without-runtime-schema-registry-in-v1.md
@@ -58,6 +65,7 @@ docs/adr/0042-define-single-server-production-profile-v1.md
 docs/adr/0043-define-production-network-trust-boundaries-v1.md
 docs/adr/0044-define-day-one-observability-runtime-v1.md
 docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1.md
+docs/adr/0046-adopt-git-native-agent-context-engine-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -89,6 +97,7 @@ docs/architecture/services/web-bff.md
 docs/architecture/testing-and-quality-gates.md
 docs/architecture/threat-model.md
 docs/engineering/agent-communication-and-reporting.md
+docs/engineering/agent-context-engine.md
 docs/engineering/build-and-ci-quality-enforcement.md
 docs/engineering/coding-standards.md
 docs/engineering/current-only-documentation-policy.md
@@ -107,6 +116,10 @@ docs/technology/production-compatibility-matrix.md
 docs/technology/technology-baseline.md
 scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
+scripts/context/context_engine.py
+scripts/context/mcp_server.py
+scripts/context/tests/test_context_engine.py
+scripts/context/tests/test_mcp_server.py
 services/compromised-password-service/.dockerignore
 services/compromised-password-service/Dockerfile
 services/compromised-password-service/buf.yaml

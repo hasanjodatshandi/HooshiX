@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance.
 
 ## 1. Required Java PR gates
 
@@ -190,7 +190,7 @@ Applicable checks include:
 - secret/render scans;
 - profile-correct replica/HPA/PDB/topology.
 
-## 9. Documentation/governance gates
+## 9. Documentation/governance and Agent Context gates
 
 CI SHOULD enforce when implemented:
 
@@ -201,7 +201,19 @@ CI SHOULD enforce when implemented:
 - no deletion of a merged ADR without explicit repository-owner exception;
 - superseded ADRs not treated as current authority;
 - no stale baseline version copies outside permitted contexts;
-- dependency YAML/schema/render consistency.
+- dependency YAML/schema/render consistency;
+- `context/bootstrap.json`, `context/routes.json`, and checkpoint contracts are valid/current and all referenced authority/source paths exist;
+- `docs/architecture/TASK-REVIEW-MATRIX.md` exactly matches canonical `context/routes.json` generation;
+- unknown/ambiguous/full-read-trigger task routing cannot silently become targeted review;
+- dirty configured authority state cannot be reported as verified targeted-review context;
+- Context Engine retrieval remains tracked-file-only, repository-root confined, bounded, provenance-bearing, and configured sensitive filenames are excluded;
+- caller-controlled revision/query input cannot become shell execution or arbitrary filesystem access;
+- MCP modern discovery/tool calls and bounded legacy initialize compatibility remain tested;
+- MCP exposes no file/Git/checkpoint/deployment/write mutation tool.
+
+These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
+
+`make baseline-verify` includes the repository Context Engine tests and verification. A Context Engine/documentation drift therefore blocks the same repository-governance boundary.
 
 ## 10. Heavy release/scheduled evidence
 

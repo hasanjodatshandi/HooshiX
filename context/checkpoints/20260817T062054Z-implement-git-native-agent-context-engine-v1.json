@@ -1,0 +1,101 @@
+{
+  "base_commit": "5eb7024b3c3cfbc02b689f46315d0bf7eee466d6",
+  "branch": "agent/context-engine-v1",
+  "changed_paths": [
+    "AGENTS.md",
+    "FILE_INDEX.txt",
+    "Makefile",
+    "README.md",
+    "context/bootstrap.json",
+    "context/bootstrap.schema.json",
+    "context/checkpoint.schema.json",
+    "context/checkpoints/README.md",
+    "context/routes.json",
+    "context/routes.schema.json",
+    "docs/adr/0046-adopt-git-native-agent-context-engine-v1.md",
+    "docs/adr/decision-register.md",
+    "docs/architecture/README.md",
+    "docs/architecture/SOURCES.md",
+    "docs/architecture/TASK-REVIEW-MATRIX.md",
+    "docs/architecture/architecture-fitness-functions.md",
+    "docs/architecture/implementation-status.md",
+    "docs/architecture/security-verification-matrix.md",
+    "docs/engineering/agent-context-engine.md",
+    "docs/engineering/build-and-ci-quality-enforcement.md",
+    "docs/engineering/developer-workflow.md",
+    "docs/engineering/documentation-standards.md",
+    "scripts/context/context_engine.py",
+    "scripts/context/mcp_server.py",
+    "scripts/context/tests/test_context_engine.py",
+    "scripts/context/tests/test_mcp_server.py"
+  ],
+  "checkpoint_id": "20260817T062054Z-implement-git-native-agent-context-engine-v1",
+  "completed": [
+    "Defined ADR-0046 and repository authority/routing contracts.",
+    "Implemented verified Git bootstrap, conservative task routing, bounded tracked-file retrieval, Git change inspection, and commit-bound checkpoint tooling.",
+    "Implemented a read-only stdio MCP adapter on the same Context Engine with modern and bounded legacy protocol compatibility.",
+    "Added deterministic Context Engine/MCP tests and wired them into make baseline-verify.",
+    "Updated repository governance, source routing, implementation status, security verification, architecture fitness functions, and developer documentation."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "docs/adr/0046-adopt-git-native-agent-context-engine-v1.md"
+      ],
+      "summary": "Current Git authority outranks derived context, historical checkpoints, and model/chat memory."
+    },
+    {
+      "authority_refs": [
+        "docs/adr/0046-adopt-git-native-agent-context-engine-v1.md",
+        "docs/engineering/agent-context-engine.md"
+      ],
+      "summary": "V1 uses local deterministic retrieval and read-only stdio MCP; no vector database, hosted index, or central cross-project memory service is introduced."
+    }
+  ],
+  "next_actions": [
+    "Run the protected repository baseline on the final PR head and resolve any exact branch drift.",
+    "Review the complete PR diff against current main before marking the PR ready."
+  ],
+  "objective": "Implement the Git-native Agent Context Engine v1: verified bootstrap, task-aware routing, automatic work checkpoints, and read-only Git-aware MCP retrieval without a central memory service.",
+  "project_id": "hooshix",
+  "pull_request": 54,
+  "recorded_at_utc": "2026-08-17T06:20:54Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "Tracked-file-only retrieval does not prove that Git contains no committed secret; ADR-0045 Gitleaks remains the required secret-detection control and is not implemented yet.",
+    "The checkpoint records the subject implementation commit before this checkpoint file and does not include later verification/fix commits."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [],
+    "review_mode": "full-read",
+    "routes": [
+      "agent-context-engine",
+      "documentation-governance",
+      "repository-ci"
+    ]
+  },
+  "subject_commit": "e7b71c896904819fbae0b874135d46a502285b6b",
+  "unfinished": [
+    "Protected GitHub Actions evidence and final diff review are not part of the subject commit evidence."
+  ],
+  "verification": {
+    "failed": [],
+    "not_run": [
+      {
+        "check": "Protected GitHub Actions repository baseline on final PR head",
+        "evidence": "Not run for the final head at checkpoint time; later commits may change the PR head."
+      }
+    ],
+    "passed": [
+      {
+        "check": "Context Engine/MCP deterministic unit tests",
+        "evidence": "Local temporary Git-repository execution: python3 -m unittest discover -s scripts/context/tests -p 'test_*.py' -v; 13 tests passed before transfer to the repository branch."
+      },
+      {
+        "check": "MCP protocol source verification",
+        "evidence": "Implementation shape checked against official Model Context Protocol 2026-07-28 discovery/tools specification before repository transfer."
+      }
+    ]
+  }
+}
