@@ -115,7 +115,8 @@ class NotificationGrpcServiceTest {
     service.submitNotification(request, recorder);
 
     assertThat(recorder.completed).isFalse();
-    assertThat(Status.fromThrowable(recorder.error).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+    assertThat(Status.fromThrowable(recorder.error).getCode())
+        .isEqualTo(Status.Code.INVALID_ARGUMENT);
   }
 
   private static SubmitNotificationRequest validRequest() {
