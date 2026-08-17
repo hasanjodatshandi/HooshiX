@@ -15,7 +15,7 @@ LEGACY_VERSION = "2025-11-25"
 SUPPORTED_VERSIONS = [MODERN_VERSION, LEGACY_VERSION]
 SERVER_INFO = {
     "name": "hooshix-context-engine",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Read-only Git-native HooshiX project context and retrieval server",
 }
 MAX_MESSAGE_BYTES = 1024 * 1024
