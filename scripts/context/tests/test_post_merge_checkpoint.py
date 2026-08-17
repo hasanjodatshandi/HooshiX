@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,9 +13,6 @@ from post_merge_checkpoint import (  # noqa: E402
     verify_tracked_post_merge_checkpoints,
 )
 from test_context_engine import git, make_repo, write  # noqa: E402
-
-
-SOURCE_CHECKPOINT = "context/checkpoints/source.json"
 
 
 def create_source_checkpoint(
@@ -204,6 +200,26 @@ class PostMergeCheckpointTest(unittest.TestCase):
                 base=base,
                 merge_commit="HEAD;touch-/tmp/bad",
                 source_checkpoint=source,
+            )
+
+    def test_post_merge_checkpoint_rejects_source_path_traversal(self) -> None:
+        temp, root, engine = make_repo()
+        self.addCleanup(temp.cleanup)
+        base = engine.head()
+        write(root, "src/new.txt", "merged work\n")
+        git(root, "add", "src/new.txt")
+        git(root, "commit", "-m", "work")
+        source = create_source_checkpoint(root, engine, base=base)
+        git(root, "add", source)
+        git(root, "commit", "-m", "work checkpoint")
+
+        with self.assertRaises(ContextError):
+            create_post_merge_checkpoint(
+                engine,
+                post_merge_receipt(root),
+                base=base,
+                merge_commit=engine.head(),
+                source_checkpoint="context/checkpoints/../checkpoint.schema.json",
             )
 
 
