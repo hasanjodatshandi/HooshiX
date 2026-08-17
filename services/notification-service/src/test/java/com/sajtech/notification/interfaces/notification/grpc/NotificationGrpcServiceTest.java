@@ -103,7 +103,7 @@ class NotificationGrpcServiceTest {
   void rejectsSubMicrosecondTimestampPrecision() {
     SubmitNotificationRequest request =
         validRequest().toBuilder()
-            .setMessageNotAfter(Timestamp.newBuilder().setSeconds(1_787_018_200L).setNanos(123))
+            .setMessageNotAfter(Timestamp.newBuilder().setSeconds(1_786_839_000L).setNanos(123))
             .build();
     NotificationGrpcService service =
         new NotificationGrpcService(
@@ -125,7 +125,7 @@ class NotificationGrpcServiceTest {
         .setChannel(NotificationChannel.NOTIFICATION_CHANNEL_EMAIL)
         .setRecipient("person@example.com")
         .setLocale("en-US")
-        .setMessageNotAfter(Timestamp.newBuilder().setSeconds(1_787_018_200L))
+        .setMessageNotAfter(Timestamp.newBuilder().setSeconds(1_786_839_000L))
         .setRegistrationVerificationCode(
             VerificationCodeContent.newBuilder().setCode("12345678").setExpiresMinutes(10))
         .build();
