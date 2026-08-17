@@ -17,6 +17,7 @@ context/bootstrap.json
 context/bootstrap.schema.json
 context/checkpoint.schema.json
 context/checkpoints/20260817T062054Z-implement-git-native-agent-context-engine-v1.json
+context/checkpoints/20260817T120535Z-post-merge-pr-54-finalize-git-native-agent-context-engine-v1-aft.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
@@ -118,8 +119,10 @@ scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
 scripts/context/context_engine.py
 scripts/context/mcp_server.py
+scripts/context/post_merge_checkpoint.py
 scripts/context/tests/test_context_engine.py
 scripts/context/tests/test_mcp_server.py
+scripts/context/tests/test_post_merge_checkpoint.py
 services/compromised-password-service/.dockerignore
 services/compromised-password-service/Dockerfile
 services/compromised-password-service/buf.yaml
