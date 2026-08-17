@@ -202,14 +202,16 @@ Then initialize a dedicated profile. Replace placeholders locally with the real 
   --sample sample_mcp_stdio_local `
   --profile hooshix-context `
   --tunnel-id <TUNNEL_ID> `
-  --mcp-command "<PYTHON_EXE> <ABSOLUTE_REPO_PATH>\scripts\context\mcp_server.py"
+  --mcp-command "<PYTHON_EXE> -B <ABSOLUTE_REPO_PATH>\scripts\context\mcp_server.py"
 ```
 
-If either local path contains spaces, use the quoting form shown by the installed `tunnel-client` help/profile sample rather than guessing a different command encoding.
+`-B` prevents Python bytecode cache files from dirtying the dedicated authority checkout. If either local path contains spaces, use the quoting form shown by the installed `tunnel-client` help/profile sample rather than guessing a different command encoding. On Windows, validate the generated command with `doctor`; if the installed parser does not preserve a backslash-form path, use the equivalent absolute forward-slash path form accepted by the installed Python executable rather than weakening the checkout or moving the MCP server.
 
 The generated profile must keep `control_plane.api_key` as an `env:` or `file:` secret reference. Do not replace it with a literal key.
 
 The HooshiX MCP entry point resolves the repository root from its own script path. The tunnel-client service working directory is therefore not repository authority.
+
+For a host where TCP 8080 is already in use, keep the health/admin surface on loopback and select a free loopback port. The reviewed v0.0.11 client supports an ephemeral listener such as `127.0.0.1:0`; do not resolve a port conflict by binding the health/admin surface to `0.0.0.0` or another LAN/public address.
 
 ## 8. Validate before connecting ChatGPT
 
@@ -246,8 +248,11 @@ While the foreground tunnel runtime is healthy:
 1. return to `Settings -> Plugins -> New Plugin`;
 2. set `Connection` to `Tunnel`;
 3. refresh/select the same HooshiX tunnel;
-4. complete the custom Plugin setup;
-5. in a new/appropriate HooshiX chat, enable/use the Plugin.
+4. use no downstream OAuth/authentication for the current local stdio MCP when the UI offers `None`/no authentication;
+5. complete the custom Plugin setup;
+6. in a new/appropriate HooshiX chat, enable/use the Plugin.
+
+The runtime API key authenticates tunnel-client to the OpenAI control plane. It is not a downstream MCP application credential and must not be pasted into the Plugin authentication field.
 
 The first functional check is tool discovery. Exactly five HooshiX tools must be visible.
 
@@ -264,6 +269,8 @@ Next verify a routed task through:
 ```text
 project.context_for_task
 ```
+
+Successful object-shaped HooshiX tool results carry matching JSON text and structured object content. A client may display only one representation; the two representations must encode the same object. This compatibility shape does not add a tool or expose additional repository data.
 
 Do not claim end-to-end tunnel integration is `Passed` until these real ChatGPT Web calls complete successfully.
 
@@ -315,6 +322,10 @@ Check:
 
 Provide `CONTROL_PLANE_API_KEY` through the approved local `env:`/`file:` secret reference with the restricted runtime key. Do not substitute an admin key and do not paste the key into ChatGPT.
 
+### `doctor` reports the health listener address is already in use
+
+Keep the listener on `127.0.0.1` and select another free loopback port or the supported ephemeral `127.0.0.1:0` form. Do not bind the operator surface to all interfaces as a workaround.
+
 ### MCP child fails to start
 
 Check:
@@ -326,6 +337,19 @@ Check:
 - tunnel-client profile quoting as shown by the installed binary's help.
 
 Do not fix this by exposing a public MCP server.
+
+### Tool discovery works but a tool response fails at the control-plane response boundary
+
+If tunnel-client logs an HTTP 400 response-post/body-parsing error after forwarding a tool call:
+
+1. preserve the bounded error/request identifiers without copying credentials;
+2. run the repository MCP tests and verify the exact five-tool surface;
+3. verify the raw stdio JSON-RPC response is valid JSON;
+4. use the tunnel-client version's official embedded/minimal stdio test path to separate tunnel/control-plane transport from HooshiX MCP result behavior;
+5. confirm object-shaped HooshiX successes contain matching JSON `content` and `structuredContent`;
+6. do not add a public HTTP MCP wrapper or broaden authentication/tool authority to bypass the failure.
+
+A passing embedded or minimal stdio tool call proves the general tunnel/control-plane/stdio path for that test. It does not by itself prove every HooshiX tool result. Retest `project.bootstrap` and `project.context_for_task` through ChatGPT Web after the repository fix is synchronized.
 
 ### Bootstrap reports stale/dirty context
 
