@@ -30,31 +30,41 @@ jobs:
       - name: Verify repository baseline
         run: make baseline-verify
 
-  service-security:
+  compromised-password-security:
     name: Compromised Password security suite
     uses: ./.github/workflows/compromised-password-service.yml
+
+  notification-security:
+    name: Notification security suite
+    uses: ./.github/workflows/notification-service.yml
 
   baseline:
     name: Baseline verify
     if: ${{ always() }}
     needs:
       - repository-structure
-      - service-security
+      - compromised-password-security
+      - notification-security
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
       - name: Require repository and service verification
         env:
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
-          SERVICE_SECURITY_RESULT: ${{ needs.service-security.result }}
+          COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
+          NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
         run: |
           set -euo pipefail
           if [ "${REPOSITORY_RESULT}" != 'success' ]; then
             echo "Repository structure verification result: ${REPOSITORY_RESULT}" >&2
             exit 1
           fi
-          if [ "${SERVICE_SECURITY_RESULT}" != 'success' ]; then
-            echo "Service security verification result: ${SERVICE_SECURITY_RESULT}" >&2
+          if [ "${COMPROMISED_PASSWORD_RESULT}" != 'success' ]; then
+            echo "Compromised Password security result: ${COMPROMISED_PASSWORD_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${NOTIFICATION_RESULT}" != 'success' ]; then
+            echo "Notification security result: ${NOTIFICATION_RESULT}" >&2
             exit 1
           fi
           echo 'Required repository and service security verification passed.'

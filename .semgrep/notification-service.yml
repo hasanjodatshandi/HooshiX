@@ -1,0 +1,67 @@
+rules:
+  - id: notification-no-field-injection
+    languages: [java]
+    severity: ERROR
+    message: Required dependencies must use constructor injection.
+    paths:
+      include:
+        - /services/notification-service/src/main/java
+    pattern: |
+      @Autowired
+      $TYPE $FIELD;
+
+  - id: notification-no-jpa
+    languages: [java]
+    severity: ERROR
+    message: Notification persistence uses jOOQ/JDBC only; JPA APIs are prohibited.
+    paths:
+      include:
+        - /services/notification-service/src/main/java
+    pattern-regex: '(?m)^\s*import\s+(jakarta|javax)\.persistence\.'
+
+  - id: notification-no-system-output
+    languages: [java]
+    severity: ERROR
+    message: Notification runtime must use structured allow-list logging.
+    paths:
+      include:
+        - /services/notification-service/src/main/java
+    pattern-either:
+      - pattern: System.out.$METHOD(...)
+      - pattern: System.err.$METHOD(...)
+      - pattern: $EX.printStackTrace(...)
+
+  - id: notification-no-sensitive-log-keys
+    languages: [java]
+    severity: ERROR
+    message: Notification logs must not attach recipient, code, rendered content, request IDs, or provider response bodies.
+    paths:
+      include:
+        - /services/notification-service/src/main/java
+    pattern-either:
+      - pattern: $LOG.addKeyValue("recipient", ...)
+      - pattern: $LOG.addKeyValue("code", ...)
+      - pattern: $LOG.addKeyValue("request_id", ...)
+      - pattern: $LOG.addKeyValue("notification_id", ...)
+      - pattern: $LOG.addKeyValue("provider_response", ...)
+
+  - id: notification-no-raw-observation-error
+    languages: [java]
+    severity: ERROR
+    message: Raw exceptions must not be attached to Notification observations.
+    paths:
+      include:
+        - /services/notification-service/src/main/java
+    pattern: $OBSERVATION.error($EXCEPTION)
+
+  - id: notification-no-string-built-sql
+    languages: [java]
+    severity: ERROR
+    message: Notification SQL must remain fixed and parameterized.
+    paths:
+      include:
+        - /services/notification-service/src/main/java
+    pattern-either:
+      - pattern: $DSL.execute($SQL + $X, ...)
+      - pattern: $DSL.fetch($SQL + $X, ...)
+      - pattern: $DSL.fetchOne($SQL + $X, ...)

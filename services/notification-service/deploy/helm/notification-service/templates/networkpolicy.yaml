@@ -1,0 +1,64 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "notification-service.name" . }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "notification-service.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.identity.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.identity.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.grpcPort }}
+    {{- if .Values.observability.metrics.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "observability metrics namespace is required" .Values.observability.metrics.prometheus.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.observability.metrics.prometheus.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.managementPort }}
+    {{- end }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.database.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.database.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.database.port }}
+    {{- if .Values.observability.tracing.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "observability tracing namespace is required" .Values.observability.tracing.collector.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.observability.tracing.collector.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.observability.tracing.collector.port }}
+    {{- end }}

@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package hooshix.notification.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.notification.contract.v1";
+
+service NotificationService {
+  rpc SubmitNotification(SubmitNotificationRequest) returns (SubmitNotificationResponse);
+}
+
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_EMAIL = 1;
+  NOTIFICATION_CHANNEL_SMS = 2;
+}
+
+enum NotificationLifecycle {
+  NOTIFICATION_LIFECYCLE_UNSPECIFIED = 0;
+  NOTIFICATION_LIFECYCLE_ACCEPTED = 1;
+  NOTIFICATION_LIFECYCLE_DISPATCHING = 2;
+  NOTIFICATION_LIFECYCLE_RETRY_WAIT = 3;
+  NOTIFICATION_LIFECYCLE_PROVIDER_ACCEPTED = 4;
+  NOTIFICATION_LIFECYCLE_DELIVERED = 5;
+  NOTIFICATION_LIFECYCLE_FAILED_PERMANENT = 6;
+  NOTIFICATION_LIFECYCLE_EXPIRED = 7;
+  NOTIFICATION_LIFECYCLE_DELIVERY_STATUS_UNKNOWN = 8;
+}
+
+message VerificationCodeContent {
+  string code = 1;
+  uint32 expires_minutes = 2;
+}
+
+message PasswordChangedNoticeContent {}
+
+message SubmitNotificationRequest {
+  string request_id = 1;
+  NotificationChannel channel = 2;
+  string recipient = 3;
+  string locale = 4;
+  google.protobuf.Timestamp message_not_after = 5;
+
+  oneof semantic_content {
+    VerificationCodeContent registration_verification_code = 10;
+    VerificationCodeContent password_recovery_code = 11;
+    VerificationCodeContent mfa_verification_code = 12;
+    PasswordChangedNoticeContent password_changed_notice = 13;
+  }
+}
+
+message SubmitNotificationResponse {
+  string notification_id = 1;
+  NotificationLifecycle lifecycle = 2;
+  google.protobuf.Timestamp accepted_at = 3;
+}

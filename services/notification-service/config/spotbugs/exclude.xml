@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <Match>
+        <Package name="com.sajtech.notification.contract.v1"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.persistence.PostgresDatabaseTime"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.persistence.JooqNotificationAcceptanceRepository"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.persistence.JooqNotificationTemplateCatalog"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrow"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.application.submit.usecase.SubmitNotificationUseCase"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.observability.ObservedSubmitNotification"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.observability.NotificationReadinessHealthIndicator"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

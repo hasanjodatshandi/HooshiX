@@ -1,0 +1,61 @@
+replicaCount: 1
+
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: notification-service
+
+service:
+  grpcPort: 9090
+  managementPort: 9092
+
+runtime:
+  maxConcurrentCallsPerConnection: 128
+  temporaryStorageLimit: 256Mi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 64Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+    ephemeral-storage: 512Mi
+
+database:
+  jdbcUrl: ""
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: notification-postgresql
+  port: 5432
+  runtimeSecretName: ""
+  migrationSecretName: ""
+
+secrets:
+  fingerprintSecretName: ""
+  deliverySecretName: ""
+
+identity:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: identity-service
+  principal: prod.sajtech.internal/ns/platform-apps/sa/identity-service
+
+observability:
+  tracing:
+    enabled: true
+    otlpEndpoint: ""
+    collector:
+      namespace: ""
+      podLabels: {}
+      port: 4318
+  metrics:
+    enabled: true
+    prometheus:
+      namespace: ""
+      podLabels: {}
+      principal: ""
