@@ -67,6 +67,7 @@ docs/adr/0043-define-production-network-trust-boundaries-v1.md
 docs/adr/0044-define-day-one-observability-runtime-v1.md
 docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1.md
 docs/adr/0046-adopt-git-native-agent-context-engine-v1.md
+docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -109,6 +110,7 @@ docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
+docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
 docs/runbooks/local-istio-ambient.md
 docs/runbooks/local-traefik-edge.md
 docs/runbooks/production-cold-dr.md

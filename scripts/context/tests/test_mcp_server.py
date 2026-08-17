@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -65,6 +68,50 @@ class McpContextServerTest(unittest.TestCase):
             all(tool["annotations"]["readOnlyHint"] for tool in listed["result"]["tools"])
         )
         self.assertFalse(any("write" in name or "create" in name for name in names))
+
+    def test_server_entrypoint_is_independent_of_process_working_directory(self) -> None:
+        script = Path(__file__).resolve().parents[1] / "mcp_server.py"
+        requests = [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "server/discover",
+                "params": {"_meta": modern_meta()},
+            },
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "_meta": modern_meta(),
+                    "name": "project.bootstrap",
+                    "arguments": {},
+                },
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            completed = subprocess.run(
+                [sys.executable, str(script)],
+                cwd=temp_dir,
+                input="".join(json.dumps(request) + "\n" for request in requests),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        responses = [json.loads(line) for line in completed.stdout.splitlines() if line.strip()]
+        self.assertEqual(2, len(responses))
+        self.assertEqual(MODERN_VERSION, responses[0]["result"]["supportedVersions"][0])
+        self.assertEqual(
+            "hooshix-context-engine",
+            responses[0]["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"],
+        )
+        self.assertFalse(responses[1]["result"]["isError"])
+        bootstrap = json.loads(responses[1]["result"]["content"][0]["text"])
+        self.assertEqual(str(script.parents[2].resolve()), bootstrap["repository_root"])
+        self.assertTrue(bootstrap["verification"]["valid"])
 
     def test_modern_tool_call_works_without_discover_when_meta_selects_era(self) -> None:
         temp, root, engine = make_repo()

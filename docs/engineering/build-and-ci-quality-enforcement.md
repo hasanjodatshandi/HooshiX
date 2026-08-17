@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP.
 
 ## 1. Required Java PR gates
 
@@ -210,11 +210,16 @@ CI SHOULD enforce when implemented:
 - Context Engine retrieval remains tracked-file-only, repository-root confined, bounded, provenance-bearing, and configured sensitive filenames are excluded;
 - caller-controlled revision/query input cannot become shell execution or arbitrary filesystem access;
 - MCP modern discovery/tool calls and bounded legacy initialize compatibility remain tested;
-- MCP exposes no file/Git/checkpoint/deployment/write mutation tool.
+- MCP exposes no file/Git/checkpoint/deployment/write mutation tool;
+- the MCP entry point starts correctly from a working directory outside the repository and resolves HooshiX from the tracked script path;
+- ADR-0047 ChatGPT Web access remains an external OpenAI tunnel-client bridge to the unchanged stdio child and does not add a HooshiX HTTP/SSE/TCP listener, public MCP port, shell, arbitrary filesystem, Git mutation, credential-read, or deployment tool;
+- ADR-0047 documentation/pins require official tunnel-client release integrity verification and a restricted Tunnels `Read` + `Use` runtime credential; an admin key is not the long-lived daemon credential.
 
 These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
 
 `make baseline-verify` includes the repository Context Engine tests and verification. A Context Engine/documentation drift therefore blocks the same repository-governance boundary.
+
+Repository CI proves only the repository-side tunnel-ready stdio boundary and governance. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
 
 ## 10. Heavy release/scheduled evidence
 

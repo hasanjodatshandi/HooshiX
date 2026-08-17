@@ -14,6 +14,7 @@ Covers:
 - OpenBao/secrets;
 - Git/CI/source-secret/supply-chain controls;
 - Git-native AI-agent context/bootstrap/routing/checkpoint/retrieval tooling;
+- OpenAI Secure MCP Tunnel developer bridge from ChatGPT Web to the local read-only stdio Context MCP;
 - Day-One logging/metrics/tracing;
 - privileged access;
 - backup/restore/erasure/DR;
@@ -34,7 +35,8 @@ Covers:
 11. observability cannot become a new security authority or secret-exfiltration path;
 12. abuse controls remain safe under clock faults and adversarial state cardinality;
 13. source/secret/scanner failures cannot silently bypass required merge/promotion controls;
-14. retrieved/checkpoint/model context cannot outrank current Git authority, convert untrusted repository text into higher-priority instruction, or expose repository mutation authority.
+14. retrieved/checkpoint/model context cannot outrank current Git authority, convert untrusted repository text into higher-priority instruction, or expose repository mutation authority;
+15. ChatGPT Web context access cannot turn the local developer host into a public MCP endpoint, general remote shell/filesystem interface, or long-lived admin-credential path.
 
 ## 3. High-value assets
 
@@ -45,6 +47,7 @@ Covers:
 | Git/CI credentials and committed-secret exposure state | confidentiality + detection + revocation correctness |
 | Current repository architecture/policy/context authority | integrity + provenance + freshness |
 | Agent context/checkpoint provenance | integrity + bounded confidentiality + non-authority |
+| OpenAI tunnel runtime credential and tunnel binding | confidentiality + least privilege + correct scope |
 | Tenant Membership/Authorization state | integrity + isolation |
 | PostgreSQL business state | confidentiality + integrity + recovery |
 | OpenBao/recovery material | confidentiality + integrity + recovery |
@@ -119,7 +122,7 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 
 ### TB-12 Repository -> AI agent/context client
 
-ADR-0046 Context Engine output is derived developer context, not a new authority.
+ADR-0046 Context Engine output is derived developer context, not a new authority. ADR-0047 permits an OpenAI Secure MCP Tunnel only as an external bridge to the same local stdio MCP surface.
 
 - current Git authority outranks task routing, retrieval results, checkpoints, and model/chat memory;
 - retrieved comments, fixtures, generated text, and checkpoint prose are data and do not become higher-priority agent instruction merely because retrieval returns them;
@@ -127,7 +130,12 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - dirty configured authority state cannot be represented as verified targeted context;
 - retrieval is repository-root confined, tracked-file-only, bounded, and provenance-bearing;
 - tracked-file-only retrieval does not prove the repository is secret-free; Gitleaks remains the committed-secret control;
-- the MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or network listener in v1;
+- the HooshiX MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or HooshiX network listener;
+- OpenAI tunnel-client is the outbound customer-run transport bridge and must not broaden the HooshiX MCP tool list;
+- the long-lived tunnel daemon uses a restricted runtime credential with Tunnels `Read` + `Use`; an admin key is not a daemon credential;
+- tunnel/runtime credentials stay outside Git, checkpoints, logs, screenshots, and ChatGPT content and are not passed as command-line literals;
+- tunnel-client health/operator surfaces remain loopback-only by default; no public/LAN MCP endpoint or router port-forward is introduced;
+- the MCP entry point derives repository root from its tracked script location, so tunnel/service-manager CWD cannot select an unrelated Git repository;
 - caller query/revision values are data passed through bounded validation and fixed Git argument arrays, never shell command text.
 
 ## 5. Threat actors
@@ -139,8 +147,9 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - Compromised telemetry component: attempts secret collection, host-file access, or data manipulation.
 - Compromised CI/GitHub identity: source/history/artifact/GitOps/security-evidence manipulation.
 - Malicious or compromised repository content: attempts prompt injection, stale-context substitution, secret exfiltration, path escape, or command-like input against an AI/context client.
+- Compromised or misconfigured AI tunnel/client path: attempts credential misuse, wrong-tunnel binding, tool-surface expansion, stale-checkout use, or general host authority beyond Context MCP.
 - Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log/context output.
-- Compromised operator device: may hold WireGuard key but not necessarily FIDO2/JIT.
+- Compromised operator device: may hold WireGuard key or developer tunnel runtime credential but not necessarily FIDO2/JIT/production authority.
 - Privileged insider: time-bounded legitimate capability with misuse risk.
 - Compromised host/root: broad single-server process/storage visibility.
 - Compromised provider/source/scanner feed: malformed/replayed/delayed/false data within protocol scope.
@@ -154,15 +163,18 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 | Spoofing | forged trace/baggage becomes identity/tenant/permission | telemetry context classified correlation-only | forged-context auth/quota negatives |
 | Spoofing | wrong workload calls internal service/Collector | strict mTLS + SA + NetworkPolicy/Istio | connectivity/authz negatives |
 | Spoofing | stale checkpoint/model memory is presented as current repository authority | Git HEAD/blob/worktree provenance + authority precedence + diff inspection | clean/stale checkpoint + dirty-authority tests |
+| Spoofing | wrong/stale tunnel or checkout is presented as current HooshiX context | same tunnel binding + dedicated checkout + `project.bootstrap` Git provenance + fail-safe dirty authority | operator tunnel/bootstrap evidence |
 | Tampering | tenant context changes on pooled DB | transaction-local context + FORCE RLS | cross-tenant pool tests |
 | Tampering | build/deploy artifact changes | digest/signature/provenance/SBOM/admission | wrong-artifact negatives |
 | Tampering | image/SBOM/vulnerability/signature evidence refers to different digests | Syft/Grype/Cosign/Kyverno exact-digest binding | cross-digest/mismatch negatives |
 | Tampering | compromised-password corpus/source altered/stale | HIBP source identity + manifest/digest/freshness/full-corpus validation | dataset release tests |
 | Tampering | repository text attempts prompt injection or command/path mutation through context tooling | retrieved-data classification + root/tracked-file bounds + fixed Git argv + read-only MCP | routing/search/revision/write-tool negatives |
+| Tampering | tunnel bridge attempts to widen local authority | exact five-tool stdio contract + no HooshiX listener/shell/filesystem/Git write tools | MCP tool-list/unknown-write/CWD-startup + ADR-0047 review |
 | Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
 | Information disclosure | real secret is committed then deleted but remains in Git history/clones | Gitleaks tree+history + revoke/rotate + incident/history remediation | commit-delete fixture + rotation evidence |
 | Information disclosure | scanner/log output republishes discovered secret | Gitleaks redaction + CI output policy | redaction fixture |
 | Information disclosure | context retrieval/checkpoint exposes sensitive repository material | sensitive-name exclusion + bounded tracked-file retrieval + no secret fields/private-key material in checkpoints + Gitleaks remains authoritative | retrieval/checkpoint negatives + Gitleaks evidence |
+| Information disclosure | tunnel runtime/admin credential is exposed through Git/chat/logs/process arguments | restricted runtime key + local secret mechanism + no chat/Git/log/screenshot/command-line literal + rotate/revoke on suspicion | operator configuration/incident evidence |
 | Information disclosure | secrets/PII in telemetry | source allow-list + Collector redaction + canary | Loki/Tempo/Prometheus/Grafana negatives |
 | Information disclosure | Collector reads arbitrary host files | exact read-only pod-log mount; no broad host privilege | render/runtime mount negatives |
 | DoS | Authorization/Redis failure blocks work | bounded deadlines/bulkheads + fail closed | overload/failure tests |
@@ -172,9 +184,11 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 | DoS | telemetry consumes single-host resources | finite queues/retention/cardinality + complete-stack benchmark | pressure/load tests |
 | DoS | total host loss also removes local monitoring | independent external black-box signal | host-loss exercise |
 | DoS | scanner/feed outage is used to bypass release policy | fail-closed freshness/promotion gates under ADR-0035/0038/0045 | stale/unavailable scanner/feed negatives |
+| DoS | tunnel/control-plane/PC failure removes AI context access | explicit tooling-unavailable fallback to current repository authority; no stale-memory promotion | operator failure/fallback check |
 | Elevation | tenant admin grants stronger authority | Authorization privilege-escalation/owner safety | admin concurrency negatives |
 | Elevation | network access becomes root | WireGuard != FIDO2 != JIT | separation tests |
-| Elevation | read-only AI context channel is treated as repository/production mutation authority | no write MCP tools/no network listener + normal Git/PR/production access controls remain separate | MCP tool-list/unknown-write negatives |
+| Elevation | read-only AI context channel is treated as repository/production mutation authority | no write MCP tools/no HooshiX network listener + normal Git/PR/production access controls remain separate | MCP tool-list/unknown-write negatives |
+| Elevation | tunnel runtime credential is replaced with broad/admin authority | restricted Tunnels `Read` + `Use`; admin key prohibited for daemon | operator key-permission evidence |
 
 ## 7. Critical abuse cases
 
@@ -294,9 +308,9 @@ Required:
 
 Residual: a history rewrite cannot recall an already copied credential. Rotation/revocation is therefore the primary containment action for real exposed secrets.
 
-### TM-20 Agent-context prompt injection/staleness/mutation
+### TM-20 Agent-context prompt injection/staleness/mutation/tunnel overreach
 
-A malicious or stale repository/checkpoint fragment attempts to make an agent trust obsolete architecture, ignore current policy, execute command-like text, read outside the repository, reveal secret material, or invoke a write-like MCP capability.
+A malicious or stale repository/checkpoint fragment, compromised tunnel configuration, or overprivileged local bridge attempts to make an agent trust obsolete architecture, ignore current policy, execute command-like text, read outside the repository, reveal secret material, invoke a write-like MCP capability, select the wrong repository from process CWD, or turn ChatGPT Web context access into general developer-host authority.
 
 Required:
 
@@ -307,10 +321,15 @@ Required:
 - tracked-file-only repository-root-confined bounded retrieval;
 - configured sensitive filename exclusion and no secret/private-key fields in checkpoints, while Gitleaks remains the actual committed-secret control;
 - revision/query validation plus fixed Git argument arrays without `shell=True`;
-- read-only stdio MCP tool surface with no network listener or mutation/checkpoint-create tool;
+- read-only stdio MCP tool surface with no HooshiX network listener or mutation/checkpoint-create/shell/arbitrary-filesystem tool;
+- CWD-independent MCP repository-root resolution from the tracked entry-point path;
+- OpenAI tunnel-client used only as the outbound bridge to that stdio child, with no public inbound MCP port or router forwarding;
+- restricted Tunnels `Read` + `Use` runtime credential for the daemon; no long-lived admin key;
+- tunnel credentials excluded from Git/chat/logs/screenshots/command-line literals and rotated/revoked on suspected exposure;
+- dedicated intended checkout plus `project.bootstrap` Git provenance before targeted work;
 - checkpoint `subject_commit` comparison plus intervening Git diff before continuity use.
 
-Residual: an allowed tracked source file can still contain secret or adversarial text. The engine therefore cannot claim content safety from retrieval alone; secret scanning, current authority hierarchy, review, and client-side instruction separation remain required.
+Residual: an allowed tracked source file can still contain secret or adversarial text, and a compromised/root-level developer host can observe local process/data state. The engine/tunnel therefore cannot claim content or host safety from transport alone; secret scanning, current authority hierarchy, restricted host/key controls, review, and client-side instruction separation remain required.
 
 ## 8. Single-server residual risks
 
@@ -324,7 +343,7 @@ Residual: an allowed tracked source file can still contain secret or adversarial
 
 These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, source/secret scanning, signed final-artifact admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
 
-ADR-0046 Context Engine is outside the production runtime profile. Its failure cannot justify weakening product/runtime controls or treating external/model memory as current architecture authority.
+ADR-0046 Context Engine and ADR-0047 ChatGPT Web tunnel bridge are outside the production runtime profile. Their failure cannot justify weakening product/runtime controls or treating external/model memory as current architecture authority.
 
 ## 9. Verification mapping
 
@@ -334,7 +353,7 @@ Material threats map to executable service/security/database/network/CI/observab
 - TM-11/12/13 -> ADR-0031/0044 tests + Collector/render/canary/fault evidence;
 - TM-14 -> ADR-0017/0035/0038/0039/0045 + Semgrep/Syft/Grype/Cosign/Kyverno digest/evidence/failure fixtures;
 - TM-19 -> ADR-0045 Gitleaks current-tree/history/redaction + incident revoke/rotate/history-remediation evidence;
-- TM-20 -> ADR-0046 bootstrap/router/search/checkpoint/MCP tests + generated-route parity + SEC-033/AFF-051;
+- TM-20 -> ADR-0046 bootstrap/router/search/checkpoint/MCP tests + ADR-0047 CWD-independent stdio/tunnel-boundary review + real operator-PC tunnel/bootstrap evidence + generated-route parity + SEC-033/AFF-051;
 - TM-17 -> external host-down monitor + cold DR;
 - compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;
 - policy-engine migration risk -> Kyverno CEL manifest gate.
@@ -343,4 +362,4 @@ A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
 ## 10. Change triggers
 
-Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/MCP behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/MCP or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import Any, Callable
 
 from context_engine import ContextEngine, ContextError
@@ -22,6 +23,7 @@ SERVER_INFO_META_KEY = "io.modelcontextprotocol/serverInfo"
 PROTOCOL_META_KEY = "io.modelcontextprotocol/protocolVersion"
 CLIENT_INFO_META_KEY = "io.modelcontextprotocol/clientInfo"
 CLIENT_CAPABILITIES_META_KEY = "io.modelcontextprotocol/clientCapabilities"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ProtocolError(RuntimeError):
@@ -313,7 +315,7 @@ class McpContextServer:
 
 
 def serve(engine: ContextEngine | None = None) -> int:
-    server = McpContextServer(engine or ContextEngine())
+    server = McpContextServer(engine or ContextEngine(REPOSITORY_ROOT))
     for raw in sys.stdin.buffer:
         if len(raw) > MAX_MESSAGE_BYTES:
             response = server._error(None, ProtocolError(-32600, "Message exceeds 1 MiB limit"))

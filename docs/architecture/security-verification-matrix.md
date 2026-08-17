@@ -39,7 +39,7 @@ This matrix maps material security properties to executable evidence. A document
 | SEC-030 | A committed secret remains detectable after deletion from the latest tree | Gitleaks synthetic commit-then-delete history fixture + fully redacted CI output |
 | SEC-031 | Dependency integrity, early dependency advisory, and final-artifact vulnerability authority cannot be conflated | separate Gradle verification failure, OSV locked-dependency advisory finding, and Syft/Grype vulnerable final-artifact fixture |
 | SEC-032 | Required DevSecOps evidence cannot be bypassed by scanner/feed outage or stale data | Gitleaks/Semgrep/OSV/Grype/Cosign/Kyverno failure/freshness negatives under ADR-0035/0038/0045 |
-| SEC-033 | Agent context cannot silently outrank current Git, expose mutation authority, accept stale/ambiguous narrow scope, or forge post-merge continuity | clean/dirty bootstrap provenance tests + route escalation + tracked-file bounds/sensitive-name exclusion + work/post-merge same-PR/main-ancestry/Git-diff/path-traversal/command-injection negatives + read-only stdio MCP tool-list/unknown-write negatives |
+| SEC-033 | Agent context cannot silently outrank current Git, expose mutation authority, accept stale/ambiguous narrow scope, forge post-merge continuity, or turn ChatGPT Web access into public/general host authority | clean/dirty bootstrap provenance + route escalation + tracked-file bounds/sensitive-name exclusion + work/post-merge provenance negatives + read-only stdio tool-list/unknown-write negatives + MCP entrypoint launched from non-repository CWD + ADR-0047 tunnel review proving stdio child/no HooshiX listener/restricted runtime credential/no shell or arbitrary filesystem tool |
 
 ## Security-gate rule
 
@@ -50,5 +50,7 @@ ADR-0044 ordinary telemetry is best-effort/bounded. Required security/privileged
 ADR-0045 owns the selected DevSecOps tool responsibility map. OSV-Scanner is early declared/locked dependency advisory feedback; Syft+Grype own final-image release/deployed-artifact vulnerability evidence. Trivy and OWASP Dependency-Check are not missing required controls in the current baseline; introducing them requires a reviewed distinct-coverage decision.
 
 ADR-0046 keeps current Git authority above derived context/checkpoints/model memory. Context retrieval being tracked-file-only does not prove the repository is secret-free; Gitleaks remains the required committed-secret control. Post-merge context evidence must be path-confined, same-PR linked, reachable from current main, and reproducible from the exact Git diff. The Context MCP adapter has no write/mutation/network-listener authority in v1.
+
+ADR-0047 permits an external OpenAI tunnel-client to bridge ChatGPT Web to the unchanged stdio MCP adapter. The bridge does not authorize a HooshiX public MCP listener, general shell/filesystem access, Git mutation, or long-lived admin credential. Real tunnel-client/runtime-key/ChatGPT discovery evidence remains environment-specific and is not proven by repository documentation.
 
 A failed applicable security gate blocks the dependent merge/promotion boundary until remediation and revalidation.

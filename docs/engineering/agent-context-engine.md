@@ -1,6 +1,6 @@
 # Agent Context Engine — Current Standard
 
-ADR-0046 is authoritative for the Git-native Agent Context Engine. This document defines the developer/agent operating interface. The engine is repository tooling, not an application service or production dependency.
+ADR-0046 is authoritative for the Git-native Agent Context Engine. ADR-0047 defines the approved ChatGPT Web bridge. This document defines the developer/agent operating interface. The engine is repository tooling, not an application service or production dependency.
 
 ## 1. Authority rule
 
@@ -205,11 +205,19 @@ Always compare its `subject_commit` with current `HEAD` and inspect changed cont
 
 ## 9. MCP server
 
-Start the local read-only stdio server from the repository root:
+From the repository root, start the local read-only stdio server with the relative tracked path:
 
 ```bash
 python3 scripts/context/mcp_server.py
 ```
+
+When a tunnel or service manager launches the server from another working directory, use the absolute path to the same tracked entry point:
+
+```text
+<PYTHON_EXECUTABLE> <ABSOLUTE_HOOSHIX_REPOSITORY_PATH>/scripts/context/mcp_server.py
+```
+
+The entry point resolves the HooshiX repository root from its own script location. Process working directory is not repository authority. This permits a tunnel/service manager to spawn the MCP child without requiring its own CWD to be the repository root.
 
 V1 exposes exactly these read-only tools:
 
@@ -224,6 +232,34 @@ project.changed_context
 The server supports MCP `2026-07-28` and bounded stdio compatibility for `2025-11-25` initialize-based clients. It has no HTTP listener, network fetch, file write, Git mutation, checkpoint-create, command-execution, secret-read, deployment, or other mutation tool.
 
 The protocol process writes JSON-RPC frames only to stdout. Startup/diagnostic errors use stderr.
+
+### 9.1 ChatGPT Web through Secure MCP Tunnel
+
+ADR-0047 permits ChatGPT Web to use this same stdio server through OpenAI Secure MCP Tunnel.
+
+Selected boundary:
+
+```text
+ChatGPT Web
+-> OpenAI tunnel control plane
+-> tunnel-client on approved developer PC
+-> scripts/context/mcp_server.py child over stdio
+-> Context Engine
+```
+
+HooshiX does not add a network MCP listener for this path. The tunnel-client is the customer-run bridge and opens the local stdio child. The five-tool contract remains unchanged.
+
+Use a dedicated clean HooshiX checkout for the tunnel runtime. Synchronize that checkout through explicit operator Git actions. The MCP server itself remains read-only and never pulls/resets/checks out Git.
+
+The long-lived tunnel runtime uses a dedicated restricted runtime API key with Tunnels `Read` + `Use`. Do not use an admin key for the daemon. Never commit or paste the real runtime/admin key into Git, checkpoints, logs, screenshots, or ChatGPT.
+
+Full Windows setup and rollback instructions are in:
+
+```text
+docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
+```
+
+A tunnel connection is not verification by itself. Before targeted work in ChatGPT Web, call `project.bootstrap`, inspect current Git/dirty/authority provenance, then call `project.context_for_task` for the task.
 
 ## 10. Verification
 
@@ -243,9 +279,11 @@ make context-post-merge-verify
 
 `context-verify` checks canonical config/path/route/checkpoint consistency, exact generated task-matrix parity, and tracked post-merge checkpoint semantics. Post-merge verification recomputes main ancestry and the recorded `base..subject` changed paths from Git, so repository-structure CI checks out the required Git history.
 
-`context-test` covers bootstrap trust, conservative routing, search provenance/bounds/exclusions, work checkpoint derivation, post-merge same-PR linkage/main reachability/Git-derived path verification, command-injection rejection, and MCP modern/legacy read-only behavior.
+`context-test` covers bootstrap trust, conservative routing, search provenance/bounds/exclusions, work checkpoint derivation, post-merge same-PR linkage/main reachability/Git-derived path verification, command-injection rejection, CWD-independent stdio MCP startup, and MCP modern/legacy read-only behavior.
 
 The repository baseline includes these checks, so context-governance drift cannot be merged only because application tests pass.
+
+Repository tests can verify the tunnel-ready stdio boundary. Real OpenAI tunnel-client installation, runtime key permissions, `/readyz`, ChatGPT Plugin selection/discovery, and ChatGPT Web `project.bootstrap` are external host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
 
 ## 11. Do not add a central memory service yet
 
