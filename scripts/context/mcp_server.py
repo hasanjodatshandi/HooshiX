@@ -184,6 +184,21 @@ class McpContextServer:
         result["_meta"] = meta
         return result
 
+    @staticmethod
+    def _tool_result(value: Any) -> dict[str, Any]:
+        text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+        result: dict[str, Any] = {
+            "content": [{"type": "text", "text": text}],
+            "isError": False,
+        }
+        # MCP 2025-era structuredContent is object-shaped. Every current Context
+        # Engine success except an empty latest-checkpoint result is a mapping.
+        # Keep the JSON TextContent for older clients while giving tunnel/client
+        # integrations the same machine-readable object without reparsing text.
+        if isinstance(value, dict):
+            result["structuredContent"] = value
+        return result
+
     def _success(self, request_id: Any, result: dict[str, Any]) -> dict[str, Any]:
         return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
@@ -294,8 +309,7 @@ class McpContextServer:
                     raise ProtocolError(-32602, f"unknown tool: {name}")
                 try:
                     value = handler(arguments)
-                    text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
-                    result = {"content": [{"type": "text", "text": text}], "isError": False}
+                    result = self._tool_result(value)
                 except (ContextError, ProtocolError) as exc:
                     if isinstance(exc, ProtocolError) and exc.code == -32602:
                         raise
