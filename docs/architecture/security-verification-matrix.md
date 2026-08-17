@@ -39,6 +39,7 @@ This matrix maps material security properties to executable evidence. A document
 | SEC-030 | A committed secret remains detectable after deletion from the latest tree | Gitleaks synthetic commit-then-delete history fixture + fully redacted CI output |
 | SEC-031 | Dependency integrity, early dependency advisory, and final-artifact vulnerability authority cannot be conflated | separate Gradle verification failure, OSV locked-dependency advisory finding, and Syft/Grype vulnerable final-artifact fixture |
 | SEC-032 | Required DevSecOps evidence cannot be bypassed by scanner/feed outage or stale data | Gitleaks/Semgrep/OSV/Grype/Cosign/Kyverno failure/freshness negatives under ADR-0035/0038/0045 |
+| SEC-033 | Agent context cannot silently outrank current Git, expose mutation authority, or accept stale/ambiguous narrow scope | clean/dirty bootstrap provenance tests + route escalation + tracked-file bounds/sensitive-name exclusion + command-injection negatives + read-only stdio MCP tool-list/unknown-write negatives |
 
 ## Security-gate rule
 
@@ -47,5 +48,7 @@ This matrix maps material security properties to executable evidence. A document
 ADR-0044 ordinary telemetry is best-effort/bounded. Required security/privileged audit is separate authoritative evidence and cannot be silently reclassified as Loki/Collector telemetry.
 
 ADR-0045 owns the selected DevSecOps tool responsibility map. OSV-Scanner is early declared/locked dependency advisory feedback; Syft+Grype own final-image release/deployed-artifact vulnerability evidence. Trivy and OWASP Dependency-Check are not missing required controls in the current baseline; introducing them requires a reviewed distinct-coverage decision.
+
+ADR-0046 keeps current Git authority above derived context/checkpoints/model memory. Context retrieval being tracked-file-only does not prove the repository is secret-free; Gitleaks remains the required committed-secret control. The Context MCP adapter has no write/mutation/network-listener authority in v1.
 
 A failed applicable security gate blocks the dependent merge/promotion boundary until remediation and revalidation.

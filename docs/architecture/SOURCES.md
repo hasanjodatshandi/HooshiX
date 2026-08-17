@@ -12,6 +12,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Topic | Primary current source |
 | --- | --- |
 | Current ADRs/stable IDs | `../adr/decision-register.md` |
+| Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -30,9 +31,23 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Compatibility | `../technology/production-compatibility-matrix.md` |
 | Chaos/DR | `../operations/chaos-engineering-program.md` + `../runbooks/production-cold-dr.md` |
 
+## Agent Context Engine source rule
+
+ADR-0046 keeps project context Git-native. `../../context/routes.json` is the canonical task-routing registry; `TASK-REVIEW-MATRIX.md` is its generated human view. Checkpoints under `../../context/checkpoints/` are historical evidence and never current architecture authority. Current Git source always outranks derived context or external/model memory.
+
+The read-only MCP adapter and local retrieval are repository/developer tooling only. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
+
 ## External primary sources used by current decisions
 
 Use upstream/official primary sources for version, protocol, API, and support claims.
+
+### Agent Context Engine interoperability
+
+- Model Context Protocol specification: `https://modelcontextprotocol.io/specification/2026-07-28/`
+- MCP server discovery: `https://modelcontextprotocol.io/specification/2026-07-28/basic/discovery`
+- MCP tools: `https://modelcontextprotocol.io/specification/2026-07-28/server/tools`
+
+ADR-0046 uses MCP only as a read-only local interoperability adapter. The repository remains context authority regardless of protocol/client metadata.
 
 ### DevSecOps security toolchain
 

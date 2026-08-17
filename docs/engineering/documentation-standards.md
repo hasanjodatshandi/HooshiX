@@ -25,6 +25,8 @@ When documents overlap, use this order unless an explicit current decision says 
 
 A lower level may make a higher-level rule more specific but MUST NOT contradict or weaken it. A superseded ADR retained only for stable reference is not current architecture authority.
 
+ADR-0046 derived context, routing output, search results, and checkpoints do not create another authority level. They point to or summarize current repository authority and remain subordinate to it.
+
 ## 3. Document classes
 
 | Class | Purpose |
@@ -51,6 +53,20 @@ For humans and agents:
 - screenshots are never the sole location of an instruction;
 - relative repository links are preferred for internal documents.
 
+### Machine-readable canonical views
+
+Where a machine-readable registry owns a generated Markdown view, the machine-readable file is canonical and repository automation MUST keep the generated view exact. Current examples include:
+
+```text
+docs/architecture/dependency-criticality.yaml
+  -> docs/architecture/dependency-criticality-matrix.md
+
+context/routes.json
+  -> docs/architecture/TASK-REVIEW-MATRIX.md
+```
+
+Do not edit a generated view as an independent authority. Update the canonical registry and regenerate/check its human view in the same coherent change.
+
 ### ADR numbering and identifier stability
 
 ADR filenames use a four-digit monotonic identifier such as `ADR-0044`.
@@ -75,7 +91,7 @@ When a decision changes:
 2. preserve every still-current invariant/security/SLO/contract/operational rule;
 3. update the single current authoritative rule;
 4. remove or normalize obsolete duplicate/predecessor implementation text under current-only policy while retaining stable ADR provenance when applicable;
-5. update Decision Register, source map, task matrix, machine-readable registries, baselines, and verification references as applicable;
+5. update Decision Register, source map, canonical task-routing registry/generated task matrix, other machine-readable registries, baselines, and verification references as applicable;
 6. validate that no current document references a deleted/non-current implementation authority;
 7. review the complete PR diff against current `main`.
 
@@ -89,7 +105,8 @@ Repository automation SHOULD check, where practical:
 - duplicate/conflicting normative rules in known canonical areas;
 - terminology drift for canonical concepts;
 - stale version pins outside baseline/lock authority;
-- Decision Register/source-map/task-matrix coverage;
+- Decision Register/source-map/task-route coverage;
+- canonical registry/generated-view parity, including `context/routes.json` -> `TASK-REVIEW-MATRIX.md`;
 - machine-readable schema/render consistency;
 - files added/removed without source/index maintenance when required.
 

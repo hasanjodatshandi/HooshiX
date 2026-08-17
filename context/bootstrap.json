@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "project": {
+    "id": "hooshix",
+    "repository": "hasanjodatshandi/HooshiX"
+  },
+  "authority_paths": [
+    "AGENTS.md",
+    "docs/engineering/current-only-documentation-policy.md",
+    "docs/engineering/repository-change-workflow.md",
+    "docs/architecture/README.md",
+    "docs/architecture/SOURCES.md",
+    "context/routes.json",
+    "docs/adr/decision-register.md",
+    "docs/architecture/implementation-status.md"
+  ],
+  "full_read_roots": [
+    "docs"
+  ],
+  "routing_registry": "context/routes.json",
+  "routing_schema": "context/routes.schema.json",
+  "checkpoint_schema": "context/checkpoint.schema.json",
+  "checkpoint_directory": "context/checkpoints",
+  "generated_task_matrix": "docs/architecture/TASK-REVIEW-MATRIX.md",
+  "retrieval": {
+    "max_query_chars": 256,
+    "max_results": 20,
+    "max_excerpt_chars": 480,
+    "max_file_bytes": 1048576,
+    "excluded_filename_patterns": [
+      "*.key",
+      "*.pem",
+      "*.p12",
+      "*.pfx",
+      "*.jks",
+      "id_rsa",
+      "id_ed25519",
+      ".env",
+      ".env.*"
+    ]
+  }
+}
