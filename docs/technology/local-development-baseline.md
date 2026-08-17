@@ -1,8 +1,8 @@
 # Local Development Baseline
 
-- **Baseline date:** 2026-08-16
+- **Baseline date:** 2026-08-18
 - **Status:** Active local-development baseline
-- **Scope:** developer host/tooling, fast service loop, and optional production-fidelity kind integration foundation.
+- **Scope:** developer host/tooling, fast service loop, optional production-fidelity kind integration foundation, and approved ChatGPT Web Context Engine bridge.
 - **Evidence rule:** a pin is a repository target, not proof it is installed.
 
 Production Technology Baseline remains authoritative for production versions.
@@ -24,8 +24,11 @@ Production Technology Baseline remains authoritative for production versions.
 | Docker cgroup | v2 + systemd driver |
 | Secret scanner | Gitleaks CLI 8.30.1; same rule/config intent as CI |
 | Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
+| ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
+
+ADR-0047 tunnel-client is not production infrastructure and does not change the production Technology Baseline. On Windows, use the official `windows-amd64` or `windows-arm64` archive matching the actual host architecture and verify the published release SHA-256 before use. Runtime tunnel credentials stay outside Git and are restricted to Tunnels `Read` + `Use` for the long-lived daemon.
 
 ## 2. Fast application lane
 
@@ -198,6 +201,16 @@ make verify-local-traefik-edge
 make verify-local-observability
 ```
 
+Context Engine developer interfaces additionally include:
+
+```text
+make context-verify
+make context-bootstrap
+python scripts/context/mcp_server.py
+```
+
+ChatGPT Web tunnel operation follows `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`; tunnel-client does not replace repository verification commands.
+
 Expected versioned platform roots may include:
 
 ```text
@@ -216,6 +229,8 @@ Service dependencies such as Xerial SQLite are pinned in service build/verificat
 Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/Helm and installed cluster component versions/digests where applicable.
 
 DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and pass/fail status without emitting discovered secret content. Release verification separately reports Syft/Grype/Cosign/Kyverno evidence when that boundary is active.
+
+For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 
