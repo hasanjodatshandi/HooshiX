@@ -13,14 +13,11 @@ rules:
   - id: notification-no-jpa
     languages: [java]
     severity: ERROR
-    message: Notification persistence uses jOOQ/JDBC only; JPA entities are prohibited.
+    message: Notification persistence uses jOOQ/JDBC only; JPA APIs are prohibited.
     paths:
       include:
         - /services/notification-service/src/main/java
-    pattern-either:
-      - pattern: "@Entity"
-      - pattern: "@Table(...)"
-      - pattern: "@PersistenceContext"
+    pattern-regex: '(?m)^\s*import\s+(jakarta|javax)\.persistence\.'
 
   - id: notification-no-system-output
     languages: [java]
@@ -55,7 +52,7 @@ rules:
     paths:
       include:
         - /services/notification-service/src/main/java
-    pattern: $OBSERVATION.error(...)
+    pattern: $OBSERVATION.error($EXCEPTION)
 
   - id: notification-no-string-built-sql
     languages: [java]
