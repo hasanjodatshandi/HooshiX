@@ -205,10 +205,16 @@ Always compare its `subject_commit` with current `HEAD` and inspect changed cont
 
 ## 9. MCP server
 
-Start the local read-only stdio server from any working directory by using the tracked script path:
+From the repository root, start the local read-only stdio server with the relative tracked path:
 
 ```bash
 python3 scripts/context/mcp_server.py
+```
+
+When a tunnel or service manager launches the server from another working directory, use the absolute path to the same tracked entry point:
+
+```text
+<PYTHON_EXECUTABLE> <ABSOLUTE_HOOSHIX_REPOSITORY_PATH>/scripts/context/mcp_server.py
 ```
 
 The entry point resolves the HooshiX repository root from its own script location. Process working directory is not repository authority. This permits a tunnel/service manager to spawn the MCP child without requiring its own CWD to be the repository root.
