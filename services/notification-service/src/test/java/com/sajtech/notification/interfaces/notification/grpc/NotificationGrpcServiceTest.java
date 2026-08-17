@@ -68,7 +68,8 @@ class NotificationGrpcServiceTest {
         .build();
   }
 
-  private static final class CapturingObserver implements StreamObserver<SubmitNotificationResponse> {
+  private static final class CapturingObserver
+      implements StreamObserver<SubmitNotificationResponse> {
     private final AtomicReference<SubmitNotificationResponse> response = new AtomicReference<>();
     private final AtomicReference<Throwable> error = new AtomicReference<>();
 
