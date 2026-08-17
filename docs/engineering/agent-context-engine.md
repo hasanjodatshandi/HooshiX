@@ -99,7 +99,7 @@ Checkpoint records live under:
 context/checkpoints/
 ```
 
-They are append-only historical evidence. Create one after a coherent implementation/review state that is useful for later continuation, normally after the subject code/document commit exists.
+They are append-only historical evidence. A work checkpoint records a coherent implementation/review state before merge and remains unchanged even when later CI, reconciliation, or merge work completes its recorded `next_actions`.
 
 Prepare a bounded receipt JSON outside the repository or in an ignored temporary location:
 
@@ -139,7 +139,59 @@ python3 scripts/context/context_engine.py checkpoint-create \
   --base <task-base-commit>
 ```
 
-The engine derives branch, exact subject/base commits, and changed paths. Do not manually create a checkpoint that claims an unverified Git state.
+The engine derives branch, exact subject/base commits, and changed paths. Do not manually create a work checkpoint that claims an unverified Git state.
+
+Legacy v1 work checkpoints may not contain `checkpoint_kind`; they remain valid historical records. New post-merge records use the explicit kind described below.
+
+## 7. Post-merge checkpoint finalization
+
+A post-merge checkpoint closes the gap between the pre-merge work checkpoint and the final merged `main` state. It does not edit or replace the earlier record.
+
+After a non-trivial task PR with a work checkpoint is merged:
+
+1. verify the exact resulting `main` commit and final repository state;
+2. prepare a final bounded receipt with the same pull-request number and only current final outcomes, risks, unfinished work, and next actions;
+3. use the exact pre-merge `main` commit as `--base`;
+4. use the exact merged `main` commit as `--merge`;
+5. reference the earlier work checkpoint with `--source-checkpoint`;
+6. create the record with the post-merge tool;
+7. publish that single record in a focused checkpoint-only follow-up PR and run protected repository verification.
+
+Example:
+
+```bash
+python3 scripts/context/post_merge_checkpoint.py create \
+  --input /safe/path/post-merge-receipt.json \
+  --base <pre-merge-main-commit> \
+  --merge <merged-main-commit> \
+  --source-checkpoint context/checkpoints/<work-checkpoint>.json
+```
+
+The post-merge tool verifies:
+
+- base and merge inputs resolve to commits;
+- base is an ancestor of the merge commit;
+- the merge commit is reachable from current `origin/main` or local `main`;
+- the source path is confined to the configured checkpoint directory;
+- the source record is a valid non-post-merge checkpoint;
+- source and post-merge records use the same positive PR number;
+- `changed_paths` is regenerated from the exact `base..merge` Git diff and excludes `context/checkpoints/` transport files;
+- the final record passes the existing bounded checkpoint and secret-field checks.
+
+The post-merge record uses:
+
+```text
+checkpoint_kind = post-merge
+branch = main
+subject_commit = exact merged main commit
+source_checkpoint = earlier work checkpoint path
+```
+
+Do not copy stale pre-merge actions into the final receipt. If final CI/diff review/merge actions completed, record them under `completed` or `verification` and remove them from `next_actions`. Keep real unresolved work as `unfinished`, `risks`, or `next_actions`.
+
+A checkpoint-only follow-up PR is transport for already-derived historical evidence. It does not require another post-merge checkpoint. If any substantive implementation, architecture, security, or governance change is added to that PR, the exemption is lost and the normal lifecycle applies.
+
+## 8. Checkpoint safety and continuity
 
 Checkpoint files must not contain passwords, tokens, API keys, private keys, credentials, production secret values, or copied large source/document bodies. The built-in field/private-key checks are defense in depth only; they do not replace Gitleaks or current secret-handling policy.
 
@@ -149,9 +201,9 @@ Read the newest valid record with:
 python3 scripts/context/context_engine.py latest-checkpoint
 ```
 
-Always compare its `subject_commit` with current `HEAD` and inspect changed context before relying on it.
+Always compare its `subject_commit` with current `HEAD` and inspect changed context before relying on it. A post-merge checkpoint is still historical evidence; it does not become current architecture authority merely because it is newer than a work checkpoint.
 
-## 7. MCP server
+## 9. MCP server
 
 Start the local read-only stdio server from the repository root:
 
@@ -173,7 +225,7 @@ The server supports MCP `2026-07-28` and bounded stdio compatibility for `2025-1
 
 The protocol process writes JSON-RPC frames only to stdout. Startup/diagnostic errors use stderr.
 
-## 8. Verification
+## 10. Verification
 
 Run:
 
@@ -183,11 +235,19 @@ make context-verify
 make baseline-verify
 ```
 
-`context-verify` checks canonical config/path/route/checkpoint consistency and exact generated task-matrix parity. `context-test` covers bootstrap trust, conservative routing, search provenance/bounds/exclusions, checkpoint derivation, command-injection rejection, and MCP modern/legacy read-only behavior.
+For the post-merge layer alone:
 
-The repository baseline includes these checks, so a context-governance drift cannot be merged only because application tests pass.
+```bash
+make context-post-merge-verify
+```
 
-## 9. Do not add a central memory service yet
+`context-verify` checks canonical config/path/route/checkpoint consistency, exact generated task-matrix parity, and tracked post-merge checkpoint semantics. Post-merge verification recomputes main ancestry and the recorded `base..subject` changed paths from Git, so repository-structure CI checks out the required Git history.
+
+`context-test` covers bootstrap trust, conservative routing, search provenance/bounds/exclusions, work checkpoint derivation, post-merge same-PR linkage/main reachability/Git-derived path verification, command-injection rejection, and MCP modern/legacy read-only behavior.
+
+The repository baseline includes these checks, so context-governance drift cannot be merged only because application tests pass.
+
+## 11. Do not add a central memory service yet
 
 Do not create a database, hosted memory backend, vector store, HTTP context service, or cross-project user-memory subsystem for this capability without the ADR-0046 evidence trigger and a new reviewed ADR.
 
