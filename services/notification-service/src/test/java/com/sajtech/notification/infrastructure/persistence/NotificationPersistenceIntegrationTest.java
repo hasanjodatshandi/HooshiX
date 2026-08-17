@@ -118,9 +118,12 @@ class NotificationPersistenceIntegrationTest {
                 "SELECT text_ciphertext FROM notification WHERE notification_id = ?",
                 first.notificationId())
             .get("text_ciphertext", byte[].class);
-    assertThat(encryptedRecipient)
-        .doesNotContain("person@example.com".getBytes(StandardCharsets.UTF_8));
-    assertThat(encryptedText).doesNotContain("12345678".getBytes(StandardCharsets.UTF_8));
+    assertThat(
+            containsSubsequence(
+                encryptedRecipient, "person@example.com".getBytes(StandardCharsets.UTF_8)))
+        .isFalse();
+    assertThat(containsSubsequence(encryptedText, "12345678".getBytes(StandardCharsets.UTF_8)))
+        .isFalse();
   }
 
   @Test
@@ -183,5 +186,24 @@ class NotificationPersistenceIntegrationTest {
         path,
         "active_key_id=v1\nkey.v1=" + Base64.getEncoder().encodeToString(key) + "\n",
         StandardCharsets.UTF_8);
+  }
+
+  private static boolean containsSubsequence(byte[] value, byte[] sequence) {
+    if (sequence.length == 0) {
+      return true;
+    }
+    for (int start = 0; start <= value.length - sequence.length; start++) {
+      boolean matched = true;
+      for (int index = 0; index < sequence.length; index++) {
+        if (value[start + index] != sequence[index]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) {
+        return true;
+      }
+    }
+    return false;
   }
 }
