@@ -18,7 +18,8 @@ class FileBackedHmacIntentFingerprintTest {
   void computesAndVerifiesVersionedHmacFingerprint() throws Exception {
     writeKeyRing("fingerprint-key-1");
     var fingerprint =
-        new FileBackedHmacIntentFingerprint(new FileBackedKeyRing(directory, Duration.ofMinutes(5)));
+        new FileBackedHmacIntentFingerprint(
+            new FileBackedKeyRing(directory, Duration.ofMinutes(5)));
 
     var digest = fingerprint.compute("intent".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
@@ -45,12 +46,7 @@ class FileBackedHmacIntentFingerprintTest {
     keyRing.reload();
 
     assertThat(fingerprint.compute(material).keyId()).isEqualTo("fingerprint-key-2");
-    assertThat(
-            fingerprint.verify(
-                material,
-                original.version(),
-                original.keyId(),
-                original.value()))
+    assertThat(fingerprint.verify(material, original.version(), original.keyId(), original.value()))
         .isTrue();
   }
 
@@ -77,10 +73,7 @@ class FileBackedHmacIntentFingerprintTest {
     assertThatThrownBy(
             () ->
                 fingerprint.verify(
-                    material,
-                    original.version(),
-                    original.keyId(),
-                    original.value()))
+                    material, original.version(), original.keyId(), original.value()))
         .isInstanceOf(IllegalStateException.class);
   }
 
