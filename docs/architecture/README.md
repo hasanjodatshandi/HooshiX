@@ -15,6 +15,8 @@ Start with:
 7. applicable service/platform/security/data/reliability documents;
 8. `PRODUCTION-READINESS-CHECKLIST.md` for executable evidence.
 
+ADR-0046 may compile this reading scope through the verified Git-native Context Engine. A verified targeted route does not change document authority or bypass a real `full-read` trigger. `context/routes.json` is canonical for machine-readable task routing; `TASK-REVIEW-MATRIX.md` is its generated human view.
+
 ADR IDs are stable after merge. Current-state documents remain current-only; a superseded ADR retained for provenance is not current implementation authority.
 
 ## Current production profile
@@ -32,8 +34,11 @@ Executable vertical slices must preserve these current architecture requirements
 - ADR-0041: Reference Data remains local immutable capability until an independent-service trigger is evidenced;
 - ADR-0044: structured logging, Micrometer metrics, OpenTelemetry tracing, Collector/Loki/Tempo/Prometheus/Grafana/Alertmanager integration, and external host-down detection from Day-1;
 - ADR-0045: Gitleaks secret scanning + Semgrep source SAST + Gradle integrity + OSV-Scanner early dependency advisory + Syft/Grype/Cosign/Kyverno final-artifact security chain, with distinct tool responsibilities and no duplicate scanner by default;
+- ADR-0046: Git-native verified agent bootstrap, conservative task routing, commit-bound historical checkpoints, bounded local retrieval, and read-only stdio MCP; no central cross-project memory service without a later evidence trigger;
 - ADR-0017/build gates: Kyverno new production policies use stable CEL-based `policies.kyverno.io/v1` APIs;
 - stable merged ADR identifiers and coherent-change PR governance.
+
+ADR-0046 is repository/developer tooling only. It does not change application services, production topology, data ownership, security authority, or runtime availability.
 
 These are target decisions. `implementation-status.md` remains authoritative for whether code/deployment/CI/runtime evidence exists.
 
@@ -51,10 +56,13 @@ These are target decisions. `implementation-status.md` remains authoritative for
 - `security-verification-matrix.md` / `architecture-fitness-functions.md` — traceable security/architecture properties.
 - `PRODUCTION-READINESS-CHECKLIST.md` — production traffic gate.
 - `implementation-status.md` — actual repository implementation/evidence presence.
+- `../engineering/agent-context-engine.md` — developer/agent operating interface for ADR-0046.
 - `services/` — implementation-facing service contracts.
 
 ## Authority rule
 
 Do not create a second normative copy merely for convenience. ADR/current architecture/standards have the precedence defined in Documentation Standards. Lower-level documents may add implementation context but cannot weaken higher-level decisions.
+
+Derived context/search/checkpoints/model memory are never a second authority. Current Git authority wins.
 
 A path or component name in documentation is not proof it exists. Only actual repository/runtime evidence may be reported as implemented/passed.

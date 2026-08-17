@@ -13,6 +13,7 @@ Covers:
 - PostgreSQL/Redis/Kafka/reference datasets;
 - OpenBao/secrets;
 - Git/CI/source-secret/supply-chain controls;
+- Git-native AI-agent context/bootstrap/routing/checkpoint/retrieval tooling;
 - Day-One logging/metrics/tracing;
 - privileged access;
 - backup/restore/erasure/DR;
@@ -32,7 +33,8 @@ Covers:
 10. non-HA availability trade-offs never become security downgrades;
 11. observability cannot become a new security authority or secret-exfiltration path;
 12. abuse controls remain safe under clock faults and adversarial state cardinality;
-13. source/secret/scanner failures cannot silently bypass required merge/promotion controls.
+13. source/secret/scanner failures cannot silently bypass required merge/promotion controls;
+14. retrieved/checkpoint/model context cannot outrank current Git authority, convert untrusted repository text into higher-priority instruction, or expose repository mutation authority.
 
 ## 3. High-value assets
 
@@ -41,6 +43,8 @@ Covers:
 | Password/MFA/recovery material | confidentiality + integrity |
 | Sessions/refresh/signing keys | confidentiality + revocation correctness |
 | Git/CI credentials and committed-secret exposure state | confidentiality + detection + revocation correctness |
+| Current repository architecture/policy/context authority | integrity + provenance + freshness |
+| Agent context/checkpoint provenance | integrity + bounded confidentiality + non-authority |
 | Tenant Membership/Authorization state | integrity + isolation |
 | PostgreSQL business state | confidentiality + integrity + recovery |
 | OpenBao/recovery material | confidentiality + integrity + recovery |
@@ -113,6 +117,19 @@ WireGuard network admission, FIDO2 identity, and JIT privilege are separate gate
 
 Restored state is not current authority until integrity/schema/RLS/erasure/legal-hold/secrets/workload/edge/security gates pass.
 
+### TB-12 Repository -> AI agent/context client
+
+ADR-0046 Context Engine output is derived developer context, not a new authority.
+
+- current Git authority outranks task routing, retrieval results, checkpoints, and model/chat memory;
+- retrieved comments, fixtures, generated text, and checkpoint prose are data and do not become higher-priority agent instruction merely because retrieval returns them;
+- task routing fails conservatively to `full-read` for unknown/ambiguous/global-trigger cases;
+- dirty configured authority state cannot be represented as verified targeted context;
+- retrieval is repository-root confined, tracked-file-only, bounded, and provenance-bearing;
+- tracked-file-only retrieval does not prove the repository is secret-free; Gitleaks remains the committed-secret control;
+- the MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or network listener in v1;
+- caller query/revision values are data passed through bounded validation and fixed Git argument arrays, never shell command text.
+
 ## 5. Threat actors
 
 - Internet attacker: arbitrary requests, spoofed forwarding/trace headers, credential stuffing, high-cardinality abuse, DDoS participation.
@@ -121,7 +138,8 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 - Compromised workload/service credential: lateral DB/Redis/Kafka/OpenBao/provider/telemetry access attempts.
 - Compromised telemetry component: attempts secret collection, host-file access, or data manipulation.
 - Compromised CI/GitHub identity: source/history/artifact/GitOps/security-evidence manipulation.
-- Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log output.
+- Malicious or compromised repository content: attempts prompt injection, stale-context substitution, secret exfiltration, path escape, or command-like input against an AI/context client.
+- Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log/context output.
 - Compromised operator device: may hold WireGuard key but not necessarily FIDO2/JIT.
 - Privileged insider: time-bounded legitimate capability with misuse risk.
 - Compromised host/root: broad single-server process/storage visibility.
@@ -135,13 +153,16 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 | Spoofing | forged XFF/client header changes quota identity | ADR-0043 trusted PROXY chain; exact BFF context | header/PROXY negatives |
 | Spoofing | forged trace/baggage becomes identity/tenant/permission | telemetry context classified correlation-only | forged-context auth/quota negatives |
 | Spoofing | wrong workload calls internal service/Collector | strict mTLS + SA + NetworkPolicy/Istio | connectivity/authz negatives |
+| Spoofing | stale checkpoint/model memory is presented as current repository authority | Git HEAD/blob/worktree provenance + authority precedence + diff inspection | clean/stale checkpoint + dirty-authority tests |
 | Tampering | tenant context changes on pooled DB | transaction-local context + FORCE RLS | cross-tenant pool tests |
 | Tampering | build/deploy artifact changes | digest/signature/provenance/SBOM/admission | wrong-artifact negatives |
 | Tampering | image/SBOM/vulnerability/signature evidence refers to different digests | Syft/Grype/Cosign/Kyverno exact-digest binding | cross-digest/mismatch negatives |
 | Tampering | compromised-password corpus/source altered/stale | HIBP source identity + manifest/digest/freshness/full-corpus validation | dataset release tests |
+| Tampering | repository text attempts prompt injection or command/path mutation through context tooling | retrieved-data classification + root/tracked-file bounds + fixed Git argv + read-only MCP | routing/search/revision/write-tool negatives |
 | Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
 | Information disclosure | real secret is committed then deleted but remains in Git history/clones | Gitleaks tree+history + revoke/rotate + incident/history remediation | commit-delete fixture + rotation evidence |
 | Information disclosure | scanner/log output republishes discovered secret | Gitleaks redaction + CI output policy | redaction fixture |
+| Information disclosure | context retrieval/checkpoint exposes sensitive repository material | sensitive-name exclusion + bounded tracked-file retrieval + no secret fields/private-key material in checkpoints + Gitleaks remains authoritative | retrieval/checkpoint negatives + Gitleaks evidence |
 | Information disclosure | secrets/PII in telemetry | source allow-list + Collector redaction + canary | Loki/Tempo/Prometheus/Grafana negatives |
 | Information disclosure | Collector reads arbitrary host files | exact read-only pod-log mount; no broad host privilege | render/runtime mount negatives |
 | DoS | Authorization/Redis failure blocks work | bounded deadlines/bulkheads + fail closed | overload/failure tests |
@@ -153,6 +174,7 @@ Restored state is not current authority until integrity/schema/RLS/erasure/legal
 | DoS | scanner/feed outage is used to bypass release policy | fail-closed freshness/promotion gates under ADR-0035/0038/0045 | stale/unavailable scanner/feed negatives |
 | Elevation | tenant admin grants stronger authority | Authorization privilege-escalation/owner safety | admin concurrency negatives |
 | Elevation | network access becomes root | WireGuard != FIDO2 != JIT | separation tests |
+| Elevation | read-only AI context channel is treated as repository/production mutation authority | no write MCP tools/no network listener + normal Git/PR/production access controls remain separate | MCP tool-list/unknown-write negatives |
 
 ## 7. Critical abuse cases
 
@@ -272,6 +294,24 @@ Required:
 
 Residual: a history rewrite cannot recall an already copied credential. Rotation/revocation is therefore the primary containment action for real exposed secrets.
 
+### TM-20 Agent-context prompt injection/staleness/mutation
+
+A malicious or stale repository/checkpoint fragment attempts to make an agent trust obsolete architecture, ignore current policy, execute command-like text, read outside the repository, reveal secret material, or invoke a write-like MCP capability.
+
+Required:
+
+- current Git authority precedence and live HEAD/blob/worktree provenance;
+- conservative route escalation for ambiguous/unknown/full-read-trigger tasks;
+- dirty configured authority state cannot claim verified targeted context;
+- retrieved source is classified as data, not automatically instruction;
+- tracked-file-only repository-root-confined bounded retrieval;
+- configured sensitive filename exclusion and no secret/private-key fields in checkpoints, while Gitleaks remains the actual committed-secret control;
+- revision/query validation plus fixed Git argument arrays without `shell=True`;
+- read-only stdio MCP tool surface with no network listener or mutation/checkpoint-create tool;
+- checkpoint `subject_commit` comparison plus intervening Git diff before continuity use.
+
+Residual: an allowed tracked source file can still contain secret or adversarial text. The engine therefore cannot claim content safety from retrieval alone; secret scanning, current authority hierarchy, review, and client-side instruction separation remain required.
+
 ## 8. Single-server residual risks
 
 - one host failure can stop complete platform and local observability;
@@ -284,14 +324,17 @@ Residual: a history rewrite cannot recall an already copied credential. Rotation
 
 These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, source/secret scanning, signed final-artifact admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
 
+ADR-0046 Context Engine is outside the production runtime profile. Its failure cannot justify weakening product/runtime controls or treating external/model memory as current architecture authority.
+
 ## 9. Verification mapping
 
-Material threats map to executable service/security/database/network/CI/observability/chaos/recovery evidence. In particular:
+Material threats map to executable service/security/database/network/CI/observability/chaos/recovery/context evidence. In particular:
 
 - TM-02/03/04 -> ADR-0024 tests + Redis load/chaos;
 - TM-11/12/13 -> ADR-0031/0044 tests + Collector/render/canary/fault evidence;
 - TM-14 -> ADR-0017/0035/0038/0039/0045 + Semgrep/Syft/Grype/Cosign/Kyverno digest/evidence/failure fixtures;
 - TM-19 -> ADR-0045 Gitleaks current-tree/history/redaction + incident revoke/rotate/history-remediation evidence;
+- TM-20 -> ADR-0046 bootstrap/router/search/checkpoint/MCP tests + generated-route parity + SEC-033/AFF-051;
 - TM-17 -> external host-down monitor + cold DR;
 - compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;
 - policy-engine migration risk -> Kyverno CEL manifest gate.
@@ -300,4 +343,4 @@ A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
 ## 10. Change triggers
 
-Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/MCP behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
