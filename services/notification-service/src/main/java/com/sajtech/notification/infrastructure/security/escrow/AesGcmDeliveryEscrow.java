@@ -6,31 +6,30 @@ import com.sajtech.notification.application.submit.model.EncryptedField;
 import com.sajtech.notification.application.submit.port.out.DeliveryEscrowPort;
 import com.sajtech.notification.application.template.model.NotificationTemplateVersion;
 import com.sajtech.notification.application.template.model.RenderedNotification;
-import com.sajtech.notification.infrastructure.security.keyring.DeliveryEncryptionKey;
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
+import com.sajtech.notification.infrastructure.security.keyring.KeyRingMaterial;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 public final class AesGcmDeliveryEscrow implements DeliveryEscrowPort {
   private static final int FORMAT_VERSION = 1;
-  private static final int NONCE_LENGTH = 12;
+  private static final int NONCE_BYTES = 12;
   private static final int TAG_BITS = 128;
+  private static final String PURPOSE = "notification-delivery-escrow-local";
 
   private final FileBackedKeyRing keyRing;
-  private final SecureRandom secureRandom;
+  private final SecureRandom random;
 
-  public AesGcmDeliveryEscrow(FileBackedKeyRing keyRing) {
-    this(keyRing, new SecureRandom());
-  }
-
-  AesGcmDeliveryEscrow(FileBackedKeyRing keyRing, SecureRandom secureRandom) {
+  public AesGcmDeliveryEscrow(FileBackedKeyRing keyRing, SecureRandom random) {
     this.keyRing = keyRing;
-    this.secureRandom = secureRandom;
+    this.random = random;
   }
 
   @Override
@@ -39,59 +38,77 @@ public final class AesGcmDeliveryEscrow implements DeliveryEscrowPort {
       CanonicalNotificationIntent intent,
       NotificationTemplateVersion template,
       RenderedNotification rendered) {
-    if (!keyRing.isFresh()) {
-      throw new IllegalStateException("Notification delivery key ring is stale");
-    }
-    DeliveryEncryptionKey key = keyRing.activeDeliveryKey();
-    byte[] associatedData = associatedData(notificationId, intent, template);
+    KeyRingMaterial active = keyRing.activeKey();
     return new EncryptedDeliveryPayload(
         FORMAT_VERSION,
-        key.keyId(),
-        encryptField(key, associatedData, intent.recipient()),
-        encryptField(key, associatedData, rendered.subject()),
-        encryptField(key, associatedData, rendered.text()),
-        encryptField(key, associatedData, rendered.html()));
+        active.keyId(),
+        encryptField(active, notificationId, intent, template, "recipient", intent.canonicalRecipient()),
+        encryptOptional(active, notificationId, intent, template, "subject", rendered.subject()),
+        encryptField(active, notificationId, intent, template, "text", rendered.text()),
+        encryptOptional(active, notificationId, intent, template, "html", rendered.html()));
   }
 
-  private EncryptedField encryptField(
-      DeliveryEncryptionKey key, byte[] associatedData, String plaintext) {
+  private EncryptedField encryptOptional(
+      KeyRingMaterial active,
+      UUID notificationId,
+      CanonicalNotificationIntent intent,
+      NotificationTemplateVersion template,
+      String field,
+      String plaintext) {
     if (plaintext == null) {
       return null;
     }
-    byte[] nonce = new byte[NONCE_LENGTH];
-    secureRandom.nextBytes(nonce);
+    return encryptField(active, notificationId, intent, template, field, plaintext);
+  }
+
+  private EncryptedField encryptField(
+      KeyRingMaterial active,
+      UUID notificationId,
+      CanonicalNotificationIntent intent,
+      NotificationTemplateVersion template,
+      String field,
+      String plaintext) {
+    byte[] nonce = new byte[NONCE_BYTES];
+    random.nextBytes(nonce);
     try {
       Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-      cipher.init(
-          Cipher.ENCRYPT_MODE,
-          new SecretKeySpec(key.keyBytes(), "AES"),
-          new GCMParameterSpec(TAG_BITS, nonce));
-      cipher.updateAAD(associatedData);
+      cipher.init(Cipher.ENCRYPT_MODE, active.key(), new GCMParameterSpec(TAG_BITS, nonce));
+      cipher.updateAAD(aad(notificationId, intent, template, active.keyId(), field));
       return new EncryptedField(nonce, cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8)));
-    } catch (GeneralSecurityException encryptionFailure) {
-      throw new IllegalStateException(
-          "Notification delivery payload encryption failed", encryptionFailure);
+    } catch (GeneralSecurityException exception) {
+      throw new IllegalStateException("Unable to encrypt notification delivery escrow", exception);
     }
   }
 
-  private static byte[] associatedData(
+  private static byte[] aad(
       UUID notificationId,
       CanonicalNotificationIntent intent,
-      NotificationTemplateVersion template) {
-    String value =
-        notificationId
-            + "\n"
-            + intent.callerService()
-            + "\n"
-            + intent.requestId()
-            + "\n"
-            + intent.channel().name()
-            + "\n"
-            + intent.semanticType().name()
-            + "\n"
-            + template.templateId()
-            + "\n"
-            + template.version();
-    return value.getBytes(StandardCharsets.UTF_8);
+      NotificationTemplateVersion template,
+      String keyId,
+      String field) {
+    try {
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream(256);
+      try (DataOutputStream output = new DataOutputStream(bytes)) {
+        write(output, PURPOSE);
+        write(output, Integer.toString(FORMAT_VERSION));
+        write(output, keyId);
+        write(output, notificationId.toString());
+        write(output, intent.callerService());
+        write(output, intent.requestId().toString());
+        write(output, intent.channel().name());
+        write(output, intent.semanticType().name());
+        write(output, template.versionId().toString());
+        write(output, field);
+      }
+      return bytes.toByteArray();
+    } catch (IOException impossible) {
+      throw new IllegalStateException("Unable to encode notification escrow AAD", impossible);
+    }
+  }
+
+  private static void write(DataOutputStream output, String value) throws IOException {
+    byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
+    output.writeInt(encoded.length);
+    output.write(encoded);
   }
 }

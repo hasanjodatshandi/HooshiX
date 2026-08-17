@@ -1,6 +1,8 @@
 package com.sajtech.notification.infrastructure.security.keyring;
 
 import java.io.IOException;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -11,126 +13,112 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 public final class FileBackedKeyRing {
-  private static final String ACTIVE_FINGERPRINT_KEY_ID = "fingerprint.active-key-id";
-  private static final String ACTIVE_DELIVERY_KEY_ID = "delivery.active-key-id";
-
-  private final Path directory;
-  private final Duration maxStaleness;
+  private final Path path;
+  private final String algorithm;
+  private final int expectedKeyBytes;
   private final Clock clock;
-  private final AtomicReference<KeyRingSnapshot> snapshot = new AtomicReference<>();
+  private final Duration maximumStaleness;
+  private final AtomicReference<Snapshot> snapshot = new AtomicReference<>();
 
-  public FileBackedKeyRing(Path directory, Duration maxStaleness) {
-    this(directory, maxStaleness, Clock.systemUTC());
-  }
-
-  FileBackedKeyRing(Path directory, Duration maxStaleness, Clock clock) {
-    this.directory = directory;
-    this.maxStaleness = maxStaleness;
+  public FileBackedKeyRing(
+      Path path,
+      String algorithm,
+      int expectedKeyBytes,
+      Clock clock,
+      Duration maximumStaleness) {
+    if (path == null
+        || algorithm == null
+        || algorithm.isBlank()
+        || expectedKeyBytes <= 0
+        || maximumStaleness == null
+        || maximumStaleness.isNegative()
+        || maximumStaleness.isZero()) {
+      throw new IllegalArgumentException("Key-ring configuration is invalid");
+    }
+    this.path = path;
+    this.algorithm = algorithm;
+    this.expectedKeyBytes = expectedKeyBytes;
     this.clock = clock;
-    reload();
+    this.maximumStaleness = maximumStaleness;
+    refresh();
   }
 
-  public void reload() {
-    Path propertiesPath = directory.resolve("key-ring.properties");
+  public synchronized void refresh() {
     Properties properties = new Properties();
-    try (var reader = Files.newBufferedReader(propertiesPath)) {
+    try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
       properties.load(reader);
-    } catch (IOException readFailure) {
-      throw new IllegalStateException("Notification key ring could not be read", readFailure);
+    } catch (IOException exception) {
+      throw new IllegalStateException("Unable to load local notification key ring", exception);
     }
-    String activeFingerprintKeyId = required(properties, ACTIVE_FINGERPRINT_KEY_ID);
-    String activeDeliveryKeyId = required(properties, ACTIVE_DELIVERY_KEY_ID);
-    Map<String, FingerprintKey> fingerprintKeys = new HashMap<>();
-    Map<String, DeliveryEncryptionKey> deliveryKeys = new HashMap<>();
+
+    String activeKeyId = required(properties, "active_key_id");
+    Map<String, SecretKey> keys = new HashMap<>();
     for (String name : properties.stringPropertyNames()) {
-      if (name.startsWith("fingerprint.key.")) {
-        String keyId = name.substring("fingerprint.key.".length());
-        fingerprintKeys.put(
-            keyId,
-            new FingerprintKey(keyId, decode(required(properties, name), 32, "fingerprint")));
+      if (!name.startsWith("key.")) {
+        continue;
       }
-      if (name.startsWith("delivery.key.")) {
-        String keyId = name.substring("delivery.key.".length());
-        deliveryKeys.put(
-            keyId,
-            new DeliveryEncryptionKey(keyId, decode(required(properties, name), 32, "delivery")));
+      String keyId = name.substring("key.".length());
+      if (!keyId.matches("[A-Za-z0-9._-]{1,64}")) {
+        throw new IllegalStateException("Notification key identifier is invalid");
       }
+      byte[] decoded;
+      try {
+        decoded = Base64.getDecoder().decode(properties.getProperty(name).trim());
+      } catch (IllegalArgumentException exception) {
+        throw new IllegalStateException("Notification key material is not canonical Base64", exception);
+      }
+      if (decoded.length != expectedKeyBytes) {
+        throw new IllegalStateException("Notification key material has invalid length");
+      }
+      keys.put(keyId, new SecretKeySpec(decoded, algorithm));
+      java.util.Arrays.fill(decoded, (byte) 0);
     }
-    if (!fingerprintKeys.containsKey(activeFingerprintKeyId)) {
-      throw new IllegalStateException("Active notification fingerprint key is missing");
+    if (!keys.containsKey(activeKeyId)) {
+      throw new IllegalStateException("Active notification key identifier is unavailable");
     }
-    if (!deliveryKeys.containsKey(activeDeliveryKeyId)) {
-      throw new IllegalStateException("Active notification delivery key is missing");
-    }
-    snapshot.set(
-        new KeyRingSnapshot(
-            Map.copyOf(fingerprintKeys),
-            Map.copyOf(deliveryKeys),
-            activeFingerprintKeyId,
-            activeDeliveryKeyId,
-            clock.instant()));
+    snapshot.set(new Snapshot(activeKeyId, Map.copyOf(keys), clock.instant()));
   }
 
-  public boolean isFresh() {
-    KeyRingSnapshot current = snapshot.get();
-    return current != null
-        && Duration.between(current.loadedAt(), clock.instant()).compareTo(maxStaleness) <= 0;
+  public KeyRingMaterial activeKey() {
+    Snapshot current = requireFreshSnapshot();
+    return new KeyRingMaterial(current.activeKeyId(), current.keys().get(current.activeKeyId()));
   }
 
-  public FingerprintKey activeFingerprintKey() {
-    requireFresh();
-    KeyRingSnapshot current = snapshot.get();
-    return current.fingerprintKeys().get(current.activeFingerprintKeyId());
-  }
-
-  public FingerprintKey fingerprintKey(String keyId) {
-    requireFresh();
-    FingerprintKey key = snapshot.get().fingerprintKeys().get(keyId);
+  public SecretKey key(String keyId) {
+    Snapshot current = requireFreshSnapshot();
+    SecretKey key = current.keys().get(keyId);
     if (key == null) {
-      throw new IllegalStateException("Notification fingerprint key is unavailable");
+      throw new IllegalStateException("Required notification verification key is unavailable");
     }
     return key;
   }
 
-  public DeliveryEncryptionKey activeDeliveryKey() {
-    requireFresh();
-    KeyRingSnapshot current = snapshot.get();
-    return current.deliveryKeys().get(current.activeDeliveryKeyId());
+  public boolean isFresh() {
+    Snapshot current = snapshot.get();
+    return current != null
+        && !current.loadedAt().plus(maximumStaleness).isBefore(clock.instant());
   }
 
-  private void requireFresh() {
-    if (!isFresh()) {
-      throw new IllegalStateException("Notification key ring is stale");
+  private Snapshot requireFreshSnapshot() {
+    Snapshot current = snapshot.get();
+    if (current == null
+        || current.loadedAt().plus(maximumStaleness).isBefore(clock.instant())) {
+      throw new IllegalStateException("Notification key-ring snapshot is stale");
     }
+    return current;
   }
 
   private static String required(Properties properties, String name) {
     String value = properties.getProperty(name);
     if (value == null || value.isBlank()) {
-      throw new IllegalStateException("Notification key-ring setting is missing");
+      throw new IllegalStateException("Notification key-ring property is missing");
     }
     return value.trim();
   }
 
-  private static byte[] decode(String encoded, int requiredBytes, String usage) {
-    try {
-      byte[] decoded = Base64.getDecoder().decode(encoded);
-      if (decoded.length != requiredBytes) {
-        throw new IllegalStateException("Notification " + usage + " key has invalid length");
-      }
-      return decoded;
-    } catch (IllegalArgumentException invalidBase64) {
-      throw new IllegalStateException(
-          "Notification " + usage + " key is not valid base64", invalidBase64);
-    }
-  }
-
-  private record KeyRingSnapshot(
-      Map<String, FingerprintKey> fingerprintKeys,
-      Map<String, DeliveryEncryptionKey> deliveryKeys,
-      String activeFingerprintKeyId,
-      String activeDeliveryKeyId,
-      Instant loadedAt) {}
+  private record Snapshot(String activeKeyId, Map<String, SecretKey> keys, Instant loadedAt) {}
 }

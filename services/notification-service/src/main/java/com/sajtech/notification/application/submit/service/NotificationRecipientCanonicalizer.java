@@ -1,70 +1,75 @@
 package com.sajtech.notification.application.submit.service;
 
+import com.sajtech.notification.application.submit.NotificationSubmissionError;
+import com.sajtech.notification.application.submit.NotificationSubmissionException;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import java.net.IDN;
+import java.text.Normalizer;
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 public final class NotificationRecipientCanonicalizer {
-  private static final Pattern LOCAL_PART =
-      Pattern.compile("[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]{1,64}");
-  private static final Pattern PHONE = Pattern.compile("\\+[1-9][0-9]{7,14}");
+  private static final int MAX_EMAIL_LENGTH = 254;
+  private static final String EMAIL_LOCAL_PATTERN = "[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+";
+  private static final String E164_PATTERN = "\\+[1-9][0-9]{7,14}";
 
-  public String canonicalize(NotificationChannel channel, String recipient) {
-    if (channel == null || recipient == null || recipient.isBlank()) {
-      throw new IllegalArgumentException("Notification recipient is required");
+  public String canonicalize(NotificationChannel channel, String rawRecipient) {
+    if (rawRecipient == null) {
+      throw invalidRecipient();
+    }
+    String normalized = Normalizer.normalize(rawRecipient.trim(), Normalizer.Form.NFC);
+    if (containsControlOrWhitespace(normalized)) {
+      throw invalidRecipient();
     }
     return switch (channel) {
-      case EMAIL -> canonicalEmail(recipient);
-      case SMS -> canonicalPhone(recipient);
+      case EMAIL -> canonicalizeEmail(normalized);
+      case SMS -> canonicalizePhone(normalized);
     };
   }
 
-  private static String canonicalEmail(String raw) {
-    String trimmed = raw.trim();
-    int at = trimmed.lastIndexOf('@');
-    if (at <= 0 || at == trimmed.length() - 1 || trimmed.indexOf('@') != at) {
-      throw new IllegalArgumentException("Invalid email recipient");
+  private String canonicalizeEmail(String value) {
+    if (value.length() > MAX_EMAIL_LENGTH
+        || value.indexOf('<') >= 0
+        || value.indexOf('>') >= 0
+        || value.indexOf('(') >= 0
+        || value.indexOf(')') >= 0
+        || value.indexOf(',') >= 0
+        || value.indexOf(';') >= 0
+        || value.indexOf(':') >= 0) {
+      throw invalidRecipient();
     }
-    String local = trimmed.substring(0, at);
-    String domain = trimmed.substring(at + 1);
-    if (!LOCAL_PART.matcher(local).matches()) {
-      throw new IllegalArgumentException("Invalid email local-part");
+    int at = value.lastIndexOf('@');
+    if (at <= 0 || at != value.indexOf('@') || at == value.length() - 1) {
+      throw invalidRecipient();
     }
-    String asciiDomain;
+    String local = value.substring(0, at);
+    String domain = value.substring(at + 1);
+    if (local.length() > 64 || !local.matches(EMAIL_LOCAL_PATTERN)) {
+      throw invalidRecipient();
+    }
     try {
-      asciiDomain = IDN.toASCII(domain, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
-    } catch (IllegalArgumentException invalidDomain) {
-      throw new IllegalArgumentException("Invalid email domain", invalidDomain);
+      String asciiDomain = IDN.toASCII(domain, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
+      if (asciiDomain.isBlank() || asciiDomain.length() > 253 || !asciiDomain.contains(".")) {
+        throw invalidRecipient();
+      }
+      return local + "@" + asciiDomain;
+    } catch (IllegalArgumentException exception) {
+      throw invalidRecipient();
     }
-    if (asciiDomain.length() > 253
-        || asciiDomain.startsWith(".")
-        || asciiDomain.endsWith(".")
-        || !asciiDomain.contains(".")) {
-      throw new IllegalArgumentException("Invalid email domain");
-    }
-    return local + "@" + asciiDomain;
   }
 
-  private static String canonicalPhone(String raw) {
-    String trimmed = raw.trim();
-    StringBuilder canonical = new StringBuilder(trimmed.length());
-    for (int index = 0; index < trimmed.length(); index++) {
-      char character = trimmed.charAt(index);
-      if (index == 0 && character == '+') {
-        canonical.append(character);
-      } else if (Character.isDigit(character)) {
-        canonical.append(character);
-      } else if (character == ' ' || character == '-' || character == '(' || character == ')') {
-        // Presentation separators are intentionally ignored.
-      } else {
-        throw new IllegalArgumentException("Invalid phone recipient");
-      }
+  private String canonicalizePhone(String value) {
+    if (!value.matches(E164_PATTERN)) {
+      throw invalidRecipient();
     }
-    String result = canonical.toString();
-    if (!PHONE.matcher(result).matches()) {
-      throw new IllegalArgumentException("Phone recipient must be canonical E.164");
-    }
-    return result;
+    return value;
+  }
+
+  private static boolean containsControlOrWhitespace(String value) {
+    return value.codePoints().anyMatch(codePoint -> Character.isISOControl(codePoint) || Character.isWhitespace(codePoint));
+  }
+
+  private static NotificationSubmissionException invalidRecipient() {
+    return new NotificationSubmissionException(
+        NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST, "Notification recipient is invalid");
   }
 }

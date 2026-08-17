@@ -48,7 +48,7 @@ dependencies {
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
     testImplementation("io.grpc:grpc-inprocess:1.83.1")
     testImplementation("io.grpc:grpc-testing:1.83.1")
-    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

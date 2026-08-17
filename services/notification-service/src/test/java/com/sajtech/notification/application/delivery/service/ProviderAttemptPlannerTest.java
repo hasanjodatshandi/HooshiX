@@ -4,66 +4,82 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sajtech.notification.application.delivery.model.ProviderAttemptAction;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
-import com.sajtech.notification.domain.notification.model.ProviderOutcomeClassification;
+import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
 import com.sajtech.notification.domain.notification.service.ProviderRetryPolicy;
 import java.time.Instant;
 import java.util.random.RandomGenerator;
 import org.junit.jupiter.api.Test;
 
 class ProviderAttemptPlannerTest {
-  private static final RandomGenerator DETERMINISTIC_RANDOM = new ZeroRandom();
   private final ProviderAttemptPlanner planner =
       new ProviderAttemptPlanner(new ProviderRetryPolicy());
+  private final RandomGenerator deterministic = new FixedRandomGenerator(0.5d);
 
   @Test
-  void ambiguousOutcomeAlwaysReconciles() {
+  void ambiguousOutcomeRequiresReconciliationAndNeverBlindRetry() {
     var decision =
-        planner.afterOutcome(
-            NotificationChannel.EMAIL,
-            1,
-            ProviderOutcomeClassification.AMBIGUOUS,
-            Instant.parse("2026-08-16T00:00:00Z"),
-            Instant.parse("2026-08-16T00:10:00Z"),
-            DETERMINISTIC_RANDOM);
-
-    assertThat(decision.action()).isEqualTo(ProviderAttemptAction.RECONCILE);
-  }
-
-  @Test
-  void transientFailureSchedulesBoundedRetryBeforeDeadline() {
-    Instant now = Instant.parse("2026-08-16T00:00:00Z");
-    var decision =
-        planner.afterOutcome(
+        planner.plan(
             NotificationChannel.SMS,
             1,
-            ProviderOutcomeClassification.DEFINITIVE_TRANSIENT_FAILURE,
-            now,
-            now.plusSeconds(60),
-            DETERMINISTIC_RANDOM);
+            ProviderAttemptClassification.AMBIGUOUS,
+            Instant.parse("2026-08-16T00:00:00Z"),
+            Instant.parse("2026-08-16T00:02:00Z"),
+            deterministic);
 
-    assertThat(decision.action()).isEqualTo(ProviderAttemptAction.RETRY);
-    assertThat(decision.retryAt()).isAfter(now).isBefore(now.plusSeconds(60));
+    assertThat(decision.action()).isEqualTo(ProviderAttemptAction.RECONCILE);
+    assertThat(decision.retryDelay()).isNull();
   }
 
   @Test
-  void retryThatWouldMissDeadlineExpiresInstead() {
-    Instant now = Instant.parse("2026-08-16T00:00:00Z");
-    var decision =
-        planner.afterOutcome(
-            NotificationChannel.EMAIL,
+  void transientFailureUsesBoundedRetryOnlyInsideDeliveryDeadline() {
+    var retry =
+        planner.plan(
+            NotificationChannel.SMS,
             1,
-            ProviderOutcomeClassification.DEFINITIVE_TRANSIENT_FAILURE,
-            now,
-            now.plusMillis(1),
-            DETERMINISTIC_RANDOM);
+            ProviderAttemptClassification.DEFINITIVE_TRANSIENT_FAILURE,
+            Instant.parse("2026-08-16T00:00:00Z"),
+            Instant.parse("2026-08-16T00:02:00Z"),
+            deterministic);
+    var expired =
+        planner.plan(
+            NotificationChannel.SMS,
+            1,
+            ProviderAttemptClassification.DEFINITIVE_TRANSIENT_FAILURE,
+            Instant.parse("2026-08-16T00:01:59Z"),
+            Instant.parse("2026-08-16T00:02:00Z"),
+            deterministic);
 
-    assertThat(decision.action()).isEqualTo(ProviderAttemptAction.EXPIRE);
+    assertThat(retry.action()).isEqualTo(ProviderAttemptAction.RETRY_AFTER);
+    assertThat(retry.retryDelay()).isNotNull();
+    assertThat(expired.action()).isEqualTo(ProviderAttemptAction.EXPIRE);
   }
 
-  private static final class ZeroRandom extends java.util.Random {
+  @Test
+  void closesObservationWindowAtChannelSpecificBound() {
+    Instant accepted = Instant.parse("2026-08-16T00:00:00Z");
+    assertThat(
+            planner.observationWindowClosed(
+                NotificationChannel.SMS,
+                accepted,
+                accepted.plus(NotificationChannel.SMS.observationWindow())))
+        .isTrue();
+    assertThat(
+            planner.observationWindowClosed(
+                NotificationChannel.EMAIL,
+                accepted,
+                accepted.plusSeconds(60)))
+        .isFalse();
+  }
+
+  private record FixedRandomGenerator(double value) implements RandomGenerator {
     @Override
-    public long nextLong(long bound) {
-      return 0;
+    public long nextLong() {
+      return Double.doubleToLongBits(value);
+    }
+
+    @Override
+    public double nextDouble() {
+      return value;
     }
   }
 }

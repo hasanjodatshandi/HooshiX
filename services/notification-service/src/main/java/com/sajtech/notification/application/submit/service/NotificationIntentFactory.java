@@ -1,5 +1,7 @@
 package com.sajtech.notification.application.submit.service;
 
+import com.sajtech.notification.application.submit.NotificationSubmissionError;
+import com.sajtech.notification.application.submit.NotificationSubmissionException;
 import com.sajtech.notification.application.submit.model.CanonicalNotificationIntent;
 import com.sajtech.notification.application.submit.model.SubmitNotificationCommand;
 
@@ -13,27 +15,27 @@ public final class NotificationIntentFactory {
       NotificationRecipientCanonicalizer recipients,
       NotificationLocaleNormalizer locales) {
     if (callerService == null || callerService.isBlank()) {
-      throw new IllegalArgumentException("Caller service is required");
+      throw new IllegalArgumentException("Caller service identity is required");
     }
-    this.callerService = callerService.trim();
+    this.callerService = callerService;
     this.recipients = recipients;
     this.locales = locales;
   }
 
   public CanonicalNotificationIntent create(SubmitNotificationCommand command) {
-    if (command == null) {
-      throw new IllegalArgumentException("Notification command is required");
+    if (command.semanticContent().semanticType().isTimeBound() && command.messageNotAfter() == null) {
+      throw new NotificationSubmissionException(
+          NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST,
+          "Time-bound notification requires message_not_after");
     }
-    String canonicalRecipient = recipients.canonicalize(command.channel(), command.recipient());
-    String canonicalLocale = locales.normalize(command.locale());
     return new CanonicalNotificationIntent(
-        callerService,
         command.requestId(),
+        callerService,
         command.channel(),
-        canonicalRecipient,
-        canonicalLocale,
-        command.messageNotAfter(),
+        recipients.canonicalize(command.channel(), command.recipient()),
+        locales.normalize(command.locale()),
         command.semanticContent().semanticType(),
-        command.semanticContent());
+        command.semanticContent(),
+        command.messageNotAfter());
   }
 }
