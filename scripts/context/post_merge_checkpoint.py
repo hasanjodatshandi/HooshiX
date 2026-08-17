@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,10 @@ def _main_tip(root: Path) -> str:
     )
 
 
+def _parse_timestamp(value: Any) -> datetime:
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
 def _resolve_source_checkpoint(engine: ContextEngine, rel: str) -> tuple[Path, dict[str, Any]]:
     if not isinstance(rel, str) or not CHECKPOINT_PATH_RE.fullmatch(rel):
         raise ContextError("source checkpoint must be a canonical context/checkpoints JSON path")
@@ -72,8 +77,9 @@ def _resolve_source_checkpoint(engine: ContextEngine, rel: str) -> tuple[Path, d
     errors = engine.validate_checkpoint(data, require_commit=False)
     if errors:
         raise ContextError("invalid source checkpoint: " + "; ".join(errors))
-    if data.get("checkpoint_kind") == CHECKPOINT_KIND:
-        raise ContextError("source checkpoint must be a work checkpoint, not post-merge")
+    kind = data.get("checkpoint_kind")
+    if kind not in {None, "work"} or "source_checkpoint" in data:
+        raise ContextError("source checkpoint must be a standalone work checkpoint")
     return path, data
 
 
@@ -122,8 +128,9 @@ def validate_post_merge_checkpoint(
         errors.append("post-merge pull_request must match source checkpoint pull_request")
     if data.get("branch") != "main":
         errors.append("post-merge checkpoint branch must be main")
-    if source is not None and source.get("recorded_at_utc", "") > data.get("recorded_at_utc", ""):
-        errors.append("post-merge checkpoint cannot predate its source checkpoint")
+    if source is not None and not errors:
+        if _parse_timestamp(source["recorded_at_utc"]) > _parse_timestamp(data["recorded_at_utc"]):
+            errors.append("post-merge checkpoint cannot predate its source checkpoint")
     if verify_git and not errors:
         try:
             base_sha, subject_sha, changed_paths = _derive_merge_state(
