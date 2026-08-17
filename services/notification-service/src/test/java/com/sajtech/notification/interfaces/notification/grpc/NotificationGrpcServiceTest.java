@@ -10,14 +10,16 @@ import com.sajtech.notification.application.submit.model.SubmitNotificationResul
 import com.sajtech.notification.contract.v1.NotificationChannel;
 import com.sajtech.notification.contract.v1.NotificationLifecycle;
 import com.sajtech.notification.contract.v1.SubmitNotificationRequest;
+import com.sajtech.notification.contract.v1.SubmitNotificationResponse;
 import com.sajtech.notification.contract.v1.VerificationCodeContent;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.grpc.stub.StreamRecorder;
+import io.grpc.stub.StreamObserver;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +28,7 @@ class NotificationGrpcServiceTest {
       Metadata.Key.of("x-hooshix-error-code", Metadata.ASCII_STRING_MARSHALLER);
 
   @Test
-  void mapsCanonicalSubmitRequestAndReturnsAcceptedHandoff() throws Exception {
+  void mapsCanonicalSubmitRequestAndReturnsAcceptedHandoff() {
     AtomicReference<SubmitNotificationCommand> captured = new AtomicReference<>();
     UUID notificationId = UUID.fromString("d9428888-122b-41e1-b85c-61c0c552a118");
     Instant acceptedAt = Instant.parse("2026-08-16T00:00:00.123456Z");
@@ -40,24 +42,22 @@ class NotificationGrpcServiceTest {
                   acceptedAt,
                   false);
             });
-    StreamRecorder<com.sajtech.notification.contract.v1.SubmitNotificationResponse> recorder =
-        StreamRecorder.create();
+    CapturingObserver<SubmitNotificationResponse> recorder = new CapturingObserver<>();
 
     service.submitNotification(validRequest(), recorder);
 
-    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
-    assertThat(recorder.getError()).isNull();
-    assertThat(recorder.getValues()).hasSize(1);
-    assertThat(recorder.getValues().getFirst().getNotificationId())
-        .isEqualTo(notificationId.toString());
-    assertThat(recorder.getValues().getFirst().getLifecycle())
+    assertThat(recorder.completed).isTrue();
+    assertThat(recorder.error).isNull();
+    assertThat(recorder.values).hasSize(1);
+    assertThat(recorder.values.getFirst().getNotificationId()).isEqualTo(notificationId.toString());
+    assertThat(recorder.values.getFirst().getLifecycle())
         .isEqualTo(NotificationLifecycle.NOTIFICATION_LIFECYCLE_ACCEPTED);
     assertThat(captured.get().locale()).isEqualTo("en-US");
     assertThat(captured.get().messageNotAfter()).isEqualTo(Instant.parse("2026-08-16T00:10:00Z"));
   }
 
   @Test
-  void replayReturnsStoredLifecycleInsteadOfForcingAccepted() throws Exception {
+  void replayReturnsStoredLifecycleInsteadOfForcingAccepted() {
     NotificationGrpcService service =
         new NotificationGrpcService(
             command ->
@@ -67,19 +67,18 @@ class NotificationGrpcServiceTest {
                         .PROVIDER_ACCEPTED,
                     Instant.parse("2026-08-16T00:00:00Z"),
                     true));
-    StreamRecorder<com.sajtech.notification.contract.v1.SubmitNotificationResponse> recorder =
-        StreamRecorder.create();
+    CapturingObserver<SubmitNotificationResponse> recorder = new CapturingObserver<>();
 
     service.submitNotification(validRequest(), recorder);
 
-    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
-    assertThat(recorder.getError()).isNull();
-    assertThat(recorder.getValues().getFirst().getLifecycle())
+    assertThat(recorder.completed).isTrue();
+    assertThat(recorder.error).isNull();
+    assertThat(recorder.values.getFirst().getLifecycle())
         .isEqualTo(NotificationLifecycle.NOTIFICATION_LIFECYCLE_PROVIDER_ACCEPTED);
   }
 
   @Test
-  void exposesOnlyStableMachineCodeForConflict() throws Exception {
+  void exposesOnlyStableMachineCodeForConflict() {
     NotificationGrpcService service =
         new NotificationGrpcService(
             command -> {
@@ -87,13 +86,12 @@ class NotificationGrpcServiceTest {
                   NotificationSubmissionError.REQUEST_ID_CONFLICT,
                   "sensitive recipient or request detail must not cross the boundary");
             });
-    StreamRecorder<com.sajtech.notification.contract.v1.SubmitNotificationResponse> recorder =
-        StreamRecorder.create();
+    CapturingObserver<SubmitNotificationResponse> recorder = new CapturingObserver<>();
 
     service.submitNotification(validRequest(), recorder);
 
-    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
-    StatusRuntimeException error = (StatusRuntimeException) recorder.getError();
+    assertThat(recorder.completed).isFalse();
+    StatusRuntimeException error = (StatusRuntimeException) recorder.error;
     assertThat(error.getStatus().getCode()).isEqualTo(Status.Code.ALREADY_EXISTS);
     assertThat(error.getStatus().getDescription()).isEqualTo("REQUEST_ID_CONFLICT");
     assertThat(Status.trailersFromThrowable(error).get(ERROR_CODE))
@@ -102,7 +100,7 @@ class NotificationGrpcServiceTest {
   }
 
   @Test
-  void rejectsSubMicrosecondTimestampPrecision() throws Exception {
+  void rejectsSubMicrosecondTimestampPrecision() {
     SubmitNotificationRequest request =
         validRequest().toBuilder()
             .setMessageNotAfter(Timestamp.newBuilder().setSeconds(1_787_018_200L).setNanos(123))
@@ -112,14 +110,12 @@ class NotificationGrpcServiceTest {
             command -> {
               throw new AssertionError("invalid request must not reach application use case");
             });
-    StreamRecorder<com.sajtech.notification.contract.v1.SubmitNotificationResponse> recorder =
-        StreamRecorder.create();
+    CapturingObserver<SubmitNotificationResponse> recorder = new CapturingObserver<>();
 
     service.submitNotification(request, recorder);
 
-    assertThat(recorder.awaitCompletion(1, TimeUnit.SECONDS)).isTrue();
-    assertThat(Status.fromThrowable(recorder.getError()).getCode())
-        .isEqualTo(Status.Code.INVALID_ARGUMENT);
+    assertThat(recorder.completed).isFalse();
+    assertThat(Status.fromThrowable(recorder.error).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
   }
 
   private static SubmitNotificationRequest validRequest() {
@@ -132,5 +128,26 @@ class NotificationGrpcServiceTest {
         .setRegistrationVerificationCode(
             VerificationCodeContent.newBuilder().setCode("12345678").setExpiresMinutes(10))
         .build();
+  }
+
+  private static final class CapturingObserver<T> implements StreamObserver<T> {
+    private final List<T> values = new ArrayList<>();
+    private Throwable error;
+    private boolean completed;
+
+    @Override
+    public void onNext(T value) {
+      values.add(value);
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+      error = throwable;
+    }
+
+    @Override
+    public void onCompleted() {
+      completed = true;
+    }
   }
 }
