@@ -53,7 +53,10 @@ public final class JooqNotificationAcceptanceRepository
               text_nonce, text_ciphertext, html_nonce, html_ciphertext,
               accepted_at, sensitive_expires_at, updated_at
           ) VALUES (
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP WITH TIME ZONE),
+              CAST(? AS TIMESTAMP WITH TIME ZONE), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              CAST(? AS TIMESTAMP WITH TIME ZONE), CAST(? AS TIMESTAMP WITH TIME ZONE),
+              CAST(? AS TIMESTAMP WITH TIME ZONE)
           )
           """,
           write.notificationId(),
@@ -87,7 +90,7 @@ public final class JooqNotificationAcceptanceRepository
           """
           INSERT INTO notification_attempt(
               attempt_id, notification_id, attempt_number, state, next_action_at
-          ) VALUES (?, ?, 1, 'PENDING', ?)
+          ) VALUES (?, ?, 1, 'PENDING', CAST(? AS TIMESTAMP WITH TIME ZONE))
           """,
           UUID.randomUUID(),
           write.notificationId(),
