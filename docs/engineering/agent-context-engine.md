@@ -231,6 +231,8 @@ project.changed_context
 
 The server supports MCP `2026-07-28` and bounded stdio compatibility for `2025-11-25` initialize-based clients. It has no HTTP listener, network fetch, file write, Git mutation, checkpoint-create, command-execution, secret-read, deployment, or other mutation tool.
 
+Successful object-shaped tool results contain both matching JSON `TextContent` and `structuredContent`. The text form preserves compatibility with clients that consume textual JSON. The structured form lets tunnel/client integrations consume the same object without reparsing text. `project.latest_checkpoint` may return JSON `null` when no checkpoint exists; that non-object result remains text-only for compatibility with 2025-era object-shaped `structuredContent` contracts. The two forms must not carry different data.
+
 The protocol process writes JSON-RPC frames only to stdout. Startup/diagnostic errors use stderr.
 
 ### 9.1 ChatGPT Web through Secure MCP Tunnel
@@ -279,11 +281,11 @@ make context-post-merge-verify
 
 `context-verify` checks canonical config/path/route/checkpoint consistency, exact generated task-matrix parity, and tracked post-merge checkpoint semantics. Post-merge verification recomputes main ancestry and the recorded `base..subject` changed paths from Git, so repository-structure CI checks out the required Git history.
 
-`context-test` covers bootstrap trust, conservative routing, search provenance/bounds/exclusions, work checkpoint derivation, post-merge same-PR linkage/main reachability/Git-derived path verification, command-injection rejection, CWD-independent stdio MCP startup, and MCP modern/legacy read-only behavior.
+`context-test` covers bootstrap trust, conservative routing, search provenance/bounds/exclusions, work checkpoint derivation, post-merge same-PR linkage/main reachability/Git-derived path verification, command-injection rejection, CWD-independent stdio MCP startup, matching textual/structured object tool results, and MCP modern/legacy read-only behavior.
 
 The repository baseline includes these checks, so context-governance drift cannot be merged only because application tests pass.
 
-Repository tests can verify the tunnel-ready stdio boundary. Real OpenAI tunnel-client installation, runtime key permissions, `/readyz`, ChatGPT Plugin selection/discovery, and ChatGPT Web `project.bootstrap` are external host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
+Repository tests can verify the tunnel-ready stdio boundary. Real OpenAI tunnel-client installation, runtime key permissions, `/readyz`, ChatGPT Plugin selection/discovery, and ChatGPT Web tool calls are external host/integration evidence. Record each as `Passed`, `Failed`, or `Not verified` only from executed operator evidence; repository CI cannot substitute for that evidence.
 
 ## 11. Do not add a central memory service yet
 
