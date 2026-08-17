@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "HooshiX commit-bound work checkpoint",
+  "title": "HooshiX commit-bound context checkpoint",
   "type": "object",
   "required": [
     "schema_version",
