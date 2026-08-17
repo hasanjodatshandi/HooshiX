@@ -18,7 +18,8 @@ public final class BoundedTemplateRenderer {
   private static final int MAX_RENDERED_LENGTH = 32_768;
   private static final int MAX_PLACEHOLDERS = 32;
 
-  public RenderedNotification render(NotificationTemplateVersion template, SemanticContent content) {
+  public RenderedNotification render(
+      NotificationTemplateVersion template, SemanticContent content) {
     if (template == null || content == null) {
       throw new IllegalArgumentException("Template and semantic content are required");
     }
