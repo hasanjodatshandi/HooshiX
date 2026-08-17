@@ -122,8 +122,8 @@ def validate_post_merge_checkpoint(
         errors.append("post-merge pull_request must match source checkpoint pull_request")
     if data.get("branch") != "main":
         errors.append("post-merge checkpoint branch must be main")
-    if source is not None and source.get("recorded_at_utc", "") >= data.get("recorded_at_utc", ""):
-        errors.append("post-merge checkpoint must be recorded after its source checkpoint")
+    if source is not None and source.get("recorded_at_utc", "") > data.get("recorded_at_utc", ""):
+        errors.append("post-merge checkpoint cannot predate its source checkpoint")
     if verify_git and not errors:
         try:
             base_sha, subject_sha, changed_paths = _derive_merge_state(
