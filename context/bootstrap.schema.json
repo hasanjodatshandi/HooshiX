@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HooshiX verified project bootstrap",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "authority_paths",
+    "full_read_roots",
+    "routing_registry",
+    "routing_schema",
+    "checkpoint_schema",
+    "checkpoint_directory",
+    "generated_task_matrix",
+    "retrieval"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project": {
+      "type": "object",
+      "required": ["id", "repository"],
+      "properties": {
+        "id": {"const": "hooshix"},
+        "repository": {"const": "hasanjodatshandi/HooshiX"}
+      },
+      "additionalProperties": false
+    },
+    "authority_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "full_read_roots": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "routing_registry": {"const": "context/routes.json"},
+    "routing_schema": {"const": "context/routes.schema.json"},
+    "checkpoint_schema": {"const": "context/checkpoint.schema.json"},
+    "checkpoint_directory": {"const": "context/checkpoints"},
+    "generated_task_matrix": {"const": "docs/architecture/TASK-REVIEW-MATRIX.md"},
+    "retrieval": {
+      "type": "object",
+      "required": [
+        "max_query_chars",
+        "max_results",
+        "max_excerpt_chars",
+        "max_file_bytes",
+        "excluded_filename_patterns"
+      ],
+      "properties": {
+        "max_query_chars": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "max_results": {"type": "integer", "minimum": 1, "maximum": 100},
+        "max_excerpt_chars": {"type": "integer", "minimum": 80, "maximum": 4096},
+        "max_file_bytes": {"type": "integer", "minimum": 1024, "maximum": 10485760},
+        "excluded_filename_patterns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
