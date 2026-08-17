@@ -17,11 +17,30 @@ Required sequence:
 7. if final review finds another issue in the same coherent change, fix it in the same PR and re-review the affected authority/dependent documents;
 8. mark the pull request ready only when scope/review is complete;
 9. merge into `main` only after required review and verification;
-10. verify the resulting `main` merge/head SHA and final repository state.
+10. verify the resulting `main` merge/head SHA and final repository state;
+11. for a non-trivial task PR with a pre-merge work checkpoint, create the required post-merge checkpoint follow-up defined below.
 
 GitHub does not permit opening a PR whose head has no commit different from base. The smallest legitimate task/governance scaffolding commit may be created first only to establish the Draft PR; substantive work remains inside that PR.
 
 Direct commits to `main` are prohibited for normal agent-driven work. Emergency exceptions require an explicit user instruction describing the emergency and must be documented after the fact.
+
+## Post-merge checkpoint lifecycle
+
+A pre-merge work checkpoint is historical evidence for the subject implementation/review commit. It MUST NOT be rewritten after later CI, reconciliation, or merge evidence exists.
+
+For every non-trivial task PR that created a work checkpoint, after the task PR is merged and the resulting `main` commit is verified:
+
+1. use the verified pre-merge checkpoint as `source_checkpoint`;
+2. use the exact pre-merge `main` commit as `base_commit`;
+3. use the exact merged `main` commit as post-merge `subject_commit`;
+4. record final merge, CI, diff-review, risk, unfinished-work, and next-action evidence in a bounded post-merge receipt;
+5. create the post-merge checkpoint only through `scripts/context/post_merge_checkpoint.py`;
+6. publish that one checkpoint in a focused checkpoint-only follow-up PR against `main`;
+7. run the protected repository baseline on the checkpoint follow-up before merge.
+
+The post-merge tool verifies that the merge subject is reachable from current `main`, the base is its ancestor, the source checkpoint is valid and belongs to the same PR, and `changed_paths` exactly matches the Git-derived `base..merge` diff excluding `context/checkpoints/` transport files.
+
+A checkpoint-only follow-up PR exists only to transport already-derived historical evidence into current Git. It does **not** create another post-merge checkpoint for itself. This explicit non-recursion rule prevents an infinite checkpoint-PR chain. Any substantive code, architecture, security, or governance change added to that follow-up makes the exemption invalid and requires the normal lifecycle.
 
 ## Coherent-change PR rule
 
