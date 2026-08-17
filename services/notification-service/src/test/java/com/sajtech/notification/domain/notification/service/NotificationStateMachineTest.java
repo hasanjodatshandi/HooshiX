@@ -12,8 +12,7 @@ class NotificationStateMachineTest {
   @Test
   void permitsCanonicalAcceptedToSendingProgression() {
     assertThat(
-            stateMachine.transition(
-                NotificationLifecycle.ACCEPTED, NotificationLifecycle.SENDING))
+            stateMachine.transition(NotificationLifecycle.ACCEPTED, NotificationLifecycle.SENDING))
         .isEqualTo(NotificationLifecycle.SENDING);
   }
 
