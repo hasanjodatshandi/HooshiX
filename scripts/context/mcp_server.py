@@ -15,7 +15,7 @@ LEGACY_VERSION = "2025-11-25"
 SUPPORTED_VERSIONS = [MODERN_VERSION, LEGACY_VERSION]
 SERVER_INFO = {
     "name": "hooshix-context-engine",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Read-only Git-native HooshiX project context and retrieval server",
 }
 MAX_MESSAGE_BYTES = 1024 * 1024
@@ -296,6 +296,8 @@ class McpContextServer:
                     value = handler(arguments)
                     text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
                     result = {"content": [{"type": "text", "text": text}], "isError": False}
+                    if isinstance(value, dict):
+                        result["structuredContent"] = value
                 except (ContextError, ProtocolError) as exc:
                     if isinstance(exc, ProtocolError) and exc.code == -32602:
                         raise
