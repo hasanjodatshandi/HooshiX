@@ -112,6 +112,7 @@ class McpContextServerTest(unittest.TestCase):
         bootstrap = json.loads(responses[1]["result"]["content"][0]["text"])
         self.assertEqual(str(script.parents[2].resolve()), bootstrap["repository_root"])
         self.assertTrue(bootstrap["verification"]["valid"])
+        self.assertEqual(bootstrap, responses[1]["result"]["structuredContent"])
 
     def test_modern_tool_call_works_without_discover_when_meta_selects_era(self) -> None:
         temp, root, engine = make_repo()
@@ -133,6 +134,32 @@ class McpContextServerTest(unittest.TestCase):
         self.assertEqual("complete", response["result"]["resultType"])
         self.assertIn(
             '"review_mode": "targeted"', response["result"]["content"][0]["text"]
+        )
+
+    def test_modern_search_returns_structured_and_text_results(self) -> None:
+        temp, root, engine = make_repo()
+        self.addCleanup(temp.cleanup)
+        server = McpContextServer(engine)
+        response = server.dispatch(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "_meta": modern_meta(),
+                    "name": "project.search",
+                    "arguments": {"query": "Identity password", "limit": 2},
+                },
+            }
+        )
+
+        self.assertFalse(response["result"]["isError"])
+        structured = response["result"]["structuredContent"]
+        serialized = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual(structured, serialized)
+        self.assertTrue(structured["results"])
+        self.assertTrue(
+            any(item["path"] == "src/example.txt" for item in structured["results"])
         )
 
     def test_modern_request_rejects_wrong_version(self) -> None:
@@ -181,6 +208,10 @@ class McpContextServerTest(unittest.TestCase):
         )
         self.assertFalse(response["result"]["isError"])
         self.assertNotIn("resultType", response["result"])
+        self.assertEqual(
+            json.loads(response["result"]["content"][0]["text"]),
+            response["result"]["structuredContent"],
+        )
 
     def test_unknown_tool_is_invalid_params(self) -> None:
         temp, root, engine = make_repo()
