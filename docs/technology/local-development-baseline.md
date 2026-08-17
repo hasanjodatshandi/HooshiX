@@ -230,7 +230,7 @@ Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/H
 
 DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and pass/fail status without emitting discovered secret content. Release verification separately reports Syft/Grype/Cosign/Kyverno evidence when that boundary is active.
 
-For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
+For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point, fixed five-tool boundary, positive-search structured/text result compatibility, configured sensitive-path retrieval exclusion, and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, remote-main freshness at startup/session time, ChatGPT custom-app tool discovery/action state, persistent restart behavior, and ChatGPT Web `project.bootstrap` plus positive-result `project.search` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 
