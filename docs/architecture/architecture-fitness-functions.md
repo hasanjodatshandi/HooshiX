@@ -54,7 +54,7 @@ This catalog defines properties that should be continuously verified. A row is n
 | AFF-048 | Final releasable image has digest-bound Syft SBOM, Grype decision, Cosign signature/provenance/signed-SBOM evidence | release pipeline + artifact verification | release | block promotion |
 | AFF-049 | DevSecOps scanner/feed/signing/admission failure or stale evidence cannot silently permit the boundary that depends on it | Gitleaks/Semgrep/OSV/Grype/Cosign/Kyverno failure/freshness/negative fixtures under ADR-0035/0038/0045 | PR/release | block affected merge/promotion |
 | AFF-050 | OSV scheduled dependency advisory scanning does not replace deployed-digest final-artifact rescanning | scheduled OSV evidence + ADR-0035 Grype deployed-digest rescan evidence | scheduled/release | block false vulnerability-readiness claim |
-| AFF-051 | Agent context is Git-provenanced, conservative under uncertainty, and exposed through read-only bounded local tooling only | context bootstrap/router/checkpoint/search/MCP tests + generated matrix check | PR | block misleading/narrow agent context |
+| AFF-051 | Agent context is Git-provenanced, conservative under uncertainty, and exposed through read-only bounded local tooling only | context bootstrap/router/work-checkpoint/post-merge ancestry+same-PR+Git-diff/search/MCP tests + generated matrix check | PR | block misleading/narrow agent context |
 
 ## Interpretation
 
@@ -63,5 +63,5 @@ This catalog defines properties that should be continuously verified. A row is n
 - A capacity problem is not permission to disable OpenBao, Kyverno, Ambient, WAF, PITR, MFA, fail-closed quota/Authorization, required audit, client-address trust, secret scanning, dependency advisory scanning, or signed final-artifact gates.
 - ADR-0044 ordinary telemetry is best-effort/bounded; privileged/security audit remains separate authority.
 - ADR-0045 owns the selected DevSecOps tool roles. OSV-Scanner is early declared/locked dependency advisory feedback; Syft+Grype own final-image release/deployed-artifact vulnerability evidence. Trivy/OWASP Dependency-Check remain unselected unless a distinct coverage gap is reviewed.
-- ADR-0046 keeps Git as project-context authority. Context routes, retrieval, and checkpoints are derived support; unknown/ambiguous/dirty-authority state cannot be used to justify a narrower review. The read-only Context MCP surface cannot mutate the repository or production state.
+- ADR-0046 keeps Git as project-context authority. Context routes, retrieval, work checkpoints, and post-merge checkpoints are derived support; unknown/ambiguous/dirty-authority state cannot be used to justify a narrower review. Post-merge evidence must remain same-PR, path-confined, main-reachable, and Git-diff-derived. The read-only Context MCP surface cannot mutate the repository or production state.
 - Blocking functions need concrete executable CI/release/scheduled jobs before compliance is claimed.
