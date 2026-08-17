@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 
 class ProviderAttemptPlannerTest {
   private static final RandomGenerator DETERMINISTIC_RANDOM = new ZeroRandom();
-  private final ProviderAttemptPlanner planner = new ProviderAttemptPlanner(new ProviderRetryPolicy());
+  private final ProviderAttemptPlanner planner =
+      new ProviderAttemptPlanner(new ProviderRetryPolicy());
 
   @Test
   void ambiguousOutcomeAlwaysReconciles() {
