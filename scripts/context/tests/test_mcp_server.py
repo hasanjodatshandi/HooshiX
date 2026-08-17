@@ -28,6 +28,12 @@ def modern_meta() -> dict:
     }
 
 
+def assert_structured_matches_text(test: unittest.TestCase, result: dict) -> dict:
+    text_value = json.loads(result["content"][0]["text"])
+    test.assertEqual(text_value, result["structuredContent"])
+    return result["structuredContent"]
+
+
 class McpContextServerTest(unittest.TestCase):
     def test_modern_discover_and_readonly_tool_list(self) -> None:
         temp, root, engine = make_repo()
@@ -109,7 +115,7 @@ class McpContextServerTest(unittest.TestCase):
             responses[0]["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"],
         )
         self.assertFalse(responses[1]["result"]["isError"])
-        bootstrap = json.loads(responses[1]["result"]["content"][0]["text"])
+        bootstrap = assert_structured_matches_text(self, responses[1]["result"])
         self.assertEqual(str(script.parents[2].resolve()), bootstrap["repository_root"])
         self.assertTrue(bootstrap["verification"]["valid"])
 
@@ -131,9 +137,33 @@ class McpContextServerTest(unittest.TestCase):
         )
         self.assertFalse(response["result"]["isError"])
         self.assertEqual("complete", response["result"]["resultType"])
-        self.assertIn(
-            '"review_mode": "targeted"', response["result"]["content"][0]["text"]
+        structured = assert_structured_matches_text(self, response["result"])
+        self.assertEqual("targeted", structured["review_mode"])
+        self.assertEqual("identity", structured["route"])
+
+    def test_context_for_task_full_read_null_route_is_structured(self) -> None:
+        temp, root, engine = make_repo()
+        self.addCleanup(temp.cleanup)
+        server = McpContextServer(engine)
+        response = server.dispatch(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "_meta": modern_meta(),
+                    "name": "project.context_for_task",
+                    "arguments": {"task": "frobnicate the unrelated widget"},
+                },
+            }
         )
+
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual("complete", response["result"]["resultType"])
+        structured = assert_structured_matches_text(self, response["result"])
+        self.assertEqual("full-read", structured["review_mode"])
+        self.assertIsNone(structured["route"])
+        self.assertEqual("no deterministic route match", structured["selection_reason"])
 
     def test_modern_request_rejects_wrong_version(self) -> None:
         temp, root, engine = make_repo()
@@ -181,6 +211,29 @@ class McpContextServerTest(unittest.TestCase):
         )
         self.assertFalse(response["result"]["isError"])
         self.assertNotIn("resultType", response["result"])
+        structured = assert_structured_matches_text(self, response["result"])
+        self.assertEqual("Identity", structured["query"])
+
+    def test_empty_latest_checkpoint_keeps_object_compatible_shape(self) -> None:
+        temp, root, engine = make_repo()
+        self.addCleanup(temp.cleanup)
+        server = McpContextServer(engine)
+        response = server.dispatch(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "_meta": modern_meta(),
+                    "name": "project.latest_checkpoint",
+                    "arguments": {},
+                },
+            }
+        )
+
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual("null", response["result"]["content"][0]["text"])
+        self.assertNotIn("structuredContent", response["result"])
 
     def test_unknown_tool_is_invalid_params(self) -> None:
         temp, root, engine = make_repo()
