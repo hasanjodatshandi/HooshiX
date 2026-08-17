@@ -13,6 +13,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | --- | --- |
 | Current ADRs/stable IDs | `../adr/decision-register.md` |
 | Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
+| ChatGPT Web Context Engine tunnel bridge | ADR-0047 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -37,6 +38,8 @@ ADR-0046 keeps project context Git-native. `../../context/routes.json` is the ca
 
 The read-only MCP adapter and local retrieval are repository/developer tooling only. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
 
+ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
+
 ## External primary sources used by current decisions
 
 Use upstream/official primary sources for version, protocol, API, and support claims.
@@ -48,6 +51,15 @@ Use upstream/official primary sources for version, protocol, API, and support cl
 - MCP tools: `https://modelcontextprotocol.io/specification/2026-07-28/server/tools`
 
 ADR-0046 uses MCP only as a read-only local interoperability adapter. The repository remains context authority regardless of protocol/client metadata.
+
+### ChatGPT Web Secure MCP Tunnel
+
+- OpenAI tunnel-client repository: `https://github.com/openai/tunnel-client`
+- OpenAI tunnel-client stable releases/integrity metadata: `https://github.com/openai/tunnel-client/releases/latest`
+- OpenAI tunnel-client end-user guide: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/end-user-guide.md`
+- OpenAI tunnel-client configuration reference: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/configuration.md`
+
+ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. Version/integrity/authentication facts are developer-tool inputs; they do not prove the operator PC tunnel is installed, ready, or connected to ChatGPT.
 
 ### DevSecOps security toolchain
 
@@ -109,5 +121,6 @@ Kyverno 1.18 marks `policies.kyverno.io/v1` CEL types stable and legacy ClusterP
 
 - Do not copy upstream release notes into multiple repository authorities.
 - Record exact production versions only in Technology Baseline and deployment locks/digests.
+- Developer-only integration pins may live in Local Development Baseline when they do not affect production runtime.
 - A source URL is evidence input, not proof that repository implementation exists.
 - When an upstream statement changes materially, review affected ADR/baseline/compatibility/evidence gates in one coherent change.
