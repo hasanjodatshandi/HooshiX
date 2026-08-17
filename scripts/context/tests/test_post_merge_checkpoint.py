@@ -222,6 +222,31 @@ class PostMergeCheckpointTest(unittest.TestCase):
                 source_checkpoint="context/checkpoints/../checkpoint.schema.json",
             )
 
+    def test_post_merge_checkpoint_rejects_nested_source_checkpoint(self) -> None:
+        temp, root, engine = make_repo()
+        self.addCleanup(temp.cleanup)
+        base = engine.head()
+        write(root, "src/new.txt", "merged work\n")
+        git(root, "add", "src/new.txt")
+        git(root, "commit", "-m", "work")
+        source = create_source_checkpoint(root, engine, base=base)
+        source_path = root / source
+        source_data = json.loads(source_path.read_text(encoding="utf-8"))
+        source_data["checkpoint_kind"] = "work"
+        source_data["source_checkpoint"] = source
+        source_path.write_text(json.dumps(source_data), encoding="utf-8")
+        git(root, "add", source)
+        git(root, "commit", "-m", "invalid nested work checkpoint")
+
+        with self.assertRaises(ContextError):
+            create_post_merge_checkpoint(
+                engine,
+                post_merge_receipt(root),
+                base=base,
+                merge_commit=engine.head(),
+                source_checkpoint=source,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
