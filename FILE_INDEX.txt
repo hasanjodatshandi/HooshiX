@@ -14,6 +14,7 @@ README.md
 context/bootstrap.json
 context/bootstrap.schema.json
 context/checkpoint.schema.json
+context/checkpoints/20260817T062054Z-implement-git-native-agent-context-engine-v1.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
