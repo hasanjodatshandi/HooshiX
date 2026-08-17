@@ -27,6 +27,8 @@
     "recorded_at_utc": {"type": "string", "format": "date-time"},
     "project_id": {"const": "hooshix"},
     "repository": {"const": "hasanjodatshandi/HooshiX"},
+    "checkpoint_kind": {"enum": ["work", "post-merge"]},
+    "source_checkpoint": {"type": "string", "pattern": "^context/checkpoints/[0-9]{8}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,63}\\.json$"},
     "branch": {"type": "string", "minLength": 1, "maxLength": 255},
     "base_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "subject_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
@@ -70,6 +72,17 @@
     "unfinished": {"$ref": "#/$defs/stringList"},
     "next_actions": {"$ref": "#/$defs/stringList"}
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["checkpoint_kind"],
+        "properties": {"checkpoint_kind": {"const": "post-merge"}}
+      },
+      "then": {
+        "required": ["source_checkpoint", "pull_request"]
+      }
+    }
+  ],
   "$defs": {
     "stringList": {
       "type": "array",
