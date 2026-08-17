@@ -108,7 +108,7 @@ jobs:
           /tmp/buf lint
           /tmp/buf build -o /tmp/notification-contract.binpb
           if git cat-file -e origin/main:services/notification-service/src/main/proto 2>/dev/null; then
-            /tmp/buf breaking --against '.git#branch=main,subdir=services/notification-service'
+            /tmp/buf breaking --against '../../.git#branch=main,subdir=services/notification-service'
           fi
 
       - name: Run pinned Semgrep policy
