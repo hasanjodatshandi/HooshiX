@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Format Notification source
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -15,6 +20,7 @@ permissions:
 jobs:
   repository-structure:
     name: Repository structure verify
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -32,11 +38,12 @@ jobs:
 
   service-security:
     name: Compromised Password security suite
+    if: github.event_name != 'workflow_run'
     uses: ./.github/workflows/compromised-password-service.yml
 
   baseline:
     name: Baseline verify
-    if: ${{ always() }}
+    if: ${{ always() && github.event_name != 'workflow_run' }}
     needs:
       - repository-structure
       - service-security
@@ -58,3 +65,97 @@ jobs:
             exit 1
           fi
           echo 'Required repository and service security verification passed.'
+
+  apply-notification-format:
+    name: Apply reviewed Notification formatter output
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_branch == 'agent/notification-service-vertical-slice' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    permissions:
+      actions: read
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact audited branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/notification-service-vertical-slice
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Verify workflow head did not move
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD_SHA}"
+
+      - name: Download formatter artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: notification-format-output
+          path: /tmp/notification-format-output
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify exact reviewed formatter output
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected-format.sha256 <<'HASHES'
+          998b91664f9b966ccf503eee02a6c423cb0d2bb3b5a8d6b8a37cb7794b7a0d01  services/notification-service/src/main/java/com/sajtech/notification/application/delivery/model/ProviderDispatchOutcome.java
+          0263172382dd469c0d367b32b7b368462d2744705901fa590e1d1663afbfbbba  services/notification-service/src/main/java/com/sajtech/notification/application/delivery/service/ProviderAttemptPlanner.java
+          770db6c35b18bc91116e75f0d235fe3cfb41bc0d14a110508ef40c112a388625  services/notification-service/src/main/java/com/sajtech/notification/application/submit/model/EncryptedDeliveryPayload.java
+          815de54988b53fa8a57db931458f3171571ef9cdfee046ba41bc9d599af937b8  services/notification-service/src/main/java/com/sajtech/notification/application/submit/model/SubmitNotificationCommand.java
+          9cd2f311dc2995810832585da434e9506095f552daf320aecc59045fe5face8d  services/notification-service/src/main/java/com/sajtech/notification/application/submit/model/VerificationCodeContent.java
+          772544b53c6e218df782a1538f69b63188759f06baa92c07d814e97e21eab049  services/notification-service/src/main/java/com/sajtech/notification/application/submit/service/FingerprintMaterialEncoder.java
+          ceafbb5cd953c7721ffef7898fcbb03885ee0f3d58bd42e3cdd963fce9c489ac  services/notification-service/src/main/java/com/sajtech/notification/application/submit/service/NotificationIntentFactory.java
+          038f337571f81d25253a8860cca46b5cd8d1de1c530a2b7dfd906a982ea3fc2a  services/notification-service/src/main/java/com/sajtech/notification/application/submit/service/NotificationRecipientCanonicalizer.java
+          e49e96b6c8f4c6d05d744142f015dfd00501deff95244de2cf832633d7320117  services/notification-service/src/main/java/com/sajtech/notification/application/submit/usecase/SubmitNotificationUseCase.java
+          cae0ca38b58cb629acd0174cfa29abf74093a9b0c3fb2fcd96b1b95f396e76aa  services/notification-service/src/main/java/com/sajtech/notification/application/template/service/BoundedTemplateRenderer.java
+          b046bad99bd7fce8d53f1b322da63f8e8a555beb50905698f5e5afc369ccf885  services/notification-service/src/main/java/com/sajtech/notification/configuration/RuntimeConfiguration.java
+          f97e406854d336753f0276ff490e182ee8f5a37431f175ab5978f8fa2f9950bc  services/notification-service/src/main/java/com/sajtech/notification/infrastructure/observability/NotificationKeyRingRefresher.java
+          af936ba1655a9571b1d727723abd18a489d0c6414857f27c3521a84a4a953d0f  services/notification-service/src/main/java/com/sajtech/notification/infrastructure/observability/NotificationReadinessHealthIndicator.java
+          421b726489ea08fde37d2c6f35b3256a05f87bc3f86ec7818a26608e16c95387  services/notification-service/src/main/java/com/sajtech/notification/infrastructure/persistence/JooqNotificationAcceptanceRepository.java
+          c39dd7dc707ea623ee3efe4b3b6353c2b4ac9ff09ae716e7663605f057a7ec52  services/notification-service/src/main/java/com/sajtech/notification/infrastructure/security/escrow/AesGcmDeliveryEscrow.java
+          0ab0311c827cc8560568a8645d67b25dae4ba30f3195627a3f7d3632965acc7f  services/notification-service/src/main/java/com/sajtech/notification/infrastructure/security/fingerprint/FileBackedHmacIntentFingerprint.java
+          f5b2cd9303c419cb281378a6acad5d7335848a3c0a89d123a3ceed2766a62b44  services/notification-service/src/main/java/com/sajtech/notification/infrastructure/security/keyring/FileBackedKeyRing.java
+          429a137638a0819c17201a8019e395b31544b80c07fe0e01c640de0e4c63c126  services/notification-service/src/main/java/com/sajtech/notification/interfaces/notification/grpc/NotificationGrpcService.java
+          cee679cbd53a286e0741e7a473708db0b9a56aeecd45b75226250d6db385a21e  services/notification-service/src/test/java/com/sajtech/notification/application/delivery/service/ProviderAttemptPlannerTest.java
+          bedc8e17da5cc8bf0bef3be29bf9a5387d2e549f3f93742d1706c89d22fb6b85  services/notification-service/src/test/java/com/sajtech/notification/application/submit/service/NotificationRecipientCanonicalizerTest.java
+          ed45c52bc2540bd311ccb32f8d9e89b7d5d035dcf2393007ad3d50397f979c72  services/notification-service/src/test/java/com/sajtech/notification/domain/notification/service/NotificationStateMachineTest.java
+          4f83d0f139e02af738bea8e3c13f015ef3d2d0ca401d0761f5021aa1622a730f  services/notification-service/src/test/java/com/sajtech/notification/domain/notification/service/ProviderRetryPolicyTest.java
+          577819247a58a41342863ad9afd4a7c8d4311f2cfe9061830fa421302e42d05a  services/notification-service/src/test/java/com/sajtech/notification/infrastructure/persistence/NotificationPersistenceIntegrationTest.java
+          3c722c7f8c37ad84292e5c7fec7110edc96a0ebcb72db1a7840194dba5d41040  services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/FileBackedHmacIntentFingerprintTest.java
+          4755630a877735945f5812d08b79a63429062e61c7f8085295287c334b01ada4  services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/FileBackedKeyRingTest.java
+          5823793ef1c258a6470221986d8b8afa9ca249d2f22db0b174f7a8d49dacbf74  services/notification-service/src/test/java/com/sajtech/notification/interfaces/notification/grpc/NotificationGrpcServiceTest.java
+          HASHES
+          sed 's#  #  /tmp/notification-format-output/files/#' /tmp/expected-format.sha256 > /tmp/expected-format-absolute.sha256
+          sha256sum --check --strict /tmp/expected-format-absolute.sha256
+          cut -d' ' -f3- /tmp/expected-format.sha256 > /tmp/expected-paths.txt
+          diff -u /tmp/expected-paths.txt /tmp/notification-format-output/changed-files.txt
+          find /tmp/notification-format-output/files -type f -printf '%P\n' | LC_ALL=C sort > /tmp/actual-artifact-paths.txt
+          LC_ALL=C sort /tmp/expected-paths.txt > /tmp/expected-paths-sorted.txt
+          diff -u /tmp/expected-paths-sorted.txt /tmp/actual-artifact-paths.txt
+
+      - name: Apply exact formatter data and remove helper
+        run: |
+          set -euo pipefail
+          while IFS= read -r path; do
+            cp "/tmp/notification-format-output/files/${path}" "${path}"
+            git add "${path}"
+          done < /tmp/expected-paths.txt
+          git rm .github/workflows/format-notification-source.yml
+          git diff --cached --check
+          git ls-files | LC_ALL=C sort > /tmp/current-file-index.txt
+          diff -u FILE_INDEX.txt /tmp/current-file-index.txt
+          git diff --cached --name-only | LC_ALL=C sort > /tmp/changed.txt
+          { cat /tmp/expected-paths-sorted.txt; echo '.github/workflows/format-notification-source.yml'; } | LC_ALL=C sort > /tmp/expected-changed.txt
+          diff -u /tmp/expected-changed.txt /tmp/changed.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Apply reviewed Notification formatter output'
+          git push origin HEAD:agent/notification-service-vertical-slice
