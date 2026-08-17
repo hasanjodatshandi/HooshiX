@@ -78,7 +78,7 @@ def _resolve_source_checkpoint(engine: ContextEngine, rel: str) -> tuple[Path, d
     if errors:
         raise ContextError("invalid source checkpoint: " + "; ".join(errors))
     kind = data.get("checkpoint_kind")
-    if kind not in {None, "work"} or "source_checkpoint" in data:
+    if (kind is not None and kind != "work") or "source_checkpoint" in data:
         raise ContextError("source checkpoint must be a standalone work checkpoint")
     return path, data
 
