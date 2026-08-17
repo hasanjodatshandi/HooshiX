@@ -76,9 +76,7 @@ class NotificationPersistenceIntegrationTest {
                     "en-US",
                     Instant.parse("2026-08-16T00:10:00Z"),
                     new VerificationCodeContent(
-                        NotificationSemanticType.REGISTRATION_VERIFICATION_CODE,
-                        "12345678",
-                        10)));
+                        NotificationSemanticType.REGISTRATION_VERIFICATION_CODE, "12345678", 10)));
     var write =
         new AcceptedNotificationWrite(
             UUID.fromString("11111111-1111-4111-8111-111111111111"),
