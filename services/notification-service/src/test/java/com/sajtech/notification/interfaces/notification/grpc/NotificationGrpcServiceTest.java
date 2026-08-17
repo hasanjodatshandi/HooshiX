@@ -52,7 +52,7 @@ class NotificationGrpcServiceTest {
     assertThat(recorder.values.getFirst().getNotificationId()).isEqualTo(notificationId.toString());
     assertThat(recorder.values.getFirst().getLifecycle())
         .isEqualTo(NotificationLifecycle.NOTIFICATION_LIFECYCLE_ACCEPTED);
-    assertThat(captured.get().locale()).isEqualTo("en-US");
+    assertThat(captured.get().locale()).isEqualTo("en");
     assertThat(captured.get().messageNotAfter()).isEqualTo(Instant.parse("2026-08-16T00:10:00Z"));
   }
 
