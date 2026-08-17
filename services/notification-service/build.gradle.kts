@@ -113,6 +113,7 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     useJUnitPlatform {
         includeTags("integration")
     }
