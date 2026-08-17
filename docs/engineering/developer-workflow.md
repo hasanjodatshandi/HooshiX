@@ -16,7 +16,32 @@ Normal work does not commit directly to `main`. A PR is not ready with a known C
 
 ADR/documentation work also follows stable-ID/current-only policy.
 
-## 2. Inner-loop principle
+## 2. Agent/session bootstrap and continuation
+
+ADR-0046 provides a local Git-native context path for work that moves between chats, clients, or AI agents without making model memory authoritative.
+
+At a new non-trivial session, where repository tooling is available:
+
+```bash
+make context-verify
+make context-bootstrap
+python3 scripts/context/context_engine.py route --task '<current task>'
+```
+
+A clean verified bootstrap can remove ordinary chat/session context uncertainty. A real `full-read` trigger still requires full review. Unknown/ambiguous routing, dirty authority state, current-source disagreement, or an engine validation failure must not be converted into a guessed targeted scope.
+
+For continuation from prior work:
+
+```bash
+python3 scripts/context/context_engine.py latest-checkpoint
+python3 scripts/context/context_engine.py changed --base <checkpoint-subject-commit>
+```
+
+Checkpoint records are historical evidence only. Current Git/Decision Register/architecture remains authoritative. Do not copy a checkpoint into current architecture merely to preserve conversational history.
+
+The local MCP adapter exposes the same bootstrap/routing/search/checkpoint/diff information read-only over stdio. It is not a repository mutation or production-management channel.
+
+## 3. Inner-loop principle
 
 Use the smallest trustworthy scope:
 
@@ -32,7 +57,15 @@ Use the smallest trustworthy scope:
 
 Pure Domain/Application work does not require a complete Kubernetes stack.
 
-## 3. Day-One observability development rule
+For repository/context-engine changes, use the cheapest trustworthy path first:
+
+```bash
+make context-test
+make context-verify
+make baseline-verify
+```
+
+## 4. Day-One observability development rule
 
 ADR-0044 is part of implementation, not a later platform phase.
 
@@ -51,7 +84,7 @@ Do not merge a feature with TODO text such as “add observability later” when
 
 For local development, telemetry backends may be optional when the code path is testable with an in-memory/test OTLP exporter or local Collector fixture. This does not remove staging/release evidence against the real Collector/backends.
 
-## 4. Local-only substitutions
+## 5. Local-only substitutions
 
 Local adapters/fakes are allowed only where architecture permits and MUST be impossible to activate in staging/production. Use profile constraints equivalent to `local & !staging & !production` where applicable.
 
@@ -61,12 +94,15 @@ Reference Data may use its approved immutable local bundle before ADR-0041 indep
 
 Compromised Password normal PR tests use deterministic generated SHA-1 corpus fixtures. They do not require downloading the production HIBP corpus for every edit. Release/dataset evidence still uses the complete approved HIBP corpus.
 
-## 5. CI efficiency
+The Agent Context Engine is local repository tooling by design. Do not turn its local stdio MCP adapter into a production/cluster service merely to make clients uniform.
+
+## 6. CI efficiency
 
 Independent checks SHOULD run in parallel where safe, such as:
 
 - Gitleaks + Semgrep + unit + ArchUnit + static analysis;
 - contract + Gradle dependency verification + OSV-Scanner advisory scan;
+- Context Engine tests + existing repository baseline checks;
 - independent integration shards;
 - quota clock/cardinality tests separate from unrelated service tests;
 - observability config/privacy/context tests separate from heavy telemetry storage/load tests;
@@ -82,22 +118,22 @@ OSV-Scanner is earlier dependency feedback. It does not replace final-image Syft
 
 Use Gradle build/configuration cache and secure reproducible CI caching where compatible. Never skip a mandatory gate to reduce duration.
 
-## 6. Secret-finding workflow
+## 7. Secret-finding workflow
 
 ADR-0045 selects Gitleaks as the dedicated current-tree/Git-history secret scanner.
 
 If Gitleaks finds a likely real credential:
 
-1. do not paste the secret into PR comments, tickets, logs, or chat;
+1. do not paste the secret into PR comments, tickets, logs, chat, context checkpoints, or MCP output examples;
 2. revoke/rotate it when exposure is plausible;
 3. remove it from current source/config;
 4. follow incident/history-remediation procedure when prior Git exposure exists;
 5. rerun current-tree and history scans;
 6. use an allow-list only for an exact reviewed false positive or non-secret fixture that cannot reasonably be mistaken for a live credential.
 
-Deleting a line from the latest tree does not by itself remediate a committed credential.
+Deleting a line from the latest tree does not by itself remediate a committed credential. Tracked-file-only Context Engine retrieval does not prove that Git contains no secret.
 
-## 7. Dependency advisory workflow
+## 8. Dependency advisory workflow
 
 ADR-0045 selects OSV-Scanner for early declared/locked dependency advisory feedback.
 
@@ -112,7 +148,7 @@ When OSV-Scanner finds a vulnerability:
 
 Scheduled OSV scanning is useful for newly disclosed dependency findings even without a source change. ADR-0035/0038 final-artifact Grype rescanning remains the production/deployed-digest vulnerability authority.
 
-## 8. Heavy verification
+## 9. Heavy verification
 
 These are not every-edit requirements unless the change directly demands them:
 
@@ -127,13 +163,15 @@ These are not every-edit requirements unless the change directly demands them:
 
 They remain mandatory at the current release/scheduled cadence. A fast gate may protect a regression class at PR time, but it does not delete the heavy evidence gate.
 
-## 9. Service startup discipline
+## 10. Service startup discipline
 
 Do not start unrelated services for a narrow task. Use explicit contracts/test doubles for unit/application tests and real downstreams when integration behavior is the subject under test.
 
 Do not create a new network service merely to make local composition look uniform. ADR-0041 Reference Data remains local until its deployable trigger is evidenced.
 
-## 10. Performance guardrails
+ADR-0046 likewise prohibits a central Context/Memory service until its separate evidence trigger and reviewed decision exist.
+
+## 11. Performance guardrails
 
 Virtual Threads do not remove downstream resource limits. Keep DB pools, gRPC concurrency, Kafka consumers, Redis work, telemetry queues, workers, and provider calls bounded/observable.
 
@@ -141,7 +179,9 @@ Do not add cache/broker/proxy/retry/service/distributed coordination as speculat
 
 Semantic quota development also measures new security-bucket cardinality and common-mode clock behavior; normal-traffic latency alone is not enough.
 
-## 11. Local code-quality baseline
+Context retrieval v1 stays local/lexical/rebuildable. Do not add a vector database, embedding provider, hosted index, or central memory service until measured retrieval failures justify the added data-flow, dependency, cost, and security lifecycle.
+
+## 12. Local code-quality baseline
 
 Java pre-push SHOULD run the repository-defined equivalent of:
 
@@ -154,11 +194,19 @@ gitleaks git --redact=100
 # focused integration/contract/schema/dataset/quota/observability tasks
 ```
 
+Repository/context changes also run:
+
+```bash
+make context-test
+make context-verify
+make baseline-verify
+```
+
 Exact Gitleaks/OSV versions and configuration come from Technology Baseline/repository CI. Local commands are convenience feedback; protected CI remains authoritative.
 
 Use `spotlessApply` only for formatting. Do not weaken gates for speed.
 
-## 12. Code-generation preflight
+## 13. Code-generation preflight
 
 Before implementation, complete the mandatory preflight in `AGENTS.md` and `coding-standards.md`.
 
@@ -166,9 +214,9 @@ Decide ownership/ports, sync-vs-event, transactions, deadlines/retry/idempotency
 
 AI-generated and handwritten code use the same gates. Compilation alone is not completion evidence.
 
-## 13. Local platform foundation
+## 14. Local platform foundation
 
-Use the pinned local foundation only when real mesh/edge/Gateway/NetworkPolicy/telemetry integration is under test.
+Use the pinned local foundation only when real Kubernetes/mesh/edge/policy/telemetry integration is under test.
 
 Expected interface after implementation exists:
 
@@ -179,5 +227,7 @@ make verify-local-istio-ambient
 make verify-local-traefik-edge
 make verify-local-observability   # when ADR-0044 local target exists
 ```
+
+The Context Engine does not require the local Kubernetes foundation.
 
 A documented target is not evidence until the target actually exists and passes.
