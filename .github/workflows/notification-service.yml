@@ -117,11 +117,17 @@ jobs:
           docker run --rm \
             --network none \
             --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=128m \
             --cap-drop ALL \
             --security-opt no-new-privileges \
-            -v "${GITHUB_WORKSPACE}:/src:ro" \
+            --volume "${GITHUB_WORKSPACE}:/src:ro" \
+            --workdir /src \
+            --env HOME=/tmp \
+            --env SEMGREP_SEND_METRICS=off \
             "${SEMGREP_IMAGE}" \
-            semgrep --error --config /src/.semgrep/notification-service.yml /src/services/notification-service/src/main/java
+            semgrep scan --error \
+              --config .semgrep/notification-service.yml \
+              services/notification-service/src/main/java
 
       - name: Install and verify Helm
         run: |
