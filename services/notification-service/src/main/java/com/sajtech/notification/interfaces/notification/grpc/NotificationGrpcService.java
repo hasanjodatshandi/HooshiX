@@ -18,7 +18,8 @@ import io.grpc.stub.StreamObserver;
 import java.time.Instant;
 import java.util.UUID;
 
-public final class NotificationGrpcService extends NotificationServiceGrpc.NotificationServiceImplBase {
+public final class NotificationGrpcService
+    extends NotificationServiceGrpc.NotificationServiceImplBase {
   private final SubmitNotification submitNotification;
 
   public NotificationGrpcService(SubmitNotification submitNotification) {
@@ -44,9 +45,15 @@ public final class NotificationGrpcService extends NotificationServiceGrpc.Notif
     } catch (NotificationSubmissionException domainFailure) {
       responseObserver.onError(toStatus(domainFailure));
     } catch (IllegalArgumentException invalidRequest) {
-      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Invalid notification request").asRuntimeException());
+      responseObserver.onError(
+          Status.INVALID_ARGUMENT
+              .withDescription("Invalid notification request")
+              .asRuntimeException());
     } catch (RuntimeException unavailable) {
-      responseObserver.onError(Status.UNAVAILABLE.withDescription("Notification service unavailable").asRuntimeException());
+      responseObserver.onError(
+          Status.UNAVAILABLE
+              .withDescription("Notification service unavailable")
+              .asRuntimeException());
     }
   }
 
@@ -64,7 +71,8 @@ public final class NotificationGrpcService extends NotificationServiceGrpc.Notif
           case UNRECOGNIZED, NOTIFICATION_CHANNEL_UNSPECIFIED ->
               throw new IllegalArgumentException("Notification channel is required");
         };
-    Instant messageNotAfter = request.hasMessageNotAfter() ? toInstant(request.getMessageNotAfter()) : null;
+    Instant messageNotAfter =
+        request.hasMessageNotAfter() ? toInstant(request.getMessageNotAfter()) : null;
     return new SubmitNotificationCommand(
         requestId,
         channel,
@@ -121,7 +129,10 @@ public final class NotificationGrpcService extends NotificationServiceGrpc.Notif
   }
 
   private static Timestamp toTimestamp(Instant instant) {
-    return Timestamp.newBuilder().setSeconds(instant.getEpochSecond()).setNanos(instant.getNano()).build();
+    return Timestamp.newBuilder()
+        .setSeconds(instant.getEpochSecond())
+        .setNanos(instant.getNano())
+        .build();
   }
 
   private static StatusRuntimeException toStatus(NotificationSubmissionException failure) {
