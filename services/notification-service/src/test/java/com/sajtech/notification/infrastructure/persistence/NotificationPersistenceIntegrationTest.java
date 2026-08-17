@@ -34,6 +34,8 @@ import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -41,22 +43,18 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Tag("integration")
-@Testcontainers
 class NotificationPersistenceIntegrationTest {
   private static final DockerImageName POSTGRES_IMAGE =
       DockerImageName.parse(
               "postgres:18.4-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296")
           .asCompatibleSubstituteFor("postgres");
 
-  @Container
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(POSTGRES_IMAGE)
+  static final PostgreSQLContainer POSTGRES =
+      new PostgreSQLContainer(POSTGRES_IMAGE)
           .withDatabaseName("notification")
           .withUsername("notification_test")
           .withPassword("notification_test_password");
@@ -65,6 +63,16 @@ class NotificationPersistenceIntegrationTest {
 
   private DataSource dataSource;
   private DSLContext dsl;
+
+  @BeforeAll
+  static void startPostgres() {
+    POSTGRES.start();
+  }
+
+  @AfterAll
+  static void stopPostgres() {
+    POSTGRES.stop();
+  }
 
   @BeforeEach
   void resetDatabase() {
