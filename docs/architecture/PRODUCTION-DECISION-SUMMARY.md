@@ -3,7 +3,7 @@
 - **Reviewed:** 2026-08-16
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for the executable Compromised Password, Notification, and Identity registration slices; service-specific Semgrep/OSV gates are present and Identity also has an implemented Gitleaks current-tree/Git-history gate with local execution evidence. Protected-CI/deployed runtime/staging/release evidence remains commit-specific or `NOT VERIFIED`, and Syft/Grype/Cosign/Kyverno final-artifact/admission evidence remains `NOT VERIFIED`; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for the executable Compromised Password, Notification, and Identity registration slices; service-specific Semgrep/OSV gates are present and Identity also has an implemented Gitleaks current-tree/Git-history gate. Protected merged-main repository/security CI passed for all three implemented service slices on `main@9642507`; deployed runtime/staging/release evidence remains `NOT VERIFIED`, and Syft/Grype/Cosign/Kyverno final-artifact/admission evidence remains `NOT VERIFIED`; see `implementation-status.md`
 
 ## 1. Selected single-server topology
 
@@ -142,7 +142,7 @@ Trivy and OWASP Dependency-Check are not selected current default tools because 
 
 A real committed secret requires revoke/rotate handling when exposure is plausible; deleting the latest line is not sufficient. Scanner output must stay redacted.
 
-The complete ADR-0045 chain is not implemented yet. Identity has an implemented Gitleaks current-tree/Git-history gate with local execution evidence, but protected-CI execution remains commit-specific. Syft/Grype/Cosign final-artifact release evidence and Kyverno production admission evidence remain `NOT VERIFIED`.
+The complete ADR-0045 chain is not implemented yet. Identity has an implemented Gitleaks current-tree/Git-history gate with local and protected merged-main execution evidence on `main@9642507`. Syft/Grype/Cosign final-artifact release evidence and Kyverno production admission evidence remain `NOT VERIFIED`.
 
 ## 8. Kyverno
 
