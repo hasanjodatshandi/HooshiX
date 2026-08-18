@@ -171,7 +171,228 @@ public static class HooshiXDesktopCredentialInput
         }
     }
 
-    private static AutomationElement RequireFocusedPassword(long hwnd, int expectedProcessId)
+    private delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GUITHREADINFO
+    {
+        public int cbSize;
+        public uint flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public RECT rcCaret;
+    }
+
+    private sealed class PasswordTarget
+    {
+        public AutomationElement AutomationElement { get; private set; }
+        public IntPtr NativeHwnd { get; private set; }
+        public bool IsNative { get { return NativeHwnd != IntPtr.Zero; } }
+
+        public static PasswordTarget FromAutomation(AutomationElement element)
+        {
+            return new PasswordTarget { AutomationElement = element, NativeHwnd = IntPtr.Zero };
+        }
+
+        public static PasswordTarget FromNative(IntPtr hwnd)
+        {
+            return new PasswordTarget { AutomationElement = null, NativeHwnd = hwnd };
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumChildProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SendMessageTimeoutW(
+        IntPtr hWnd,
+        uint Msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        uint fuFlags,
+        uint uTimeout,
+        out UIntPtr lpdwResult);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetFocus(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
+    private const int GWL_STYLE = -16;
+    private const long ES_MULTILINE = 0x0004L;
+    private const long ES_PASSWORD = 0x0020L;
+    private const uint EM_GETPASSWORDCHAR = 0x00D2;
+    private const uint SMTO_ABORTIFHUNG = 0x0002;
+
+    private static long GetWindowStyle(IntPtr hwnd)
+    {
+        return IntPtr.Size == 8 ? GetWindowLongPtr64(hwnd, GWL_STYLE).ToInt64() : GetWindowLong32(hwnd, GWL_STYLE);
+    }
+
+    private static bool IsSupportedNativeEditClass(IntPtr hwnd)
+    {
+        var name = new System.Text.StringBuilder(256);
+        if (GetClassNameW(hwnd, name, name.Capacity) <= 0)
+        {
+            return false;
+        }
+        string value = name.ToString();
+        return string.Equals(value, "Edit", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("WindowsForms10.EDIT.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasNativePasswordMask(IntPtr hwnd)
+    {
+        UIntPtr result;
+        IntPtr call = SendMessageTimeoutW(
+            hwnd,
+            EM_GETPASSWORDCHAR,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            SMTO_ABORTIFHUNG,
+            100,
+            out result);
+        return call != IntPtr.Zero && result.ToUInt64() != 0;
+    }
+
+    private static bool IsNativePasswordControl(long rootHwnd, IntPtr candidate, int expectedProcessId)
+    {
+        IntPtr root = new IntPtr(rootHwnd);
+        if (candidate == IntPtr.Zero || candidate == root || !IsChild(root, candidate))
+        {
+            return false;
+        }
+        if (!IsWindowVisible(candidate) || !IsWindowEnabled(candidate) || !IsSupportedNativeEditClass(candidate))
+        {
+            return false;
+        }
+        uint actualProcessId;
+        if (GetWindowThreadProcessId(candidate, out actualProcessId) == 0 || actualProcessId != (uint)expectedProcessId)
+        {
+            return false;
+        }
+        long style = GetWindowStyle(candidate);
+        if ((style & ES_PASSWORD) == 0 || (style & ES_MULTILINE) != 0)
+        {
+            return false;
+        }
+        return HasNativePasswordMask(candidate);
+    }
+
+    private static System.Collections.Generic.List<IntPtr> FindNativePasswordControls(long hwnd, int expectedProcessId)
+    {
+        var matches = new System.Collections.Generic.List<IntPtr>();
+        IntPtr root = new IntPtr(hwnd);
+        EnumChildProc callback = delegate(IntPtr candidate, IntPtr ignored)
+        {
+            if (IsNativePasswordControl(hwnd, candidate, expectedProcessId))
+            {
+                matches.Add(candidate);
+                if (matches.Count > 1)
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        EnumChildWindows(root, callback, IntPtr.Zero);
+        return matches;
+    }
+
+    private static uint RequireNativePasswordThread(long hwnd, int expectedProcessId, IntPtr candidate, int delivered)
+    {
+        RequireWindowProcess(hwnd, expectedProcessId);
+        if (GetForegroundWindow().ToInt64() != hwnd || !IsNativePasswordControl(hwnd, candidate, expectedProcessId))
+        {
+            throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:" + delivered);
+        }
+        uint actualProcessId;
+        uint threadId = GetWindowThreadProcessId(candidate, out actualProcessId);
+        if (threadId == 0 || actualProcessId != (uint)expectedProcessId)
+        {
+            throw new InvalidOperationException("CREDENTIAL_PROCESS_CHANGED:" + delivered);
+        }
+        return threadId;
+    }
+
+    private static void RequireNativePasswordFocus(long hwnd, int expectedProcessId, IntPtr candidate, int delivered)
+    {
+        uint threadId = RequireNativePasswordThread(hwnd, expectedProcessId, candidate, delivered);
+        var info = new GUITHREADINFO();
+        info.cbSize = Marshal.SizeOf<GUITHREADINFO>();
+        if (!GetGUIThreadInfo(threadId, ref info) || info.hwndFocus != candidate)
+        {
+            throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:" + delivered);
+        }
+    }
+
+    private static void FocusNativePassword(long hwnd, int expectedProcessId, IntPtr candidate)
+    {
+        uint targetThreadId = RequireNativePasswordThread(hwnd, expectedProcessId, candidate, 0);
+        uint currentThreadId = GetCurrentThreadId();
+        bool attached = false;
+        try
+        {
+            if (currentThreadId != targetThreadId)
+            {
+                if (!AttachThreadInput(currentThreadId, targetThreadId, true))
+                {
+                    throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:0");
+                }
+                attached = true;
+            }
+            SetFocus(candidate);
+        }
+        finally
+        {
+            if (attached && !AttachThreadInput(currentThreadId, targetThreadId, false))
+            {
+                throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:0");
+            }
+        }
+        Thread.Sleep(50);
+        RequireNativePasswordFocus(hwnd, expectedProcessId, candidate, 0);
+    }
+
+    private static PasswordTarget RequireFocusedPassword(long hwnd, int expectedProcessId)
     {
         RequireWindowProcess(hwnd, expectedProcessId);
         if (GetForegroundWindow().ToInt64() != hwnd)
@@ -205,7 +426,7 @@ public static class HooshiXDesktopCredentialInput
                 int native = cursor.Current.NativeWindowHandle;
                 if (native != 0 && native == hwnd)
                 {
-                    return focused;
+                    return PasswordTarget.FromAutomation(focused);
                 }
             }
             catch { }
@@ -221,63 +442,81 @@ public static class HooshiXDesktopCredentialInput
         throw new InvalidOperationException("CREDENTIAL_TARGET_NOT_PASSWORD:0");
     }
 
-    private static AutomationElement FocusUniquePassword(long hwnd, int expectedProcessId)
+    private static PasswordTarget FocusUniquePassword(long hwnd, int expectedProcessId)
     {
         RequireWindowProcess(hwnd, expectedProcessId);
         if (GetForegroundWindow().ToInt64() != hwnd)
         {
             throw new InvalidOperationException("FOREGROUND_CHANGED:0");
         }
+
         AutomationElement root = AutomationElement.FromHandle(new IntPtr(hwnd));
-        if (root == null)
-        {
-            throw new InvalidOperationException("CREDENTIAL_PASSWORD_TARGET_AMBIGUOUS:0");
-        }
-        Condition condition = new AndCondition(
-            new PropertyCondition(AutomationElement.IsPasswordProperty, true),
-            new PropertyCondition(AutomationElement.IsEnabledProperty, true)
-        );
-        AutomationElementCollection matches = root.FindAll(TreeScope.Descendants, condition);
         AutomationElement selected = null;
         int visibleMatches = 0;
-        for (int index = 0; index < matches.Count; index++)
+        if (root != null)
         {
-            AutomationElement candidate = matches[index];
-            bool offscreen;
-            try { offscreen = candidate.Current.IsOffscreen; } catch { continue; }
-            if (offscreen) { continue; }
-            selected = candidate;
-            visibleMatches++;
-            if (visibleMatches > 1) { break; }
+            Condition condition = new AndCondition(
+                new PropertyCondition(AutomationElement.IsPasswordProperty, true),
+                new PropertyCondition(AutomationElement.IsEnabledProperty, true)
+            );
+            AutomationElementCollection matches = root.FindAll(TreeScope.Descendants, condition);
+            for (int index = 0; index < matches.Count; index++)
+            {
+                AutomationElement candidate = matches[index];
+                bool offscreen;
+                try { offscreen = candidate.Current.IsOffscreen; } catch { continue; }
+                if (offscreen) { continue; }
+                selected = candidate;
+                visibleMatches++;
+                if (visibleMatches > 1) { break; }
+            }
         }
-        if (visibleMatches != 1 || selected == null)
+
+        if (visibleMatches > 1)
         {
             throw new InvalidOperationException("CREDENTIAL_PASSWORD_TARGET_AMBIGUOUS:0");
         }
-        selected.SetFocus();
-        Thread.Sleep(50);
-        RequireWindowProcess(hwnd, expectedProcessId);
-        if (GetForegroundWindow().ToInt64() != hwnd)
+        if (visibleMatches == 1 && selected != null)
         {
-            throw new InvalidOperationException("FOREGROUND_CHANGED:0");
+            selected.SetFocus();
+            Thread.Sleep(50);
+            RequireWindowProcess(hwnd, expectedProcessId);
+            if (GetForegroundWindow().ToInt64() != hwnd)
+            {
+                throw new InvalidOperationException("FOREGROUND_CHANGED:0");
+            }
+            AutomationElement current = AutomationElement.FocusedElement;
+            if (current == null || !Automation.Compare(selected, current))
+            {
+                throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:0");
+            }
+            return PasswordTarget.FromAutomation(selected);
         }
-        AutomationElement current = AutomationElement.FocusedElement;
-        if (current == null || !Automation.Compare(selected, current))
+
+        System.Collections.Generic.List<IntPtr> nativeMatches = FindNativePasswordControls(hwnd, expectedProcessId);
+        if (nativeMatches.Count != 1)
         {
-            throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:0");
+            throw new InvalidOperationException("CREDENTIAL_PASSWORD_TARGET_AMBIGUOUS:0");
         }
-        return selected;
+        IntPtr native = nativeMatches[0];
+        FocusNativePassword(hwnd, expectedProcessId, native);
+        return PasswordTarget.FromNative(native);
     }
 
-    private static void RequireSameFocus(long hwnd, int expectedProcessId, AutomationElement expected, int delivered)
+    private static void RequireSameFocus(long hwnd, int expectedProcessId, PasswordTarget expected, int delivered)
     {
         RequireWindowProcess(hwnd, expectedProcessId);
         if (GetForegroundWindow().ToInt64() != hwnd)
         {
             throw new InvalidOperationException("FOREGROUND_CHANGED:" + delivered);
         }
+        if (expected.IsNative)
+        {
+            RequireNativePasswordFocus(hwnd, expectedProcessId, expected.NativeHwnd, delivered);
+            return;
+        }
         AutomationElement current = AutomationElement.FocusedElement;
-        if (current == null || !Automation.Compare(expected, current))
+        if (current == null || expected.AutomationElement == null || !Automation.Compare(expected.AutomationElement, current))
         {
             throw new InvalidOperationException("CREDENTIAL_FOCUS_CHANGED:" + delivered);
         }
@@ -285,7 +524,7 @@ public static class HooshiXDesktopCredentialInput
 
     public static void Send(long hwnd, int expectedProcessId, string credentialTarget, int maxUnits, bool focusUniquePassword)
     {
-        AutomationElement expectedFocus = focusUniquePassword
+        PasswordTarget expectedFocus = focusUniquePassword
             ? FocusUniquePassword(hwnd, expectedProcessId)
             : RequireFocusedPassword(hwnd, expectedProcessId);
         IntPtr credentialPtr = IntPtr.Zero;
