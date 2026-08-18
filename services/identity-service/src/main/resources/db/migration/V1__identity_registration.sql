@@ -6,7 +6,7 @@ CREATE TABLE identity_user (
 );
 
 CREATE TABLE identity_profile (
-    user_id UUID PRIMARY KEY REFERENCES identity_user(user_id) ON DELETE RESTRICT,
+    user_id UUID PRIMARY KEY REFERENCES identity_user(user_id) ON DELETE CASCADE,
     first_name VARCHAR(480) NOT NULL,
     last_name VARCHAR(480) NOT NULL,
     father_name VARCHAR(480),
@@ -16,7 +16,7 @@ CREATE TABLE identity_profile (
 
 CREATE TABLE identity_contact (
     contact_id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES identity_user(user_id) ON DELETE RESTRICT,
+    user_id UUID NOT NULL REFERENCES identity_user(user_id) ON DELETE CASCADE,
     kind VARCHAR(16) NOT NULL CHECK (kind IN ('EMAIL', 'PHONE')),
     canonical_value VARCHAR(512) NOT NULL,
     delivery_value VARCHAR(512) NOT NULL,
@@ -27,19 +27,18 @@ CREATE TABLE identity_contact (
     UNIQUE (kind, canonical_value)
 );
 
-CREATE UNIQUE INDEX ux_identity_contact_primary_per_user
-    ON identity_contact(user_id) WHERE primary_contact;
+CREATE UNIQUE INDEX ux_identity_contact_primary_per_user ON identity_contact(user_id) WHERE primary_contact;
 
 CREATE TABLE identity_credential (
-    user_id UUID PRIMARY KEY REFERENCES identity_user(user_id) ON DELETE RESTRICT,
+    user_id UUID PRIMARY KEY REFERENCES identity_user(user_id) ON DELETE CASCADE,
     password_hash VARCHAR(512) NOT NULL,
     created_at TIMESTAMPTZ(6) NOT NULL
 );
 
 CREATE TABLE identity_registration_challenge (
     challenge_id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES identity_user(user_id) ON DELETE RESTRICT,
-    contact_id UUID NOT NULL REFERENCES identity_contact(contact_id) ON DELETE RESTRICT,
+    user_id UUID NOT NULL REFERENCES identity_user(user_id) ON DELETE CASCADE,
+    contact_id UUID NOT NULL REFERENCES identity_contact(contact_id) ON DELETE CASCADE,
     locale VARCHAR(8) NOT NULL CHECK (locale IN ('fa', 'en')),
     verifier_key_id VARCHAR(64) NOT NULL,
     verifier_digest BYTEA NOT NULL CHECK (octet_length(verifier_digest) = 32),
@@ -50,8 +49,7 @@ CREATE TABLE identity_registration_challenge (
     created_at TIMESTAMPTZ(6) NOT NULL
 );
 
-CREATE INDEX ix_identity_registration_challenge_contact_created
-    ON identity_registration_challenge(contact_id, created_at DESC);
+CREATE INDEX ix_identity_registration_challenge_contact_created ON identity_registration_challenge(contact_id, created_at DESC);
 
 CREATE TABLE identity_request_idempotency (
     request_id UUID NOT NULL,
@@ -67,10 +65,10 @@ CREATE TABLE identity_request_idempotency (
 CREATE TABLE identity_notification_outbox (
     outbox_id UUID PRIMARY KEY,
     request_id UUID NOT NULL UNIQUE,
-    user_id UUID NOT NULL REFERENCES identity_user(user_id) ON DELETE RESTRICT,
-    escrow_key_id VARCHAR(64) NOT NULL,
-    escrow_nonce BYTEA NOT NULL CHECK (octet_length(escrow_nonce) = 12),
-    escrow_ciphertext BYTEA NOT NULL,
+    user_id UUID NOT NULL REFERENCES identity_user(user_id) ON DELETE CASCADE,
+    escrow_key_id VARCHAR(64),
+    escrow_nonce BYTEA CHECK (escrow_nonce IS NULL OR octet_length(escrow_nonce) = 12),
+    escrow_ciphertext BYTEA,
     message_not_after TIMESTAMPTZ(6) NOT NULL,
     state VARCHAR(24) NOT NULL CHECK (state IN ('PENDING', 'PROCESSING', 'ACKNOWLEDGED', 'HANDOFF_FAILED')),
     attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
@@ -78,8 +76,9 @@ CREATE TABLE identity_notification_outbox (
     lease_until TIMESTAMPTZ(6),
     last_error_code VARCHAR(64),
     created_at TIMESTAMPTZ(6) NOT NULL,
-    updated_at TIMESTAMPTZ(6) NOT NULL
+    updated_at TIMESTAMPTZ(6) NOT NULL,
+    CHECK ((state IN ('PENDING', 'PROCESSING') AND escrow_key_id IS NOT NULL AND escrow_nonce IS NOT NULL AND escrow_ciphertext IS NOT NULL)
+        OR (state IN ('ACKNOWLEDGED', 'HANDOFF_FAILED') AND escrow_key_id IS NULL AND escrow_nonce IS NULL AND escrow_ciphertext IS NULL))
 );
 
-CREATE INDEX ix_identity_notification_outbox_claim
-    ON identity_notification_outbox(state, next_attempt_at, created_at);
+CREATE INDEX ix_identity_notification_outbox_claim ON identity_notification_outbox(state, next_attempt_at, created_at);
