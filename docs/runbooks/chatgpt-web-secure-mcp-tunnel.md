@@ -291,6 +291,10 @@ For persistent operation, preserve these invariants:
 
 Use the persistent-runtime mechanism documented by the installed OpenAI tunnel-client version. Do not invent background wrappers that lose health/readiness ownership.
 
+On the verified Windows host with tunnel-client v0.0.11, a stdio MCP-child failure can make tunnel-client log `stdio MCP command failed; requesting tunnel-client shutdown` and then exit on `EOF`. Task Scheduler restart-on-failure alone was not reliable for this termination path. The reviewed host pattern therefore uses two recovery layers: a secret-free supervised wrapper restarts a terminated tunnel-client child after a bounded delay, and a separate one-minute process/health-aware watchdog clean-restarts the named Scheduled Task when the parent task is not running, the same profile has an orphan/duplicate process, or `/readyz` remains unhealthy after startup grace. The watchdog targets only the reviewed HooshiX tunnel task/profile names, does not read runtime keys, preserves one tunnel-client process per profile, and keeps health checks on loopback.
+
+Keep bounded local tunnel logs and enable the Windows Task Scheduler Operational log. Do not remove MCP output/time bounds as a generic crash workaround; first reproduce a transport-size or duration threshold. Unbounded output increases memory/transport risk without fixing lifecycle recovery.
+
 ## 11. Normal operating procedure
 
 Before relying on the tunnel for a new non-trivial engineering session:

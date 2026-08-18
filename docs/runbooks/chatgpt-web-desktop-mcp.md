@@ -250,6 +250,8 @@ No finite maximum runtime
 
 The wrapper/profile uses no literal runtime key. The task starts only after successful foreground verification.
 
+Do not rely on the Task Scheduler `restart after` setting as the only recovery mechanism. The verified host uses the same secret-free two-layer recovery as Context/Ops: an internal wrapper supervisor restarts a terminated tunnel-client child, while the shared one-minute `HooshiX MCP Tunnel Watchdog` checks the named Desktop task/process and loopback `/readyz` after startup grace. If the task is not running or remains unready, the watchdog removes same-profile orphan tunnel processes and starts exactly one clean task instance. The watchdog does not change the Desktop principal: Desktop remains interactive and `RunLevel=Limited`. Record bounded tunnel logs and enable `Microsoft-Windows-TaskScheduler/Operational`.
+
 A startup-before-login Session-0 service is not the Desktop v1 runtime because it cannot represent the operator's interactive desktop authority.
 
 ## 12. Host evidence
