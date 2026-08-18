@@ -94,9 +94,9 @@ desktop.key_press
 
 It does not expose arbitrary `winapp` argv, recording, touch, pen, clipboard read, credential read, arbitrary process execution, arbitrary filesystem access, or network fetch.
 
-`desktop.type_text` accepts literal bounded text only. It is not a credential-entry channel. Passwords, API keys, private keys, recovery codes, OTPs, session values, and other secrets MUST NOT be supplied through Desktop MCP tool arguments.
+`desktop.type_text` accepts bounded non-secret text only. After fresh HWND/process authorization and optional semantic WinApp focus, the engine starts one fixed short-lived Windows PowerShell helper with `-NoProfile -NonInteractive`; the helper contains a fixed C# `SendInput` P/Invoke implementation using `KEYEVENTF_UNICODE`. Raw text is transferred only as bounded UTF-8 JSON on child stdin, never in child argv/environment/audit. The helper decodes stdin from raw bytes as UTF-8, verifies the requested HWND remains foreground before each UTF-16 code unit, uses evidence-backed 5 ms pacing plus a 500 ms final queue drain, and returns bounded metadata only. The helper path/command is fixed by repository code and is not an arbitrary PowerShell execution surface. Text whose estimated delivery cannot fit the configured timeout is rejected before the helper starts. It is not a credential-entry channel. Passwords, API keys, private keys, recovery codes, OTPs, session values, and other secrets MUST NOT be supplied through Desktop MCP tool arguments.
 
-`desktop.key_press` rejects literal-text grammar, raw virtual-key syntax, and system/shell-reserved combinations unless the local policy explicitly enables system keys. Windows/WinApp hard restrictions such as workstation lock and Secure Attention Sequence remain outside authority.
+`desktop.key_press` remains on the reviewed WinApp input path. It rejects literal-text grammar, caller-supplied raw virtual-key syntax, and system/shell-reserved combinations unless the local policy explicitly enables system keys. Because WinApp CLI 0.6.0 can fail `VkKeyScan()` for alphanumeric modifier chords in Scheduled Task threads, only already-validated `a-z`/`0-9` chord main keys are mapped internally to their equivalent explicit virtual key before WinApp invocation. Windows/WinApp hard restrictions such as workstation lock and Secure Attention Sequence remain outside authority.
 
 ### 6. Screenshots and UI text
 
@@ -133,7 +133,7 @@ A future request to use AI desktop automation for production privileged administ
 - Synthetic input depends on the active unlocked interactive desktop and Windows integrity/UIPI behavior. Failure must remain failure; the implementation does not weaken Windows controls.
 - An application can change between discovery and action. The engine revalidates HWND/process before each call, but UI state can still race after validation.
 - WinApp CLI is public preview. Output/behavior changes require reviewed pin updates and regression tests.
-- Synthetic keyboard text fidelity depends on the target application and current Windows keyboard semantics. V1 does not claim arbitrary case-sensitive text is exact across every application/layout. Case-sensitive workflows must verify the resulting UI/application state before depending on it.
+- Literal text uses isolated `KEYEVENTF_UNICODE` delivery because host verification found WinApp 0.6.0 text synthesis and same-process Python `SendInput` were not fidelity-safe. The final helper passed exact mixed-case, `✓`, and Persian Unicode persistence in disposable Notepad host smoke. Target applications can still transform received text, so material workflows must verify resulting application state.
 
 ## Verification
 
@@ -145,6 +145,7 @@ Repository evidence must prove at least:
 - allow/deny app filtering and fresh HWND/process authorization;
 - screenshot permission/size/PNG/temp-cleanup behavior;
 - mutation/mouse/keyboard/system-key policy negatives;
+- fixed isolated Unicode helper path/argv, stdin-only raw text, sanitized environment, explicit UTF-8 input, foreground/UIPI failure semantics, safe alphanumeric-chord VK normalization, and pre-injection timeout bound;
 - bounded text/selectors/depth/output/time;
 - audit redaction/rotation/fail-closed behavior;
 - no credential/clipboard/arbitrary-command tool exists.

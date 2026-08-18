@@ -25,7 +25,7 @@
   "allow_mouse_input": true,
   "allow_keyboard_input": true,
   "allow_system_keys": false,
-  "max_command_seconds": 20,
+  "max_command_seconds": 30,
   "max_output_bytes": 1048576,
   "max_screenshot_bytes": 8388608,
   "max_text_chars": 4096,

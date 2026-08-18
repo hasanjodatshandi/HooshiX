@@ -27,7 +27,7 @@ Production Technology Baseline remains authoritative for production versions.
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
 | HooshiX developer-host Ops MCP | Python standard-library stdio server under ADR-0048; mandatory local policy, separate tunnel/profile/key, no production authority |
 | Microsoft WinApp CLI | 0.6.0; WinGet `Microsoft.WinAppCli`; developer-only ADR-0049 Desktop MCP dependency; reviewed x64 MSIX SHA-256 `dc5d323f6d1601ef3342420746f0163651176f4cc183690f0354546a36648eec`; public-preview upgrades require review |
-| HooshiX developer-host Desktop MCP | Python standard-library stdio server under ADR-0049; interactive non-elevated Windows session by default; separate policy/tunnel/profile/key; no production authority |
+| HooshiX developer-host Desktop MCP | Python standard-library stdio server under ADR-0049 plus fixed Windows PowerShell 5.1/C# `SendInput` helper for literal Unicode text; interactive non-elevated Windows session by default; separate policy/tunnel/profile/key; no production authority |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 

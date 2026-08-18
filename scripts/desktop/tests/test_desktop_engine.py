@@ -64,6 +64,16 @@ def rr_json(value: object, *, exit_code: int = 0, truncated: bool = False) -> Ru
     )
 
 
+class FakeTextInput:
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, str]] = []
+
+    def send_text(self, hwnd: int, text: str) -> dict[str, int]:
+        self.calls.append((hwnd, text))
+        units = len(text.replace("\r\n", "\r").replace("\n", "\r").encode("utf-16-le")) // 2
+        return {"characters": len(text), "utf16_code_units": units, "chunks": 1}
+
+
 class FakeRunner:
     def __init__(self, handler=None) -> None:
         self.calls: list[tuple[list[str], int]] = []
@@ -133,7 +143,7 @@ def make_policy(
 def make_engine(root: Path, *, runner: FakeRunner | None = None, **policy_options) -> tuple[DesktopEngine, FakeRunner, Path]:
     policy_path = make_policy(root, **policy_options)
     effective_runner = runner or FakeRunner()
-    engine = DesktopEngine(load_policy(policy_path), effective_runner, runtime_version="0.6.0")
+    engine = DesktopEngine(load_policy(policy_path), effective_runner, runtime_version="0.6.0", text_input=FakeTextInput())
     return engine, effective_runner, policy_path
 
 
@@ -315,11 +325,27 @@ class DesktopEngineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             engine, runner, _ = make_engine(Path(temp_dir))
             engine.key_press(1001, "ctrl+a delete")
-            self.assertIn("ctrl+a delete", runner.calls[-1][0])
+            self.assertIn("ctrl+vk=0x41 delete", runner.calls[-1][0])
             for keys in ("text=secret", "vk=0x42", r"a\sb", "alt+f4", "win+r", "ctrl+shift+esc", "win+l", "ctrl+alt+delete"):
                 with self.subTest(keys=keys):
                     with self.assertRaises(DesktopError):
                         engine.key_press(1001, keys)
+
+    def test_key_press_maps_valid_alphanumeric_chords_to_explicit_virtual_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            engine, runner, _ = make_engine(Path(temp_dir))
+            engine.key_press(1001, "ctrl+s alt+4 enter")
+            args = runner.calls[-1][0]
+            self.assertIn("ctrl+vk=0x53 alt+vk=0x34 enter", args)
+            self.assertNotIn("ctrl+s alt+4 enter", args)
+
+    def test_internal_chord_mapping_does_not_expand_public_raw_vk_grammar(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            engine, _, _ = make_engine(Path(temp_dir))
+            self.assertEqual("ctrl+vk=0x53", engine._normalize_winapp_chords("ctrl+s"))
+            self.assertEqual("ctrl+vk=0x41 shift+vk=0x39 enter", engine._normalize_winapp_chords("ctrl+a shift+9 enter"))
+            with self.assertRaises(DesktopError):
+                engine.key_press(1001, "ctrl+vk=0x53")
 
     def test_system_key_policy_can_enable_bounded_shell_combos_but_not_hard_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -335,9 +361,11 @@ class DesktopEngineTest(unittest.TestCase):
             engine, runner, _ = make_engine(root)
             secretish_marker = "literal-marker-that-must-not-be-audited"
             selector = "RichEditBox-private-selector"
-            engine.type_text(1001, secretish_marker, target_selector=selector)
-            args = runner.calls[-1][0]
-            self.assertIn(secretish_marker, args)
+            result = engine.type_text(1001, secretish_marker, target_selector=selector)
+            self.assertEqual(1001, result["hwnd"])
+            self.assertEqual((1001, secretish_marker), engine.text_input.calls[-1])
+            self.assertNotIn(secretish_marker, repr(runner.calls))
+            self.assertIn(["ui", "focus", selector, "-w", "1001", "--json"], [call[0] for call in runner.calls])
             audit = engine.policy.audit_log.read_text(encoding="utf-8")
             self.assertNotIn(secretish_marker, audit)
             self.assertNotIn(selector, audit)

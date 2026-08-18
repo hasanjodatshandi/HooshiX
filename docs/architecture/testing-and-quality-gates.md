@@ -220,12 +220,13 @@ ADR-0049 repository tests prove:
 - app allow/deny rules use the real process identity from a freshly resolved HWND before targeted actions;
 - inspect depth/selectors/output are bounded and coordinate-only mouse targets are refused;
 - screenshot permission/capture-screen opt-in, PNG validation, byte bound, MCP image representation, and temporary-file cleanup;
-- UIA/mouse/keyboard/system-key capabilities require explicit policy and key grammar rejects literal/raw-virtual/Secure-Attention/workstation-lock forms;
+- UIA/mouse/keyboard/system-key capabilities require explicit policy; caller key grammar rejects literal/raw-virtual/Secure-Attention/workstation-lock forms and only validated alphanumeric modifier chords receive internal VK normalization;
+- literal text uses a fixed isolated PowerShell/C# Unicode helper; tests prove text is stdin-only, helper argv is fixed, child environment excludes tunnel/API secrets, output is bounded UTF-8 JSON, timeout preflight occurs before injection, and structured partial/foreground failures are not automatically retried;
 - WinApp child environment excludes tunnel/API secrets and enables telemetry opt-out;
 - audit begins before sensitive observation/action, fails closed when unavailable, rotates within bound, and never stores raw typed text/selectors/window titles/screenshots/WinApp output;
 - explicit UTF-8 stdio behavior and modern/legacy MCP error handling remain deterministic.
 
-Host evidence separately proves exact WinApp package/version/integrity, protected policy/audit/capture ACLs, intended non-elevated interactive session, separate Desktop tunnel/profile/key, readiness, ChatGPT tool discovery, bounded screenshot/inspect, harmless UIA/mouse/keyboard smoke, audit behavior, logoff/logon restart, and rollback/revocation.
+Host evidence separately proves exact WinApp package/version/integrity, protected policy/audit/capture ACLs, intended non-elevated interactive session, exact mixed-case/Unicode helper delivery plus bounded shortcut/mouse/screenshot behavior, separate Desktop tunnel/profile/key, readiness, ChatGPT tool discovery, audit behavior, logoff/logon restart, and rollback/revocation.
 
 Desktop tests do not prove production administration safety or credential-entry safety. ADR-0030 and credential owners remain unchanged.
 

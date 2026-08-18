@@ -221,7 +221,7 @@ CI SHOULD enforce when implemented:
 - repository examples contain no real Ops policy secret or tunnel credential;
 - ADR-0049 Desktop MCP remains a third separate stdio server and does not change Context or Ops tool surfaces;
 - Desktop startup/runtime tests cover strict local policy, exact WinApp version pin, intended Windows interactive/non-elevated state, app allow/deny rules, fresh HWND/process authorization, and sanitized WinApp child environment;
-- Desktop observation/input tests cover bounded UI inspection, PNG capture/temp cleanup, UIA/mouse/keyboard opt-ins, semantic-selector-only mouse targeting, bounded literal typing, system-key negatives, output/time limits, fail-closed/redacted audit, CWD-independent stdio protocol behavior, screenshot MCP image content, and explicit UTF-8 response bytes;
+- Desktop observation/input tests cover bounded UI inspection, PNG capture/temp cleanup, UIA/mouse/keyboard opt-ins, semantic-selector-only mouse targeting, safe WinApp chord normalization, fixed isolated PowerShell/C# Unicode-helper stdin/argv/environment/timeout/error contracts, system-key negatives, output/time limits, fail-closed/redacted audit, CWD-independent stdio protocol behavior, screenshot MCP image content, and explicit UTF-8 response bytes;
 - Desktop has no arbitrary WinApp argv, process shell, arbitrary filesystem/network fetch, recording/touch/pen, clipboard-read, get-value/credential-reader, UAC/Secure-Desktop bypass, or production administration tool;
 - repository examples contain no real Desktop policy secret, screenshot, typed secret, or tunnel credential.
 
