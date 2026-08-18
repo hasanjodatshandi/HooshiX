@@ -11,7 +11,9 @@
   "denied_apps": [
     "consent",
     "credentialuibroker",
-    "logonui"
+    "lockapp",
+    "logonui",
+    "sechealthui"
   ],
   "audit_log": "C:\\ProgramData\\HooshiX\\desktop\\audit.ndjson",
   "capture_temp_dir": "C:\\Users\\REPLACE_ME\\AppData\\Local\\HooshiX\\desktop-capture",

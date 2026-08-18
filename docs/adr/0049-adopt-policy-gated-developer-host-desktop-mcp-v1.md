@@ -133,6 +133,7 @@ A future request to use AI desktop automation for production privileged administ
 - Synthetic input depends on the active unlocked interactive desktop and Windows integrity/UIPI behavior. Failure must remain failure; the implementation does not weaken Windows controls.
 - An application can change between discovery and action. The engine revalidates HWND/process before each call, but UI state can still race after validation.
 - WinApp CLI is public preview. Output/behavior changes require reviewed pin updates and regression tests.
+- Synthetic keyboard text fidelity depends on the target application and current Windows keyboard semantics. V1 does not claim arbitrary case-sensitive text is exact across every application/layout. Case-sensitive workflows must verify the resulting UI/application state before depending on it.
 
 ## Verification
 

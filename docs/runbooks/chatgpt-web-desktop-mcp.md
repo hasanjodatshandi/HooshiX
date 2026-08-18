@@ -180,7 +180,7 @@ Recommended sequence:
 8. close/discard disposable content manually or through a harmless reviewed action;
 9. inspect `desktop.audit_tail` and local audit.
 
-Verify audit does not contain raw typed text, raw selectors, window titles, screenshot bytes/base64, or WinApp raw output.
+Verify audit does not contain raw typed text, raw selectors, window titles, screenshot bytes/base64, or WinApp raw output. Verify the capture temporary directory is empty after successful screenshot readback.
 
 ## 8. Input rules
 
@@ -194,7 +194,7 @@ over coordinate behavior.
 
 V1 click/hover/drag accept semantic selectors only. Caller-selected arbitrary screen coordinates are not exposed.
 
-`desktop.type_text` is literal bounded non-secret text. It uses WinApp input targeting and must fail if Windows cannot safely foreground/deliver input.
+`desktop.type_text` is bounded non-secret text delivered through WinApp synthetic keyboard input. Exact text fidelity can vary with application/keyboard semantics; verify resulting application state for case-sensitive workflows. Do not use this tool for secrets. It must fail if Windows cannot safely foreground/deliver input.
 
 `desktop.key_press` accepts bounded key grammar. Raw virtual-key syntax and text-escape grammar are rejected. System/shell-reserved combinations require explicit local `allow_system_keys=true`; Windows/WinApp hard blocks still apply.
 

@@ -133,6 +133,11 @@ scripts/context/post_merge_checkpoint.py
 scripts/context/tests/test_context_engine.py
 scripts/context/tests/test_mcp_server.py
 scripts/context/tests/test_post_merge_checkpoint.py
+scripts/desktop/desktop_engine.py
+scripts/desktop/mcp_server.py
+scripts/desktop/tests/test_audit_fail_closed.py
+scripts/desktop/tests/test_desktop_engine.py
+scripts/desktop/tests/test_mcp_server.py
 scripts/ops/mcp_server.py
 scripts/ops/ops_engine.py
 scripts/ops/tests/test_audit_fail_closed.py

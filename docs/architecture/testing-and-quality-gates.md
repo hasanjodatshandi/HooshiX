@@ -211,7 +211,25 @@ Host evidence separately proves real Windows policy ACLs, intended elevation sta
 
 Ops MCP tests do not prove production administration safety. ADR-0030 remains the production privileged-access authority.
 
-## 16. Complete-stack single-server test
+## 16. Developer-host Desktop MCP tests
+
+ADR-0049 repository tests prove:
+
+- Context and Ops tool surfaces remain unchanged while Desktop exposes exactly the reviewed separate Desktop tool list/annotations;
+- missing/malformed/unknown/duplicate/ambiguous policy state and incompatible WinApp version fail closed;
+- app allow/deny rules use the real process identity from a freshly resolved HWND before targeted actions;
+- inspect depth/selectors/output are bounded and coordinate-only mouse targets are refused;
+- screenshot permission/capture-screen opt-in, PNG validation, byte bound, MCP image representation, and temporary-file cleanup;
+- UIA/mouse/keyboard/system-key capabilities require explicit policy and key grammar rejects literal/raw-virtual/Secure-Attention/workstation-lock forms;
+- WinApp child environment excludes tunnel/API secrets and enables telemetry opt-out;
+- audit begins before sensitive observation/action, fails closed when unavailable, rotates within bound, and never stores raw typed text/selectors/window titles/screenshots/WinApp output;
+- explicit UTF-8 stdio behavior and modern/legacy MCP error handling remain deterministic.
+
+Host evidence separately proves exact WinApp package/version/integrity, protected policy/audit/capture ACLs, intended non-elevated interactive session, separate Desktop tunnel/profile/key, readiness, ChatGPT tool discovery, bounded screenshot/inspect, harmless UIA/mouse/keyboard smoke, audit behavior, logoff/logon restart, and rollback/revocation.
+
+Desktop tests do not prove production administration safety or credential-entry safety. ADR-0030 and credential owners remain unchanged.
+
+## 17. Complete-stack single-server test
 
 Run all intended platform/application/observability components together.
 
@@ -233,7 +251,7 @@ Record:
 
 Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security load, safe concurrent WAL+AOF+Kafka+telemetry IO, and no security/admission/backup/observability bypass.
 
-## 17. CI/CD ordering
+## 18. CI/CD ordering
 
 Recommended authority order:
 
@@ -253,7 +271,7 @@ Gitleaks secret scan
 
 Independent checks may execute in parallel only when required input/evidence ordering remains correct. Scheduled OSV advisory scanning complements, but does not replace, ADR-0035 deployed-digest Grype rescanning.
 
-## 18. Definition of Done
+## 19. Definition of Done
 
 A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, source/secret/dependency-advisory/final-artifact security, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
 

@@ -459,7 +459,8 @@
         "docs/technology/local-development-baseline.md"
       ],
       "summary": "Keep Context read-only and Ops separate. Desktop is developer-host only, policy-gated, interactive-session scoped, separately tunneled/audited, and never a credential/UAC/production-access bypass."
-    },    {
+    },
+    {
       "id": "production-readiness",
       "title": "Production readiness/release",
       "review_mode": "targeted",
