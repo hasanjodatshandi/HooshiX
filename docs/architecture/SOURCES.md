@@ -15,6 +15,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
 | ChatGPT Web Context Engine tunnel bridge | ADR-0047 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
 | ChatGPT Web developer-host Ops MCP | ADR-0048 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Desktop MCP | ADR-0049 + `../runbooks/chatgpt-web-desktop-mcp.md` + `../technology/local-development-baseline.md` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -43,6 +44,8 @@ ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bri
 
 ADR-0048 permits a separate developer-host Ops MCP using the same approved tunnel transport pattern but a separate profile/key/policy. Ops does not broaden Context MCP, create production authority, or make retrieved context an execution authorization source.
 
+ADR-0049 permits a third developer-host Desktop MCP for policy-gated interactive Windows UI observation/input. Desktop uses its own policy/tunnel/profile/key/runtime, remains outside production authority, and does not add tools to Context or Ops.
+
 ## External primary sources used by current decisions
 
 Use upstream/official primary sources for version, protocol, API, and support claims.
@@ -62,7 +65,15 @@ ADR-0046 uses MCP only as a read-only local interoperability adapter. The reposi
 - OpenAI tunnel-client end-user guide: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/end-user-guide.md`
 - OpenAI tunnel-client configuration reference: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/configuration.md`
 
-ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. ADR-0048 reuses the reviewed transport pattern for a separate developer-host Ops profile and credential. Version/integrity/authentication facts are developer-tool inputs; they do not prove either operator-PC tunnel is installed, ready, elevated as intended, or connected to ChatGPT.
+ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. ADR-0048 and ADR-0049 reuse the reviewed transport pattern for separate developer-host Ops and Desktop profiles/credentials. Version/integrity/authentication facts are developer-tool inputs; they do not prove an operator-PC tunnel is installed, ready, running with the intended Windows token/session, or connected to ChatGPT.
+
+### Windows desktop automation
+
+- Microsoft WinApp CLI documentation: `https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/`
+- Microsoft WinApp CLI UI automation documentation: `https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/ui-automation`
+- Microsoft WinApp CLI repository/releases: `https://github.com/microsoft/WinAppCli`
+
+ADR-0049 uses WinApp CLI only as pinned developer-host UI automation tooling behind HooshiX policy/MCP controls. It is not a production dependency or a credential/UAC/Secure-Desktop bypass.
 
 ### DevSecOps security toolchain
 
