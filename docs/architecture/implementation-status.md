@@ -6,7 +6,7 @@ Architecture documents describe approved targets. A target path named in documen
 
 ## Current repository state
 
-At this revision the repository contains architecture documentation, the repository-governance baseline, the Git-native Agent Context Engine under `context/` + `scripts/context/`, the ADR-0047 repository-side ChatGPT Web tunnel integration contract/runbook, and executable service implementations under:
+At this revision the repository contains architecture documentation, the repository-governance baseline, the Git-native Agent Context Engine under `context/` + `scripts/context/`, the ADR-0047 repository-side ChatGPT Web Context tunnel integration, the ADR-0048 policy-gated developer-host Ops MCP under `ops/` + `scripts/ops/`, and executable service implementations under:
 
 ```text
 services/compromised-password-service/
@@ -18,16 +18,20 @@ Implemented repository-governance artifacts are:
 ```text
 Makefile
 context/
+ops/
 scripts/baseline/
 scripts/context/
+scripts/ops/
 .github/workflows/repository-baseline.yml
 ```
 
-The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, selected guarded structure rules, and ADR-0046 Context Engine contracts/tests. Context verification covers current bootstrap/source paths, canonical task-routing/generation parity, commit-bound checkpoint shape, tracked-file bounded retrieval/provenance, conservative full-read escalation, CWD-independent stdio MCP startup, matching textual/structured object tool results, and read-only MCP behavior. The protected repository workflow also invokes the reusable Compromised Password and Notification service security suites on PR/push and on the scheduled repository security cadence.
+The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, selected guarded structure rules, ADR-0046 Context Engine contracts/tests, and ADR-0048 Ops MCP policy/stdio/filesystem/process/audit tests. Context verification covers current bootstrap/source paths, canonical task-routing/generation parity, commit-bound checkpoint shape, tracked-file bounded retrieval/provenance, conservative full-read escalation, CWD-independent stdio MCP startup, matching textual/structured object tool results, and read-only MCP behavior. Ops verification covers fail-closed policy parsing, path/symlink boundaries, bounded UTF-8 file mutation, command alias/cwd/timeout/output bounds, child-environment credential exclusion, bounded audit metadata, CWD-independent startup, and explicit UTF-8 stdio output. The protected repository workflow also invokes the reusable Compromised Password and Notification service security suites on PR/push and on the scheduled repository security cadence.
 
 The Agent Context Engine implementation is developer/repository tooling only. It has no application runtime service, datastore, HTTP/network listener, production dependency, or cross-project memory database. V1 uses Python standard library + Git CLI, local bounded tracked-file lexical/path retrieval, commit-bound historical checkpoints, and a read-only stdio MCP adapter. Current Git authority remains above every derived context/checkpoint/model memory result.
 
-ADR-0047 adds repository-side readiness for ChatGPT Web to reach that existing stdio MCP adapter through the external OpenAI Secure MCP Tunnel bridge. Repository evidence includes the CWD-independent MCP entry point, unchanged five-tool read-only contract, reviewed tunnel-client v0.0.11 developer pin/integrity metadata, least-privilege credential rules, threat/security governance, and Windows operator runbook. HooshiX still adds no HTTP/SSE/TCP MCP listener or public MCP port. Operator execution on 2026-08-18 verified the reviewed v0.0.11 Windows archive digest, restricted runtime-key path, local health/readiness, and exact five-tool ChatGPT Plugin discovery. An initial real ChatGPT Web `project.context_for_task` call exposed an interoperability defect at the tunnel response boundary, while independent embedded-MCP and minimal stdio `echo` control tests passed and narrowed the defect to HooshiX MCP tool-result interoperability. This repository revision adds matching JSON text plus object `structuredContent` for object-shaped successful tool results. After synchronizing the dedicated operator checkout to PR-head commit `98b06c802bdf1a2e79d28c2e2335d864739acfc6`, a real ChatGPT Web `project.bootstrap` call returned clean trusted current Git authority and a real `project.context_for_task` call completed successfully without the prior HTTP 400, conservatively returning `review_mode: full-read` with `selection_reason: ambiguous route score tie`. This passes the post-fix PR-head interoperability test. ADR-0047 still requires the real end-to-end operator evidence on the merged `main` state, so the final merged-main retest remains **NOT VERIFIED** until the operator checkout is synchronized after merge and the real ChatGPT Web calls are repeated. The other discovered Context tools were not individually invoked in this operator evidence.
+ADR-0047 adds repository-side readiness for ChatGPT Web to reach the Context stdio MCP adapter through the external OpenAI Secure MCP Tunnel bridge. Repository evidence includes the CWD-independent MCP entry point, unchanged five-tool read-only contract, reviewed tunnel-client v0.0.11 developer pin/integrity metadata, least-privilege credential rules, threat/security governance, and Windows operator runbook. HooshiX still adds no Context HTTP/SSE/TCP MCP listener or public MCP port. Operator execution on 2026-08-18 verified the reviewed v0.0.11 Windows archive digest, restricted runtime-key path, local health/readiness, exact five-tool ChatGPT Plugin discovery, the UTF-8 stdio interoperability repair, and real merged-main `project.bootstrap`, `project.search`, and `project.context_for_task` calls on `main` commit `1a1b265769fb24a054c1ffb1c5d7479416d50a2a`. The merged-main calls returned clean trusted Git authority and completed without the prior response-boundary HTTP 400. This passes the ADR-0047 merged-main Context tunnel retest for the exercised tools; unexercised Context tools retain only repository-level evidence.
+
+ADR-0048 adds a separate developer-host Ops MCP. Repository implementation includes a mandatory local-policy parser, typed bounded filesystem operations, policy-alias process execution, sanitized child environment, bounded output/time/audit behavior, explicit UTF-8 stdio framing, and deterministic tests. The real operator policy, Ops tunnel/profile/key, Windows elevation mode, ACLs, background task/service, and ChatGPT Web Ops calls are external host evidence and remain **NOT VERIFIED** until executed on the operator PC. Ops MCP is not a production administration path and does not change ADR-0030.
 
 The Compromised Password service repository implementation includes service-owned Java/Gradle source and wrapper, Protobuf/gRPC contract, immutable SQLite lookup adapter, deterministic tests, dependency locks/verification metadata, container definition, Helm/security policy package, Day-One service telemetry code, and service CI/static/architecture/deployment gates. It also includes the service-owned offline/local SHA-1 source-to-SQLite dataset builder, version-2 release-manifest schema, generated-fixture integration/CLI verification, explicit build/runtime prefix-cardinality and serialized-response compatibility bounds, exact runtime manifest SHA-256 binding to the SQLite artifact digest, raw-corpus/generated-database Git guards, privacy/architecture regression enforcement, and a runtime-JAR exclusion that keeps builder tooling out of the deployed application artifact. The builder has no URL/network/downloader path and normal PR CI uses only generated fixtures marked `GENERATED_TEST_FIXTURE`. Runtime image construction verifies the exact official Temurin 25.0.4+7 Linux/x64 archive SHA-256 before placing that JDK in the image.
 
@@ -42,7 +46,8 @@ ADR-0045 defines the repository target for DevSecOps source/secret/dependency-ad
 Current repository evidence is:
 
 - Agent Context Engine source/contracts/tests are present; CI evidence remains commit-specific;
-- ADR-0047 ChatGPT Web tunnel repository integration artifacts are present; operator execution verified reviewed tunnel-client integrity/runtime/readiness, exact five-tool Plugin discovery, and real post-fix PR-head `project.bootstrap` plus `project.context_for_task`; final merged-main ChatGPT Web retest remains NOT VERIFIED as required by ADR-0047;
+- ADR-0047 ChatGPT Web Context tunnel repository integration artifacts are present; operator execution verified reviewed tunnel-client integrity/runtime/readiness, exact five-tool Plugin discovery, and real merged-main `project.bootstrap`, `project.search`, and `project.context_for_task` on `main@1a1b265`;
+- ADR-0048 Ops MCP source/policy schema/tests/runbook are present; real Windows policy/elevation/separate-tunnel/background/ChatGPT execution evidence remains NOT VERIFIED;
 - service-specific Semgrep enforcement exists for Compromised Password and Notification;
 - OSV-Scanner locked-dependency advisory scanning exists for Compromised Password and Notification and runs in PR/push/scheduled security verification;
 - Gitleaks is not present;
@@ -80,7 +85,8 @@ Identity, Authorization, and Web BFF application services remain absent. Notific
 | --- | --- | --- | --- |
 | Repository governance baseline | DESIGNED | IMPLEMENTED | CI evidence is commit-specific; `make baseline-verify` is the local entry point |
 | Git-native Agent Context Engine | DESIGNED under ADR-0046 | IMPLEMENTED | bootstrap/router/checkpoint/retrieval/MCP source + deterministic tests present; protected CI evidence is commit-specific |
-| ChatGPT Web Context Engine tunnel bridge | DESIGNED under ADR-0047 | IMPLEMENTED repository integration | PARTIALLY VERIFIED externally: reviewed v0.0.11 integrity/runtime/readiness, exact five-tool Plugin discovery, embedded/minimal stdio controls, and real post-fix PR-head `project.bootstrap`/`project.context_for_task` passed; merged-main ChatGPT Web retest remains NOT VERIFIED; other discovered Context tools were not individually invoked |
+| ChatGPT Web Context Engine tunnel bridge | DESIGNED under ADR-0047 | IMPLEMENTED repository integration | PARTIALLY VERIFIED externally: reviewed v0.0.11 integrity/runtime/readiness, exact five-tool Plugin discovery, and real merged-main `project.bootstrap`/`project.search`/`project.context_for_task` passed on `main@1a1b265`; other unexercised Context tools retain repository evidence only |
+| ChatGPT Web developer-host Ops MCP | DESIGNED under ADR-0048 | IMPLEMENTED repository integration | repository policy/filesystem/process/audit/stdio tests present; real Windows policy/elevation/separate-tunnel/background/ChatGPT evidence NOT VERIFIED |
 | Cross-project/central agent memory service | NOT SELECTED / GATED under ADR-0046 | NOT APPLICABLE | NOT APPLICABLE until evidence trigger + new ADR |
 | Compromised Password service CI/architecture/security/dataset-build gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
 | Notification service CI/architecture/security/migration/deployment gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
@@ -122,10 +128,11 @@ The bootstrap baseline makes these current repository invariants executable:
 - `context/bootstrap.json`, `context/routes.json`, and checkpoint contracts resolve to current tracked repository authorities;
 - `docs/architecture/TASK-REVIEW-MATRIX.md` must exactly match canonical `context/routes.json` generation;
 - Context Engine targeted review trust fails safe when configured authority state is dirty/invalid or routing is ambiguous;
-- Context Engine retrieval remains tracked-file/local/bounded/provenance-bearing and MCP remains read-only/stdio-only;
+- Context Engine retrieval remains tracked-file/local/bounded/provenance-bearing and Context MCP remains read-only/stdio-only;
 - object-shaped Context MCP successes preserve matching JSON text and `structuredContent`, so the tunnel/client boundary does not depend on reparsing the only result representation;
 - Context MCP startup is independent of the caller working directory and resolves the repository from the tracked MCP entry point;
 - ADR-0047 tunnel integration must remain an external stdio bridge and cannot add a HooshiX network listener/write/general-shell authority;
+- ADR-0048 Ops MCP must remain separate from Context MCP, require local fail-closed policy, use explicit UTF-8 stdio, bound filesystem/process/audit behavior, sanitize child credential environment, and remain developer-host only;
 - the ADR-0041-gated `services/reference-data-service` path is rejected until the architecture/trigger evidence is intentionally revised;
 - root `services/common` and `services/shared` dumping grounds are rejected;
 - the Compromised Password Gradle wrapper must retain executable state.
@@ -138,7 +145,7 @@ ADR-0045 documents additional target gates. Gitleaks/Syft/Grype/Cosign/Kyverno m
 
 Current architecture still requires evidence that this repository slice does not create by itself:
 
-- real ChatGPT Web merged-main `project.bootstrap` and `project.context_for_task` execution through the synchronized dedicated checkout and reviewed tunnel runtime, as the remaining ADR-0047 end-to-end evidence gate for this fix;
+- real Windows/ChatGPT Web ADR-0048 Ops evidence for protected local policy ACLs, intended elevation mode, separate tunnel credential/profile, `ops.status`, bounded filesystem/process calls, audit behavior, and background restart/rollback;
 - blocking Gitleaks current-tree + protected Git-history scanning with redacted output and positive/negative fixtures;
 - final-image Syft CycloneDX generation bound to exact image digest;
 - Grype final-image/SBOM vulnerability policy, feed freshness, exception/VEX behavior, and deployed-digest rescanning;

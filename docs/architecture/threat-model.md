@@ -130,8 +130,10 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - dirty configured authority state cannot be represented as verified targeted context;
 - retrieval is repository-root confined, tracked-file-only, bounded, and provenance-bearing;
 - tracked-file-only retrieval does not prove the repository is secret-free; Gitleaks remains the committed-secret control;
-- the HooshiX MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or HooshiX network listener;
-- OpenAI tunnel-client is the outbound customer-run transport bridge and must not broaden the HooshiX MCP tool list;
+- the HooshiX Context MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or HooshiX network listener;
+- OpenAI tunnel-client is the outbound customer-run transport bridge and must not broaden the Context MCP tool list;
+- ADR-0048 Ops MCP is a separate developer-host stdio surface with mandatory local policy, explicit mutation/execution semantics, separate tunnel/profile/key, bounded path/process/output/audit controls, and no production authority;
+- typed Ops path authorization is not claimed to defeat a malicious local process that can race/replace filesystem entries; host ACLs/work roots and the local account remain part of the trust boundary;
 - the long-lived tunnel daemon uses a restricted runtime credential with Tunnels `Read` + `Use`; an admin key is not a daemon credential;
 - tunnel/runtime credentials stay outside Git, checkpoints, logs, screenshots, and ChatGPT content and are not passed as command-line literals;
 - tunnel-client health/operator surfaces remain loopback-only by default; no public/LAN MCP endpoint or router port-forward is introduced;
@@ -147,7 +149,8 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - Compromised telemetry component: attempts secret collection, host-file access, or data manipulation.
 - Compromised CI/GitHub identity: source/history/artifact/GitOps/security-evidence manipulation.
 - Malicious or compromised repository content: attempts prompt injection, stale-context substitution, secret exfiltration, path escape, or command-like input against an AI/context client.
-- Compromised or misconfigured AI tunnel/client path: attempts credential misuse, wrong-tunnel binding, tool-surface expansion, stale-checkout use, or general host authority beyond Context MCP.
+- Compromised or misconfigured AI Context tunnel/client path: attempts credential misuse, wrong-tunnel binding, tool-surface expansion, or stale-checkout use.
+- Compromised or misconfigured AI Ops tunnel/client/policy: attempts unauthorized local mutation/execution, path escape, command-alias expansion, credential exposure, audit evasion, or unintended administrator execution.
 - Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log/context output.
 - Compromised operator device: may hold WireGuard key or developer tunnel runtime credential but not necessarily FIDO2/JIT/production authority.
 - Privileged insider: time-bounded legitimate capability with misuse risk.
@@ -170,11 +173,16 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 | Tampering | compromised-password corpus/source altered/stale | HIBP source identity + manifest/digest/freshness/full-corpus validation | dataset release tests |
 | Tampering | repository text attempts prompt injection or command/path mutation through context tooling | retrieved-data classification + root/tracked-file bounds + fixed Git argv + read-only MCP | routing/search/revision/write-tool negatives |
 | Tampering | tunnel bridge attempts to widen local authority | exact five-tool stdio contract + no HooshiX listener/shell/filesystem/Git write tools | MCP tool-list/unknown-write/CWD-startup + ADR-0047 review |
+| Tampering | Ops request escapes allowed root through path/symlink/reparse behavior | lexical allowed-root check + denied roots + canonical resolved-path containment | ADR-0048 path/denied-root/symlink negative tests |
+| Tampering | Ops request executes a caller-selected program or unbounded command | policy alias to absolute executable + argv array + allowed cwd + finite timeout/output | ADR-0048 alias/cwd/timeout/output tests |
+| Elevation of privilege | non-elevated Ops configuration gains administrator execution | Windows token is external authority + `require_elevated` and separate elevated mutation/process opt-ins; no UAC bypass logic | startup/elevation policy tests + operator `ops.status` evidence |
 | Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
 | Information disclosure | real secret is committed then deleted but remains in Git history/clones | Gitleaks tree+history + revoke/rotate + incident/history remediation | commit-delete fixture + rotation evidence |
 | Information disclosure | scanner/log output republishes discovered secret | Gitleaks redaction + CI output policy | redaction fixture |
 | Information disclosure | context retrieval/checkpoint exposes sensitive repository material | sensitive-name exclusion + bounded tracked-file retrieval + no secret fields/private-key material in checkpoints + Gitleaks remains authoritative | retrieval/checkpoint negatives + Gitleaks evidence |
 | Information disclosure | tunnel runtime/admin credential is exposed through Git/chat/logs/process arguments | restricted runtime key + local secret mechanism + no chat/Git/log/screenshot/command-line literal + rotate/revoke on suspicion | operator configuration/incident evidence |
+| Information disclosure | Ops child command inherits tunnel/API credentials | allow-listed child environment + secret-like key exclusion + no caller environment map/stdin secret channel | ADR-0048 child-environment negative test |
+| Repudiation | local Ops mutation/execution has no usable trace | bounded JSON-lines metadata audit with event/time/action/outcome and hashed purpose/argv; no claim of tamper-resistant production audit | audit content/rotation tests + operator ACL evidence |
 | Information disclosure | secrets/PII in telemetry | source allow-list + Collector redaction + canary | Loki/Tempo/Prometheus/Grafana negatives |
 | Information disclosure | Collector reads arbitrary host files | exact read-only pod-log mount; no broad host privilege | render/runtime mount negatives |
 | DoS | Authorization/Redis failure blocks work | bounded deadlines/bulkheads + fail closed | overload/failure tests |
@@ -321,7 +329,7 @@ Required:
 - tracked-file-only repository-root-confined bounded retrieval;
 - configured sensitive filename exclusion and no secret/private-key fields in checkpoints, while Gitleaks remains the actual committed-secret control;
 - revision/query validation plus fixed Git argument arrays without `shell=True`;
-- read-only stdio MCP tool surface with no HooshiX network listener or mutation/checkpoint-create/shell/arbitrary-filesystem tool;
+- read-only Context stdio MCP tool surface with no HooshiX network listener or mutation/checkpoint-create/shell/arbitrary-filesystem tool;
 - CWD-independent MCP repository-root resolution from the tracked entry-point path;
 - OpenAI tunnel-client used only as the outbound bridge to that stdio child, with no public inbound MCP port or router forwarding;
 - restricted Tunnels `Read` + `Use` runtime credential for the daemon; no long-lived admin key;
@@ -343,7 +351,7 @@ Residual: an allowed tracked source file can still contain secret or adversarial
 
 These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, source/secret scanning, signed final-artifact admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
 
-ADR-0046 Context Engine and ADR-0047 ChatGPT Web tunnel bridge are outside the production runtime profile. Their failure cannot justify weakening product/runtime controls or treating external/model memory as current architecture authority.
+ADR-0046 Context Engine, ADR-0047 ChatGPT Web Context tunnel bridge, and ADR-0048 developer-host Ops MCP are outside the production runtime profile. Their failure cannot justify weakening product/runtime controls or treating external/model memory as current architecture authority. Ops local administrator capability is not production JIT authority.
 
 ## 9. Verification mapping
 
@@ -354,6 +362,7 @@ Material threats map to executable service/security/database/network/CI/observab
 - TM-14 -> ADR-0017/0035/0038/0039/0045 + Semgrep/Syft/Grype/Cosign/Kyverno digest/evidence/failure fixtures;
 - TM-19 -> ADR-0045 Gitleaks current-tree/history/redaction + incident revoke/rotate/history-remediation evidence;
 - TM-20 -> ADR-0046 bootstrap/router/search/checkpoint/MCP tests + ADR-0047 CWD-independent stdio/tunnel-boundary review + real operator-PC tunnel/bootstrap evidence + generated-route parity + SEC-033/AFF-051;
+- developer-host Ops threats -> ADR-0048 policy/path/symlink/process/environment/audit/UTF-8 tests + separate operator-PC tunnel/elevation/background evidence;
 - TM-17 -> external host-down monitor + cold DR;
 - compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;
 - policy-engine migration risk -> Kyverno CEL manifest gate.
@@ -362,4 +371,4 @@ A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
 ## 10. Change triggers
 
-Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/MCP or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/Context MCP, developer-host Ops MCP/policy/execution, or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.

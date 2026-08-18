@@ -26,11 +26,19 @@ make context-bootstrap
 python3 scripts/context/context_engine.py route --task '<task>'
 ```
 
-`context/routes.json` is the canonical task router, `docs/architecture/TASK-REVIEW-MATRIX.md` is its generated human view, and `context/checkpoints/` contains commit-bound historical work receipts. The local MCP adapter is read-only/stdio-only:
+`context/routes.json` is the canonical task router, `docs/architecture/TASK-REVIEW-MATRIX.md` is its generated human view, and `context/checkpoints/` contains commit-bound historical work receipts. The local Context MCP adapter is read-only/stdio-only:
 
 ```bash
 python3 scripts/context/mcp_server.py
 ```
+
+ADR-0048 adds a separate policy-gated developer-host Ops MCP for explicit local filesystem mutation and process execution. It does not change the Context MCP tool surface and is not a production administration path:
+
+```bash
+python3 scripts/ops/mcp_server.py --policy <ABSOLUTE_LOCAL_POLICY_PATH>
+```
+
+The real Ops policy and tunnel credential stay outside Git. Repository work performed through Ops still follows the branch/PR/protected-CI workflow.
 
 Current Git authority always outranks derived context/checkpoints/model memory. A central cross-project memory service is not selected in v1.
 

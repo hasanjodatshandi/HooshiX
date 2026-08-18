@@ -2,7 +2,7 @@
 
 - **Baseline date:** 2026-08-18
 - **Status:** Active local-development baseline
-- **Scope:** developer host/tooling, fast service loop, optional production-fidelity kind integration foundation, and approved ChatGPT Web Context Engine bridge.
+- **Scope:** developer host/tooling, fast service loop, optional production-fidelity kind integration foundation, approved ChatGPT Web Context Engine bridge, and separate ADR-0048 developer-host Ops MCP.
 - **Evidence rule:** a pin is a repository target, not proof it is installed.
 
 Production Technology Baseline remains authoritative for production versions.
@@ -25,6 +25,7 @@ Production Technology Baseline remains authoritative for production versions.
 | Secret scanner | Gitleaks CLI 8.30.1; same rule/config intent as CI |
 | Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
+| HooshiX developer-host Ops MCP | Python standard-library stdio server under ADR-0048; mandatory local policy, separate tunnel/profile/key, no production authority |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 
@@ -209,6 +210,15 @@ make context-bootstrap
 python scripts/context/mcp_server.py
 ```
 
+Developer-host Ops interfaces additionally include:
+
+```text
+make ops-test
+python scripts/ops/mcp_server.py --policy <ABSOLUTE_LOCAL_POLICY_PATH>
+```
+
+Real Ops policy stays outside Git. Elevated local operation requires explicit policy opt-in and an actually elevated Windows process token.
+
 ChatGPT Web tunnel operation follows `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`; tunnel-client does not replace repository verification commands.
 
 Expected versioned platform roots may include:
@@ -231,6 +241,8 @@ Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/H
 DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and pass/fail status without emitting discovered secret content. Release verification separately reports Syft/Grype/Cosign/Kyverno evidence when that boundary is active.
 
 For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
+
+For ADR-0048, repository evidence verifies policy parsing, filesystem/process boundaries, child-environment credential exclusion, bounded audit/output/time, and UTF-8 stdio behavior. Real protected policy/secret ACLs, separate Ops tunnel/profile/key, Windows elevation state, background startup, ChatGPT tool discovery, `ops.status`, and real local mutation/execution remain host/integration evidence until executed on the operator PC.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 

@@ -14,6 +14,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Current ADRs/stable IDs | `../adr/decision-register.md` |
 | Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
 | ChatGPT Web Context Engine tunnel bridge | ADR-0047 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Ops MCP | ADR-0048 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -36,9 +37,11 @@ This file is a routing/source index. It does not duplicate normative architectur
 
 ADR-0046 keeps project context Git-native. `../../context/routes.json` is the canonical task-routing registry; `TASK-REVIEW-MATRIX.md` is its generated human view. Checkpoints under `../../context/checkpoints/` are historical evidence and never current architecture authority. Current Git source always outranks derived context or external/model memory.
 
-The read-only MCP adapter and local retrieval are repository/developer tooling only. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
+The read-only Context MCP adapter and local retrieval are repository/developer tooling only. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
 
-ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
+ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX Context stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
+
+ADR-0048 permits a separate developer-host Ops MCP using the same approved tunnel transport pattern but a separate profile/key/policy. Ops does not broaden Context MCP, create production authority, or make retrieved context an execution authorization source.
 
 ## External primary sources used by current decisions
 
@@ -59,7 +62,7 @@ ADR-0046 uses MCP only as a read-only local interoperability adapter. The reposi
 - OpenAI tunnel-client end-user guide: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/end-user-guide.md`
 - OpenAI tunnel-client configuration reference: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/configuration.md`
 
-ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. Version/integrity/authentication facts are developer-tool inputs; they do not prove the operator PC tunnel is installed, ready, or connected to ChatGPT.
+ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. ADR-0048 reuses the reviewed transport pattern for a separate developer-host Ops profile and credential. Version/integrity/authentication facts are developer-tool inputs; they do not prove either operator-PC tunnel is installed, ready, elevated as intended, or connected to ChatGPT.
 
 ### DevSecOps security toolchain
 

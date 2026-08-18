@@ -227,8 +227,30 @@ Single-server accepts outages but never weaker decisions:
 - telemetry unavailable -> no security/audit/control bypass;
 - host loss -> external monitor alerts while local observability is unavailable.
 
-## 14. Verification
+## 14. Developer-host AI Ops boundary
 
-Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, and complete-stack capacity/DR.
+ADR-0048 adds a developer-host-only Ops MCP separate from the ADR-0046 Context MCP. The Context MCP remains exact read-only repository/context authority and receives no write/execute tool.
+
+Ops security controls are:
+
+- mandatory local policy outside Git; missing/invalid policy fails startup;
+- absolute allowed roots plus denied roots for typed filesystem operations;
+- lexical authorization before existence probing and resolved-path checks against symlink/reparse escape;
+- explicit absolute executable aliases; no caller-selected executable path;
+- bounded argv, cwd, timeout, captured output, file size, listing size, and audit retention;
+- no arbitrary caller environment or stdin secret channel; child environment excludes secret-like variables including tunnel/API credentials;
+- explicit opt-in for process execution, elevated filesystem mutation, and elevated process execution;
+- separate Ops tunnel/profile/runtime key from Context tunnel;
+- local audit stores metadata/digests, not file content, raw argv, raw purpose, stdout/stderr, or credentials;
+- no HooshiX network MCP listener or public port;
+- no production credentials or production administration authority; ADR-0030 remains unchanged.
+
+A configured elevated PowerShell/Python/cmd/interpreter alias can exercise broad Windows account authority and can bypass typed filesystem policy through the interpreter itself. This is an explicit local-host residual risk, not a sandbox claim. The operator must treat that configuration as broad developer-host administrator authority.
+
+The Ops local audit is not tamper-resistant production audit. It cannot satisfy production JIT/audit requirements.
+
+## 15. Verification
+
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, and ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests.
 
 Documentation alone remains `NOT VERIFIED`.

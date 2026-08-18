@@ -34,7 +34,7 @@ Do not:
 - commit tunnel credentials to Git;
 - use an OpenAI admin key for the long-lived runtime daemon.
 
-The HooshiX MCP tool list remains exactly:
+The HooshiX Context MCP tool list remains exactly:
 
 ```text
 project.bootstrap
@@ -186,7 +186,7 @@ Do not store the real key in this repository, shell transcripts, screenshots, lo
 
 ## 7. Configure the stdio MCP profile
 
-Use the official stdio sample and an absolute path to the HooshiX MCP entry point.
+Use the official stdio sample and an absolute path to the HooshiX Context MCP entry point.
 
 First inspect the installed binary's sample/help:
 
@@ -209,7 +209,7 @@ Then initialize a dedicated profile. Replace placeholders locally with the real 
 
 The generated profile must keep `control_plane.api_key` as an `env:` or `file:` secret reference. Do not replace it with a literal key.
 
-The HooshiX MCP entry point resolves the repository root from its own script path. The tunnel-client service working directory is therefore not repository authority.
+The HooshiX Context MCP entry point resolves the repository root from its own script path. The tunnel-client service working directory is therefore not repository authority.
 
 For a host where TCP 8080 is already in use, keep the health/admin surface on loopback and select a free loopback port. The reviewed v0.0.11 client supports an ephemeral listener such as `127.0.0.1:0`; do not resolve a port conflict by binding the health/admin surface to `0.0.0.0` or another LAN/public address.
 
@@ -345,7 +345,7 @@ If tunnel-client logs an HTTP 400 response-post/body-parsing error after forward
 1. preserve the bounded error/request identifiers without copying credentials;
 2. run the repository MCP tests and verify the exact five-tool surface;
 3. verify the raw stdio JSON-RPC response is valid JSON;
-4. use the tunnel-client version's official embedded/minimal stdio test path to separate tunnel/control-plane transport from HooshiX MCP result behavior;
+4. use the tunnel-client version's official embedded/minimal stdio test path to separate tunnel/control-plane transport from HooshiX Context MCP result behavior;
 5. confirm object-shaped HooshiX successes contain matching JSON `content` and `structuredContent`;
 6. do not add a public HTTP MCP wrapper or broaden authentication/tool authority to bypass the failure.
 

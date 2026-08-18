@@ -68,6 +68,7 @@ docs/adr/0044-define-day-one-observability-runtime-v1.md
 docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1.md
 docs/adr/0046-adopt-git-native-agent-context-engine-v1.md
 docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md
+docs/adr/0048-adopt-policy-gated-developer-host-ops-mcp-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -110,6 +111,7 @@ docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
+docs/runbooks/chatgpt-web-ops-mcp.md
 docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
 docs/runbooks/local-istio-ambient.md
 docs/runbooks/local-traefik-edge.md
@@ -117,6 +119,8 @@ docs/runbooks/production-cold-dr.md
 docs/technology/local-development-baseline.md
 docs/technology/production-compatibility-matrix.md
 docs/technology/technology-baseline.md
+ops/policy.example.json
+ops/policy.schema.json
 scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
 scripts/context/context_engine.py
@@ -125,6 +129,11 @@ scripts/context/post_merge_checkpoint.py
 scripts/context/tests/test_context_engine.py
 scripts/context/tests/test_mcp_server.py
 scripts/context/tests/test_post_merge_checkpoint.py
+scripts/ops/mcp_server.py
+scripts/ops/ops_engine.py
+scripts/ops/tests/test_audit_fail_closed.py
+scripts/ops/tests/test_mcp_server.py
+scripts/ops/tests/test_ops_engine.py
 services/compromised-password-service/.dockerignore
 services/compromised-password-service/Dockerfile
 services/compromised-password-service/buf.yaml
