@@ -194,9 +194,9 @@ over coordinate behavior.
 
 V1 click/hover/drag accept semantic selectors only. Caller-selected arbitrary screen coordinates are not exposed.
 
-`desktop.type_text` is bounded non-secret text delivered through WinApp synthetic keyboard input. Exact text fidelity can vary with application/keyboard semantics; verify resulting application state for case-sensitive workflows. Do not use this tool for secrets. It must fail if Windows cannot safely foreground/deliver input.
+`desktop.type_text` is bounded non-secret text. WinApp is used only to focus an optional semantic target; literal text then goes through the fixed isolated repository helper `scripts/desktop/windows_text_input_helper.ps1`. The parent sends text only as UTF-8 JSON on stdin. The helper uses C# `SendInput` + `KEYEVENTF_UNICODE`, checks that the requested HWND remains foreground before each UTF-16 code unit, paces delivery at 5 ms per code unit, waits 500 ms for the target queue to drain, and returns metadata only. The child environment is allow-listed and does not inherit tunnel/API credentials. Text that cannot fit `max_command_seconds` is rejected before injection. Do not use this tool for secrets. If Windows foreground/UIPI rules block delivery, treat the action as failed and do not retry automatically when partial input is possible.
 
-`desktop.key_press` accepts bounded key grammar. Raw virtual-key syntax and text-escape grammar are rejected. System/shell-reserved combinations require explicit local `allow_system_keys=true`; Windows/WinApp hard blocks still apply.
+`desktop.key_press` accepts bounded key grammar and remains on WinApp. Raw virtual-key syntax and text-escape grammar are rejected at the MCP boundary. For WinApp CLI 0.6.0 compatibility in Scheduled Task sessions, already-validated `a-z`/`0-9` modifier-chord main keys are mapped internally to the equivalent explicit virtual key (for example `ctrl+s` -> `ctrl+vk=0x53`) before invoking WinApp; callers still cannot submit arbitrary `vk=` values. System/shell-reserved combinations require explicit local `allow_system_keys=true`; Windows/WinApp hard blocks still apply.
 
 If the desktop is locked, Secure Desktop is active, or integrity/UIPI prevents input, treat the action as failed. Do not weaken Windows controls as a workaround.
 

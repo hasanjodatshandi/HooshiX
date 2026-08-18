@@ -204,7 +204,7 @@ class McpDesktopServer:
             {
                 "name": "desktop.type_text",
                 "title": "Type bounded non-secret text through Windows input",
-                "description": "Type bounded non-secret text through Windows input into a policy-authorized window/optional semantic target. Exact case-sensitive fidelity follows WinApp/current Windows keyboard semantics and must be verified by the caller when material. Do not pass passwords, API keys, OTPs, recovery codes, private keys, cookies/session values, or other credentials/secrets through this tool.",
+                "description": "Type bounded non-secret Unicode text into a policy-authorized window/optional semantic target. A fixed isolated Windows helper receives text only over bounded UTF-8 stdin and uses foreground-guarded KEYEVENTF_UNICODE input; raw text is not passed in child argv/environment/audit. Target applications can still transform received text, so verify resulting application state when material. Do not pass passwords, API keys, OTPs, recovery codes, private keys, cookies/session values, or other credentials/secrets through this tool.",
                 "inputSchema": {
                     "type": "object",
                     "required": ["hwnd", "text"],

@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol
 
+from windows_text_input import IsolatedWindowsUnicodeTextInput, WindowsTextInputError
+
 POLICY_SCHEMA_VERSION = 1
 MAX_POLICY_BYTES = 1024 * 1024
 MAX_PATH_CHARS = 4096
@@ -421,10 +423,11 @@ class SubprocessWinAppRunner:
 
 
 class DesktopEngine:
-    def __init__(self, policy: DesktopPolicy, runner: Runner, *, runtime_version: str) -> None:
+    def __init__(self, policy: DesktopPolicy, runner: Runner, *, runtime_version: str, text_input: Any | None = None) -> None:
         self.policy = policy
         self.runner = runner
         self.runtime_version = runtime_version
+        self.text_input = text_input
         self._audit_lock = threading.Lock()
         try:
             self.policy.audit_log.parent.mkdir(parents=True, exist_ok=True)
@@ -441,7 +444,7 @@ class DesktopEngine:
         cls._validate_runtime_state(policy, elevated=_is_elevated(), interactive=_is_interactive_session())
         runner = SubprocessWinAppRunner(policy)
         version = cls._probe_version(policy, runner)
-        return cls(policy, runner, runtime_version=version)
+        return cls(policy, runner, runtime_version=version, text_input=IsolatedWindowsUnicodeTextInput(helper_path=Path(__file__).with_name("windows_text_input_helper.ps1"), timeout_seconds=policy.max_command_seconds))
 
     @staticmethod
     def _validate_runtime_state(policy: DesktopPolicy, *, elevated: bool, interactive: bool) -> None:
@@ -490,6 +493,7 @@ class DesktopEngine:
                 "uia_mutation": self.policy.allow_uia_mutation,
                 "mouse_input": self.policy.allow_mouse_input,
                 "keyboard_input": self.policy.allow_keyboard_input,
+                "text_input_backend": "isolated-windows-unicode-sendinput" if self.text_input is not None else "unavailable",
                 "system_keys": self.policy.allow_system_keys,
             },
             "limits": {
@@ -659,32 +663,38 @@ class DesktopEngine:
             raise DesktopError("keyboard input is disabled by local policy", code="KEYBOARD_INPUT_DENIED")
         if not isinstance(text, str) or not text or len(text) > self.policy.max_text_chars:
             raise DesktopError(f"text must contain 1-{self.policy.max_text_chars} characters", code="INVALID_ARGUMENT")
+        if self.text_input is None:
+            raise DesktopError("exact Windows text input backend is unavailable", code="TEXT_INPUT_UNAVAILABLE")
         selector = self._selector(target_selector, optional=True)
         target = self._authorize_window(hwnd)
         audit = self._target_audit(target, selector)
         audit.update({"text_chars": len(text), "text_sha256": self._hash_text(text)})
         self._audit("desktop.type_text", "started", audit)
-        args = ["ui", "send-keys", text, "-w", str(hwnd), "--via", "send-input", "--verbatim", "--json"]
-        if selector is not None:
-            args.extend(["--target", selector])
         try:
-            value = self._run_json(args)
+            if selector is not None:
+                self._run_json(["ui", "focus", selector, "-w", str(hwnd), "--json"])
+            value = self.text_input.send_text(hwnd, text)
+        except WindowsTextInputError as exc:
+            error = DesktopError(str(exc), code=exc.code, data=exc.data)
+            self._audit("desktop.type_text", "failed", {**audit, "error": error.code})
+            raise error from exc
         except DesktopError as exc:
             self._audit("desktop.type_text", "failed", {**audit, "error": exc.code})
             raise
-        self._audit("desktop.type_text", "passed", audit)
-        return value if isinstance(value, dict) else {"result": value}
+        self._audit("desktop.type_text", "passed", {**audit, "utf16_code_units": value.get("utf16_code_units"), "chunks": value.get("chunks")})
+        return {"hwnd": hwnd, **value}
 
     def key_press(self, hwnd: int, keys: str, *, target_selector: str | None = None) -> dict[str, Any]:
         if not self.policy.allow_keyboard_input:
             raise DesktopError("keyboard input is disabled by local policy", code="KEYBOARD_INPUT_DENIED")
         normalized = self._validate_keys(keys)
+        winapp_keys = self._normalize_winapp_chords(normalized)
         selector = self._selector(target_selector, optional=True)
         target = self._authorize_window(hwnd)
         audit = self._target_audit(target, selector)
         audit.update({"keys_sha256": self._hash_text(normalized), "key_tokens": len(normalized.split())})
         self._audit("desktop.key_press", "started", audit)
-        args = ["ui", "send-keys", normalized, "-w", str(hwnd), "--via", "send-input", "--json"]
+        args = ["ui", "send-keys", winapp_keys, "-w", str(hwnd), "--via", "send-input", "--json"]
         if selector is not None:
             args.extend(["--target", selector])
         if self.policy.allow_system_keys:
@@ -786,6 +796,30 @@ class DesktopEngine:
         if COORDINATE_RE.fullmatch(selector):
             raise DesktopError("coordinate-only selectors are not exposed by Desktop MCP v1", code="COORDINATE_DENIED")
         return selector
+
+    @staticmethod
+    def _normalize_winapp_chords(keys: str) -> str:
+        """Map caller-safe alphanumeric chord keys to explicit VKs for WinApp stability.
+
+        WinApp CLI 0.6.0 resolves a single-character chord key with VkKeyScan(),
+        which can return -1 in a Scheduled Task thread even when the interactive
+        desktop uses a normal keyboard layout. The public Desktop API still rejects
+        raw vk= syntax; this internal mapping covers only the already-validated
+        ASCII a-z / 0-9 chord main keys.
+        """
+        normalized_tokens: list[str] = []
+        modifiers = {"ctrl", "alt", "shift", "win"}
+        for token in keys.split():
+            parts = token.split("+")
+            if len(parts) >= 2 and all(part in modifiers for part in parts[:-1]):
+                main = parts[-1]
+                if len(main) == 1 and "a" <= main <= "z":
+                    main = f"vk=0x{ord(main.upper()):02X}"
+                elif len(main) == 1 and "0" <= main <= "9":
+                    main = f"vk=0x{ord(main):02X}"
+                token = "+".join([*parts[:-1], main])
+            normalized_tokens.append(token)
+        return " ".join(normalized_tokens)
 
     def _validate_keys(self, keys: str) -> str:
         if not isinstance(keys, str) or not keys.strip() or len(keys) > MAX_KEY_CHARS:

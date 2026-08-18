@@ -60,9 +60,12 @@ REQUIRED_BASELINE_PATHS = (
     "desktop/policy.schema.json",
     "scripts/desktop/mcp_server.py",
     "scripts/desktop/desktop_engine.py",
+    "scripts/desktop/windows_text_input.py",
+    "scripts/desktop/windows_text_input_helper.ps1",
     "scripts/desktop/tests/test_audit_fail_closed.py",
     "scripts/desktop/tests/test_desktop_engine.py",
     "scripts/desktop/tests/test_mcp_server.py",
+    "scripts/desktop/tests/test_windows_text_input.py",
     "scripts/baseline/tests/test_verify_repository.py",
     "scripts/baseline/verify_repository.py",
 )

@@ -261,15 +261,15 @@ Desktop security controls are:
 - semantic selectors for UIA/mouse actions; no arbitrary coordinate-only click/drag and no arbitrary WinApp argv;
 - separate opt-ins for screenshot/capture-screen, UIA mutation, mouse, keyboard, and system keys;
 - no clipboard-read/get-value/credential-reader/recording/touch/pen/process/filesystem/network-fetch tool in v1;
-- literal bounded text entry is explicitly non-secret; raw typed text/selectors/window titles/screenshots/WinApp output are excluded from audit;
+- literal bounded text entry is explicitly non-secret and uses a fixed isolated PowerShell/C# `KEYEVENTF_UNICODE` helper; raw text goes only over bounded UTF-8 stdin, never child argv/environment/audit; the helper checks foreground HWND per UTF-16 code unit, paces delivery, drains the target queue, and rejects inputs that cannot fit the policy timeout before injection;
 - bounded command/output/screenshot/text/depth/audit limits; temporary PNG capture is deleted after bounded readback;
-- WinApp child environment excludes tunnel/API credential variables and opts out of WinApp telemetry;
+- WinApp and text-helper child environments exclude tunnel/API credential variables; WinApp children opt out of telemetry;
 - fail-closed metadata audit before sensitive observation/mutation and separate Desktop tunnel/profile/runtime key.
 
 Visible UI/screenshot content can itself contain PII or confidential data. Desktop MCP therefore gives the model/client operator-authorized screen context but does not claim visible content is secret-safe. Local Desktop audit is not production audit.
 
 ## 16. Verification
 
-Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049 Desktop policy/app/HWND/capture/input/environment/audit/UTF-8 tests.
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049 Desktop policy/app/HWND/capture/input/isolated-Unicode-helper/environment/audit/UTF-8 tests.
 
 Documentation alone remains `NOT VERIFIED`.

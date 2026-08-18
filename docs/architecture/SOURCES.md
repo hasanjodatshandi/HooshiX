@@ -72,6 +72,8 @@ ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the exis
 - Microsoft WinApp CLI documentation: `https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/`
 - Microsoft WinApp CLI UI automation documentation: `https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/ui-automation`
 - Microsoft WinApp CLI repository/releases: `https://github.com/microsoft/WinAppCli`
+- Microsoft `SendInput` / `KEYBDINPUT` reference: `https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-keybdinput`
+- Microsoft `INPUT` structure reference: `https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-input`
 
 ADR-0049 uses WinApp CLI only as pinned developer-host UI automation tooling behind HooshiX policy/MCP controls. It is not a production dependency or a credential/UAC/Secure-Desktop bypass.
 

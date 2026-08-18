@@ -138,6 +138,9 @@ scripts/desktop/mcp_server.py
 scripts/desktop/tests/test_audit_fail_closed.py
 scripts/desktop/tests/test_desktop_engine.py
 scripts/desktop/tests/test_mcp_server.py
+scripts/desktop/tests/test_windows_text_input.py
+scripts/desktop/windows_text_input.py
+scripts/desktop/windows_text_input_helper.ps1
 scripts/ops/mcp_server.py
 scripts/ops/ops_engine.py
 scripts/ops/tests/test_audit_fail_closed.py
