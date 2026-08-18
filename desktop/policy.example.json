@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "winapp_path": "C:\\Users\\REPLACE_ME\\AppData\\Local\\Microsoft\\WindowsApps\\winapp.exe",
+  "expected_winapp_version": "0.6.0",
+  "allow_all_apps": false,
+  "allowed_apps": [
+    "notepad",
+    "explorer",
+    "code"
+  ],
+  "denied_apps": [
+    "consent",
+    "credentialuibroker",
+    "lockapp",
+    "logonui",
+    "sechealthui"
+  ],
+  "audit_log": "C:\\ProgramData\\HooshiX\\desktop\\audit.ndjson",
+  "capture_temp_dir": "C:\\Users\\REPLACE_ME\\AppData\\Local\\HooshiX\\desktop-capture",
+  "require_interactive_session": true,
+  "require_non_elevated": true,
+  "allow_screenshot": true,
+  "allow_capture_screen": false,
+  "allow_uia_mutation": true,
+  "allow_mouse_input": true,
+  "allow_keyboard_input": true,
+  "allow_system_keys": false,
+  "max_command_seconds": 20,
+  "max_output_bytes": 1048576,
+  "max_screenshot_bytes": 8388608,
+  "max_text_chars": 4096,
+  "max_inspect_depth": 8,
+  "max_audit_bytes": 67108864,
+  "audit_backups": 5
+}

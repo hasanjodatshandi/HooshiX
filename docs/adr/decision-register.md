@@ -54,6 +54,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0046 | Git-native Agent Context Engine: verified bootstrap, task routing, commit-bound checkpoints, bounded retrieval, read-only MCP |
 | ADR-0047 | OpenAI Secure MCP Tunnel bridge for ChatGPT Web access to the existing read-only stdio Context MCP |
 | ADR-0048 | policy-gated developer-host Ops MCP for separate local filesystem/process authority |
+| ADR-0049 | policy-gated developer-host Desktop MCP for separate interactive Windows UI observation/input authority |
 
 ## Superseded ADR identifiers
 
