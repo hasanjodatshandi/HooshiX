@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package hooshix.identity.registration.v1;
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.registration.v1";
+
+service IdentityRegistrationService {
+  rpc RegisterLocal(RegisterLocalRequest) returns (RegistrationAcceptedResponse);
+  rpc ResendRegistrationVerification(ResendRegistrationVerificationRequest) returns (RegistrationAcceptedResponse);
+  rpc ConfirmRegistration(ConfirmRegistrationRequest) returns (ConfirmRegistrationResponse);
+}
+
+enum RegistrationContactKind {
+  REGISTRATION_CONTACT_KIND_UNSPECIFIED = 0;
+  REGISTRATION_CONTACT_KIND_EMAIL = 1;
+  REGISTRATION_CONTACT_KIND_PHONE = 2;
+}
+
+enum RegistrationLocale {
+  REGISTRATION_LOCALE_UNSPECIFIED = 0;
+  REGISTRATION_LOCALE_FA = 1;
+  REGISTRATION_LOCALE_EN = 2;
+}
+
+message RegistrationContact {
+  RegistrationContactKind kind = 1;
+  string value = 2;
+}
+
+message RegisterLocalRequest {
+  string request_id = 1;
+  RegistrationContact contact = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string father_name = 5;
+  string password = 6;
+  RegistrationLocale locale = 7;
+  string trusted_client_ip = 8;
+}
+
+message ResendRegistrationVerificationRequest {
+  string request_id = 1;
+  RegistrationContact contact = 2;
+  string trusted_client_ip = 3;
+}
+
+message ConfirmRegistrationRequest {
+  string request_id = 1;
+  RegistrationContact contact = 2;
+  string code = 3;
+  string trusted_client_ip = 4;
+}
+
+message RegistrationAcceptedResponse {
+  bool accepted = 1;
+}
+
+message ConfirmRegistrationResponse {
+  bool confirmed = 1;
+}
