@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hooshix.local/schemas/ops-policy-v1.json",
+  "title": "HooshiX developer-host Ops MCP policy v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "allowed_roots",
+    "denied_roots",
+    "commands",
+    "audit_log",
+    "require_elevated",
+    "allow_process_execution",
+    "allow_elevated_mutation",
+    "allow_elevated_process_execution",
+    "max_command_seconds",
+    "max_output_bytes",
+    "max_file_bytes",
+    "max_list_entries",
+    "max_audit_bytes",
+    "audit_backups"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "allowed_roots": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    },
+    "denied_roots": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    },
+    "commands": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9._-]{0,63}$"},
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 4096}
+    },
+    "audit_log": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "require_elevated": {"type": "boolean"},
+    "allow_process_execution": {"type": "boolean"},
+    "allow_elevated_mutation": {"type": "boolean"},
+    "allow_elevated_process_execution": {"type": "boolean"},
+    "max_command_seconds": {"type": "integer", "minimum": 1, "maximum": 3600},
+    "max_output_bytes": {"type": "integer", "minimum": 1024, "maximum": 16777216},
+    "max_file_bytes": {"type": "integer", "minimum": 1024, "maximum": 16777216},
+    "max_list_entries": {"type": "integer", "minimum": 1, "maximum": 5000},
+    "max_audit_bytes": {"type": "integer", "minimum": 1048576, "maximum": 1073741824},
+    "audit_backups": {"type": "integer", "minimum": 1, "maximum": 20}
+  },
+  "additionalProperties": false
+}

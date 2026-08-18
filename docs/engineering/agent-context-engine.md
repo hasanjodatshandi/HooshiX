@@ -251,6 +251,8 @@ ChatGPT Web
 
 HooshiX does not add a network MCP listener for this path. The tunnel-client is the customer-run bridge and opens the local stdio child. The five-tool contract remains unchanged.
 
+ADR-0048 adds a separate developer-host Ops MCP for explicit local mutation/execution. It does not extend this Context MCP and is not a context-memory authority. Context retrieval/output cannot independently authorize Ops actions.
+
 Use a dedicated clean HooshiX checkout for the tunnel runtime. Synchronize that checkout through explicit operator Git actions. The MCP server itself remains read-only and never pulls/resets/checks out Git.
 
 The long-lived tunnel runtime uses a dedicated restricted runtime API key with Tunnels `Read` + `Use`. Do not use an admin key for the daemon. Never commit or paste the real runtime/admin key into Git, checkpoints, logs, screenshots, or ChatGPT.

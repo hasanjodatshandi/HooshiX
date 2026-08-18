@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP and its repository verification boundary.
 
 ## 1. Required Java PR gates
 
@@ -190,7 +190,7 @@ Applicable checks include:
 - secret/render scans;
 - profile-correct replica/HPA/PDB/topology.
 
-## 9. Documentation/governance and Agent Context gates
+## 9. Documentation/governance, Agent Context, and developer-host Ops gates
 
 CI SHOULD enforce when implemented:
 
@@ -209,17 +209,22 @@ CI SHOULD enforce when implemented:
 - dirty configured authority state cannot be reported as verified targeted-review context;
 - Context Engine retrieval remains tracked-file-only, repository-root confined, bounded, provenance-bearing, and configured sensitive filenames are excluded;
 - caller-controlled revision/query input cannot become shell execution or arbitrary filesystem access;
-- MCP modern discovery/tool calls and bounded legacy initialize compatibility remain tested;
-- MCP exposes no file/Git/checkpoint/deployment/write mutation tool;
-- the MCP entry point starts correctly from a working directory outside the repository and resolves HooshiX from the tracked script path;
+- Context MCP modern discovery/tool calls and bounded legacy initialize compatibility remain tested;
+- Context MCP exposes no file/Git/checkpoint/deployment/write mutation tool;
+- the Context MCP entry point starts correctly from a working directory outside the repository and resolves HooshiX from the tracked script path;
 - ADR-0047 ChatGPT Web access remains an external OpenAI tunnel-client bridge to the unchanged stdio child and does not add a HooshiX HTTP/SSE/TCP listener, public MCP port, shell, arbitrary filesystem, Git mutation, credential-read, or deployment tool;
 - ADR-0047 documentation/pins require official tunnel-client release integrity verification and a restricted Tunnels `Read` + `Use` runtime credential; an admin key is not the long-lived daemon credential.
+- ADR-0048 Ops MCP remains a separate stdio server and does not change the exact five-tool Context MCP surface;
+- Ops server startup requires a local fail-closed policy and tests cover missing/malformed/unknown/duplicate/relative policy state, path/denied-root/symlink escape, allowed-root deletion denial, bounded atomic UTF-8 file mutation, process alias/cwd/timeout/output controls, child credential-environment exclusion, bounded audit metadata/rotation, CWD-independent startup, and explicit UTF-8 response bytes;
+- Ops process execution accepts only policy aliases to absolute executables and argv arrays; no caller-selected executable path, arbitrary environment map, or stdin secret channel is added;
+- elevated Ops mutation/process execution requires explicit local policy opt-in and remains developer-host only; no test or tunnel setup may treat it as ADR-0030 production privilege;
+- repository examples contain no real Ops policy secret or tunnel credential.
 
 These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
 
-`make baseline-verify` includes the repository Context Engine tests and verification. A Context Engine/documentation drift therefore blocks the same repository-governance boundary.
+`make baseline-verify` includes repository Context Engine tests/verification and Ops MCP tests. Context/route/documentation or Ops policy/stdio boundary drift therefore blocks the same repository-governance boundary.
 
-Repository CI proves only the repository-side tunnel-ready stdio boundary and governance. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
+Repository CI proves only repository-side stdio/policy/governance behavior. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, Windows ACL/elevation/background state, Context `project.bootstrap`, and Ops `ops.status`/mutation/execution are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC for the relevant surface.
 
 ## 10. Heavy release/scheduled evidence
 

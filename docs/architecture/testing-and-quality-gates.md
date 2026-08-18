@@ -192,7 +192,26 @@ Every executable service/critical path proves applicable:
 - required authoritative audit remains durable/off-host;
 - independent external black-box check detects total host loss when local monitoring is down.
 
-## 15. Complete-stack single-server test
+## 15. Developer-host Ops MCP tests
+
+ADR-0048 repository tests prove:
+
+- Context MCP still exposes exactly its five read-only tools;
+- Ops MCP exposes only the reviewed separate Ops tool list with correct read-only/destructive/open-world hints;
+- missing/malformed/unknown-field/duplicate-key/relative/out-of-range policy state fails closed;
+- out-of-root, denied-root, allowed-root deletion, and symlink/reparse escape negatives;
+- bounded UTF-8 file read/write, atomic replace, and SHA-256 overwrite precondition;
+- policy command alias only, absolute allowed cwd, bounded argv, finite timeout, process-tree termination attempt, and bounded stdout/stderr capture;
+- secret-like parent environment values such as `CONTROL_PLANE_API_KEY` are absent from child environment;
+- audit metadata excludes file content, raw argv, raw purpose, stdout/stderr, and credentials and has bounded rotation;
+- stdio JSON-RPC output is explicit UTF-8 bytes independent of Windows text code page;
+- entry point works outside repository CWD.
+
+Host evidence separately proves real Windows policy ACLs, intended elevation state, separate Ops tunnel/profile/key, local readiness, exact tool discovery, `ops.status`, bounded mutation/execution, background restart, audit behavior, and rollback/revocation.
+
+Ops MCP tests do not prove production administration safety. ADR-0030 remains the production privileged-access authority.
+
+## 16. Complete-stack single-server test
 
 Run all intended platform/application/observability components together.
 
@@ -214,7 +233,7 @@ Record:
 
 Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security load, safe concurrent WAL+AOF+Kafka+telemetry IO, and no security/admission/backup/observability bypass.
 
-## 16. CI/CD ordering
+## 17. CI/CD ordering
 
 Recommended authority order:
 
@@ -234,7 +253,7 @@ Gitleaks secret scan
 
 Independent checks may execute in parallel only when required input/evidence ordering remains correct. Scheduled OSV advisory scanning complements, but does not replace, ADR-0035 deployed-digest Grype rescanning.
 
-## 17. Definition of Done
+## 18. Definition of Done
 
 A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, source/secret/dependency-advisory/final-artifact security, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
 
