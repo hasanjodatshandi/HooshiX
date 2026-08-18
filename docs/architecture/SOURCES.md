@@ -15,7 +15,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
 | ChatGPT Web Context Engine tunnel bridge | ADR-0047 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
 | ChatGPT Web developer-host Ops MCP | ADR-0048 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |
-| ChatGPT Web developer-host Desktop MCP | ADR-0049 + `../runbooks/chatgpt-web-desktop-mcp.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Desktop MCP | ADR-0049 + ADR-0050 + `../runbooks/chatgpt-web-desktop-mcp.md` + `../technology/local-development-baseline.md` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -44,7 +44,7 @@ ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bri
 
 ADR-0048 permits a separate developer-host Ops MCP using the same approved tunnel transport pattern but a separate profile/key/policy. Ops does not broaden Context MCP, create production authority, or make retrieved context an execution authorization source.
 
-ADR-0049 permits a third developer-host Desktop MCP for policy-gated interactive Windows UI observation/input. Desktop uses its own policy/tunnel/profile/key/runtime, remains outside production authority, and does not add tools to Context or Ops.
+ADR-0049 permits a third developer-host Desktop MCP for policy-gated interactive Windows UI observation/input. ADR-0050 narrowly extends that same Desktop boundary with an optional local credential-use broker: ChatGPT supplies only an opaque `credential_id`; a fixed helper resolves a policy-bound Windows Credential Manager Generic Credential after fresh app/process-image-path/SHA-256/password-target checks and never returns the credential value. Desktop remains outside production authority and does not add tools to Context or Ops.
 
 ## External primary sources used by current decisions
 
@@ -74,8 +74,12 @@ ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the exis
 - Microsoft WinApp CLI repository/releases: `https://github.com/microsoft/WinAppCli`
 - Microsoft `SendInput` / `KEYBDINPUT` reference: `https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-keybdinput`
 - Microsoft `INPUT` structure reference: `https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-input`
+- Microsoft `QueryFullProcessImageNameW` reference: `https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew`
+- Microsoft `CredReadW` reference: `https://learn.microsoft.com/windows/win32/api/wincred/nf-wincred-credreadw`
+- Microsoft `CREDENTIALW` reference: `https://learn.microsoft.com/windows/win32/api/wincred/ns-wincred-credentialw`
+- Microsoft UI Automation `AutomationElement.IsPasswordProperty`: `https://learn.microsoft.com/dotnet/api/system.windows.automation.automationelement.ispasswordproperty`
 
-ADR-0049 uses WinApp CLI only as pinned developer-host UI automation tooling behind HooshiX policy/MCP controls. It is not a production dependency or a credential/UAC/Secure-Desktop bypass.
+ADR-0049 uses WinApp CLI only as pinned developer-host UI automation tooling behind HooshiX policy/MCP controls. ADR-0050 uses Windows Credential Manager/UI Automation only for a policy-bound use-without-disclosure broker. Neither decision creates production authority, a credential reader, or a UAC/Secure-Desktop bypass.
 
 ### DevSecOps security toolchain
 

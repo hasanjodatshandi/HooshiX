@@ -27,7 +27,7 @@ Production Technology Baseline remains authoritative for production versions.
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
 | HooshiX developer-host Ops MCP | Python standard-library stdio server under ADR-0048; mandatory local policy, separate tunnel/profile/key, no production authority |
 | Microsoft WinApp CLI | 0.6.0; WinGet `Microsoft.WinAppCli`; developer-only ADR-0049 Desktop MCP dependency; reviewed x64 MSIX SHA-256 `dc5d323f6d1601ef3342420746f0163651176f4cc183690f0354546a36648eec`; public-preview upgrades require review |
-| HooshiX developer-host Desktop MCP | Python standard-library stdio server under ADR-0049 plus fixed Windows PowerShell 5.1/C# `SendInput` helper for literal Unicode text; interactive non-elevated Windows session by default; separate policy/tunnel/profile/key; no production authority |
+| HooshiX developer-host Desktop MCP | Python standard-library stdio server under ADR-0049/0050 plus fixed Windows PowerShell 5.1/C# helpers for literal Unicode text and optional Windows Credential Manager Generic-Credential use-without-disclosure; interactive non-elevated Windows session by default; separate policy/tunnel/profile/key; no production authority |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 
@@ -228,7 +228,7 @@ make desktop-test
 python scripts/desktop/mcp_server.py --policy <ABSOLUTE_LOCAL_POLICY_PATH>
 ```
 
-Real Desktop policy/audit/capture state stays outside Git. The Desktop runtime uses the reviewed WinApp CLI pin, requires the intended interactive Windows session/token, opts out of WinApp CLI telemetry for child invocations, and does not create production authority.
+Real Desktop policy/audit/capture state stays outside Git. ADR-0050 credential values also stay outside Git, policy, ChatGPT, MCP arguments/results, Python, argv, environment, and audit; the operator provisions Generic Credentials through a trusted local Windows path. The Desktop runtime uses the reviewed WinApp CLI pin, requires the intended interactive Windows session/token, opts out of WinApp CLI telemetry for child invocations, and does not create production authority.
 
 ChatGPT Web tunnel operation follows `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`; tunnel-client does not replace repository verification commands.
 
@@ -254,6 +254,8 @@ DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and 
 For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
 
 For ADR-0048, repository evidence verifies policy parsing, filesystem/process boundaries, child-environment credential exclusion, bounded audit/output/time, and UTF-8 stdio behavior. Real protected policy/secret ACLs, separate Ops tunnel/profile/key, Windows elevation state, background startup, ChatGPT tool discovery, `ops.status`, and real local mutation/execution remain host/integration evidence until executed on the operator PC.
+
+For ADR-0049/0050, repository evidence verifies Desktop policy/app/HWND/input/capture boundaries plus the secret-free broker schema, exact executable-path/SHA-256/PID binding, semantic or exactly-one `@unique-password` targeting, fixed credential-helper protocol, no credential value/length output, and audit redaction. Operator-PC negative smoke has verified the real EOrgsetad process image/password target reaches `CredReadW` and fails safely when the configured Generic Credential is absent. Actual credential enrollment/injection/login remains host/integration evidence until the operator provisions the local credential through a trusted Windows path.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 

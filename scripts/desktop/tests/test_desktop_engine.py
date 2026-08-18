@@ -12,6 +12,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from desktop_engine import (  # noqa: E402
+    OPTIONAL_POLICY_FIELDS,
     POLICY_FIELDS,
     DesktopEngine,
     DesktopError,
@@ -74,6 +75,26 @@ class FakeTextInput:
         return {"characters": len(text), "utf16_code_units": units, "chunks": 1}
 
 
+def fake_process_identity(process_id: int) -> tuple[str, str]:
+    identities = {
+        11: (r"C:\Program Files\WindowsApps\Notepad\notepad.exe", "1" * 64),
+        22: (r"C:\Windows\System32\consent.exe", "2" * 64),
+        33: (r"C:\Program Files\WindowsApps\Calculator\calculatorapp.exe", "3" * 64),
+    }
+    if process_id not in identities:
+        raise OSError("unknown process")
+    return identities[process_id]
+
+
+class FakeCredentialInput:
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, str]] = []
+
+    def send_credential(self, hwnd: int, expected_process_id: int, credential_target: str, *, focus_unique_password: bool = False) -> dict[str, object]:
+        self.calls.append((hwnd, expected_process_id, credential_target, focus_unique_password))
+        return {"credential_applied": True, "settle_ms": 500}
+
+
 class FakeRunner:
     def __init__(self, handler=None) -> None:
         self.calls: list[tuple[list[str], int]] = []
@@ -103,6 +124,8 @@ def make_policy(
     allow_keyboard_input: bool = True,
     allow_system_keys: bool = False,
     max_screenshot_bytes: int = 1024 * 1024,
+    allow_credential_input: bool = False,
+    credential_bindings: list[dict[str, str]] | None = None,
 ) -> Path:
     fake_winapp = root / "fake-winapp.exe"
     fake_winapp.write_bytes(b"fake")
@@ -126,6 +149,8 @@ def make_policy(
                 "allow_mouse_input": allow_mouse_input,
                 "allow_keyboard_input": allow_keyboard_input,
                 "allow_system_keys": allow_system_keys,
+                "allow_credential_input": allow_credential_input,
+                "credential_bindings": [] if credential_bindings is None else credential_bindings,
                 "max_command_seconds": 10,
                 "max_output_bytes": 1024 * 1024,
                 "max_screenshot_bytes": max_screenshot_bytes,
@@ -143,7 +168,7 @@ def make_policy(
 def make_engine(root: Path, *, runner: FakeRunner | None = None, **policy_options) -> tuple[DesktopEngine, FakeRunner, Path]:
     policy_path = make_policy(root, **policy_options)
     effective_runner = runner or FakeRunner()
-    engine = DesktopEngine(load_policy(policy_path), effective_runner, runtime_version="0.6.0", text_input=FakeTextInput())
+    engine = DesktopEngine(load_policy(policy_path), effective_runner, runtime_version="0.6.0", text_input=FakeTextInput(), credential_input=FakeCredentialInput(), credential_process_identity=fake_process_identity)
     return engine, effective_runner, policy_path
 
 
@@ -152,7 +177,7 @@ class DesktopEngineTest(unittest.TestCase):
         schema_path = Path(__file__).resolve().parents[3] / "desktop" / "policy.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
         self.assertEqual(POLICY_FIELDS, set(schema["properties"]))
-        self.assertEqual(POLICY_FIELDS, set(schema["required"]))
+        self.assertEqual(POLICY_FIELDS - OPTIONAL_POLICY_FIELDS, set(schema["required"]))
 
     def test_policy_rejects_unknown_duplicate_and_ambiguous_app_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -203,6 +228,64 @@ class DesktopEngineTest(unittest.TestCase):
             policy.write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaisesRegex(DesktopError, "requires allow_keyboard_input"):
                 load_policy(policy)
+
+    def test_legacy_policy_without_credential_fields_defaults_broker_off(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            policy_path = make_policy(root)
+            data = json.loads(policy_path.read_text(encoding="utf-8"))
+            data.pop("allow_credential_input")
+            data.pop("credential_bindings")
+            policy_path.write_text(json.dumps(data), encoding="utf-8")
+            policy = load_policy(policy_path)
+            self.assertFalse(policy.allow_credential_input)
+            self.assertEqual((), policy.credential_bindings)
+
+    def test_credential_policy_requires_explicit_capability_and_authorized_unique_bindings(self) -> None:
+        binding = {
+            "credential_id": "notepad-main",
+            "app": "notepad",
+            "executable_path": r"C:\Program Files\WindowsApps\Notepad\notepad.exe",
+            "executable_sha256": "1" * 64,
+            "target_selector": "PasswordBox",
+            "credential_target": "HooshiX/Desktop/notepad-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            policy_path = make_policy(root, credential_bindings=[binding])
+            with self.assertRaisesRegex(DesktopError, "require allow_credential_input"):
+                load_policy(policy_path)
+
+            policy_path = make_policy(root, allow_credential_input=True, credential_bindings=[binding])
+            policy = load_policy(policy_path)
+            self.assertEqual("notepad-main", policy.credential_bindings[0].credential_id)
+            self.assertEqual("notepad", policy.credential_bindings[0].app)
+
+            duplicate = dict(binding)
+            duplicate["credential_target"] = "HooshiX/Desktop/other-target"
+            policy_path = make_policy(root, allow_credential_input=True, credential_bindings=[binding, duplicate])
+            with self.assertRaisesRegex(DesktopError, "duplicate credential_id"):
+                load_policy(policy_path)
+
+            denied = dict(binding)
+            denied["app"] = "consent"
+            denied["executable_path"] = r"C:\Windows\System32\consent.exe"
+            denied["executable_sha256"] = "2" * 64
+            policy_path = make_policy(root, allow_all_apps=True, denied_apps=[], allow_credential_input=True, credential_bindings=[denied])
+            with self.assertRaisesRegex(DesktopError, "not authorized for credential use"):
+                load_policy(policy_path)
+
+            coordinate = dict(binding)
+            coordinate["target_selector"] = "10,20"
+            policy_path = make_policy(root, allow_credential_input=True, credential_bindings=[coordinate])
+            with self.assertRaisesRegex(DesktopError, "coordinate-only"):
+                load_policy(policy_path)
+
+            unsupported_strategy = dict(binding)
+            unsupported_strategy["target_selector"] = "@first-password"
+            policy_path = make_policy(root, allow_credential_input=True, credential_bindings=[unsupported_strategy])
+            with self.assertRaisesRegex(DesktopError, "unsupported credential target strategy"):
+                load_policy(policy_path)
 
     def test_list_windows_filters_by_real_process_policy(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -330,6 +413,141 @@ class DesktopEngineTest(unittest.TestCase):
                 with self.subTest(keys=keys):
                     with self.assertRaises(DesktopError):
                         engine.key_press(1001, keys)
+
+    def test_use_credential_is_policy_bound_reauthorizes_and_redacts_audit(self) -> None:
+        binding = {
+            "credential_id": "notepad-main",
+            "app": "notepad",
+            "executable_path": r"C:\Program Files\WindowsApps\Notepad\notepad.exe",
+            "executable_sha256": "1" * 64,
+            "target_selector": "PasswordBox",
+            "credential_target": "HooshiX/Desktop/notepad-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            engine, runner, _ = make_engine(
+                root,
+                allow_credential_input=True,
+                credential_bindings=[binding],
+            )
+            result = engine.use_credential(1001, "notepad-main")
+            self.assertEqual({"hwnd": 1001, "credential_applied": True}, result)
+            self.assertEqual([(1001, 11, "HooshiX/Desktop/notepad-main", False)], engine.credential_input.calls)
+            self.assertEqual(2, sum(1 for args, _ in runner.calls if args == ["ui", "list-windows", "--json"]))
+            self.assertIn(
+                ["ui", "focus", "PasswordBox", "-w", "1001", "--json"],
+                [args for args, _ in runner.calls],
+            )
+            audit = engine.policy.audit_log.read_text(encoding="utf-8")
+            self.assertNotIn("notepad-main", audit)
+            self.assertNotIn("HooshiX/Desktop/notepad-main", audit)
+            self.assertNotIn("PasswordBox", audit)
+            self.assertIn("credential_ref_sha256", audit)
+            self.assertIn("selector_sha256", audit)
+
+    def test_use_credential_unique_password_strategy_skips_unstable_winapp_selector(self) -> None:
+        binding = {
+            "credential_id": "notepad-main",
+            "app": "notepad",
+            "executable_path": r"C:\Program Files\WindowsApps\Notepad\notepad.exe",
+            "executable_sha256": "1" * 64,
+            "target_selector": "@unique-password",
+            "credential_target": "HooshiX/Desktop/notepad-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            engine, runner, _ = make_engine(root, allow_credential_input=True, credential_bindings=[binding])
+            result = engine.use_credential(1001, "notepad-main")
+            self.assertTrue(result["credential_applied"])
+            self.assertEqual([(1001, 11, "HooshiX/Desktop/notepad-main", True)], engine.credential_input.calls)
+            self.assertFalse(any(args[:2] == ["ui", "focus"] for args, _ in runner.calls))
+
+    def test_use_credential_fails_closed_for_disabled_unknown_or_wrong_app_binding(self) -> None:
+        binding = {
+            "credential_id": "calculator-main",
+            "app": "calculatorapp",
+            "executable_path": r"C:\Program Files\WindowsApps\Calculator\calculatorapp.exe",
+            "executable_sha256": "3" * 64,
+            "target_selector": "PasswordBox",
+            "credential_target": "HooshiX/Desktop/calculator-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            disabled, _, _ = make_engine(root)
+            with self.assertRaises(DesktopError) as caught:
+                disabled.use_credential(1001, "anything")
+            self.assertEqual("CREDENTIAL_INPUT_DENIED", caught.exception.code)
+
+            engine, _, _ = make_engine(
+                root,
+                allow_all_apps=True,
+                allow_credential_input=True,
+                credential_bindings=[binding],
+            )
+            with self.assertRaises(DesktopError) as unknown:
+                engine.use_credential(1001, "missing")
+            self.assertEqual("CREDENTIAL_UNAVAILABLE", unknown.exception.code)
+            with self.assertRaises(DesktopError) as mismatch:
+                engine.use_credential(1001, "calculator-main")
+            self.assertEqual("CREDENTIAL_BINDING_MISMATCH", mismatch.exception.code)
+            self.assertEqual([], engine.credential_input.calls)
+
+    def test_use_credential_rejects_pid_change_after_focus_before_helper(self) -> None:
+        binding = {
+            "credential_id": "notepad-main",
+            "app": "notepad",
+            "executable_path": r"C:\Program Files\WindowsApps\Notepad\notepad.exe",
+            "executable_sha256": "1" * 64,
+            "target_selector": "PasswordBox",
+            "credential_target": "HooshiX/Desktop/notepad-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            list_calls = 0
+
+            def handler(args: list[str]) -> RunnerResult:
+                nonlocal list_calls
+                if args == ["ui", "list-windows", "--json"]:
+                    list_calls += 1
+                    process_id = 11 if list_calls == 1 else 44
+                    return rr_json([{**WINDOWS[0], "processId": process_id}])
+                return rr_json({"ok": True})
+
+            engine, _, _ = make_engine(
+                root,
+                runner=FakeRunner(handler),
+                allow_credential_input=True,
+                credential_bindings=[binding],
+            )
+            engine.credential_process_identity = lambda pid: (binding["executable_path"], "1" * 64)
+            with self.assertRaises(DesktopError) as caught:
+                engine.use_credential(1001, "notepad-main")
+            self.assertEqual("CREDENTIAL_BINDING_MISMATCH", caught.exception.code)
+            self.assertEqual([], engine.credential_input.calls)
+
+    def test_use_credential_rejects_executable_path_or_hash_mismatch_before_helper(self) -> None:
+        binding = {
+            "credential_id": "notepad-main",
+            "app": "notepad",
+            "executable_path": r"C:\Program Files\WindowsApps\Notepad\notepad.exe",
+            "executable_sha256": "1" * 64,
+            "target_selector": "PasswordBox",
+            "credential_target": "HooshiX/Desktop/notepad-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            engine, _, _ = make_engine(root, allow_credential_input=True, credential_bindings=[binding])
+            engine.credential_process_identity = lambda pid: (r"C:\Malicious\notepad.exe", "1" * 64)
+            with self.assertRaises(DesktopError) as path_error:
+                engine.use_credential(1001, "notepad-main")
+            self.assertEqual("CREDENTIAL_BINDING_MISMATCH", path_error.exception.code)
+            self.assertEqual([], engine.credential_input.calls)
+
+            engine.credential_process_identity = lambda pid: (binding["executable_path"], "f" * 64)
+            with self.assertRaises(DesktopError) as hash_error:
+                engine.use_credential(1001, "notepad-main")
+            self.assertEqual("CREDENTIAL_BINDING_MISMATCH", hash_error.exception.code)
+            self.assertEqual([], engine.credential_input.calls)
 
     def test_key_press_maps_valid_alphanumeric_chords_to_explicit_virtual_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

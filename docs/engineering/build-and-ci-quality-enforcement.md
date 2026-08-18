@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP. ADR-0049 defines the separate policy-gated interactive Windows Desktop MCP and its repository verification boundary.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP. ADR-0049 defines the separate policy-gated interactive Windows Desktop MCP; ADR-0050 narrowly adds its policy-bound local credential-use broker and repository verification boundary.
 
 ## 1. Required Java PR gates
 
@@ -222,14 +222,15 @@ CI SHOULD enforce when implemented:
 - ADR-0049 Desktop MCP remains a third separate stdio server and does not change Context or Ops tool surfaces;
 - Desktop startup/runtime tests cover strict local policy, exact WinApp version pin, intended Windows interactive/non-elevated state, app allow/deny rules, fresh HWND/process authorization, and sanitized WinApp child environment;
 - Desktop observation/input tests cover bounded UI inspection, PNG capture/temp cleanup, UIA/mouse/keyboard opt-ins, semantic-selector-only mouse targeting, safe WinApp chord normalization, fixed isolated PowerShell/C# Unicode-helper stdin/argv/environment/timeout/error contracts, system-key negatives, output/time limits, fail-closed/redacted audit, CWD-independent stdio protocol behavior, screenshot MCP image content, and explicit UTF-8 response bytes;
-- Desktop has no arbitrary WinApp argv, process shell, arbitrary filesystem/network fetch, recording/touch/pen, clipboard-read, get-value/credential-reader, UAC/Secure-Desktop bypass, or production administration tool;
-- repository examples contain no real Desktop policy secret, screenshot, typed secret, or tunnel credential.
+- ADR-0050 credential-broker tests cover disabled-by-default/backward-compatible policy, exact bounded app/executable-path/SHA-256/selector/Generic-Credential bindings, secret-free MCP schema, wrong-app/executable-identity/unknown-ID failure before helper use, fixed helper stdin/environment/protocol bounds, focused-password/unique-password/PID/same-focus checks before/during `CredReadW`-backed delivery, `CredFree`, no credential value/length output, and audit redaction;
+- Desktop has no arbitrary WinApp argv, process shell, arbitrary filesystem/network fetch, recording/touch/pen, clipboard-read, get-value/credential-reader/list/write/export, general secret-input tool, UAC/Secure-Desktop bypass, or production administration tool; `desktop.use_credential` is only a policy-bound local use-without-disclosure primitive;
+- repository examples contain no real Desktop credential, policy secret, screenshot, typed secret, or tunnel credential.
 
 These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
 
 `make baseline-verify` includes repository Context Engine tests/verification plus Ops and Desktop MCP tests. Context/route/documentation, Ops policy/stdio, or Desktop policy/UI-boundary drift therefore blocks the same repository-governance boundary.
 
-Repository CI proves only repository-side stdio/policy/governance behavior. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, Windows ACL/token/session/background state, Context calls, Ops host calls, and Desktop WinApp/UI/screenshot/input calls are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC for the relevant surface.
+Repository CI proves only repository-side stdio/policy/governance behavior. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, Windows ACL/token/session/background state, Context calls, Ops host calls, Desktop WinApp/UI/screenshot/input calls, and ADR-0050 disposable/real application credential-use behavior are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC for the relevant surface.
 
 ## 10. Heavy release/scheduled evidence
 

@@ -251,7 +251,7 @@ The Ops local audit is not tamper-resistant production audit. It cannot satisfy 
 
 ## 15. Developer-host AI Desktop boundary
 
-ADR-0049 adds a third developer-host Desktop MCP for interactive Windows UI observation/input. It is separate from read-only Context and process/filesystem Ops.
+ADR-0049 adds a third developer-host Desktop MCP for interactive Windows UI observation/input. ADR-0050 adds an optional policy-bound local credential-use broker to that same Desktop boundary. It is separate from read-only Context and process/filesystem Ops.
 
 Desktop security controls are:
 
@@ -260,8 +260,9 @@ Desktop security controls are:
 - fresh HWND -> real process-name revalidation before each targeted operation, with app allow/deny policy and denied-app precedence;
 - semantic selectors for UIA/mouse actions; no arbitrary coordinate-only click/drag and no arbitrary WinApp argv;
 - separate opt-ins for screenshot/capture-screen, UIA mutation, mouse, keyboard, and system keys;
-- no clipboard-read/get-value/credential-reader/recording/touch/pen/process/filesystem/network-fetch tool in v1;
+- no clipboard-read/get-value/credential-reader/list/write/export/recording/touch/pen/process/filesystem/network-fetch tool; `desktop.use_credential` is use-without-disclosure only and is not a credential reader or general secret-input channel;
 - literal bounded text entry is explicitly non-secret and uses a fixed isolated PowerShell/C# `KEYEVENTF_UNICODE` helper; raw text goes only over bounded UTF-8 stdin, never child argv/environment/audit; the helper checks foreground HWND per UTF-16 code unit, paces delivery, drains the target queue, and rejects inputs that cannot fit the policy timeout before injection;
+- credential use is disabled by default and accepts only opaque `credential_id`; protected policy fixes app, exact executable path/SHA-256, target strategy, and Generic-Credential target; the fixed helper verifies HWND/PID plus password UIA semantics (or exactly one eligible `@unique-password`) before `CredReadW`, keeps the credential value out of MCP/Python/output/audit/argv/environment, checks PID/focus/foreground during delivery, and never retries automatically when partial input is possible;
 - bounded command/output/screenshot/text/depth/audit limits; temporary PNG capture is deleted after bounded readback;
 - WinApp and text-helper child environments exclude tunnel/API credential variables; WinApp children opt out of telemetry;
 - fail-closed metadata audit before sensitive observation/mutation and separate Desktop tunnel/profile/runtime key.
@@ -270,6 +271,6 @@ Visible UI/screenshot content can itself contain PII or confidential data. Deskt
 
 ## 16. Verification
 
-Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049 Desktop policy/app/HWND/capture/input/isolated-Unicode-helper/environment/audit/UTF-8 tests.
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049/0050 Desktop policy/app/HWND/capture/input/isolated-text-helper/credential-broker/process-identity/password-target/environment/audit/UTF-8 tests.
 
 Documentation alone remains `NOT VERIFIED`.

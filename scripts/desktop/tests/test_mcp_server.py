@@ -75,6 +75,8 @@ def make_engine(temp_dir: str) -> DesktopEngine:
                 "allow_mouse_input": True,
                 "allow_keyboard_input": True,
                 "allow_system_keys": False,
+                "allow_credential_input": False,
+                "credential_bindings": [],
                 "max_command_seconds": 10,
                 "max_output_bytes": 1048576,
                 "max_screenshot_bytes": 1048576,
@@ -111,6 +113,7 @@ class McpDesktopServerTest(unittest.TestCase):
                     "desktop.hover",
                     "desktop.drag",
                     "desktop.type_text",
+                    "desktop.use_credential",
                     "desktop.key_press",
                 ],
                 names,
@@ -121,6 +124,8 @@ class McpDesktopServerTest(unittest.TestCase):
             self.assertTrue(by_name["desktop.screenshot"]["annotations"]["readOnlyHint"])
             self.assertTrue(by_name["desktop.click"]["annotations"]["destructiveHint"])
             self.assertTrue(by_name["desktop.type_text"]["annotations"]["destructiveHint"])
+            self.assertTrue(by_name["desktop.use_credential"]["annotations"]["destructiveHint"])
+            self.assertNotIn("password", by_name["desktop.use_credential"]["inputSchema"]["properties"])
             self.assertFalse(by_name["desktop.status"]["annotations"]["openWorldHint"])
             self.assertTrue(by_name["desktop.list_windows"]["annotations"]["openWorldHint"])
 
@@ -215,6 +220,28 @@ class McpDesktopServerTest(unittest.TestCase):
                 }
             )
             self.assertEqual(-32602, extra["error"]["code"])
+
+    def test_credential_tool_rejects_caller_supplied_secret_fields_before_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            server = McpDesktopServer(make_engine(temp_dir))
+            response = server.dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                        "_meta": modern_meta(),
+                        "name": "desktop.use_credential",
+                        "arguments": {
+                            "hwnd": 1001,
+                            "credential_id": "notepad-main",
+                            "password": "must-never-be-accepted",
+                        },
+                    },
+                }
+            )
+            self.assertEqual(-32602, response["error"]["code"])
+            self.assertIn("password", response["error"]["data"]["fields"])
 
     def test_entrypoint_fails_closed_when_policy_is_missing(self) -> None:
         script = Path(__file__).resolve().parents[1] / "mcp_server.py"

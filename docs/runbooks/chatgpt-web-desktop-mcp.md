@@ -10,7 +10,8 @@ Authoritative decisions:
 
 - ADR-0047 for the approved Secure MCP Tunnel transport pattern;
 - ADR-0048 for the separate Ops authority boundary;
-- ADR-0049 for Desktop UI observation/input authority.
+- ADR-0049 for Desktop UI observation/input authority;
+- ADR-0050 for optional policy-bound local credential use without credential disclosure.
 
 ## 1. Trust model
 
@@ -21,6 +22,7 @@ ChatGPT Web
 -> scripts/desktop/mcp_server.py over stdio
 -> protected local Desktop policy
 -> pinned Microsoft WinApp CLI
+-> optional fixed local Credential Manager helper under ADR-0050
 -> current unlocked interactive Windows desktop
 ```
 
@@ -32,8 +34,8 @@ Do not:
 - run Desktop as an administrator shell merely to bypass UI/input restrictions;
 - automate UAC/Secure Desktop/Winlogon/workstation lock/Secure Attention Sequence;
 - expose Desktop MCP on a public HTTP/SSE/TCP port;
-- add credential/clipboard-read/arbitrary-command/network-fetch tools;
-- pass passwords, API keys, private keys, OTPs, recovery codes, cookies/session values, or other secrets through `desktop.type_text`;
+- add a credential reader/list/writer/export tool, general secret-input tool, clipboard-read, arbitrary-command, or network-fetch tool;
+- pass passwords, API keys, private keys, OTPs, recovery codes, cookies/session values, or other secrets through `desktop.type_text` or any MCP argument;
 - put tunnel keys in Git, policy, argv, logs, screenshots, or ChatGPT content.
 
 ## 2. Install and verify WinApp CLI
@@ -108,7 +110,7 @@ desktop/policy.example.json
 
 Use the actual absolute WinApp alias path and expected `0.6.0` version.
 
-Recommended initial policy keeps `allow_all_apps=false`, uses a small app allow-list, denies secure/credential broker process names, requires an interactive non-elevated process, enables screenshot/UIA/mouse/keyboard only as needed, and keeps system keys/capture-screen disabled until explicitly required.
+Recommended initial policy keeps `allow_all_apps=false`, uses a small app allow-list, denies secure/credential broker process names, requires an interactive non-elevated process, enables screenshot/UIA/mouse/keyboard only as needed, keeps system keys/capture-screen disabled until explicitly required, and keeps `allow_credential_input=false` with no bindings until a specific application login is reviewed.
 
 `allow_all_apps=true` is broad ordinary-desktop authority. `denied_apps` still wins. It does not create Secure Desktop authority.
 
@@ -125,6 +127,38 @@ C:\ProgramData\HooshiX\desktop\audit.ndjson
 ```
 
 Capture PNG files are temporary and are deleted by Desktop MCP after bounded readback.
+
+### 4.1 Optional ADR-0050 credential broker
+
+Keep the broker disabled unless a specific developer-host application login needs unattended credential use. Existing policies that omit the ADR-0050 fields keep the broker disabled.
+
+A reviewed binding has this shape:
+
+```json
+{
+  "allow_credential_input": true,
+  "credential_bindings": [
+    {
+      "credential_id": "example-login",
+      "app": "exampleapp",
+      "executable_path": "C:\\Program Files\\Example\\exampleapp.exe",
+      "executable_sha256": "<64-hex-sha256>",
+      "target_selector": "@unique-password",
+      "credential_target": "HooshiX/Desktop/example-login"
+    }
+  ]
+}
+```
+
+Use the real normalized process name from `desktop.list_windows`. Resolve the exact executable path for that PID and calculate SHA-256 from the executable file, then store both in the protected local binding. A binary update changes the hash and must fail closed until the binding is reviewed and updated. Prefer a stable semantic selector confirmed through `desktop.inspect`. If the password control has no stable AutomationId and the target window has exactly one enabled/visible password control, use the reserved `@unique-password` strategy instead of copying a transient numeric AutomationId. Do not use a coordinate-only selector. The fixed helper always requires UI Automation password semantics and HWND/PID continuity before credential resolution.
+
+Provision the password **locally under the same interactive Windows account that runs Desktop MCP** as a Windows Credential Manager Generic Credential whose target exactly matches `credential_target`. Enter the real secret only through the trusted local Windows credential-management UI/path. Do not paste the secret into ChatGPT, PowerShell command arguments, repository files, policy JSON, logs, or MCP tools. Desktop MCP intentionally has no credential enrollment/list/read/delete API.
+
+Windows treats the `CRED_TYPE_GENERIC` blob as application-defined; it does not supply a standard password encoding for that blob. HooshiX v1 provisioning therefore requires the Generic Credential blob used by this broker to contain the password as UTF-16LE and rejects unsupported/oversized blobs. First validate the host path with a disposable credential and disposable/password-capable target. Do not enable a valuable credential until wrong-window/focus-change negatives and audit/process redaction are verified.
+
+The Windows user account remains part of the trust boundary. ADR-0050 prevents the ChatGPT/MCP/Python path from receiving the value; it does not claim to protect the credential from malware or compromise running with the same Windows-user authority.
+
+To disable immediately, set `allow_credential_input=false`, set `credential_bindings=[]`, restart Desktop MCP, and confirm `desktop.status` reports the broker disabled with zero bindings.
 
 ## 5. Direct stdio validation
 
@@ -155,10 +189,11 @@ desktop.click
 desktop.hover
 desktop.drag
 desktop.type_text
+desktop.use_credential
 desktop.key_press
 ```
 
-There is no arbitrary WinApp command, process shell, filesystem browser, clipboard read, `get-value`, recording, touch, pen, credential reader, or network fetch.
+There is no arbitrary WinApp command, process shell, filesystem browser, clipboard read, `get-value`, recording, touch, pen, credential reader/list/writer/export, general secret-input tool, or network fetch. `desktop.use_credential` is use-without-disclosure only and cannot return a credential value.
 
 First call `desktop.status`, then `desktop.list_windows`.
 
@@ -195,6 +230,8 @@ over coordinate behavior.
 V1 click/hover/drag accept semantic selectors only. Caller-selected arbitrary screen coordinates are not exposed.
 
 `desktop.type_text` is bounded non-secret text. WinApp is used only to focus an optional semantic target; literal text then goes through the fixed isolated repository helper `scripts/desktop/windows_text_input_helper.ps1`. The parent sends text only as UTF-8 JSON on stdin. The helper uses C# `SendInput` + `KEYEVENTF_UNICODE`, checks that the requested HWND remains foreground before each UTF-16 code unit, paces delivery at 5 ms per code unit, waits 500 ms for the target queue to drain, and returns metadata only. The child environment is allow-listed and does not inherit tunnel/API credentials. Text that cannot fit `max_command_seconds` is rejected before injection. Do not use this tool for secrets. If Windows foreground/UIPI rules block delivery, treat the action as failed and do not retry automatically when partial input is possible.
+
+`desktop.use_credential` accepts only a current HWND plus opaque `credential_id`. The engine resolves the fixed app/executable-path/SHA-256/target strategy/Credential Manager target from protected local policy, reauthorizes the real app and exact process image, optionally focuses only the fixed semantic selector, repeats process/PID/image verification, then starts `scripts/desktop/windows_credential_input_helper.ps1`. The helper verifies HWND/PID and foreground state plus focused UIA password semantics before `CredReadW`. With `@unique-password`, it finds exactly one enabled/visible password descendant and focuses it locally; zero/multiple matches fail. It verifies the same PID/focus/foreground before each delivered code unit and frees the credential buffer. The credential value is not accepted or returned by MCP/Python and is not written to argv/environment/audit. If partial input may have happened, treat the result as failed and do not retry automatically.
 
 `desktop.key_press` accepts bounded key grammar and remains on WinApp. Raw virtual-key syntax and text-escape grammar are rejected at the MCP boundary. For WinApp CLI 0.6.0 compatibility in Scheduled Task sessions, already-validated `a-z`/`0-9` modifier-chord main keys are mapped internally to the equivalent explicit virtual key (for example `ctrl+s` -> `ctrl+vk=0x53`) before invoking WinApp; callers still cannot submit arbitrary `vk=` values. System/shell-reserved combinations require explicit local `allow_system_keys=true`; Windows/WinApp hard blocks still apply.
 
@@ -262,6 +299,7 @@ Record separately from repository CI:
 
 - exact installed WinApp `0.6.0` and package integrity evidence;
 - policy/audit/capture ACLs;
+- when ADR-0050 is enabled: disposable Generic Credential enrollment, exact executable path/SHA-256 binding, semantic or `@unique-password` target recognition, correct broker injection, wrong-window/focus-change failure, and no credential content in audit/argv/environment;
 - non-elevated interactive Desktop process;
 - separate tunnel/profile/key and loopback health/admin;
 - `/readyz`;
@@ -276,15 +314,16 @@ Repository tests cannot substitute for this Windows evidence.
 
 ## 13. Incident handling
 
-If an unexpected Desktop tool appears, policy fingerprint changes without operator intent, an unapproved process becomes controllable, screen/typed data appears in audit, or Desktop actions occur outside the user's request:
+If an unexpected Desktop tool appears, policy fingerprint/broker binding changes without operator intent, an unapproved process becomes controllable, screen/typed/credential data appears in audit/output, a credential is applied to the wrong target, or Desktop actions occur outside the user's request:
 
 1. stop the Desktop task/tunnel runtime;
 2. revoke the dedicated Desktop runtime key;
 3. preserve bounded metadata without copying sensitive screen/typed content;
 4. inspect local policy/task/profile and repository revision;
 5. verify Context and Ops remained separate;
-6. treat unexpected automation of a security-sensitive app as potential developer-host compromise and rotate affected credentials through their owners;
-7. restore only after policy/tool/readiness/smoke tests pass.
+6. disable `allow_credential_input`, clear broker bindings, and treat wrong-target/partial/unexpected credential use as potential compromise; rotate/remove affected credentials through their owners when exposure or misuse is plausible;
+7. treat unexpected automation of a security-sensitive app as potential developer-host compromise;
+8. restore only after policy/tool/readiness/smoke tests pass.
 
 ## 14. Rollback
 
@@ -294,6 +333,7 @@ Rollback only Desktop:
 2. stop/delete Desktop scheduled task/runtime;
 3. stop Desktop tunnel;
 4. revoke Desktop runtime key;
-5. remove/disable local Desktop policy/audit/capture directory if no longer needed;
-6. optionally uninstall the pinned WinApp CLI package;
-7. leave Context and Ops unchanged.
+5. set `allow_credential_input=false`, clear `credential_bindings`, and remove/rotate any no-longer-needed Generic Credentials through the trusted local Windows path;
+6. remove/disable local Desktop policy/audit/capture directory if no longer needed;
+7. optionally uninstall the pinned WinApp CLI package;
+8. leave Context and Ops unchanged.
