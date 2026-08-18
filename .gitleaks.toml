@@ -1,0 +1,28 @@
+title = "HooshiX Gitleaks policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "ADR-0045 scanner-governance prose false positive"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1\.md$''']
+regexTarget = "line"
+regexes = ['''Security owns scanner policy, secret-rule governance, severity/VEX/exception policy, advisory/feed policy, and security escalation\.''']
+
+[[allowlists]]
+description = "Threat-model scanner-governance prose false positive"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)docs/architecture/threat-model\.md$''']
+regexTarget = "line"
+regexes = ['''OpenBao/secrets, Git-history secret scanning, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority''']
+
+[[allowlists]]
+description = "Compromised Password quality-gate prose false positive"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)docs/architecture/testing-and-quality-gates\.md$''']
+regexTarget = "line"
+regexes = ['''For Compromised Password, SBOM/advisory evaluation covers both''']

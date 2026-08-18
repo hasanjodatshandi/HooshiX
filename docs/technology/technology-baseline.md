@@ -40,7 +40,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Pool | HikariCP managed/aligned with Spring Boot | profile-aware pool budget |
 | Persistence | Spring Data JPA/Hibernate or jOOQ by service responsibility | separate Domain/persistence models |
 | Notification persistence | jOOQ/JDBC, no JPA | fixed service decision |
-| Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2 | single-server TLS/ACL/noeviction/AOF; HA Sentinel |
+| Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2.RELEASE | single-server TLS/ACL/noeviction/AOF; HA Sentinel |
 | Resilience | Resilience4j | breaker/bulkhead; no layered retry |
 | Observability API | Spring Boot 4.1 Micrometer Observation/Tracing + OpenTelemetry | ADR-0044; Day-1 service requirement |
 | Trace export protocol | OTLP | services -> approved internal Collector |
@@ -50,7 +50,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Formatting | Spotless + one approved pinned formatter | exact plugin/formatter in build metadata |
 | Java bug analysis | SpotBugs | blocking production-code gate |
 | Source policy/SAST | repository Semgrep CLI/rules | ADR-0039/0045; exact Semgrep image/tool and rules pinned in CI; separate Semgrep products are not implied |
-| Secret scanning | Gitleaks CLI 8.30.1 | ADR-0045; current-tree + Git-history scan; native release artifact integrity pinned in CI; no raw secret output |
+| Secret scanning | Gitleaks CLI 8.30.0 | ADR-0045; reviewed fallback from defective 8.30.1; current-tree + Git-history scan; immutable official GHCR image digest pinned in CI; positive detection control required; no raw secret output |
 | Dependency advisory scan | OSV-Scanner 2.4.0 | ADR-0045; early declared/locked dependency advisory feedback; exact Linux/x64 artifact SHA-256 pinned in implemented service CI; not final-image authority |
 | CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
 | BDD | Cucumber-JVM + Gherkin | critical behavior only |
@@ -179,7 +179,7 @@ Both profiles preserve:
 ## 6. Version governance
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
-- Gitleaks 8.30.1 native release artifact, OSV-Scanner 2.4.0, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
+- Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
 - services own Wrapper/dependency locks/verification metadata;
 - Spring Boot dependency management is default; overrides require rationale/alignment tests;
 - no agent guesses an unlisted patch;

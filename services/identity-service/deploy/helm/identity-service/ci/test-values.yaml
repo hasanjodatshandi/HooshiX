@@ -1,0 +1,36 @@
+image:
+  repository: registry.invalid/hooshix/identity-service
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+database:
+  jdbcUrl: jdbc:postgresql://identity-postgresql.platform-data.svc:5432/identity
+  runtimeSecretName: identity-db-runtime
+  migrationSecretName: identity-db-migration
+quota:
+  redis:
+    connectionSecretName: identity-quota-redis
+  maxActiveBuckets: 10000
+  maxNewBucketsPerMinute: 1000
+  minimumMemoryHeadroomPercent: 30
+  hostTimeStatus:
+    configMapName: identity-host-time-status
+runtime:
+  registrationRuntimeEnabled: true
+  argon2MaxConcurrentHashes: 2
+secrets:
+  fingerprintSecretName: identity-fingerprint
+  challengeSecretName: identity-challenge
+  handoffSecretName: identity-handoff
+  quotaKeySecretName: identity-quota-key
+observability:
+  tracing:
+    otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces
+    collector:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: otel-collector
+  metrics:
+    prometheus:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: prometheus
+      principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus

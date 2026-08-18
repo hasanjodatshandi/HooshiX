@@ -1,0 +1,123 @@
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $digest := required "image.digest is required" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) }}{{ fail "image.digest must be an immutable sha256 digest" }}{{ end -}}
+{{- if ne (int .Values.replicaCount) 1 }}{{ fail "Identity single-server profile must render exactly one replica" }}{{ end -}}
+{{- if le (int .Values.runtime.argon2MaxConcurrentHashes) 0 }}{{ fail "runtime.argon2MaxConcurrentHashes must be measured and positive" }}{{ end -}}
+{{- if le (int .Values.quota.maxActiveBuckets) 0 }}{{ fail "quota.maxActiveBuckets must be measured and positive" }}{{ end -}}
+{{- if le (int .Values.quota.maxNewBucketsPerMinute) 0 }}{{ fail "quota.maxNewBucketsPerMinute must be measured and positive" }}{{ end -}}
+{{- if lt (int .Values.quota.minimumMemoryHeadroomPercent) 30 }}{{ fail "quota.minimumMemoryHeadroomPercent must be at least 30" }}{{ end -}}
+{{- $jdbcUrl := required "database.jdbcUrl is required" .Values.database.jdbcUrl -}}
+{{- $runtimeDb := required "database.runtimeSecretName is required" .Values.database.runtimeSecretName -}}
+{{- $migrationDb := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
+{{- if eq $runtimeDb $migrationDb }}{{ fail "runtime and migration database credentials must be distinct" }}{{ end -}}
+{{- $fingerprint := required "secrets.fingerprintSecretName is required" .Values.secrets.fingerprintSecretName -}}
+{{- $challenge := required "secrets.challengeSecretName is required" .Values.secrets.challengeSecretName -}}
+{{- $handoff := required "secrets.handoffSecretName is required" .Values.secrets.handoffSecretName -}}
+{{- $quotaKey := required "secrets.quotaKeySecretName is required" .Values.secrets.quotaKeySecretName -}}
+{{- $quotaRedis := required "quota.redis.connectionSecretName is required" .Values.quota.redis.connectionSecretName -}}
+{{- $hostTime := required "quota.hostTimeStatus.configMapName is required" .Values.quota.hostTimeStatus.configMapName -}}
+{{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
+{{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
+{{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "identity-service.name" . }}
+  labels:
+    {{- include "identity-service.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  selector:
+    matchLabels:
+      {{- include "identity-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "identity-service.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | quote }}
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 15
+      initContainers:
+        - name: migrate
+          image: "{{ $repository }}@{{ $digest }}"
+          args: ["--spring.profiles.active=migration"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          env:
+            - {name: IDENTITY_DATABASE_URL, value: {{ $jdbcUrl | quote }}}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - {name: migration-db, mountPath: /run/secrets/identity-db-migration, readOnly: true}
+            - {name: temporary, mountPath: /tmp}
+      containers:
+        - name: application
+          image: "{{ $repository }}@{{ $digest }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          ports:
+            - {name: grpc, containerPort: {{ .Values.service.grpcPort }}, protocol: TCP}
+            - {name: management, containerPort: {{ .Values.service.managementPort }}, protocol: TCP}
+          env:
+            - {name: IDENTITY_DATABASE_URL, value: {{ $jdbcUrl | quote }}}
+            - {name: IDENTITY_GRPC_PORT, value: {{ .Values.service.grpcPort | quote }}}
+            - {name: IDENTITY_REGISTRATION_RUNTIME_ENABLED, value: {{ .Values.runtime.registrationRuntimeEnabled | quote }}}
+            - {name: IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION, value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}}
+            - {name: IDENTITY_ARGON2_MAX_CONCURRENT_HASHES, value: {{ .Values.runtime.argon2MaxConcurrentHashes | quote }}}
+            - {name: IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT, value: {{ .Values.runtime.compromisedPasswordMaxInFlight | quote }}}
+            - {name: IDENTITY_PHONE_REGISTRATION_ENABLED, value: {{ .Values.runtime.phoneRegistrationEnabled | quote }}}
+            - {name: IDENTITY_NOTIFICATION_DISPATCH_ENABLED, value: {{ .Values.runtime.notificationDispatchEnabled | quote }}}
+            - {name: IDENTITY_COMPROMISED_PASSWORD_TARGET, value: {{ .Values.compromisedPassword.target | quote }}}
+            - {name: IDENTITY_NOTIFICATION_TARGET, value: {{ .Values.notification.target | quote }}}
+            - {name: IDENTITY_QUOTA_MAX_ACTIVE_BUCKETS, value: {{ .Values.quota.maxActiveBuckets | quote }}}
+            - {name: IDENTITY_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE, value: {{ .Values.quota.maxNewBucketsPerMinute | quote }}}
+            - {name: IDENTITY_QUOTA_MINIMUM_MEMORY_HEADROOM_PERCENT, value: {{ .Values.quota.minimumMemoryHeadroomPercent | quote }}}
+            - {name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT, value: {{ $traceEndpoint | quote }}}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe: {httpGet: {path: /actuator/health/readiness, port: management}, periodSeconds: 10, failureThreshold: 60}
+          readinessProbe: {httpGet: {path: /actuator/health/readiness, port: management}, periodSeconds: 10, timeoutSeconds: 2, failureThreshold: 3}
+          livenessProbe: {httpGet: {path: /actuator/health/liveness, port: management}, periodSeconds: 20, timeoutSeconds: 2, failureThreshold: 3}
+          volumeMounts:
+            - {name: runtime-db, mountPath: /run/secrets/identity-db-runtime, readOnly: true}
+            - {name: fingerprint-key, mountPath: /run/secrets/identity-fingerprint, readOnly: true}
+            - {name: challenge-key, mountPath: /run/secrets/identity-challenge, readOnly: true}
+            - {name: handoff-key, mountPath: /run/secrets/identity-handoff, readOnly: true}
+            - {name: quota-key, mountPath: /run/secrets/identity-quota, readOnly: true}
+            - {name: quota-redis, mountPath: /run/secrets/identity-quota-redis, readOnly: true}
+            - {name: host-time-status, mountPath: /run/status/identity, readOnly: true}
+            - {name: temporary, mountPath: /tmp}
+      volumes:
+        - name: runtime-db
+          secret: {secretName: {{ $runtimeDb | quote }}, defaultMode: 0440}
+        - name: migration-db
+          secret: {secretName: {{ $migrationDb | quote }}, defaultMode: 0440}
+        - name: fingerprint-key
+          secret: {secretName: {{ $fingerprint | quote }}, defaultMode: 0440, items: [{key: fingerprint.properties, path: fingerprint.properties}]}
+        - name: challenge-key
+          secret: {secretName: {{ $challenge | quote }}, defaultMode: 0440, items: [{key: challenge.properties, path: challenge.properties}]}
+        - name: handoff-key
+          secret: {secretName: {{ $handoff | quote }}, defaultMode: 0440, items: [{key: handoff.properties, path: handoff.properties}]}
+        - name: quota-key
+          secret: {secretName: {{ $quotaKey | quote }}, defaultMode: 0440, items: [{key: quota.properties, path: quota.properties}]}
+        - name: quota-redis
+          secret: {secretName: {{ $quotaRedis | quote }}, defaultMode: 0440}
+        - name: host-time-status
+          configMap: {name: {{ $hostTime | quote }}, items: [{key: host-time-synchronized, path: host-time-synchronized}]}
+        - name: temporary
+          emptyDir: {sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}}

@@ -75,7 +75,7 @@ They answer whether the build resolved the expected dependency bytes/metadata. T
 
 OSV-Scanner is the selected early advisory scanner for supported declared/locked dependency evidence.
 
-Current repository implementation for the Compromised Password service pins OSV-Scanner 2.4.0 and the official Linux/x64 SHA-256, scans the Gradle lockfile during the blocking service security suite, and re-runs that security suite from the scheduled repository workflow.
+Current repository implementation pins OSV-Scanner 2.4.0 in the implemented Compromised Password, Notification, and Identity service security suites, scans their Gradle lockfiles during blocking service security verification, and re-runs those security suites from the scheduled repository workflow. Exact downloaded-binary checksum ownership remains in each implemented workflow.
 
 This is useful fast feedback, but it is not the final-artifact vulnerability authority:
 
@@ -166,9 +166,9 @@ Architecture selection is not implementation evidence.
 
 At the current repository state:
 
-- repository Semgrep rules exist for the implemented Compromised Password service;
-- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for the Compromised Password service and is exercised by PR/push/scheduled repository security workflow evidence;
-- Gitleaks CI/repository-history scanning is **NOT PRESENT / NOT VERIFIED**;
+- repository Semgrep rules exist for the implemented Compromised Password, Notification, and Identity registration slices;
+- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, and Identity and is wired into PR/push/scheduled repository security workflows; current-commit advisory evidence remains commit-specific and must pass the protected service-security workflow;
+- Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in the Identity security workflow with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; local fixtures/current-tree/full-current-history execution has passed, while protected-CI execution remains **NOT VERIFIED** on this branch;
 - final-image Syft SBOM generation is **NOT PRESENT / NOT VERIFIED**;
 - final-image/SBOM Grype vulnerability gating is **NOT PRESENT / NOT VERIFIED**;
 - Cosign signing/provenance/SBOM attestation release automation is **NOT PRESENT / NOT VERIFIED**;

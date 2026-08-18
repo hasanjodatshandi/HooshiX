@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import re,sys
+from pathlib import Path
+
+def require(text,pattern,message):
+    if re.search(pattern,text,re.MULTILINE) is None: raise AssertionError(message)
+def forbid(text,pattern,message):
+    if re.search(pattern,text,re.MULTILINE) is not None: raise AssertionError(message)
+def main():
+    if len(sys.argv)!=2: return 2
+    text=Path(sys.argv[1]).read_text(encoding="utf-8")
+    require(text,r"^kind: Deployment$","Deployment missing")
+    require(text,r"^  replicas: 1$","single-server replica must be one")
+    require(text,r'image: "registry\.invalid/hooshix/identity-service@sha256:[0-9a-f]{64}"',"immutable image missing")
+    require(text,r"name: migrate","migration init container missing")
+    require(text,r"--spring\.profiles\.active=migration","migration profile missing")
+    require(text,r'serviceAccountName: "identity-service"',"dedicated ServiceAccount missing")
+    require(text,r"automountServiceAccountToken: false","SA token automount must be false")
+    require(text,r"runAsNonRoot: true","non-root missing")
+    require(text,r"allowPrivilegeEscalation: false","privilege escalation must be false")
+    require(text,r"readOnlyRootFilesystem: true","read-only root missing")
+    require(text,r"type: RuntimeDefault","seccomp missing")
+    require(text,r'drop: \["ALL"\]',"capability drop missing")
+    require(text,r"^  type: ClusterIP$","ClusterIP required")
+    require(text,r"^kind: NetworkPolicy$","NetworkPolicy missing")
+    require(text,r'policyTypes: \["Ingress", "Egress"\]',"both network directions required")
+    require(text,r"^kind: PeerAuthentication$","PeerAuthentication missing")
+    require(text,r"mode: STRICT","STRICT mTLS required")
+    require(text,r"^kind: AuthorizationPolicy$","AuthorizationPolicy missing")
+    require(text,r"prod\.sajtech\.internal/ns/platform-apps/sa/web-bff","Web BFF principal missing")
+    require(text,r"compromised-password-service","Compromised Password egress missing")
+    require(text,r"notification-service","Notification egress missing")
+    require(text,r"security-redis","security Redis egress missing")
+    require(text,r"identity-postgresql","Identity database egress missing")
+    require(text,r"IDENTITY_ARGON2_MAX_CONCURRENT_HASHES","Argon2 bulkhead config missing")
+    require(text,r"IDENTITY_QUOTA_MAX_ACTIVE_BUCKETS","quota active bucket capacity missing")
+    require(text,r"host-time-synchronized","host time synchronization status mount missing")
+    require(text,r"MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT","OTLP endpoint missing")
+    for kind in ("HorizontalPodAutoscaler","PodDisruptionBudget","Ingress","Gateway"):
+        forbid(text,rf"^kind: {kind}$",f"{kind} prohibited")
+    forbid(text,r'serviceAccountName: "?default"?',"default ServiceAccount prohibited")
+    forbid(text,r"image: .*:latest(?:\s|$)","latest prohibited")
+    forbid(text,r"hostNetwork: true","host network prohibited")
+    forbid(text,r"privileged: true","privileged prohibited")
+    forbid(text,r"hostPath:","hostPath prohibited")
+    forbid(text,r"^\s*- \{\}\s*$","unrestricted peers prohibited")
+    print("Rendered Identity manifest verification PASSED")
+    return 0
+if __name__=="__main__": raise SystemExit(main())
