@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from mcp_server import (  # noqa: E402
     CLIENT_CAPABILITIES_META_KEY,
     CLIENT_INFO_META_KEY,
@@ -16,9 +19,9 @@ from mcp_server import (  # noqa: E402
     MODERN_VERSION,
     PROTOCOL_META_KEY,
     McpContextServer,
+    _write_response,
 )
 from test_context_engine import make_repo  # noqa: E402
-
 
 def modern_meta() -> dict:
     return {
@@ -253,6 +256,40 @@ class McpContextServerTest(unittest.TestCase):
         )
         self.assertEqual(-32602, response["error"]["code"])
 
+    def test_response_writer_always_emits_utf8_bytes(self) -> None:
+        raw_stdout = io.BytesIO()
+        non_utf8_text_stdout = io.TextIOWrapper(
+            raw_stdout,
+            encoding="cp1252",
+        )
+
+        response = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "text": "compromised-password…",
+            },
+        }
+        with mock.patch.object(
+            sys,
+            "stdout",
+            non_utf8_text_stdout,
+        ):
+            _write_response(response)
+
+        payload = raw_stdout.getvalue()
+
+        decoded = payload.decode("utf-8")
+        parsed = json.loads(decoded)
+
+        self.assertEqual(
+            "compromised-password…",
+            parsed["result"]["text"],
+        )
+        self.assertIn(
+            "…".encode("utf-8"),
+            payload,
+        )
 
 if __name__ == "__main__":
     unittest.main()

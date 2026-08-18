@@ -327,14 +327,26 @@ class McpContextServer:
                 return None
             return self._error(request_id, exc)
 
+def _write_response(response: dict[str, Any]) -> None:
+    payload = (
+        json.dumps(
+            response,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+
+    sys.stdout.buffer.write(payload)
+    sys.stdout.buffer.flush()
+
 
 def serve(engine: ContextEngine | None = None) -> int:
     server = McpContextServer(engine or ContextEngine(REPOSITORY_ROOT))
     for raw in sys.stdin.buffer:
         if len(raw) > MAX_MESSAGE_BYTES:
             response = server._error(None, ProtocolError(-32600, "Message exceeds 1 MiB limit"))
-            sys.stdout.write(json.dumps(response, separators=(",", ":")) + "\n")
-            sys.stdout.flush()
+            _write_response(response)
             continue
         try:
             message = json.loads(raw.decode("utf-8"))
@@ -343,8 +355,7 @@ def serve(engine: ContextEngine | None = None) -> int:
         else:
             response = server.dispatch(message)
         if response is not None:
-            sys.stdout.write(json.dumps(response, ensure_ascii=False, separators=(",", ":")) + "\n")
-            sys.stdout.flush()
+            _write_response(response)
     return 0
 
 
