@@ -224,8 +224,8 @@ only when the local policy also has `require_elevated=true`, `allow_elevated_mut
 Recommended task properties:
 
 ```text
-Trigger: At startup, delayed 30 seconds
-Run whether user is logged on or not
+Trigger: At log on for the intended operator account, delayed if needed
+Run only when that user is logged on
 If task fails: restart after 1 minute
 If already running: Do not start a new instance
 No finite maximum runtime
