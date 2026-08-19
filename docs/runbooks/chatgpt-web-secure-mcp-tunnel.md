@@ -291,6 +291,14 @@ For persistent operation, preserve these invariants:
 
 Use the persistent-runtime mechanism documented by the installed OpenAI tunnel-client version. Do not invent background wrappers that lose health/readiness ownership.
 
+On the verified Windows host with tunnel-client v0.0.11, a stdio MCP-child failure can make tunnel-client log `stdio MCP command failed; requesting tunnel-client shutdown` and then exit on `EOF`. Task Scheduler restart-on-failure alone was not reliable for this termination path. The reviewed host pattern therefore uses two recovery layers: a secret-free supervised wrapper restarts a terminated tunnel-client child after a bounded delay, and a separate one-minute process/health-aware watchdog clean-restarts the named Scheduled Task when the parent task is not running, the same profile has an orphan/duplicate process, or `/readyz` remains unhealthy after startup grace. The watchdog targets only the reviewed HooshiX tunnel task/profile names, does not read runtime keys, preserves one tunnel-client process per profile, and keeps health checks on loopback. On Windows, run the recurring watchdog as `SYSTEM` / `ServiceAccount` in Session 0 so the one-minute check cannot create a visible console window in the operator's desktop session. Interactive tunnel tasks that must remain in the user's session should use a GUI-subsystem hidden launcher (for example `wscript.exe` -> hidden PowerShell wrapper) rather than a direct Task Scheduler `powershell.exe` action when Windows Terminal is the default console host.
+
+On recovery, clean the full known profile process tree before restart: matching `tunnel-client.exe`, the exact supervised PowerShell wrapper, and the exact hidden `wscript.exe` launcher when present. Stopping only the Task Scheduler parent can leave a PowerShell supervisor orphaned; after its delay that orphan can create a second tunnel beside the new task. Full-tree cleanup must converge to exactly one managed profile chain.
+
+Keep bounded local tunnel logs and enable the Windows Task Scheduler Operational log. Do not remove MCP output/time bounds as a generic crash workaround; first reproduce a transport-size or duration threshold. Unbounded output increases memory/transport risk without fixing lifecycle recovery.
+
+On the verified host, multiple Ops requests logged `MCP connection TTL reached` roughly 99-119.5 seconds after a nearby synchronous `process.run` started, while local tunnel-client `--mcp.connection-max-ttl` remained at its 10-minute default and no local TTL override was configured. Treat this as an observed effective response deadline for this tunnel/session, not as a universal platform constant. Keep synchronous Ops work below the shortest observed deadline with margin; split or poll longer workflows.
+
 ## 11. Normal operating procedure
 
 Before relying on the tunnel for a new non-trivial engineering session:

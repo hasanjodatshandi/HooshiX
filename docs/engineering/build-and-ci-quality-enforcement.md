@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP and its repository verification boundary.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP. ADR-0049 defines the separate policy-gated interactive Windows Desktop MCP and its repository verification boundary.
 
 ## 1. Required Java PR gates
 
@@ -190,7 +190,7 @@ Applicable checks include:
 - secret/render scans;
 - profile-correct replica/HPA/PDB/topology.
 
-## 9. Documentation/governance, Agent Context, and developer-host Ops gates
+## 9. Documentation/governance, Agent Context, developer-host Ops, and Desktop gates
 
 CI SHOULD enforce when implemented:
 
@@ -218,13 +218,18 @@ CI SHOULD enforce when implemented:
 - Ops server startup requires a local fail-closed policy and tests cover missing/malformed/unknown/duplicate/relative policy state, path/denied-root/symlink escape, allowed-root deletion denial, bounded atomic UTF-8 file mutation, process alias/cwd/timeout/output controls, child credential-environment exclusion, bounded audit metadata/rotation, CWD-independent startup, and explicit UTF-8 response bytes;
 - Ops process execution accepts only policy aliases to absolute executables and argv arrays; no caller-selected executable path, arbitrary environment map, or stdin secret channel is added;
 - elevated Ops mutation/process execution requires explicit local policy opt-in and remains developer-host only; no test or tunnel setup may treat it as ADR-0030 production privilege;
-- repository examples contain no real Ops policy secret or tunnel credential.
+- repository examples contain no real Ops policy secret or tunnel credential;
+- ADR-0049 Desktop MCP remains a third separate stdio server and does not change Context or Ops tool surfaces;
+- Desktop startup/runtime tests cover strict local policy, exact WinApp version pin, intended Windows interactive/non-elevated state, app allow/deny rules, fresh HWND/process authorization, and sanitized WinApp child environment;
+- Desktop observation/input tests cover bounded UI inspection, PNG capture/temp cleanup, UIA/mouse/keyboard opt-ins, semantic-selector-only mouse targeting, safe WinApp chord normalization, fixed isolated PowerShell/C# Unicode-helper stdin/argv/environment/timeout/error contracts, system-key negatives, output/time limits, fail-closed/redacted audit, CWD-independent stdio protocol behavior, screenshot MCP image content, and explicit UTF-8 response bytes;
+- Desktop has no arbitrary WinApp argv, process shell, arbitrary filesystem/network fetch, recording/touch/pen, clipboard-read, get-value/credential-reader, UAC/Secure-Desktop bypass, or production administration tool;
+- repository examples contain no real Desktop policy secret, screenshot, typed secret, or tunnel credential.
 
 These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
 
-`make baseline-verify` includes repository Context Engine tests/verification and Ops MCP tests. Context/route/documentation or Ops policy/stdio boundary drift therefore blocks the same repository-governance boundary.
+`make baseline-verify` includes repository Context Engine tests/verification plus Ops and Desktop MCP tests. Context/route/documentation, Ops policy/stdio, or Desktop policy/UI-boundary drift therefore blocks the same repository-governance boundary.
 
-Repository CI proves only repository-side stdio/policy/governance behavior. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, Windows ACL/elevation/background state, Context `project.bootstrap`, and Ops `ops.status`/mutation/execution are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC for the relevant surface.
+Repository CI proves only repository-side stdio/policy/governance behavior. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, Windows ACL/token/session/background state, Context calls, Ops host calls, and Desktop WinApp/UI/screenshot/input calls are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC for the relevant surface.
 
 ## 10. Heavy release/scheduled evidence
 

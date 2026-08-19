@@ -24,6 +24,8 @@ context/checkpoints/20260817T120535Z-post-merge-pr-54-finalize-git-native-agent-
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
+desktop/policy.example.json
+desktop/policy.schema.json
 docs/adr/0001-select-dedicated-caddy-coraza-edge-waf.md
 docs/adr/0002-define-production-istio-trust-and-enrollment.md
 docs/adr/0003-use-git-and-buf-without-runtime-schema-registry-in-v1.md
@@ -72,6 +74,7 @@ docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1.md
 docs/adr/0046-adopt-git-native-agent-context-engine-v1.md
 docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md
 docs/adr/0048-adopt-policy-gated-developer-host-ops-mcp-v1.md
+docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -114,6 +117,7 @@ docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
+docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
 docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
 docs/runbooks/local-istio-ambient.md
@@ -132,6 +136,14 @@ scripts/context/post_merge_checkpoint.py
 scripts/context/tests/test_context_engine.py
 scripts/context/tests/test_mcp_server.py
 scripts/context/tests/test_post_merge_checkpoint.py
+scripts/desktop/desktop_engine.py
+scripts/desktop/mcp_server.py
+scripts/desktop/tests/test_audit_fail_closed.py
+scripts/desktop/tests/test_desktop_engine.py
+scripts/desktop/tests/test_mcp_server.py
+scripts/desktop/tests/test_windows_text_input.py
+scripts/desktop/windows_text_input.py
+scripts/desktop/windows_text_input_helper.ps1
 scripts/ops/mcp_server.py
 scripts/ops/ops_engine.py
 scripts/ops/tests/test_audit_fail_closed.py

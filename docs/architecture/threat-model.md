@@ -15,6 +15,7 @@ Covers:
 - Git/CI/source-secret/supply-chain controls;
 - Git-native AI-agent context/bootstrap/routing/checkpoint/retrieval tooling;
 - OpenAI Secure MCP Tunnel developer bridge from ChatGPT Web to the local read-only stdio Context MCP;
+- policy-gated developer-host Ops and interactive Desktop MCP boundaries;
 - Day-One logging/metrics/tracing;
 - privileged access;
 - backup/restore/erasure/DR;
@@ -133,6 +134,7 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - the HooshiX Context MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or HooshiX network listener;
 - OpenAI tunnel-client is the outbound customer-run transport bridge and must not broaden the Context MCP tool list;
 - ADR-0048 Ops MCP is a separate developer-host stdio surface with mandatory local policy, explicit mutation/execution semantics, separate tunnel/profile/key, bounded path/process/output/audit controls, and no production authority;
+- ADR-0049 Desktop MCP is a third developer-host stdio surface with mandatory local policy, pinned WinApp version, intended interactive/non-elevated session, fresh HWND/process app authorization, explicit screenshot/UIA/mouse/keyboard/system-key flags, a fixed isolated PowerShell/C# Unicode text helper with stdin-only text and sanitized environment, bounded transient capture, metadata-only audit, separate tunnel/profile/key, and no credential/UAC/production authority;
 - typed Ops path authorization is not claimed to defeat a malicious local process that can race/replace filesystem entries; host ACLs/work roots and the local account remain part of the trust boundary;
 - the long-lived tunnel daemon uses a restricted runtime credential with Tunnels `Read` + `Use`; an admin key is not a daemon credential;
 - tunnel/runtime credentials stay outside Git, checkpoints, logs, screenshots, and ChatGPT content and are not passed as command-line literals;
@@ -176,6 +178,9 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 | Tampering | Ops request escapes allowed root through path/symlink/reparse behavior | lexical allowed-root check + denied roots + canonical resolved-path containment | ADR-0048 path/denied-root/symlink negative tests |
 | Tampering | Ops request executes a caller-selected program or unbounded command | policy alias to absolute executable + argv array + allowed cwd + finite timeout/output | ADR-0048 alias/cwd/timeout/output tests |
 | Elevation of privilege | non-elevated Ops configuration gains administrator execution | Windows token is external authority + `require_elevated` and separate elevated mutation/process opt-ins; no UAC bypass logic | startup/elevation policy tests + operator `ops.status` evidence |
+| Tampering | Desktop request targets a denied/stale/spoofed window or arbitrary coordinate/WinApp command | fresh HWND -> real process-name policy check before target action + semantic selector-only v1 mouse surface + no arbitrary WinApp argv | ADR-0049 app/HWND/selector/tool-surface negatives |
+| Information disclosure | Desktop capture/UI text/typed input is retained in local audit/argv/environment or used as a credential-reader path | bounded transient PNG cleanup + no clipboard/get-value/credential tool + typed text only over bounded UTF-8 helper stdin + sanitized helper environment + audit stores only digests/metadata and never raw title/selector/text/screenshot/output | ADR-0049 screenshot/text-helper/audit redaction/fail-closed tests + host evidence |
+| Elevation of privilege | Desktop automation is used to bypass UAC/Secure Desktop or silently becomes elevated administration | interactive non-elevated requirement by default + no UAC/Winlogon/SAS tool + Windows/WinApp integrity/security boundaries remain fail-closed + Ops remains separate admin boundary | ADR-0049 runtime/session/tool negatives + operator token/session evidence |
 | Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
 | Information disclosure | real secret is committed then deleted but remains in Git history/clones | Gitleaks tree+history + revoke/rotate + incident/history remediation | commit-delete fixture + rotation evidence |
 | Information disclosure | scanner/log output republishes discovered secret | Gitleaks redaction + CI output policy | redaction fixture |
@@ -351,7 +356,7 @@ Residual: an allowed tracked source file can still contain secret or adversarial
 
 These risks do not permit weaker MFA, Authorization, RLS, OpenBao, WAF, source/secret scanning, signed final-artifact admission, audit, backup, trusted client identity, quota safety, or telemetry privacy.
 
-ADR-0046 Context Engine, ADR-0047 ChatGPT Web Context tunnel bridge, and ADR-0048 developer-host Ops MCP are outside the production runtime profile. Their failure cannot justify weakening product/runtime controls or treating external/model memory as current architecture authority. Ops local administrator capability is not production JIT authority.
+ADR-0046 Context Engine, ADR-0047 ChatGPT Web Context tunnel bridge, ADR-0048 developer-host Ops MCP, and ADR-0049 developer-host Desktop MCP are outside the production runtime profile. Their failure cannot justify weakening product/runtime controls or treating external/model/UI memory as current architecture authority. Ops local administrator capability and Desktop UI authority are not production JIT authority.
 
 ## 9. Verification mapping
 
@@ -363,6 +368,7 @@ Material threats map to executable service/security/database/network/CI/observab
 - TM-19 -> ADR-0045 Gitleaks current-tree/history/redaction + incident revoke/rotate/history-remediation evidence;
 - TM-20 -> ADR-0046 bootstrap/router/search/checkpoint/MCP tests + ADR-0047 CWD-independent stdio/tunnel-boundary review + real operator-PC tunnel/bootstrap evidence + generated-route parity + SEC-033/AFF-051;
 - developer-host Ops threats -> ADR-0048 policy/path/symlink/process/environment/audit/UTF-8 tests + separate operator-PC tunnel/elevation/background evidence;
+- developer-host Desktop threats -> ADR-0049 policy/version/session/app/HWND/capture/UIA/mouse/keyboard/isolated-text-helper/environment/audit/UTF-8 tests + separate operator-PC WinApp/tunnel/interactive/background evidence;
 - TM-17 -> external host-down monitor + cold DR;
 - compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;
 - policy-engine migration risk -> Kyverno CEL manifest gate.
@@ -371,4 +377,4 @@ A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
 ## 10. Change triggers
 
-Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/Context MCP, developer-host Ops MCP/policy/execution, or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/Context MCP, developer-host Ops MCP/policy/execution, developer-host Desktop MCP/screen/input/session policy, or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.

@@ -75,7 +75,7 @@ They answer whether the build resolved the expected dependency bytes/metadata. T
 
 OSV-Scanner is the selected early advisory scanner for supported declared/locked dependency evidence.
 
-Current repository implementation for the Compromised Password service pins OSV-Scanner 2.4.0 and the official Linux/x64 SHA-256, scans the Gradle lockfile during the blocking service security suite, and re-runs that security suite from the scheduled repository workflow.
+Current repository implementation pins OSV-Scanner 2.4.0 in the implemented Compromised Password, Notification, and Identity service security suites, scans their Gradle lockfiles during blocking service security verification, and re-runs those security suites from the scheduled repository workflow. Exact downloaded-binary checksum ownership remains in each implemented workflow.
 
 This is useful fast feedback, but it is not the final-artifact vulnerability authority:
 

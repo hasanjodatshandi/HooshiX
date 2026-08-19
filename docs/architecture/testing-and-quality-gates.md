@@ -207,11 +207,30 @@ ADR-0048 repository tests prove:
 - stdio JSON-RPC output is explicit UTF-8 bytes independent of Windows text code page;
 - entry point works outside repository CWD.
 
-Host evidence separately proves real Windows policy ACLs, intended elevation state, separate Ops tunnel/profile/key, local readiness, exact tool discovery, `ops.status`, bounded mutation/execution, background restart, audit behavior, and rollback/revocation.
+Host evidence separately proves real Windows policy ACLs, intended elevation state, separate Ops tunnel/profile/key, local readiness, exact tool discovery, `ops.status`, bounded mutation/execution, audit behavior, and rollback/revocation. Background resilience evidence distinguishes tunnel-client child exit, internal stdio MCP-child failure/unready state, complete parent Scheduled Task stop, and orphan/duplicate same-profile cleanup. Pass requires full known profile-tree cleanup before parent recovery, convergence to exactly one launcher/wrapper/tunnel chain where applicable, healthy loopback `/readyz`, bounded local diagnostics, and no runtime-key exposure. The synchronous execution bound must also be proven below the effective end-to-end response deadline: a deliberately over-bound command must time out locally without changing tunnel PID or readiness.
 
 Ops MCP tests do not prove production administration safety. ADR-0030 remains the production privileged-access authority.
 
-## 16. Complete-stack single-server test
+## 16. Developer-host Desktop MCP tests
+
+ADR-0049 repository tests prove:
+
+- Context and Ops tool surfaces remain unchanged while Desktop exposes exactly the reviewed separate Desktop tool list/annotations;
+- missing/malformed/unknown/duplicate/ambiguous policy state and incompatible WinApp version fail closed;
+- app allow/deny rules use the real process identity from a freshly resolved HWND before targeted actions;
+- inspect depth/selectors/output are bounded and coordinate-only mouse targets are refused;
+- screenshot permission/capture-screen opt-in, PNG validation, byte bound, MCP image representation, and temporary-file cleanup;
+- UIA/mouse/keyboard/system-key capabilities require explicit policy; caller key grammar rejects literal/raw-virtual/Secure-Attention/workstation-lock forms and only validated alphanumeric modifier chords receive internal VK normalization;
+- literal text uses a fixed isolated PowerShell/C# Unicode helper; tests prove text is stdin-only, helper argv is fixed, child environment excludes tunnel/API secrets, output is bounded UTF-8 JSON, timeout preflight occurs before injection, and structured partial/foreground failures are not automatically retried;
+- WinApp child environment excludes tunnel/API secrets and enables telemetry opt-out;
+- audit begins before sensitive observation/action, fails closed when unavailable, rotates within bound, and never stores raw typed text/selectors/window titles/screenshots/WinApp output;
+- explicit UTF-8 stdio behavior and modern/legacy MCP error handling remain deterministic.
+
+Host evidence separately proves exact WinApp package/version/integrity, protected policy/audit/capture ACLs, intended non-elevated interactive session, exact mixed-case/Unicode helper delivery plus bounded shortcut/mouse/screenshot behavior, separate Desktop tunnel/profile/key, readiness, ChatGPT tool discovery, audit behavior, and rollback/revocation. Background resilience also proves tunnel-client child recovery, internal MCP-child/unready recovery, parent-task recovery, full launcher/wrapper/tunnel process-tree cleanup, one-process-per-profile convergence, and continued `elevated=false` / `interactive_session=true` after recovery. Logoff/logon persistence remains a separate session-bound host test.
+
+Desktop tests do not prove production administration safety or credential-entry safety. ADR-0030 and credential owners remain unchanged.
+
+## 17. Complete-stack single-server test
 
 Run all intended platform/application/observability components together.
 
@@ -233,7 +252,7 @@ Record:
 
 Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security load, safe concurrent WAL+AOF+Kafka+telemetry IO, and no security/admission/backup/observability bypass.
 
-## 17. CI/CD ordering
+## 18. CI/CD ordering
 
 Recommended authority order:
 
@@ -253,7 +272,7 @@ Gitleaks secret scan
 
 Independent checks may execute in parallel only when required input/evidence ordering remains correct. Scheduled OSV advisory scanning complements, but does not replace, ADR-0035 deployed-digest Grype rescanning.
 
-## 18. Definition of Done
+## 19. Definition of Done
 
 A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, source/secret/dependency-advisory/final-artifact security, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
 
