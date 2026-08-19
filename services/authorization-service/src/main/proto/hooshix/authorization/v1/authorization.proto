@@ -1,0 +1,60 @@
+syntax = "proto3";
+package hooshix.authorization.v1;
+option java_multiple_files = true;
+option java_package = "com.sajtech.authorization.contract.v1";
+service AuthorizationService {
+  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse);
+  rpc CheckPlatformPermission(CheckPlatformPermissionRequest) returns (CheckPlatformPermissionResponse);
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse);
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+  rpc GetRole(GetRoleRequest) returns (GetRoleResponse);
+  rpc GetMembershipAuthorization(GetMembershipAuthorizationRequest) returns (GetMembershipAuthorizationResponse);
+  rpc CreateRole(CreateRoleRequest) returns (RoleResponse);
+  rpc UpdateRole(UpdateRoleRequest) returns (RoleResponse);
+  rpc ArchiveRole(ArchiveRoleRequest) returns (RoleResponse);
+  rpc ReplaceRolePermissions(ReplaceRolePermissionsRequest) returns (RoleResponse);
+  rpc AssignRoleToMembership(AssignRoleToMembershipRequest) returns (MutationResponse);
+  rpc RemoveRoleFromMembership(RemoveRoleFromMembershipRequest) returns (MutationResponse);
+  rpc SetMembershipPermissionOverride(SetMembershipPermissionOverrideRequest) returns (MutationResponse);
+  rpc RemoveMembershipPermissionOverride(RemoveMembershipPermissionOverrideRequest) returns (MutationResponse);
+  rpc ProvisionTenantOwner(ProvisionTenantOwnerRequest) returns (LifecycleCommandResponse);
+  rpc ProvisionTenantMember(ProvisionTenantMemberRequest) returns (LifecycleCommandResponse);
+  rpc ApplyTenantLifecycle(ApplyTenantLifecycleRequest) returns (LifecycleCommandResponse);
+  rpc PrepareMembershipRemoval(PrepareMembershipRemovalRequest) returns (PrepareMembershipRemovalResponse);
+  rpc FinalizeMembershipRemoval(FinalizeMembershipRemovalRequest) returns (LifecycleCommandResponse);
+  rpc CancelMembershipRemovalPreparation(CancelMembershipRemovalPreparationRequest) returns (LifecycleCommandResponse);
+}
+message CheckPermissionRequest { string tenant_id = 1; string membership_id = 2; string permission_key = 3; }
+message CheckPermissionResponse {}
+message CheckPlatformPermissionRequest { string user_id = 1; string permission_key = 2; }
+message CheckPlatformPermissionResponse {}
+message ListPermissionsRequest { int32 page_size = 1; string page_token = 2; }
+message PermissionView { string permission_key = 1; string scope = 2; string lifecycle = 3; }
+message ListPermissionsResponse { repeated PermissionView permissions = 1; string next_page_token = 2; }
+message ListRolesRequest { int32 page_size = 1; string page_token = 2; }
+message RoleView { string role_id = 1; string name = 2; string description = 3; string kind = 4; string lifecycle = 5; int64 version = 6; repeated string permission_keys = 7; }
+message ListRolesResponse { repeated RoleView roles = 1; string next_page_token = 2; }
+message GetRoleRequest { string role_id = 1; }
+message GetRoleResponse { RoleView role = 1; }
+message GetMembershipAuthorizationRequest { string membership_id = 1; }
+message MembershipAuthorizationView { string membership_id = 1; repeated string role_ids = 2; repeated MembershipPermissionOverrideView overrides = 3; bool authoritative_for_access_decisions = 4; }
+message MembershipPermissionOverrideView { string permission_key = 1; string decision = 2; }
+message GetMembershipAuthorizationResponse { MembershipAuthorizationView authorization = 1; }
+message CreateRoleRequest { string request_id = 1; string name = 2; string description = 3; repeated string permission_keys = 4; }
+message UpdateRoleRequest { string request_id = 1; string role_id = 2; int64 expected_version = 3; string name = 4; string description = 5; }
+message ArchiveRoleRequest { string request_id = 1; string role_id = 2; int64 expected_version = 3; }
+message ReplaceRolePermissionsRequest { string request_id = 1; string role_id = 2; int64 expected_version = 3; repeated string permission_keys = 4; string reason = 5; }
+message AssignRoleToMembershipRequest { string request_id = 1; string membership_id = 2; string role_id = 3; string reason = 4; }
+message RemoveRoleFromMembershipRequest { string request_id = 1; string membership_id = 2; string role_id = 3; string reason = 4; }
+message SetMembershipPermissionOverrideRequest { string request_id = 1; string membership_id = 2; string permission_key = 3; string decision = 4; string reason = 5; }
+message RemoveMembershipPermissionOverrideRequest { string request_id = 1; string membership_id = 2; string permission_key = 3; string reason = 4; }
+message RoleResponse { RoleView role = 1; }
+message MutationResponse { bool accepted = 1; }
+message ProvisionTenantOwnerRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; string user_id = 4; }
+message ProvisionTenantMemberRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; string user_id = 4; }
+message ApplyTenantLifecycleRequest { string request_id = 1; string tenant_id = 2; string lifecycle = 3; }
+message PrepareMembershipRemovalRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; }
+message PrepareMembershipRemovalResponse { bool prepared = 1; }
+message FinalizeMembershipRemovalRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; }
+message CancelMembershipRemovalPreparationRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; }
+message LifecycleCommandResponse { bool accepted = 1; }

@@ -1,0 +1,6 @@
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  main:
+    web-application-type: none

@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: authorization-service
+  main:
+    banner-mode: "off"
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${AUTHORIZATION_DATABASE_URL:jdbc:postgresql://localhost:5432/authorization}
+    username: ${AUTHORIZATION_DATABASE_USERNAME:authorization_runtime}
+    password: ${AUTHORIZATION_DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 16
+      minimum-idle: 1
+      connection-timeout: 50
+      validation-timeout: 50
+  flyway:
+    enabled: false
+  jooq:
+    sql-dialect: POSTGRES
+server:
+  port: -1
+management:
+  server:
+    port: 9092
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: INFO
