@@ -38,7 +38,9 @@ import java.util.List;
 import java.util.Optional;
 import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -47,6 +49,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
 @Profile("!migration")
+@EnableConfigurationProperties(IdentityProperties.class)
 public class RuntimeConfiguration {
   @Bean
   Clock identityClock() {
@@ -594,8 +597,12 @@ public class RuntimeConfiguration {
 
   @Bean
   GrpcServerLifecycle grpcLifecycle(
-      IdentityProperties p, List<BindableService> services, SafeTracingServerInterceptor tracing) {
+      IdentityProperties p,
+      List<BindableService> services,
+      SafeTracingServerInterceptor tracing,
+      @Value("${identity.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
+        bindAddress,
         p.grpcPort(),
         p.maxConcurrentCallsPerConnection(),
         p.registrationRuntimeEnabled()

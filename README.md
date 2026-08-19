@@ -18,6 +18,15 @@ make baseline-verify
 
 It verifies repository/file-index consistency, ADR identifier/register invariants, canonical dependency-registry/Markdown operation parity, current source references, guarded structure rules, and the ADR-0046 project Context Engine/checkpoint contracts. It also rejects reintroduction of the Windows MCP runtime paths externalized by ADR-0051. `.github/workflows/repository-baseline.yml` runs this repository gate and the implemented service security suites.
 
+The current executable application slices can be run together in the canonical WSL checkout with the repository-owned local integration runtime:
+
+```bash
+make local-runtime-up
+make local-runtime-status
+```
+
+This starts pinned local PostgreSQL/Redis, runs service-owned Flyway migrations with separate roles, creates Git-ignored local-only key/TLS material, and runs all five current services together. The local Web BFF endpoint is `https://localhost:18443`. This is application-integration evidence only; it does not replace the production-fidelity kind/mesh/edge lane or staging/production verification. See `docs/runbooks/local-integrated-runtime.md`.
+
 For a new AI-agent/session, the Git-native Context Engine provides a verified current-project bootstrap and conservative task routing without making chat/model memory authoritative:
 
 ```bash

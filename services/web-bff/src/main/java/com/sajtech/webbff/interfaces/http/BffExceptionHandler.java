@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public final class BffExceptionHandler {
@@ -37,6 +38,11 @@ public final class BffExceptionHandler {
           case INVALID_REQUEST -> 400;
         };
     return problem(status, e.error().name());
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  ResponseEntity<Map<String, Object>> notFound(NoResourceFoundException e) {
+    return problem(404, "NOT_FOUND");
   }
 
   @ExceptionHandler({MethodArgumentNotValidException.class, IllegalArgumentException.class})
@@ -72,6 +78,7 @@ public final class BffExceptionHandler {
       case 400 -> "Invalid request";
       case 401 -> "Authentication required";
       case 403 -> "Request forbidden";
+      case 404 -> "Resource not found";
       case 409 -> "Request precondition failed";
       case 429 -> "Request rate limited";
       case 503 -> "Dependency unavailable";

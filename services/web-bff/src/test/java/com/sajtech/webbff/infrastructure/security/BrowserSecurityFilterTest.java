@@ -83,6 +83,22 @@ class BrowserSecurityFilterTest {
   }
 
   @Test
+  void loadedSessionUsesSharedControllerSecurityContextAttribute() throws Exception {
+    BrowserSession session = session();
+    when(sessions.load("cookie")).thenReturn(Optional.of(session));
+    when(sessions.touch(session)).thenReturn(true);
+    var request = new MockHttpServletRequest("GET", "/api/v1/identity/profile");
+    request.setCookies(new Cookie(BrowserSecurityFilter.COOKIE, "cookie"));
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(request.getAttribute(BrowserSecurityContext.SESSION_ATTRIBUTE)).isSameAs(session);
+    verify(chain).doFilter(same(request), same(response));
+  }
+
+  @Test
   void failedAtomicTouchInvalidatesCurrentRequest() throws Exception {
     BrowserSession session = session();
     when(sessions.load("cookie")).thenReturn(Optional.of(session));

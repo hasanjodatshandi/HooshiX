@@ -1,5 +1,6 @@
 package com.sajtech.webbff.infrastructure.security;
 
+import com.sajtech.webbff.application.model.BrowserSecurityContext;
 import com.sajtech.webbff.application.model.BrowserSession;
 import com.sajtech.webbff.configuration.WebBffProperties;
 import com.sajtech.webbff.infrastructure.session.RedisBffSessionRepository;
@@ -11,8 +12,8 @@ import java.util.*;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class BrowserSecurityFilter extends OncePerRequestFilter {
-  public static final String SESSION_ATTRIBUTE = BrowserSecurityFilter.class.getName() + ".session";
-  public static final String COOKIE = "__Host-sajtech-session";
+  public static final String SESSION_ATTRIBUTE = BrowserSecurityContext.SESSION_ATTRIBUTE;
+  public static final String COOKIE = BrowserSecurityContext.COOKIE_NAME;
   private final WebBffProperties properties;
   private final RedisBffSessionRepository sessions;
 

@@ -34,6 +34,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -182,9 +183,14 @@ public class RuntimeConfiguration {
   GrpcServerLifecycle grpcServerLifecycle(
       NotificationProperties properties,
       NotificationGrpcService service,
-      SafeTracingServerInterceptor interceptor) {
+      SafeTracingServerInterceptor interceptor,
+      @Value("${notification.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
-        properties.grpcPort(), properties.maxConcurrentCallsPerConnection(), service, interceptor);
+        bindAddress,
+        properties.grpcPort(),
+        properties.maxConcurrentCallsPerConnection(),
+        service,
+        interceptor);
   }
 
   @Bean("notificationReadiness")

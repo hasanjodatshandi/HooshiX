@@ -6,3 +6,7 @@ spring:
     locations: classpath:db/migration
   main:
     web-application-type: none
+management:
+  endpoint:
+    health:
+      validate-group-membership: false
