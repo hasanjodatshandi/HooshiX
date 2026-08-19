@@ -209,4 +209,4 @@ Identity implementation evidence covers, as applicable:
 - Day-One logs/metrics/traces, PII canaries, correlation, and telemetry-backend outage;
 - profile-correct container/GitOps/render/load/recovery evidence.
 
-The first executable implementation is repository-complete only when source, contracts, migrations, tests, build/dependency locks, container/deployment/security policy, **observability**, and CI gates for the implemented slice exist. Current repository implementation/runtime evidence remains `NOT VERIFIED` until those artifacts are present and executed.
+The first executable implementation is repository-complete only when source, contracts, migrations, tests, build/dependency locks, container/deployment/security policy, **observability**, and CI gates for the implemented slice exist. Those repository artifacts and protected registration-slice CI are verified on `main@9642507`; deployed runtime, wider ADR-0012 Identity behavior, load/recovery, and production-readiness evidence remain `NOT VERIFIED`.

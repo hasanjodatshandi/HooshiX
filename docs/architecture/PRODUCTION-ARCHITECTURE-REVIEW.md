@@ -142,7 +142,7 @@ A real committed credential requires revoke/rotate handling when exposure is pla
 
 Trivy and OWASP Dependency-Check are intentionally not selected default controls because their expected default roles overlap the current OSV+Syft+Grype chain. They can be proposed later only for a distinct measured coverage gap. Repository Semgrep CLI similarly does not imply separate Semgrep Secrets/Supply Chain product enablement.
 
-This is an architecture decision, not executable evidence. Current repository implementation status is: service-specific Semgrep and OSV locked-dependency scanning exist for the implemented service slices; the Identity workflow also implements Gitleaks current-tree/Git-history scanning with local execution evidence. Protected-CI Gitleaks execution remains commit-specific, while Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
+This is an architecture decision, not executable evidence. Current repository implementation status is: service-specific Semgrep and OSV locked-dependency scanning exist for the implemented service slices; the Identity workflow also implements Gitleaks current-tree/Git-history scanning. Protected merged-main Compromised Password, Notification, and Identity security suites plus the final baseline aggregator passed on `main@9642507`; Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
 
 ## Kyverno review
 
