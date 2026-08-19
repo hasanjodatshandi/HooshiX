@@ -15,12 +15,20 @@ quota:
     configMapName: identity-host-time-status
 runtime:
   registrationRuntimeEnabled: true
+  authenticationRuntimeEnabled: true
   argon2MaxConcurrentHashes: 2
 secrets:
   fingerprintSecretName: identity-fingerprint
   challengeSecretName: identity-challenge
   handoffSecretName: identity-handoff
   quotaKeySecretName: identity-quota-key
+  refreshSecretName: identity-refresh
+  jwtPrivateSecretName: identity-jwt-private
+jwt:
+  publicVerifierConfigMapName: identity-jwt-public
+  issuer: https://identity.sajtech.internal
+  allowedAudiences:
+    - authorization-service
 observability:
   tracing:
     otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces

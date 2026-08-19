@@ -87,6 +87,14 @@ public final class FileBackedKeyRing {
     return key;
   }
 
+  public java.util.List<KeyRingMaterial> allKeys() {
+    Snapshot s = fresh();
+    return s.keys().entrySet().stream()
+        .sorted(java.util.Map.Entry.comparingByKey())
+        .map(entry -> new KeyRingMaterial(entry.getKey(), entry.getValue()))
+        .toList();
+  }
+
   public boolean isFresh() {
     Snapshot s = snapshot.get();
     return s != null && !s.loadedAt().plus(maximumStaleness).isBefore(clock.instant());

@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package hooshix.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.v1";
+
+service IdentityAuthenticationService {
+  rpc AuthenticateLocal(AuthenticateLocalRequest) returns (AuthenticateLocalResponse);
+  rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
+  rpc LogoutCurrent(LogoutCurrentRequest) returns (LogoutCurrentResponse);
+  rpc LogoutAll(LogoutAllRequest) returns (LogoutAllResponse);
+  rpc IssueAudienceAccessToken(IssueAudienceAccessTokenRequest) returns (IssueAudienceAccessTokenResponse);
+}
+
+enum AuthenticationChannel {
+  AUTHENTICATION_CHANNEL_UNSPECIFIED = 0;
+  AUTHENTICATION_CHANNEL_EMAIL = 1;
+  AUTHENTICATION_CHANNEL_PHONE = 2;
+}
+
+enum AuthenticationSessionMode {
+  AUTHENTICATION_SESSION_MODE_UNSPECIFIED = 0;
+  AUTHENTICATION_SESSION_MODE_AUTHENTICATED_ONBOARDING = 1;
+}
+
+message AuthenticationTrustedClientAddress {
+  bytes address = 1;
+}
+
+message AuthenticateLocalRequest {
+  string request_id = 1;
+  AuthenticationChannel channel = 2;
+  string contact = 3;
+  string password = 4;
+  AuthenticationTrustedClientAddress client_address = 5;
+}
+
+message AuthenticateLocalResponse {
+  string identity_session_id = 1;
+  string refresh_family_id = 2;
+  string refresh_credential = 3;
+  google.protobuf.Timestamp refresh_idle_expires_at = 4;
+  google.protobuf.Timestamp refresh_absolute_expires_at = 5;
+  AuthenticationSessionMode session_mode = 6;
+}
+
+message RefreshSessionRequest {
+  string request_id = 1;
+  string refresh_credential = 2;
+}
+
+message RefreshSessionResponse {
+  string identity_session_id = 1;
+  string refresh_family_id = 2;
+  string refresh_credential = 3;
+  google.protobuf.Timestamp refresh_idle_expires_at = 4;
+  google.protobuf.Timestamp refresh_absolute_expires_at = 5;
+  AuthenticationSessionMode session_mode = 6;
+}
+
+message LogoutCurrentRequest {
+  string request_id = 1;
+  string refresh_credential = 2;
+}
+
+message LogoutCurrentResponse {
+  bool accepted = 1;
+}
+
+message LogoutAllRequest {
+  string request_id = 1;
+  string refresh_credential = 2;
+}
+
+message LogoutAllResponse {
+  bool accepted = 1;
+}
+
+message IssueAudienceAccessTokenRequest {
+  string request_id = 1;
+  string refresh_credential = 2;
+  string audience = 3;
+}
+
+message IssueAudienceAccessTokenResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}

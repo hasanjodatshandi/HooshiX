@@ -37,3 +37,39 @@ groups:
           service: identity-service
         annotations:
           summary: Identity password hashing remains continuously occupied
+      - alert: IdentityAuthenticationUnavailableRateHigh
+        expr: |
+          sum(rate(identity_authentication_duration_seconds_count{outcome=~"QUOTA_UNAVAILABLE|QUOTA_TIME_SOURCE_UNHEALTHY|QUOTA_CAPACITY_UNHEALTHY|AUTHENTICATION_OVERLOADED|SIGNING_KEY_UNAVAILABLE|SESSION_STATE_INVALID"}[5m]))
+          /
+          clamp_min(sum(rate(identity_authentication_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity authentication security dependency or capacity unavailable rate is above 1%
+      - alert: IdentityAuthenticationSaturationHigh
+        expr: identity_authentication_in_flight > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity authentication in-flight work is near the configured transport bound
+      - alert: IdentityPasswordVerificationSaturationHigh
+        expr: identity_password_verify_in_flight > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity password verification remains continuously occupied
+      - alert: IdentityRefreshReuseDetected
+        expr: increase(identity_refresh_reuse_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity detected reuse of a rotated refresh credential

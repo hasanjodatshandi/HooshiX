@@ -6,6 +6,7 @@ import com.sajtech.identity.application.registration.model.*;
 import com.sajtech.identity.application.registration.port.in.RegisterLocal;
 import com.sajtech.identity.application.registration.port.out.*;
 import com.sajtech.identity.application.registration.service.*;
+import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import com.sajtech.identity.domain.registration.valueobject.*;
 import java.time.Clock;
 import java.time.Duration;

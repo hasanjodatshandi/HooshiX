@@ -59,6 +59,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
+    testImplementation("io.cucumber:cucumber-java:7.34.6")
+    testImplementation("io.cucumber:cucumber-junit-platform-engine:7.34.6")
+    testImplementation("org.junit.platform:junit-platform-suite")
     testImplementation("io.grpc:grpc-inprocess:1.83.1")
     testImplementation("io.grpc:grpc-testing:1.83.1")
     testImplementation("org.testcontainers:testcontainers")
@@ -127,6 +130,9 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
+    filter {
+        excludeTestsMatching("com.sajtech.identity.bdd.*")
+    }
     useJUnitPlatform {
         includeTags("integration")
     }
@@ -138,6 +144,9 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
+    filter {
+        excludeTestsMatching("com.sajtech.identity.bdd.*")
+    }
     useJUnitPlatform {
         includeTags("architecture")
     }

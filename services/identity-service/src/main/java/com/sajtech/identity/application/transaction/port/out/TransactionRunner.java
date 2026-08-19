@@ -1,4 +1,4 @@
-package com.sajtech.identity.application.registration.port.out;
+package com.sajtech.identity.application.transaction.port.out;
 
 import java.util.function.Supplier;
 

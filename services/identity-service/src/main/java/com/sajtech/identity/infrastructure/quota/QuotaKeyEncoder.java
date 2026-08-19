@@ -24,34 +24,56 @@ public final class QuotaKeyEncoder {
     byte[] exact = normalizeAddress(address);
     byte[] aggregate = aggregate(exact);
     KeyRingMaterial key = keys.activeKey();
-    String contactKey =
-        contact == null
-            ? null
-            : key(
-                key,
-                "contact",
-                operation,
-                contact.channel().name().getBytes(StandardCharsets.US_ASCII),
-                contact.canonicalValue().getBytes(StandardCharsets.UTF_8));
+    String operationName = operation.name();
+    String contactKey = contact == null ? null : contactKey(key, operationName, contact);
     String exactKey =
-        key(key, "client-ip-exact", operation, new byte[] {(byte) exact.length}, exact);
+        key(key, "client-ip-exact", operationName, new byte[] {(byte) exact.length}, exact);
     String aggregateKey =
         key(
             key,
             "client-network-aggregate",
-            operation,
+            operationName,
             new byte[] {(byte) aggregate.length},
             aggregate);
     return new EncodedKeys(key.keyId(), contactKey, exactKey, aggregateKey);
   }
 
+  public LoginSourceKeys encodeLoginSource(byte[] address) {
+    byte[] exact = normalizeAddress(address);
+    byte[] aggregate = aggregate(exact);
+    KeyRingMaterial material = keys.activeKey();
+    return new LoginSourceKeys(
+        key(material, "client-ip-exact", "LOGIN", new byte[] {(byte) exact.length}, exact),
+        key(
+            material,
+            "client-network-aggregate",
+            "LOGIN",
+            new byte[] {(byte) aggregate.length},
+            aggregate));
+  }
+
+  public String encodeLoginSubject(CanonicalContact contact) {
+    if (contact == null) throw new IllegalArgumentException("Login contact is required");
+    return contactKey(keys.activeKey(), "LOGIN", contact);
+  }
+
+  private static String contactKey(
+      KeyRingMaterial material, String operation, CanonicalContact contact) {
+    return key(
+        material,
+        "contact",
+        operation,
+        contact.channel().name().getBytes(StandardCharsets.US_ASCII),
+        contact.canonicalValue().getBytes(StandardCharsets.UTF_8));
+  }
+
   private static String key(
-      KeyRingMaterial material, String dimension, QuotaOperation operation, byte[]... parts) {
+      KeyRingMaterial material, String dimension, String operation, byte[]... parts) {
     try {
       Mac mac = Mac.getInstance("HmacSHA256");
       mac.init(material.key());
       mac.update("hooshix:identity:quota:v1\0".getBytes(StandardCharsets.US_ASCII));
-      mac.update(operation.name().getBytes(StandardCharsets.US_ASCII));
+      mac.update(operation.getBytes(StandardCharsets.US_ASCII));
       mac.update((byte) 0);
       mac.update(dimension.getBytes(StandardCharsets.US_ASCII));
       for (byte[] part : parts) {
@@ -65,8 +87,9 @@ public final class QuotaKeyEncoder {
   }
 
   private static byte[] normalizeAddress(byte[] input) {
-    if (input == null || (input.length != 4 && input.length != 16))
+    if (input == null || (input.length != 4 && input.length != 16)) {
       throw new IllegalArgumentException("Trusted client address is invalid");
+    }
     if (input.length == 16) {
       boolean mapped = true;
       for (int i = 0; i < 10; i++) mapped &= input[i] == 0;
@@ -92,4 +115,6 @@ public final class QuotaKeyEncoder {
 
   public record EncodedKeys(
       String keyId, String contactKey, String exactIpKey, String aggregateNetworkKey) {}
+
+  public record LoginSourceKeys(String exactIpKey, String aggregateNetworkKey) {}
 }
