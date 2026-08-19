@@ -12,10 +12,10 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Topic | Primary current source |
 | --- | --- |
 | Current ADRs/stable IDs | `../adr/decision-register.md` |
-| Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
-| ChatGPT Web Context Engine tunnel bridge | ADR-0047 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
-| ChatGPT Web developer-host Ops MCP | ADR-0048 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |
-| ChatGPT Web developer-host Desktop MCP | ADR-0049 + ADR-0050 + `../runbooks/chatgpt-web-desktop-mcp.md` + `../technology/local-development-baseline.md` |
+| Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + ADR-0051 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
+| ChatGPT Web Context Engine tunnel bridge | ADR-0047 + ADR-0051 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Ops MCP | ADR-0048 + ADR-0051 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Desktop MCP | ADR-0049 + ADR-0050 + ADR-0051 + `../runbooks/chatgpt-web-desktop-mcp.md` + `../technology/local-development-baseline.md` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -38,7 +38,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 
 ADR-0046 keeps project context Git-native. `../../context/routes.json` is the canonical task-routing registry; `TASK-REVIEW-MATRIX.md` is its generated human view. Checkpoints under `../../context/checkpoints/` are historical evidence and never current architecture authority. Current Git source always outranks derived context or external/model memory.
 
-The read-only Context MCP adapter and local retrieval are repository/developer tooling only. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
+The project Context Engine and local retrieval are repository tooling. Under ADR-0051, the read-only Context MCP adapter and Ops/Desktop MCP implementations are independently versioned Windows developer-host tooling. Linux Git in `/home/coder/workspace/Hooshix` remains repository authority. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
 
 ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX Context stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
 

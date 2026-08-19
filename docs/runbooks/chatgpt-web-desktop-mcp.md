@@ -19,7 +19,7 @@ Authoritative decisions:
 ChatGPT Web
 -> dedicated OpenAI Secure MCP Tunnel
 -> dedicated tunnel-client Desktop profile on Windows
--> scripts/desktop/mcp_server.py over stdio
+-> independent Windows Desktop MCP runtime over stdio
 -> protected local Desktop policy
 -> pinned Microsoft WinApp CLI
 -> optional fixed local Credential Manager helper under ADR-0050
@@ -79,20 +79,18 @@ Expected version is exactly `0.6.0`. Review a new version before changing the ba
 
 Desktop MCP sets `WINAPP_CLI_TELEMETRY_OPTOUT=1` for WinApp child invocations.
 
-## 3. Repository verification
+## 3. Runtime and project verification
 
-Before host integration:
+Desktop and Ops runtime source/tests belong to the independent Windows MCP runtime. HooshiX project Context authority belongs to WSL. Before host integration:
 
 ```powershell
-Set-Location D:\HooshiXContext\repo
+Set-Location D:\Projects\HooshiXMcpRuntime
 python -B -m unittest discover -s .\scripts\desktop\tests -p "test_*.py" -v
 python -B -m unittest discover -s .\scripts\ops\tests -p "test_*.py" -v
-python -B -m unittest discover -s .\scripts\context\tests -p "test_*.py" -v
-python -B .\scripts\context\context_engine.py verify
-python -B .\scripts\baseline\verify_repository.py
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec python3 scripts/context/context_engine.py verify
 ```
 
-Context must remain exactly five read-only tools. Ops must remain its reviewed separate surface.
+Context must remain exactly five read-only tools. Ops remains a separate authority. Do not use Windows Git against the WSL checkout.
 
 ## 4. Create protected local Desktop policy
 
@@ -105,7 +103,7 @@ C:\ProgramData\HooshiX\desktop\policy.json
 Start from:
 
 ```text
-desktop/policy.example.json
+D:\Projects\HooshiXMcpRuntime\desktop\policy.example.json
 ```
 
 Use the actual absolute WinApp alias path and expected `0.6.0` version.
@@ -167,7 +165,7 @@ To disable immediately, set `allow_credential_input=false`, set `credential_bind
 Run from a **normal non-elevated interactive PowerShell** when policy requires `require_non_elevated=true`:
 
 ```powershell
-python -B D:\HooshiXContext\repo\scripts\desktop\mcp_server.py `
+python -B D:\Projects\HooshiXMcpRuntime\scripts\desktop\mcp_server.py `
   --policy C:\ProgramData\HooshiX\desktop\policy.json
 ```
 
@@ -231,9 +229,9 @@ over coordinate behavior.
 
 V1 click/hover/drag accept semantic selectors only. Caller-selected arbitrary screen coordinates are not exposed.
 
-`desktop.type_text` is bounded non-secret text. WinApp is used only to focus an optional semantic target; literal text then goes through the fixed isolated repository helper `scripts/desktop/windows_text_input_helper.ps1`. The parent sends text only as UTF-8 JSON on stdin. The helper uses C# `SendInput` + `KEYEVENTF_UNICODE`, checks that the requested HWND remains foreground before each UTF-16 code unit, paces delivery at 5 ms per code unit, waits 500 ms for the target queue to drain, and returns metadata only. The child environment is allow-listed and does not inherit tunnel/API credentials. Text that cannot fit `max_command_seconds` is rejected before injection. Do not use this tool for secrets. If Windows foreground/UIPI rules block delivery, treat the action as failed and do not retry automatically when partial input is possible.
+`desktop.type_text` is bounded non-secret text. WinApp is used only to focus an optional semantic target; literal text then goes through the fixed isolated helper owned by the independent Windows MCP runtime. The parent sends text only as UTF-8 JSON on stdin. The helper uses C# `SendInput` + `KEYEVENTF_UNICODE`, checks that the requested HWND remains foreground before each UTF-16 code unit, paces delivery at 5 ms per code unit, waits 500 ms for the target queue to drain, and returns metadata only. The child environment is allow-listed and does not inherit tunnel/API credentials. Text that cannot fit `max_command_seconds` is rejected before injection. Do not use this tool for secrets. If Windows foreground/UIPI rules block delivery, treat the action as failed and do not retry automatically when partial input is possible.
 
-`desktop.use_credential` accepts only a current HWND plus opaque `credential_id`. The engine resolves the fixed app/executable-path/SHA-256/target strategy/Credential Manager target from protected local policy, reauthorizes the real app and exact process image, optionally focuses only the fixed semantic selector, repeats process/PID/image verification, then starts `scripts/desktop/windows_credential_input_helper.ps1`. The helper verifies HWND/PID and foreground state plus focused UIA password semantics before `CredReadW`. With `@unique-password`, it finds exactly one enabled/visible password descendant and focuses it locally; zero/multiple matches fail. It verifies the same PID/focus/foreground before each delivered code unit and frees the credential buffer. The credential value is not accepted or returned by MCP/Python and is not written to argv/environment/audit. If partial input may have happened, treat the result as failed and do not retry automatically.
+`desktop.use_credential` accepts only a current HWND plus opaque `credential_id`. The engine resolves the fixed app/executable-path/SHA-256/target strategy/Credential Manager target from protected local policy, reauthorizes the real app and exact process image, optionally focuses only the fixed semantic selector, repeats process/PID/image verification, then starts the fixed credential helper owned by the independent Windows MCP runtime. The helper verifies HWND/PID and foreground state plus focused UIA password semantics before `CredReadW`. With `@unique-password`, it finds exactly one enabled/visible password descendant and focuses it locally; zero/multiple matches fail. It verifies the same PID/focus/foreground before each delivered code unit and frees the credential buffer. The credential value is not accepted or returned by MCP/Python and is not written to argv/environment/audit. If partial input may have happened, treat the result as failed and do not retry automatically.
 
 `desktop.key_press` accepts bounded key grammar and remains on WinApp. Raw virtual-key syntax and text-escape grammar are rejected at the MCP boundary. For WinApp CLI 0.6.0 compatibility in Scheduled Task sessions, already-validated `a-z`/`0-9` modifier-chord main keys are mapped internally to the equivalent explicit virtual key (for example `ctrl+s` -> `ctrl+vk=0x53`) before invoking WinApp; callers still cannot submit arbitrary `vk=` values. System/shell-reserved combinations require explicit local `allow_system_keys=true`; Windows/WinApp hard blocks still apply.
 
@@ -258,7 +256,7 @@ Use the reviewed tunnel-client v0.0.11 transport pattern and a separate profile 
 The stdio command is equivalent to:
 
 ```text
-<PYTHON_EXE> -B D:/HooshiXContext/repo/scripts/desktop/mcp_server.py --policy C:/ProgramData/HooshiX/desktop/policy.json
+<PYTHON_EXE> -B D:/Projects/HooshiXMcpRuntime/scripts/desktop/mcp_server.py --policy C:/ProgramData/HooshiX/desktop/policy.json
 ```
 
 Keep control-plane key as protected reference, local health/admin on `127.0.0.1`, and do not put a literal key in the profile/argv.

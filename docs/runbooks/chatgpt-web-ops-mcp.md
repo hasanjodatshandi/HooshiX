@@ -19,7 +19,7 @@ The existing Context MCP/tunnel remains separate and unchanged.
 ChatGPT Web
 -> dedicated OpenAI Secure MCP Tunnel
 -> dedicated tunnel-client profile on Windows
--> scripts/ops/mcp_server.py over stdio
+-> independent Windows Ops MCP runtime over stdio
 -> local Ops policy
 -> filesystem/process capabilities allowed by policy
 -> Windows token of the tunnel/MCP process
@@ -29,28 +29,29 @@ The Tunnel does not create Windows administrator privilege. An elevated Task Sch
 
 Do not:
 
-- add Ops tools to `scripts/context/mcp_server.py`;
+- add Ops tools to the read-only Context MCP surface;
 - reuse the Context tunnel as the Ops authority boundary;
 - expose the Ops server on a public HTTP/SSE/TCP port;
 - put the real tunnel API key in Git, the policy file, argv, logs, screenshots, or ChatGPT;
 - configure production root/cluster-admin/database-superuser/break-glass credentials for this developer-host MCP;
 - describe the local Ops audit file as authoritative production audit.
 
-## 2. Repository verification
+## 2. Runtime and project verification
 
-Before host setup:
+Ops source/tests belong to the independent Windows runtime. HooshiX project authority belongs to WSL. Before host setup:
 
 ```powershell
-Set-Location D:\HooshiXContext\repo
+Set-Location D:\Projects\HooshiXMcpRuntime
 python -B -m unittest discover -s .\scripts\ops\tests -p "test_*.py" -v
-python -B .\scripts\context\context_engine.py verify
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec python3 scripts/context/context_engine.py verify
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec git status --short
 ```
 
-The Context MCP tests must also remain green because Ops must not change its five-tool read-only surface.
+Do not use Windows Git against the WSL checkout. Ops must not change the five-tool read-only Context contract.
 
 ## 3. Create the local policy outside Git
 
-Copy the repository example to a protected local location. Do not modify the tracked example with real machine secrets or unrestricted user-specific state.
+Copy the independent MCP runtime example to a protected local location. Do not modify the tracked example with real machine secrets or unrestricted user-specific state.
 
 Example location:
 
@@ -61,7 +62,7 @@ C:\ProgramData\HooshiX\ops\policy.json
 Start from:
 
 ```text
-ops/policy.example.json
+D:\Projects\HooshiXMcpRuntime\ops\policy.example.json
 ```
 
 Replace every placeholder with an actual absolute local path.
@@ -75,7 +76,7 @@ For the first non-elevated validation, use:
 "allow_elevated_process_execution": false
 ```
 
-`allowed_roots` should initially contain only the repository/work directories needed for the test. `denied_roots` should include local credential stores such as the tunnel secret directory and SSH key directory.
+`allowed_roots` should contain only Windows host work roots needed by Ops. The old Windows HooshiX checkout is not an allowed application project root. Run HooshiX Git/build/test commands through the explicit `wsl.exe` alias in `/home/coder/workspace/Hooshix`. `denied_roots` should include local credential stores such as the tunnel secret directory and SSH key directory.
 
 Command aliases must map to exact absolute executable paths. The server does not search a caller-provided executable name through `PATH`.
 
@@ -103,7 +104,7 @@ Set the policy path only for the test process:
 
 ```powershell
 $env:HOOSHIX_OPS_POLICY = 'C:\ProgramData\HooshiX\ops\policy.json'
-python -B D:\HooshiXContext\repo\scripts\ops\mcp_server.py
+python -B D:\Projects\HooshiXMcpRuntime\scripts\ops\mcp_server.py
 ```
 
 This is a stdio server. An interactive terminal does not provide an MCP client, so normal use is through the tunnel or an MCP inspector.
@@ -140,7 +141,7 @@ Create a separate stdio profile. Example shape:
   --sample sample_mcp_stdio_local `
   --profile hooshix-ops `
   --tunnel-id <OPS_TUNNEL_ID> `
-  --mcp-command "<PYTHON_EXE> -B D:/HooshiXContext/repo/scripts/ops/mcp_server.py --policy C:/ProgramData/HooshiX/ops/policy.json"
+  --mcp-command "<PYTHON_EXE> -B D:/Projects/HooshiXMcpRuntime/scripts/ops/mcp_server.py --policy C:/ProgramData/HooshiX/ops/policy.json"
 ```
 
 Use the quoting form required by the installed `tunnel-client` help when local paths contain spaces.

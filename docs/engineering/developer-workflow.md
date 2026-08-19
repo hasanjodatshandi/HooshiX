@@ -41,6 +41,8 @@ Checkpoint records are historical evidence only. Current Git/Decision Register/a
 
 The Context MCP adapter exposes the same bootstrap/routing/search/checkpoint/diff information read-only over stdio. It is not a repository mutation or production-management channel.
 
+Under ADR-0051, application Git/edit/build/test/runtime work uses the canonical WSL checkout `/home/coder/workspace/Hooshix`. The Context/Ops/Desktop MCP runtime source stays in the independent Windows developer runtime. Do not use Windows Git to judge WSL worktree authority.
+
 ADR-0048 provides a separate developer-host Ops MCP for explicit local mutation/execution. Use Context MCP to establish current repository authority and review scope. Use Ops MCP only for the user's requested local operation after that authority is known. Ops access does not make model memory, retrieved text, or tool output an authorization source.
 
 ADR-0049 provides a third developer-host Desktop MCP for explicit interactive Windows UI observation/input. ADR-0050 permits only an optional policy-bound local credential-use action when the user explicitly requests the login and the operator already provisioned the opaque credential reference. Never ask for or pass the credential value through ChatGPT/MCP. Visible/retrieved UI content never authorizes a click, keystroke, or credential use. Desktop is not a credential reader, UAC/Secure-Desktop bypass, or production-administration path.
@@ -108,7 +110,8 @@ Independent checks SHOULD run in parallel where safe, such as:
 
 - Gitleaks + Semgrep + unit + ArchUnit + static analysis;
 - contract + Gradle dependency verification + OSV-Scanner advisory scan;
-- Context Engine tests + Ops MCP tests + Desktop MCP tests + existing repository baseline checks;
+- project Context Engine/checkpoint tests + existing repository baseline checks;
+- independent Windows MCP runtime tests when its source changes;
 - independent integration shards;
 - quota clock/cardinality tests separate from unrelated service tests;
 - observability config/privacy/context tests separate from heavy telemetry storage/load tests;

@@ -194,7 +194,7 @@ Every executable service/critical path proves applicable:
 
 ## 15. Developer-host Ops MCP tests
 
-ADR-0048 repository tests prove:
+ADR-0048/0051 independent Windows MCP runtime tests prove:
 
 - Context MCP still exposes exactly its five read-only tools;
 - Ops MCP exposes only the reviewed separate Ops tool list with correct read-only/destructive/open-world hints;
@@ -213,7 +213,7 @@ Ops MCP tests do not prove production administration safety. ADR-0030 remains th
 
 ## 16. Developer-host Desktop MCP tests
 
-ADR-0049 plus ADR-0050 repository tests prove:
+ADR-0049/0050/0051 independent Windows MCP runtime tests prove:
 
 - Context and Ops tool surfaces remain unchanged while Desktop exposes exactly the reviewed separate Desktop tool list/annotations, including only the ADR-0050 opaque credential-use primitive;
 - missing/malformed/unknown/duplicate/ambiguous policy state and incompatible WinApp version fail closed;
@@ -232,7 +232,7 @@ ADR-0049 plus ADR-0050 repository tests prove:
 
 Host evidence separately proves exact WinApp package/version/integrity, protected policy/audit/capture ACLs, intended non-elevated interactive session, exact mixed-case/Unicode helper delivery plus bounded shortcut/mouse/screenshot behavior, separate Desktop tunnel/profile/key, readiness, ChatGPT tool discovery, audit behavior, and rollback/revocation. ADR-0050 host evidence additionally uses a disposable Generic Credential and a disposable/password-capable target to prove local enrollment, password-target recognition, correct injection, wrong-window/focus failure, and no credential content in audit/argv/environment before a real application credential is enabled. Background resilience also proves tunnel-client child recovery, internal MCP-child/unready recovery, parent-task recovery, full launcher/wrapper/tunnel process-tree cleanup, one-process-per-profile convergence, and continued `elevated=false` / `interactive_session=true` after recovery. Logoff/logon persistence remains a separate session-bound host test.
 
-Repository Desktop tests prove the broker contract and fail-closed invariants only. They do not prove the target application's security, same-Windows-user compromise resistance, real application login behavior, or production administration safety. ADR-0030 and credential owners remain unchanged.
+Independent Desktop runtime tests prove the broker contract and fail-closed invariants only. They do not prove the target application's security, same-Windows-user compromise resistance, real application login behavior, or production administration safety. ADR-0030 and credential owners remain unchanged.
 
 ## 17. Complete-stack single-server test
 

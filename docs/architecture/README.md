@@ -37,6 +37,7 @@ Executable vertical slices must preserve these current architecture requirements
 - ADR-0046: Git-native verified agent bootstrap, conservative task routing, commit-bound historical checkpoints, bounded local retrieval, and read-only stdio MCP; no central cross-project memory service without a later evidence trigger;
 - ADR-0047: separate approved Secure MCP Tunnel bridge for ChatGPT Web access to the unchanged read-only Context MCP;
 - ADR-0048: separate policy-gated developer-host Ops MCP for explicit local mutation/execution; no production administration authority and no change to Context MCP;
+- ADR-0051: WSL-native HooshiX application workspace at `/home/coder/workspace/Hooshix`; Context/Ops/Desktop MCP runtime source is independently versioned on Windows and stays outside the application repository;
 - ADR-0017/build gates: Kyverno new production policies use stable CEL-based `policies.kyverno.io/v1` APIs;
 - stable merged ADR identifiers and coherent-change PR governance.
 

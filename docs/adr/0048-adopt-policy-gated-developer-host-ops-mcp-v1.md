@@ -56,7 +56,7 @@ A future request to make an AI-operated MCP a production administration authorit
 
 The Ops server does not start without an explicit local UTF-8 JSON policy supplied through `--policy` or `HOOSHIX_OPS_POLICY`.
 
-The policy is stored outside Git for the real operator host. The repository contains only its schema and a non-secret example.
+The policy is stored outside Git for the real operator host. Under ADR-0051, the independent Windows MCP runtime owns its schema, non-secret example, implementation, and runtime tests; HooshiX does not carry those runtime artifacts.
 
 Policy defines:
 
@@ -168,23 +168,15 @@ Ops MCP has no credential-read tool. Tunnel credentials remain outside Git. Chil
 
 Because explicitly configured broad local interpreters can exercise the Windows account's own permissions, the operator must treat enabling such aliases as broad host authority. Transport isolation alone cannot make an administrator interpreter safe against a compromised host or malicious command.
 
-## Initial repository implementation
+## Runtime ownership
 
-Repository v1 contains:
-
-- `scripts/ops/ops_engine.py`;
-- `scripts/ops/mcp_server.py`;
-- `scripts/ops/tests/`;
-- `ops/policy.schema.json`;
-- `ops/policy.example.json`;
-- `docs/runbooks/chatgpt-web-ops-mcp.md`;
-- repository-baseline integration for Ops tests.
+ADR-0051 moves Ops implementation, policy schema/example, and runtime tests to the independently versioned Windows MCP runtime. HooshiX keeps this ADR, the operator runbook, architecture/security contracts, and a repository guard that rejects reintroduction of the external runtime paths.
 
 Typed Windows service/package/registry/task wrappers may be added later if they reduce use of general PowerShell execution. They do not need a new ADR when they remain inside this developer-host trust boundary and preserve the same policy/audit/fail-closed semantics. A material expansion of trust, production authority, credential access, network exposure, or autonomous operation requires a new decision.
 
 ## Verification requirements
 
-Repository verification requires at least:
+Independent Windows MCP runtime verification requires at least:
 
 - Context MCP exact five-tool read-only tests still pass unchanged;
 - Ops tool list contains only the reviewed Ops tools;
@@ -204,9 +196,9 @@ Repository verification requires at least:
 - MCP output remains explicit UTF-8 bytes even when the surrounding text stdout encoding is CP1252;
 - MCP startup is independent of caller working directory;
 - missing policy fails startup;
-- repository baseline and task-matrix generation remain green.
+HooshiX repository baseline and task-matrix generation must also remain green and must preserve the ADR-0051 external-runtime boundary.
 
-Host integration evidence is separate from repository evidence. Real Windows proof must verify the intended policy ACL, process elevation state, separate tunnel credential/profile, local tunnel readiness, ChatGPT discovery, `ops.status`, one bounded read/write test, one bounded process test, audit output, background restart behavior, and removal/revocation behavior.
+Host integration evidence is separate from HooshiX repository evidence and from independent MCP runtime unit/security evidence. Real Windows proof must verify the intended policy ACL, process elevation state, separate tunnel credential/profile, local tunnel readiness, ChatGPT discovery, `ops.status`, one bounded read/write test, one bounded process test, audit output, background restart behavior, and removal/revocation behavior.
 
 ## Rollback
 

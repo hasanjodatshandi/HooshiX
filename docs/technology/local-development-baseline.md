@@ -1,8 +1,8 @@
 # Local Development Baseline
 
-- **Baseline date:** 2026-08-18
+- **Baseline date:** 2026-08-19
 - **Status:** Active local-development baseline
-- **Scope:** developer host/tooling, fast service loop, optional production-fidelity kind integration foundation, approved ChatGPT Web Context Engine bridge, and separate ADR-0048 developer-host Ops MCP.
+- **Scope:** WSL-native HooshiX application engineering, Windows-hosted independent Context/Ops/Desktop MCP tooling, fast service loop, and optional production-fidelity kind integration foundation.
 - **Evidence rule:** a pin is a repository target, not proof it is installed.
 
 Production Technology Baseline remains authoritative for production versions.
@@ -11,8 +11,8 @@ Production Technology Baseline remains authoritative for production versions.
 
 | Component | Version/policy |
 | --- | --- |
-| Host OS | Windows 11 Pro primary target |
-| Linux environment | Ubuntu 26.04 LTS on WSL2 |
+| Host OS | Windows 11 Pro host for WSL2 and Windows-only MCP/UI tooling |
+| Application execution OS | Ubuntu 26.04 LTS on WSL2; canonical checkout `/home/coder/workspace/Hooshix` on native Linux filesystem |
 | Architecture | `linux/amd64` primary local target |
 | Java | Eclipse Temurin 25.0.4 LTS |
 | Git | 2.55.0 |
@@ -25,9 +25,9 @@ Production Technology Baseline remains authoritative for production versions.
 | Secret scanner | Gitleaks CLI 8.30.0; reviewed fallback from defective 8.30.1; same rule/config intent and positive-control requirement as CI |
 | Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
-| HooshiX developer-host Ops MCP | Python standard-library stdio server under ADR-0048; mandatory local policy, separate tunnel/profile/key, no production authority |
+| HooshiX developer-host Ops MCP | independent Windows runtime under ADR-0048/0051; mandatory local policy, separate tunnel/profile/key, WSL bridge for project commands, no production authority |
 | Microsoft WinApp CLI | 0.6.0; WinGet `Microsoft.WinAppCli`; developer-only ADR-0049 Desktop MCP dependency; reviewed x64 MSIX SHA-256 `dc5d323f6d1601ef3342420746f0163651176f4cc183690f0354546a36648eec`; public-preview upgrades require review |
-| HooshiX developer-host Desktop MCP | Python standard-library stdio server under ADR-0049/0050 plus fixed Windows PowerShell 5.1/C# helpers for literal Unicode text and optional Windows Credential Manager Generic-Credential use-without-disclosure; interactive non-elevated Windows session by default; separate policy/tunnel/profile/key; no production authority |
+| HooshiX developer-host Desktop MCP | independent Windows runtime under ADR-0049/0050/0051 with fixed Windows helpers; interactive non-elevated session by default; separate policy/tunnel/profile/key; no production authority |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 
@@ -204,31 +204,14 @@ make verify-local-traefik-edge
 make verify-local-observability
 ```
 
-Context Engine developer interfaces additionally include:
+Context Engine repository interfaces additionally include:
 
 ```text
 make context-verify
 make context-bootstrap
-python scripts/context/mcp_server.py
 ```
 
-Developer-host Ops interfaces additionally include:
-
-```text
-make ops-test
-python scripts/ops/mcp_server.py --policy <ABSOLUTE_LOCAL_POLICY_PATH>
-```
-
-Real Ops policy stays outside Git. Elevated local operation requires explicit policy opt-in and an actually elevated Windows process token.
-
-Developer-host Desktop interfaces additionally include:
-
-```text
-make desktop-test
-python scripts/desktop/mcp_server.py --policy <ABSOLUTE_LOCAL_POLICY_PATH>
-```
-
-Real Desktop policy/audit/capture state stays outside Git. ADR-0050 credential values also stay outside Git, policy, ChatGPT, MCP arguments/results, Python, argv, environment, and audit; the operator provisions Generic Credentials through a trusted local Windows path. The Desktop runtime uses the reviewed WinApp CLI pin, requires the intended interactive Windows session/token, opts out of WinApp CLI telemetry for child invocations, and does not create production authority.
+Context/Ops/Desktop MCP adapter/runtime tests execute from the independent Windows MCP runtime, not from HooshiX. Project commands issued through Ops use the explicit WSL bridge and `/home/coder/workspace/Hooshix`. Real MCP policies, audit/capture state, tunnel keys, and ADR-0050 credential values stay outside Git.
 
 ChatGPT Web tunnel operation follows `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`; tunnel-client does not replace repository verification commands.
 
@@ -251,11 +234,11 @@ Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/H
 
 DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and pass/fail status without emitting discovered secret content. Release verification separately reports Syft/Grype/Cosign/Kyverno evidence when that boundary is active.
 
-For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, ChatGPT Plugin discovery, and ChatGPT Web `project.bootstrap` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
+For ADR-0046/0051, HooshiX repository evidence verifies the project Context Engine and the external-runtime path guard. Independent runtime tests verify the Context adapter protocol surface. Host evidence verifies tunnel-client, restricted credentials, readiness, and live Context calls against the canonical WSL checkout.
 
-For ADR-0048, repository evidence verifies policy parsing, filesystem/process boundaries, child-environment credential exclusion, bounded audit/output/time, and UTF-8 stdio behavior. Real protected policy/secret ACLs, separate Ops tunnel/profile/key, Windows elevation state, background startup, ChatGPT tool discovery, `ops.status`, and real local mutation/execution remain host/integration evidence until executed on the operator PC.
+For ADR-0048/0051, the independent Windows MCP runtime verifies Ops policy/process/filesystem/audit contracts. Host evidence verifies protected policy/key ACLs, separate tunnel state, Windows token state, `ops.status`, and WSL project-command execution.
 
-For ADR-0049/0050, repository evidence verifies Desktop policy/app/HWND/input/capture boundaries plus the secret-free broker schema, exact executable-path/SHA-256/PID binding, semantic or exactly-one `@unique-password` targeting, fixed credential-helper protocol, no credential value/length output, and audit redaction. Operator-PC negative smoke has verified the real EOrgsetad process image/password target reaches `CredReadW` and fails safely when the configured Generic Credential is absent. Actual credential enrollment/injection/login remains host/integration evidence until the operator provisions the local credential through a trusted Windows path.
+For ADR-0049/0050/0051, the independent Windows MCP runtime verifies Desktop policy/app/HWND/input/capture/credential-broker contracts. Host evidence verifies the actual interactive session, WinApp integration, tunnel state, and application-specific credential-use behavior.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 
