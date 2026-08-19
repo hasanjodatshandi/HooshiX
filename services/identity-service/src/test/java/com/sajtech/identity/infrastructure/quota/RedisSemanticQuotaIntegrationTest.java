@@ -3,6 +3,8 @@ package com.sajtech.identity.infrastructure.quota;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sajtech.identity.application.authentication.AuthenticationError;
+import com.sajtech.identity.application.authentication.AuthenticationException;
 import com.sajtech.identity.application.registration.RegistrationError;
 import com.sajtech.identity.application.registration.RegistrationException;
 import com.sajtech.identity.application.registration.model.QuotaOperation;
@@ -185,6 +187,112 @@ class RedisSemanticQuotaIntegrationTest {
           .isInstanceOf(RegistrationException.class)
           .extracting(error -> ((RegistrationException) error).error())
           .isEqualTo(RegistrationError.QUOTA_CAPACITY_UNHEALTHY);
+    }
+  }
+
+  @Test
+  void loginExactIpIsHardWhileAggregatePressureAloneDoesNotReject() throws Exception {
+    Clock clock = Clock.systemUTC();
+    byte[] exact = new byte[] {(byte) 192, 0, 2, 88};
+    try (LoginQuotaFixture fixture = loginQuotaFixture(clock, 1000, 1000)) {
+      fixture.quota().checkSource(exact);
+      QuotaKeyEncoder.LoginSourceKeys encoded = fixture.encoder().encodeLoginSource(exact);
+      RedisClient client = RedisClient.create(redisUri());
+      try (StatefulRedisConnection<String, String> connection = client.connect()) {
+        connection
+            .sync()
+            .hset(
+                encoded.exactIpKey(),
+                java.util.Map.of(
+                    "tokens", "0", "last_ms", Long.toString(clock.millis() + 60_000L)));
+      } finally {
+        client.shutdown();
+      }
+      assertThatThrownBy(() -> fixture.quota().checkSource(exact))
+          .isInstanceOf(AuthenticationException.class)
+          .extracting(error -> ((AuthenticationException) error).error())
+          .isEqualTo(AuthenticationError.QUOTA_EXCEEDED);
+
+      RedisClient secondClient = RedisClient.create(redisUri());
+      try (StatefulRedisConnection<String, String> connection = secondClient.connect()) {
+        connection
+            .sync()
+            .hset(
+                encoded.exactIpKey(),
+                java.util.Map.of("tokens", "120000000", "last_ms", Long.toString(clock.millis())));
+        connection
+            .sync()
+            .hset(
+                encoded.aggregateNetworkKey(),
+                java.util.Map.of(
+                    "tokens", "0", "last_ms", Long.toString(clock.millis() + 60_000L)));
+      } finally {
+        secondClient.shutdown();
+      }
+      fixture.quota().checkSource(exact);
+    }
+  }
+
+  @Test
+  void loginFailureSubjectPressureIsPostProofAndSuccessfulProofResetRemovesIt() throws Exception {
+    CanonicalContact contact = email("login@example.com");
+    try (LoginQuotaFixture fixture = loginQuotaFixture(Clock.systemUTC(), 1000, 1000)) {
+      for (int i = 0; i < 8; i++) fixture.quota().recordFailure(contact);
+      assertThatThrownBy(() -> fixture.quota().recordFailure(contact))
+          .isInstanceOf(AuthenticationException.class)
+          .extracting(error -> ((AuthenticationException) error).error())
+          .isEqualTo(AuthenticationError.QUOTA_EXCEEDED);
+      String subjectKey = fixture.encoder().encodeLoginSubject(contact);
+      RedisClient client = RedisClient.create(redisUri());
+      try (StatefulRedisConnection<String, String> connection = client.connect()) {
+        assertThat(connection.sync().ttl(subjectKey)).isEqualTo(-1L);
+      } finally {
+        client.shutdown();
+      }
+
+      fixture.quota().recordSuccess(contact);
+      fixture.quota().recordFailure(contact);
+    }
+  }
+
+  @Test
+  void loginRedisClockSkewFailsClosedAsAvailabilityNotQuotaDenial() throws Exception {
+    Clock staleClock = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
+    try (LoginQuotaFixture fixture = loginQuotaFixture(staleClock, 100, 100)) {
+      assertThatThrownBy(() -> fixture.quota().checkSource(new byte[] {(byte) 203, 0, 113, 99}))
+          .isInstanceOf(AuthenticationException.class)
+          .extracting(error -> ((AuthenticationException) error).error())
+          .isEqualTo(AuthenticationError.QUOTA_TIME_SOURCE_UNHEALTHY);
+    }
+  }
+
+  private LoginQuotaFixture loginQuotaFixture(Clock clock, int maxActive, int maxNewPerMinute)
+      throws Exception {
+    Path keyRing = temp.resolve("login-quota-" + System.nanoTime() + ".properties");
+    byte[] key = new byte[32];
+    Arrays.fill(key, (byte) 9);
+    Files.writeString(
+        keyRing, "active_key_id=v1\nkey.v1=" + Base64.getEncoder().encodeToString(key) + "\n");
+    FileBackedKeyRing ring =
+        new FileBackedKeyRing(keyRing, "HmacSHA256", 32, clock, Duration.ofHours(1));
+    QuotaKeyEncoder encoder = new QuotaKeyEncoder(ring);
+    RedisLoginQuota quota =
+        new RedisLoginQuota(
+            redisUri(),
+            encoder,
+            new ClockSafetyGuard(clock),
+            () -> true,
+            maxActive,
+            maxNewPerMinute,
+            30);
+    return new LoginQuotaFixture(quota, encoder);
+  }
+
+  private record LoginQuotaFixture(RedisLoginQuota quota, QuotaKeyEncoder encoder)
+      implements AutoCloseable {
+    @Override
+    public void close() {
+      quota.close();
     }
   }
 

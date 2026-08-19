@@ -1,10 +1,16 @@
 package com.sajtech.identity.infrastructure.runtime.grpc;
 
-import io.grpc.*;
+import io.grpc.BindableService;
+import io.grpc.Server;
+import io.grpc.ServerInterceptor;
+import io.grpc.ServerInterceptors;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -20,26 +26,39 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
   public GrpcServerLifecycle(
       int port,
       int maxConcurrentCallsPerConnection,
-      BindableService service,
+      boolean enabled,
+      List<BindableService> services,
       ServerInterceptor interceptor) {
-    if (port <= 0 || port > 65535 || maxConcurrentCallsPerConnection <= 0)
+    if (port <= 0 || port > 65535 || maxConcurrentCallsPerConnection <= 0) {
       throw new IllegalArgumentException("Identity gRPC configuration is invalid");
-    Objects.requireNonNull(service);
+    }
+    Objects.requireNonNull(services);
     Objects.requireNonNull(interceptor);
+    if (!enabled) {
+      server = null;
+      executor = null;
+      return;
+    }
+    if (services.isEmpty()) {
+      throw new IllegalArgumentException("Enabled Identity gRPC runtime has no service");
+    }
     executor = Executors.newVirtualThreadPerTaskExecutor();
-    server =
+    NettyServerBuilder builder =
         NettyServerBuilder.forPort(port)
             .executor(executor)
             .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
             .maxInboundMessageSize(MAX_INBOUND_MESSAGE_BYTES)
-            .maxInboundMetadataSize(MAX_INBOUND_METADATA_BYTES)
-            .addService(ServerInterceptors.intercept(service, interceptor))
-            .build();
+            .maxInboundMetadataSize(MAX_INBOUND_METADATA_BYTES);
+    for (BindableService service : services) {
+      builder.addService(
+          ServerInterceptors.intercept(Objects.requireNonNull(service), interceptor));
+    }
+    server = builder.build();
   }
 
   @Override
   public synchronized void start() {
-    if (running) return;
+    if (server == null || running) return;
     try {
       server.start();
       running = true;
@@ -55,7 +74,7 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
 
   @Override
   public synchronized void stop() {
-    if (!running) return;
+    if (server == null || !running) return;
     server.shutdown();
     boolean interrupted = false;
     try {

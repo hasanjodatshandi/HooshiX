@@ -214,6 +214,47 @@ edges:
       - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
       - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
 
+  - operation_id: web-bff.identity-local-password-authentication
+    caller_owner: Web BFF
+    dependency_id: identity.AuthenticateLocal
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "login unavailable; fail closed; no alternate credential acceptance"
+    retry_owner: none
+    fallback: none
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/web-bff.md
+
+  - operation_id: web-bff.identity-session-refresh
+    caller_owner: Web BFF
+    dependency_id: identity.RefreshSession
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "session refresh unavailable; fail closed; no browser reconstruction"
+    retry_owner: none
+    fallback: none
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/web-bff.md
+
+  - operation_id: web-bff.identity-session-revocation
+    caller_owner: Web BFF
+    dependency_id: identity.LogoutCurrentOrAll
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "Identity revocation outcome unavailable; BFF may discard its browser session but must not claim global family revocation"
+    retry_owner: none
+    fallback: none
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/web-bff.md
   - operation_id: web-bff.identity-audience-token-broker
     caller_owner: Web BFF
     dependency_id: identity.IssueAudienceAccessToken

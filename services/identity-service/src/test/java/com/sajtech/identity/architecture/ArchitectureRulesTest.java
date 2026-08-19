@@ -20,7 +20,7 @@ class ArchitectureRulesTest {
         .resideInAPackage("..domain..")
         .should()
         .dependOnClassesThat()
-        .resideOutsideOfPackages("java..", "..domain..")
+        .resideOutsideOfPackages("java..", "com.sajtech.identity..domain..")
         .check(classes);
   }
 
@@ -32,9 +32,9 @@ class ArchitectureRulesTest {
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage(
-            "..infrastructure..",
-            "..interfaces..",
-            "..configuration..",
+            "com.sajtech.identity..infrastructure..",
+            "com.sajtech.identity..interfaces..",
+            "com.sajtech.identity..configuration..",
             "org.springframework..",
             "org.jooq..",
             "io.grpc..",
@@ -47,10 +47,11 @@ class ArchitectureRulesTest {
   void interfacesDependOnlyInward() {
     noClasses()
         .that()
-        .resideInAPackage("..interfaces..")
+        .resideInAPackage("com.sajtech.identity..interfaces..")
         .should()
         .dependOnClassesThat()
-        .resideInAnyPackage("..infrastructure..", "..configuration..")
+        .resideInAnyPackage(
+            "com.sajtech.identity..infrastructure..", "com.sajtech.identity..configuration..")
         .check(classes);
   }
 
@@ -58,10 +59,10 @@ class ArchitectureRulesTest {
   void infrastructureDoesNotDependOnInterfaces() {
     noClasses()
         .that()
-        .resideInAPackage("..infrastructure..")
+        .resideInAPackage("com.sajtech.identity..infrastructure..")
         .should()
         .dependOnClassesThat()
-        .resideInAPackage("..interfaces..")
+        .resideInAPackage("com.sajtech.identity..interfaces..")
         .check(classes);
   }
 }

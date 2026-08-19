@@ -1,5 +1,6 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import com.sajtech.identity.application.authentication.port.out.AuthenticationStore;
 import com.sajtech.identity.application.notification.port.out.NotificationOutboxStore;
 import com.sajtech.identity.application.registration.port.out.RegistrationStore;
 import java.time.Clock;
@@ -17,9 +18,11 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   private static final int BATCH = 128;
   private static final Duration INTERVAL = Duration.ofMinutes(1);
   private static final Duration DEDUP_RETENTION = Duration.ofDays(35);
+  private static final Duration SESSION_REUSE_EVIDENCE_RETENTION = Duration.ofDays(35);
 
   private final NotificationOutboxStore outboxStore;
   private final RegistrationStore registrationStore;
+  private final AuthenticationStore authenticationStore;
   private final Clock clock;
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(
@@ -27,17 +30,19 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   private volatile boolean running;
 
   public IdentityRetentionWorker(
-      NotificationOutboxStore outboxStore, RegistrationStore registrationStore, Clock clock) {
+      NotificationOutboxStore outboxStore,
+      RegistrationStore registrationStore,
+      AuthenticationStore authenticationStore,
+      Clock clock) {
     this.outboxStore = outboxStore;
     this.registrationStore = registrationStore;
+    this.authenticationStore = authenticationStore;
     this.clock = clock;
   }
 
   @Override
   public synchronized void start() {
-    if (running) {
-      return;
-    }
+    if (running) return;
     running = true;
     schedule(Duration.ZERO);
   }
@@ -54,9 +59,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   }
 
   private void schedule(Duration delay) {
-    if (!running) {
-      return;
-    }
+    if (!running) return;
     executor.schedule(this::cycle, delay.toMillis(), TimeUnit.MILLISECONDS);
   }
 
@@ -65,6 +68,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
       Instant now = clock.instant();
       int erased = outboxStore.eraseExpiredSensitive(now, BATCH);
       registrationStore.deleteDedupBefore(now.minus(DEDUP_RETENTION), BATCH);
+      authenticationStore.deleteFamiliesBefore(now.minus(SESSION_REUSE_EVIDENCE_RETENTION), BATCH);
       if (erased > 0) {
         LOGGER
             .atWarn()

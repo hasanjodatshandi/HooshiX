@@ -1,9 +1,13 @@
 package com.sajtech.identity.configuration;
 
+import com.sajtech.identity.application.authentication.port.out.*;
+import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
+import com.sajtech.identity.application.authentication.usecase.*;
 import com.sajtech.identity.application.notification.port.out.*;
 import com.sajtech.identity.application.registration.port.out.*;
 import com.sajtech.identity.application.registration.service.*;
 import com.sajtech.identity.application.registration.usecase.*;
+import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import com.sajtech.identity.infrastructure.client.compromisedpassword.GrpcCompromisedPasswordClient;
 import com.sajtech.identity.infrastructure.client.notification.GrpcNotificationSubmissionClient;
 import com.sajtech.identity.infrastructure.observability.*;
@@ -13,22 +17,32 @@ import com.sajtech.identity.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.identity.infrastructure.security.challenge.HmacChallengeSecret;
 import com.sajtech.identity.infrastructure.security.escrow.AesGcmNotificationEscrow;
 import com.sajtech.identity.infrastructure.security.fingerprint.HmacIntentFingerprint;
+import com.sajtech.identity.infrastructure.security.jwt.FileBackedRsaSigningKeyRing;
+import com.sajtech.identity.infrastructure.security.jwt.RsaJwtAccessTokenSigner;
 import com.sajtech.identity.infrastructure.security.keyring.FileBackedKeyRing;
 import com.sajtech.identity.infrastructure.security.password.Argon2idPasswordHasher;
+import com.sajtech.identity.infrastructure.security.session.HmacSessionCredential;
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
+import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
+import io.grpc.BindableService;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
+import java.util.List;
+import java.util.Optional;
 import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -62,6 +76,29 @@ public class RuntimeConfiguration {
         p.quota().hmacKeyRingPath(), "HmacSHA256", 32, c, p.keyRingMaximumStaleness());
   }
 
+  @Bean("refreshKeyRing")
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  FileBackedKeyRing refreshKeyRing(IdentityProperties p, Clock c) {
+    return new FileBackedKeyRing(
+        p.refreshKeyRingPath(), "HmacSHA256", 32, c, p.keyRingMaximumStaleness());
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  FileBackedRsaSigningKeyRing jwtSigningKeyRing(IdentityProperties p, Clock c) {
+    return new FileBackedRsaSigningKeyRing(
+        p.jwt().privateKeyRingPath(),
+        p.jwt().publicVerifierBundlePath(),
+        c,
+        p.keyRingMaximumStaleness());
+  }
+
   @Bean
   IdentityKeyRingRefresher keyRingRefresher(
       @Qualifier("fingerprintKeyRing") FileBackedKeyRing a,
@@ -69,6 +106,16 @@ public class RuntimeConfiguration {
       @Qualifier("handoffKeyRing") FileBackedKeyRing c,
       @Qualifier("quotaKeyRing") FileBackedKeyRing d) {
     return new IdentityKeyRingRefresher(a, b, c, d);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityAuthenticationKeyRingRefresher authenticationKeyRingRefresher(
+      @Qualifier("refreshKeyRing") FileBackedKeyRing refresh, FileBackedRsaSigningKeyRing signing) {
+    return new IdentityAuthenticationKeyRingRefresher(refresh, signing);
   }
 
   @Bean
@@ -94,6 +141,11 @@ public class RuntimeConfiguration {
   @Bean
   RegistrationStore registrationStore(DSLContext dsl) {
     return new JooqRegistrationStore(dsl);
+  }
+
+  @Bean
+  AuthenticationStore authenticationStore(DSLContext dsl) {
+    return new JooqAuthenticationStore(dsl);
   }
 
   @Bean
@@ -150,17 +202,30 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  PasswordHashPort passwordHashCore(IdentityProperties p) {
+  Argon2idPasswordHasher passwordHashCore(IdentityProperties p) {
     return new Argon2idPasswordHasher(p.argon2MaxConcurrentHashes());
   }
 
   @Bean
   @Primary
   PasswordHashPort passwordHashObserved(
-      @Qualifier("passwordHashCore") PasswordHashPort delegate,
+      @Qualifier("passwordHashCore") Argon2idPasswordHasher delegate,
       ObservationRegistry observations,
       MeterRegistry meters) {
     return new ObservedPasswordHash(delegate, observations, meters);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  PasswordVerificationPort passwordVerificationObserved(
+      @Qualifier("passwordHashCore") Argon2idPasswordHasher delegate,
+      ObservationRegistry observations,
+      MeterRegistry meters) {
+    return new ObservedPasswordVerification(delegate, observations, meters);
   }
 
   @Bean
@@ -199,6 +264,36 @@ public class RuntimeConfiguration {
     return new ObservedSemanticQuota(delegate, observations);
   }
 
+  @Bean(destroyMethod = "close", name = "loginQuotaCore")
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  RedisLoginQuota loginQuotaCore(
+      IdentityProperties p, QuotaKeyEncoder keys, ClockSafetyGuard guard, HostTimeHealth hostTime) {
+    return new RedisLoginQuota(
+        p.quota().redisUri(),
+        keys,
+        guard,
+        hostTime,
+        p.quota().maxActiveBuckets(),
+        p.quota().maxNewBucketsPerMinute(),
+        p.quota().minimumMemoryHeadroomPercent());
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  LoginQuotaPort loginQuotaObserved(
+      @Qualifier("loginQuotaCore") RedisLoginQuota delegate,
+      ObservationRegistry observations,
+      MeterRegistry meters) {
+    return new ObservedLoginQuota(delegate, observations, meters);
+  }
+
   @Bean
   RedisQuotaCleanupWorker quotaCleanup(
       @Qualifier("semanticQuotaCore") RedisSemanticQuota quota,
@@ -206,6 +301,33 @@ public class RuntimeConfiguration {
       HostTimeHealth hostTime,
       Clock clock) {
     return new RedisQuotaCleanupWorker(quota, guard, hostTime, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  SessionCredentialPort sessionCredentials(@Qualifier("refreshKeyRing") FileBackedKeyRing keys) {
+    return new HmacSessionCredential(keys);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  AccessTokenSigner accessTokenSigner(IdentityProperties p, FileBackedRsaSigningKeyRing keys) {
+    return new RsaJwtAccessTokenSigner(p.jwt().issuer(), keys);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  RefreshCredentialLookup refreshCredentialLookup(SessionCredentialPort credentials) {
+    return new RefreshCredentialLookup(credentials);
   }
 
   @Bean
@@ -286,8 +408,112 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "registration-runtime-enabled",
+      havingValue = "true")
   IdentityRegistrationGrpcService registrationGrpc(ObservedRegistration observed) {
     return new IdentityRegistrationGrpcService(observed, observed, observed);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  AuthenticateLocalUseCase authenticateLocalCore(
+      ContactCanonicalizer contacts,
+      PasswordNormalizer passwords,
+      LoginQuotaPort quota,
+      PasswordVerificationPort verifier,
+      SessionCredentialPort credentials,
+      TransactionRunner tx,
+      AuthenticationStore store,
+      Clock clock) {
+    return new AuthenticateLocalUseCase(
+        contacts, passwords, quota, verifier, credentials, tx, store, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  RefreshSessionUseCase refreshSessionCore(
+      RefreshCredentialLookup lookup,
+      SessionCredentialPort credentials,
+      TransactionRunner tx,
+      AuthenticationStore store,
+      Clock clock) {
+    return new RefreshSessionUseCase(lookup, credentials, tx, store, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  LogoutCurrentUseCase logoutCurrentCore(
+      RefreshCredentialLookup lookup,
+      TransactionRunner tx,
+      AuthenticationStore store,
+      Clock clock) {
+    return new LogoutCurrentUseCase(lookup, tx, store, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  LogoutAllUseCase logoutAllCore(
+      RefreshCredentialLookup lookup,
+      TransactionRunner tx,
+      AuthenticationStore store,
+      Clock clock) {
+    return new LogoutAllUseCase(lookup, tx, store, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IssueAudienceAccessTokenUseCase issueAudienceAccessTokenCore(
+      IdentityProperties p,
+      RefreshCredentialLookup lookup,
+      TransactionRunner tx,
+      AuthenticationStore store,
+      Clock clock) {
+    return new IssueAudienceAccessTokenUseCase(
+        p.jwt().allowedAudiences(), lookup, tx, store, clock);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ObservedAuthentication observedAuthentication(
+      AuthenticateLocalUseCase authenticate,
+      RefreshSessionUseCase refresh,
+      LogoutCurrentUseCase logoutCurrent,
+      LogoutAllUseCase logoutAll,
+      IssueAudienceAccessTokenUseCase issueAccessToken,
+      ObservationRegistry observations,
+      MeterRegistry meters) {
+    return new ObservedAuthentication(
+        authenticate, refresh, logoutCurrent, logoutAll, issueAccessToken, observations, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityAuthenticationGrpcService authenticationGrpc(ObservedAuthentication observed) {
+    return new IdentityAuthenticationGrpcService(observed, observed, observed, observed, observed);
   }
 
   @Bean
@@ -296,16 +522,14 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  @ConditionalOnProperty(
-      prefix = "identity",
-      name = "registration-runtime-enabled",
-      havingValue = "true")
   GrpcServerLifecycle grpcLifecycle(
-      IdentityProperties p,
-      IdentityRegistrationGrpcService service,
-      SafeTracingServerInterceptor tracing) {
+      IdentityProperties p, List<BindableService> services, SafeTracingServerInterceptor tracing) {
     return new GrpcServerLifecycle(
-        p.grpcPort(), p.maxConcurrentCallsPerConnection(), service, tracing);
+        p.grpcPort(),
+        p.maxConcurrentCallsPerConnection(),
+        p.registrationRuntimeEnabled() || p.authenticationRuntimeEnabled(),
+        services,
+        tracing);
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "notificationChannel")
@@ -325,8 +549,11 @@ public class RuntimeConfiguration {
 
   @Bean
   IdentityRetentionWorker retentionWorker(
-      NotificationOutboxStore outboxStore, RegistrationStore registrationStore, Clock clock) {
-    return new IdentityRetentionWorker(outboxStore, registrationStore, clock);
+      NotificationOutboxStore outboxStore,
+      RegistrationStore registrationStore,
+      AuthenticationStore authenticationStore,
+      Clock clock) {
+    return new IdentityRetentionWorker(outboxStore, registrationStore, authenticationStore, clock);
   }
 
   @Bean
@@ -353,5 +580,18 @@ public class RuntimeConfiguration {
       @Qualifier("handoffKeyRing") FileBackedKeyRing c,
       @Qualifier("quotaKeyRing") FileBackedKeyRing d) {
     return new IdentityReadinessHealthIndicator(dsl, quota, hostTime, a, b, c, d);
+  }
+
+  @Bean("identityAuthenticationReadiness")
+  IdentityAuthenticationReadinessHealthIndicator authenticationReadiness(
+      IdentityProperties p,
+      @Qualifier("refreshKeyRing") Optional<FileBackedKeyRing> refresh,
+      Optional<FileBackedRsaSigningKeyRing> signing,
+      @Qualifier("loginQuotaCore") Optional<RedisLoginQuota> loginQuota) {
+    return new IdentityAuthenticationReadinessHealthIndicator(
+        p.authenticationRuntimeEnabled(),
+        () -> refresh.map(FileBackedKeyRing::isFresh).orElse(false),
+        () -> signing.map(FileBackedRsaSigningKeyRing::isFresh).orElse(false),
+        () -> loginQuota.map(RedisLoginQuota::connectivityHealthy).orElse(false));
   }
 }

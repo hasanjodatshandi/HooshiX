@@ -19,12 +19,12 @@ import com.sajtech.identity.application.registration.port.out.NotificationEscrow
 import com.sajtech.identity.application.registration.port.out.PasswordHashPort;
 import com.sajtech.identity.application.registration.port.out.RegistrationStore;
 import com.sajtech.identity.application.registration.port.out.SemanticQuotaPort;
-import com.sajtech.identity.application.registration.port.out.TransactionRunner;
 import com.sajtech.identity.application.registration.service.ContactCanonicalizer;
 import com.sajtech.identity.application.registration.service.FingerprintMaterialEncoder;
 import com.sajtech.identity.application.registration.service.IdempotencyGuard;
 import com.sajtech.identity.application.registration.service.PasswordNormalizer;
 import com.sajtech.identity.application.registration.service.ProfileCanonicalizer;
+import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import com.sajtech.identity.domain.registration.valueobject.CanonicalContact;
 import com.sajtech.identity.domain.registration.valueobject.RegistrationChannel;
 import com.sajtech.identity.domain.registration.valueobject.RegistrationLocale;

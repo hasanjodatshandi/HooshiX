@@ -57,4 +57,39 @@
         <Class name="com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
-</FindBugsFilter>
+    <Match>
+        <Class name="com.sajtech.identity.infrastructure.persistence.JooqAuthenticationStore"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.application.authentication.usecase.AuthenticateLocalUseCase"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.application.authentication.usecase.RefreshSessionUseCase"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.application.authentication.usecase.LogoutCurrentUseCase"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.application.authentication.usecase.LogoutAllUseCase"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.application.authentication.usecase.IssueAudienceAccessTokenUseCase"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.infrastructure.observability.ObservedAuthentication"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.infrastructure.observability.ObservedLoginQuota"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.identity.infrastructure.observability.ObservedPasswordVerification"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match></FindBugsFilter>

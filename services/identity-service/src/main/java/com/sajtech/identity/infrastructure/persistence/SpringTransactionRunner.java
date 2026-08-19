@@ -1,6 +1,6 @@
 package com.sajtech.identity.infrastructure.persistence;
 
-import com.sajtech.identity.application.registration.port.out.TransactionRunner;
+import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import java.util.function.Supplier;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;

@@ -25,7 +25,7 @@ rules:
   - id: identity-no-sensitive-log-keys
     languages: [java]
     severity: ERROR
-    message: Identity logs must not attach contact, password, verification code, request IDs, screening hashes, or secret material.
+    message: Identity logs must not attach contact, password, verification code, request/session IDs, tokens, screening hashes, or secret material.
     paths:
       include:
         - /services/identity-service/src/main/java
@@ -41,6 +41,14 @@ rules:
       - pattern: $LOG.addKeyValue("prefix", ...)
       - pattern: $LOG.addKeyValue("suffix", ...)
       - pattern: $LOG.addKeyValue("ciphertext", ...)
+      - pattern: $LOG.addKeyValue("token", ...)
+      - pattern: $LOG.addKeyValue("access_token", ...)
+      - pattern: $LOG.addKeyValue("refresh", ...)
+      - pattern: $LOG.addKeyValue("refresh_credential", ...)
+      - pattern: $LOG.addKeyValue("session", ...)
+      - pattern: $LOG.addKeyValue("session_id", ...)
+      - pattern: $LOG.addKeyValue("cookie", ...)
+      - pattern: $LOG.addKeyValue("private_key", ...)
 
   - id: identity-no-raw-observation-error
     languages: [java]

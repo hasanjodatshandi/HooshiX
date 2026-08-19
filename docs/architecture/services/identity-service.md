@@ -79,6 +79,13 @@ Current ADR-0012/0016/0023 rules remain unchanged, including:
 - recovery-code/TOTP anti-replay and current assurance-age rules.
 
 Implementation MUST NOT invent a local permission snapshot, stale authorization cache, or provider email auto-link shortcut.
+Current repository implementation of this bounded slice includes local-password `AuthenticateLocal`, rotating `RefreshSession`, current/all logout, Session/RefreshFamily persistence, and the `IssueAudienceAccessToken` contract boundary. Local-password authentication applies the ADR-0024 exact-IP hard gate before credential proof, charges the contact/subject failure bucket only after failed proof, performs an Argon2id dummy verification for an unknown Contact, and keeps Redis outside the PostgreSQL transaction.
+
+The implemented Session/RefreshFamily model uses 256-bit CSPRNG session/refresh secrets, Base64URL without padding, digest-only purpose-separated HMAC-SHA-256 refresh persistence, seven-day idle and 30-day absolute expiry, deterministic oldest-family revocation at the 20-active-family limit, rotation with predecessor retention, family-wide reuse revocation, and bounded post-expiry security-evidence cleanup. Raw refresh credentials are returned only across the internal BFF contract and never persisted or emitted to telemetry.
+
+ADR-0023 signing machinery is local RS256/RSA-3072 with an active private key mounted read-only into Identity and a bounded `current`/`next`/`previous` public verifier bundle. Candidate key snapshots are validated before atomic activation and the active private `kid` must already match the current published public key. The current implemented session mode is only `authenticated_onboarding`; therefore `IssueAudienceAccessToken` validates its exact server-owned audience allow-list and current Session/RefreshFamily state but fails closed with tenant-selection-required behavior instead of minting an ordinary tenant/resource JWT before Tenant/Membership authority exists.
+
+The authentication listener is separately gated by `IDENTITY_AUTHENTICATION_RUNTIME_ENABLED=false` by default. When disabled, authentication refresh/JWT key mounts are not required by the Helm render. This is the supported runtime rollback control for this additive slice; Flyway V2 is not downgraded. Critical authentication acceptance behavior is also covered by executable Cucumber-JVM/Gherkin scenarios for onboarding-only local authentication and refresh-predecessor reuse revocation.
 
 ## 5. Tenant/Membership lifecycle and Authorization
 
@@ -209,4 +216,4 @@ Identity implementation evidence covers, as applicable:
 - Day-One logs/metrics/traces, PII canaries, correlation, and telemetry-backend outage;
 - profile-correct container/GitOps/render/load/recovery evidence.
 
-The first executable implementation is repository-complete only when source, contracts, migrations, tests, build/dependency locks, container/deployment/security policy, **observability**, and CI gates for the implemented slice exist. Those repository artifacts and protected registration-slice CI are verified on `main@9642507`; deployed runtime, wider ADR-0012 Identity behavior, load/recovery, and production-readiness evidence remain `NOT VERIFIED`.
+The first executable implementation is repository-complete only when source, contracts, migrations, tests, build/dependency locks, container/deployment/security policy, **observability**, and CI gates for the implemented slice exist. The registration repository artifacts and protected registration-slice CI are verified on `main@9642507`. The local-password authentication/Session/RefreshFamily/JWT-signing repository slice is present in the current source; its commit-specific protected CI, deployed runtime, Tenant/Membership selection, MFA/OIDC/password-change/recovery/erasure behavior, load/recovery, signing-key rotation exercise, and production-readiness evidence remain `NOT VERIFIED` until their owning gates execute.

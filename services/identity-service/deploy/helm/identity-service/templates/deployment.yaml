@@ -16,6 +16,17 @@
 {{- $quotaKey := required "secrets.quotaKeySecretName is required" .Values.secrets.quotaKeySecretName -}}
 {{- $quotaRedis := required "quota.redis.connectionSecretName is required" .Values.quota.redis.connectionSecretName -}}
 {{- $hostTime := required "quota.hostTimeStatus.configMapName is required" .Values.quota.hostTimeStatus.configMapName -}}
+{{- $refresh := "" -}}
+{{- $jwtPrivate := "" -}}
+{{- $jwtPublic := "" -}}
+{{- if .Values.runtime.authenticationRuntimeEnabled -}}
+{{- $refresh = required "secrets.refreshSecretName is required when authentication runtime is enabled" .Values.secrets.refreshSecretName -}}
+{{- $jwtPrivate = required "secrets.jwtPrivateSecretName is required when authentication runtime is enabled" .Values.secrets.jwtPrivateSecretName -}}
+{{- $jwtPublic = required "jwt.publicVerifierConfigMapName is required when authentication runtime is enabled" .Values.jwt.publicVerifierConfigMapName -}}
+{{- if or (not .Values.jwt.issuer) (contains "*" .Values.jwt.issuer) }}{{ fail "jwt.issuer must be an exact configured issuer" }}{{ end -}}
+{{- if eq (len .Values.jwt.allowedAudiences) 0 }}{{ fail "jwt.allowedAudiences must contain at least one exact audience" }}{{ end -}}
+{{- range .Values.jwt.allowedAudiences }}{{ if or (not .) (contains "*" .) }}{{ fail "jwt.allowedAudiences must not contain blank or wildcard values" }}{{ end }}{{ end -}}
+{{- end -}}
 {{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
 {{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
 {{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
@@ -77,6 +88,11 @@ spec:
             - {name: IDENTITY_DATABASE_URL, value: {{ $jdbcUrl | quote }}}
             - {name: IDENTITY_GRPC_PORT, value: {{ .Values.service.grpcPort | quote }}}
             - {name: IDENTITY_REGISTRATION_RUNTIME_ENABLED, value: {{ .Values.runtime.registrationRuntimeEnabled | quote }}}
+            - {name: IDENTITY_AUTHENTICATION_RUNTIME_ENABLED, value: {{ .Values.runtime.authenticationRuntimeEnabled | quote }}}
+            {{- if .Values.runtime.authenticationRuntimeEnabled }}
+            - {name: IDENTITY_JWT_ISSUER, value: {{ .Values.jwt.issuer | quote }}}
+            - {name: IDENTITY_JWT_ALLOWED_AUDIENCES, value: {{ join "," .Values.jwt.allowedAudiences | quote }}}
+            {{- end }}
             - {name: IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION, value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}}
             - {name: IDENTITY_ARGON2_MAX_CONCURRENT_HASHES, value: {{ .Values.runtime.argon2MaxConcurrentHashes | quote }}}
             - {name: IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT, value: {{ .Values.runtime.compromisedPasswordMaxInFlight | quote }}}
@@ -99,6 +115,11 @@ spec:
             - {name: challenge-key, mountPath: /run/secrets/identity-challenge, readOnly: true}
             - {name: handoff-key, mountPath: /run/secrets/identity-handoff, readOnly: true}
             - {name: quota-key, mountPath: /run/secrets/identity-quota, readOnly: true}
+            {{- if .Values.runtime.authenticationRuntimeEnabled }}
+            - {name: refresh-key, mountPath: /run/secrets/identity-refresh, readOnly: true}
+            - {name: jwt-private-key, mountPath: /run/secrets/identity-jwt-private, readOnly: true}
+            - {name: jwt-public-bundle, mountPath: /run/config/identity-jwt-public, readOnly: true}
+            {{- end }}
             - {name: quota-redis, mountPath: /run/secrets/identity-quota-redis, readOnly: true}
             - {name: host-time-status, mountPath: /run/status/identity, readOnly: true}
             - {name: temporary, mountPath: /tmp}
@@ -115,6 +136,14 @@ spec:
           secret: {secretName: {{ $handoff | quote }}, defaultMode: 0440, items: [{key: handoff.properties, path: handoff.properties}]}
         - name: quota-key
           secret: {secretName: {{ $quotaKey | quote }}, defaultMode: 0440, items: [{key: quota.properties, path: quota.properties}]}
+        {{- if .Values.runtime.authenticationRuntimeEnabled }}
+        - name: refresh-key
+          secret: {secretName: {{ $refresh | quote }}, defaultMode: 0440, items: [{key: refresh.properties, path: refresh.properties}]}
+        - name: jwt-private-key
+          secret: {secretName: {{ $jwtPrivate | quote }}, defaultMode: 0440, items: [{key: signing.properties, path: signing.properties}]}
+        - name: jwt-public-bundle
+          configMap: {name: {{ $jwtPublic | quote }}, items: [{key: verifier.properties, path: verifier.properties}]}
+        {{- end }}
         - name: quota-redis
           secret: {secretName: {{ $quotaRedis | quote }}, defaultMode: 0440}
         - name: host-time-status
