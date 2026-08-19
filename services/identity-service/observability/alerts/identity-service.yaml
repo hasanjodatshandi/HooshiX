@@ -1,0 +1,39 @@
+groups:
+  - name: identity-service
+    rules:
+      - alert: IdentityRegistrationUnavailableRateHigh
+        expr: |
+          sum(rate(identity_registration_duration_seconds_count{outcome=~"DEPENDENCY_UNAVAILABLE|QUOTA_UNAVAILABLE|QUOTA_TIME_SOURCE_UNHEALTHY|QUOTA_CAPACITY_UNHEALTHY"}[5m]))
+          /
+          clamp_min(sum(rate(identity_registration_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity registration security-dependency unavailable rate is above 1%
+      - alert: IdentityRegistrationQuotaDenialSpike
+        expr: sum(rate(identity_registration_duration_seconds_count{outcome="QUOTA_EXCEEDED"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity semantic quota denial rate is elevated
+      - alert: IdentityRegistrationSaturationHigh
+        expr: identity_registration_in_flight > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity registration in-flight work is near the configured transport bound
+      - alert: IdentityPasswordHashSaturationHigh
+        expr: identity_password_hash_in_flight > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity password hashing remains continuously occupied

@@ -125,7 +125,7 @@ Gitleaks -> Semgrep/static + Gradle integrity -> OSV-Scanner dependency advisory
 
 Current selected roles:
 
-- Gitleaks 8.30.1: committed/current-tree and protected Git-history secret detection;
+- Gitleaks 8.30.0: committed/current-tree and protected Git-history secret detection;
 - Semgrep: first-party SAST/repository-owned source policy;
 - Gradle verification/locks: dependency integrity/reproducibility only;
 - OSV-Scanner 2.4.0: early declared/locked dependency advisory scanning;
@@ -134,7 +134,7 @@ Current selected roles:
 - Cosign 3.0.6: exact-digest signature, provenance, and signed SBOM attestation;
 - Kyverno 1.18.2: production admission.
 
-The current Compromised Password CI already implements OSV-Scanner 2.4.0 with an exact Linux/x64 SHA-256 and scans the Gradle lockfile. The scheduled repository security workflow reuses that service security suite, so declared/locked dependency advisory scanning also runs without a source change. This is early dependency feedback only.
+The implemented Compromised Password, Notification, and Identity service CI suites include OSV-Scanner 2.4.0 locked-dependency scanning, and the scheduled repository security workflow reuses those service security suites so declared/locked dependency advisory scanning also runs without a source change. Exact tool/checksum ownership remains in each implemented workflow. This is early dependency feedback only.
 
 Final-image vulnerability authority remains Syft+Grype because the final image can contain OS packages, JDK/runtime files, native libraries, and packaged transitive components outside the lockfile.
 
@@ -142,7 +142,7 @@ A real committed credential requires revoke/rotate handling when exposure is pla
 
 Trivy and OWASP Dependency-Check are intentionally not selected default controls because their expected default roles overlap the current OSV+Syft+Grype chain. They can be proposed later only for a distinct measured coverage gap. Repository Semgrep CLI similarly does not imply separate Semgrep Secrets/Supply Chain product enablement.
 
-This is an architecture decision, not executable evidence. Current repository implementation status is: service-specific Semgrep and OSV locked-dependency scanning exist; Gitleaks/Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
+This is an architecture decision, not executable evidence. Current repository implementation status is: service-specific Semgrep and OSV locked-dependency scanning exist for the implemented service slices; the Identity workflow also implements Gitleaks current-tree/Git-history scanning with local execution evidence. Protected-CI Gitleaks execution remains commit-specific, while Syft/Grype/Cosign release automation and production Kyverno admission remain `NOT PRESENT / NOT VERIFIED` until implemented and executed.
 
 ## Kyverno review
 
@@ -187,8 +187,8 @@ Still rejected:
 
 ## Production-readiness conclusion
 
-Architecture has moved from design into its first executable service implementation, but production readiness is **not** proven.
+Architecture has moved from design into multiple executable service slices, but production readiness is **not** proven.
 
-The repository contains repository-governance CI and the first executable Compromised Password service slice under `services/compromised-password-service/`. It also has service-specific Semgrep and OSV locked-dependency security gates. It still lacks root `deploy/` and `infrastructure/` platform implementation, other application services, production corpus/release evidence, complete ADR-0045 DevSecOps release-chain implementation, and deployed observability/platform runtime. Repository source and CI evidence are not staging/runtime/release evidence.
+The repository contains repository-governance CI plus executable Compromised Password, Notification, and Identity registration slices under their service roots. Service-specific Semgrep and OSV locked-dependency gates are present, and Identity adds the implemented Gitleaks tree/history gate. The wider Identity ADR-0012 surface and other application/platform implementation remain incomplete; root `deploy/` and `infrastructure/` production platform implementation, production corpus/release evidence, the complete ADR-0045 final-artifact release chain, and deployed observability/platform runtime are still absent or not verified as recorded in `implementation-status.md`. Repository source and local/CI evidence are not staging/runtime/release evidence.
 
 Production traffic remains blocked until applicable readiness gates have executed evidence, including Gitleaks tree/history scanning, current OSV dependency-advisory state, final-image Syft/Grype/Cosign evidence, Kyverno admission negatives, quota fault/cardinality tests, HIBP corpus build evidence, real logs/metrics/traces, independent host-loss detection, complete-stack capacity, and cold DR.
