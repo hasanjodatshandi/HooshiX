@@ -53,6 +53,24 @@
     "allow_mouse_input": {"type": "boolean"},
     "allow_keyboard_input": {"type": "boolean"},
     "allow_system_keys": {"type": "boolean"},
+    "allow_credential_input": {"type": "boolean"},
+    "credential_bindings": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": ["credential_id", "app", "executable_path", "executable_sha256", "target_selector", "credential_target"],
+        "properties": {
+          "credential_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+          "app": {"type": "string", "minLength": 1, "maxLength": 128},
+          "executable_path": {"type": "string", "minLength": 3, "maxLength": 4096},
+          "executable_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+          "target_selector": {"type": "string", "minLength": 1, "maxLength": 512},
+          "credential_target": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "additionalProperties": false
+      }
+    },
     "max_command_seconds": {"type": "integer", "minimum": 1, "maximum": 120},
     "max_output_bytes": {"type": "integer", "minimum": 4096, "maximum": 16777216},
     "max_screenshot_bytes": {"type": "integer", "minimum": 65536, "maximum": 33554432},

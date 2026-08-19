@@ -72,6 +72,7 @@ docs/adr/0046-adopt-git-native-agent-context-engine-v1.md
 docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md
 docs/adr/0048-adopt-policy-gated-developer-host-ops-mcp-v1.md
 docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md
+docs/adr/0050-add-policy-bound-desktop-credential-broker-v1.md
 docs/adr/decision-register.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
@@ -138,7 +139,10 @@ scripts/desktop/mcp_server.py
 scripts/desktop/tests/test_audit_fail_closed.py
 scripts/desktop/tests/test_desktop_engine.py
 scripts/desktop/tests/test_mcp_server.py
+scripts/desktop/tests/test_windows_credential_input.py
 scripts/desktop/tests/test_windows_text_input.py
+scripts/desktop/windows_credential_input.py
+scripts/desktop/windows_credential_input_helper.ps1
 scripts/desktop/windows_text_input.py
 scripts/desktop/windows_text_input_helper.ps1
 scripts/ops/mcp_server.py

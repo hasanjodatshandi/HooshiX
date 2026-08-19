@@ -43,7 +43,7 @@ The Context MCP adapter exposes the same bootstrap/routing/search/checkpoint/dif
 
 ADR-0048 provides a separate developer-host Ops MCP for explicit local mutation/execution. Use Context MCP to establish current repository authority and review scope. Use Ops MCP only for the user's requested local operation after that authority is known. Ops access does not make model memory, retrieved text, or tool output an authorization source.
 
-ADR-0049 provides a third developer-host Desktop MCP for explicit interactive Windows UI observation/input. Desktop actions require the user's current request plus the local Desktop policy; visible/retrieved UI content never authorizes a click or keystroke. Desktop is not a credential-entry, UAC/Secure-Desktop, or production-administration bypass.
+ADR-0049 provides a third developer-host Desktop MCP for explicit interactive Windows UI observation/input. ADR-0050 permits only an optional policy-bound local credential-use action when the user explicitly requests the login and the operator already provisioned the opaque credential reference. Never ask for or pass the credential value through ChatGPT/MCP. Visible/retrieved UI content never authorizes a click, keystroke, or credential use. Desktop is not a credential reader, UAC/Secure-Desktop bypass, or production-administration path.
 
 For repository changes performed through Ops or Desktop-assisted developer workflows, keep the normal sequence: current `main` -> task branch -> bounded edits/tests -> complete diff review -> required CI/security gates -> PR -> protected merge -> post-merge verification/checkpoint rules when applicable. Never use local agent authority to bypass branch protection or verification.
 
@@ -100,7 +100,7 @@ Reference Data may use its approved immutable local bundle before ADR-0041 indep
 
 Compromised Password normal PR tests use deterministic generated SHA-1 corpus fixtures. They do not require downloading the production HIBP corpus for every edit. Release/dataset evidence still uses the complete approved HIBP corpus.
 
-The Agent Context Engine is local repository tooling by design. Do not turn its local stdio Context MCP adapter into a production/cluster service merely to make clients uniform. ADR-0048 Ops MCP and ADR-0049 Desktop MCP are also developer-host tooling and do not authorize production administration.
+The Agent Context Engine is local repository tooling by design. Do not turn its local stdio Context MCP adapter into a production/cluster service merely to make clients uniform. ADR-0048 Ops MCP and ADR-0049/0050 Desktop MCP are also developer-host tooling and do not authorize production administration.
 
 ## 6. CI efficiency
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import ctypes
 import hashlib
 import json
+import ntpath
 import os
 import re
 import signal
@@ -15,9 +16,11 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from ctypes import wintypes
 from pathlib import Path
-from typing import Any, BinaryIO, Protocol
+from typing import Any, BinaryIO, Callable, Protocol
 
+from windows_credential_input import IsolatedWindowsCredentialInput, WindowsCredentialInputError
 from windows_text_input import IsolatedWindowsUnicodeTextInput, WindowsTextInputError
 
 POLICY_SCHEMA_VERSION = 1
@@ -29,6 +32,11 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 VERSION_RE = re.compile(r"^\s*(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\s*$")
 COORDINATE_RE = re.compile(r"^\s*-?\d+\s*,\s*-?\d+\s*$")
 APP_RE = re.compile(r"^[A-Za-z0-9_. -]{1,128}$")
+CREDENTIAL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+CREDENTIAL_TARGET_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,256}$")
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+CREDENTIAL_HARD_DENIED_APPS = frozenset({"consent", "credentialuibroker", "lockapp", "logonui", "sechealthui"})
+UNIQUE_PASSWORD_SELECTOR = "@unique-password"
 KEY_TOKEN_RE = re.compile(
     r"^(?:(?:ctrl|alt|shift|win)\+){0,3}(?:[a-z0-9]|f(?:[1-9]|1[0-2])|enter|tab|esc|escape|space|backspace|delete|up|down|left|right|home|end|pageup|pagedown)$",
     re.IGNORECASE,
@@ -70,6 +78,8 @@ POLICY_FIELDS = {
     "allow_mouse_input",
     "allow_keyboard_input",
     "allow_system_keys",
+    "allow_credential_input",
+    "credential_bindings",
     "max_command_seconds",
     "max_output_bytes",
     "max_screenshot_bytes",
@@ -78,6 +88,7 @@ POLICY_FIELDS = {
     "max_audit_bytes",
     "audit_backups",
 }
+OPTIONAL_POLICY_FIELDS = {"allow_credential_input", "credential_bindings"}
 
 
 class DesktopError(RuntimeError):
@@ -87,6 +98,16 @@ class DesktopError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.data = data or {}
+
+
+@dataclass(frozen=True)
+class CredentialBinding:
+    credential_id: str
+    app: str
+    executable_path: str
+    executable_sha256: str
+    target_selector: str
+    credential_target: str
 
 
 @dataclass(frozen=True)
@@ -108,6 +129,8 @@ class DesktopPolicy:
     allow_mouse_input: bool
     allow_keyboard_input: bool
     allow_system_keys: bool
+    allow_credential_input: bool
+    credential_bindings: tuple[CredentialBinding, ...]
     max_command_seconds: int
     max_output_bytes: int
     max_screenshot_bytes: int
@@ -182,6 +205,110 @@ def _load_apps(data: dict[str, Any], key: str) -> frozenset[str]:
     return frozenset(result)
 
 
+def _normalize_windows_path(value: str) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > MAX_PATH_CHARS or re.search(r"[\x00-\x1f\x7f]", value):
+        raise DesktopError("Desktop credential executable path is invalid", code="INVALID_POLICY")
+    candidate = value.strip()
+    if not ntpath.isabs(candidate):
+        raise DesktopError("Desktop credential executable path must be absolute", code="INVALID_POLICY")
+    return ntpath.normcase(ntpath.normpath(candidate))
+
+
+def _sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        while True:
+            chunk = stream.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _windows_process_image_identity(process_id: int) -> tuple[str, str]:
+    if os.name != "nt":
+        raise OSError("Windows process identity is unavailable on this platform")
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    open_process = kernel32.OpenProcess
+    open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    open_process.restype = wintypes.HANDLE
+    query_image = kernel32.QueryFullProcessImageNameW
+    query_image.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    query_image.restype = wintypes.BOOL
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+
+    handle = open_process(0x1000, False, process_id)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        raise OSError("process image cannot be opened")
+    try:
+        size = wintypes.DWORD(32768)
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if not query_image(handle, 0, buffer, ctypes.byref(size)):
+            raise OSError("process image path cannot be resolved")
+        path = _normalize_windows_path(buffer.value)
+        return path, _sha256_file(buffer.value)
+    finally:
+        close_handle(handle)
+
+
+def _load_credential_bindings(
+    raw: Any,
+    *,
+    allow_all_apps: bool,
+    allowed_apps: frozenset[str],
+    denied_apps: frozenset[str],
+) -> tuple[CredentialBinding, ...]:
+    if raw is None:
+        raw = []
+    if not isinstance(raw, list) or len(raw) > 64:
+        raise DesktopError("Desktop policy credential_bindings must be an array with at most 64 entries", code="INVALID_POLICY")
+    bindings: list[CredentialBinding] = []
+    seen_ids: set[str] = set()
+    seen_targets: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict) or set(item) != {"credential_id", "app", "executable_path", "executable_sha256", "target_selector", "credential_target"}:
+            raise DesktopError("Desktop policy contains invalid credential binding shape", code="INVALID_POLICY")
+        credential_id = item.get("credential_id")
+        if not isinstance(credential_id, str) or CREDENTIAL_ID_RE.fullmatch(credential_id) is None:
+            raise DesktopError("Desktop policy contains invalid credential_id", code="INVALID_POLICY")
+        if credential_id.casefold() in seen_ids:
+            raise DesktopError("Desktop policy contains duplicate credential_id", code="INVALID_POLICY")
+        seen_ids.add(credential_id.casefold())
+
+        app_value = item.get("app")
+        if not isinstance(app_value, str) or APP_RE.fullmatch(app_value.strip()) is None:
+            raise DesktopError("Desktop policy contains invalid credential binding app", code="INVALID_POLICY")
+        app = _normalize_app(app_value)
+        if app in CREDENTIAL_HARD_DENIED_APPS or app in denied_apps or (not allow_all_apps and app not in allowed_apps):
+            raise DesktopError("credential binding app is not authorized for credential use", code="INVALID_POLICY")
+
+        executable_path = _normalize_windows_path(item.get("executable_path"))
+        executable_sha256 = item.get("executable_sha256")
+        if not isinstance(executable_sha256, str) or SHA256_RE.fullmatch(executable_sha256) is None:
+            raise DesktopError("Desktop credential executable SHA-256 is invalid", code="INVALID_POLICY")
+        executable_sha256 = executable_sha256.casefold()
+
+        selector = item.get("target_selector")
+        if not isinstance(selector, str) or not selector.strip() or len(selector) > MAX_SELECTOR_CHARS:
+            raise DesktopError("Desktop policy contains invalid credential target selector", code="INVALID_POLICY")
+        selector = selector.strip()
+        if selector.startswith("@") and selector != UNIQUE_PASSWORD_SELECTOR:
+            raise DesktopError("Desktop policy contains unsupported credential target strategy", code="INVALID_POLICY")
+        if COORDINATE_RE.fullmatch(selector):
+            raise DesktopError("credential target selector cannot be coordinate-only", code="INVALID_POLICY")
+
+        credential_target = item.get("credential_target")
+        if not isinstance(credential_target, str) or CREDENTIAL_TARGET_RE.fullmatch(credential_target) is None:
+            raise DesktopError("Desktop policy contains invalid Windows credential target", code="INVALID_POLICY")
+        if credential_target.casefold() in seen_targets:
+            raise DesktopError("Desktop policy contains duplicate Windows credential target", code="INVALID_POLICY")
+        seen_targets.add(credential_target.casefold())
+        bindings.append(CredentialBinding(credential_id, app, executable_path, executable_sha256, selector, credential_target))
+    return tuple(bindings)
+
+
 def _absolute_policy_path(data: dict[str, Any], key: str) -> Path:
     value = data.get(key)
     if not isinstance(value, str) or not value.strip() or len(value) > MAX_PATH_CHARS:
@@ -205,7 +332,7 @@ def load_policy(path: str | os.PathLike[str]) -> DesktopPolicy:
         raise DesktopError(f"Desktop policy is not valid UTF-8 JSON: {exc}", code="INVALID_POLICY") from exc
     if not isinstance(data, dict) or data.get("schema_version") != POLICY_SCHEMA_VERSION:
         raise DesktopError("Desktop policy schema_version must be 1", code="INVALID_POLICY")
-    missing = sorted(POLICY_FIELDS - set(data))
+    missing = sorted((POLICY_FIELDS - OPTIONAL_POLICY_FIELDS) - set(data))
     if missing:
         raise DesktopError("Desktop policy is missing required fields: " + ", ".join(missing), code="INVALID_POLICY")
     extra = sorted(set(data) - POLICY_FIELDS)
@@ -245,6 +372,24 @@ def load_policy(path: str | os.PathLike[str]) -> DesktopPolicy:
     if bools["allow_system_keys"] and not bools["allow_keyboard_input"]:
         raise DesktopError("allow_system_keys requires allow_keyboard_input", code="INVALID_POLICY")
 
+    allow_credential_input = data.get("allow_credential_input", False)
+    if not isinstance(allow_credential_input, bool):
+        raise DesktopError("Desktop policy allow_credential_input must be boolean", code="INVALID_POLICY")
+    credential_bindings = _load_credential_bindings(
+        data.get("credential_bindings", []),
+        allow_all_apps=bools["allow_all_apps"],
+        allowed_apps=allowed,
+        denied_apps=denied,
+    )
+    if credential_bindings and not allow_credential_input:
+        raise DesktopError("credential_bindings require allow_credential_input", code="INVALID_POLICY")
+    if allow_credential_input and not credential_bindings:
+        raise DesktopError("allow_credential_input requires at least one credential binding", code="INVALID_POLICY")
+    if allow_credential_input and not bools["allow_keyboard_input"]:
+        raise DesktopError("allow_credential_input requires allow_keyboard_input", code="INVALID_POLICY")
+    if allow_credential_input and not bools["allow_uia_mutation"]:
+        raise DesktopError("allow_credential_input requires allow_uia_mutation", code="INVALID_POLICY")
+
     return DesktopPolicy(
         path=policy_path,
         fingerprint=hashlib.sha256(raw).hexdigest(),
@@ -263,6 +408,8 @@ def load_policy(path: str | os.PathLike[str]) -> DesktopPolicy:
         allow_mouse_input=bools["allow_mouse_input"],
         allow_keyboard_input=bools["allow_keyboard_input"],
         allow_system_keys=bools["allow_system_keys"],
+        allow_credential_input=allow_credential_input,
+        credential_bindings=credential_bindings,
         max_command_seconds=_require_int(data, "max_command_seconds", 1, 120),
         max_output_bytes=_require_int(data, "max_output_bytes", 4096, 16 * 1024 * 1024),
         max_screenshot_bytes=_require_int(data, "max_screenshot_bytes", 65536, 32 * 1024 * 1024),
@@ -423,11 +570,13 @@ class SubprocessWinAppRunner:
 
 
 class DesktopEngine:
-    def __init__(self, policy: DesktopPolicy, runner: Runner, *, runtime_version: str, text_input: Any | None = None) -> None:
+    def __init__(self, policy: DesktopPolicy, runner: Runner, *, runtime_version: str, text_input: Any | None = None, credential_input: Any | None = None, credential_process_identity: Callable[[int], tuple[str, str]] | None = None) -> None:
         self.policy = policy
         self.runner = runner
         self.runtime_version = runtime_version
         self.text_input = text_input
+        self.credential_input = credential_input
+        self.credential_process_identity = credential_process_identity or _windows_process_image_identity
         self._audit_lock = threading.Lock()
         try:
             self.policy.audit_log.parent.mkdir(parents=True, exist_ok=True)
@@ -444,7 +593,22 @@ class DesktopEngine:
         cls._validate_runtime_state(policy, elevated=_is_elevated(), interactive=_is_interactive_session())
         runner = SubprocessWinAppRunner(policy)
         version = cls._probe_version(policy, runner)
-        return cls(policy, runner, runtime_version=version, text_input=IsolatedWindowsUnicodeTextInput(helper_path=Path(__file__).with_name("windows_text_input_helper.ps1"), timeout_seconds=policy.max_command_seconds))
+        credential_input = None
+        if policy.allow_credential_input:
+            credential_input = IsolatedWindowsCredentialInput(
+                helper_path=Path(__file__).with_name("windows_credential_input_helper.ps1"),
+                timeout_seconds=policy.max_command_seconds,
+            )
+        return cls(
+            policy,
+            runner,
+            runtime_version=version,
+            text_input=IsolatedWindowsUnicodeTextInput(
+                helper_path=Path(__file__).with_name("windows_text_input_helper.ps1"),
+                timeout_seconds=policy.max_command_seconds,
+            ),
+            credential_input=credential_input,
+        )
 
     @staticmethod
     def _validate_runtime_state(policy: DesktopPolicy, *, elevated: bool, interactive: bool) -> None:
@@ -494,6 +658,8 @@ class DesktopEngine:
                 "mouse_input": self.policy.allow_mouse_input,
                 "keyboard_input": self.policy.allow_keyboard_input,
                 "text_input_backend": "isolated-windows-unicode-sendinput" if self.text_input is not None else "unavailable",
+                "credential_broker": self.policy.allow_credential_input and self.credential_input is not None,
+                "credential_binding_count": len(self.policy.credential_bindings),
                 "system_keys": self.policy.allow_system_keys,
             },
             "limits": {
@@ -683,6 +849,72 @@ class DesktopEngine:
             raise
         self._audit("desktop.type_text", "passed", {**audit, "utf16_code_units": value.get("utf16_code_units"), "chunks": value.get("chunks")})
         return {"hwnd": hwnd, **value}
+
+    def _verify_credential_process_identity(self, target: dict[str, Any], binding: CredentialBinding) -> None:
+        process_id = target.get("processId")
+        if not isinstance(process_id, int) or isinstance(process_id, bool) or process_id <= 0:
+            raise DesktopError("credential target process identity is unavailable", code="CREDENTIAL_PROCESS_IDENTITY_UNAVAILABLE")
+        try:
+            executable_path, executable_sha256 = self.credential_process_identity(process_id)
+        except (OSError, ValueError) as exc:
+            raise DesktopError("credential target process identity is unavailable", code="CREDENTIAL_PROCESS_IDENTITY_UNAVAILABLE") from exc
+        try:
+            normalized_path = _normalize_windows_path(executable_path)
+        except DesktopError as exc:
+            raise DesktopError("credential target process identity is unavailable", code="CREDENTIAL_PROCESS_IDENTITY_UNAVAILABLE") from exc
+        if normalized_path != binding.executable_path or executable_sha256.casefold() != binding.executable_sha256:
+            raise DesktopError("credential is not bound to this executable", code="CREDENTIAL_BINDING_MISMATCH")
+
+    def use_credential(self, hwnd: int, credential_id: str) -> dict[str, Any]:
+        if not self.policy.allow_credential_input:
+            raise DesktopError("credential input is disabled by local policy", code="CREDENTIAL_INPUT_DENIED")
+        if self.credential_input is None:
+            raise DesktopError("credential input backend is unavailable", code="CREDENTIAL_INPUT_UNAVAILABLE")
+        if not isinstance(credential_id, str) or CREDENTIAL_ID_RE.fullmatch(credential_id) is None:
+            raise DesktopError("credential_id is invalid", code="INVALID_ARGUMENT")
+        binding = next(
+            (item for item in self.policy.credential_bindings if item.credential_id.casefold() == credential_id.casefold()),
+            None,
+        )
+        if binding is None:
+            raise DesktopError("credential is unavailable for this Desktop policy", code="CREDENTIAL_UNAVAILABLE")
+
+        target = self._authorize_window(hwnd)
+        if _normalize_app(str(target.get("processName", ""))) != binding.app:
+            raise DesktopError("credential is not bound to this application", code="CREDENTIAL_BINDING_MISMATCH")
+        self._verify_credential_process_identity(target, binding)
+        process_id = target.get("processId")
+        if not isinstance(process_id, int) or isinstance(process_id, bool) or process_id <= 0:
+            raise DesktopError("credential target process identity is unavailable", code="CREDENTIAL_PROCESS_IDENTITY_UNAVAILABLE")
+        audit = self._target_audit(target, binding.target_selector)
+        audit["credential_ref_sha256"] = self._hash_text(binding.credential_id.casefold())
+        self._audit("desktop.use_credential", "started", audit)
+        try:
+            focus_unique_password = binding.target_selector == UNIQUE_PASSWORD_SELECTOR
+            if not focus_unique_password:
+                self._run_json(["ui", "focus", binding.target_selector, "-w", str(hwnd), "--json"])
+            refreshed = self._authorize_window(hwnd)
+            if _normalize_app(str(refreshed.get("processName", ""))) != binding.app:
+                raise DesktopError("credential target application changed", code="CREDENTIAL_BINDING_MISMATCH")
+            self._verify_credential_process_identity(refreshed, binding)
+            refreshed_process_id = refreshed.get("processId")
+            if refreshed_process_id != process_id:
+                raise DesktopError("credential target process changed", code="CREDENTIAL_BINDING_MISMATCH")
+            value = self.credential_input.send_credential(
+                hwnd,
+                process_id,
+                binding.credential_target,
+                focus_unique_password=focus_unique_password,
+            )
+        except WindowsCredentialInputError as exc:
+            error = DesktopError(str(exc), code=exc.code, data=exc.data)
+            self._audit("desktop.use_credential", "failed", {**audit, "error": error.code})
+            raise error from exc
+        except DesktopError as exc:
+            self._audit("desktop.use_credential", "failed", {**audit, "error": exc.code})
+            raise
+        self._audit("desktop.use_credential", "passed", audit)
+        return {"hwnd": hwnd, "credential_applied": bool(value.get("credential_applied"))}
 
     def key_press(self, hwnd: int, keys: str, *, target_selector: str | None = None) -> dict[str, Any]:
         if not self.policy.allow_keyboard_input:

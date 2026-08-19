@@ -447,6 +447,7 @@
       "review_mode": "full-read",
       "match_terms": ["desktop mcp", "computer use", "mouse automation", "keyboard automation", "screen capture", "gui automation", "winapp", "ui automation", "کنترل دسکتاپ", "ماوس", "کیبورد"],
       "minimum_sources": [
+        "docs/adr/0050-add-policy-bound-desktop-credential-broker-v1.md",
         "docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md",
         "docs/adr/0048-adopt-policy-gated-developer-host-ops-mcp-v1.md",
         "docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md",
@@ -458,7 +459,7 @@
         "docs/runbooks/chatgpt-web-desktop-mcp.md",
         "docs/technology/local-development-baseline.md"
       ],
-      "summary": "Keep Context read-only and Ops separate. Desktop is developer-host only, policy-gated, interactive-session scoped, separately tunneled/audited, and never a credential/UAC/production-access bypass."
+      "summary": "Keep Context read-only and Ops separate. Desktop is developer-host only and policy-gated. General text stays non-secret. ADR-0050 credential use is optional, opaque-reference-only, app/executable-path/SHA-256/password-target bound, locally resolved without disclosure, separately audited, and never a UAC/Secure-Desktop/production-access bypass."
     },
     {
       "id": "production-readiness",

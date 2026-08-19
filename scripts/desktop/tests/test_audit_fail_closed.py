@@ -59,6 +59,8 @@ class DesktopAuditFailClosedTest(unittest.TestCase):
                         "allow_mouse_input": True,
                         "allow_keyboard_input": True,
                         "allow_system_keys": False,
+                        "allow_credential_input": False,
+                        "credential_bindings": [],
                         "max_command_seconds": 10,
                         "max_output_bytes": 65536,
                         "max_screenshot_bytes": 1048576,
@@ -95,6 +97,7 @@ class DesktopAuditFailClosedTest(unittest.TestCase):
                 "require_interactive_session": False, "require_non_elevated": False,
                 "allow_screenshot": True, "allow_capture_screen": False, "allow_uia_mutation": True,
                 "allow_mouse_input": True, "allow_keyboard_input": True, "allow_system_keys": False,
+                "allow_credential_input": False, "credential_bindings": [],
                 "max_command_seconds": 10, "max_output_bytes": 65536, "max_screenshot_bytes": 1048576,
                 "max_text_chars": 4096, "max_inspect_depth": 8, "max_audit_bytes": 1048576, "audit_backups": 2
             }), encoding="utf-8")
@@ -138,6 +141,8 @@ class DesktopAuditFailClosedTest(unittest.TestCase):
                         "allow_mouse_input": True,
                         "allow_keyboard_input": True,
                         "allow_system_keys": False,
+                        "allow_credential_input": False,
+                        "credential_bindings": [],
                         "max_command_seconds": 10,
                         "max_output_bytes": 65536,
                         "max_screenshot_bytes": 1048576,
