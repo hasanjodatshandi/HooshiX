@@ -11,6 +11,7 @@ At this revision the repository contains architecture documentation, the reposit
 ```text
 services/compromised-password-service/
 services/notification-service/
+services/identity-service/
 ```
 
 Implemented repository-governance artifacts are:
@@ -25,7 +26,7 @@ scripts/ops/
 .github/workflows/repository-baseline.yml
 ```
 
-The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, selected guarded structure rules, ADR-0046 Context Engine contracts/tests, ADR-0048 Ops MCP policy/stdio/filesystem/process/audit tests, and ADR-0049/0050 Desktop MCP policy/version/app/HWND/capture/input/credential-broker/audit/stdio tests. Context verification covers current bootstrap/source paths, canonical task-routing/generation parity, commit-bound checkpoint shape, tracked-file bounded retrieval/provenance, conservative full-read escalation, CWD-independent stdio MCP startup, matching textual/structured object tool results, and read-only MCP behavior. Ops verification covers fail-closed policy parsing, path/symlink boundaries, bounded UTF-8 file mutation, command alias/cwd/timeout/output bounds, child-environment credential exclusion, bounded audit metadata, CWD-independent startup, and explicit UTF-8 stdio output. Desktop verification covers strict policy/version state, app/HWND authorization, bounded UI inspection/PNG capture, transient capture cleanup, UIA/mouse/keyboard/system-key controls, ADR-0050 disabled-by-default credential bindings and secret-free MCP/helper/focus/redaction contracts, child-environment credential exclusion/telemetry opt-out, metadata-only fail-closed audit, screenshot MCP image representation, and explicit UTF-8 stdio output. The protected repository workflow also invokes the reusable Compromised Password and Notification service security suites on PR/push and on the scheduled repository security cadence.
+The repository baseline verifies file-index consistency, stable ADR identifiers/register coverage, dependency-registry/schema/Markdown-view consistency, current source references, selected guarded structure rules, ADR-0046 Context Engine contracts/tests, ADR-0048 Ops MCP policy/stdio/filesystem/process/audit tests, and ADR-0049/0050 Desktop MCP policy/version/app/HWND/capture/input/credential-broker/audit/stdio tests. Context verification covers current bootstrap/source paths, canonical task-routing/generation parity, commit-bound checkpoint shape, tracked-file bounded retrieval/provenance, conservative full-read escalation, CWD-independent stdio MCP startup, matching textual/structured object tool results, and read-only MCP behavior. Ops verification covers fail-closed policy parsing, path/symlink boundaries, bounded UTF-8 file mutation, command alias/cwd/timeout/output bounds, child-environment credential exclusion, bounded audit metadata, CWD-independent startup, and explicit UTF-8 stdio output. Desktop verification covers strict policy/version state, app/HWND authorization, bounded UI inspection/PNG capture, transient capture cleanup, UIA/mouse/keyboard/system-key controls, ADR-0050 disabled-by-default credential bindings and secret-free MCP/helper/executable-identity/PID/password-target/focus/redaction contracts, child-environment credential exclusion/telemetry opt-out, metadata-only fail-closed audit, screenshot MCP image representation, and explicit UTF-8 stdio output. The protected repository workflow also invokes the reusable Compromised Password, Notification, and Identity service security suites on PR/push and on the scheduled repository security cadence.
 
 The Agent Context Engine implementation is developer/repository tooling only. It has no application runtime service, datastore, HTTP/network listener, production dependency, or cross-project memory database. V1 uses Python standard library + Git CLI, local bounded tracked-file lexical/path retrieval, commit-bound historical checkpoints, and a read-only stdio MCP adapter. Current Git authority remains above every derived context/checkpoint/model memory result.
 
@@ -39,7 +40,9 @@ The Compromised Password service repository implementation includes service-owne
 
 The Notification service repository implementation includes the internal `SubmitNotification` Protobuf/gRPC contract, service-owned PostgreSQL persistence with Flyway and jOOQ/JDBC, durable `ACCEPTED` handoff semantics, idempotency and versioned HMAC intent fingerprinting, lifecycle/state-machine and bounded retry/reconciliation primitives, versioned database templates and bounded rendering, local AES-GCM delivery escrow and fail-closed key-ring integration, Email/SMS provider ports with local-only non-production adapters, Day-One structured logging/metrics/tracing/health source configuration, hardened container/Helm/ServiceAccount/NetworkPolicy/Istio artifacts, and service-owned formatting/static/architecture/dependency/contract/migration/deployment CI gates. Production Liara SMTP and IPPanel dispatch are not implemented by this slice. Repository source and CI evidence do not prove deployed provider behavior or production readiness.
 
-The implemented service security suites install digest-verified OSV-Scanner 2.4.0 and scan locked Gradle dependencies for known vulnerabilities. Because the repository baseline invokes both reusable service security suites on schedule, the same locked-dependency advisory scans also run on the scheduled repository security cadence. This is early dependency-advisory evidence only; it is not final-image/SBOM vulnerability evidence.
+The Identity service repository implementation includes the local EMAIL/PHONE registration contract and application flow, profile/contact canonicalization, PENDING-to-ACTIVE verification lifecycle, globally unique verified-contact persistence primitives, one-live-contact reservation, eight-digit HMAC-only registration challenges, versioned HMAC idempotency, Argon2id credential hashing, fail-closed Compromised Password screening, ADR-0024 Redis semantic-quota source including exact-IP hard buckets/common-clock guard/capacity-allocation controls/bounded cleanup, encrypted durable Notification handoff outbox/dispatcher, bounded ciphertext/idempotency retention maintenance, PostgreSQL/Flyway+jOOQ persistence, Day-One telemetry/readiness, hardened container/Helm/ServiceAccount/NetworkPolicy/Istio artifacts, and service-owned formatting/static/architecture/dependency/contract/migration/deployment CI gates. Phone registration remains server-gated off by default. Login/session/MFA/tenant/OIDC/erasure and the wider ADR-0012 Identity surface are not implemented by this registration slice. Production quota thresholds, real host-time synchronization status integration, deployed Redis/mesh/database behavior, and full runtime/load/recovery evidence remain NOT VERIFIED. The current architecture also does not define a concrete password composition/minimum-length rule beyond NFC normalization, compromised-password screening, and the Argon2id storage baseline; production registration readiness remains blocked until that security-policy gap is resolved rather than guessed in code.
+
+The implemented service security suites install digest-verified OSV-Scanner 2.4.0 and scan locked Gradle dependencies for known vulnerabilities. Because the repository baseline invokes all three reusable service security suites on schedule, the same locked-dependency advisory scans also run on the scheduled repository security cadence. The Identity suite configures immutable-digest Gitleaks 8.30.0 with a mandatory positive detection control plus redacted current-tree and full-Git-history scans for the repository. Protected-CI execution evidence for this new gate is NOT VERIFIED until the branch workflow runs. This is early dependency-advisory evidence only; it is not final-image/SBOM vulnerability evidence.
 
 This is repository implementation evidence only. It is not proof of approved production HIBP acquisition/provenance/licensing, current corpus freshness, real complete-corpus cardinality/response measurements and reviewed production bounds, Notification production-provider integration, staging runtime, load, recovery, final-image SBOM/vulnerability correlation, artifact signing, admission, or production readiness.
 
@@ -50,10 +53,10 @@ Current repository evidence is:
 - Agent Context Engine source/contracts/tests are present; CI evidence remains commit-specific;
 - ADR-0047 ChatGPT Web Context tunnel repository integration artifacts are present; operator execution verified reviewed tunnel-client integrity/runtime/readiness, exact five-tool Plugin discovery, and real merged-main `project.bootstrap`, `project.search`, and `project.context_for_task` on `main@1a1b265`;
 - ADR-0048 Ops MCP source/policy schema/tests/runbook are present; operator Windows policy/elevation/separate-tunnel/ChatGPT/background/reboot smoke passed on 2026-08-18;
-- ADR-0049/0050 Desktop MCP source/policy schema/tests/runbook are present; existing protected-policy GUI/tunnel/recovery evidence remains valid for ADR-0049, while ADR-0050 repository broker tests are present and host process-image/password-target and missing-credential negative smoke passed for EOrgsetad, while actual credential injection/login remains NOT VERIFIED until the operator provisions the local Generic Credential; real logoff/logon and revocation/rollback also remain NOT VERIFIED;
-- service-specific Semgrep enforcement exists for Compromised Password and Notification;
-- OSV-Scanner locked-dependency advisory scanning exists for Compromised Password and Notification and runs in PR/push/scheduled security verification;
-- Gitleaks is not present;
+- ADR-0049/0050 Desktop MCP source/policy schema/tests/runbook are present; final protected-policy GUI smoke, separate tunnel/ChatGPT discovery/status, persistent interactive task, and tunnel/MCP/parent recovery evidence remains valid for ADR-0049; ADR-0050 repository broker tests and EOrgsetad process-image/SHA-256/password-target/missing-credential negative host smoke passed, while actual credential injection/login remains NOT VERIFIED until the operator provisions the local Generic Credential; real logoff/logon and revocation/rollback also remain NOT VERIFIED;
+- service-specific Semgrep enforcement exists for Compromised Password, Notification, and Identity; local Identity execution with the pinned image, local rules, network disabled, version check disabled, and metrics disabled completed with zero findings; protected-CI execution remains commit-specific;
+- OSV-Scanner locked-dependency advisory scanning exists for Compromised Password, Notification, and Identity and runs in PR/push/scheduled security verification; current-commit Identity advisory evidence remains commit-specific and must pass the protected service-security workflow;
+- Gitleaks 8.30.0 redacted current-tree and full-Git-history scanning plus negative/current-tree-positive/commit-then-delete history fixtures is PRESENT in the required Identity security workflow; local execution passed the fixtures, current tree, and full current Git history with the reviewed narrow false-positive policy, while protected-CI execution evidence remains NOT VERIFIED on this branch;
 - Syft/Grype/Cosign release automation is not present;
 - production Kyverno admission is not present.
 
@@ -66,13 +69,13 @@ deploy/
 infrastructure/
 ```
 
-Identity, Authorization, and Web BFF application services remain absent. Notification is implemented as a repository vertical slice, while production Liara/IPPanel provider integration remains absent. No production platform runtime, complete observability backend, restore exercise, complete-stack load test, artifact-signing release pipeline, final-image vulnerability/admission gate, or production traffic readiness is claimed.
+Authorization and Web BFF application services remain absent. Identity is implemented only as the registration vertical slice described above, and Notification is implemented as a repository vertical slice, while production Liara/IPPanel provider integration remains absent. No production platform runtime, complete observability backend, restore exercise, complete-stack load test, artifact-signing release pipeline, final-image vulnerability/admission gate, or production traffic readiness is claimed.
 
 ## Capability/service status
 
 | Capability | Architecture | Independent implementation | Runtime evidence | Production readiness | Planned target |
 | --- | --- | --- | --- | --- | --- |
-| Identity Service | DESIGNED | NOT PRESENT | NOT VERIFIED | NOT VERIFIED | `services/identity-service` |
+| Identity Service | DESIGNED | IMPLEMENTED registration vertical slice | repository service/persistence/registration-security/quota/handoff/deployment CI evidence is commit-specific; deployed runtime and wider ADR-0012 Identity surface NOT VERIFIED | NOT VERIFIED | `services/identity-service` |
 | Authorization Service | DESIGNED | NOT PRESENT | NOT VERIFIED | NOT VERIFIED | `services/authorization-service` |
 | Notification Service | DESIGNED | IMPLEMENTED | repository service/persistence/contract/security/migration/deployment CI evidence is commit-specific; production Liara/IPPanel provider/runtime evidence NOT VERIFIED | NOT VERIFIED | `services/notification-service` |
 | Web BFF | DESIGNED | NOT PRESENT | NOT VERIFIED | NOT VERIFIED | `services/web-bff` |
@@ -94,9 +97,10 @@ Identity, Authorization, and Web BFF application services remain absent. Notific
 | Cross-project/central agent memory service | NOT SELECTED / GATED under ADR-0046 | NOT APPLICABLE | NOT APPLICABLE until evidence trigger + new ADR |
 | Compromised Password service CI/architecture/security/dataset-build gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
 | Notification service CI/architecture/security/migration/deployment gates | DESIGNED | IMPLEMENTED | CI evidence is commit-specific |
-| Semgrep source SAST/policy | DESIGNED under ADR-0039/0045 | PARTIAL | implemented for Compromised Password and Notification; future-service coverage NOT VERIFIED |
-| Gitleaks current-tree/Git-history secret scanning | DESIGNED under ADR-0045 | NOT PRESENT | NOT VERIFIED |
-| OSV-Scanner declared/locked dependency advisory scan | DESIGNED under ADR-0045 | PARTIAL | OSV-Scanner 2.4.0 implemented for Compromised Password and Notification PR/push/scheduled service-security suites; future-service coverage NOT VERIFIED |
+| Identity registration CI/architecture/security/migration/quota/deployment gates | DESIGNED | IMPLEMENTED | local Java 25/WSL verification passed unit/integration/architecture/SpotBugs/Spotless/bootJar including PostgreSQL/Flyway and Redis Testcontainers; local Buf, Semgrep, Gitleaks, Helm render/hardening, and repository baseline gates passed; OSV is implemented but current-commit advisory evidence is protected-CI dependent; protected-CI/deployed-runtime evidence remains commit-specific/NOT VERIFIED |
+| Semgrep source SAST/policy | DESIGNED under ADR-0039/0045 | PARTIAL | implemented for Compromised Password, Notification, and Identity; pinned local Identity scan passed with zero findings after explicit offline version-check/metrics suppression; protected-CI and future-service coverage remain NOT VERIFIED |
+| Gitleaks current-tree/Git-history secret scanning | DESIGNED under ADR-0045 | PARTIAL | immutable-digest Gitleaks 8.30.0 workflow includes negative/current-tree-positive/commit-then-delete fixtures and reviewed narrow false-positive policy; local fixtures/current-tree/full-current-history passed, protected-CI execution remains NOT VERIFIED |
+| OSV-Scanner declared/locked dependency advisory scan | DESIGNED under ADR-0045 | PARTIAL | OSV-Scanner 2.4.0 implemented for Compromised Password, Notification, and Identity PR/push/scheduled service-security suites; Identity current-commit advisory evidence remains protected-CI/commit-specific; future-service coverage remains NOT VERIFIED |
 | Syft final-image CycloneDX SBOM generation | DESIGNED under ADR-0035/0045 | NOT PRESENT | NOT VERIFIED |
 | Grype final-image/SBOM vulnerability correlation | DESIGNED under ADR-0035/0038/0045 | NOT PRESENT | NOT VERIFIED |
 | Cosign image signature/provenance/signed-SBOM release automation | DESIGNED under ADR-0017/0045 | NOT PRESENT | NOT VERIFIED |
@@ -111,7 +115,7 @@ Identity, Authorization, and Web BFF application services remain absent. Notific
 | Kafka | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | OpenBao + External Secrets | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
-| Cross-service CI/security/supply-chain release gates | DESIGNED | PARTIAL | implemented-service Semgrep/OSV repository gates exist; Gitleaks/Syft/Grype/Cosign/Kyverno release evidence NOT VERIFIED |
+| Cross-service CI/security/supply-chain release gates | DESIGNED | PARTIAL | implemented-service Semgrep/OSV gates and the Identity Gitleaks tree/history workflow are present; local Identity Semgrep/Gitleaks evidence passed; OSV current-commit evidence remains protected-CI dependent, while protected-CI execution plus Syft/Grype/Cosign/Kyverno release evidence remain NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | NOT PRESENT | NOT VERIFIED |
 | Prometheus/Alertmanager/Grafana | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Loki log backend | DESIGNED under ADR-0044 | NOT PRESENT | NOT VERIFIED |
@@ -144,7 +148,7 @@ The bootstrap baseline makes these current repository invariants executable:
 
 Service-specific CI adds stricter checks for implemented code, OSV locked-dependency advisory scanning, migrations where applicable, offline dataset-build tooling where applicable, runtime compatibility validation, telemetry/privacy controls, contracts, and deployment/runtime-image artifacts. Repository governance does not replace runtime/staging/release evidence.
 
-ADR-0045 documents additional target gates. Gitleaks/Syft/Grype/Cosign/Kyverno must not be reported as implemented until their repository workflows/policies exist and execute successfully. OSV-Scanner must not be reported as final-image vulnerability evidence.
+ADR-0045 documents additional target gates. The Identity Gitleaks workflow is implemented and has local execution evidence, but protected-CI execution remains commit-specific. Syft/Grype/Cosign/Kyverno must not be reported as implemented until their repository workflows/policies exist and execute successfully. OSV-Scanner must not be reported as final-image vulnerability evidence.
 
 ## Implementation/release gates still not evidenced
 
@@ -152,7 +156,7 @@ Current architecture still requires evidence that this repository slice does not
 
 - real Windows/ChatGPT Web ADR-0049 remaining evidence for an actual logoff/logon cycle and stop/revoke/rollback behavior; protected policy/session/tunnel/`desktop.status`/GUI smoke/persistent-task/recovery evidence is already recorded above;
 - ADR-0050 remaining host evidence for operator-local Generic Credential enrollment, actual secret injection/login, wrong-window/focus/ambiguous-password negatives with a provisioned disposable credential, and rollback/rotation behavior; EOrgsetad process-image/SHA-256/password-target and missing-credential negative smoke is already verified;
-- blocking Gitleaks current-tree + protected Git-history scanning with redacted output and positive/negative fixtures;
+- protected-CI execution evidence for the configured blocking Gitleaks current-tree + Git-history scans, positive/negative fixtures, commit-then-delete fixture, and redacted output;
 - final-image Syft CycloneDX generation bound to exact image digest;
 - Grype final-image/SBOM vulnerability policy, feed freshness, exception/VEX behavior, and deployed-digest rescanning;
 - Cosign exact-digest signature, provenance, and signed-SBOM attestation plus Kyverno admission positives/negatives;
@@ -163,7 +167,7 @@ Current architecture still requires evidence that this repository slice does not
 - real Collector/Loki/Tempo/Prometheus integration, telemetry canary/privacy evidence, and telemetry-backend fault evidence beyond service-level code/tests;
 - signed final image/dataset release artifacts as applicable, CycloneDX SBOM, final-artifact vulnerability correlation, provenance, admission validation, and staging-to-production digest promotion;
 - K3s/Calico/Istio/Kyverno/OpenBao/edge/observability platform implementation and complete-stack capacity evidence;
-- ADR-0024 quota implementation/evidence when a quota-owning service is implemented;
+- deployed Identity ADR-0024 Redis quota evidence, measured production capacity/allocation thresholds, real host-time synchronization integration, NAT/IPv6/collateral tests, and complete-stack cardinality/load/failure evidence;
 - Reference Data deployable trigger evidence before any independent Reference Data service creation.
 
 These are implementation/release gates, not evidence that production is ready.

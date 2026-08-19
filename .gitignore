@@ -10,7 +10,7 @@
 # Java and Gradle
 .gradle/
 build/
-out/
+/out/
 target/
 *.class
 *.jar

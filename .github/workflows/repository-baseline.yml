@@ -38,6 +38,10 @@ jobs:
     name: Notification security suite
     uses: ./.github/workflows/notification-service.yml
 
+  identity-security:
+    name: Identity security suite
+    uses: ./.github/workflows/identity-service.yml
+
   baseline:
     name: Baseline verify
     if: ${{ always() }}
@@ -45,6 +49,7 @@ jobs:
       - repository-structure
       - compromised-password-security
       - notification-security
+      - identity-security
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -53,6 +58,7 @@ jobs:
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
           COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
           NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
+          IDENTITY_RESULT: ${{ needs.identity-security.result }}
         run: |
           set -euo pipefail
           if [ "${REPOSITORY_RESULT}" != 'success' ]; then
@@ -65,6 +71,10 @@ jobs:
           fi
           if [ "${NOTIFICATION_RESULT}" != 'success' ]; then
             echo "Notification security result: ${NOTIFICATION_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${IDENTITY_RESULT}" != 'success' ]; then
+            echo "Identity security result: ${IDENTITY_RESULT}" >&2
             exit 1
           fi
           echo 'Required repository and service security verification passed.'

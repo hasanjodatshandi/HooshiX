@@ -22,7 +22,7 @@ Production Technology Baseline remains authoritative for production versions.
 | Docker Compose | 5.1.4 |
 | Docker Buildx | 0.34.1 |
 | Docker cgroup | v2 + systemd driver |
-| Secret scanner | Gitleaks CLI 8.30.1; same rule/config intent as CI |
+| Secret scanner | Gitleaks CLI 8.30.0; reviewed fallback from defective 8.30.1; same rule/config intent and positive-control requirement as CI |
 | Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
 | HooshiX developer-host Ops MCP | Python standard-library stdio server under ADR-0048; mandatory local policy, separate tunnel/profile/key, no production authority |
