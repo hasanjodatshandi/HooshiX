@@ -1,0 +1,73 @@
+rules:
+  - id: authorization-no-field-injection
+    languages: [java]
+    severity: ERROR
+    message: Required dependencies must use constructor injection.
+    paths: {include: [/services/authorization-service/src/main/java]}
+    pattern: |
+      @Autowired
+      $TYPE $FIELD;
+
+  - id: authorization-no-system-output
+    languages: [java]
+    severity: ERROR
+    message: Authorization runtime must use structured allow-list logging.
+    paths: {include: [/services/authorization-service/src/main/java]}
+    pattern-either:
+      - pattern: System.out.$METHOD(...)
+      - pattern: System.err.$METHOD(...)
+      - pattern: $EX.printStackTrace(...)
+
+  - id: authorization-no-sensitive-log-keys
+    languages: [java]
+    severity: ERROR
+    message: Authorization telemetry must not attach security or subject identifiers.
+    paths: {include: [/services/authorization-service/src/main/java]}
+    pattern-either:
+      - pattern: $LOG.addKeyValue("token", ...)
+      - pattern: $LOG.addKeyValue("access_token", ...)
+      - pattern: $LOG.addKeyValue("user_id", ...)
+      - pattern: $LOG.addKeyValue("tenant_id", ...)
+      - pattern: $LOG.addKeyValue("membership_id", ...)
+      - pattern: $LOG.addKeyValue("session_id", ...)
+      - pattern: $LOG.addKeyValue("sid", ...)
+      - pattern: $LOG.addKeyValue("request_id", ...)
+      - pattern: $LOG.addKeyValue("fingerprint", ...)
+      - pattern: $LOG.addKeyValue("quota_key", ...)
+      - pattern: $LOG.addKeyValue("client_ip", ...)
+
+  - id: authorization-no-string-built-sql
+    languages: [java]
+    severity: ERROR
+    message: Authorization SQL must remain fixed and parameterized.
+    paths: {include: [/services/authorization-service/src/main/java]}
+    pattern-either:
+      - pattern: $DSL.execute($SQL + $X, ...)
+      - pattern: $DSL.fetch($SQL + $X, ...)
+      - pattern: $DSL.fetchOne($SQL + $X, ...)
+
+  - id: authorization-no-thread-sleep
+    languages: [java]
+    severity: ERROR
+    message: Authorization coordination must not use Thread.sleep.
+    paths:
+      include:
+        - /services/authorization-service/src/main/java
+        - /services/authorization-service/src/test/java
+    pattern: Thread.sleep(...)
+
+  - id: authorization-no-legacy-deterministic-uuid
+    languages: [java]
+    severity: ERROR
+    message: Security identifiers must not use UUID.nameUUIDFromBytes.
+    paths: {include: [/services/authorization-service/src/main/java]}
+    pattern: UUID.nameUUIDFromBytes(...)
+
+  - id: authorization-no-legacy-digest
+    languages: [java]
+    severity: ERROR
+    message: Authorization must not use MD5 or SHA-1.
+    paths: {include: [/services/authorization-service/src/main/java]}
+    pattern-either:
+      - pattern: MessageDigest.getInstance("MD5")
+      - pattern: MessageDigest.getInstance("SHA-1")

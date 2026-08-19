@@ -70,6 +70,16 @@ spec:
             matchLabels:
               {{- toYaml .Values.notification.podLabels | nindent 14 }}
       ports: [{protocol: TCP, port: {{ .Values.notification.port }}}]
+    {{- if .Values.runtime.tenantRuntimeEnabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.authorization.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.authorization.podLabels | nindent 14 }}
+      ports: [{protocol: TCP, port: {{ .Values.authorization.port }}}]
+    {{- end }}
     {{- if .Values.observability.tracing.enabled }}
     - to:
         - namespaceSelector:

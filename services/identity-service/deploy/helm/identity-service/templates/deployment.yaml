@@ -89,6 +89,7 @@ spec:
             - {name: IDENTITY_GRPC_PORT, value: {{ .Values.service.grpcPort | quote }}}
             - {name: IDENTITY_REGISTRATION_RUNTIME_ENABLED, value: {{ .Values.runtime.registrationRuntimeEnabled | quote }}}
             - {name: IDENTITY_AUTHENTICATION_RUNTIME_ENABLED, value: {{ .Values.runtime.authenticationRuntimeEnabled | quote }}}
+            - {name: IDENTITY_TENANT_RUNTIME_ENABLED, value: {{ .Values.runtime.tenantRuntimeEnabled | quote }}}
             {{- if .Values.runtime.authenticationRuntimeEnabled }}
             - {name: IDENTITY_JWT_ISSUER, value: {{ .Values.jwt.issuer | quote }}}
             - {name: IDENTITY_JWT_ALLOWED_AUDIENCES, value: {{ join "," .Values.jwt.allowedAudiences | quote }}}
@@ -100,6 +101,7 @@ spec:
             - {name: IDENTITY_NOTIFICATION_DISPATCH_ENABLED, value: {{ .Values.runtime.notificationDispatchEnabled | quote }}}
             - {name: IDENTITY_COMPROMISED_PASSWORD_TARGET, value: {{ .Values.compromisedPassword.target | quote }}}
             - {name: IDENTITY_NOTIFICATION_TARGET, value: {{ .Values.notification.target | quote }}}
+            - {name: IDENTITY_AUTHORIZATION_TARGET, value: {{ .Values.authorization.target | quote }}}
             - {name: IDENTITY_QUOTA_MAX_ACTIVE_BUCKETS, value: {{ .Values.quota.maxActiveBuckets | quote }}}
             - {name: IDENTITY_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE, value: {{ .Values.quota.maxNewBucketsPerMinute | quote }}}
             - {name: IDENTITY_QUOTA_MINIMUM_MEMORY_HEADROOM_PERCENT, value: {{ .Values.quota.minimumMemoryHeadroomPercent | quote }}}

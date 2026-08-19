@@ -12,4 +12,32 @@ public record PreparedSession(
     Instant authenticatedAt,
     Instant createdAt,
     Instant idleExpiresAt,
-    Instant absoluteExpiresAt) {}
+    Instant absoluteExpiresAt,
+    AuthenticationSessionMode mode,
+    UUID selectedTenantId,
+    UUID selectedMembershipId) {
+  public PreparedSession(
+      UUID refreshFamilyId,
+      String sessionId,
+      UUID userId,
+      UUID credentialId,
+      RefreshDigest refreshDigest,
+      Instant authenticatedAt,
+      Instant createdAt,
+      Instant idleExpiresAt,
+      Instant absoluteExpiresAt) {
+    this(
+        refreshFamilyId,
+        sessionId,
+        userId,
+        credentialId,
+        refreshDigest,
+        authenticatedAt,
+        createdAt,
+        idleExpiresAt,
+        absoluteExpiresAt,
+        AuthenticationSessionMode.AUTHENTICATED_ONBOARDING,
+        null,
+        null);
+  }
+}

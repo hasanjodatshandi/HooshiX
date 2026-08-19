@@ -24,6 +24,7 @@ enum AuthenticationChannel {
 enum AuthenticationSessionMode {
   AUTHENTICATION_SESSION_MODE_UNSPECIFIED = 0;
   AUTHENTICATION_SESSION_MODE_AUTHENTICATED_ONBOARDING = 1;
+  AUTHENTICATION_SESSION_MODE_TENANT_AUTHENTICATED = 2;
 }
 
 message AuthenticationTrustedClientAddress {
@@ -45,6 +46,9 @@ message AuthenticateLocalResponse {
   google.protobuf.Timestamp refresh_idle_expires_at = 4;
   google.protobuf.Timestamp refresh_absolute_expires_at = 5;
   AuthenticationSessionMode session_mode = 6;
+  string user_id = 7;
+  string selected_tenant_id = 8;
+  string selected_membership_id = 9;
 }
 
 message RefreshSessionRequest {
@@ -59,6 +63,9 @@ message RefreshSessionResponse {
   google.protobuf.Timestamp refresh_idle_expires_at = 4;
   google.protobuf.Timestamp refresh_absolute_expires_at = 5;
   AuthenticationSessionMode session_mode = 6;
+  string user_id = 7;
+  string selected_tenant_id = 8;
+  string selected_membership_id = 9;
 }
 
 message LogoutCurrentRequest {

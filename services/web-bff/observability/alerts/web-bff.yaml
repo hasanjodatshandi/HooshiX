@@ -1,0 +1,19 @@
+groups:
+  - name: web-bff
+    rules:
+      - alert: WebBffUnavailable
+        expr: up{job="web-bff"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Web BFF scrape target is unavailable
+      - alert: WebBffHttp5xxRatioHigh
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="web-bff",status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(http_server_requests_seconds_count{job="web-bff"}[5m])), 0.001)
+          > 0.02
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: Web BFF HTTP 5xx ratio is elevated

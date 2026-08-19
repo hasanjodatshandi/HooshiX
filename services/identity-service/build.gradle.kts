@@ -22,6 +22,7 @@ sourceSets {
         proto {
             srcDir("../compromised-password-service/src/main/proto")
             srcDir("../notification-service/src/main/proto")
+            srcDir("../authorization-service/src/main/proto")
         }
     }
 }

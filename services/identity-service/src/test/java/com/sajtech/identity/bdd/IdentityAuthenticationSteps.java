@@ -85,6 +85,8 @@ public final class IdentityAuthenticationSteps {
             new RefreshCredentialLookup(credentials),
             new DirectTransactionRunner(),
             store,
+            (userId, tenantId, membershipId) -> true,
+            context -> new SignedAccessToken("test-token", NOW.plusSeconds(300)),
             Clock.fixed(NOW, ZoneOffset.UTC));
     tokenFailure =
         catchThrowable(

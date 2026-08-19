@@ -1,0 +1,5 @@
+# Authorization Service Observability
+
+The service exposes management telemetry only on the private management port. The gRPC interceptor emits privacy-safe server spans plus `authorization.grpc.server.duration` and `authorization.grpc.server.in_flight`. The application-facing quota decorator emits `authorization.admin_quota.duration` with bounded outcome labels while Redis quota state remains authoritative. Tags are bounded to registered RPC operation and gRPC outcome. User, tenant, membership, request, session, token, fingerprint, raw permission payload, and raw client address are prohibited metric labels and span attributes.
+
+Prometheus scrapes `/actuator/prometheus` through the management-only network/Istio policy. Readiness includes runtime enablement, PostgreSQL, Redis, host time safety, HMAC key freshness, and Identity JWT verifier bundle freshness. Dashboard and alerts below do not create authorization authority.

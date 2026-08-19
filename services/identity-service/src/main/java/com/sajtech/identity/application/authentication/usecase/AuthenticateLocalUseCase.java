@@ -28,6 +28,7 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
   private final SessionCredentialPort credentials;
   private final TransactionRunner transactions;
   private final AuthenticationStore store;
+  private final AuthenticationTenantSelectionPort tenantSelection;
   private final Clock clock;
 
   public AuthenticateLocalUseCase(
@@ -38,6 +39,7 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
       SessionCredentialPort credentials,
       TransactionRunner transactions,
       AuthenticationStore store,
+      AuthenticationTenantSelectionPort tenantSelection,
       Clock clock) {
     this.contacts = contacts;
     this.passwords = passwords;
@@ -46,7 +48,29 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
     this.credentials = credentials;
     this.transactions = transactions;
     this.store = store;
+    this.tenantSelection = tenantSelection;
     this.clock = clock;
+  }
+
+  public AuthenticateLocalUseCase(
+      ContactCanonicalizer contacts,
+      PasswordNormalizer passwords,
+      LoginQuotaPort quota,
+      PasswordVerificationPort verifier,
+      SessionCredentialPort credentials,
+      TransactionRunner transactions,
+      AuthenticationStore store,
+      Clock clock) {
+    this(
+        contacts,
+        passwords,
+        quota,
+        verifier,
+        credentials,
+        transactions,
+        store,
+        userId -> AuthenticationTenantSelection.onboarding(),
+        clock);
   }
 
   @Override
@@ -71,6 +95,8 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
     if (!"ACTIVE".equals(found.userStatus())) throw invalidCredentials();
 
     Instant now = clock.instant();
+    AuthenticationTenantSelection selection =
+        tenantSelection.resolveAfterPrimaryAuthentication(found.userId());
     GeneratedRefreshCredential refresh = credentials.newRefreshCredential();
     PreparedSession prepared =
         new PreparedSession(
@@ -82,7 +108,10 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
             now,
             now,
             now.plus(IDLE_LIFETIME),
-            now.plus(ABSOLUTE_LIFETIME));
+            now.plus(ABSOLUTE_LIFETIME),
+            selection.mode(),
+            selection.tenantId(),
+            selection.membershipId());
 
     transactions.required(
         () -> {
@@ -118,10 +147,13 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
     return new AuthenticationSession(
         prepared.sessionId(),
         prepared.refreshFamilyId(),
+        prepared.userId(),
         refresh.encoded(),
         prepared.idleExpiresAt(),
         prepared.absoluteExpiresAt(),
-        AuthenticationSessionMode.AUTHENTICATED_ONBOARDING);
+        prepared.mode(),
+        prepared.selectedTenantId(),
+        prepared.selectedMembershipId());
   }
 
   private static boolean sameHash(String expected, String actual) {

@@ -75,7 +75,7 @@ They answer whether the build resolved the expected dependency bytes/metadata. T
 
 OSV-Scanner is the selected early advisory scanner for supported declared/locked dependency evidence.
 
-Current repository implementation pins OSV-Scanner 2.4.0 in the implemented Compromised Password, Notification, and Identity service security suites, scans their Gradle lockfiles during blocking service security verification, and re-runs those security suites from the scheduled repository workflow. Exact downloaded-binary checksum ownership remains in each implemented workflow.
+Current repository implementation pins OSV-Scanner 2.4.0 in the implemented Compromised Password, Notification, Identity, Authorization, and Web BFF service security suites, scans their Gradle lockfiles during blocking service security verification, and re-runs those security suites from the scheduled repository workflow. Exact downloaded-binary checksum ownership remains in each implemented workflow.
 
 This is useful fast feedback, but it is not the final-artifact vulnerability authority:
 
@@ -166,8 +166,8 @@ Architecture selection is not implementation evidence.
 
 At the current repository state:
 
-- repository Semgrep rules exist for the implemented Compromised Password, Notification, and Identity registration plus authentication/session/JWT slices;
-- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, and Identity and is wired into PR/push/scheduled repository security workflows; protected merged-main advisory scans passed for all three implemented service suites on `main@a3766bd`;
+- repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, and Web BFF;
+- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, and Web BFF and is wired into PR/push/scheduled repository security workflows; prior protected Compromised Password/Notification/Identity advisory scans passed on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`;
 - Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in the Identity security workflow with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; local fixtures/current-tree/full-current-history execution passed, and protected Identity current-tree/full-history execution passed on `main@a3766bd`;
 - final-image Syft SBOM generation is **NOT PRESENT / NOT VERIFIED**;
 - final-image/SBOM Grype vulnerability gating is **NOT PRESENT / NOT VERIFIED**;

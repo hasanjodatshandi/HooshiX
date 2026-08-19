@@ -1,0 +1,50 @@
+version: 1
+permissions:
+  - key: tenant.read
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: tenant.delete
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: role.read
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: role.create
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: role.update
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: role.archive
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: role.permission.manage
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: membership.read
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: membership.role.assign
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: membership.permission.manage
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: membership.owner.assign
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: platform.tenant.create
+    scope: PLATFORM
+    lifecycle: ACTIVE
+  - key: platform.tenant.suspend
+    scope: PLATFORM
+    lifecycle: ACTIVE
+  - key: platform.tenant.resume
+    scope: PLATFORM
+    lifecycle: ACTIVE
+  - key: platform.tenant.restore
+    scope: PLATFORM
+    lifecycle: ACTIVE
+  - key: platform.legal_hold.manage
+    scope: PLATFORM
+    lifecycle: ACTIVE

@@ -75,10 +75,13 @@ public final class RefreshSessionUseCase implements RefreshSession {
     return new AuthenticationSession(
         decision.current.sessionId(),
         decision.current.refreshFamilyId(),
+        decision.current.userId(),
         next.encoded(),
         decision.idleExpiresAt,
         decision.current.absoluteExpiresAt(),
-        decision.current.sessionMode());
+        decision.current.sessionMode(),
+        decision.current.selectedTenantId(),
+        decision.current.selectedMembershipId());
   }
 
   private static Instant minimum(Instant a, Instant b) {

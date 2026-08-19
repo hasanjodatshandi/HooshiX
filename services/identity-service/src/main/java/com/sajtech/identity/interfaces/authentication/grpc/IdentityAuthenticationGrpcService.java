@@ -54,6 +54,13 @@ public final class IdentityAuthenticationGrpcService
               .setRefreshIdleExpiresAt(timestamp(session.idleExpiresAt()))
               .setRefreshAbsoluteExpiresAt(timestamp(session.absoluteExpiresAt()))
               .setSessionMode(mode(session.mode()))
+              .setUserId(session.userId().toString())
+              .setSelectedTenantId(
+                  session.selectedTenantId() == null ? "" : session.selectedTenantId().toString())
+              .setSelectedMembershipId(
+                  session.selectedMembershipId() == null
+                      ? ""
+                      : session.selectedMembershipId().toString())
               .build());
       observer.onCompleted();
     } catch (AuthenticationException exception) {
@@ -80,6 +87,13 @@ public final class IdentityAuthenticationGrpcService
               .setRefreshIdleExpiresAt(timestamp(session.idleExpiresAt()))
               .setRefreshAbsoluteExpiresAt(timestamp(session.absoluteExpiresAt()))
               .setSessionMode(mode(session.mode()))
+              .setUserId(session.userId().toString())
+              .setSelectedTenantId(
+                  session.selectedTenantId() == null ? "" : session.selectedTenantId().toString())
+              .setSelectedMembershipId(
+                  session.selectedMembershipId() == null
+                      ? ""
+                      : session.selectedMembershipId().toString())
               .build());
       observer.onCompleted();
     } catch (AuthenticationException exception) {
@@ -178,6 +192,9 @@ public final class IdentityAuthenticationGrpcService
       case AUTHENTICATED_ONBOARDING ->
           com.sajtech.identity.contract.v1.AuthenticationSessionMode
               .AUTHENTICATION_SESSION_MODE_AUTHENTICATED_ONBOARDING;
+      case TENANT_AUTHENTICATED ->
+          com.sajtech.identity.contract.v1.AuthenticationSessionMode
+              .AUTHENTICATION_SESSION_MODE_TENANT_AUTHENTICATED;
     };
   }
 

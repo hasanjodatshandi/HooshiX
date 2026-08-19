@@ -1,0 +1,8 @@
+spring:
+  config:
+    import: optional:configtree:/run/secrets/authorization-db-migration/
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  main:
+    web-application-type: none
