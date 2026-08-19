@@ -492,6 +492,39 @@ class DesktopEngineTest(unittest.TestCase):
             self.assertEqual("CREDENTIAL_BINDING_MISMATCH", mismatch.exception.code)
             self.assertEqual([], engine.credential_input.calls)
 
+    def test_use_credential_rejects_pid_change_after_focus_before_helper(self) -> None:
+        binding = {
+            "credential_id": "notepad-main",
+            "app": "notepad",
+            "executable_path": r"C:\Program Files\WindowsApps\Notepad\notepad.exe",
+            "executable_sha256": "1" * 64,
+            "target_selector": "PasswordBox",
+            "credential_target": "HooshiX/Desktop/notepad-main",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            list_calls = 0
+
+            def handler(args: list[str]) -> RunnerResult:
+                nonlocal list_calls
+                if args == ["ui", "list-windows", "--json"]:
+                    list_calls += 1
+                    process_id = 11 if list_calls == 1 else 44
+                    return rr_json([{**WINDOWS[0], "processId": process_id}])
+                return rr_json({"ok": True})
+
+            engine, _, _ = make_engine(
+                root,
+                runner=FakeRunner(handler),
+                allow_credential_input=True,
+                credential_bindings=[binding],
+            )
+            engine.credential_process_identity = lambda pid: (binding["executable_path"], "1" * 64)
+            with self.assertRaises(DesktopError) as caught:
+                engine.use_credential(1001, "notepad-main")
+            self.assertEqual("CREDENTIAL_BINDING_MISMATCH", caught.exception.code)
+            self.assertEqual([], engine.credential_input.calls)
+
     def test_use_credential_rejects_executable_path_or_hash_mismatch_before_helper(self) -> None:
         binding = {
             "credential_id": "notepad-main",

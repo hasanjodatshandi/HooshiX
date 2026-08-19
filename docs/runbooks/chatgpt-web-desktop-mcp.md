@@ -154,7 +154,7 @@ Use the real normalized process name from `desktop.list_windows`. Resolve the ex
 
 Provision the password **locally under the same interactive Windows account that runs Desktop MCP** as a Windows Credential Manager Generic Credential whose target exactly matches `credential_target`. Enter the real secret only through the trusted local Windows credential-management UI/path. Do not paste the secret into ChatGPT, PowerShell command arguments, repository files, policy JSON, logs, or MCP tools. Desktop MCP intentionally has no credential enrollment/list/read/delete API.
 
-V1 expects that Generic Credential blob to represent the password as UTF-16LE and rejects unsupported/oversized blobs. First validate the host path with a disposable credential and disposable/password-capable target. Do not enable a valuable credential until wrong-window/focus-change negatives and audit/process redaction are verified.
+Windows treats the `CRED_TYPE_GENERIC` blob as application-defined; it does not supply a standard password encoding for that blob. HooshiX v1 provisioning therefore requires the Generic Credential blob used by this broker to contain the password as UTF-16LE and rejects unsupported/oversized blobs. First validate the host path with a disposable credential and disposable/password-capable target. Do not enable a valuable credential until wrong-window/focus-change negatives and audit/process redaction are verified.
 
 The Windows user account remains part of the trust boundary. ADR-0050 prevents the ChatGPT/MCP/Python path from receiving the value; it does not claim to protect the credential from malware or compromise running with the same Windows-user authority.
 

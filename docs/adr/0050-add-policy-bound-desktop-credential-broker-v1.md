@@ -89,7 +89,7 @@ The helper contract is:
 - one fixed repository PowerShell script;
 - one fixed embedded C# implementation;
 - `-NoProfile -NonInteractive`;
-- bounded UTF-8 JSON stdin containing only HWND, Credential Manager target name, and a size bound;
+- bounded UTF-8 JSON stdin containing only HWND, expected PID, Credential Manager target name, the policy-derived unique-password focus flag, and a size bound;
 - sanitized child environment;
 - `CredReadW(..., CRED_TYPE_GENERIC, ...)` only;
 - at most 256 UTF-16 code units in v1;
@@ -102,7 +102,7 @@ The helper does not convert the credential blob to a managed `String`, does not 
 
 The Credential Manager target name is a non-secret policy identifier. It is sent to the fixed helper over stdin and is not put in child argv or environment.
 
-V1 expects the Generic Credential blob to contain the operator-provisioned password as UTF-16LE code units. Unsupported or oversized blobs fail closed.
+Windows defines the `CRED_TYPE_GENERIC` credential blob as application-defined; it does not define a password encoding for that blob. HooshiX v1 therefore defines its own provisioning contract: the operator-provisioned Generic Credential blob used by this broker MUST contain the password as UTF-16LE code units. Unsupported or oversized blobs fail closed.
 
 ### 4. MCP contract and output
 
