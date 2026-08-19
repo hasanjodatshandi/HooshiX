@@ -167,6 +167,41 @@ class IsolatedWindowsCredentialInputTest(unittest.TestCase):
         self.assertNotIn("Marshal.PtrToString", source)
         self.assertNotIn("CredentialBlob).ToString", source)
 
+    def test_repository_helper_native_password_fallback_is_bounded_unique_and_fail_closed(self) -> None:
+        helper = Path(__file__).resolve().parents[1] / "windows_credential_input_helper.ps1"
+        source = helper.read_text(encoding="utf-8")
+        for required in (
+            "EnumChildWindows",
+            "IsChild",
+            "IsWindowVisible",
+            "IsWindowEnabled",
+            "WindowsForms10.EDIT.",
+            "ES_PASSWORD",
+            "ES_MULTILINE",
+            "EM_GETPASSWORDCHAR",
+            "SendMessageTimeoutW",
+            "SMTO_ABORTIFHUNG",
+            "GetGUIThreadInfo",
+            "AttachThreadInput",
+            "attached && !AttachThreadInput(currentThreadId, targetThreadId, false)",
+            "RequireNativePasswordFocus",
+        ):
+            self.assertIn(required, source)
+        self.assertIn("nativeMatches.Count != 1", source)
+        self.assertIn("actualProcessId != (uint)expectedProcessId", source)
+        self.assertIn("GetForegroundWindow().ToInt64() != hwnd", source)
+        self.assertIn("(style & ES_PASSWORD) == 0 || (style & ES_MULTILINE) != 0", source)
+
+        focus_start = source.index("private static PasswordTarget FocusUniquePassword")
+        focus_end = source.index("private static void RequireSameFocus", focus_start)
+        focus = source[focus_start:focus_end]
+        multiple_uia = focus.index("if (visibleMatches > 1)")
+        one_uia = focus.index("if (visibleMatches == 1")
+        native_fallback = focus.index("FindNativePasswordControls")
+        self.assertLess(multiple_uia, native_fallback)
+        self.assertLess(one_uia, native_fallback)
+        self.assertIn("throw new InvalidOperationException(\"CREDENTIAL_PASSWORD_TARGET_AMBIGUOUS:0\")", focus)
+
 
 if __name__ == "__main__":
     unittest.main()

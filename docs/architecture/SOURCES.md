@@ -78,6 +78,12 @@ ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the exis
 - Microsoft `CredReadW` reference: `https://learn.microsoft.com/windows/win32/api/wincred/nf-wincred-credreadw`
 - Microsoft `CREDENTIALW` reference: `https://learn.microsoft.com/windows/win32/api/wincred/ns-wincred-credentialw`
 - Microsoft UI Automation `AutomationElement.IsPasswordProperty`: `https://learn.microsoft.com/dotnet/api/system.windows.automation.automationelement.ispasswordproperty`
+- Microsoft `EM_GETPASSWORDCHAR`: `https://learn.microsoft.com/windows/win32/controls/em-getpasswordchar`
+- Microsoft edit-control styles including `ES_PASSWORD`: `https://learn.microsoft.com/windows/win32/controls/edit-control-styles`
+- Microsoft `EnumChildWindows`: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumchildwindows`
+- Microsoft `GetGUIThreadInfo` / `GUITHREADINFO`: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getguithreadinfo`
+- Microsoft `AttachThreadInput`: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-attachthreadinput`
+- Microsoft `SendInput` UIPI behavior: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendinput`
 
 ADR-0049 uses WinApp CLI only as pinned developer-host UI automation tooling behind HooshiX policy/MCP controls. ADR-0050 uses Windows Credential Manager/UI Automation only for a policy-bound use-without-disclosure broker. Neither decision creates production authority, a credential reader, or a UAC/Secure-Desktop bypass.
 

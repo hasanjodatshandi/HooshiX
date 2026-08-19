@@ -72,9 +72,10 @@ For every `desktop.use_credential` call:
 4. For a normal semantic selector, Desktop uses WinApp only to focus the selector stored in local policy. For `@unique-password`, Desktop does not pass an unstable caller/UI selector to WinApp.
 5. Desktop resolves the HWND/process and executable path/SHA-256 again after the optional WinApp focus operation and requires the PID to be unchanged.
 6. The fixed credential helper verifies that the requested HWND still belongs to the expected PID and is the foreground window.
-7. For a normal selector, the helper verifies that the currently focused UI Automation element has `IsPassword=true` and belongs to the requested HWND. For `@unique-password`, the helper enumerates enabled, visible `IsPassword=true` descendants of that HWND, requires **exactly one**, focuses it, and verifies that focus. Zero or multiple matches fail closed.
-8. Only after those checks pass may the helper call `CredReadW`.
-9. Before every UTF-16 code unit, the helper verifies the same HWND/PID, foreground HWND, and focused password element.
+7. For a normal selector, the helper verifies that the currently focused UI Automation element has `IsPassword=true` and belongs to the requested HWND. For `@unique-password`, UI Automation remains the first authority: more than one enabled/visible `IsPassword=true` descendant fails closed; exactly one is focused and verified. Only when UI Automation reports **zero** eligible password descendants may the helper use the legacy native-edit fallback. That fallback enumerates descendant HWNDs and requires exactly one enabled/visible single-line `Edit` or `WindowsForms10.EDIT.*` control in the same PID with `ES_PASSWORD` set and a non-zero `EM_GETPASSWORDCHAR` result obtained through bounded `SendMessageTimeoutW`; zero, multiple, hung/unverifiable, wrong-process, non-child, disabled, hidden, multiline, or unmasked candidates fail closed.
+8. For the native fallback, the helper temporarily attaches only its input thread to the already-authorized target GUI thread to set focus, detaches immediately, then verifies the exact native focus HWND through `GetGUIThreadInfo`. The same native HWND/PID/foreground/password predicates are rechecked before every delivered UTF-16 code unit.
+9. Only after the applicable UIA/native password-target checks pass may the helper call `CredReadW`.
+10. `SendInput` remains subject to Windows UIPI. The broker does not bypass integrity boundaries: a Desktop/helper process cannot inject into a target at a higher integrity level, and that case remains a host/runtime incompatibility rather than a reason to elevate or weaken the ordinary Desktop profile automatically.
 
 A focus/app/window change fails closed. When partial input may already have occurred, the operation reports only that boolean condition and MUST NOT retry automatically.
 
@@ -178,7 +179,9 @@ Repository evidence MUST prove at least:
 - audit contains hashes only and no raw binding identifiers/targets/selectors;
 - the Python adapter passes only non-secret reference metadata to the fixed helper and sanitizes its environment;
 - helper success/error protocols cannot return credential content or length;
-- the helper verifies HWND/PID continuity plus focused `IsPassword=true` before `CredReadW`; `@unique-password` additionally requires exactly one enabled/visible password descendant; unchanged process/focus/foreground is verified during delivery;
+- the helper verifies HWND/PID continuity plus focused `IsPassword=true` before `CredReadW`; `@unique-password` remains UIA-first and falls back only on zero UIA matches to exactly one same-PID, enabled/visible, single-line native `Edit`/`WindowsForms10.EDIT.*` child with `ES_PASSWORD` plus non-zero bounded `EM_GETPASSWORDCHAR`; multiple UIA matches never fall through to native matching;
+- native fallback focus is set only after exact candidate selection, uses bounded thread-input attachment, is verified with `GetGUIThreadInfo`, and the same native target/PID/foreground/password predicates are checked during delivery;
+- UIPI/elevated-target behavior remains fail-closed; the broker does not auto-elevate or bypass Windows integrity controls;
 - `CredFree` always releases the credential buffer;
 - timeout/partial-input failure does not create automatic retry;
 - Context and Ops MCP tool surfaces remain unchanged.
@@ -186,7 +189,8 @@ Repository evidence MUST prove at least:
 Host evidence is separate. Before an application credential is considered usable, the operator must verify with a disposable/synthetic credential that:
 
 - the credential exists under the intended interactive Windows account;
-- the selected application/password element is uniquely targeted and reports UIA password semantics; for a control without a stable AutomationId, `@unique-password` is allowed only when the helper proves exactly one eligible password control;
+- the selected application/password element is uniquely targeted; UIA password semantics are preferred, while `@unique-password` may use the bounded native-edit fallback only when UIA reports zero matches and the helper proves exactly one eligible native password edit as defined above;
+- the target application runs at an integrity level that the Desktop/helper process is permitted to receive `SendInput` from; higher-integrity targets are not made automatable by weakening UIPI or automatically elevating Desktop;
 - the binding records the intended executable absolute path and SHA-256, and an executable update requires review/rebinding before credential use resumes;
 - the broker can apply the disposable credential without exposing it in audit/process arguments/environment;
 - wrong-window and focus-change cases fail;
