@@ -6,8 +6,8 @@ option java_multiple_files = true;
 option java_package = "com.sajtech.identity.contract.v1";
 
 service IdentityRegistrationService {
-  rpc RegisterLocal(RegisterLocalRequest) returns (RegistrationAcceptedResponse);
-  rpc ResendRegistrationVerification(ResendRegistrationVerificationRequest) returns (RegistrationAcceptedResponse);
+  rpc RegisterLocal(RegisterLocalRequest) returns (RegisterLocalResponse);
+  rpc ResendRegistrationVerification(ResendRegistrationVerificationRequest) returns (ResendRegistrationVerificationResponse);
   rpc ConfirmRegistration(ConfirmRegistrationRequest) returns (ConfirmRegistrationResponse);
 }
 
@@ -39,7 +39,11 @@ message RegisterLocalRequest {
   TrustedClientAddress client_address = 9;
 }
 
-message RegistrationAcceptedResponse {
+message RegisterLocalResponse {
+  bool accepted = 1;
+}
+
+message ResendRegistrationVerificationResponse {
   bool accepted = 1;
 }
 

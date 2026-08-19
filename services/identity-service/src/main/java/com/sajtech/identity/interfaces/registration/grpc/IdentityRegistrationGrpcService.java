@@ -24,7 +24,7 @@ public final class IdentityRegistrationGrpcService
 
   @Override
   public void registerLocal(
-      RegisterLocalRequest request, StreamObserver<RegistrationAcceptedResponse> observer) {
+      RegisterLocalRequest request, StreamObserver<RegisterLocalResponse> observer) {
     try {
       register.register(
           new RegisterLocalCommand(
@@ -37,7 +37,7 @@ public final class IdentityRegistrationGrpcService
               request.getLastName(),
               request.hasFatherName() ? request.getFatherName() : null,
               address(request.getClientAddress().getAddress())));
-      observer.onNext(RegistrationAcceptedResponse.newBuilder().setAccepted(true).build());
+      observer.onNext(RegisterLocalResponse.newBuilder().setAccepted(true).build());
       observer.onCompleted();
     } catch (RegistrationException exception) {
       observer.onError(status(exception).asRuntimeException());
@@ -50,7 +50,7 @@ public final class IdentityRegistrationGrpcService
   @Override
   public void resendRegistrationVerification(
       ResendRegistrationVerificationRequest request,
-      StreamObserver<RegistrationAcceptedResponse> observer) {
+      StreamObserver<ResendRegistrationVerificationResponse> observer) {
     try {
       resend.resend(
           new ResendRegistrationCommand(
@@ -58,7 +58,8 @@ public final class IdentityRegistrationGrpcService
               channel(request.getChannel()),
               request.getContact(),
               address(request.getClientAddress().getAddress())));
-      observer.onNext(RegistrationAcceptedResponse.newBuilder().setAccepted(true).build());
+      observer.onNext(
+          ResendRegistrationVerificationResponse.newBuilder().setAccepted(true).build());
       observer.onCompleted();
     } catch (RegistrationException exception) {
       observer.onError(status(exception).asRuntimeException());
