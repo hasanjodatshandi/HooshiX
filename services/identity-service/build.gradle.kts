@@ -28,6 +28,7 @@ sourceSets {
 
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
+    implementation(platform("io.netty:netty-bom:4.2.16.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-jooq")
