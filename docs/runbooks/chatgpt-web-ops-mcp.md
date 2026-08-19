@@ -233,6 +233,8 @@ No finite maximum runtime
 
 The task command should contain the tunnel-client profile selection only. It must not contain the runtime API key literal.
 
+Do not rely on the Task Scheduler `restart after` setting as the only recovery mechanism. The verified host uses a secret-free wrapper supervisor for tunnel-client child exit plus the shared `HooshiX MCP Tunnel Watchdog` for parent-task/process/readiness recovery. The watchdog runs once per minute, checks only the three named HooshiX tunnel tasks/profiles, enforces one process per profile, uses loopback `/readyz` after startup grace, removes same-profile orphan duplicates before clean restart, and never reads the runtime key. Record bounded tunnel logs and enable `Microsoft-Windows-TaskScheduler/Operational`. Recovery evidence includes tunnel-client child kill, Python MCP-child kill/unready, and complete Ops task stop, each followed by automatic recovery and restored `/readyz`.
+
 Preserve:
 
 - loopback-only health/admin UI;
