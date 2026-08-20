@@ -76,7 +76,7 @@ The bridge uses fixed argument arrays. Caller data MUST NOT select a different d
 
 ADR-0048 remains authoritative for Ops policy, filesystem/process authority, audit, elevation, and developer-host-only scope.
 
-Ops remains Windows-hosted. HooshiX project commands run through an explicit `wsl.exe` policy alias and use `/home/coder/workspace/Hooshix`.
+Ops remains Windows-hosted. HooshiX project commands run through an explicit `wsl.exe` policy alias and use `/home/coder/workspace/Hooshix`. Long developer-host commands use the ADR-0048 persistent process-job surface when they can exceed one synchronous tunnel response lifetime; job state remains in protected Windows Ops state and does not move application Git authority out of WSL.
 
 The old Windows HooshiX checkout is not an approved application mutation root. A broad PowerShell, Python, or WSL alias is still broad host authority. It is not a sandbox and it is not production authority.
 
@@ -108,7 +108,7 @@ Exact local tool versions remain in `docs/technology/local-development-baseline.
 
 HooshiX CI continues to verify project Context metadata, routing, checkpoints, generated task matrix, repository structure, and application/service gates. HooshiX CI does not claim to test the external Windows MCP runtime after extraction.
 
-Host evidence must verify that all three live MCP backends run from the independent Windows runtime, Context reports `/home/coder/workspace/Hooshix`, Ops can run a harmless Git command through WSL in that checkout, Desktop reports expected policy state, and no live MCP backend command references the old Windows HooshiX checkout.
+Host evidence must verify that all three live MCP backends run from the independent Windows runtime, Context reports `/home/coder/workspace/Hooshix`, Ops can run a harmless Git command through WSL in that checkout, the reviewed Ops process-job surface survives one MCP response lifetime with bounded polling/cancellation, Desktop reports expected policy state, and no live MCP backend command references the old Windows HooshiX checkout.
 
 Repository baseline verification must reject reintroduction of the MCP runtime paths externalized by this ADR.
 
