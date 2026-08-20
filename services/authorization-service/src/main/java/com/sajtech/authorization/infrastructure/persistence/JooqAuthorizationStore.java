@@ -1250,12 +1250,26 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
 
   private static int execute(DSLContext tx, String sql, Object... arguments) {
     Object[] normalized = new Object[arguments.length];
-    for (int i = 0; i < arguments.length; i++) {
-      Object value = arguments[i];
-      normalized[i] =
-          value instanceof Instant instant ? instant.atOffset(java.time.ZoneOffset.UTC) : value;
+    StringBuilder typedSql = new StringBuilder(sql.length() + arguments.length * 32);
+    int argument = 0;
+    for (int i = 0; i < sql.length(); i++) {
+      char c = sql.charAt(i);
+      if (c == '?' && argument < arguments.length) {
+        Object value = arguments[argument];
+        if (value instanceof Instant instant) {
+          typedSql.append("CAST(? AS TIMESTAMP WITH TIME ZONE)");
+          normalized[argument] = instant.atOffset(java.time.ZoneOffset.UTC);
+        } else {
+          typedSql.append('?');
+          normalized[argument] = value;
+        }
+        argument++;
+      } else {
+        typedSql.append(c);
+      }
     }
-    return tx.execute(sql, normalized);
+    if (argument != arguments.length) throw new IllegalArgumentException("SQL bind count mismatch");
+    return tx.execute(typedSql.toString(), normalized);
   }
 
   private static AuthorizationException error(AuthorizationError error, String message) {
