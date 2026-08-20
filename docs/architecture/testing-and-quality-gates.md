@@ -11,6 +11,7 @@ Use the smallest trustworthy layer:
 - Domain/Application unit tests;
 - ArchUnit package/layer/dependency tests;
 - focused adapter/Testcontainers tests for PostgreSQL/Redis/Kafka/SQLite/protocol behavior;
+- integrated WSL application-runtime verification after focused source/service gates when cross-service composition is in scope;
 - gRPC/Protobuf/OpenAPI/provider contract tests;
 - Flyway/RLS/security tests;
 - Gitleaks current-tree/Git-history secret-scanning tests;

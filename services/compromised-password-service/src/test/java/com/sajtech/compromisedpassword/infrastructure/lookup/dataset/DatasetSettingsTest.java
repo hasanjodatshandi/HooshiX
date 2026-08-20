@@ -13,8 +13,8 @@ class DatasetSettingsTest {
     assertThatThrownBy(
             () ->
                 new DatasetSettings(
-                    Path.of("/data/corpus.sqlite?mode=rw"),
-                    Path.of("/data/release-manifest.json"),
+                    Path.of("data/corpus.sqlite?mode=rw"),
+                    Path.of("data/release-manifest.json"),
                     SHA256,
                     "GENERATED_TEST_FIXTURE",
                     1,
@@ -25,8 +25,8 @@ class DatasetSettingsTest {
     assertThatThrownBy(
             () ->
                 new DatasetSettings(
-                    Path.of("/data/corpus%2fshadow.sqlite"),
-                    Path.of("/data/release-manifest.json"),
+                    Path.of("data/corpus%2fshadow.sqlite"),
+                    Path.of("data/release-manifest.json"),
                     SHA256,
                     "GENERATED_TEST_FIXTURE",
                     1,
@@ -37,8 +37,8 @@ class DatasetSettingsTest {
     assertThatThrownBy(
             () ->
                 new DatasetSettings(
-                    Path.of("/data/corpus.sqlite"),
-                    Path.of("/data/release-manifest.json#fragment"),
+                    Path.of("data/corpus.sqlite"),
+                    Path.of("data/release-manifest.json#fragment"),
                     SHA256,
                     "GENERATED_TEST_FIXTURE",
                     1,
@@ -52,8 +52,8 @@ class DatasetSettingsTest {
     assertThatThrownBy(
             () ->
                 new DatasetSettings(
-                    Path.of("/data/corpus.sqlite"),
-                    Path.of("/data/release-manifest.json"),
+                    Path.of("data/corpus.sqlite"),
+                    Path.of("data/release-manifest.json"),
                     "ABC",
                     "GENERATED_TEST_FIXTURE",
                     1,

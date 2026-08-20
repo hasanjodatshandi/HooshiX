@@ -42,7 +42,7 @@ web-bff:
   hmac-key-maximum-staleness: ${WEB_BFF_HMAC_KEY_MAXIMUM_STALENESS:PT5M}
   encryption-key-maximum-staleness: ${WEB_BFF_ENCRYPTION_KEY_MAXIMUM_STALENESS:PT1H}
   route-audiences:
-    /api/v1/authorization: authorization-service
+    "[/api/v1/authorization]": authorization-service
 logging:
   structured:
     format:

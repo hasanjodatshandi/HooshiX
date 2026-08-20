@@ -56,6 +56,25 @@ Local fakes/substitutes are allowed only where architecture permits and must be 
 
 ADR-0044 Day-One observability still applies to implementation code. A developer may use an in-memory/test OTLP exporter or local Collector fixture instead of starting Loki/Tempo/Prometheus for every edit. This does not replace staging/release evidence against the real stack.
 
+### Integrated WSL application runtime
+
+The canonical WSL checkout implements a repeatable fast-lane integrated runtime under `infrastructure/local/` and `scripts/local/runtime.py`. It runs pinned PostgreSQL/Redis plus all five current executable Spring Boot services together without claiming Kubernetes/mesh/edge fidelity.
+
+Repository interfaces are:
+
+```text
+make local-runtime-test
+make local-runtime-up
+make local-runtime-status
+make local-runtime-logs
+make local-runtime-down
+make local-runtime-reset
+```
+
+The local runtime generates database credentials, HMAC/AES key rings, an RSA-3072 Identity signing/verifier pair, the Web BFF self-signed HTTPS material, and the generated Compromised Password fixture only under Git-ignored `.local-runtime/`. Identity/Authorization host-time health uses an explicit local fixture and Notification uses only its `local & !staging & !production` simulated providers. These are developer-lane substitutes and are not staging/production evidence.
+
+The Web BFF local public origin is `https://localhost:18443`; PostgreSQL and Redis are loopback-bound on ports `15432` and `16379`. See `docs/runbooks/local-integrated-runtime.md`.
+
 ## 3. Application baseline
 
 | Component | Version/policy |
@@ -194,10 +213,18 @@ GitHub Actions remains required CI target. Documentation alone is not executed e
 
 ## 8. Expected repository interfaces
 
-After implementation exists:
+Implemented fast-lane interfaces include:
 
 ```text
 make baseline-verify
+make local-runtime-test
+make local-runtime-up
+make local-runtime-status
+```
+
+Production-fidelity interfaces are added/used when their corresponding infrastructure exists:
+
+```text
 make local-cluster-verify
 make verify-local-istio-ambient
 make verify-local-traefik-edge

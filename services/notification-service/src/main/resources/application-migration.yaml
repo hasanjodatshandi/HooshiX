@@ -12,3 +12,6 @@ server:
 management:
   server:
     port: -1
+  endpoint:
+    health:
+      validate-group-membership: false

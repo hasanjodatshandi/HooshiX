@@ -6,6 +6,7 @@ import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,12 +27,13 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
   private volatile boolean running;
 
   public GrpcServerLifecycle(
+      String bindAddress,
       int port,
       int maxConcurrentCallsPerConnection,
       BindableService service,
       ServerInterceptor interceptor) {
-    if (port <= 0 || port > 65_535) {
-      throw new IllegalArgumentException("Invalid gRPC port");
+    if (bindAddress == null || bindAddress.isBlank() || port <= 0 || port > 65_535) {
+      throw new IllegalArgumentException("Invalid gRPC bind address or port");
     }
     if (maxConcurrentCallsPerConnection <= 0) {
       throw new IllegalArgumentException(
@@ -41,7 +43,7 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
     Objects.requireNonNull(interceptor, "interceptor");
     requestExecutor = Executors.newVirtualThreadPerTaskExecutor();
     server =
-        NettyServerBuilder.forPort(port)
+        NettyServerBuilder.forAddress(new InetSocketAddress(bindAddress, port))
             .executor(requestExecutor)
             .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
             .maxInboundMessageSize(MAX_INBOUND_MESSAGE_BYTES)

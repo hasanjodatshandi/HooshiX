@@ -219,7 +219,7 @@ CI SHOULD enforce when implemented:
 
 These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
 
-`make baseline-verify` includes project Context Engine/checkpoint tests and verification plus the ADR-0051 guard against reintroducing external MCP runtime paths. Independent Windows MCP runtime tests are a separate developer-tool gate.
+`make baseline-verify` includes project Context Engine/checkpoint tests and verification, the ADR-0051 guard against reintroducing external MCP runtime paths, and the pure local-runtime contract test that rejects unsafe repository/runtime-path, port, role, TLS, or loopback configuration drift without starting Docker or services. Independent Windows MCP runtime tests are a separate developer-tool gate.
 
 HooshiX CI proves repository governance and application/service gates. Independent MCP runtime tests prove developer-tool source contracts. Real tunnel-client, Windows ACL/token/session/background state, live Context/Ops/Desktop calls, and application-specific credential use remain host/integration evidence.
 

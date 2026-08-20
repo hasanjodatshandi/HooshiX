@@ -17,6 +17,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -89,9 +90,14 @@ public class RuntimeConfiguration {
   GrpcServerLifecycle grpcServerLifecycle(
       CompromisedPasswordProperties properties,
       CompromisedPasswordGrpcService service,
-      SafeTracingServerInterceptor interceptor) {
+      SafeTracingServerInterceptor interceptor,
+      @Value("${hooshix.compromised-password.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
-        properties.grpcPort(), properties.maxConcurrentLookups(), service, interceptor);
+        bindAddress,
+        properties.grpcPort(),
+        properties.maxConcurrentLookups(),
+        service,
+        interceptor);
   }
 
   @Bean(name = "compromisedPasswordDatasetHealthIndicator")

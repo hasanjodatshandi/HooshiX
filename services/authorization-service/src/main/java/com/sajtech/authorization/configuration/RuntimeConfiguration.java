@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.util.List;
 import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
@@ -146,8 +147,10 @@ public class RuntimeConfiguration {
       AuthorizationProperties p,
       AuthorizationGrpcService service,
       AuthorizationObservabilityInterceptor telemetry,
-      JwtActorServerInterceptor jwt) {
+      JwtActorServerInterceptor jwt,
+      @Value("${authorization.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
+        bindAddress,
         p.grpcPort(),
         p.maxConcurrentCallsPerConnection(),
         p.runtimeEnabled(),

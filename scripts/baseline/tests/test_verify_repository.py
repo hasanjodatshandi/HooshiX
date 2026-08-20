@@ -78,6 +78,25 @@ edges:
             self.assertTrue(any("actual.txt" in error for error in errors))
             self.assertTrue(any("stale.txt" in error for error in errors))
 
+    def test_repository_files_exclude_generated_local_runtime_and_gradle_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "tracked.txt").write_text("source\n", encoding="utf-8")
+            generated = [
+                root / ".local-runtime/keys/private.properties",
+                root / "services/sample/build/generated.txt",
+                root / "services/sample/.gradle/cache.bin",
+            ]
+            for path in generated:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("generated\n", encoding="utf-8")
+
+            files = verifier.collect_repository_files(root)
+
+            self.assertIn("tracked.txt", files)
+            for path in generated:
+                self.assertNotIn(path.relative_to(root).as_posix(), files)
+
     def test_adr_register_detects_identifier_reuse(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
