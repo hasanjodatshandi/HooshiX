@@ -17,8 +17,8 @@ spring:
     hikari:
       maximum-pool-size: 16
       minimum-idle: 1
-      connection-timeout: 50
-      validation-timeout: 50
+      connection-timeout: 250
+      validation-timeout: 250
   flyway:
     enabled: false
   jooq:

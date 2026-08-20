@@ -117,7 +117,7 @@ class AuthorizationPersistenceIntegrationTest {
               tx.fetchValue("SELECT set_config('app.current_tenant_id', ?, true)", t1.toString());
               Object v =
                   tx.fetchValue("SELECT count(*) FROM authorization_role WHERE tenant_id=?", t2);
-              return ((Number) v).intValue();
+              return ((Number) Objects.requireNonNull(v)).intValue();
             });
     assertThat(count).isZero();
   }
