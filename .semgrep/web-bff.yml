@@ -55,7 +55,7 @@ rules:
     severity: ERROR
     message: Web BFF browser endpoints must remain same-origin and must not use @CrossOrigin.
     paths: {include: [/services/web-bff/src/main/java]}
-    pattern: @CrossOrigin(...)
+    pattern: '@CrossOrigin(...)'
 
   - id: web-bff-no-raw-observation-error
     languages: [java]

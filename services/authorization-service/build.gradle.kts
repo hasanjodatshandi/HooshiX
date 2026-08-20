@@ -1,4 +1,5 @@
 import com.github.spotbugs.snom.SpotBugsExtension
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     java
@@ -75,6 +76,12 @@ val integrationTest = tasks.register<Test>("integrationTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     useJUnitPlatform { includeTags("integration") }
+    testLogging {
+        events("failed")
+        exceptionFormat = TestExceptionFormat.FULL
+        showCauses = true
+        showStackTraces = true
+    }
     shouldRunAfter(tasks.test)
 }
 val architectureTest = tasks.register<Test>("architectureTest") {
