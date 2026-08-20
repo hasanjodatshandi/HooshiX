@@ -182,26 +182,30 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           DSLContext tx = DSL.using(c);
           Replay replay = replay(tx, requestId, "PROVISION_OWNER", fp);
           if (replay.present()) return;
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_tenant_projection(tenant_id,lifecycle,updated_at) VALUES (?, 'ACTIVE', ?) ON CONFLICT (tenant_id) DO UPDATE SET lifecycle='ACTIVE',updated_at=EXCLUDED.updated_at",
               tenantId,
               now);
           setTenant(tx, tenantId);
           ensureSystemRoles(tx, tenantId, now);
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_projection(tenant_id,membership_id,user_id,lifecycle,updated_at) VALUES (?,?,?,'ACTIVE',?) ON CONFLICT (tenant_id,membership_id) DO UPDATE SET user_id=EXCLUDED.user_id,lifecycle='ACTIVE',updated_at=EXCLUDED.updated_at",
               tenantId,
               membershipId,
               userId,
               now);
           UUID owner = systemRoleId(tenantId, "tenant_owner");
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_role(tenant_id,membership_id,role_id,created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
               tenantId,
               membershipId,
               owner,
               now);
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_owner_safety_guard(tenant_id,guard_version,updated_at) VALUES (?,1,?) ON CONFLICT (tenant_id) DO NOTHING",
               tenantId,
               now);
@@ -241,13 +245,15 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           if (!"ACTIVE".equals(state))
             throw error(AuthorizationError.TENANT_NOT_AUTHORIZABLE, "Tenant is not active");
           ensureSystemRoles(tx, tenantId, now);
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_projection(tenant_id,membership_id,user_id,lifecycle,updated_at) VALUES (?,?,?,'ACTIVE',?) ON CONFLICT (tenant_id,membership_id) DO UPDATE SET user_id=EXCLUDED.user_id,lifecycle='ACTIVE',updated_at=EXCLUDED.updated_at",
               tenantId,
               membershipId,
               userId,
               now);
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_role(tenant_id,membership_id,role_id,created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
               tenantId,
               membershipId,
@@ -276,7 +282,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           Replay replay = replay(tx, requestId, "TENANT_LIFECYCLE", fp);
           if (replay.present()) return;
           int changed =
-              tx.execute(
+              execute(
+                  tx,
                   "UPDATE authorization_tenant_projection SET lifecycle=?,updated_at=? WHERE tenant_id=?",
                   lifecycle,
                   now,
@@ -339,7 +346,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
               throw error(
                   AuthorizationError.LAST_TENANT_OWNER, "Last tenant owner cannot be removed");
           }
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_removal_reservation(tenant_id,membership_id,request_id,state,created_at) VALUES (?,?,?,'PREPARED',?)",
               tenantId,
               membershipId,
@@ -379,20 +387,24 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           if (!"PREPARED".equals(state) && !"FINALIZED".equals(state))
             throw error(AuthorizationError.INVALID_ARGUMENT, "Removal preparation is missing");
           if ("PREPARED".equals(state)) {
-            tx.execute(
+            execute(
+                tx,
                 "DELETE FROM authorization_membership_role WHERE tenant_id=? AND membership_id=?",
                 tenantId,
                 membershipId);
-            tx.execute(
+            execute(
+                tx,
                 "DELETE FROM authorization_membership_permission_override WHERE tenant_id=? AND membership_id=?",
                 tenantId,
                 membershipId);
-            tx.execute(
+            execute(
+                tx,
                 "UPDATE authorization_membership_projection SET lifecycle='REMOVED',updated_at=? WHERE tenant_id=? AND membership_id=?",
                 now,
                 tenantId,
                 membershipId);
-            tx.execute(
+            execute(
+                tx,
                 "UPDATE authorization_membership_removal_reservation SET state='FINALIZED',resolved_at=? WHERE tenant_id=? AND membership_id=? AND request_id=?",
                 now,
                 tenantId,
@@ -436,7 +448,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
             throw error(
                 AuthorizationError.INVALID_ARGUMENT, "Finalized removal cannot be cancelled");
           if ("PREPARED".equals(state))
-            tx.execute(
+            execute(
+                tx,
                 "UPDATE authorization_membership_removal_reservation SET state='CANCELLED',resolved_at=? WHERE tenant_id=? AND membership_id=? AND request_id=?",
                 now,
                 tenantId,
@@ -463,7 +476,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
         c -> {
           DSLContext tx = DSL.using(c);
           for (PermissionModel p : permissions)
-            tx.execute(
+            execute(
+                tx,
                 "INSERT INTO authorization_permission_definition(permission_key,scope,lifecycle,catalog_version,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(permission_key) DO UPDATE SET scope=EXCLUDED.scope,lifecycle=EXCLUDED.lifecycle,catalog_version=EXCLUDED.catalog_version,updated_at=EXCLUDED.updated_at",
                 p.key(),
                 p.scope(),
@@ -497,7 +511,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
   private void systemRole(
       DSLContext tx, UUID tenantId, String name, List<String> permissions, Instant now) {
     UUID roleId = systemRoleId(tenantId, name);
-    tx.execute(
+    execute(
+        tx,
         "INSERT INTO authorization_role(tenant_id,role_id,name,name_key,description,kind,lifecycle,version,created_at,updated_at) VALUES (?,?,?,?,?,'SYSTEM','ACTIVE',1,?,?) ON CONFLICT (tenant_id,role_id) DO NOTHING",
         tenantId,
         roleId,
@@ -507,7 +522,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
         now,
         now);
     for (String permission : permissions)
-      tx.execute(
+      execute(
+          tx,
           "INSERT INTO authorization_role_permission(tenant_id,role_id,permission_key,created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
           tenantId,
           roleId,
@@ -588,7 +604,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           requireGrantablePermissions(tx, actor, permissions, true);
           UUID roleId = UUID.randomUUID();
           int inserted =
-              tx.execute(
+              execute(
+                  tx,
                   """
         INSERT INTO authorization_role(tenant_id,role_id,name,name_key,description,kind,lifecycle,version,created_at,updated_at)
         SELECT ?,?,?,?,?,'CUSTOM','ACTIVE',1,?,?
@@ -606,7 +623,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           if (inserted != 1)
             throw error(AuthorizationError.ROLE_NAME_CONFLICT, "Role name is already used");
           for (String permission : permissions)
-            tx.execute(
+            execute(
+                tx,
                 "INSERT INTO authorization_role_permission(tenant_id,role_id,permission_key,created_at) VALUES (?,?,?,?)",
                 actor.tenantId(),
                 roleId,
@@ -657,7 +675,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
                   roleId);
           if (conflict != null && conflict > 0)
             throw error(AuthorizationError.ROLE_NAME_CONFLICT, "Role name is already used");
-          tx.execute(
+          execute(
+              tx,
               "UPDATE authorization_role SET name=?,name_key=?,description=?,version=version+1,updated_at=? WHERE tenant_id=? AND role_id=?",
               name,
               nameKey,
@@ -698,7 +717,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           requirePermission(tx, actor, "role.archive");
           RoleState state = lockRole(tx, actor.tenantId(), roleId);
           requireMutable(state, expectedVersion);
-          tx.execute(
+          execute(
+              tx,
               "UPDATE authorization_role SET lifecycle='ARCHIVED',version=version+1,updated_at=? WHERE tenant_id=? AND role_id=?",
               now,
               actor.tenantId(),
@@ -762,18 +782,21 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           Set<String> added = new HashSet<>(permissions);
           added.removeAll(current);
           requireGrantablePermissions(tx, actor, List.copyOf(added), true);
-          tx.execute(
+          execute(
+              tx,
               "DELETE FROM authorization_role_permission WHERE tenant_id=? AND role_id=?",
               actor.tenantId(),
               roleId);
           for (String permission : permissions)
-            tx.execute(
+            execute(
+                tx,
                 "INSERT INTO authorization_role_permission(tenant_id,role_id,permission_key,created_at) VALUES (?,?,?,?)",
                 actor.tenantId(),
                 roleId,
                 permission,
                 now);
-          tx.execute(
+          execute(
+              tx,
               "UPDATE authorization_role SET version=version+1,updated_at=? WHERE tenant_id=? AND role_id=?",
               now,
               actor.tenantId(),
@@ -835,7 +858,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
                   membershipId);
           if (count != null && count >= 20)
             throw error(AuthorizationError.LIMIT_EXCEEDED, "Membership role limit reached");
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_role(tenant_id,membership_id,role_id,created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING",
               actor.tenantId(),
               membershipId,
@@ -890,7 +914,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
               throw error(
                   AuthorizationError.LAST_TENANT_OWNER, "Last tenant owner cannot be removed");
           }
-          tx.execute(
+          execute(
+              tx,
               "DELETE FROM authorization_membership_role WHERE tenant_id=? AND membership_id=? AND role_id=?",
               actor.tenantId(),
               membershipId,
@@ -945,7 +970,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
                   permissionKey);
           if (existing == null && count != null && count >= 100)
             throw error(AuthorizationError.LIMIT_EXCEEDED, "Membership override limit reached");
-          tx.execute(
+          execute(
+              tx,
               "INSERT INTO authorization_membership_permission_override(tenant_id,membership_id,permission_key,decision,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT (tenant_id,membership_id,permission_key) DO UPDATE SET decision=EXCLUDED.decision,updated_at=EXCLUDED.updated_at",
               actor.tenantId(),
               membershipId,
@@ -993,7 +1019,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
                   membershipId,
                   permissionKey);
           if ("DENY".equals(existing)) requirePermission(tx, actor, permissionKey);
-          tx.execute(
+          execute(
+              tx,
               "DELETE FROM authorization_membership_permission_override WHERE tenant_id=? AND membership_id=? AND permission_key=?",
               actor.tenantId(),
               membershipId,
@@ -1155,7 +1182,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
       UUID tenantId,
       UUID reference,
       Instant now) {
-    tx.execute(
+    execute(
+        tx,
         "INSERT INTO authorization_idempotency_record(request_id,tenant_id,operation,intent_fingerprint,fingerprint_version,fingerprint_key_id,outcome_code,outcome_reference,created_at) VALUES (?,?,?,?,?,?,\'ACCEPTED\',?,?)",
         requestId,
         tenantId,
@@ -1189,7 +1217,8 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
       String result,
       String reason,
       Instant now) {
-    tx.execute(
+    execute(
+        tx,
         "INSERT INTO authorization_audit(audit_id,event_code,request_id,tenant_id,actor_user_id,target_id,result_code,reason,catalog_version,occurred_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
         UUID.randomUUID(),
         event,
@@ -1217,6 +1246,16 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
     return value == null
         ? null
         : (value instanceof Boolean b ? b : Boolean.valueOf(value.toString()));
+  }
+
+  private static int execute(DSLContext tx, String sql, Object... arguments) {
+    Object[] normalized = new Object[arguments.length];
+    for (int i = 0; i < arguments.length; i++) {
+      Object value = arguments[i];
+      normalized[i] =
+          value instanceof Instant instant ? instant.atOffset(java.time.ZoneOffset.UTC) : value;
+    }
+    return tx.execute(sql, normalized);
   }
 
   private static AuthorizationException error(AuthorizationError error, String message) {
