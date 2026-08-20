@@ -74,7 +74,15 @@ def make_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, ContextEngine]:
             "max_results": 20,
             "max_excerpt_chars": 480,
             "max_file_bytes": 1048576,
-            "excluded_filename_patterns": ["*.pem", ".env", ".env.*"],
+            "excluded_filename_patterns": [
+                "*.pem",
+                ".env",
+                ".env.*",
+                "credentials/*",
+                "*/credentials/*",
+                "secrets/*",
+                "*/secrets/*",
+            ],
         },
     }
     routes = {
@@ -115,7 +123,16 @@ def make_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, ContextEngine]:
         "src/example.txt",
         "Identity password policy and Authorization context.\nSecond line.\n",
     )
-    write(root, "private.pem", "-----BEGIN PRIVATE KEY-----\nnot-real\n")
+    write(
+        root,
+        "private.pem",
+        "-----BEGIN PRIVATE KEY-----\nIdentity password secret fixture\n",
+    )
+    write(
+        root,
+        "secrets/runtime-config.json",
+        "Identity password secret fixture\n",
+    )
     git(root, "add", ".")
     git(root, "commit", "-m", "fixture")
     return temp, root, engine
@@ -164,13 +181,14 @@ class ContextEngineTest(unittest.TestCase):
         errors = engine.validate()
         self.assertTrue(any("TASK-REVIEW-MATRIX" in error for error in errors))
 
-    def test_search_returns_provenance_and_excludes_sensitive_filename(self) -> None:
+    def test_search_returns_provenance_and_excludes_sensitive_paths(self) -> None:
         temp, root, engine = make_repo()
         self.addCleanup(temp.cleanup)
         result = engine.search("Identity password", 10)
         paths = [item["path"] for item in result["results"]]
         self.assertIn("src/example.txt", paths)
         self.assertNotIn("private.pem", paths)
+        self.assertNotIn("secrets/runtime-config.json", paths)
         match = next(item for item in result["results"] if item["path"] == "src/example.txt")
         self.assertRegex(match["head_blob_sha"], r"^[0-9a-f]{40}$")
         self.assertRegex(match["worktree_sha256"], r"^[0-9a-f]{64}$")
