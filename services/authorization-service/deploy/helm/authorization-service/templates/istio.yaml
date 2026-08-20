@@ -11,11 +11,12 @@ spec:
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: {{ include "authorization-service.name" . }}
+  name: {{ include "authorization-service.name" . }}-waypoint
 spec:
-  selector:
-    matchLabels:
-      {{- include "authorization-service.selectorLabels" . | nindent 6 }}
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: {{ include "authorization-service.name" . }}
   action: ALLOW
   rules:
     - from:
@@ -63,3 +64,20 @@ spec:
       to:
         - operation: {ports: [{{ .Values.service.managementPort | quote }}]}
     {{- end }}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "authorization-service.name" . }}-ztunnel
+spec:
+  selector:
+    matchLabels:
+      {{- include "authorization-service.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: [{{ required "ambient.waypointPrincipal is required" .Values.ambient.waypointPrincipal | quote }}]
+      to:
+        - operation:
+            ports: [{{ .Values.service.grpcPort | quote }}, {{ .Values.service.managementPort | quote }}]

@@ -64,3 +64,6 @@ observability:
       namespace: ""
       podLabels: {}
       principal: ""
+ambient:
+  waypointName: platform-apps-waypoint
+  waypointPrincipal: prod.sajtech.internal/ns/platform-apps/sa/platform-apps-waypoint

@@ -27,6 +27,15 @@ make local-runtime-status
 
 This starts pinned local PostgreSQL/Redis, runs service-owned Flyway migrations with separate roles, creates Git-ignored local-only key/TLS material, and runs all five current services together. The local Web BFF endpoint is `https://localhost:18443`. This is application-integration evidence only; it does not replace the production-fidelity kind/mesh/edge lane or staging/production verification. See `docs/runbooks/local-integrated-runtime.md`.
 
+The repository also implements a separate production-fidelity local kind/staging lane for Kubernetes, Calico, Istio Ambient, Kyverno CEL admission, Traefik/WAF, local staging PostgreSQL/Redis, all five current services, and the approved observability stack:
+
+```bash
+make production-fidelity-up
+make production-fidelity-verify
+```
+
+This lane is local integration-fidelity evidence, not the production K3s deployment and not production readiness. See `docs/runbooks/local-production-fidelity-staging.md`.
+
 For a new AI-agent/session, the Git-native Context Engine provides a verified current-project bootstrap and conservative task routing without making chat/model memory authoritative:
 
 ```bash

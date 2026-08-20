@@ -18,6 +18,8 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.service.grpcPort }}
+        - protocol: TCP
+          port: 15008
     {{- if .Values.observability.metrics.enabled }}
     - from:
         - namespaceSelector:
@@ -29,6 +31,8 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.service.managementPort }}
+        - protocol: TCP
+          port: 15008
     {{- end }}
   egress:
     - to:
@@ -51,4 +55,6 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.observability.tracing.collector.port }}
+        - protocol: TCP
+          port: 15008
     {{- end }}

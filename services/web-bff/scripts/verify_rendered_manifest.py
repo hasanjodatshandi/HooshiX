@@ -29,7 +29,7 @@ def main():
     require(text, r"WEB_BFF_AUTHORIZATION_TARGET", "Authorization target missing")
     require(text, r"WEB_BFF_LOCATOR_KEY_RING_PATH", "session locator key ring missing")
     require(text, r"WEB_BFF_CSRF_KEY_RING_PATH", "CSRF key ring missing")
-    require(text, r"WEB_BFF_REFRESH_KEY_RING_PATH", "refresh encryption key ring missing")
+    require(text, r"WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH", "refresh encryption key ring missing")
     require(text, r"readOnlyRootFilesystem: true", "read-only root filesystem missing")
     require(text, r"allowPrivilegeEscalation: false", "privilege escalation hardening missing")
     require(text, r"mode: STRICT", "STRICT mTLS missing")

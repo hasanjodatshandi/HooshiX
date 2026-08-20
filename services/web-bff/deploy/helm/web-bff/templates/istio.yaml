@@ -11,11 +11,12 @@ spec:
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: {{ include "web-bff.name" . }}
+  name: {{ include "web-bff.name" . }}-waypoint
 spec:
-  selector:
-    matchLabels:
-      {{- include "web-bff.selectorLabels" . | nindent 6 }}
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: {{ include "web-bff.name" . }}
   action: ALLOW
   rules:
     - from:
@@ -30,3 +31,20 @@ spec:
       to:
         - operation: {ports: [{{ .Values.service.managementPort | quote }}]}
     {{- end }}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "web-bff.name" . }}-ztunnel
+spec:
+  selector:
+    matchLabels:
+      {{- include "web-bff.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: [{{ required "ambient.waypointPrincipal is required" .Values.ambient.waypointPrincipal | quote }}]
+      to:
+        - operation:
+            ports: [{{ .Values.service.applicationPort | quote }}, {{ .Values.service.managementPort | quote }}]

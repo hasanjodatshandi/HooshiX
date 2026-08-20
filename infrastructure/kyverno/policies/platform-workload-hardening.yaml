@@ -1,0 +1,158 @@
+apiVersion: policies.kyverno.io/v1
+kind: MutatingPolicy
+metadata:
+  name: pin-istio-waypoint-image
+spec:
+  autogen:
+    podControllers:
+      controllers: []
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchConditions:
+    - name: platform-apps-waypoint
+      expression: >-
+        object.metadata.namespace == 'platform-apps' &&
+        has(object.metadata.labels) &&
+        object.metadata.labels[?'gateway.networking.k8s.io/gateway-name'].orValue('') == 'platform-apps-waypoint'
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: |
+          object.spec.containers.map(c,
+            c.name == 'istio-proxy' && c.image == 'docker.io/istio/proxyv2:1.30.3-distroless' ?
+            JSONPatch{
+              op: "replace",
+              path: "/spec/containers/" + string(object.spec.containers.indexOf(c)) + "/image",
+              value: "docker.io/istio/proxyv2@sha256:2f59eaf91e15213e50d91c7951c81073695872d6b17b82e146773695f24b1c6e"
+            } : null
+          ).filter(p, p != null)
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: platform-images-by-digest
+spec:
+  autogen:
+    podControllers:
+      controllers: []
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchConditions:
+    - name: platform-namespaces
+      expression: >-
+        object.metadata.namespace in ['platform-apps','platform-edge','platform-data','platform-observability','platform-observability-node']
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, parseImageReference(c.image)) +
+        object.spec.?initContainers.orValue([]).map(c, parseImageReference(c.image))
+  validations:
+    - expression: variables.images.all(i, i.containsDigest())
+      message: Platform workload images must be immutable digest references.
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: platform-pod-hardening
+spec:
+  autogen:
+    podControllers:
+      controllers: []
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchConditions:
+    - name: platform-namespaces
+      expression: >-
+        object.metadata.namespace in ['platform-apps','platform-edge','platform-data','platform-observability']
+  validations:
+    - expression: '!has(object.spec.hostNetwork) || object.spec.hostNetwork == false'
+      message: Platform workloads must not use hostNetwork.
+    - expression: '!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.hostPath))'
+      message: Platform workloads must not mount hostPath directly.
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.securityContext) &&
+          has(c.securityContext.allowPrivilegeEscalation) &&
+          c.securityContext.allowPrivilegeEscalation == false &&
+          (!has(c.securityContext.privileged) || c.securityContext.privileged == false) &&
+          has(c.securityContext.capabilities) &&
+          has(c.securityContext.capabilities.drop) &&
+          c.securityContext.capabilities.drop.exists(x, x == 'ALL'))
+      message: Platform containers must disable privilege escalation and drop ALL capabilities.
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: platform-observability-node-hardening
+spec:
+  autogen:
+    podControllers:
+      controllers: []
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchConditions:
+    - name: node-observability
+      expression: object.metadata.namespace == 'platform-observability-node'
+  validations:
+    - expression: has(object.spec.serviceAccountName) && object.spec.serviceAccountName == 'otel-collector'
+      message: Node observability pods must use only the otel-collector ServiceAccount.
+    - expression: has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false
+      message: Node observability pods must not automount a Kubernetes API token.
+    - expression: (!has(object.spec.hostNetwork) || object.spec.hostNetwork == false) && (!has(object.spec.hostPID) || object.spec.hostPID == false) && (!has(object.spec.hostIPC) || object.spec.hostIPC == false)
+      message: Node observability pods must not join host namespaces.
+    - expression: >-
+        has(object.spec.securityContext) &&
+        has(object.spec.securityContext.runAsNonRoot) && object.spec.securityContext.runAsNonRoot == true &&
+        has(object.spec.securityContext.runAsUser) && object.spec.securityContext.runAsUser > 0 &&
+        has(object.spec.securityContext.runAsGroup) && object.spec.securityContext.runAsGroup > 0 &&
+        has(object.spec.securityContext.supplementalGroups) && object.spec.securityContext.supplementalGroups.exists(g, g == 0) &&
+        has(object.spec.securityContext.seccompProfile) && object.spec.securityContext.seccompProfile.type == 'RuntimeDefault'
+      message: Node observability must remain non-root and may use supplemental group 0 only for the reviewed root-group log files.
+    - expression: >-
+        object.spec.?volumes.orValue([]).filter(v, has(v.hostPath)).size() == 1 &&
+        object.spec.?volumes.orValue([]).exists(v,
+          has(v.hostPath) && v.name == 'pod-logs' &&
+          v.hostPath.path == '/var/log/pods' && v.hostPath.type == 'Directory')
+      message: The only permitted hostPath is the exact Kubernetes pod log directory.
+    - expression: >-
+        object.spec.containers.exists(c,
+          c.?volumeMounts.orValue([]).exists(vm,
+            vm.name == 'pod-logs' && vm.mountPath == '/var/log/pods' &&
+            has(vm.readOnly) && vm.readOnly == true)) &&
+        object.spec.containers.all(c,
+          c.?volumeMounts.orValue([]).filter(vm, vm.name == 'pod-logs').all(vm,
+            vm.mountPath == '/var/log/pods' && has(vm.readOnly) && vm.readOnly == true))
+      message: Kubernetes pod logs must be mounted read-only at the exact reviewed path.
+    - expression: >-
+        object.spec.containers.size() == 1 &&
+        object.spec.containers[0].name == 'collector' &&
+        object.spec.containers[0].image == 'otel/opentelemetry-collector-contrib:0.157.0@sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6'
+      message: Node observability must run only the exact pinned OpenTelemetry Collector image.
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.securityContext) &&
+          has(c.securityContext.allowPrivilegeEscalation) && c.securityContext.allowPrivilegeEscalation == false &&
+          (!has(c.securityContext.privileged) || c.securityContext.privileged == false) &&
+          has(c.securityContext.readOnlyRootFilesystem) && c.securityContext.readOnlyRootFilesystem == true &&
+          has(c.securityContext.capabilities) && has(c.securityContext.capabilities.drop) &&
+          c.securityContext.capabilities.drop.exists(x, x == 'ALL'))
+      message: Node observability containers must be read-only, unprivileged, and drop ALL capabilities.

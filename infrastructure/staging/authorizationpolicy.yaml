@@ -1,0 +1,44 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata: {name: postgresql, namespace: platform-data}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: postgresql}}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: postgresql, namespace: platform-data}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: postgresql}}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - prod.sajtech.internal/ns/platform-apps/sa/authorization-service
+              - prod.sajtech.internal/ns/platform-apps/sa/identity-service
+              - prod.sajtech.internal/ns/platform-apps/sa/notification-service
+              - prod.sajtech.internal/ns/platform-data/sa/postgres-bootstrap
+      to: [{operation: {ports: ["5432"]}}]
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata: {name: security-redis, namespace: platform-data}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: security-redis}}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: security-redis, namespace: platform-data}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: security-redis}}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - prod.sajtech.internal/ns/platform-apps/sa/authorization-service
+              - prod.sajtech.internal/ns/platform-apps/sa/identity-service
+              - prod.sajtech.internal/ns/platform-apps/sa/web-bff
+      to: [{operation: {ports: ["6379"]}}]
