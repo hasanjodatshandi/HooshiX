@@ -56,6 +56,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0048 | policy-gated developer-host Ops MCP for separate local filesystem/process authority |
 | ADR-0049 | policy-gated developer-host Desktop MCP for separate interactive Windows UI observation/input authority |
 | ADR-0050 | policy-bound developer-host Desktop credential broker for local use-without-disclosure |
+| ADR-0051 | WSL-native HooshiX workspace with independently versioned Windows Context/Ops/Desktop MCP runtime |
 
 ## Superseded ADR identifiers
 
