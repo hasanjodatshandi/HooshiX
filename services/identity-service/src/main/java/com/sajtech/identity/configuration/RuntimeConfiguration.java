@@ -580,14 +580,21 @@ public class RuntimeConfiguration {
 
   @Bean
   @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  AuthorizationOutboxMetrics authorizationOutboxMetrics(MeterRegistry meters) {
+    return new AuthorizationOutboxMetrics(meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
   com.sajtech.identity.infrastructure.worker.AuthorizationOutboxDispatcher
       authorizationOutboxDispatcher(
           com.sajtech.identity.infrastructure.persistence.JooqTenantStore store,
           com.sajtech.identity.application.tenant.port.out.AuthorizationTenantPort authorization,
           TransactionRunner tx,
-          Clock clock) {
+          Clock clock,
+          AuthorizationOutboxMetrics metrics) {
     return new com.sajtech.identity.infrastructure.worker.AuthorizationOutboxDispatcher(
-        store, authorization, tx, clock);
+        store, store, authorization, tx, clock, metrics);
   }
 
   @Bean

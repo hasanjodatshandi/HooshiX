@@ -4,6 +4,8 @@ import com.sajtech.identity.application.tenant.*;
 import com.sajtech.identity.application.tenant.model.AuthorizationOutboxItem;
 import com.sajtech.identity.application.tenant.port.out.*;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
+import com.sajtech.identity.infrastructure.observability.AuthorizationOutboxMetrics;
+import com.sajtech.identity.infrastructure.persistence.AuthorizationOutboxTelemetryQuery;
 import java.time.*;
 import java.util.List;
 import java.util.concurrent.*;
@@ -13,20 +15,29 @@ import org.springframework.context.SmartLifecycle;
 public final class AuthorizationOutboxDispatcher implements SmartLifecycle {
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationOutboxDispatcher.class);
   private final TenantStore store;
+  private final AuthorizationOutboxTelemetryQuery telemetryQuery;
   private final AuthorizationTenantPort authorization;
   private final TransactionRunner tx;
   private final Clock clock;
+  private final AuthorizationOutboxMetrics metrics;
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(
           Thread.ofPlatform().name("identity-authorization-outbox").factory());
   private volatile boolean running;
 
   public AuthorizationOutboxDispatcher(
-      TenantStore store, AuthorizationTenantPort authorization, TransactionRunner tx, Clock clock) {
+      TenantStore store,
+      AuthorizationOutboxTelemetryQuery telemetryQuery,
+      AuthorizationTenantPort authorization,
+      TransactionRunner tx,
+      Clock clock,
+      AuthorizationOutboxMetrics metrics) {
     this.store = store;
+    this.telemetryQuery = telemetryQuery;
     this.authorization = authorization;
     this.tx = tx;
     this.clock = clock;
+    this.metrics = metrics;
   }
 
   @Override
@@ -64,7 +75,19 @@ public final class AuthorizationOutboxDispatcher implements SmartLifecycle {
           .addKeyValue("eventCode", "IDENTITY_AUTHORIZATION_OUTBOX_CYCLE_FAILED")
           .log("Authorization outbox cycle failed");
     } finally {
+      sampleMetrics();
       schedule(busy ? 250 : 1000);
+    }
+  }
+
+  private void sampleMetrics() {
+    Instant now = clock.instant();
+    if (!metrics.sampleDue(now)) return;
+    try {
+      metrics.recordOldestPending(
+          telemetryQuery.oldestUnresolvedAuthorizationOutboxCreatedAt().orElse(null), now);
+    } catch (RuntimeException ignored) {
+      // Ordinary telemetry sampling must not change durable outbox processing.
     }
   }
 
@@ -111,11 +134,13 @@ public final class AuthorizationOutboxDispatcher implements SmartLifecycle {
               i.outboxId(), now, now.plus(delay), attempt, definitive);
           return null;
         });
-    if (definitive)
+    if (definitive) {
+      metrics.definitiveFailure(i.operation());
       LOG.atError()
           .addKeyValue("eventCode", "IDENTITY_AUTHORIZATION_OUTBOX_DEFINITIVE_FAILURE")
           .addKeyValue("operation", i.operation())
           .log("Authorization outbox command failed definitively");
+    }
   }
 
   private static Duration delay(int attempt) {

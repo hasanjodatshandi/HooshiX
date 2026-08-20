@@ -73,3 +73,27 @@ groups:
           service: identity-service
         annotations:
           summary: Identity detected reuse of a rotated refresh credential
+      - alert: IdentityAuthorizationOutboxPending15Minutes
+        expr: identity_authorization_outbox_oldest_pending_age_seconds >= 900
+        for: 0m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity Authorization outbox has unresolved work older than 15 minutes
+      - alert: IdentityAuthorizationOutboxPendingOneHour
+        expr: identity_authorization_outbox_oldest_pending_age_seconds >= 3600
+        for: 0m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity Authorization outbox has unresolved work older than one hour
+      - alert: IdentityAuthorizationOutboxDefinitiveFailure
+        expr: sum(increase(identity_authorization_outbox_definitive_failures_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity Authorization outbox recorded a definitive command failure

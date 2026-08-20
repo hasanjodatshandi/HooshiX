@@ -13,7 +13,10 @@ import java.util.*;
 import org.jooq.*;
 
 public final class JooqTenantStore
-    implements TenantStore, TenantContextValidationPort, AuthenticationTenantSelectionPort {
+    implements TenantStore,
+        TenantContextValidationPort,
+        AuthenticationTenantSelectionPort,
+        AuthorizationOutboxTelemetryQuery {
   private final DSLContext dsl;
   private final IntentFingerprintPort fingerprints;
 
@@ -504,6 +507,22 @@ public final class JooqTenantStore
               r.get("attempt_count", Integer.class)));
     }
     return List.copyOf(out);
+  }
+
+  @Override
+  public Optional<Instant> oldestUnresolvedAuthorizationOutboxCreatedAt() {
+    var row =
+        dsl.fetchOne(
+            """
+            SELECT created_at
+            FROM identity_authorization_outbox
+            WHERE state IN ('PENDING','DISPATCHING')
+            ORDER BY created_at, outbox_id
+            LIMIT 1
+            """);
+    if (row == null) return Optional.empty();
+    OffsetDateTime createdAt = row.get("created_at", OffsetDateTime.class);
+    return Optional.of(createdAt.toInstant());
   }
 
   @Override

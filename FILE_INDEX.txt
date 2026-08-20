@@ -500,6 +500,7 @@ services/identity-service/src/main/java/com/sajtech/identity/domain/registration
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/client/authorization/GrpcAuthorizationTenantClient.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/client/compromisedpassword/GrpcCompromisedPasswordClient.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/client/notification/GrpcNotificationSubmissionClient.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/AuthorizationOutboxMetrics.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/IdentityAuthenticationKeyRingRefresher.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/IdentityAuthenticationReadinessHealthIndicator.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/IdentityKeyRingRefresher.java
@@ -511,6 +512,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/obse
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedPasswordVerification.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedRegistration.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedSemanticQuota.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/AuthorizationOutboxTelemetryQuery.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqAuthenticationStore.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqNotificationOutboxStore.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqRegistrationStore.java
@@ -549,6 +551,7 @@ services/identity-service/src/main/resources/application.yaml
 services/identity-service/src/main/resources/db/migration/V1__create_identity_registration_schema.sql
 services/identity-service/src/main/resources/db/migration/V2__create_identity_authentication_session_schema.sql
 services/identity-service/src/main/resources/db/migration/V3__create_identity_tenant_membership_schema.sql
+services/identity-service/src/main/resources/db/migration/V4__index_authorization_outbox_oldest_unresolved.sql
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/AuthenticateLocalUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/IssueAudienceAccessTokenUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/LogoutCurrentUseCaseTest.java
@@ -564,6 +567,7 @@ services/identity-service/src/test/java/com/sajtech/identity/configuration/Ident
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityAuthenticationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityRegistrationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantPersistenceIntegrationTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantRlsIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/ClockSafetyGuardTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/RedisSemanticQuotaIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/challenge/HmacChallengeSecretTest.java

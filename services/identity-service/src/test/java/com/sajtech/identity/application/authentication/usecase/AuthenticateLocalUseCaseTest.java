@@ -188,6 +188,32 @@ class AuthenticateLocalUseCaseTest {
     assertThat(store.created.selectedMembershipId()).isEqualTo(membershipId);
   }
 
+  @Test
+  void tenantSelectionRunsInsideTransactionForTransactionLocalRlsContext() {
+    UUID userId = UUID.randomUUID();
+    store.local = new LocalCredentialRecord(userId, "ACTIVE", "");
+    verifier.result = true;
+    TrackingTransactionRunner transactionRunner = new TrackingTransactionRunner();
+    AuthenticateLocalUseCase tenantAware =
+        new AuthenticateLocalUseCase(
+            new ContactCanonicalizer(),
+            new PasswordNormalizer(),
+            quota,
+            verifier,
+            new FakeCredentials(),
+            transactionRunner,
+            store,
+            ignored -> {
+              assertThat(transactionRunner.inTransaction()).isTrue();
+              return AuthenticationTenantSelection.onboarding();
+            },
+            Clock.fixed(NOW, ZoneOffset.UTC));
+
+    tenantAware.authenticate(command());
+
+    assertThat(transactionRunner.calls()).isEqualTo(2);
+  }
+
   private static final class FakeCredentials implements SessionCredentialPort {
     @Override
     public String newSessionId() {
@@ -210,6 +236,30 @@ class AuthenticateLocalUseCaseTest {
     @Override
     public <T> T required(java.util.function.Supplier<T> work) {
       return work.get();
+    }
+  }
+
+  private static final class TrackingTransactionRunner implements TransactionRunner {
+    private int calls;
+    private int depth;
+
+    @Override
+    public <T> T required(java.util.function.Supplier<T> work) {
+      calls++;
+      depth++;
+      try {
+        return work.get();
+      } finally {
+        depth--;
+      }
+    }
+
+    int calls() {
+      return calls;
+    }
+
+    boolean inTransaction() {
+      return depth > 0;
     }
   }
 
