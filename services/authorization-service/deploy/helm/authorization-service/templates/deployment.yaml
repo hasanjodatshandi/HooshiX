@@ -61,7 +61,8 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - {name: migration-db, mountPath: /run/secrets/authorization-db-migration, readOnly: true}
-            - {name: temporary, mountPath: /tmp}      containers:
+            - {name: temporary, mountPath: /tmp}
+      containers:
         - name: application
           image: "{{ $repository }}@{{ $digest }}"
           securityContext:
