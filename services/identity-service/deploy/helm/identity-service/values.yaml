@@ -11,6 +11,7 @@ service:
 runtime:
   registrationRuntimeEnabled: false
   authenticationRuntimeEnabled: false
+  tenantRuntimeEnabled: false
   maxConcurrentCallsPerConnection: 128
   argon2MaxConcurrentHashes: 0
   compromisedPasswordMaxInFlight: 32
@@ -69,6 +70,12 @@ compromisedPassword:
     app.kubernetes.io/name: compromised-password-service
   port: 9090
   target: dns:///compromised-password-service.platform-apps.svc.cluster.local:9090
+authorization:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: authorization-service
+  port: 9090
+  target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
 notification:
   namespace: platform-apps
   podLabels:

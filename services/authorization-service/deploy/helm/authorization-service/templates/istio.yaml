@@ -1,0 +1,65 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "authorization-service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "authorization-service.selectorLabels" . | nindent 6 }}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "authorization-service.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "authorization-service.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: [{{ required "identity.principal is required" .Values.identity.principal | quote }}]}
+      to:
+        - operation:
+            ports: [{{ .Values.service.grpcPort | quote }}]
+            paths:
+              - /hooshix.authorization.v1.AuthorizationService/CheckPlatformPermission
+              - /hooshix.authorization.v1.AuthorizationService/ProvisionTenantOwner
+              - /hooshix.authorization.v1.AuthorizationService/ProvisionTenantMember
+              - /hooshix.authorization.v1.AuthorizationService/ApplyTenantLifecycle
+              - /hooshix.authorization.v1.AuthorizationService/PrepareMembershipRemoval
+              - /hooshix.authorization.v1.AuthorizationService/FinalizeMembershipRemoval
+              - /hooshix.authorization.v1.AuthorizationService/CancelMembershipRemovalPreparation
+    - from:
+        - source: {principals: [{{ required "webBff.principal is required" .Values.webBff.principal | quote }}]}
+      to:
+        - operation:
+            ports: [{{ .Values.service.grpcPort | quote }}]
+            paths:
+              - /hooshix.authorization.v1.AuthorizationService/ListPermissions
+              - /hooshix.authorization.v1.AuthorizationService/ListRoles
+              - /hooshix.authorization.v1.AuthorizationService/GetRole
+              - /hooshix.authorization.v1.AuthorizationService/GetMembershipAuthorization
+              - /hooshix.authorization.v1.AuthorizationService/CreateRole
+              - /hooshix.authorization.v1.AuthorizationService/UpdateRole
+              - /hooshix.authorization.v1.AuthorizationService/ArchiveRole
+              - /hooshix.authorization.v1.AuthorizationService/ReplaceRolePermissions
+              - /hooshix.authorization.v1.AuthorizationService/AssignRoleToMembership
+              - /hooshix.authorization.v1.AuthorizationService/RemoveRoleFromMembership
+              - /hooshix.authorization.v1.AuthorizationService/SetMembershipPermissionOverride
+              - /hooshix.authorization.v1.AuthorizationService/RemoveMembershipPermissionOverride
+    {{- range .Values.resourceCallers }}
+    - from:
+        - source: {principals: [{{ required "resource caller principal is required" .principal | quote }}]}
+      to:
+        - operation:
+            ports: [{{ $.Values.service.grpcPort | quote }}]
+            paths: [/hooshix.authorization.v1.AuthorizationService/CheckPermission]
+    {{- end }}
+    {{- if .Values.observability.metrics.enabled }}
+    - from:
+        - source: {principals: [{{ required "metrics principal is required" .Values.observability.metrics.prometheus.principal | quote }}]}
+      to:
+        - operation: {ports: [{{ .Values.service.managementPort | quote }}]}
+    {{- end }}

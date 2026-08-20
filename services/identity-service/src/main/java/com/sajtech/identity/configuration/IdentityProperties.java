@@ -10,11 +10,13 @@ public record IdentityProperties(
     int grpcPort,
     boolean registrationRuntimeEnabled,
     boolean authenticationRuntimeEnabled,
+    boolean tenantRuntimeEnabled,
     int maxConcurrentCallsPerConnection,
     boolean phoneRegistrationEnabled,
     String compromisedPasswordTarget,
     int compromisedPasswordMaxInFlight,
     String notificationTarget,
+    String authorizationTarget,
     boolean notificationDispatchEnabled,
     Path fingerprintKeyRingPath,
     Path challengeKeyRingPath,
@@ -25,6 +27,9 @@ public record IdentityProperties(
     Quota quota,
     Jwt jwt) {
   public IdentityProperties {
+    if (tenantRuntimeEnabled && !authenticationRuntimeEnabled) {
+      throw new IllegalArgumentException("Identity tenant runtime requires authentication runtime");
+    }
     if (grpcPort <= 0 || grpcPort > 65535) {
       throw new IllegalArgumentException("Identity gRPC port is invalid");
     }
@@ -36,7 +41,9 @@ public record IdentityProperties(
     if (compromisedPasswordTarget == null
         || compromisedPasswordTarget.isBlank()
         || notificationTarget == null
-        || notificationTarget.isBlank()) {
+        || notificationTarget.isBlank()
+        || authorizationTarget == null
+        || authorizationTarget.isBlank()) {
       throw new IllegalArgumentException("Identity dependency targets are required");
     }
     if (fingerprintKeyRingPath == null

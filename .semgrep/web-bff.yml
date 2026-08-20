@@ -1,0 +1,65 @@
+rules:
+  - id: web-bff-no-field-injection
+    languages: [java]
+    severity: ERROR
+    message: Required dependencies must use constructor injection.
+    paths: {include: [/services/web-bff/src/main/java]}
+    pattern: |
+      @Autowired
+      $TYPE $FIELD;
+
+  - id: web-bff-no-system-output
+    languages: [java]
+    severity: ERROR
+    message: Web BFF runtime must use structured allow-list logging.
+    paths: {include: [/services/web-bff/src/main/java]}
+    pattern-either:
+      - pattern: System.out.$METHOD(...)
+      - pattern: System.err.$METHOD(...)
+      - pattern: $EX.printStackTrace(...)
+
+  - id: web-bff-no-sensitive-log-keys
+    languages: [java]
+    severity: ERROR
+    message: Browser and internal credentials must not enter logs or telemetry.
+    paths: {include: [/services/web-bff/src/main/java]}
+    pattern-either:
+      - pattern: $LOG.addKeyValue("cookie", ...)
+      - pattern: $LOG.addKeyValue("session", ...)
+      - pattern: $LOG.addKeyValue("preauth", ...)
+      - pattern: $LOG.addKeyValue("token", ...)
+      - pattern: $LOG.addKeyValue("access_token", ...)
+      - pattern: $LOG.addKeyValue("refresh", ...)
+      - pattern: $LOG.addKeyValue("state", ...)
+      - pattern: $LOG.addKeyValue("nonce", ...)
+      - pattern: $LOG.addKeyValue("verifier", ...)
+      - pattern: $LOG.addKeyValue("csrf", ...)
+      - pattern: $LOG.addKeyValue("client_ip", ...)
+      - pattern: $LOG.addKeyValue("user_id", ...)
+      - pattern: $LOG.addKeyValue("tenant_id", ...)
+      - pattern: $LOG.addKeyValue("membership_id", ...)
+      - pattern: $LOG.addKeyValue("request_id", ...)
+
+  - id: web-bff-no-thread-sleep
+    languages: [java]
+    severity: ERROR
+    message: Web BFF coordination must not use Thread.sleep.
+    paths:
+      include:
+        - /services/web-bff/src/main/java
+        - /services/web-bff/src/test/java
+    pattern: Thread.sleep(...)
+
+  - id: web-bff-no-cross-origin-annotation
+    languages: [java]
+    severity: ERROR
+    message: Web BFF browser endpoints must remain same-origin and must not use @CrossOrigin.
+    paths: {include: [/services/web-bff/src/main/java]}
+    pattern: @CrossOrigin(...)
+
+  - id: web-bff-no-raw-observation-error
+    languages: [java]
+    severity: ERROR
+    message: Raw exceptions must not be attached to Web BFF observations.
+    paths: {include: [/services/web-bff/src/main/java]}
+    pattern: $OBSERVATION.error($EXCEPTION)

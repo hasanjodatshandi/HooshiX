@@ -16,6 +16,7 @@ quota:
 runtime:
   registrationRuntimeEnabled: true
   authenticationRuntimeEnabled: true
+  tenantRuntimeEnabled: true
   argon2MaxConcurrentHashes: 2
 secrets:
   fingerprintSecretName: identity-fingerprint

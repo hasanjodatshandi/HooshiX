@@ -633,3 +633,7 @@ Repository and release evidence covers at least:
 Rollback must preserve permission-key non-reuse, SYSTEM Role immutability, custom Role/audit identifiers, owner-safety reservations, platform-authority assignments/revocations, idempotency evidence, erasure effects, tenant RLS, and stable error/Protobuf compatibility.
 
 Rollback MUST NOT reintroduce stale/cached allow, Kafka permission invalidation, retry amplification, caller-supplied role/owner snapshots, wildcard/custom inheritance, resource-condition policy, tenant-admin platform bypass, read-only race-prone last-owner checks, self-gRPC management authorization, `allowed=false` ambiguity, JPA model leakage, unsafe database downgrade, erased User authority, or a production profile that bypasses quota/workload/JWT security controls.
+
+## Current repository implementation evidence
+
+The current branch contains the first executable Authorization repository slice under `services/authorization-service/`, including contracts, PostgreSQL/Flyway persistence with forced RLS, online checks and management commands, owner-removal reservation safety, Redis quota, audit/idempotency, readiness/observability, hardened deployment artifacts, dependency locks, Semgrep/security workflow, and unit/architecture/integration test sources. Local strict Gradle/unit/architecture/SpotBugs/bootJar verification passes. PostgreSQL/Redis Testcontainers assertions and protected CI/deployed runtime remain `NOT VERIFIED` on the current Docker-unavailable host.

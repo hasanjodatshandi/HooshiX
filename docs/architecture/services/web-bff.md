@@ -185,3 +185,7 @@ BFF evidence covers:
 - profile-correct container/GitOps/load/recovery behavior.
 
 The BFF is not repository-complete until applicable source/contracts/tests/build/deploy/security/observability/CI artifacts exist. Current runtime evidence remains `NOT VERIFIED` until they execute.
+
+## Current repository implementation evidence
+
+The current branch contains the first executable Web BFF repository slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement, local authentication/logout, Tenant lifecycle/selection routes, Authorization-management routes, exact audience brokerage, Application ports with ArchUnit enforcement, security-aware readiness, HTTP/gRPC/Redis observability, hardened edge-only deployment artifacts, dependency locks, and service-owned security workflow. Local strict Gradle/unit/architecture/SpotBugs/bootJar verification passes. Redis Testcontainers, protected CI, real edge/WAF runtime, Google OIDC/provider behavior, and production readiness remain `NOT VERIFIED`.

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "web-bff.name" . }}
+  labels:
+    {{- include "web-bff.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "web-bff.selectorLabels" . | nindent 4 }}
+  ports:
+    - {name: http, port: {{ .Values.service.applicationPort }}, targetPort: http, protocol: TCP}
+    - {name: management, port: {{ .Values.service.managementPort }}, targetPort: management, protocol: TCP}

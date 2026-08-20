@@ -429,9 +429,10 @@ public class RuntimeConfiguration {
       SessionCredentialPort credentials,
       TransactionRunner tx,
       AuthenticationStore store,
+      AuthenticationTenantSelectionPort tenantSelection,
       Clock clock) {
     return new AuthenticateLocalUseCase(
-        contacts, passwords, quota, verifier, credentials, tx, store, clock);
+        contacts, passwords, quota, verifier, credentials, tx, store, tenantSelection, clock);
   }
 
   @Bean
@@ -484,9 +485,11 @@ public class RuntimeConfiguration {
       RefreshCredentialLookup lookup,
       TransactionRunner tx,
       AuthenticationStore store,
+      com.sajtech.identity.application.authentication.port.out.TenantContextValidationPort tenants,
+      AccessTokenSigner signer,
       Clock clock) {
     return new IssueAudienceAccessTokenUseCase(
-        p.jwt().allowedAudiences(), lookup, tx, store, clock);
+        p.jwt().allowedAudiences(), lookup, tx, store, tenants, signer, clock);
   }
 
   @Bean
@@ -517,6 +520,74 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  com.sajtech.identity.infrastructure.persistence.JooqTenantStore tenantStore(
+      DSLContext dsl, IntentFingerprintPort fingerprints) {
+    return new com.sajtech.identity.infrastructure.persistence.JooqTenantStore(dsl, fingerprints);
+  }
+
+  @Bean(destroyMethod = "shutdownNow", name = "authorizationChannel")
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  ManagedChannel authorizationChannel(IdentityProperties p) {
+    return NettyChannelBuilder.forTarget(p.authorizationTarget())
+        .usePlaintext()
+        .disableRetry()
+        .maxInboundMessageSize(64 * 1024)
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  com.sajtech.identity.application.tenant.port.out.AuthorizationTenantPort authorizationTenantPort(
+      @Qualifier("authorizationChannel") ManagedChannel channel) {
+    return new com.sajtech.identity.infrastructure.client.authorization
+        .GrpcAuthorizationTenantClient(channel);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  com.sajtech.identity.application.tenant.TenantLifecycleService tenantLifecycleService(
+      IdentityProperties p,
+      RefreshCredentialLookup lookup,
+      SessionCredentialPort credentials,
+      AuthenticationStore authenticationStore,
+      com.sajtech.identity.infrastructure.persistence.JooqTenantStore tenantStore,
+      com.sajtech.identity.application.tenant.port.out.AuthorizationTenantPort authorization,
+      AccessTokenSigner signer,
+      TransactionRunner tx,
+      Clock clock) {
+    return new com.sajtech.identity.application.tenant.TenantLifecycleService(
+        p.jwt().allowedAudiences(),
+        lookup,
+        credentials,
+        authenticationStore,
+        tenantStore,
+        authorization,
+        signer,
+        new com.sajtech.identity.application.tenant.service.TenantIntentEncoder(),
+        tx,
+        clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService tenantGrpc(
+      com.sajtech.identity.application.tenant.TenantLifecycleService service) {
+    return new com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService(service);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.AuthorizationOutboxDispatcher
+      authorizationOutboxDispatcher(
+          com.sajtech.identity.infrastructure.persistence.JooqTenantStore store,
+          com.sajtech.identity.application.tenant.port.out.AuthorizationTenantPort authorization,
+          TransactionRunner tx,
+          Clock clock) {
+    return new com.sajtech.identity.infrastructure.worker.AuthorizationOutboxDispatcher(
+        store, authorization, tx, clock);
+  }
+
+  @Bean
   SafeTracingServerInterceptor tracing(OpenTelemetry otel) {
     return new SafeTracingServerInterceptor(otel);
   }
@@ -527,7 +598,9 @@ public class RuntimeConfiguration {
     return new GrpcServerLifecycle(
         p.grpcPort(),
         p.maxConcurrentCallsPerConnection(),
-        p.registrationRuntimeEnabled() || p.authenticationRuntimeEnabled(),
+        p.registrationRuntimeEnabled()
+            || p.authenticationRuntimeEnabled()
+            || p.tenantRuntimeEnabled(),
         services,
         tracing);
   }

@@ -52,6 +52,8 @@ protobuf {
     generateProtoTasks { all().forEach { task -> task.plugins.maybeCreate("grpc") } }
 }
 
+tasks.processResources { from("contracts/permissions/permission-catalog.yaml") { into("permission-catalog") } }
+
 spotless {
     java { target("src/**/*.java"); googleJavaFormat("1.36.1"); removeUnusedImports(); trimTrailingWhitespace(); endWithNewline() }
     format("misc") { target("*.gradle.kts", "*.properties", "src/**/*.proto", "deploy/**/*.yaml", "Dockerfile"); trimTrailingWhitespace(); endWithNewline() }

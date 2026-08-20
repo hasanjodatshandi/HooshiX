@@ -1,0 +1,25 @@
+groups:
+  - name: authorization-service
+    rules:
+      - alert: AuthorizationServiceUnavailable
+        expr: up{job="authorization-service"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization service scrape target is unavailable
+      - alert: AuthorizationGrpcErrorRatioHigh
+        expr: |
+          sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",outcome!="OK"}[5m]))
+          /
+          clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service"}[5m])), 0.001)
+          > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: Authorization gRPC non-OK outcome ratio is elevated
+      - alert: AuthorizationGrpcInFlightHigh
+        expr: max(authorization_grpc_server_in_flight{job="authorization-service"}) > 100
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: Authorization gRPC in-flight pressure is elevated

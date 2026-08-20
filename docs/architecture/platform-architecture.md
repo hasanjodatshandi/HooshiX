@@ -195,7 +195,7 @@ ADR-0045 standardizes the pre-runtime control chain:
 - Semgrep — first-party source SAST and repository policy;
 - Gitleaks — current-tree and Git-history secret detection;
 - Gradle dependency verification/locks — dependency integrity/reproducibility, not vulnerability authority;
-- OSV-Scanner — early declared/locked dependency advisory feedback; implemented for the current Compromised Password, Notification, and Identity service security suites;
+- OSV-Scanner — early declared/locked dependency advisory feedback; implemented for the current Compromised Password, Notification, Identity, Authorization, and Web BFF service security suites;
 - Syft — CycloneDX JSON software inventory of the exact final image;
 - Grype — exact final-image/SBOM release/deployed-artifact vulnerability correlation under ADR-0035/0038;
 - Cosign — exact-digest image signature, provenance, and signed SBOM attestation;

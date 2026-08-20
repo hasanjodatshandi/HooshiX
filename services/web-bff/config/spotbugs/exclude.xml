@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FindBugsFilter>
+  <Match>
+    <Package name="com.sajtech.identity.contract.v1" />
+  </Match>
+  <Match>
+    <Package name="com.sajtech.authorization.contract.v1" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.infrastructure.health.WebBffReadinessHealthIndicator" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.infrastructure.security.BrowserSecurityFilter" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.AuthorizationController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.BffExceptionHandler" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.IdentityTenantController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.BrowserAuthController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.infrastructure.session.RedisBffSessionRepository" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.infrastructure.observability.BffDependencyObservabilityInterceptor" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+</FindBugsFilter>

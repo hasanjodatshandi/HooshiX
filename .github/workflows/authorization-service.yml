@@ -1,0 +1,337 @@
+name: Authorization service
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: authorization-service-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SERVICE_DIR: services/authorization-service
+  BUF_VERSION: '1.72.0'
+  BUF_SHA256: 8720830e26a733da55bb89bcd3cb44849c0965fc0c44fb5d691cccdc64dca5af
+  HELM_VERSION: '4.2.4'
+  HELM_SHA256: c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3
+  GITLEAKS_VERSION: '8.30.0'
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
+  OSV_SCANNER_VERSION: '2.4.0'
+  OSV_SCANNER_SHA256: 15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0
+  PROMETHEUS_VERSION: '3.13.2'
+  PROMETHEUS_SHA256: 0e8c4d46101bd025ea8265e377d2caabc57f488fc1be1c367f37db69ea41be6f
+  SEMGREP_IMAGE: semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
+
+jobs:
+  verify:
+    name: Build, architecture, security, migration, and render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Eclipse Temurin 25.0.4
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25.0.4'
+
+      - name: Verify Java and Gradle wrapper pins
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: |
+          set -euo pipefail
+          java -version 2>&1 | tee /tmp/authorization-java-version.txt
+          grep -F '25.0.4' /tmp/authorization-java-version.txt
+          printf '%s  %s\n' \
+            '497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7' \
+            'gradle/wrapper/gradle-wrapper.jar' | sha256sum --check --strict -
+          grep -F 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.6.1-bin.zip' gradle/wrapper/gradle-wrapper.properties
+          grep -F 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' gradle/wrapper/gradle-wrapper.properties
+
+      - name: Verify Gitleaks image and detection fixtures
+        run: |
+          set -euo pipefail
+          common=(
+            --rm
+            --network none
+            --read-only
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m
+            --cap-drop ALL
+            --security-opt no-new-privileges
+            --volume "${GITHUB_WORKSPACE}/.gitleaks.toml:/config/.gitleaks.toml:ro"
+          )
+          docker run "${common[@]}" "${GITLEAKS_IMAGE}" version | grep -F "${GITLEAKS_VERSION}"
+
+          fixture_root="$(mktemp -d)"
+          trap 'rm -rf "${fixture_root}" /tmp/gitleaks-*-control.log /tmp/gitleaks-*-git.stderr' EXIT
+
+          mkdir "${fixture_root}/negative"
+          git -C "${fixture_root}/negative" init --quiet
+          git -C "${fixture_root}/negative" config user.name 'HooshiX CI Fixture'
+          git -C "${fixture_root}/negative" config user.email 'ci-fixture@invalid.example'
+          printf '%s\n' 'ordinary test content without credentials' > "${fixture_root}/negative/input.txt"
+          git -C "${fixture_root}/negative" add input.txt
+          git -C "${fixture_root}/negative" commit --quiet -m 'fixture benign'
+          docker run "${common[@]}" \
+            --volume "${fixture_root}/negative:/fixture:ro" \
+            "${GITLEAKS_IMAGE}" \
+            dir --config /config/.gitleaks.toml --no-banner --redact=100 /fixture \
+            >/tmp/gitleaks-negative-control.log 2>&1
+          docker run "${common[@]}" \
+            --volume "${fixture_root}/negative:/fixture:ro" \
+            --entrypoint git \
+            "${GITLEAKS_IMAGE}" \
+            -C /fixture log -p --all --no-ext-diff --no-textconv \
+            >/dev/null 2>/tmp/gitleaks-negative-git.stderr
+          if [ -s /tmp/gitleaks-negative-git.stderr ]; then
+            echo 'Gitleaks negative-history Git preflight wrote stderr.' >&2
+            exit 1
+          fi
+          docker run "${common[@]}" \
+            --volume "${fixture_root}/negative:/fixture:ro" \
+            --workdir /fixture \
+            "${GITLEAKS_IMAGE}" \
+            git --config /config/.gitleaks.toml --no-banner --redact=100 --log-opts="--all" /fixture \
+            >/tmp/gitleaks-negative-history-control.log 2>&1
+
+          mkdir "${fixture_root}/positive"
+          printf 'token = "ghp_%s%s"\n' \
+            '9Kq7mX2vP4sN8cR1tY6a' \
+            'B3dF5hJ7L9wZ0uE2iO4p' > "${fixture_root}/positive/input.txt"
+          set +e
+          docker run "${common[@]}" \
+            --volume "${fixture_root}/positive:/fixture:ro" \
+            "${GITLEAKS_IMAGE}" \
+            dir --config /config/.gitleaks.toml --no-banner --redact=100 --exit-code 42 /fixture \
+            >/tmp/gitleaks-positive-control.log 2>&1
+          status=$?
+          set -e
+          if [ "${status}" -ne 42 ]; then
+            echo 'Gitleaks current-tree positive detection control failed.' >&2
+            exit 1
+          fi
+
+          mkdir "${fixture_root}/history"
+          git -C "${fixture_root}/history" init --quiet
+          git -C "${fixture_root}/history" config user.name 'HooshiX CI Fixture'
+          git -C "${fixture_root}/history" config user.email 'ci-fixture@invalid.example'
+          printf 'token = "ghp_%s%s"\n' \
+            '9Kq7mX2vP4sN8cR1tY6a' \
+            'B3dF5hJ7L9wZ0uE2iO4p' > "${fixture_root}/history/committed-secret.txt"
+          git -C "${fixture_root}/history" add committed-secret.txt
+          git -C "${fixture_root}/history" commit --quiet -m 'fixture add'
+          git -C "${fixture_root}/history" rm --quiet committed-secret.txt
+          git -C "${fixture_root}/history" commit --quiet -m 'fixture delete'
+          docker run "${common[@]}" \
+            --volume "${fixture_root}/history:/fixture:ro" \
+            --entrypoint git \
+            "${GITLEAKS_IMAGE}" \
+            -C /fixture log -p --all --no-ext-diff --no-textconv \
+            >/dev/null 2>/tmp/gitleaks-history-git.stderr
+          if [ -s /tmp/gitleaks-history-git.stderr ]; then
+            echo 'Gitleaks positive-history Git preflight wrote stderr.' >&2
+            exit 1
+          fi
+          set +e
+          docker run "${common[@]}" \
+            --volume "${fixture_root}/history:/fixture:ro" \
+            --workdir /fixture \
+            "${GITLEAKS_IMAGE}" \
+            git --config /config/.gitleaks.toml --no-banner --redact=100 --exit-code 42 --log-opts="--all" /fixture \
+            >/tmp/gitleaks-history-control.log 2>&1
+          status=$?
+          set -e
+          if [ "${status}" -ne 42 ]; then
+            echo 'Gitleaks commit-then-delete history detection control failed.' >&2
+            exit 1
+          fi
+
+          rm -rf "${fixture_root}"
+          rm -f /tmp/gitleaks-*-control.log /tmp/gitleaks-*-git.stderr
+          trap - EXIT
+
+      - name: Scan current tree and Git history for secrets
+        run: |
+          set -euo pipefail
+          common=(
+            --rm
+            --network none
+            --read-only
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m
+            --cap-drop ALL
+            --security-opt no-new-privileges
+            --volume "${GITHUB_WORKSPACE}/.gitleaks.toml:/config/.gitleaks.toml:ro"
+          )
+          docker run "${common[@]}" \
+            --volume "${GITHUB_WORKSPACE}:/src:ro" \
+            --workdir /src \
+            "${GITLEAKS_IMAGE}" \
+            dir --config /config/.gitleaks.toml --no-banner --redact=100 /src
+
+          git_stderr="$(mktemp)"
+          trap 'rm -f "${git_stderr}"' EXIT
+          docker run "${common[@]}" \
+            --volume "${GITHUB_WORKSPACE}:/src:ro" \
+            --entrypoint git \
+            "${GITLEAKS_IMAGE}" \
+            -C /src log -p --all --no-ext-diff --no-textconv \
+            >/dev/null 2>"${git_stderr}"
+          if [ -s "${git_stderr}" ]; then
+            echo 'Gitleaks history Git preflight wrote stderr.' >&2
+            exit 1
+          fi
+          docker run "${common[@]}" \
+            --volume "${GITHUB_WORKSPACE}:/src:ro" \
+            --workdir /src \
+            "${GITLEAKS_IMAGE}" \
+            git --config /config/.gitleaks.toml --no-banner --redact=100 --log-opts="--all" /src
+          rm -f "${git_stderr}"
+          trap - EXIT
+
+      - name: Install and verify OSV-Scanner
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          printf '%s  %s\n' "${OSV_SCANNER_SHA256}" /tmp/osv-scanner | sha256sum --check --strict -
+          chmod 0755 /tmp/osv-scanner
+          /tmp/osv-scanner --version | grep -F "${OSV_SCANNER_VERSION}"
+
+      - name: Scan locked dependencies for known vulnerabilities
+        run: |
+          set -euo pipefail
+          /tmp/osv-scanner scan source --lockfile="${SERVICE_DIR}/gradle.lockfile" --format=vertical
+
+      - name: Capture Gradle lock baseline
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: cp gradle.lockfile /tmp/authorization-gradle.lockfile
+
+      - name: Verify formatting
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew spotlessCheck --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
+      - name: Verify unit tests
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew test --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
+      - name: Verify PostgreSQL migrations and integration tests
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew integrationTest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
+      - name: Verify architecture tests
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew architectureTest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
+      - name: Verify SpotBugs and runtime JAR
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew spotbugsMain bootJar --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
+      - name: Install and verify Buf
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/buf \
+            "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-x86_64"
+          printf '%s  %s\n' "${BUF_SHA256}" /tmp/buf | sha256sum --check --strict -
+          chmod 0755 /tmp/buf
+          /tmp/buf --version | grep -F "${BUF_VERSION}"
+
+      - name: Lint and check Protobuf compatibility
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: |
+          set -euo pipefail
+          /tmp/buf lint
+          /tmp/buf build -o /tmp/authorization-contract.binpb
+          if git cat-file -e origin/main:services/authorization-service/src/main/proto 2>/dev/null; then
+            git update-ref refs/heads/buf-ci-main refs/remotes/origin/main
+            trap 'git update-ref -d refs/heads/buf-ci-main || true' EXIT
+            /tmp/buf breaking --against '../../.git#branch=buf-ci-main,subdir=services/authorization-service'
+          fi
+
+      - name: Run pinned Semgrep policy
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network none \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=128m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --volume "${GITHUB_WORKSPACE}:/src:ro" \
+            --workdir /src \
+            --env HOME=/tmp \
+            --env SEMGREP_SEND_METRICS=off \
+            "${SEMGREP_IMAGE}" \
+            semgrep scan \
+              --disable-version-check \
+              --metrics=off \
+              --error \
+              --config .semgrep/authorization-service.yml \
+              services/authorization-service/src/main/java
+
+      - name: Install and verify Helm
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/helm.tar.gz \
+            "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+          printf '%s  %s\n' "${HELM_SHA256}" /tmp/helm.tar.gz | sha256sum --check --strict -
+          tar -xzf /tmp/helm.tar.gz -C /tmp
+          /tmp/linux-amd64/helm version --short | grep -F "v${HELM_VERSION}"
+
+      - name: Lint and verify hardened Helm render
+        run: |
+          set -euo pipefail
+          chart="${SERVICE_DIR}/deploy/helm/authorization-service"
+          /tmp/linux-amd64/helm lint "${chart}" -f "${chart}/ci/test-values.yaml"
+          /tmp/linux-amd64/helm template authorization-service "${chart}" \
+            -f "${chart}/ci/test-values.yaml" > /tmp/authorization-rendered.yaml
+          python3 "${SERVICE_DIR}/scripts/verify_rendered_manifest.py" /tmp/authorization-rendered.yaml
+
+      - name: Install and verify Prometheus tooling
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/prometheus.tar.gz \
+            "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz"
+          printf '%s  %s\n' "${PROMETHEUS_SHA256}" /tmp/prometheus.tar.gz | sha256sum --check --strict -
+          tar -xzf /tmp/prometheus.tar.gz -C /tmp
+          mv "/tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool" /tmp/promtool
+
+      - name: Verify service alert rules and dashboard JSON
+        run: |
+          set -euo pipefail
+          /tmp/promtool check rules "${SERVICE_DIR}/observability/alerts/authorization-service.yaml"
+          python3 -m json.tool "${SERVICE_DIR}/observability/grafana/authorization-service.json" > /dev/null
+
+      - name: Build digest-verified Temurin runtime image
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: |
+          set -euo pipefail
+          source container/pins.env
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/temurin.tar.gz "${TEMURIN_ARCHIVE_URL}"
+          printf '%s  %s\n' "${TEMURIN_ARCHIVE_SHA256}" /tmp/temurin.tar.gz | sha256sum --check --strict -
+          rm -rf .runtime-jdk
+          mkdir .runtime-jdk
+          tar -xzf /tmp/temurin.tar.gz -C .runtime-jdk --strip-components=1
+          docker build --pull=false \
+            --build-arg "RUNTIME_BASE_IMAGE=${RUNTIME_BASE_IMAGE}" \
+            --build-arg "APP_JAR=build/libs/authorization-service-0.1.0-SNAPSHOT.jar" \
+            --build-arg "RUNTIME_JDK_DIR=.runtime-jdk" \
+            -t authorization-service:ci .
+          rm -rf .runtime-jdk
+
+      - name: Verify generated files are committed
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: |
+          set -euo pipefail
+          cmp /tmp/authorization-gradle.lockfile gradle.lockfile
+          git diff --exit-code -- gradle.lockfile gradle/verification-metadata.xml

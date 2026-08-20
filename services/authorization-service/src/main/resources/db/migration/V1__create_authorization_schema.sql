@@ -100,20 +100,23 @@ CREATE TABLE authorization_platform_profile_assignment (
 );
 
 CREATE TABLE authorization_idempotency_record (
-  request_id UUID PRIMARY KEY,
+  request_id UUID NOT NULL,
   tenant_id UUID,
   operation VARCHAR(64) NOT NULL,
   intent_fingerprint BYTEA NOT NULL CHECK (octet_length(intent_fingerprint)=32),
   fingerprint_version VARCHAR(32) NOT NULL,
+  fingerprint_key_id VARCHAR(64) NOT NULL,
   outcome_code VARCHAR(64) NOT NULL,
   outcome_reference UUID,
-  created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL
+  created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
+  PRIMARY KEY (request_id,operation)
 );
 CREATE INDEX authorization_idempotency_retention_idx ON authorization_idempotency_record(created_at,request_id);
 
 CREATE TABLE authorization_audit (
   audit_id UUID PRIMARY KEY,
   event_code VARCHAR(64) NOT NULL,
+  request_id UUID,
   tenant_id UUID,
   actor_user_id UUID,
   target_id UUID,

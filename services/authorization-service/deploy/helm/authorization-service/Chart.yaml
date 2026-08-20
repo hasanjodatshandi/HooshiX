@@ -1,0 +1,6 @@
+apiVersion: v2
+name: authorization-service
+description: HooshiX authoritative online authorization service
+version: 0.1.0
+appVersion: "0.1.0"
+type: application

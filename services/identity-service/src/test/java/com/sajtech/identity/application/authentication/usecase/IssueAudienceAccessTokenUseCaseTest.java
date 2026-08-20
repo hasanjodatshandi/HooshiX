@@ -27,6 +27,8 @@ class IssueAudienceAccessTokenUseCaseTest {
           new RefreshCredentialLookup(new FixedCredentials(digest)),
           new DirectTransactionRunner(),
           store,
+          (userId, tenantId, membershipId) -> true,
+          context -> new SignedAccessToken("test-token", NOW.plusSeconds(300)),
           Clock.fixed(NOW, ZoneOffset.UTC));
 
   @Test

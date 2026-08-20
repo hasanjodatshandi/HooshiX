@@ -161,6 +161,33 @@ class AuthenticateLocalUseCaseTest {
     }
   }
 
+  @Test
+  void successfulLoginAutoSelectsResolvedTenantContext() {
+    UUID userId = UUID.randomUUID(), tenantId = UUID.randomUUID(), membershipId = UUID.randomUUID();
+    store.local = new LocalCredentialRecord(userId, "ACTIVE", "$argon2id$stored");
+    verifier.result = true;
+    AuthenticateLocalUseCase tenantAware =
+        new AuthenticateLocalUseCase(
+            new ContactCanonicalizer(),
+            new PasswordNormalizer(),
+            quota,
+            verifier,
+            new FakeCredentials(),
+            new DirectTransactionRunner(),
+            store,
+            ignored -> AuthenticationTenantSelection.tenant(tenantId, membershipId),
+            Clock.fixed(NOW, ZoneOffset.UTC));
+
+    AuthenticationSession session = tenantAware.authenticate(command());
+
+    assertThat(session.mode()).isEqualTo(AuthenticationSessionMode.TENANT_AUTHENTICATED);
+    assertThat(session.selectedTenantId()).isEqualTo(tenantId);
+    assertThat(session.selectedMembershipId()).isEqualTo(membershipId);
+    assertThat(store.created.mode()).isEqualTo(AuthenticationSessionMode.TENANT_AUTHENTICATED);
+    assertThat(store.created.selectedTenantId()).isEqualTo(tenantId);
+    assertThat(store.created.selectedMembershipId()).isEqualTo(membershipId);
+  }
+
   private static final class FakeCredentials implements SessionCredentialPort {
     @Override
     public String newSessionId() {

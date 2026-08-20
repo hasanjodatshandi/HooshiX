@@ -3,7 +3,7 @@
 - **Reviewed:** 2026-08-16
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for the executable Compromised Password, Notification, and Identity registration plus local-password authentication/Session/RefreshFamily/JWT-signing slices; service-specific Semgrep/OSV gates are present and Identity also has an implemented Gitleaks current-tree/Git-history gate. Protected merged-main repository/security CI passed for all three implemented service suites on `main@a3766bd`; deployed runtime/staging/release evidence remains `NOT VERIFIED`, and Syft/Grype/Cosign/Kyverno final-artifact/admission evidence remains `NOT VERIFIED`; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, Identity registration/authentication/Session/RefreshFamily/JWT/Tenant slices, Authorization, and Web BFF slices; service-specific Semgrep/OSV gates are present and Identity also has an implemented Gitleaks current-tree/Git-history gate. Protected merged-main repository/security CI passed for the prior Compromised Password, Notification, and Identity suites on `main@a3766bd`; Authorization/Web BFF protected CI for the current branch remains NOT VERIFIED; deployed runtime/staging/release evidence remains `NOT VERIFIED`, and Syft/Grype/Cosign/Kyverno final-artifact/admission evidence remains `NOT VERIFIED`; see `implementation-status.md`
 
 ## 1. Selected single-server topology
 
@@ -134,7 +134,7 @@ Current exact selected versions include:
 
 Semgrep remains first-party source SAST/repository policy. Gradle dependency verification/locks remain dependency-integrity controls, not CVE authority.
 
-OSV-Scanner 2.4.0 locked-dependency scanning is implemented for the current Compromised Password, Notification, and Identity service slices and is wired into their PR/push security verification plus the scheduled repository security workflow. Exact tool/checksum ownership remains in the implemented workflows. This is early dependency-advisory evidence only.
+OSV-Scanner 2.4.0 locked-dependency scanning is implemented for the current Compromised Password, Notification, Identity, Authorization, and Web BFF service slices and is wired into their PR/push security verification plus the scheduled repository security workflow. Exact tool/checksum ownership remains in the implemented workflows. This is early dependency-advisory evidence only.
 
 Syft+Grype remain mandatory for exact final-image release/deployed-artifact vulnerability evidence because OS packages, the JDK/runtime, native libraries, and packaged transitive content may not be represented by the lockfile.
 
