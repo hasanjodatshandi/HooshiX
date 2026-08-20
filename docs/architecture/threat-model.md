@@ -133,7 +133,7 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - tracked-file-only retrieval does not prove the repository is secret-free; Gitleaks remains the committed-secret control;
 - the HooshiX Context MCP surface is read-only/stdio-only and has no file/Git/checkpoint/deployment/credential mutation tool or HooshiX network listener;
 - OpenAI tunnel-client is the outbound customer-run transport bridge and must not broaden the Context MCP tool list;
-- ADR-0048 Ops MCP is a separate developer-host stdio surface with mandatory local policy, explicit mutation/execution semantics, separate tunnel/profile/key, bounded path/process/output/audit controls, and no production authority;
+- ADR-0048 Ops MCP is a separate developer-host stdio surface with mandatory local policy, explicit mutation/execution semantics, separate tunnel/profile/key, bounded path/process/persistent-job/output/audit controls, runner-owned timeout/cancellation, and no production authority;
 - ADR-0049 Desktop MCP is a third developer-host stdio surface with mandatory local policy, pinned WinApp version, intended interactive/non-elevated session, fresh HWND/process app authorization, explicit screenshot/UIA/mouse/keyboard/system-key flags, a fixed isolated PowerShell/C# Unicode text helper with stdin-only non-secret text and sanitized environment, bounded transient capture, metadata-only audit, separate tunnel/profile/key, and no UAC/production authority; ADR-0050 adds only an opt-in policy-bound local credential-use broker whose secret value never enters MCP/Python/output/audit/argv/environment and which has no credential-read/list/write/export surface;
 - ADR-0051 keeps all three MCP runtime implementations outside the HooshiX application repository; Context invokes project context through fixed WSL policy, Ops uses an explicit WSL alias for project commands, and Desktop remains Windows-session-only;
 - typed Ops path authorization is not claimed to defeat a malicious local process that can race/replace filesystem entries; host ACLs/work roots and the local account remain part of the trust boundary;
@@ -190,7 +190,10 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 | Information disclosure | context retrieval/checkpoint exposes sensitive repository material | sensitive-name exclusion + bounded tracked-file retrieval + no secret fields/private-key material in checkpoints + Gitleaks remains authoritative | retrieval/checkpoint negatives + Gitleaks evidence |
 | Information disclosure | tunnel runtime/admin credential is exposed through Git/chat/logs/process arguments | restricted runtime key + local secret mechanism + no chat/Git/log/screenshot/command-line literal + rotate/revoke on suspicion | operator configuration/incident evidence |
 | Information disclosure | Ops child command inherits tunnel/API credentials | allow-listed child environment + secret-like key exclusion + no caller environment map/stdin secret channel | ADR-0048 child-environment negative test |
-| Repudiation | local Ops mutation/execution has no usable trace | bounded JSON-lines metadata audit with event/time/action/outcome and hashed purpose/argv; no claim of tamper-resistant production audit | audit content/rotation tests + operator ACL evidence |
+| Tampering | persistent Ops job state/output is redirected outside protected state through traversal or symlink/junction/reparse substitution | runtime-created job IDs + protected fixed state root + lexical/resolved confinement + regular-file/reparse validation | ADR-0048 job-ID/path/reparse negatives |
+| DoS | persistent Ops jobs consume unbounded processes, disk, retained records, or response memory | max 4 active jobs + max 16 retained records + 24h cleanup age + <=1 MiB/stream or lower policy cap + <=64 KiB log page + finite policy timeout | ADR-0048 capacity/output/retention/timeout tests |
+| Elevation of privilege | `process.cancel` is abused as an arbitrary host process-kill primitive | caller supplies only runtime-created job ID; fixed runner owns its child process tree and termination | ADR-0048 cancellation/job-ID negatives |
+| Repudiation | local Ops mutation/execution has no usable trace | bounded JSON-lines metadata audit with event/time/action/outcome and hashed purpose/argv; persistent stdout/stderr remains separate operational state; no claim of tamper-resistant production audit | audit content/rotation tests + operator ACL evidence |
 | Information disclosure | secrets/PII in telemetry | source allow-list + Collector redaction + canary | Loki/Tempo/Prometheus/Grafana negatives |
 | Information disclosure | Collector reads arbitrary host files | exact read-only pod-log mount; no broad host privilege | render/runtime mount negatives |
 | DoS | Authorization/Redis failure blocks work | bounded deadlines/bulkheads + fail closed | overload/failure tests |
@@ -364,6 +367,22 @@ Required:
 
 Residual: compromise running with the same Windows-user authority can attack user-scoped credentials outside MCP. ADR-0050 does not claim same-user malware isolation. It constrains the ChatGPT/Desktop broker path only.
 
+### TM-22 Ops persistent-job state/cancellation abuse
+
+A malicious or malformed Ops request attempts to create unbounded long-running jobs, escape the protected job-state root, persist raw argv/purpose indefinitely, read unbounded output, or cancel an unrelated host process.
+
+Required:
+
+- the same policy alias, cwd, argv, environment, elevation, and finite local timeout apply to synchronous and persistent execution;
+- random fixed-format job IDs select only runtime-created job directories under protected Ops state;
+- job/request/state/output paths reject traversal and symlink/junction/reparse escape;
+- raw argv is only transient runner-handoff state and is deleted before target execution; persistent metadata/audit keeps hashes and bounded metadata;
+- active jobs, retained records, terminal cleanup age, per-stream output, and per-call log-page size remain bounded;
+- cancellation accepts job ID only and the fixed runner owns child process-tree termination;
+- persistent job completion across a tunnel response lifetime is not represented as a longer synchronous response SLA.
+
+Residual: output produced by an explicitly authorized broad local command can itself contain sensitive developer-host data. Persistent output therefore remains protected local operational state and is not a secret-storage or audit channel.
+
 ## 8. Single-server residual risks
 
 - one host failure can stop complete platform and local observability;
@@ -387,7 +406,7 @@ Material threats map to executable service/security/database/network/CI/observab
 - TM-14 -> ADR-0017/0035/0038/0039/0045 + Semgrep/Syft/Grype/Cosign/Kyverno digest/evidence/failure fixtures;
 - TM-19 -> ADR-0045 Gitleaks current-tree/history/redaction + incident revoke/rotate/history-remediation evidence;
 - TM-20 -> ADR-0046 bootstrap/router/search/checkpoint/MCP tests + ADR-0047 CWD-independent stdio/tunnel-boundary review + real operator-PC tunnel/bootstrap evidence + generated-route parity + SEC-033/AFF-051;
-- developer-host Ops threats -> ADR-0048 policy/path/symlink/process/environment/audit/UTF-8 tests + separate operator-PC tunnel/elevation/background evidence;
+- TM-22/developer-host Ops threats -> ADR-0048 policy/path/symlink/reparse/process/persistent-job/environment/capacity/cancellation/audit/UTF-8 tests + separate operator-PC tunnel/elevation/background evidence;
 - developer-host Desktop threats -> ADR-0049 policy/version/session/app/HWND/capture/UIA/mouse/keyboard/isolated-text-helper/environment/audit/UTF-8 tests + ADR-0050 broker policy/schema/wrong-app/executable-identity/credential-helper/password-focus/unique-password/PID/redaction tests + separate operator-PC disposable-credential/WinApp/tunnel/interactive/background evidence;
 - TM-17 -> external host-down monitor + cold DR;
 - compromised-password source risk -> ADR-0040 corpus build/freshness/provenance tests;

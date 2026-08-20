@@ -32,7 +32,7 @@ WSL2 Ubuntu
 
 The active HooshiX checkout MUST be on the native WSL Linux filesystem. Do not use `/mnt/c`, `/mnt/d`, or another Windows-mounted filesystem as the active application checkout.
 
-The current Windows MCP runtime root is `D:\Projects\HooshiXMcpRuntime`. This path is developer-host state. It is not production state and is not part of the HooshiX Git tree.
+The current Windows MCP runtime root is `D:\Projects\HooshiXMcpRuntime`. Its independent Git authority is `https://github.com/hasanjodatshandi/HooshiXMcpRuntime.git`. This path/repository is developer-host tooling state. It is not production state and is not part of the HooshiX application Git tree.
 
 ## 1. Repository ownership
 

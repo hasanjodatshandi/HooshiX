@@ -198,17 +198,20 @@ Every executable service/critical path proves applicable:
 ADR-0048/0051 independent Windows MCP runtime tests prove:
 
 - Context MCP still exposes exactly its five read-only tools;
-- Ops MCP exposes only the reviewed separate Ops tool list with correct read-only/destructive/open-world hints;
+- Ops MCP exposes exactly the reviewed 13-tool surface: `ops.status`, `ops.audit_tail`, six typed filesystem tools, `process.run`, `process.start`, `process.status`, `process.logs`, and `process.cancel`, with correct read-only/destructive/open-world hints;
 - missing/malformed/unknown-field/duplicate-key/relative/out-of-range policy state fails closed;
 - out-of-root, denied-root, allowed-root deletion, and symlink/reparse escape negatives;
 - bounded UTF-8 file read/write, atomic replace, and SHA-256 overwrite precondition;
-- policy command alias only, absolute allowed cwd, bounded argv, finite timeout, process-tree termination attempt, and bounded stdout/stderr capture;
+- policy command alias only, absolute allowed cwd, bounded argv, finite timeout, process-tree termination attempt, and bounded synchronous stdout/stderr capture;
+- persistent jobs survive MCP parent exit/restart, keep the same policy timeout/environment/cwd/alias authority, and bound active jobs, retained records, stdout/stderr files, and log-page reads;
+- persistent state/request/output paths reject traversal and symlink/junction/reparse escape; raw argv is transient and absent from persistent metadata after runner pickup;
+- cancellation uses only runtime-created job ID and runner-owned process-tree termination; no arbitrary caller PID kill primitive exists;
 - secret-like parent environment values such as `CONTROL_PLANE_API_KEY` are absent from child environment;
 - audit metadata excludes file content, raw argv, raw purpose, stdout/stderr, and credentials and has bounded rotation;
 - stdio JSON-RPC output is explicit UTF-8 bytes independent of Windows text code page;
 - entry point works outside repository CWD.
 
-Host evidence separately proves real Windows policy ACLs, intended elevation state, separate Ops tunnel/profile/key, local readiness, exact tool discovery, `ops.status`, bounded mutation/execution, audit behavior, and rollback/revocation. Background resilience evidence distinguishes tunnel-client child exit, internal stdio MCP-child failure/unready state, complete parent Scheduled Task stop, and orphan/duplicate same-profile cleanup. Pass requires full known profile-tree cleanup before parent recovery, convergence to exactly one launcher/wrapper/tunnel chain where applicable, healthy loopback `/readyz`, bounded local diagnostics, and no runtime-key exposure. Local process timeout and end-to-end tunnel response lifetime are separate bounds. Tests must prove the configured local timeout is finite and enforced. A synchronous ChatGPT/Ops call must stay below the shortest measured effective tunnel response deadline with margin. If the configured local timeout is longer than that response window, longer work must use an explicit split/checkpoint or persistent-terminal/polling pattern; the larger local timeout must not be reported as synchronous transport evidence.
+Host evidence separately proves real Windows policy/job-state ACLs, intended elevation state, separate Ops tunnel/profile/key, local readiness, exact tool discovery, `ops.status`, bounded mutation/execution, persistent-job start/status/log/cancel behavior, audit behavior, and rollback/revocation. Background resilience evidence distinguishes tunnel-client child exit, internal stdio MCP-child failure/unready state, complete parent Scheduled Task stop, and orphan/duplicate same-profile cleanup. Pass requires full known profile-tree cleanup before parent recovery, convergence to exactly one launcher/wrapper/tunnel chain where applicable, healthy loopback `/readyz`, bounded local diagnostics, and no runtime-key exposure. Local process timeout and end-to-end tunnel response lifetime are separate bounds. Tests must prove the configured local timeout is finite and enforced. A synchronous ChatGPT/Ops call must stay below the shortest measured effective tunnel response deadline with margin. Work that can exceed that window uses `process.start` and short `process.status`/`process.logs` polling, with `process.cancel` when cancellation is required; split/checkpoint remains a workflow option. Persistent-job success must not be reported as a longer synchronous transport SLA.
 
 Ops MCP tests do not prove production administration safety. ADR-0030 remains the production privileged-access authority.
 

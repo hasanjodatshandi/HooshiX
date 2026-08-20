@@ -53,7 +53,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0045 | DevSecOps responsibility map: Semgrep, Gitleaks, OSV-Scanner, Syft, Grype, Cosign, and Kyverno |
 | ADR-0046 | Git-native Agent Context Engine: verified bootstrap, task routing, commit-bound checkpoints, bounded retrieval, read-only MCP |
 | ADR-0047 | OpenAI Secure MCP Tunnel bridge for ChatGPT Web access to the existing read-only stdio Context MCP |
-| ADR-0048 | policy-gated developer-host Ops MCP for separate local filesystem/process authority |
+| ADR-0048 | policy-gated developer-host Ops MCP for separate bounded filesystem, synchronous process, and persistent process-job authority |
 | ADR-0049 | policy-gated developer-host Desktop MCP for separate interactive Windows UI observation/input authority |
 | ADR-0050 | policy-bound developer-host Desktop credential broker for local use-without-disclosure |
 | ADR-0051 | WSL-native HooshiX workspace with independently versioned Windows Context/Ops/Desktop MCP runtime |
