@@ -61,7 +61,7 @@ spec:
             - {name: WEB_BFF_AUTHORIZATION_TARGET, value: {{ .Values.authorization.target | quote }}}
             - {name: WEB_BFF_LOCATOR_KEY_RING_PATH, value: /run/secrets/web-bff-locator/locator.properties}
             - {name: WEB_BFF_CSRF_KEY_RING_PATH, value: /run/secrets/web-bff-csrf/csrf.properties}
-            - {name: WEB_BFF_REFRESH_KEY_RING_PATH, value: /run/secrets/web-bff-refresh/refresh.properties}
+            - {name: WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH, value: /run/secrets/web-bff-refresh/refresh.properties}
             - {name: WEB_BFF_ROUTE_AUDIENCES_AUTHORIZATION_PREFIX, value: {{ .Values.routeAudiences.authorizationPrefix | quote }}}
             - {name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT, value: {{ $traceEndpoint | quote }}}
           resources:

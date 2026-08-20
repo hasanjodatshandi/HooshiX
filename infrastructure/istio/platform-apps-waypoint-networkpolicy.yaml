@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: platform-apps-waypoint, namespace: platform-apps}
+spec:
+  podSelector:
+    matchLabels: {gateway.networking.k8s.io/gateway-name: platform-apps-waypoint}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-edge}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: edge-waf}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-observability}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: prometheus}}
+      ports: [{protocol: TCP, port: 15008}]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: istio-system}}
+          podSelector: {matchLabels: {app: istiod, istio: pilot}}
+      ports: [{protocol: TCP, port: 15012}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: authorization-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
+      ports: [{protocol: TCP, port: 15008}]

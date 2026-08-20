@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: service-mesh
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik-system
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: edge
+    istio.io/dataplane-mode: ambient
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-edge
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: waf
+    platform.local/gateway-access: "true"
+    istio.io/dataplane-mode: ambient
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-apps
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: applications
+    istio.io/dataplane-mode: ambient
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-data
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: data
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-observability
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: observability
+    istio.io/dataplane-mode: ambient
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-observability-node
+  labels:
+    app.kubernetes.io/part-of: platform
+    platform.local/component: observability-node
+    istio.io/dataplane-mode: ambient
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

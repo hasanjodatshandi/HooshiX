@@ -4,6 +4,7 @@ metadata:
   name: {{ include "authorization-service.name" . }}
   labels:
     {{- include "authorization-service.labels" . | nindent 4 }}
+    istio.io/use-waypoint: {{ required "ambient.waypointName is required" .Values.ambient.waypointName | quote }}
 spec:
   type: ClusterIP
   selector:

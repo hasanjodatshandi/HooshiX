@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: postgresql, namespace: platform-data}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: security-redis, namespace: platform-data}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: postgresql, namespace: platform-data}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: postgresql}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql
+        istio.io/dataplane-mode: ambient
+    spec:
+      serviceAccountName: postgresql
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: postgresql
+          image: postgres:18.4-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+          env:
+            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: postgres-admin, key: password}}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports: [{name: postgres, containerPort: 5432}]
+          readinessProbe: {exec: {command: [pg_isready, -U, postgres, -d, postgres]}, periodSeconds: 3, failureThreshold: 20}
+          livenessProbe: {exec: {command: [pg_isready, -U, postgres, -d, postgres]}, periodSeconds: 10, failureThreshold: 5}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+      volumes: [{name: data, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: postgresql, namespace: platform-data}
+spec:
+  selector: {app.kubernetes.io/name: postgresql}
+  ports: [{name: postgres, port: 5432, targetPort: postgres}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: security-redis, namespace: platform-data}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: security-redis}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: security-redis
+        istio.io/dataplane-mode: ambient
+    spec:
+      serviceAccountName: security-redis
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: redis:8.2.8-bookworm@sha256:2f7462b9e93e0a7ae2edf3a0a0babc8a4d29f8bfc50849b906b7caaef925edc1
+          args: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, 256mb, --maxmemory-policy, noeviction, --save, "", --aclfile, /run/redis/users.acl]
+          ports: [{name: redis, containerPort: 6379}]
+          env:
+            - {name: REDIS_HEALTH_PASSWORD, valueFrom: {secretKeyRef: {name: redis-health, key: password}}}
+            - {name: REDIS_VERIFY_PASSWORD, valueFrom: {secretKeyRef: {name: redis-verify, key: password}}}
+          readinessProbe:
+            exec: {command: [sh, -c, 'redis-cli --user health --pass "$REDIS_HEALTH_PASSWORD" --no-auth-warning ping | grep -qx PONG']}
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            exec: {command: [sh, -c, 'redis-cli --user health --pass "$REDIS_HEALTH_PASSWORD" --no-auth-warning ping | grep -qx PONG']}
+            periodSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 500m, memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: acl, mountPath: /run/redis, readOnly: true}
+      volumes:
+        - {name: data, emptyDir: {}}
+        - {name: acl, secret: {secretName: redis-acl, defaultMode: 0440}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: security-redis, namespace: platform-data}
+spec:
+  selector: {app.kubernetes.io/name: security-redis}
+  ports: [{name: redis, port: 6379, targetPort: redis}]

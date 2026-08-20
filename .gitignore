@@ -68,7 +68,7 @@ secrets/
 
 .repair-backup/
 
-!infrastructure/traefik/chart/40.2.0/traefik-40.2.0.tgz
+!infrastructure/traefik/chart/41.2.0/traefik-41.2.0.tgz
 
 !infrastructure/istio/chart/1.30.3/*.tgz
 
@@ -77,3 +77,7 @@ secrets/
 # Python generated state
 __pycache__/
 *.py[cod]
+
+# HooshiX production-fidelity local runtime state
+.platform-runtime/
+services/*/.runtime-jdk/

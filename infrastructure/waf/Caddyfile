@@ -1,0 +1,36 @@
+{
+  auto_https off
+  order coraza_waf first
+  admin off
+  log default {
+    output stdout
+    format json
+    level INFO
+  }
+}
+
+:8080 {
+  coraza_waf {
+    load_owasp_crs
+    directives `
+      Include @coraza.conf-recommended
+      Include /etc/coraza/crs/crs-setup.conf.example
+      Include /etc/coraza/crs/rules/*.conf
+      SecRuleEngine On
+      SecResponseBodyAccess Off
+      SecRule REQUEST_HEADERS:X-HooshiX-WAF-Test "@streq block" "id:1000001,phase:1,deny,status:403,log,msg:'HooshiX controlled WAF verification'"
+    `
+  }
+  handle_errors 403 {
+    header X-HooshiX-WAF-Blocked "true"
+    respond "blocked" 403
+  }
+  reverse_proxy http://web-bff.platform-apps.svc.cluster.local:8080 {
+    header_up X-HooshiX-Client-IP {http.request.remote.host}
+  }
+}
+
+:9090 {
+  respond /healthz "ok" 200
+  respond 404
+}

@@ -1,0 +1,18 @@
+runtime:
+  enabled: true
+  requireFetchMetadata: true
+  publicOrigin: https://hooshix.local:8443
+redis:
+  podLabels: {app.kubernetes.io/name: security-redis}
+  connectionSecretName: web-bff-redis
+secrets:
+  locatorSecretName: web-bff-locator
+  csrfSecretName: web-bff-csrf
+  refreshEncryptionSecretName: web-bff-refresh
+edge:
+  namespace: platform-edge
+  podLabels: {app.kubernetes.io/name: edge-waf}
+  principal: prod.sajtech.internal/ns/platform-edge/sa/edge-waf
+observability:
+  tracing: {enabled: true, otlpEndpoint: http://otel-collector.platform-observability-node.svc.cluster.local:4318/v1/traces, collector: {namespace: platform-observability-node, podLabels: {app.kubernetes.io/name: otel-collector}, port: 4318}}
+  metrics: {enabled: true, prometheus: {namespace: platform-observability, podLabels: {app.kubernetes.io/name: prometheus}, principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus}}

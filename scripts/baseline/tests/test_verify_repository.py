@@ -84,6 +84,7 @@ edges:
             (root / "tracked.txt").write_text("source\n", encoding="utf-8")
             generated = [
                 root / ".local-runtime/keys/private.properties",
+                root / ".platform-runtime/staging/files/generated-secret",
                 root / "services/sample/build/generated.txt",
                 root / "services/sample/.gradle/cache.bin",
             ]

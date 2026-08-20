@@ -2,7 +2,7 @@
 
 - **Baseline date:** 2026-08-19
 - **Status:** Active local-development baseline
-- **Scope:** WSL-native HooshiX application engineering, Windows-hosted independent Context/Ops/Desktop MCP tooling, fast service loop, and optional production-fidelity kind integration foundation.
+- **Scope:** WSL-native HooshiX application engineering, Windows-hosted independent Context/Ops/Desktop MCP tooling, fast service loop, and implemented production-fidelity kind integration foundation.
 - **Evidence rule:** a pin is a repository target, not proof it is installed.
 
 Production Technology Baseline remains authoritative for production versions.
@@ -158,9 +158,9 @@ browser/curl -> Traefik -> Caddy/Coraza -> BFF -> internal services
 - waypoints only for an explicit tested L7 need;
 - local exposure does not claim upstream volumetric DDoS protection.
 
-## 6. Optional local observability profile
+## 6. Implemented local observability profile
 
-When testing ADR-0044 end-to-end, use the production version family/pins:
+The production-fidelity lane implements ADR-0044 end-to-end integration using the production version family/pins:
 
 ```text
 otelcol-contrib 0.157.0
@@ -222,14 +222,29 @@ make local-runtime-up
 make local-runtime-status
 ```
 
-Production-fidelity interfaces are added/used when their corresponding infrastructure exists:
+Implemented production-fidelity interfaces include:
 
 ```text
+make local-cluster-up
 make local-cluster-verify
+make local-istio-ambient-install
 make verify-local-istio-ambient
+make local-kyverno-install
+make verify-local-kyverno
+make local-traefik-edge-install
 make verify-local-traefik-edge
+make local-observability-install
 make verify-local-observability
+make staging-data-install
+make staging-build
+make staging-deploy
+make staging-verify
+make production-fidelity-up
+make production-fidelity-verify
+make production-fidelity-down
 ```
+
+The holistic runbook is `docs/runbooks/local-production-fidelity-staging.md`. These interfaces prove local integration fidelity only; they do not turn the kind lane into production K3s or production-readiness evidence.
 
 Context Engine repository interfaces additionally include:
 
@@ -242,7 +257,7 @@ Context/Ops/Desktop MCP adapter/runtime tests execute from the independent Windo
 
 ChatGPT Web tunnel operation follows `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`; tunnel-client does not replace repository verification commands.
 
-Expected versioned platform roots may include:
+Implemented local production-fidelity platform roots include:
 
 ```text
 infrastructure/kind/

@@ -227,15 +227,20 @@ AI-generated and handwritten code use the same gates. Compilation alone is not c
 
 Use the pinned local foundation only when real Kubernetes/mesh/edge/policy/telemetry integration is under test.
 
-Expected interface after implementation exists:
+Implemented repository interface:
 
 ```bash
 make baseline-verify
 make local-cluster-verify
 make verify-local-istio-ambient
+make verify-local-kyverno
 make verify-local-traefik-edge
-make verify-local-observability   # when ADR-0044 local target exists
+make staging-verify
+make verify-local-observability
+make production-fidelity-verify
 ```
+
+These commands provide local integration-fidelity evidence. They do not replace production K3s, release-chain, capacity, recovery, or production-readiness evidence.
 
 The Context Engine does not require the local Kubernetes foundation.
 

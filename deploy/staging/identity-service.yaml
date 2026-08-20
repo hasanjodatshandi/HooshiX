@@ -1,0 +1,32 @@
+runtime:
+  registrationRuntimeEnabled: true
+  authenticationRuntimeEnabled: true
+  tenantRuntimeEnabled: true
+  argon2MaxConcurrentHashes: 2
+  compromisedPasswordMaxInFlight: 16
+  phoneRegistrationEnabled: true
+  notificationDispatchEnabled: true
+database:
+  jdbcUrl: jdbc:postgresql://postgresql.platform-data.svc.cluster.local:5432/identity
+  podLabels: {app.kubernetes.io/name: postgresql}
+  runtimeSecretName: identity-db-runtime
+  migrationSecretName: identity-db-migration
+quota:
+  redis: {podLabels: {app.kubernetes.io/name: security-redis}, connectionSecretName: identity-quota-redis}
+  maxActiveBuckets: 10000
+  maxNewBucketsPerMinute: 1000
+  hostTimeStatus: {configMapName: identity-host-time}
+secrets:
+  fingerprintSecretName: identity-fingerprint
+  challengeSecretName: identity-challenge
+  handoffSecretName: identity-handoff
+  quotaKeySecretName: identity-quota
+  refreshSecretName: identity-refresh
+  jwtPrivateSecretName: identity-jwt-private
+jwt:
+  publicVerifierConfigMapName: identity-jwt-public
+  issuer: https://identity.sajtech.internal
+  allowedAudiences: [authorization-service]
+observability:
+  tracing: {enabled: true, otlpEndpoint: http://otel-collector.platform-observability-node.svc.cluster.local:4318/v1/traces, collector: {namespace: platform-observability-node, podLabels: {app.kubernetes.io/name: otel-collector}, port: 4318}}
+  metrics: {enabled: true, prometheus: {namespace: platform-observability, podLabels: {app.kubernetes.io/name: prometheus}, principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus}}

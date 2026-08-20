@@ -14,9 +14,10 @@
 *.gz binary
 *.jar binary
 
-# Preserve the vendored Gateway API release bundle byte-for-byte.
-infrastructure/cluster-addons/gateway-api/v1.5.1/standard-install.yaml whitespace=-trailing-space
+# Preserve checksum-pinned upstream vendor artifacts byte-for-byte.
+infrastructure/gateway-api/vendor/1.5.1/standard-install.yaml -whitespace
+infrastructure/kyverno/vendor/1.18.2/install.yaml -whitespace
 
-infrastructure/traefik/chart/40.2.0/traefik-40.2.0.tgz binary
+infrastructure/traefik/chart/41.2.0/traefik-41.2.0.tgz binary
 
 infrastructure/istio/chart/1.30.3/*.tgz binary
