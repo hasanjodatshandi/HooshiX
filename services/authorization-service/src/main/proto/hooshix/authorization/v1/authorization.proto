@@ -9,20 +9,20 @@ service AuthorizationService {
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
   rpc GetRole(GetRoleRequest) returns (GetRoleResponse);
   rpc GetMembershipAuthorization(GetMembershipAuthorizationRequest) returns (GetMembershipAuthorizationResponse);
-  rpc CreateRole(CreateRoleRequest) returns (RoleResponse);
-  rpc UpdateRole(UpdateRoleRequest) returns (RoleResponse);
-  rpc ArchiveRole(ArchiveRoleRequest) returns (RoleResponse);
-  rpc ReplaceRolePermissions(ReplaceRolePermissionsRequest) returns (RoleResponse);
-  rpc AssignRoleToMembership(AssignRoleToMembershipRequest) returns (MutationResponse);
-  rpc RemoveRoleFromMembership(RemoveRoleFromMembershipRequest) returns (MutationResponse);
-  rpc SetMembershipPermissionOverride(SetMembershipPermissionOverrideRequest) returns (MutationResponse);
-  rpc RemoveMembershipPermissionOverride(RemoveMembershipPermissionOverrideRequest) returns (MutationResponse);
-  rpc ProvisionTenantOwner(ProvisionTenantOwnerRequest) returns (LifecycleCommandResponse);
-  rpc ProvisionTenantMember(ProvisionTenantMemberRequest) returns (LifecycleCommandResponse);
-  rpc ApplyTenantLifecycle(ApplyTenantLifecycleRequest) returns (LifecycleCommandResponse);
+  rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse);
+  rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse);
+  rpc ArchiveRole(ArchiveRoleRequest) returns (ArchiveRoleResponse);
+  rpc ReplaceRolePermissions(ReplaceRolePermissionsRequest) returns (ReplaceRolePermissionsResponse);
+  rpc AssignRoleToMembership(AssignRoleToMembershipRequest) returns (AssignRoleToMembershipResponse);
+  rpc RemoveRoleFromMembership(RemoveRoleFromMembershipRequest) returns (RemoveRoleFromMembershipResponse);
+  rpc SetMembershipPermissionOverride(SetMembershipPermissionOverrideRequest) returns (SetMembershipPermissionOverrideResponse);
+  rpc RemoveMembershipPermissionOverride(RemoveMembershipPermissionOverrideRequest) returns (RemoveMembershipPermissionOverrideResponse);
+  rpc ProvisionTenantOwner(ProvisionTenantOwnerRequest) returns (ProvisionTenantOwnerResponse);
+  rpc ProvisionTenantMember(ProvisionTenantMemberRequest) returns (ProvisionTenantMemberResponse);
+  rpc ApplyTenantLifecycle(ApplyTenantLifecycleRequest) returns (ApplyTenantLifecycleResponse);
   rpc PrepareMembershipRemoval(PrepareMembershipRemovalRequest) returns (PrepareMembershipRemovalResponse);
-  rpc FinalizeMembershipRemoval(FinalizeMembershipRemovalRequest) returns (LifecycleCommandResponse);
-  rpc CancelMembershipRemovalPreparation(CancelMembershipRemovalPreparationRequest) returns (LifecycleCommandResponse);
+  rpc FinalizeMembershipRemoval(FinalizeMembershipRemovalRequest) returns (FinalizeMembershipRemovalResponse);
+  rpc CancelMembershipRemovalPreparation(CancelMembershipRemovalPreparationRequest) returns (CancelMembershipRemovalPreparationResponse);
 }
 message CheckPermissionRequest { string tenant_id = 1; string membership_id = 2; string permission_key = 3; }
 message CheckPermissionResponse {}
@@ -48,8 +48,14 @@ message AssignRoleToMembershipRequest { string request_id = 1; string membership
 message RemoveRoleFromMembershipRequest { string request_id = 1; string membership_id = 2; string role_id = 3; string reason = 4; }
 message SetMembershipPermissionOverrideRequest { string request_id = 1; string membership_id = 2; string permission_key = 3; string decision = 4; string reason = 5; }
 message RemoveMembershipPermissionOverrideRequest { string request_id = 1; string membership_id = 2; string permission_key = 3; string reason = 4; }
-message RoleResponse { RoleView role = 1; }
-message MutationResponse { bool accepted = 1; }
+message CreateRoleResponse { RoleView role = 1; }
+message UpdateRoleResponse { RoleView role = 1; }
+message ArchiveRoleResponse { RoleView role = 1; }
+message ReplaceRolePermissionsResponse { RoleView role = 1; }
+message AssignRoleToMembershipResponse { bool accepted = 1; }
+message RemoveRoleFromMembershipResponse { bool accepted = 1; }
+message SetMembershipPermissionOverrideResponse { bool accepted = 1; }
+message RemoveMembershipPermissionOverrideResponse { bool accepted = 1; }
 message ProvisionTenantOwnerRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; string user_id = 4; }
 message ProvisionTenantMemberRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; string user_id = 4; }
 message ApplyTenantLifecycleRequest { string request_id = 1; string tenant_id = 2; string lifecycle = 3; }
@@ -57,4 +63,8 @@ message PrepareMembershipRemovalRequest { string request_id = 1; string tenant_i
 message PrepareMembershipRemovalResponse { bool prepared = 1; }
 message FinalizeMembershipRemovalRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; }
 message CancelMembershipRemovalPreparationRequest { string request_id = 1; string tenant_id = 2; string membership_id = 3; }
-message LifecycleCommandResponse { bool accepted = 1; }
+message ProvisionTenantOwnerResponse { bool accepted = 1; }
+message ProvisionTenantMemberResponse { bool accepted = 1; }
+message ApplyTenantLifecycleResponse { bool accepted = 1; }
+message FinalizeMembershipRemovalResponse { bool accepted = 1; }
+message CancelMembershipRemovalPreparationResponse { bool accepted = 1; }

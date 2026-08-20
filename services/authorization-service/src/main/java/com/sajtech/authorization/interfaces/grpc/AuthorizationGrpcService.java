@@ -104,11 +104,11 @@ public final class AuthorizationGrpcService
   }
 
   @Override
-  public void createRole(CreateRoleRequest r, StreamObserver<RoleResponse> o) {
+  public void createRole(CreateRoleRequest r, StreamObserver<CreateRoleResponse> o) {
     run(
         o,
         () ->
-            RoleResponse.newBuilder()
+            CreateRoleResponse.newBuilder()
                 .setRole(
                     view(
                         service.createRole(
@@ -121,11 +121,11 @@ public final class AuthorizationGrpcService
   }
 
   @Override
-  public void updateRole(UpdateRoleRequest r, StreamObserver<RoleResponse> o) {
+  public void updateRole(UpdateRoleRequest r, StreamObserver<UpdateRoleResponse> o) {
     run(
         o,
         () ->
-            RoleResponse.newBuilder()
+            UpdateRoleResponse.newBuilder()
                 .setRole(
                     view(
                         service.updateRole(
@@ -139,11 +139,11 @@ public final class AuthorizationGrpcService
   }
 
   @Override
-  public void archiveRole(ArchiveRoleRequest r, StreamObserver<RoleResponse> o) {
+  public void archiveRole(ArchiveRoleRequest r, StreamObserver<ArchiveRoleResponse> o) {
     run(
         o,
         () ->
-            RoleResponse.newBuilder()
+            ArchiveRoleResponse.newBuilder()
                 .setRole(
                     view(
                         service.archiveRole(
@@ -156,11 +156,11 @@ public final class AuthorizationGrpcService
 
   @Override
   public void replaceRolePermissions(
-      ReplaceRolePermissionsRequest r, StreamObserver<RoleResponse> o) {
+      ReplaceRolePermissionsRequest r, StreamObserver<ReplaceRolePermissionsResponse> o) {
     run(
         o,
         () ->
-            RoleResponse.newBuilder()
+            ReplaceRolePermissionsResponse.newBuilder()
                 .setRole(
                     view(
                         service.replaceRolePermissions(
@@ -175,7 +175,7 @@ public final class AuthorizationGrpcService
 
   @Override
   public void assignRoleToMembership(
-      AssignRoleToMembershipRequest r, StreamObserver<MutationResponse> o) {
+      AssignRoleToMembershipRequest r, StreamObserver<AssignRoleToMembershipResponse> o) {
     run(
         o,
         () -> {
@@ -185,13 +185,13 @@ public final class AuthorizationGrpcService
               id(r.getMembershipId()),
               id(r.getRoleId()),
               r.getReason());
-          return accepted();
+          return AssignRoleToMembershipResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void removeRoleFromMembership(
-      RemoveRoleFromMembershipRequest r, StreamObserver<MutationResponse> o) {
+      RemoveRoleFromMembershipRequest r, StreamObserver<RemoveRoleFromMembershipResponse> o) {
     run(
         o,
         () -> {
@@ -201,13 +201,14 @@ public final class AuthorizationGrpcService
               id(r.getMembershipId()),
               id(r.getRoleId()),
               r.getReason());
-          return accepted();
+          return RemoveRoleFromMembershipResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void setMembershipPermissionOverride(
-      SetMembershipPermissionOverrideRequest r, StreamObserver<MutationResponse> o) {
+      SetMembershipPermissionOverrideRequest r,
+      StreamObserver<SetMembershipPermissionOverrideResponse> o) {
     run(
         o,
         () -> {
@@ -218,13 +219,14 @@ public final class AuthorizationGrpcService
               r.getPermissionKey(),
               r.getDecision(),
               r.getReason());
-          return accepted();
+          return SetMembershipPermissionOverrideResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void removeMembershipPermissionOverride(
-      RemoveMembershipPermissionOverrideRequest r, StreamObserver<MutationResponse> o) {
+      RemoveMembershipPermissionOverrideRequest r,
+      StreamObserver<RemoveMembershipPermissionOverrideResponse> o) {
     run(
         o,
         () -> {
@@ -234,13 +236,13 @@ public final class AuthorizationGrpcService
               id(r.getMembershipId()),
               r.getPermissionKey(),
               r.getReason());
-          return accepted();
+          return RemoveMembershipPermissionOverrideResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void provisionTenantOwner(
-      ProvisionTenantOwnerRequest r, StreamObserver<LifecycleCommandResponse> o) {
+      ProvisionTenantOwnerRequest r, StreamObserver<ProvisionTenantOwnerResponse> o) {
     run(
         o,
         () -> {
@@ -249,13 +251,13 @@ public final class AuthorizationGrpcService
               id(r.getTenantId()),
               id(r.getMembershipId()),
               id(r.getUserId()));
-          return lifecycleAccepted();
+          return ProvisionTenantOwnerResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void provisionTenantMember(
-      ProvisionTenantMemberRequest r, StreamObserver<LifecycleCommandResponse> o) {
+      ProvisionTenantMemberRequest r, StreamObserver<ProvisionTenantMemberResponse> o) {
     run(
         o,
         () -> {
@@ -264,19 +266,19 @@ public final class AuthorizationGrpcService
               id(r.getTenantId()),
               id(r.getMembershipId()),
               id(r.getUserId()));
-          return lifecycleAccepted();
+          return ProvisionTenantMemberResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void applyTenantLifecycle(
-      ApplyTenantLifecycleRequest r, StreamObserver<LifecycleCommandResponse> o) {
+      ApplyTenantLifecycleRequest r, StreamObserver<ApplyTenantLifecycleResponse> o) {
     run(
         o,
         () -> {
           service.applyTenantLifecycle(
               request(r.getRequestId()), id(r.getTenantId()), r.getLifecycle());
-          return lifecycleAccepted();
+          return ApplyTenantLifecycleResponse.newBuilder().setAccepted(true).build();
         });
   }
 
@@ -294,25 +296,26 @@ public final class AuthorizationGrpcService
 
   @Override
   public void finalizeMembershipRemoval(
-      FinalizeMembershipRemovalRequest r, StreamObserver<LifecycleCommandResponse> o) {
+      FinalizeMembershipRemovalRequest r, StreamObserver<FinalizeMembershipRemovalResponse> o) {
     run(
         o,
         () -> {
           service.finalizeRemoval(
               request(r.getRequestId()), id(r.getTenantId()), id(r.getMembershipId()));
-          return lifecycleAccepted();
+          return FinalizeMembershipRemovalResponse.newBuilder().setAccepted(true).build();
         });
   }
 
   @Override
   public void cancelMembershipRemovalPreparation(
-      CancelMembershipRemovalPreparationRequest r, StreamObserver<LifecycleCommandResponse> o) {
+      CancelMembershipRemovalPreparationRequest r,
+      StreamObserver<CancelMembershipRemovalPreparationResponse> o) {
     run(
         o,
         () -> {
           service.cancelRemoval(
               request(r.getRequestId()), id(r.getTenantId()), id(r.getMembershipId()));
-          return lifecycleAccepted();
+          return CancelMembershipRemovalPreparationResponse.newBuilder().setAccepted(true).build();
         });
   }
 
@@ -334,14 +337,6 @@ public final class AuthorizationGrpcService
         .setVersion(r.version())
         .addAllPermissionKeys(r.permissionKeys())
         .build();
-  }
-
-  private static MutationResponse accepted() {
-    return MutationResponse.newBuilder().setAccepted(true).build();
-  }
-
-  private static LifecycleCommandResponse lifecycleAccepted() {
-    return LifecycleCommandResponse.newBuilder().setAccepted(true).build();
   }
 
   private static int pageSize(int value) {
