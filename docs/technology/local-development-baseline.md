@@ -25,7 +25,7 @@ Production Technology Baseline remains authoritative for production versions.
 | Secret scanner | Gitleaks CLI 8.30.0; reviewed fallback from defective 8.30.1; same rule/config intent and positive-control requirement as CI |
 | Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
-| HooshiX developer-host Ops MCP | independent Windows runtime under ADR-0048/0051; mandatory local policy, separate tunnel/profile/key, WSL bridge for project commands, no production authority |
+| HooshiX developer-host Ops MCP | independent Git runtime `hasanjodatshandi/HooshiXMcpRuntime` under ADR-0048/0051; mandatory local policy, separate tunnel/profile/key, synchronous `process.run` plus bounded persistent start/status/log/cancel jobs, WSL bridge for project commands, no production authority |
 | Microsoft WinApp CLI | 0.6.0; WinGet `Microsoft.WinAppCli`; developer-only ADR-0049 Desktop MCP dependency; reviewed x64 MSIX SHA-256 `dc5d323f6d1601ef3342420746f0163651176f4cc183690f0354546a36648eec`; public-preview upgrades require review |
 | HooshiX developer-host Desktop MCP | independent Windows runtime under ADR-0049/0050/0051 with fixed Windows helpers; interactive non-elevated session by default; separate policy/tunnel/profile/key; no production authority |
 
@@ -263,7 +263,7 @@ DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and 
 
 For ADR-0046/0051, HooshiX repository evidence verifies the project Context Engine and the external-runtime path guard. Independent runtime tests verify the Context adapter protocol surface. Host evidence verifies tunnel-client, restricted credentials, readiness, and live Context calls against the canonical WSL checkout.
 
-For ADR-0048/0051, the independent Windows MCP runtime verifies Ops policy/process/filesystem/audit contracts. Host evidence verifies protected policy/key ACLs, separate tunnel state, Windows token state, `ops.status`, and WSL project-command execution.
+For ADR-0048/0051, the independent Windows MCP runtime verifies Ops policy/process/filesystem/audit contracts, including the bounded persistent-job surface. Host evidence verifies protected policy/job-state/key ACLs, separate tunnel state, Windows token state, exact tool discovery, `ops.status`, WSL project-command execution, long-job polling across one response window, and runner-owned cancellation.
 
 For ADR-0049/0050/0051, the independent Windows MCP runtime verifies Desktop policy/app/HWND/input/capture/credential-broker contracts. Host evidence verifies the actual interactive session, WinApp integration, tunnel state, and application-specific credential-use behavior.
 

@@ -108,21 +108,29 @@ The purpose text is not stored raw in the local audit log. Only its SHA-256 dige
 
 ### Process execution
 
-The initial execution surface is one tool:
+The reviewed process surface is:
 
 ```text
 process.run
+process.start
+process.status
+process.logs
+process.cancel
 ```
 
-It accepts a policy command alias, an argv array, an allowed absolute working directory, a bounded timeout, and a purpose.
+`process.run` is the synchronous path for short work. `process.start` accepts the same policy command alias, argv array, allowed absolute working directory, bounded timeout, and purpose, but returns a random job ID after a fixed detached runtime runner accepts the job. `process.status` reads bounded job metadata, `process.logs` reads one bounded stdout/stderr page by byte offset, and `process.cancel` requests runner-owned cancellation by job ID.
 
-It does not accept a caller-selected executable path, command-line string, arbitrary environment map, or stdin secret channel.
+Neither synchronous nor persistent execution accepts a caller-selected executable path, command-line string, arbitrary environment map, stdin secret channel, runner executable, or process ID to terminate. The configured executable is an absolute policy path. Child environment is allow-listed and excludes tunnel/API/token/password/credential-style environment variables.
 
-The configured executable is an absolute policy path. The child environment is allow-listed and excludes tunnel/API/token/password/credential-style environment variables. stdout and stderr are drained with bounded in-memory capture so a noisy command cannot grow the server process without limit. Timeout handling terminates the started process tree on the supported host path.
+Persistent jobs are local developer-host state under the protected Ops state root beside the configured audit log. Job directories and state/output files are confined against path traversal and symlink/junction/reparse escape. Raw argv is persisted only in a bounded transient request file that the fixed runner deletes before starting the target process. Persistent metadata keeps argument/purpose digests and bounded execution metadata, not raw argv or raw purpose. Captured persistent stdout/stderr is protected operational output, not audit authority.
+
+Current v1 defense-in-depth bounds are fixed by the independent runtime: at most 4 active jobs, at most 16 retained job records, a 24-hour terminal-job cleanup age applied on later job-start activity, at most 1 MiB per stdout/stderr stream or the lower policy output limit, and at most 64 KiB returned by one log-page call. The retained-record limit remains the hard count bound even while cleanup is idle. The same finite local policy timeout applies inside the detached runner even if the MCP/tunnel stdio process restarts.
+
+Cancellation never accepts an arbitrary caller PID. `process.cancel` creates only a job-specific cancellation request; the fixed runner that owns the child performs process-tree termination. This avoids turning the MCP surface into a general process-kill primitive.
 
 A configured interpreter or shell such as PowerShell, Python, or `cmd.exe` can intentionally provide broad host authority. When such a command is present, policy/path checks on the typed filesystem tools are not a complete sandbox. This is an explicit residual risk. An elevated shell/interpreter alias with elevated process execution enabled is operationally equivalent to granting that MCP broad local administrator capability.
 
-The policy therefore requires explicit process-execution and elevated-process-execution opt-in. This opt-in is local operator configuration, not repository authority.
+The policy therefore requires explicit process-execution and elevated-process-execution opt-in. This opt-in is local operator configuration, not repository authority. Persistent jobs do not increase the maximum local command duration or create production authority; they decouple local command lifetime from one synchronous MCP/tunnel response.
 
 ### Operating-system privilege
 
@@ -134,7 +142,7 @@ A Task Scheduler or Windows service configuration may start the Ops MCP/Tunnel w
 
 ### Audit and telemetry
 
-Every mutation and process execution writes bounded local JSON-lines audit metadata. Audit records include event ID, UTC timestamp, action, outcome, bounded target metadata, duration/exit status where applicable, and digests of purpose/arguments.
+Every mutation and process start/cancel action writes bounded local JSON-lines audit metadata. Synchronous `process.run` also records its final duration/exit status. Read-only persistent-job status/log-page calls return bounded operational state without copying job output into the audit ledger. Audit records include event ID, UTC timestamp, action, outcome, bounded target metadata, duration/exit status where applicable, job ID where applicable, and digests of purpose/arguments.
 
 Audit MUST NOT contain:
 
@@ -179,7 +187,7 @@ Typed Windows service/package/registry/task wrappers may be added later if they 
 Independent Windows MCP runtime verification requires at least:
 
 - Context MCP exact five-tool read-only tests still pass unchanged;
-- Ops tool list contains only the reviewed Ops tools;
+- Ops tool list contains exactly the reviewed filesystem/status/audit tools plus `process.run`, `process.start`, `process.status`, `process.logs`, and `process.cancel`;
 - read-only/destructive/open-world MCP annotations match actual tool semantics;
 - policy rejects relative/invalid roots and invalid bounds;
 - out-of-root and denied-root access fails closed;
@@ -189,8 +197,12 @@ Independent Windows MCP runtime verification requires at least:
 - process executable comes only from policy alias;
 - process cwd is policy-bounded;
 - child process does not inherit `CONTROL_PLANE_API_KEY` or equivalent secret-like variables;
-- stdout/stderr capture is bounded;
-- timeout is enforced and process-tree termination is attempted;
+- synchronous and persistent stdout/stderr capture is bounded and persistent log reads are page-bounded;
+- timeout is enforced by both synchronous execution and the detached persistent runner, including after MCP parent exit/restart;
+- persistent job IDs, active/retained capacity, retention, state/output paths, and request/state sizes are bounded;
+- persistent job state/output rejects traversal and symlink/junction/reparse escape;
+- raw argv is transient for runner handoff and is absent from persistent job metadata after runner pickup;
+- cancellation accepts only job ID and the runner owns process-tree termination; caller-selected PID termination is absent;
 - audit does not store raw arguments, purpose, file content, or process output;
 - audit growth is bounded by rotation;
 - MCP output remains explicit UTF-8 bytes even when the surrounding text stdout encoding is CP1252;

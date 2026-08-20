@@ -237,11 +237,13 @@ Ops security controls are:
 - absolute allowed roots plus denied roots for typed filesystem operations;
 - lexical authorization before existence probing and resolved-path checks against symlink/reparse escape;
 - explicit absolute executable aliases; no caller-selected executable path;
-- bounded argv, cwd, timeout, captured output, file size, listing size, and audit retention;
+- bounded argv, cwd, timeout, synchronous output, persistent-job count/record lifetime/output/page size, file size, listing size, and audit retention;
+- persistent job state/output is confined below protected Ops state against traversal and symlink/junction/reparse escape; raw argv is only transient runner handoff state and is removed before target execution;
+- persistent cancellation accepts only a runtime-created job ID; the fixed runner owns child process-tree termination and no caller-selected PID kill surface exists;
 - no arbitrary caller environment or stdin secret channel; child environment excludes secret-like variables including tunnel/API credentials;
 - explicit opt-in for process execution, elevated filesystem mutation, and elevated process execution;
 - separate Ops tunnel/profile/runtime key from Context tunnel;
-- local audit stores metadata/digests, not file content, raw argv, raw purpose, stdout/stderr, or credentials;
+- local audit stores metadata/digests, not file content, raw argv, raw purpose, stdout/stderr, or credentials; bounded persistent stdout/stderr is separate protected operational state and is not audit authority;
 - no HooshiX network MCP listener or public port;
 - no production credentials or production administration authority; ADR-0030 remains unchanged.
 

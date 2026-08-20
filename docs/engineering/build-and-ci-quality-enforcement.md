@@ -212,7 +212,7 @@ CI SHOULD enforce when implemented:
 - ADR-0051 externalized MCP runtime paths do not reappear in HooshiX;
 - Context Engine retrieval remains read-only, tracked-file-only, bounded, provenance-bearing, and evaluated by Linux Git in the canonical WSL checkout;
 - ADR-0047/0051 preserve the exact read-only Context MCP contract, but its protocol/adapter tests belong to the independent Windows runtime;
-- ADR-0048 Ops and ADR-0049/0050 Desktop remain separate Windows MCP authorities; their policy/protocol/helper/security tests belong to the independent Windows runtime;
+- ADR-0048 Ops and ADR-0049/0050 Desktop remain separate Windows MCP authorities; their policy/protocol/helper/security tests belong to the independent Windows runtime; Ops tests include exact persistent-job tool surface, restart survival, bounded state/output/capacity, path/reparse confinement, timeout/cancellation, transient-argv handling, environment exclusion, and audit redaction;
 - HooshiX retains architecture/security/runbook contracts for all three MCP surfaces because they affect engineering governance;
 - no HooshiX repository example contains a real MCP policy secret, credential, screenshot, typed secret, or tunnel credential;
 - Windows MCP host evidence never substitutes for branch protection, repository CI, or ADR-0030 production access controls.

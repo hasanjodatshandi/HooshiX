@@ -40,9 +40,11 @@ ADR-0046 keeps project context Git-native. `../../context/routes.json` is the ca
 
 The project Context Engine and local retrieval are repository tooling. Under ADR-0051, the read-only Context MCP adapter and Ops/Desktop MCP implementations are independently versioned Windows developer-host tooling. Linux Git in `/home/coder/workspace/Hooshix` remains repository authority. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
 
+The independent Windows MCP runtime Git authority is `https://github.com/hasanjodatshandi/HooshiXMcpRuntime.git`; its runtime commits/tests are developer-tool evidence only and cannot supersede HooshiX ADRs or the canonical WSL application checkout.
+
 ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX Context stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
 
-ADR-0048 permits a separate developer-host Ops MCP using the same approved tunnel transport pattern but a separate profile/key/policy. Ops does not broaden Context MCP, create production authority, or make retrieved context an execution authorization source.
+ADR-0048 permits a separate developer-host Ops MCP using the same approved tunnel transport pattern but a separate profile/key/policy. Its bounded persistent process-job surface decouples long local execution from one synchronous response while retaining the same local policy timeout and runner-owned cancellation. Ops does not broaden Context MCP, create production authority, or make retrieved context an execution authorization source.
 
 ADR-0049 permits a third developer-host Desktop MCP for policy-gated interactive Windows UI observation/input. ADR-0050 narrowly extends that same Desktop boundary with an optional local credential-use broker: ChatGPT supplies only an opaque `credential_id`; a fixed helper resolves a policy-bound Windows Credential Manager Generic Credential after fresh app/process-image-path/SHA-256/password-target checks and never returns the credential value. Desktop remains outside production authority and does not add tools to Context or Ops.
 

@@ -161,7 +161,7 @@ Before configuring persistent/elevated startup:
 
 Verify local `/readyz` and the tunnel UI reported by the client.
 
-In ChatGPT Web, connect the separate Ops tunnel. Expected initial tools are exactly:
+In ChatGPT Web, connect the separate Ops tunnel. Expected current tools are exactly:
 
 ```text
 ops.status
@@ -173,6 +173,10 @@ filesystem.write_text
 filesystem.mkdir
 filesystem.delete
 process.run
+process.start
+process.status
+process.logs
+process.cancel
 ```
 
 First call:
@@ -187,7 +191,7 @@ Verify:
 - expected allowed/denied roots are shown;
 - expected command aliases are shown;
 - `elevated` matches the actual host process;
-- configured bounds are correct.
+- configured bounds are correct, including the persistent-job active/retained/output/page/cleanup limits.
 
 Then perform one bounded temporary-directory write/read/delete test and one harmless process test. Inspect `ops.audit_tail` and the local audit file. Raw file content, process output, raw arguments, raw purpose text, and credentials must not appear in audit metadata.
 
@@ -242,7 +246,24 @@ The current verified local Ops policy uses `max_command_seconds=300` and `max_ou
 
 Host evidence on 2026-08-20 separates the two limits. One local Ops `process.run` remained inside the MCP server for `197968 ms` and the audit recorded `exit_code=0`, `timed_out=false`, proving the local 300-second policy no longer imposes the former 90/180-second ceiling. Separate end-to-end attempts still hit tunnel/control-plane response expiry: one failed after about `122603 ms` with tunnel logs `MCP connection TTL reached` and `command response deadline reached; dropping without posting a response`; a later 185-second attempt also crossed a tunnel connection expiry and lost the synchronous response. Therefore `max_command_seconds=300` is a local execution ceiling, not transport-SLA evidence.
 
-Keep synchronous ChatGPT/Ops calls below the shortest measured effective tunnel response window with margin. Work that may exceed that window must be split/checkpointed, or executed in the persistent WSL terminal with an explicit local `timeout 300s ...` and observed separately. Do not remove the local five-minute process bound, output bounds, watchdog, or tunnel health checks to work around a transport deadline.
+Keep synchronous ChatGPT/Ops calls below the shortest measured effective tunnel response window with margin. Use `process.run` for short work. Work that can exceed that window uses the persistent job surface:
+
+```text
+process.start -> job_id
+process.status(job_id) -> bounded metadata
+process.logs(job_id, stream, offset, max_bytes) -> bounded output page
+process.cancel(job_id) -> runner-owned cancellation request
+```
+
+`process.start` does not increase the local timeout. The current live policy still caps the target command at 300 seconds. Poll with separate short calls; do not hold one synchronous ChatGPT response open for the full command. `process.logs` is byte-offset paged and bounded to 64 KiB per call. Each persistent stdout/stderr stream is capped at 1 MiB or the lower policy output cap. The runtime permits at most 4 active jobs and 16 retained records; terminal records are cleanup-eligible after 24 hours on later job-start activity. Do not manually edit/delete job-state files as a control path.
+
+Cancellation is by runtime-created job ID only. The fixed detached runner owns its child process tree. Do not add an arbitrary PID-kill tool as a shortcut.
+
+Host verification on 2026-08-20 started a WSL job that slept for 135 seconds. `process.start` returned immediately, short polling observed it, and it completed after `135127 ms` with exit code `0` and the expected bounded stdout marker. A second WSL job reached terminal `cancelled` through job-ID-only cancellation. This proves that persistent local work can cross the previously measured synchronous response window without one long response. It does not prove a 135-second or 300-second synchronous tunnel SLA.
+
+After a process-tool surface upgrade, an already-open ChatGPT/client session can retain an earlier discovery schema. On the exercised 2026-08-20 deployment, direct live MCP `tools/list` returned all 13 tools and `ops.status` returned persistent limits while the existing conversation still exposed the earlier connector schema. Refresh/reconnect the Ops client or start a refreshed session, then verify exact tool discovery before concluding the live server is stale.
+
+Do not remove the local five-minute process bound, job/output bounds, watchdog, or tunnel health checks to work around a transport deadline. Split/checkpoint remains valid when a workflow benefits from smaller engineering units or when the refreshed persistent tools are unavailable.
 
 Preserve:
 

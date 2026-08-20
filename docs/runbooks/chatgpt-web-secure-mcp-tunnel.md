@@ -289,7 +289,7 @@ Keep bounded local tunnel logs and enable the Windows Task Scheduler Operational
 
 On the verified host, the Context and Ops wrappers now request `--mcp.connection-max-ttl=1h`, while the local Context/`process.run` command bounds are 300 seconds. This does not override a shorter tunnel/control-plane command-response lifetime. On 2026-08-20, a local Ops command completed after `197968 ms` with `timed_out=false`, but separate synchronous calls still logged `MCP connection TTL reached` plus `command response deadline reached; dropping without posting a response` and lost the ChatGPT response at about 122.6 seconds in one exercised call. Treat local command timeout, MCP-connection lifetime, and end-to-end command-response lifetime as separate limits.
 
-Keep synchronous work below the shortest measured effective response window with margin. For work that can exceed it, split/checkpoint the workflow or use the persistent WSL terminal with an explicit local `timeout 300s ...` and observe/poll separately. Do not claim that a 300-second local policy value proves a 300-second tunnel response SLA.
+Keep synchronous work below the shortest measured effective response window with margin. Context remains exactly five read-only tools and does not start jobs. For developer-host execution that can exceed the response window, use the separate ADR-0048 Ops `process.start`/short status-log polling/cancel surface after refreshed tool discovery, or split/checkpoint the workflow. Persistent Ops completion does not prove a longer synchronous tunnel response SLA, and the local 300-second policy bound remains independent.
 
 ## 11. Normal operating procedure
 
