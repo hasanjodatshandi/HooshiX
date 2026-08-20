@@ -135,11 +135,12 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - OpenAI tunnel-client is the outbound customer-run transport bridge and must not broaden the Context MCP tool list;
 - ADR-0048 Ops MCP is a separate developer-host stdio surface with mandatory local policy, explicit mutation/execution semantics, separate tunnel/profile/key, bounded path/process/output/audit controls, and no production authority;
 - ADR-0049 Desktop MCP is a third developer-host stdio surface with mandatory local policy, pinned WinApp version, intended interactive/non-elevated session, fresh HWND/process app authorization, explicit screenshot/UIA/mouse/keyboard/system-key flags, a fixed isolated PowerShell/C# Unicode text helper with stdin-only non-secret text and sanitized environment, bounded transient capture, metadata-only audit, separate tunnel/profile/key, and no UAC/production authority; ADR-0050 adds only an opt-in policy-bound local credential-use broker whose secret value never enters MCP/Python/output/audit/argv/environment and which has no credential-read/list/write/export surface;
+- ADR-0051 keeps all three MCP runtime implementations outside the HooshiX application repository; Context invokes project context through fixed WSL policy, Ops uses an explicit WSL alias for project commands, and Desktop remains Windows-session-only;
 - typed Ops path authorization is not claimed to defeat a malicious local process that can race/replace filesystem entries; host ACLs/work roots and the local account remain part of the trust boundary;
 - the long-lived tunnel daemon uses a restricted runtime credential with Tunnels `Read` + `Use`; an admin key is not a daemon credential;
 - tunnel/runtime credentials stay outside Git, checkpoints, logs, screenshots, and ChatGPT content and are not passed as command-line literals;
 - tunnel-client health/operator surfaces remain loopback-only by default; no public/LAN MCP endpoint or router port-forward is introduced;
-- the MCP entry point derives repository root from its tracked script location, so tunnel/service-manager CWD cannot select an unrelated Git repository;
+- ADR-0051 protected local policy fixes the WSL distribution, canonical repository root, and project Context Engine path; tunnel/service-manager CWD and caller input cannot select another repository; Linux Git inside WSL is authority;
 - caller query/revision values are data passed through bounded validation and fixed Git argument arrays, never shell command text.
 
 ## 5. Threat actors
@@ -337,7 +338,7 @@ Required:
 - configured sensitive filename exclusion and no secret/private-key fields in checkpoints, while Gitleaks remains the actual committed-secret control;
 - revision/query validation plus fixed Git argument arrays without `shell=True`;
 - read-only Context stdio MCP tool surface with no HooshiX network listener or mutation/checkpoint-create/shell/arbitrary-filesystem tool;
-- CWD-independent MCP repository-root resolution from the tracked entry-point path;
+- CWD-independent Context MCP startup with fixed protected WSL distribution/repository/engine policy and Linux Git authority;
 - OpenAI tunnel-client used only as the outbound bridge to that stdio child, with no public inbound MCP port or router forwarding;
 - restricted Tunnels `Read` + `Use` runtime credential for the daemon; no long-lived admin key;
 - tunnel credentials excluded from Git/chat/logs/screenshots/command-line literals and rotated/revoked on suspected exposure;

@@ -146,7 +146,7 @@ Semantic/vector retrieval may be added later only when measured retrieval failur
 
 ## 6. MCP adapter
 
-The engine exposes a read-only MCP stdio adapter for interoperability with AI clients. The adapter is developer tooling only.
+The Context contract includes a read-only MCP stdio adapter for interoperability with AI clients. Under ADR-0051, the adapter implementation is an independent Windows developer runtime. The project Context Engine, routing, retrieval, and checkpoint implementation remain in HooshiX.
 
 V1 properties:
 
@@ -186,7 +186,7 @@ A Context Engine defect cannot authorize weaker authentication, Authorization, t
 
 ## 8. CI and governance
 
-Repository baseline verification covers at least:
+HooshiX repository baseline verification covers project Context Engine governance at least:
 
 - bootstrap/routes/checkpoint schema files are valid JSON and current supported versions match tooling;
 - configured required authority/source paths exist;
@@ -199,8 +199,7 @@ Repository baseline verification covers at least:
 - targeted routing escalates on unknown/ambiguous/full-read-trigger input;
 - dirty authority state cannot be reported as verified targeted-review context;
 - search bounds/sensitive-file exclusions/provenance behavior;
-- MCP modern discovery/tools and legacy initialize compatibility;
-- MCP exposes no write/mutation tool.
+The independent Windows MCP runtime verifies modern/legacy MCP protocol behavior and the exact read-only tool contract. HooshiX CI verifies that the externalized adapter path is not reintroduced.
 
 Repository structure CI fetches the Git history needed to re-verify post-merge main provenance. Context-engine checks are part of `make baseline-verify`. Documentation alone is not implementation evidence.
 
@@ -214,7 +213,7 @@ Before such a service exists, a new ADR must define at least authority/ownership
 
 ## Verification requirements
 
-Executable evidence must prove the CI/governance requirements above, plus one end-to-end example in which a clean current repository bootstrap selects a targeted route, returns commit/blob provenance, and serves the same information through MCP without repository mutation.
+Executable evidence is split by ADR-0051. HooshiX CI proves project Context Engine/bootstrap/routing/retrieval/checkpoint governance. The independent Windows MCP runtime and host integration prove that the same clean WSL repository authority is served through the exact read-only MCP contract without repository mutation.
 
 Checkpoint evidence must also prove a work checkpoint can remain immutable while a later post-merge checkpoint references it, binds to an exact reachable `main` merge commit, derives the exact non-checkpoint changed paths from Git, and rejects source-PR mismatch, non-main subjects, tampered changed paths, path traversal, and shell-like revision input.
 

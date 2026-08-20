@@ -59,9 +59,9 @@ Every tool remains read-only, non-destructive, bounded, and non-open-world under
 
 Current Git authority still outranks derived context, checkpoints, ChatGPT conversation state, and model memory.
 
-The approved tunnel runtime uses a dedicated HooshiX checkout for context access. The checkout should be clean and synchronized to the intended reviewed Git state before the tunnel is considered ready for targeted-review use.
+ADR-0051 refines the checkout model. The canonical HooshiX checkout is `/home/coder/workspace/Hooshix` on the native WSL filesystem. It must be clean and synchronized to the intended reviewed Git state before targeted-review use.
 
-The MCP entry point resolves its repository root from its own tracked script location rather than relying on the tunnel-client process working directory. This prevents an arbitrary service/startup working directory from selecting the wrong Git repository or causing accidental root discovery failure.
+Under ADR-0051, the independent Windows Context MCP adapter uses protected local policy to fix the WSL distribution, canonical Linux repository root, and project Context Engine path. Repository authority is evaluated inside WSL and does not depend on the tunnel-client working directory.
 
 A dirty authority/configuration path continues to make targeted-review trust fail safe. The tunnel does not convert a dirty or stale checkout into verified current context.
 
@@ -119,7 +119,7 @@ The supported first-use sequence is:
 1. create or select the tunnel in the ChatGPT/OpenAI tunnel management surface;
 2. install the approved `tunnel-client` release and verify its published digest;
 3. create a restricted runtime API key with Tunnels `Read` + `Use` and store it only on the operator host through the supported secret mechanism;
-4. use the official `sample_mcp_stdio_local` profile pattern to launch the absolute HooshiX `scripts/context/mcp_server.py` path with the approved Python interpreter;
+4. use the official `sample_mcp_stdio_local` profile pattern to launch the independent Windows Context MCP adapter with its protected ADR-0051 WSL policy;
 5. run `tunnel-client doctor --profile <profile> --explain`;
 6. start `tunnel-client run --profile <profile>` and verify local `/readyz` before connecting ChatGPT;
 7. in ChatGPT, configure the custom Plugin/MCP connection with `Connection: Tunnel` and select the same tunnel;
@@ -140,8 +140,8 @@ A failed tunnel must not trigger automatic credential disclosure, public listene
 
 Executable/review evidence must prove at least:
 
-- the HooshiX MCP server starts and discovers correctly when launched from a working directory outside the repository;
-- the repository root is derived from the tracked MCP entry point, not caller working directory;
+- the independent Context MCP adapter starts and discovers correctly when launched from a working directory outside either repository;
+- protected local policy fixes the WSL distribution, canonical Linux repository root, and project Context Engine path; Windows Git/UNC access is not repository authority;
 - the five-tool list is unchanged and every tool remains read-only/non-destructive;
 - unknown/write-like MCP tool requests still fail safely;
 - no HooshiX network listener is introduced;

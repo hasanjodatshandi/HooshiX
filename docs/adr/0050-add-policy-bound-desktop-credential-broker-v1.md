@@ -87,7 +87,7 @@ Credential enrollment is out of band and local to the operator account. Desktop 
 
 The helper contract is:
 
-- one fixed repository PowerShell script;
+- one fixed PowerShell script owned by the independent Windows MCP runtime;
 - one fixed embedded C# implementation;
 - `-NoProfile -NonInteractive`;
 - bounded UTF-8 JSON stdin containing only HWND, expected PID, Credential Manager target name, the policy-derived unique-password focus flag, and a size bound;
@@ -167,7 +167,7 @@ UI state can race. Fresh process checks plus focused-password and same-focus che
 
 ## Verification
 
-Repository evidence MUST prove at least:
+Independent Windows MCP runtime evidence MUST prove at least:
 
 - existing policies without the new fields keep credential input disabled;
 - broker enablement requires explicit policy and valid bindings;
@@ -196,7 +196,7 @@ Host evidence is separate. Before an application credential is considered usable
 - wrong-window and focus-change cases fail;
 - the real application login behavior is then verified separately.
 
-Repository tests do not prove the security of the target application or the confidentiality of a credential against compromise of the Windows user account.
+Independent MCP runtime tests do not prove the security of the target application or the confidentiality of a credential against compromise of the Windows user account.
 
 ## Rollback
 

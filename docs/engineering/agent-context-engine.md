@@ -205,19 +205,9 @@ Always compare its `subject_commit` with current `HEAD` and inspect changed cont
 
 ## 9. MCP server
 
-From the repository root, start the local read-only stdio server with the relative tracked path:
+ADR-0051 places the read-only Context MCP adapter in the independently versioned Windows MCP runtime. HooshiX keeps the project Context Engine in this repository. The adapter uses protected local policy to invoke this engine inside WSL at the canonical checkout `/home/coder/workspace/Hooshix`.
 
-```bash
-python3 scripts/context/mcp_server.py
-```
-
-When a tunnel or service manager launches the server from another working directory, use the absolute path to the same tracked entry point:
-
-```text
-<PYTHON_EXECUTABLE> <ABSOLUTE_HOOSHIX_REPOSITORY_PATH>/scripts/context/mcp_server.py
-```
-
-The entry point resolves the HooshiX repository root from its own script location. Process working directory is not repository authority. This permits a tunnel/service manager to spawn the MCP child without requiring its own CWD to be the repository root.
+The adapter MUST NOT use Windows Git or a Windows filesystem view of the WSL checkout as repository authority. Linux Git and tracked-file semantics run inside WSL. The WSL distribution, repository root, Context Engine path, and `wsl.exe` path are fixed by local policy and are not caller-selected.
 
 V1 exposes exactly these read-only tools:
 
@@ -229,41 +219,31 @@ project.latest_checkpoint
 project.changed_context
 ```
 
-The server supports MCP `2026-07-28` and bounded stdio compatibility for `2025-11-25` initialize-based clients. It has no HTTP listener, network fetch, file write, Git mutation, checkpoint-create, command-execution, secret-read, deployment, or other mutation tool.
+The independent adapter supports the approved MCP protocol compatibility and has no HTTP listener, network fetch, file write, Git mutation, checkpoint-create, command-execution, secret-read, deployment, or other mutation tool. HooshiX repository CI verifies the project Context Engine and the ADR-0051 rule that the adapter source does not return to this repository. Adapter protocol tests belong to the independent Windows runtime.
 
-Successful object-shaped tool results contain both matching JSON `TextContent` and `structuredContent`. The text form preserves compatibility with clients that consume textual JSON. The structured form lets tunnel/client integrations consume the same object without reparsing text. `project.latest_checkpoint` may return JSON `null` when no checkpoint exists; that non-object result remains text-only for compatibility with 2025-era object-shaped `structuredContent` contracts. The two forms must not carry different data.
-
-The protocol process writes JSON-RPC frames only to stdout. Startup/diagnostic errors use stderr.
+The adapter preserves the ADR-0046 wire contract: object-shaped successes carry matching JSON text and `structuredContent`; JSON `null` remains text-only where required for compatibility; JSON-RPC protocol frames go only to stdout and diagnostics go to stderr. The independent runtime verifies modern/legacy MCP compatibility and explicit UTF-8 framing.
 
 ### 9.1 ChatGPT Web through Secure MCP Tunnel
 
-ADR-0047 permits ChatGPT Web to use this same stdio server through OpenAI Secure MCP Tunnel.
-
-Selected boundary:
+ADR-0047 and ADR-0051 select this boundary:
 
 ```text
 ChatGPT Web
 -> OpenAI tunnel control plane
--> tunnel-client on approved developer PC
--> scripts/context/mcp_server.py child over stdio
--> Context Engine
+-> tunnel-client on approved Windows developer PC
+-> independent Windows Context MCP adapter over stdio
+-> fixed wsl.exe bridge
+-> /home/coder/workspace/Hooshix/scripts/context/context_engine.py
+-> canonical WSL Git authority
 ```
 
-HooshiX does not add a network MCP listener for this path. The tunnel-client is the customer-run bridge and opens the local stdio child. The five-tool contract remains unchanged.
+HooshiX adds no network MCP listener. The five-tool contract remains unchanged. ADR-0048 Ops and ADR-0049/0050 Desktop remain separate Windows MCP authorities. Context output cannot authorize their mutations.
 
-ADR-0048 adds a separate developer-host Ops MCP for explicit local mutation/execution. It does not extend this Context MCP and is not a context-memory authority. Context retrieval/output cannot independently authorize Ops actions.
+Application repository synchronization is explicit Linux Git work in WSL. The Context MCP remains read-only and never pulls, resets, checks out, commits, or pushes Git. Tunnel credentials remain outside Git and ChatGPT content.
 
-Use a dedicated clean HooshiX checkout for the tunnel runtime. Synchronize that checkout through explicit operator Git actions. The MCP server itself remains read-only and never pulls/resets/checks out Git.
+Full Windows setup and rollback instructions are in `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`.
 
-The long-lived tunnel runtime uses a dedicated restricted runtime API key with Tunnels `Read` + `Use`. Do not use an admin key for the daemon. Never commit or paste the real runtime/admin key into Git, checkpoints, logs, screenshots, or ChatGPT.
-
-Full Windows setup and rollback instructions are in:
-
-```text
-docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
-```
-
-A tunnel connection is not verification by itself. Before targeted work in ChatGPT Web, call `project.bootstrap`, inspect current Git/dirty/authority provenance, then call `project.context_for_task` for the task.
+A tunnel connection is not verification by itself. Before targeted work, call `project.bootstrap`, inspect repository/dirty/authority provenance, then call `project.context_for_task`.
 
 ## 10. Verification
 

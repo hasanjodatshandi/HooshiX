@@ -16,7 +16,7 @@ The repository governance entry point is:
 make baseline-verify
 ```
 
-It verifies repository/file-index consistency, ADR identifier/register invariants, canonical dependency-registry/Markdown operation parity, current source references, selected guarded structure rules, and the ADR-0046 Agent Context Engine contracts/tests. `.github/workflows/repository-baseline.yml` runs the same repository gate on pull requests and `main` and also invokes the current Compromised Password and Notification service security suites.
+It verifies repository/file-index consistency, ADR identifier/register invariants, canonical dependency-registry/Markdown operation parity, current source references, guarded structure rules, and the ADR-0046 project Context Engine/checkpoint contracts. It also rejects reintroduction of the Windows MCP runtime paths externalized by ADR-0051. `.github/workflows/repository-baseline.yml` runs this repository gate and the implemented service security suites.
 
 For a new AI-agent/session, the Git-native Context Engine provides a verified current-project bootstrap and conservative task routing without making chat/model memory authoritative:
 
@@ -26,17 +26,15 @@ make context-bootstrap
 python3 scripts/context/context_engine.py route --task '<task>'
 ```
 
-`context/routes.json` is the canonical task router, `docs/architecture/TASK-REVIEW-MATRIX.md` is its generated human view, and `context/checkpoints/` contains commit-bound historical work receipts. The local Context MCP adapter is read-only/stdio-only:
+`context/routes.json` is the canonical task router, `docs/architecture/TASK-REVIEW-MATRIX.md` is its generated human view, and `context/checkpoints/` contains commit-bound historical work receipts. The project Context Engine remains in this repository. ADR-0051 places the Context MCP adapter and the separate Ops/Desktop MCP runtimes in the independent Windows developer runtime. The adapters use the canonical WSL checkout at `/home/coder/workspace/Hooshix`; application Git/build/test/runtime work stays inside WSL.
 
 ```bash
-python3 scripts/context/mcp_server.py
+cd /home/coder/workspace/Hooshix
+make context-verify
+make context-bootstrap
 ```
 
-ADR-0048 adds a separate policy-gated developer-host Ops MCP for explicit local filesystem mutation and process execution. It does not change the Context MCP tool surface and is not a production administration path:
-
-```bash
-python3 scripts/ops/mcp_server.py --policy <ABSOLUTE_LOCAL_POLICY_PATH>
-```
+Context stays read-only. Ops remains policy-gated Windows host authority and uses the reviewed WSL bridge for HooshiX project commands. Desktop remains a separate interactive Windows authority. None is a production administration path.
 
 The real Ops policy and tunnel credential stay outside Git. Repository work performed through Ops still follows the branch/PR/protected-CI workflow.
 

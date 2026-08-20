@@ -106,6 +106,21 @@ edges:
 
             self.assertTrue(any("ADR-0041 trigger" in error for error in errors))
 
+    def test_guard_rejects_externalized_mcp_runtime_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            ops_path = root / "scripts/ops/mcp_server.py"
+            ops_path.parent.mkdir(parents=True)
+            ops_path.write_text("external runtime\n", encoding="utf-8")
+            context_path = root / "scripts/context/mcp_server.py"
+            context_path.parent.mkdir(parents=True)
+            context_path.write_text("external adapter\n", encoding="utf-8")
+
+            errors = verifier.validate_guarded_structure(root)
+
+            self.assertTrue(any("externalized MCP runtime prefix" in error for error in errors))
+            self.assertTrue(any("externalized MCP runtime path" in error for error in errors))
+
     def test_compromised_password_gradle_wrapper_is_executable(self) -> None:
         repository_root = Path(__file__).resolve().parents[3]
         wrapper = repository_root / "services/compromised-password-service/gradlew"

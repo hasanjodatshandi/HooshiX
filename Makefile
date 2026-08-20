@@ -1,18 +1,12 @@
 PYTHON ?= python3
 
-.PHONY: baseline-test baseline-verify context-test context-verify context-bootstrap context-matrix-check context-post-merge-verify ops-test desktop-test
+.PHONY: baseline-test baseline-verify context-test context-verify context-bootstrap context-matrix-check context-post-merge-verify
 
 baseline-test:
 	$(PYTHON) -m unittest discover -s scripts/baseline/tests -p 'test_*.py'
 
 context-test:
 	$(PYTHON) -m unittest discover -s scripts/context/tests -p 'test_*.py'
-
-ops-test:
-	$(PYTHON) -m unittest discover -s scripts/ops/tests -p 'test_*.py'
-
-desktop-test:
-	$(PYTHON) -m unittest discover -s scripts/desktop/tests -p 'test_*.py'
 
 context-post-merge-verify:
 	$(PYTHON) scripts/context/post_merge_checkpoint.py verify
@@ -34,5 +28,5 @@ context-matrix-check:
 	}; \
 	rm -f $$tmp_file
 
-baseline-verify: baseline-test context-test ops-test desktop-test context-verify context-matrix-check
+baseline-verify: baseline-test context-test context-verify context-matrix-check
 	$(PYTHON) scripts/baseline/verify_repository.py

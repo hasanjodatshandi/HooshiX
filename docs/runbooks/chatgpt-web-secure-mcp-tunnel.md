@@ -19,9 +19,10 @@ The approved path is:
 ChatGPT Web
 -> OpenAI Secure MCP Tunnel
 -> tunnel-client on Windows
--> HooshiX scripts/context/mcp_server.py over stdio
--> Git-native Context Engine
--> dedicated HooshiX checkout
+-> independent Windows Context MCP adapter over stdio
+-> fixed WSL bridge
+-> `/home/coder/workspace/Hooshix`
+-> project Git-native Context Engine and Linux Git authority
 ```
 
 Do not:
@@ -49,48 +50,37 @@ project.changed_context
 Required on the always-on Windows host:
 
 - Windows 11 Pro or another reviewed supported Windows host;
-- Git;
-- Python 3 capable of running the repository Context Engine;
-- a dedicated local HooshiX checkout;
+- WSL2 Ubuntu with Linux Git and Python 3 for the project Context Engine;
+- the canonical native-Linux checkout `/home/coder/workspace/Hooshix`;
+- the independent Windows Context MCP runtime;
 - OpenAI `tunnel-client` v0.0.11;
 - a tunnel created in the ChatGPT/OpenAI tunnel-management UI;
 - a restricted OpenAI runtime API key with Tunnels `Read` + `Use`.
 
 Actual installed state is evidence. Documentation does not prove these prerequisites are present.
 
-## 3. Create a dedicated Context Engine checkout
+## 3. Verify the canonical WSL Context checkout
 
-Use a checkout that is not the normal edit/work-in-progress directory. Example only:
+ADR-0051 makes `/home/coder/workspace/Hooshix` the only approved application/context checkout for this host. Keep it on native WSL storage. Do not use `/mnt/c`, `/mnt/d`, `\\wsl.localhost`, or Windows Git as repository authority.
 
-```powershell
-New-Item -ItemType Directory -Force D:\HooshiXContext | Out-Null
-Set-Location D:\HooshiXContext
-git clone https://github.com/hasanjodatshandi/HooshiX.git repo
-Set-Location .\repo
-git switch main
-git pull --ff-only origin main
-```
-
-Before starting the tunnel for trusted targeted review, verify the checkout is on the intended state:
+From Windows, an operator can invoke Linux commands without changing the authority model:
 
 ```powershell
-git status --short
-git rev-parse HEAD
-python .\scripts\context\context_engine.py verify
-python .\scripts\context\context_engine.py bootstrap
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec git status --short
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec git rev-parse HEAD
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec python3 scripts/context/context_engine.py verify
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec python3 scripts/context/context_engine.py bootstrap
 ```
 
 Expected safety condition:
 
 ```text
-Git status: no unexpected changes
+Linux Git status: no unexpected changes
 bootstrap verification: valid
 trusted_for_targeted_review: true
 ```
 
-If these conditions are not true, do not describe the tunnel context as verified targeted-review context.
-
-The MCP server itself does not perform `git pull`, `checkout`, `reset`, or other Git mutation. Synchronization stays an explicit operator action.
+The Context MCP adapter is not stored in this checkout. Its protected Windows policy fixes `Ubuntu`, `/home/coder/workspace/Hooshix`, the project Context Engine path, and `C:\Windows\System32\wsl.exe`.
 
 ## 4. Install and verify tunnel-client
 
@@ -186,7 +176,7 @@ Do not store the real key in this repository, shell transcripts, screenshots, lo
 
 ## 7. Configure the stdio MCP profile
 
-Use the official stdio sample and an absolute path to the HooshiX Context MCP entry point.
+Use the official stdio sample and the absolute independent Windows Context MCP adapter path. Supply its protected ADR-0051 policy. The policy fixes Ubuntu, `/home/coder/workspace/Hooshix`, the project Context Engine path, and `wsl.exe`.
 
 First inspect the installed binary's sample/help:
 
@@ -209,7 +199,7 @@ Then initialize a dedicated profile. Replace placeholders locally with the real 
 
 The generated profile must keep `control_plane.api_key` as an `env:` or `file:` secret reference. Do not replace it with a literal key.
 
-The HooshiX Context MCP entry point resolves the repository root from its own script path. The tunnel-client service working directory is therefore not repository authority.
+The independent Context MCP adapter does not derive repository authority from its source path or the tunnel-client working directory. Protected local policy fixes the WSL repository root, and Linux Git inside WSL is authority. Do not use Windows Git or UNC status checks for the WSL worktree.
 
 For a host where TCP 8080 is already in use, keep the health/admin surface on loopback and select a free loopback port. The reviewed v0.0.11 client supports an ephemeral listener such as `127.0.0.1:0`; do not resolve a port conflict by binding the health/admin surface to `0.0.0.0` or another LAN/public address.
 
@@ -282,7 +272,7 @@ For persistent operation, preserve these invariants:
 
 - same reviewed tunnel-client binary/version;
 - same dedicated profile and tunnel ID;
-- same dedicated clean HooshiX checkout;
+- same canonical clean WSL HooshiX checkout;
 - runtime key supplied through a protected supported `env:` or `file:` secret reference, not a command-line literal or Git file;
 - service account/user has only the filesystem/network permissions needed for the checkout and outbound tunnel;
 - no public inbound firewall rule is added;
@@ -303,7 +293,7 @@ On the verified host, multiple Ops requests logged `MCP connection TTL reached` 
 
 Before relying on the tunnel for a new non-trivial engineering session:
 
-1. synchronize the dedicated checkout explicitly with reviewed `main` using normal operator Git workflow;
+1. synchronize the canonical WSL checkout explicitly with reviewed `main` using normal operator Git workflow;
 2. verify the checkout is clean;
 3. run Context Engine verification/bootstrap locally when practical;
 4. verify tunnel-client `/readyz`;
@@ -361,7 +351,7 @@ A passing embedded or minimal stdio tool call proves the general tunnel/control-
 
 ### Bootstrap reports stale/dirty context
 
-Stop treating the context as targeted-review trusted. Inspect/synchronize the dedicated checkout using explicit operator Git actions. Restart/recheck the tunnel after the repository is in the intended state.
+Stop treating the context as targeted-review trusted. Inspect/synchronize the canonical WSL checkout using explicit operator Git actions. Restart/recheck the tunnel after the repository is in the intended state.
 
 ## 13. Incident and credential handling
 

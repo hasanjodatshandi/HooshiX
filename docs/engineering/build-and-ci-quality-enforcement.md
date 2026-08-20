@@ -2,7 +2,7 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
-ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP. ADR-0049 defines the separate policy-gated interactive Windows Desktop MCP; ADR-0050 narrowly adds its policy-bound local credential-use broker and repository verification boundary.
+ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP. ADR-0049 defines the separate policy-gated interactive Windows Desktop MCP; ADR-0050 narrowly adds its policy-bound local credential-use broker. ADR-0051 moves Context/Ops/Desktop MCP adapter/runtime source and runtime tests outside HooshiX while keeping project Context Engine governance in this repository.
 
 ## 1. Required Java PR gates
 
@@ -209,28 +209,19 @@ CI SHOULD enforce when implemented:
 - dirty configured authority state cannot be reported as verified targeted-review context;
 - Context Engine retrieval remains tracked-file-only, repository-root confined, bounded, provenance-bearing, and configured sensitive filenames are excluded;
 - caller-controlled revision/query input cannot become shell execution or arbitrary filesystem access;
-- Context MCP modern discovery/tool calls and bounded legacy initialize compatibility remain tested;
-- Context MCP exposes no file/Git/checkpoint/deployment/write mutation tool;
-- the Context MCP entry point starts correctly from a working directory outside the repository and resolves HooshiX from the tracked script path;
-- ADR-0047 ChatGPT Web access remains an external OpenAI tunnel-client bridge to the unchanged stdio child and does not add a HooshiX HTTP/SSE/TCP listener, public MCP port, shell, arbitrary filesystem, Git mutation, credential-read, or deployment tool;
-- ADR-0047 documentation/pins require official tunnel-client release integrity verification and a restricted Tunnels `Read` + `Use` runtime credential; an admin key is not the long-lived daemon credential.
-- ADR-0048 Ops MCP remains a separate stdio server and does not change the exact five-tool Context MCP surface;
-- Ops server startup requires a local fail-closed policy and tests cover missing/malformed/unknown/duplicate/relative policy state, path/denied-root/symlink escape, allowed-root deletion denial, bounded atomic UTF-8 file mutation, process alias/cwd/timeout/output controls, child credential-environment exclusion, bounded audit metadata/rotation, CWD-independent startup, and explicit UTF-8 response bytes;
-- Ops process execution accepts only policy aliases to absolute executables and argv arrays; no caller-selected executable path, arbitrary environment map, or stdin secret channel is added;
-- elevated Ops mutation/process execution requires explicit local policy opt-in and remains developer-host only; no test or tunnel setup may treat it as ADR-0030 production privilege;
-- repository examples contain no real Ops policy secret or tunnel credential;
-- ADR-0049 Desktop MCP remains a third separate stdio server and does not change Context or Ops tool surfaces;
-- Desktop startup/runtime tests cover strict local policy, exact WinApp version pin, intended Windows interactive/non-elevated state, app allow/deny rules, fresh HWND/process authorization, and sanitized WinApp child environment;
-- Desktop observation/input tests cover bounded UI inspection, PNG capture/temp cleanup, UIA/mouse/keyboard opt-ins, semantic-selector-only mouse targeting, safe WinApp chord normalization, fixed isolated PowerShell/C# Unicode-helper stdin/argv/environment/timeout/error contracts, system-key negatives, output/time limits, fail-closed/redacted audit, CWD-independent stdio protocol behavior, screenshot MCP image content, and explicit UTF-8 response bytes;
-- ADR-0050 credential-broker tests cover disabled-by-default/backward-compatible policy, exact bounded app/executable-path/SHA-256/selector/Generic-Credential bindings, secret-free MCP schema, wrong-app/executable-identity/unknown-ID failure before helper use, fixed helper stdin/environment/protocol bounds, focused-password/unique-password/PID/same-focus checks before/during `CredReadW`-backed delivery, `CredFree`, no credential value/length output, and audit redaction;
-- Desktop has no arbitrary WinApp argv, process shell, arbitrary filesystem/network fetch, recording/touch/pen, clipboard-read, get-value/credential-reader/list/write/export, general secret-input tool, UAC/Secure-Desktop bypass, or production administration tool; `desktop.use_credential` is only a policy-bound local use-without-disclosure primitive;
-- repository examples contain no real Desktop credential, policy secret, screenshot, typed secret, or tunnel credential.
+- ADR-0051 externalized MCP runtime paths do not reappear in HooshiX;
+- Context Engine retrieval remains read-only, tracked-file-only, bounded, provenance-bearing, and evaluated by Linux Git in the canonical WSL checkout;
+- ADR-0047/0051 preserve the exact read-only Context MCP contract, but its protocol/adapter tests belong to the independent Windows runtime;
+- ADR-0048 Ops and ADR-0049/0050 Desktop remain separate Windows MCP authorities; their policy/protocol/helper/security tests belong to the independent Windows runtime;
+- HooshiX retains architecture/security/runbook contracts for all three MCP surfaces because they affect engineering governance;
+- no HooshiX repository example contains a real MCP policy secret, credential, screenshot, typed secret, or tunnel credential;
+- Windows MCP host evidence never substitutes for branch protection, repository CI, or ADR-0030 production access controls.
 
 These gates do not replace Gitleaks. Tracked-file-only retrieval is not evidence that Git contains no committed secret.
 
-`make baseline-verify` includes repository Context Engine tests/verification plus Ops and Desktop MCP tests. Context/route/documentation, Ops policy/stdio, or Desktop policy/UI-boundary drift therefore blocks the same repository-governance boundary.
+`make baseline-verify` includes project Context Engine/checkpoint tests and verification plus the ADR-0051 guard against reintroducing external MCP runtime paths. Independent Windows MCP runtime tests are a separate developer-tool gate.
 
-Repository CI proves only repository-side stdio/policy/governance behavior. Real tunnel-client installation, runtime credential permissions, local `/readyz`, ChatGPT Plugin discovery, Windows ACL/token/session/background state, Context calls, Ops host calls, Desktop WinApp/UI/screenshot/input calls, and ADR-0050 disposable/real application credential-use behavior are environment integration evidence and remain `NOT VERIFIED` until executed on the operator PC for the relevant surface.
+HooshiX CI proves repository governance and application/service gates. Independent MCP runtime tests prove developer-tool source contracts. Real tunnel-client, Windows ACL/token/session/background state, live Context/Ops/Desktop calls, and application-specific credential use remain host/integration evidence.
 
 ## 10. Heavy release/scheduled evidence
 

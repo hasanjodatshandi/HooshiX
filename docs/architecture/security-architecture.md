@@ -229,7 +229,7 @@ Single-server accepts outages but never weaker decisions:
 
 ## 14. Developer-host AI Ops boundary
 
-ADR-0048 adds a developer-host-only Ops MCP separate from the ADR-0046 Context MCP. The Context MCP remains exact read-only repository/context authority and receives no write/execute tool.
+ADR-0051 separates MCP runtime source from the HooshiX application repository and makes `/home/coder/workspace/Hooshix` the canonical Linux Git/application authority. ADR-0048 adds a developer-host-only Ops MCP separate from the ADR-0046 Context MCP. The Context MCP remains exact read-only repository/context authority and receives no write/execute tool.
 
 Ops security controls are:
 
