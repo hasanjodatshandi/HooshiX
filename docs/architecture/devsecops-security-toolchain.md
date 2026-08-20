@@ -167,7 +167,7 @@ Architecture selection is not implementation evidence.
 At the current repository state:
 
 - repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, and Web BFF;
-- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, and Web BFF and is wired into PR/push/scheduled repository security workflows; prior protected Compromised Password/Notification/Identity advisory scans passed on `main@a3766bd`; current Authorization/Web BFF protected scans remain NOT VERIFIED;
+- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, and Web BFF and is wired into PR/push/scheduled repository security workflows; prior protected Compromised Password/Notification/Identity advisory scans passed on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`;
 - Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in the Identity security workflow with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; local fixtures/current-tree/full-current-history execution passed, and protected Identity current-tree/full-history execution passed on `main@a3766bd`;
 - final-image Syft SBOM generation is **NOT PRESENT / NOT VERIFIED**;
 - final-image/SBOM Grype vulnerability gating is **NOT PRESENT / NOT VERIFIED**;
