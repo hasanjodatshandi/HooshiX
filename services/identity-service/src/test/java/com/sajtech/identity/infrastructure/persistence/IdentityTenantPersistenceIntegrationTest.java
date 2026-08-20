@@ -8,6 +8,8 @@ import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.registration.model.FingerprintDigest;
 import com.sajtech.identity.application.registration.port.out.IntentFingerprintPort;
 import com.sajtech.identity.application.tenant.model.*;
+import com.sajtech.identity.infrastructure.observability.AuthorizationOutboxMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.*;
 import java.util.*;
 import org.flywaydb.core.Flyway;
@@ -203,6 +205,87 @@ class IdentityTenantPersistenceIntegrationTest {
                     tenantStore.claimAuthorizationOutbox(
                         NOW.plusSeconds(6), 32, NOW.plusSeconds(36))))
         .anySatisfy(item -> assertThat(item.operation()).isEqualTo("FINALIZE_MEMBERSHIP_REMOVAL"));
+  }
+
+  @Test
+  void authorizationOutboxMetricsExposeIndexedOldestAgeAndBoundedDefinitiveFailures() {
+    UUID createRequest = UUID.randomUUID();
+    tx.required(
+        () ->
+            tenantStore.createTenant(
+                createRequest, ownerUser, "Metrics Tenant", "metrics-tenant", material(7), NOW));
+
+    SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    AuthorizationOutboxMetrics metrics = new AuthorizationOutboxMetrics(meters);
+    Instant metricNow = NOW.plusSeconds(901);
+    assertThat(metrics.sampleDue(metricNow)).isTrue();
+    metrics.recordOldestPending(
+        tenantStore.oldestUnresolvedAuthorizationOutboxCreatedAt().orElse(null), metricNow);
+    metrics.definitiveFailure("PROVISION_OWNER");
+    metrics.definitiveFailure("UNRECOGNIZED_OPERATION");
+
+    assertThat(meters.get("identity.authorization.outbox.oldest_pending_age").gauge().value())
+        .isEqualTo(901);
+    assertThat(
+            meters
+                .get("identity.authorization.outbox.definitive_failures")
+                .tag("operation", "PROVISION_OWNER")
+                .counter()
+                .count())
+        .isEqualTo(1);
+    assertThat(
+            meters
+                .get("identity.authorization.outbox.definitive_failures")
+                .tag("operation", "UNKNOWN")
+                .counter()
+                .count())
+        .isEqualTo(1);
+
+    AuthorizationOutboxItem item =
+        tx.required(
+                () ->
+                    tenantStore.claimAuthorizationOutbox(
+                        NOW.plusSeconds(901), 32, NOW.plusSeconds(931)))
+            .getFirst();
+    tx.required(
+        () -> {
+          tenantStore.completeAuthorizationOutbox(item.outboxId(), NOW.plusSeconds(902));
+          return null;
+        });
+
+    SimpleMeterRegistry resolvedMeters = new SimpleMeterRegistry();
+    AuthorizationOutboxMetrics resolved = new AuthorizationOutboxMetrics(resolvedMeters);
+    Instant resolvedNow = NOW.plusSeconds(903);
+    assertThat(resolved.sampleDue(resolvedNow)).isTrue();
+    resolved.recordOldestPending(
+        tenantStore.oldestUnresolvedAuthorizationOutboxCreatedAt().orElse(null), resolvedNow);
+    assertThat(
+            resolvedMeters.get("identity.authorization.outbox.oldest_pending_age").gauge().value())
+        .isZero();
+
+    String indexDefinition =
+        dsl.fetchValue(
+                "SELECT indexdef FROM pg_indexes WHERE indexname='identity_authorization_outbox_oldest_unresolved_idx'")
+            .toString();
+    assertThat(indexDefinition)
+        .contains("(created_at, outbox_id)")
+        .contains("PENDING")
+        .contains("DISPATCHING");
+
+    String plan =
+        String.join(
+            System.lineSeparator(),
+            dsl.fetch(
+                    """
+                    EXPLAIN (COSTS OFF)
+                    SELECT created_at
+                    FROM identity_authorization_outbox
+                    WHERE state IN ('PENDING','DISPATCHING')
+                    ORDER BY created_at, outbox_id
+                    LIMIT 1
+                    """)
+                .getValues(0, String.class));
+    assertThat(plan).contains("identity_authorization_outbox_oldest_unresolved_idx");
   }
 
   private void insertUser(UUID user) {

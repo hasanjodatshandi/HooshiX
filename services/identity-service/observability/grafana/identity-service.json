@@ -90,6 +90,24 @@
         {"refId": "A", "expr": "increase(identity_refresh_reuse_total[5m])", "legendFormat": "reuse"}
       ],
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Authorization outbox oldest unresolved age",
+      "targets": [
+        {"refId": "A", "expr": "identity_authorization_outbox_oldest_pending_age_seconds", "legendFormat": "age seconds"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Authorization outbox definitive failures",
+      "targets": [
+        {"refId": "A", "expr": "sum by (operation) (increase(identity_authorization_outbox_definitive_failures_total[5m]))", "legendFormat": "{{operation}}"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
     }
   ]
 }

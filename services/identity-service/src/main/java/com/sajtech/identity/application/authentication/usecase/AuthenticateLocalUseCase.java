@@ -96,7 +96,8 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
 
     Instant now = clock.instant();
     AuthenticationTenantSelection selection =
-        tenantSelection.resolveAfterPrimaryAuthentication(found.userId());
+        transactions.required(
+            () -> tenantSelection.resolveAfterPrimaryAuthentication(found.userId()));
     GeneratedRefreshCredential refresh = credentials.newRefreshCredential();
     PreparedSession prepared =
         new PreparedSession(

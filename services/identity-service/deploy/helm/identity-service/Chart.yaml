@@ -1,6 +1,6 @@
 apiVersion: v2
 name: identity-service
-description: HooshiX Identity registration service
+description: HooshiX Identity service
 version: 0.1.0
 appVersion: "0.1.0"
 type: application
