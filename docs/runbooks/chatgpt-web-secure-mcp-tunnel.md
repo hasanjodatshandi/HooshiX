@@ -287,7 +287,9 @@ On recovery, clean the full known profile process tree before restart: matching 
 
 Keep bounded local tunnel logs and enable the Windows Task Scheduler Operational log. Do not remove MCP output/time bounds as a generic crash workaround; first reproduce a transport-size or duration threshold. Unbounded output increases memory/transport risk without fixing lifecycle recovery.
 
-On the verified host, multiple Ops requests logged `MCP connection TTL reached` roughly 99-119.5 seconds after a nearby synchronous `process.run` started, while local tunnel-client `--mcp.connection-max-ttl` remained at its 10-minute default and no local TTL override was configured. Treat this as an observed effective response deadline for this tunnel/session, not as a universal platform constant. Keep synchronous Ops work below the shortest observed deadline with margin; split or poll longer workflows.
+On the verified host, the Context and Ops wrappers now request `--mcp.connection-max-ttl=1h`, while the local Context/`process.run` command bounds are 300 seconds. This does not override a shorter tunnel/control-plane command-response lifetime. On 2026-08-20, a local Ops command completed after `197968 ms` with `timed_out=false`, but separate synchronous calls still logged `MCP connection TTL reached` plus `command response deadline reached; dropping without posting a response` and lost the ChatGPT response at about 122.6 seconds in one exercised call. Treat local command timeout, MCP-connection lifetime, and end-to-end command-response lifetime as separate limits.
+
+Keep synchronous work below the shortest measured effective response window with margin. For work that can exceed it, split/checkpoint the workflow or use the persistent WSL terminal with an explicit local `timeout 300s ...` and observe/poll separately. Do not claim that a 300-second local policy value proves a 300-second tunnel response SLA.
 
 ## 11. Normal operating procedure
 

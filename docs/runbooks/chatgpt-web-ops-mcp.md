@@ -238,7 +238,11 @@ Do not rely on the Task Scheduler `restart after` setting as the only recovery m
 
 Before any clean restart, terminate the full known Ops profile tree: matching `tunnel-client.exe`, the exact PowerShell supervisor, and the exact hidden `wscript.exe` launcher. This prevents an orphan supervisor from waking after its delay and creating a duplicate tunnel. Recovery must converge to one launcher, one wrapper, and one tunnel.
 
-The current verified local Ops policy uses `max_command_seconds=90` and `max_output_bytes=10485760` (10 MiB). Repeated tunnel logs correlated `MCP connection TTL reached` with nearby long synchronous `process.run` calls at about 99-119.5 seconds. A controlled 95-second sleep with `timeout_seconds=90` returned `timed_out=true` at about 90.1 seconds while the tunnel PID stayed unchanged and `/healthz` + `/readyz` stayed healthy. Do not increase the synchronous timeout above this margin without new end-to-end evidence; split, checkpoint, or poll longer work.
+The current verified local Ops policy uses `max_command_seconds=300` and `max_output_bytes=10485760` (10 MiB). The independent Context WSL adapter also uses a 300-second command timeout. The Context and Ops tunnel wrappers request `--mcp.connection-max-ttl=1h`. These settings establish a five-minute **local command bound**; they do not guarantee a five-minute synchronous ChatGPT response.
+
+Host evidence on 2026-08-20 separates the two limits. One local Ops `process.run` remained inside the MCP server for `197968 ms` and the audit recorded `exit_code=0`, `timed_out=false`, proving the local 300-second policy no longer imposes the former 90/180-second ceiling. Separate end-to-end attempts still hit tunnel/control-plane response expiry: one failed after about `122603 ms` with tunnel logs `MCP connection TTL reached` and `command response deadline reached; dropping without posting a response`; a later 185-second attempt also crossed a tunnel connection expiry and lost the synchronous response. Therefore `max_command_seconds=300` is a local execution ceiling, not transport-SLA evidence.
+
+Keep synchronous ChatGPT/Ops calls below the shortest measured effective tunnel response window with margin. Work that may exceed that window must be split/checkpointed, or executed in the persistent WSL terminal with an explicit local `timeout 300s ...` and observed separately. Do not remove the local five-minute process bound, output bounds, watchdog, or tunnel health checks to work around a transport deadline.
 
 Preserve:
 
