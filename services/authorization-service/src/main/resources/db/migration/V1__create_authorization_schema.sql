@@ -104,7 +104,7 @@ CREATE TABLE authorization_idempotency_record (
   tenant_id UUID,
   operation VARCHAR(64) NOT NULL,
   intent_fingerprint BYTEA NOT NULL CHECK (octet_length(intent_fingerprint)=32),
-  fingerprint_version VARCHAR(32) NOT NULL,
+  fingerprint_version VARCHAR(64) NOT NULL,
   fingerprint_key_id VARCHAR(64) NOT NULL,
   outcome_code VARCHAR(64) NOT NULL,
   outcome_reference UUID,
