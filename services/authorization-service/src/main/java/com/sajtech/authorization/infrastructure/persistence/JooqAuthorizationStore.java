@@ -185,12 +185,12 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           DSLContext tx = DSL.using(c);
           Replay replay = replay(tx, requestId, "PROVISION_OWNER", fp);
           if (replay.present()) return;
+          setTenant(tx, tenantId);
           execute(
               tx,
               "INSERT INTO authorization_tenant_projection(tenant_id,lifecycle,updated_at) VALUES (?, 'ACTIVE', ?) ON CONFLICT (tenant_id) DO UPDATE SET lifecycle='ACTIVE',updated_at=EXCLUDED.updated_at",
               tenantId,
               now);
-          setTenant(tx, tenantId);
           ensureSystemRoles(tx, tenantId, now);
           execute(
               tx,
@@ -284,6 +284,7 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           DSLContext tx = DSL.using(c);
           Replay replay = replay(tx, requestId, "TENANT_LIFECYCLE", fp);
           if (replay.present()) return;
+          setTenant(tx, tenantId);
           int changed =
               execute(
                   tx,

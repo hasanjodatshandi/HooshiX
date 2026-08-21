@@ -306,6 +306,7 @@ services/authorization-service/src/main/resources/application-migration.yaml
 services/authorization-service/src/main/resources/application.yaml
 services/authorization-service/src/main/resources/db/migration/V1__create_authorization_schema.sql
 services/authorization-service/src/main/resources/db/migration/V2__index_unresolved_removal_preparations.sql
+services/authorization-service/src/main/resources/db/migration/V3__enforce_tenant_projection_rls.sql
 services/authorization-service/src/test/java/com/sajtech/authorization/application/AuthorizationServiceTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/architecture/ArchitectureRulesTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/configuration/AuthorizationMigrationProfileIntegrationTest.java
@@ -317,7 +318,9 @@ services/authorization-service/src/test/java/com/sajtech/authorization/infrastru
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/runtime/grpc/CheckPermissionAdmissionControllerTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/runtime/grpc/CheckPermissionOverloadInterceptorTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/HmacIntentFingerprintTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/IdentityJwtVerifierRebindingTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/IdentityJwtVerifierTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/keyring/FileBackedKeyRingTest.java
 services/compromised-password-service/.dockerignore
 services/compromised-password-service/Dockerfile
 services/compromised-password-service/buf.yaml

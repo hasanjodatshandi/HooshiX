@@ -5,9 +5,11 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -72,6 +74,8 @@ public final class FileBackedKeyRing {
     }
     if (!keys.containsKey(active))
       throw new IllegalStateException("Active Authorization key identifier is unavailable");
+    Snapshot previous = snapshot.get();
+    if (previous != null) requireNoKeyIdRebinding(previous.keys(), keys);
     snapshot.set(new Snapshot(active, Map.copyOf(keys), clock.instant()));
   }
 
@@ -106,6 +110,29 @@ public final class FileBackedKeyRing {
     if (s == null || s.loadedAt().plus(maximumStaleness).isBefore(clock.instant()))
       throw new IllegalStateException("Authorization key-ring snapshot is stale");
     return s;
+  }
+
+  private static void requireNoKeyIdRebinding(
+      Map<String, SecretKey> previous, Map<String, SecretKey> candidate) {
+    for (Map.Entry<String, SecretKey> entry : previous.entrySet()) {
+      SecretKey replacement = candidate.get(entry.getKey());
+      if (replacement != null && !sameKey(entry.getValue(), replacement)) {
+        throw new IllegalStateException("Authorization key identifier cannot be rebound");
+      }
+    }
+  }
+
+  private static boolean sameKey(SecretKey left, SecretKey right) {
+    byte[] leftBytes = left.getEncoded();
+    byte[] rightBytes = right.getEncoded();
+    try {
+      return leftBytes != null
+          && rightBytes != null
+          && MessageDigest.isEqual(leftBytes, rightBytes);
+    } finally {
+      if (leftBytes != null) Arrays.fill(leftBytes, (byte) 0);
+      if (rightBytes != null) Arrays.fill(rightBytes, (byte) 0);
+    }
   }
 
   private static String required(Properties p, String name) {
