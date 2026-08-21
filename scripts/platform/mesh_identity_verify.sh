@@ -90,15 +90,22 @@ POD
 k wait --for=condition=Ready pod/authorization-identity-policy -n platform-apps --timeout=60s >/dev/null
 authorization_grpc='http://authorization-service.platform-apps.svc.cluster.local:9090/hooshix.authorization.v1.AuthorizationService/CheckPermission'
 grpc_probe() {
-  local caller_header=$1
-  k exec -n platform-apps authorization-identity-policy -- sh -c "printf '\000\000\000\000\000' | curl --http2-prior-knowledge -sS -m 8 -o /dev/null -w '%{http_code}' -X POST '$authorization_grpc' -H 'content-type: application/grpc' -H 'te: trailers' $caller_header --data-binary @-"
+  local caller_id=$1
+  if [[ -n "$caller_id" ]]; then
+    k exec -n platform-apps authorization-identity-policy -- sh -c "printf '\000\000\000\000\000' | curl --http2-prior-knowledge -sS -D - -o /dev/null -X POST '$authorization_grpc' -H 'content-type: application/grpc' -H 'te: trailers' -H 'x-hooshix-authorization-caller: $caller_id' --data-binary @-" | tr -d '\r'
+  else
+    k exec -n platform-apps authorization-identity-policy -- sh -c "printf '\000\000\000\000\000' | curl --http2-prior-knowledge -sS -D - -o /dev/null -X POST '$authorization_grpc' -H 'content-type: application/grpc' -H 'te: trailers' --data-binary @-" | tr -d '\r'
+  fi
 }
-allowed_code=$(grpc_probe "-H 'x-hooshix-authorization-caller: identity-service'")
-[[ "$allowed_code" == 200 ]] || fail "Identity principal + bound caller header did not reach Authorization CheckPermission (HTTP $allowed_code)"
-wrong_code=$(grpc_probe "-H 'x-hooshix-authorization-caller: workflow-service'")
-[[ "$wrong_code" == 403 ]] || fail "Identity principal spoofed another Authorization caller class (HTTP $wrong_code)"
-missing_code=$(grpc_probe "")
-[[ "$missing_code" == 403 ]] || fail "Identity principal reached Authorization CheckPermission without bound caller header (HTTP $missing_code)"
+allowed_headers=$(grpc_probe "identity-service")
+echo "$allowed_headers" | grep -Fxq 'grpc-status: 3' || fail "Identity principal + bound caller header did not reach Authorization CheckPermission"
+echo "$allowed_headers" | grep -Fxq 'grpc-message: INVALID_ARGUMENT' || fail "Identity principal + bound caller header did not reach Authorization application validation"
+wrong_headers=$(grpc_probe "workflow-service")
+echo "$wrong_headers" | grep -Fxq 'grpc-status: 7' || fail "Identity principal spoofed another Authorization caller class"
+echo "$wrong_headers" | grep -Fxq 'grpc-message: RBAC: access denied' || fail "Identity principal spoof denial was not enforced by the Authorization waypoint"
+missing_headers=$(grpc_probe "")
+echo "$missing_headers" | grep -Fxq 'grpc-status: 7' || fail "Identity principal reached Authorization CheckPermission without bound caller header"
+echo "$missing_headers" | grep -Fxq 'grpc-message: RBAC: access denied' || fail "Missing Authorization caller header was not denied by the waypoint"
 k delete pod authorization-identity-policy -n platform-apps --wait=true >/dev/null
 cat <<POD | k apply -f - >/dev/null
 apiVersion: v1
