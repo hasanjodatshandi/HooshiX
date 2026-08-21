@@ -9,6 +9,7 @@ public record AuthorizationProperties(
     int grpcPort,
     boolean runtimeEnabled,
     int maxConcurrentCallsPerConnection,
+    CheckPermissionOverload checkPermissionOverload,
     Path fingerprintKeyRingPath,
     Path quotaKeyRingPath,
     Path identityJwtVerifierBundlePath,
@@ -19,6 +20,7 @@ public record AuthorizationProperties(
     if (grpcPort < 1
         || grpcPort > 65535
         || maxConcurrentCallsPerConnection < 1
+        || checkPermissionOverload == null
         || fingerprintKeyRingPath == null
         || quotaKeyRingPath == null
         || identityJwtVerifierBundlePath == null
@@ -29,6 +31,30 @@ public record AuthorizationProperties(
         || keyRingMaximumStaleness.isNegative()
         || quota == null)
       throw new IllegalArgumentException("Authorization security configuration is invalid");
+  }
+
+  public record CheckPermissionOverload(
+      int globalConcurrency,
+      int perCallerConcurrency,
+      int globalQueueCapacity,
+      int perCallerQueueCapacity,
+      int maxCallerBuckets,
+      Duration queueWait) {
+    public CheckPermissionOverload {
+      if (globalConcurrency < 1
+          || perCallerConcurrency < 1
+          || perCallerConcurrency > globalConcurrency
+          || globalQueueCapacity < 1
+          || perCallerQueueCapacity < 1
+          || perCallerQueueCapacity > globalQueueCapacity
+          || maxCallerBuckets < 1
+          || queueWait == null
+          || queueWait.isZero()
+          || queueWait.isNegative()
+          || queueWait.compareTo(Duration.ofMillis(25)) > 0)
+        throw new IllegalArgumentException(
+            "Authorization CheckPermission overload configuration is invalid");
+    }
   }
 
   public record Quota(

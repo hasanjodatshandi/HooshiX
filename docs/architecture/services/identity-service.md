@@ -91,7 +91,7 @@ The authentication listener is separately gated by `IDENTITY_AUTHENTICATION_RUNT
 
 Identity owns Tenant/TenantMembership lifecycle state, invitation, active-tenant selection, and lifecycle intent.
 
-Authorization owns permission state/evaluation and owner-safety reservations. Identity uses the current typed durable commands and does not copy Role/permission authority into its database/JWT/business model.
+Authorization owns permission state/evaluation and owner-safety reservations. Identity uses the current typed durable commands and the registered fail-closed `CheckPermission` edge for tenant-lifecycle administration checks such as `membership.role.assign`. Identity does not copy Role/permission authority into its database/JWT/business model.
 
 Lifecycle flows that require Authorization/Notification use current dependency-registry criticality, one-attempt request semantics, and durable Outbox/reconciliation where specified. Remote I/O is outside Identity DB transactions.
 

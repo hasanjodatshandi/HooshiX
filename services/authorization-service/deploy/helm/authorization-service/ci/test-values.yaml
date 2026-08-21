@@ -3,6 +3,13 @@ image:
   digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 runtime:
   enabled: true
+  checkPermission:
+    globalConcurrency: 8
+    perCallerConcurrency: 4
+    globalQueueCapacity: 8
+    perCallerQueueCapacity: 2
+    maxCallerBuckets: 64
+    queueWait: PT0.025S
 quota:
   maxActiveBuckets: 10000
   maxNewBucketsPerMinute: 1000
@@ -27,6 +34,7 @@ resourceCallers:
     podLabels:
       app.kubernetes.io/name: workflow-service
     principal: prod.sajtech.internal/ns/platform-apps/sa/workflow-service
+    callerId: workflow-service
 observability:
   tracing:
     enabled: true

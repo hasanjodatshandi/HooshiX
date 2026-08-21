@@ -8,7 +8,7 @@ networking:
 nodes:
   - role: control-plane
     extraMounts:
-      - hostPath: /dev/shm/hooshix-kind-etcd
+      - hostPath: /dev/shm/hooshix-kind/etcd
         containerPath: /var/lib/etcd
 
     kubeadmConfigPatches:

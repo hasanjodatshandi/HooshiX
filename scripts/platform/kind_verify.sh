@@ -5,6 +5,7 @@ load_env "$ROOT/infrastructure/kind/pins.env"
 load_env "$ROOT/infrastructure/calico/pins.env"
 load_env "$ROOT/infrastructure/gateway-api/pins.env"
 [[ "$(kind get clusters | grep -Fx "$CLUSTER_NAME" | wc -l)" -eq 1 ]] || fail "kind cluster missing"
+[[ "$(k auth can-i '*' '*' --all-namespaces)" == yes ]] || fail "kind operator context lacks expected local cluster-admin authority"
 mapfile -t nodes < <(k get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.status.nodeInfo.kubeletVersion}{"|"}{range .status.conditions[?(@.type=="Ready")]}{.status}{end}{"\n"}{end}')
 [[ ${#nodes[@]} -eq 3 ]] || fail "expected 3 nodes, found ${#nodes[@]}"
 for row in "${nodes[@]}"; do [[ "$row" == *"|v${KUBERNETES_VERSION}|True" ]] || fail "node version/readiness mismatch: $row"; done

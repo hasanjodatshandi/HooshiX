@@ -29,6 +29,13 @@ authorization:
   grpc-port: ${AUTHORIZATION_GRPC_PORT:9090}
   runtime-enabled: ${AUTHORIZATION_RUNTIME_ENABLED:false}
   max-concurrent-calls-per-connection: ${AUTHORIZATION_MAX_CONCURRENT_CALLS_PER_CONNECTION:128}
+  check-permission-overload:
+    global-concurrency: ${AUTHORIZATION_CHECK_PERMISSION_GLOBAL_CONCURRENCY:8}
+    per-caller-concurrency: ${AUTHORIZATION_CHECK_PERMISSION_PER_CALLER_CONCURRENCY:4}
+    global-queue-capacity: ${AUTHORIZATION_CHECK_PERMISSION_GLOBAL_QUEUE_CAPACITY:8}
+    per-caller-queue-capacity: ${AUTHORIZATION_CHECK_PERMISSION_PER_CALLER_QUEUE_CAPACITY:2}
+    max-caller-buckets: ${AUTHORIZATION_CHECK_PERMISSION_MAX_CALLER_BUCKETS:64}
+    queue-wait: ${AUTHORIZATION_CHECK_PERMISSION_QUEUE_WAIT:PT0.025S}
   fingerprint-key-ring-path: ${AUTHORIZATION_FINGERPRINT_KEY_RING_PATH:/var/run/secrets/hooshix/authorization-intent.properties}
   quota-key-ring-path: ${AUTHORIZATION_QUOTA_KEY_RING_PATH:/var/run/secrets/hooshix/authorization-quota.properties}
   identity-jwt-verifier-bundle-path: ${AUTHORIZATION_IDENTITY_JWT_VERIFIER_BUNDLE_PATH:/var/run/secrets/hooshix/identity-jwt-verifier.properties}
@@ -56,6 +63,13 @@ management:
           include: livenessState
         readiness:
           include: readinessState,authorizationReadiness
+  metrics:
+    distribution:
+      percentiles-histogram:
+        authorization.grpc.server.duration: true
+        authorization.check_permission.queue_wait: true
+      slo:
+        authorization.grpc.server.duration: 100ms,200ms
 logging:
   structured:
     format:

@@ -93,10 +93,10 @@ Info-level `istioctl analyze` diagnostics are reported but are not equivalent to
 The kind control-plane etcd data directory is bind-mounted from the WSL host tmpfs path:
 
 ```text
-/dev/shm/hooshix-kind-etcd -> /var/lib/etcd
+/dev/shm/hooshix-kind/etcd -> /var/lib/etcd
 ```
 
-This is a local WSL integration workaround for the measured host-filesystem fsync behavior. It is intentionally ephemeral and is not a production durability design. The staging verifier checks both the exact Docker mount source and that `/dev/shm` is `tmpfs`.
+The dedicated parent `/dev/shm/hooshix-kind` may become root-owned if Docker restores a kind node after WSL has cleared tmpfs. Repository cleanup therefore mounts only that dedicated parent into the pinned kind node image, deletes only its contents, restores the parent to the invoking numeric UID/GID, and then removes it. It never mounts all of `/dev/shm` writable and does not require broad host elevation. The storage remains intentionally ephemeral and is not a production durability design. The staging verifier checks both the exact Docker mount source and that `/dev/shm` is `tmpfs`.
 
 ## Evidence boundary
 

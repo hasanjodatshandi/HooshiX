@@ -2,9 +2,14 @@ package com.sajtech.authorization.configuration;
 
 import com.sajtech.authorization.application.port.out.*;
 import com.sajtech.authorization.infrastructure.health.AuthorizationReadinessHealthIndicator;
+import com.sajtech.authorization.infrastructure.observability.AuthorizationCheckPermissionMetrics;
+import com.sajtech.authorization.infrastructure.observability.AuthorizationReservationMonitor;
+import com.sajtech.authorization.infrastructure.observability.AuthorizationSecurityMetrics;
 import com.sajtech.authorization.infrastructure.observability.ObservedAdminQuota;
 import com.sajtech.authorization.infrastructure.persistence.JooqAuthorizationStore;
 import com.sajtech.authorization.infrastructure.quota.*;
+import com.sajtech.authorization.infrastructure.runtime.grpc.CheckPermissionAdmissionController;
+import com.sajtech.authorization.infrastructure.runtime.grpc.CheckPermissionOverloadInterceptor;
 import com.sajtech.authorization.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.authorization.infrastructure.security.*;
 import com.sajtech.authorization.infrastructure.security.keyring.FileBackedKeyRing;
@@ -61,8 +66,20 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  AuthorizationStore authorizationStore(DSLContext dsl) {
-    return new JooqAuthorizationStore(dsl);
+  AuthorizationSecurityMetrics authorizationSecurityMetrics(
+      io.micrometer.core.instrument.MeterRegistry meters) {
+    return new AuthorizationSecurityMetrics(meters);
+  }
+
+  @Bean
+  AuthorizationReservationMonitor authorizationReservationMonitor(
+      DSLContext dsl, AuthorizationSecurityMetrics metrics, Clock clock) {
+    return new AuthorizationReservationMonitor(dsl, metrics, clock);
+  }
+
+  @Bean
+  AuthorizationStore authorizationStore(DSLContext dsl, AuthorizationSecurityMetrics metrics) {
+    return new JooqAuthorizationStore(dsl, metrics);
   }
 
   @Bean
@@ -143,11 +160,38 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  AuthorizationCheckPermissionMetrics authorizationCheckPermissionMetrics(
+      io.micrometer.core.instrument.MeterRegistry meters) {
+    return new AuthorizationCheckPermissionMetrics(meters);
+  }
+
+  @Bean
+  CheckPermissionAdmissionController checkPermissionAdmissionController(
+      AuthorizationProperties p, AuthorizationCheckPermissionMetrics metrics) {
+    var overload = p.checkPermissionOverload();
+    return new CheckPermissionAdmissionController(
+        overload.globalConcurrency(),
+        overload.perCallerConcurrency(),
+        overload.globalQueueCapacity(),
+        overload.perCallerQueueCapacity(),
+        overload.maxCallerBuckets(),
+        overload.queueWait(),
+        metrics);
+  }
+
+  @Bean
+  CheckPermissionOverloadInterceptor checkPermissionOverloadInterceptor(
+      CheckPermissionAdmissionController admission) {
+    return new CheckPermissionOverloadInterceptor(admission);
+  }
+
+  @Bean
   GrpcServerLifecycle authorizationGrpcServer(
       AuthorizationProperties p,
       AuthorizationGrpcService service,
       AuthorizationObservabilityInterceptor telemetry,
       JwtActorServerInterceptor jwt,
+      CheckPermissionOverloadInterceptor overload,
       @Value("${authorization.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
@@ -155,7 +199,7 @@ public class RuntimeConfiguration {
         p.maxConcurrentCallsPerConnection(),
         p.runtimeEnabled(),
         List.<BindableService>of(service),
-        List.of(telemetry, jwt));
+        List.of(jwt, overload, telemetry));
   }
 
   @Bean
