@@ -34,6 +34,7 @@ import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -141,6 +142,44 @@ class NotificationPersistenceIntegrationTest {
         .extracting(exception -> ((NotificationSubmissionException) exception).error())
         .isEqualTo(NotificationSubmissionError.REQUEST_ID_CONFLICT);
     assertThat(dsl.fetchCount(DSL.table("notification"))).isEqualTo(1);
+  }
+
+  @Test
+  void migrationRejectsCrossDefinitionActivationAndInvalidChannelSemanticState() throws Exception {
+    assertThatThrownBy(
+            () ->
+                dsl.execute(
+                    "UPDATE notification_template_activation SET active_version_id = ? WHERE definition_id = ?",
+                    UUID.fromString("22222222-2222-4222-8222-222222222203"),
+                    UUID.fromString("11111111-1111-4111-8111-111111111101")))
+        .isInstanceOf(DataAccessException.class);
+
+    SubmitNotificationUseCase useCase = createUseCase();
+    Instant messageNotAfter = new PostgresDatabaseTime(dsl).now().plus(Duration.ofMinutes(10));
+    var accepted =
+        useCase.submit(
+            command(
+                UUID.fromString("550e8400-e29b-41d4-a716-446655440001"),
+                "12345678",
+                messageNotAfter));
+
+    assertThatThrownBy(
+            () ->
+                dsl.execute(
+                    "UPDATE notification SET channel = 'SMS', semantic_type = 'PASSWORD_CHANGED_NOTICE' WHERE notification_id = ?",
+                    accepted.notificationId()))
+        .isInstanceOf(DataAccessException.class);
+  }
+
+  @Test
+  void migrationCreatesProviderCorrelationAndPendingCallbackIndexes() {
+    var indexes =
+        dsl.fetch(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('provider_receipt_evidence', 'notification_result_outbox')")
+            .getValues("indexname", String.class);
+
+    assertThat(indexes)
+        .contains("provider_receipt_correlation_idx", "notification_result_outbox_pending_idx");
   }
 
   private SubmitNotificationUseCase createUseCase() throws Exception {

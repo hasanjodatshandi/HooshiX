@@ -276,6 +276,20 @@ def migrate_databases(values: dict[str, str]) -> None:
              f"GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO {runtime_role};\n"
              f"GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA public TO {runtime_role};\n",
              database=database)
+        if database == "notification":
+            template_privilege_sql = (
+                "REVOKE ALL PRIVILEGES ON TABLE "
+                "notification_template_definition, notification_template_version, "
+                "notification_template_activation, notification_template_audit "
+                "FROM notification_runtime;"
+                + chr(10)
+                + "GRANT SELECT ON TABLE "
+                "notification_template_definition, notification_template_version, "
+                "notification_template_activation, notification_template_audit "
+                "TO notification_runtime;"
+                + chr(10)
+            )
+            psql(template_privilege_sql, database=database)
 
 
 def build_compromised_password_dataset() -> dict[str, str]:

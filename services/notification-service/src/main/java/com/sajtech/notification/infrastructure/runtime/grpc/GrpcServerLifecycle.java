@@ -4,6 +4,7 @@ import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
+import io.grpc.ServerServiceDefinition;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -31,7 +32,8 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
       int port,
       int maxConcurrentCallsPerConnection,
       BindableService service,
-      ServerInterceptor interceptor) {
+      ServerInterceptor tracingInterceptor,
+      ServerInterceptor admissionInterceptor) {
     if (bindAddress == null || bindAddress.isBlank() || port <= 0 || port > 65_535) {
       throw new IllegalArgumentException("Invalid gRPC bind address or port");
     }
@@ -40,15 +42,20 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
           "Maximum concurrent calls per connection must be positive");
     }
     Objects.requireNonNull(service, "service");
-    Objects.requireNonNull(interceptor, "interceptor");
+    Objects.requireNonNull(tracingInterceptor, "tracingInterceptor");
+    Objects.requireNonNull(admissionInterceptor, "admissionInterceptor");
     requestExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    ServerServiceDefinition tracedService =
+        ServerInterceptors.intercept(service, tracingInterceptor);
+    ServerServiceDefinition admittedService =
+        ServerInterceptors.intercept(tracedService, admissionInterceptor);
     server =
         NettyServerBuilder.forAddress(new InetSocketAddress(bindAddress, port))
             .executor(requestExecutor)
             .maxConcurrentCallsPerConnection(maxConcurrentCallsPerConnection)
             .maxInboundMessageSize(MAX_INBOUND_MESSAGE_BYTES)
             .maxInboundMetadataSize(MAX_INBOUND_METADATA_BYTES)
-            .addService(ServerInterceptors.intercept(service, interceptor))
+            .addService(admittedService)
             .build();
   }
 

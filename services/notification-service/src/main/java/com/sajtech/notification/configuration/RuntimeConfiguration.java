@@ -25,6 +25,7 @@ import com.sajtech.notification.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrow;
 import com.sajtech.notification.infrastructure.security.fingerprint.FileBackedHmacIntentFingerprint;
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
+import com.sajtech.notification.interfaces.notification.grpc.NotificationAdmissionInterceptor;
 import com.sajtech.notification.interfaces.notification.grpc.NotificationGrpcService;
 import com.sajtech.notification.interfaces.observability.grpc.SafeTracingServerInterceptor;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -180,17 +181,26 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  NotificationAdmissionInterceptor notificationAdmissionInterceptor(
+      NotificationProperties properties, MeterRegistry meters) {
+    return new NotificationAdmissionInterceptor(
+        properties.maxConcurrentCallsPerConnection(), meters);
+  }
+
+  @Bean
   GrpcServerLifecycle grpcServerLifecycle(
       NotificationProperties properties,
       NotificationGrpcService service,
-      SafeTracingServerInterceptor interceptor,
+      SafeTracingServerInterceptor tracingInterceptor,
+      NotificationAdmissionInterceptor admissionInterceptor,
       @Value("${notification.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
         properties.grpcPort(),
         properties.maxConcurrentCallsPerConnection(),
         service,
-        interceptor);
+        tracingInterceptor,
+        admissionInterceptor);
   }
 
   @Bean("notificationReadiness")

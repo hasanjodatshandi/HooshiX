@@ -677,6 +677,7 @@ services/notification-service/src/main/java/com/sajtech/notification/infrastruct
 services/notification-service/src/main/java/com/sajtech/notification/infrastructure/security/fingerprint/FileBackedHmacIntentFingerprint.java
 services/notification-service/src/main/java/com/sajtech/notification/infrastructure/security/keyring/FileBackedKeyRing.java
 services/notification-service/src/main/java/com/sajtech/notification/infrastructure/security/keyring/KeyRingMaterial.java
+services/notification-service/src/main/java/com/sajtech/notification/interfaces/notification/grpc/NotificationAdmissionInterceptor.java
 services/notification-service/src/main/java/com/sajtech/notification/interfaces/notification/grpc/NotificationGrpcService.java
 services/notification-service/src/main/java/com/sajtech/notification/interfaces/observability/grpc/SafeTracingServerInterceptor.java
 services/notification-service/src/main/proto/hooshix/notification/v1/notification.proto
@@ -684,6 +685,7 @@ services/notification-service/src/main/resources/application-migration.yaml
 services/notification-service/src/main/resources/application.yaml
 services/notification-service/src/main/resources/db/migration/V1__create_notification_schema.sql
 services/notification-service/src/main/resources/db/migration/V2__seed_registration_verification_templates.sql
+services/notification-service/src/main/resources/db/migration/V3__enforce_notification_template_and_deadline_integrity.sql
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/service/ProviderAttemptPlannerTest.java
 services/notification-service/src/test/java/com/sajtech/notification/application/submit/service/NotificationRecipientCanonicalizerTest.java
 services/notification-service/src/test/java/com/sajtech/notification/application/submit/usecase/SubmitNotificationUseCaseTest.java
@@ -697,6 +699,7 @@ services/notification-service/src/test/java/com/sajtech/notification/infrastruct
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/provider/local/LoggingProviderAdapterTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/FileBackedHmacIntentFingerprintTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/FileBackedKeyRingTest.java
+services/notification-service/src/test/java/com/sajtech/notification/interfaces/notification/grpc/NotificationAdmissionInterceptorTest.java
 services/notification-service/src/test/java/com/sajtech/notification/interfaces/notification/grpc/NotificationGrpcServiceTest.java
 services/web-bff/.dockerignore
 services/web-bff/Dockerfile

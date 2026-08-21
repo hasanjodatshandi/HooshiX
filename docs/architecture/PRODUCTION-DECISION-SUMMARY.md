@@ -3,7 +3,7 @@
 - **Reviewed:** 2026-08-16
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, Identity registration/authentication/Session/RefreshFamily/JWT/Tenant slices, Authorization, and Web BFF slices; service-specific Semgrep/OSV gates are present and Identity plus Compromised Password have implemented Gitleaks current-tree/Git-history gates. Protected merged-main repository/security CI passed for the prior Compromised Password, Notification, and Identity suites on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`; the repository-owned local production-fidelity kind/staging lane has passed its composite runtime verification, while production deployed-runtime/staging/release evidence remains `NOT VERIFIED`; Syft/Grype/Cosign/Kyverno final-artifact/release-admission evidence also remains `NOT VERIFIED`; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, Identity registration/authentication/Session/RefreshFamily/JWT/Tenant slices, Authorization, and Web BFF slices; service-specific Semgrep/OSV gates are present and Identity, Compromised Password, and Notification have implemented Gitleaks current-tree/Git-history gates. Protected merged-main repository/security CI passed for the prior Compromised Password, Notification, and Identity suites on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`; the repository-owned local production-fidelity kind/staging lane has passed its composite runtime verification, while production deployed-runtime/staging/release evidence remains `NOT VERIFIED`; Syft/Grype/Cosign/Kyverno final-artifact/release-admission evidence also remains `NOT VERIFIED`; see `implementation-status.md`
 
 ## 1. Selected single-server topology
 
@@ -142,7 +142,7 @@ Trivy and OWASP Dependency-Check are not selected current default tools because 
 
 A real committed secret requires revoke/rotate handling when exposure is plausible; deleting the latest line is not sufficient. Scanner output must stay redacted.
 
-The complete ADR-0045 chain is not implemented yet. Identity and Compromised Password have implemented Gitleaks current-tree/Git-history gates. Identity has prior local and protected merged-main execution evidence on `main@a3766bd`; current Compromised Password local fixture/tree/history execution passes and protected evidence remains commit-specific. Syft/Grype/Cosign final-artifact release evidence and Kyverno production admission evidence remain `NOT VERIFIED`.
+The complete ADR-0045 chain is not implemented yet. Identity, Compromised Password, and Notification have implemented Gitleaks current-tree/Git-history gates. Identity has prior local and protected merged-main execution evidence on `main@a3766bd`; current Notification and Compromised Password local fixture/tree/history execution passes and protected Notification evidence remains commit-specific. Syft/Grype/Cosign final-artifact release evidence and Kyverno production admission evidence remain `NOT VERIFIED`.
 
 ## 8. Kyverno
 

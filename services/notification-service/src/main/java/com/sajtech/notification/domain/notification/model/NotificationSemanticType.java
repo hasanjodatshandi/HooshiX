@@ -15,4 +15,11 @@ public enum NotificationSemanticType {
   public boolean isTimeBound() {
     return timeBound;
   }
+
+  public boolean supportsChannel(NotificationChannel channel) {
+    if (channel == null) {
+      return false;
+    }
+    return this != PASSWORD_CHANGED_NOTICE || channel == NotificationChannel.EMAIL;
+  }
 }

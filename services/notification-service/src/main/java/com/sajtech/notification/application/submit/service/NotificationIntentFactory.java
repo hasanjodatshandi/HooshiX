@@ -23,6 +23,11 @@ public final class NotificationIntentFactory {
   }
 
   public CanonicalNotificationIntent create(SubmitNotificationCommand command) {
+    if (!command.semanticContent().semanticType().supportsChannel(command.channel())) {
+      throw new NotificationSubmissionException(
+          NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST,
+          "Notification semantic type is not supported for the selected channel");
+    }
     if (command.semanticContent().semanticType().isTimeBound()
         && command.messageNotAfter() == null) {
       throw new NotificationSubmissionException(

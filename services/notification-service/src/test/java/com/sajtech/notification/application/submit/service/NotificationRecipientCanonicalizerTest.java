@@ -27,4 +27,13 @@ class NotificationRecipientCanonicalizerTest {
     assertThatThrownBy(() -> canonicalizer.canonicalize(NotificationChannel.SMS, "09121234567"))
         .isInstanceOf(NotificationSubmissionException.class);
   }
+
+  @Test
+  void rejectsInvalidDotAtomEmailLocalPart() {
+    for (String email :
+        new String[] {".person@example.com", "person.@example.com", "per..son@example.com"}) {
+      assertThatThrownBy(() -> canonicalizer.canonicalize(NotificationChannel.EMAIL, email))
+          .isInstanceOf(NotificationSubmissionException.class);
+    }
+  }
 }
