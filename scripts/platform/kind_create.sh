@@ -5,12 +5,17 @@ load_env "$ROOT/infrastructure/kind/pins.env"
 load_env "$ROOT/infrastructure/calico/pins.env"
 load_env "$ROOT/infrastructure/gateway-api/pins.env"
 require_command docker; require_command kind; require_command kubectl; require_command timeout
-ETCD_TMPFS_DIR=/dev/shm/hooshix-kind-etcd
+ETCD_TMPFS_PARENT=/dev/shm/hooshix-kind
+ETCD_TMPFS_DIR=$ETCD_TMPFS_PARENT/etcd
 if kind get clusters | grep -Fxq "$CLUSTER_NAME"; then kind delete cluster --name "$CLUSTER_NAME"; fi
-if [[ -d "$ETCD_TMPFS_DIR" ]]; then
-  docker run --rm --pull=never --entrypoint sh -v "$ETCD_TMPFS_DIR:/etcd" "$KIND_NODE_IMAGE" -c 'find /etcd -mindepth 1 -delete'
-  rm -rf "$ETCD_TMPFS_DIR"
+if [[ -d "$ETCD_TMPFS_PARENT" ]]; then
+  docker run --rm --pull=never --entrypoint sh \
+    -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+    -v "$ETCD_TMPFS_PARENT:/hooshix-kind" "$KIND_NODE_IMAGE" \
+    -c 'find /hooshix-kind -mindepth 1 -delete && chown "$HOST_UID:$HOST_GID" /hooshix-kind'
+  rmdir "$ETCD_TMPFS_PARENT"
 fi
+install -d -m 0700 "$ETCD_TMPFS_PARENT"
 install -d -m 0700 "$ETCD_TMPFS_DIR"
 require_exact_line "$(kind version)" "v${KIND_VERSION}" kind
 require_exact_line "$(kubectl version --client -o json | python3 -c 'import json,sys; print(json.load(sys.stdin)["clientVersion"]["gitVersion"])')" "v${KUBECTL_VERSION}" kubectl

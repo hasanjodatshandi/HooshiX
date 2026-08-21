@@ -5,6 +5,24 @@
 {{- if le (int .Values.quota.maxActiveBuckets) 0 }}{{ fail "quota.maxActiveBuckets must be measured and positive" }}{{ end -}}
 {{- if le (int .Values.quota.maxNewBucketsPerMinute) 0 }}{{ fail "quota.maxNewBucketsPerMinute must be measured and positive" }}{{ end -}}
 {{- if lt (int .Values.quota.minimumMemoryHeadroomPercent) 30 }}{{ fail "quota.minimumMemoryHeadroomPercent must be at least 30" }}{{ end -}}
+{{- if .Values.runtime.enabled }}
+{{- if le (int .Values.runtime.checkPermission.globalConcurrency) 0 }}{{ fail "runtime.checkPermission.globalConcurrency must be measured and positive" }}{{ end -}}
+{{- if le (int .Values.runtime.checkPermission.perCallerConcurrency) 0 }}{{ fail "runtime.checkPermission.perCallerConcurrency must be measured and positive" }}{{ end -}}
+{{- if gt (int .Values.runtime.checkPermission.perCallerConcurrency) (int .Values.runtime.checkPermission.globalConcurrency) }}{{ fail "per-caller concurrency must not exceed global concurrency" }}{{ end -}}
+{{- if le (int .Values.runtime.checkPermission.globalQueueCapacity) 0 }}{{ fail "runtime.checkPermission.globalQueueCapacity must be bounded and positive" }}{{ end -}}
+{{- if le (int .Values.runtime.checkPermission.perCallerQueueCapacity) 0 }}{{ fail "runtime.checkPermission.perCallerQueueCapacity must be bounded and positive" }}{{ end -}}
+{{- if gt (int .Values.runtime.checkPermission.perCallerQueueCapacity) (int .Values.runtime.checkPermission.globalQueueCapacity) }}{{ fail "per-caller queue capacity must not exceed global queue capacity" }}{{ end -}}
+{{- if ne .Values.runtime.checkPermission.queueWait "PT0.025S" }}{{ fail "single-server CheckPermission queueWait must remain exactly PT0.025S" }}{{ end -}}
+{{- end -}}
+{{- $callerIds := dict -}}
+{{- $_ := set $callerIds "identity-service" true -}}
+{{- range .Values.resourceCallers }}
+{{- $callerId := required "resource caller callerId is required" .callerId -}}
+{{- if not (regexMatch "^[a-z][a-z0-9-]{0,63}$" $callerId) }}{{ fail "resource caller callerId is invalid" }}{{ end -}}
+{{- if hasKey $callerIds $callerId }}{{ fail "resource caller callerId must be unique and must not reuse identity-service" }}{{ end -}}
+{{- $_ := set $callerIds $callerId true -}}
+{{- end }}
+{{- if and .Values.runtime.enabled (lt (int .Values.runtime.checkPermission.maxCallerBuckets) (len $callerIds)) }}{{ fail "maxCallerBuckets must cover every configured CheckPermission caller" }}{{ end -}}
 {{- $jdbcUrl := required "database.jdbcUrl is required" .Values.database.jdbcUrl -}}
 {{- $runtimeDb := required "database.runtimeSecretName is required" .Values.database.runtimeSecretName -}}
 {{- $migrationDb := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
@@ -77,6 +95,12 @@ spec:
             - {name: AUTHORIZATION_GRPC_PORT, value: {{ .Values.service.grpcPort | quote }}}
             - {name: AUTHORIZATION_RUNTIME_ENABLED, value: {{ .Values.runtime.enabled | quote }}}
             - {name: AUTHORIZATION_MAX_CONCURRENT_CALLS_PER_CONNECTION, value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}}
+            - {name: AUTHORIZATION_CHECK_PERMISSION_GLOBAL_CONCURRENCY, value: {{ .Values.runtime.checkPermission.globalConcurrency | quote }}}
+            - {name: AUTHORIZATION_CHECK_PERMISSION_PER_CALLER_CONCURRENCY, value: {{ .Values.runtime.checkPermission.perCallerConcurrency | quote }}}
+            - {name: AUTHORIZATION_CHECK_PERMISSION_GLOBAL_QUEUE_CAPACITY, value: {{ .Values.runtime.checkPermission.globalQueueCapacity | quote }}}
+            - {name: AUTHORIZATION_CHECK_PERMISSION_PER_CALLER_QUEUE_CAPACITY, value: {{ .Values.runtime.checkPermission.perCallerQueueCapacity | quote }}}
+            - {name: AUTHORIZATION_CHECK_PERMISSION_MAX_CALLER_BUCKETS, value: {{ .Values.runtime.checkPermission.maxCallerBuckets | quote }}}
+            - {name: AUTHORIZATION_CHECK_PERMISSION_QUEUE_WAIT, value: {{ .Values.runtime.checkPermission.queueWait | quote }}}
             - {name: AUTHORIZATION_FINGERPRINT_KEY_RING_PATH, value: /run/secrets/authorization-fingerprint/fingerprint.properties}
             - {name: AUTHORIZATION_QUOTA_KEY_RING_PATH, value: /run/secrets/authorization-quota-key/quota.properties}
             - {name: AUTHORIZATION_IDENTITY_JWT_VERIFIER_BUNDLE_PATH, value: /run/config/authorization-identity-jwt/verifier.properties}

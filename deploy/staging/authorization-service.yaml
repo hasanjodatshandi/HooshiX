@@ -1,4 +1,7 @@
-runtime: {enabled: true, maxConcurrentCallsPerConnection: 128}
+runtime:
+  enabled: true
+  maxConcurrentCallsPerConnection: 128
+  checkPermission: {globalConcurrency: 8, perCallerConcurrency: 4, globalQueueCapacity: 8, perCallerQueueCapacity: 2, maxCallerBuckets: 64, queueWait: PT0.025S}
 database:
   jdbcUrl: jdbc:postgresql://postgresql.platform-data.svc.cluster.local:5432/authorization
   podLabels: {app.kubernetes.io/name: postgresql}

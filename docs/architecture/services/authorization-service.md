@@ -56,6 +56,8 @@ Permission-key syntax is fixed:
 maximum length: 128 characters
 ```
 
+`platform.legal_hold.manage` is the single current reserved compatibility exception because its already-approved stable identifier contains the historical `legal_hold` segment. This is not a general underscore allowance. New keys MUST match the canonical syntax, and this exception key is never renamed or reused for another meaning.
+
 Lifecycle semantics:
 
 - `ACTIVE` — may be evaluated and newly assigned where the caller is authorized;
@@ -238,7 +240,7 @@ permission_key
 
 It does not accept `user_id`, Role IDs, permission lists, owner counts, resource attributes, policy expressions, caller-selected cache state, or an `allowed` override.
 
-Only an approved resource-owning workload identity may call the operation for its registered permission namespace. The resource service performs local JWT/context/syntax reject-only checks and final resource/domain invariants; Authorization is authoritative only for the permission decision.
+Only an explicitly registered workload identity may call the operation for its registered permission namespace/use case. Resource-owning services use it for protected resource decisions. Identity may use it only for the tenant-lifecycle administration checks registered as `identity.authorization-tenant-permission-check`; the current implemented Identity flows use `membership.role.assign` before invitation/removal administration. Resource services perform local JWT/context/syntax reject-only checks and final resource/domain invariants. Identity performs its own authenticated session/lifecycle preconditions. Authorization remains authoritative only for the permission decision.
 
 Success semantics are deliberately unambiguous:
 
@@ -305,7 +307,7 @@ cost = max(1, semantic_mutation_count)
 maximum semantic_mutation_count per request = 100
 ```
 
-For `ReplaceRolePermissions`, semantic mutation count is the actual set delta (additions + removals), not the final Role size. A delta above 100 is rejected and must be performed through separately authorized bounded requests. The Role's final permission count must still remain <=200.
+For `CreateRole`, each initial permission mapping is one semantic mutation, so one create request may include at most 100 permission mappings even though the Role may later hold up to 200 permissions through separately authorized bounded mutations. For `ReplaceRolePermissions`, semantic mutation count is the actual set delta (additions + removals), not the final Role size. A delta above 100 is rejected and must be performed through separately authorized bounded requests. The Role's final permission count must still remain <=200.
 
 Quota consumption is not refunded if later database validation/commit fails. This prevents failure/retry patterns from resetting abuse pressure. PostgreSQL mutation itself is atomic: the full request commits or none of its business mutation commits; partial-success mutation responses are prohibited.
 
@@ -361,7 +363,7 @@ A reservation never auto-expires into allow state. Identity resolves it durably 
 - `FinalizeMembershipRemoval` after Identity committed Membership `REMOVED`;
 - `CancelMembershipRemovalPreparation` only after Identity durably knows local removal did not commit.
 
-Finalize/cancel use the 900ms one-attempt/no-immediate-retry durable-command baseline. Unresolved reservations remain conservative and alert rather than silently freeing owner capacity.
+Finalize/cancel use the 900ms one-attempt/no-immediate-retry durable-command baseline. Unresolved reservations remain conservative and alert rather than silently freeing owner capacity. Because resolution uses the same Identity-to-Authorization durable-command retry family as ADR-0012 provisioning, an unresolved reservation warns after 15 minutes and pages after one hour unless the workflow has been explicitly cancelled/resolved. These alert thresholds do not expire or release the reservation.
 
 ## 10. Identity provisioning and tenant lifecycle
 
@@ -582,7 +584,7 @@ production-ha:
 
 Production uses immutable signed image digest, non-root execution, `allowPrivilegeEscalation=false`, default capability drop, `RuntimeDefault` seccomp, read-only root filesystem where compatible, finite resources, deny-by-default NetworkPolicy, Istio Ambient STRICT mTLS, and least-privilege AuthorizationPolicy.
 
-Inbound policy permits only explicitly registered workload identities/operations. In particular, resource services call only their approved `CheckPermission` surface, Identity calls lifecycle/platform-authority operations it owns, and Web BFF calls approved management operations. Workload identity never substitutes for end-user/tenant authorization.
+Inbound policy permits only explicitly registered workload identities/operations. Resource services call only their approved `CheckPermission` surface. Identity calls its registered tenant-lifecycle `CheckPermission` use plus the lifecycle/platform-authority operations it owns. Web BFF calls approved management operations. For `CheckPermission`, the bounded caller-classification header is accepted only when the Authorization waypoint policy binds that exact value to the authenticated source workload principal; the header alone is never authority. Workload identity never substitutes for end-user/tenant authorization.
 
 Liveness is process/local-runtime only. Readiness requires safe ability to evaluate intended traffic, including database reachability, compatible loaded permission catalog/projection, usable approved JWT verification bundle for management traffic, and required local security configuration. A transient unrelated remote dependency is not added to liveness/readiness.
 
@@ -598,6 +600,10 @@ Hikari acquisition p99 <25 ms under validated steady load
 ```
 
 Server enforces bounded global and per-caller-workload concurrency, no unbounded application queue, fair overload shedding, and pool/HPA maxima inside the service PostgreSQL connection budget. In `production-single-server`, HPA remains disabled and the validated fixed replica/pool/concurrency envelope stays inside the same database and host budget.
+
+Authorization publishes service-side paired-window burn signals from eligible `CheckPermission` operations that reach the service. RPC success and authoritative `PERMISSION_DENIED` count as available; caller-contract `INVALID_ARGUMENT` is excluded; `UNAVAILABLE`, `RESOURCE_EXHAUSTED`, `DEADLINE_EXCEEDED`, and `INTERNAL` are unavailable. The 99.95% availability signal uses ADR-0032 14.4x/6x/3x paired windows. The <=200ms request-event SLI uses the same paired policy against its 1% budget. The <=100ms SLI uses the 3x 2h+24h pair as a reliability warning, not a paging duplicate. A caller-side transport failure that never reaches Authorization cannot appear in this server timer; complete end-to-end ADR-0032 accounting therefore also requires caller-side dependency evidence when those resource callers are implemented.
+
+Required security/reliability alerts include durable-audit write failure plus unresolved owner-removal reservation age at the ADR-0012 15-minute warning and one-hour paging thresholds. Alerting never converts required audit to best-effort or expires an owner-safety reservation.
 
 ## 18. Verification requirements
 
@@ -636,4 +642,4 @@ Rollback MUST NOT reintroduce stale/cached allow, Kafka permission invalidation,
 
 ## Current repository implementation evidence
 
-The current branch contains the first executable Authorization repository slice under `services/authorization-service/`, including contracts, PostgreSQL/Flyway persistence with forced RLS, online checks and management commands, owner-removal reservation safety, Redis quota, audit/idempotency, readiness/observability, hardened deployment artifacts, dependency locks, Semgrep/security workflow, and unit/architecture/integration test sources. Canonical WSL Java 25 verification passes the strict Gradle/unit/architecture/SpotBugs/bootJar gate and PostgreSQL/Redis Testcontainers integration. The repository-owned integrated WSL runtime applies the service Flyway migration with a distinct migration role, runs Authorization with its non-owner runtime role and runtime flag enabled, and keeps it `UP`/Ready simultaneously with Compromised Password, Notification, Identity, and Web BFF against pinned local PostgreSQL/Redis. The separate production-fidelity local kind/staging lane also deploys Authorization by exact image digest, verifies its Ready state, Flyway count/ownership, database-role isolation, and approved mesh identity paths. These are local integration/deployed-staging-lane evidence, not production runtime evidence. Protected PR baseline run `32261626399` passed the Authorization PostgreSQL/Redis integration, architecture, SpotBugs, Buf, Semgrep, OSV, Gitleaks, Helm/render, observability-artifact, runtime-image, generated-file, and aggregate repository gates on implementation head `7de8b17`. Production deployed runtime and production readiness remain `NOT VERIFIED`.
+The current repository implementation contains the executable Authorization slice under `services/authorization-service/`, including contracts, two PostgreSQL/Flyway migrations with forced RLS, online checks and management commands, bounded global/per-caller `CheckPermission` admission, owner-removal reservation safety, Redis quota, audit/idempotency, readiness/observability, hardened deployment artifacts, dependency locks, Semgrep/security workflow, and unit/architecture/integration test sources. Current canonical WSL Java 25 evidence passes strict Gradle/unit/integration/architecture/SpotBugs/bootJar gates, non-owner forced-RLS and pooled transaction-local context negatives, Buf lint/build/breaking, pinned Semgrep/Gitleaks/OSV, exact Helm 4.2.4 render verification, Prometheus 3.13.2 rule validation, dashboard JSON validation, and digest-pinned runtime-image construction. The current V2 migration, Authorization waypoint caller binding, overload policy, and observability revision are redeployed through the repository-owned local production-fidelity kind/staging lane. The executed lane verifies exact-digest five-service deployment, Flyway V2, STRICT mTLS/workload identity, the approved Identity caller reaching application validation, spoofed and missing caller metadata being denied by waypoint RBAC, persistence isolation, edge traversal/denials, and observability/fault behavior. Protected PR baseline run `32261626399` remains prior commit-specific evidence on implementation head `7de8b17`; protected CI is PR-head-specific evidence and does not become a standing production claim in this document. Production deployed runtime and production readiness remain `NOT VERIFIED`.

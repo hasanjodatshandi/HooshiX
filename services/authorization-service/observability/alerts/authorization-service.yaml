@@ -2,24 +2,86 @@ groups:
   - name: authorization-service
     rules:
       - alert: AuthorizationServiceUnavailable
-        expr: up{job="authorization-service"} == 0
+        expr: |
+          up{job="authorization-service"} == 0
         for: 5m
         labels: {severity: critical}
         annotations:
           summary: Authorization service scrape target is unavailable
-      - alert: AuthorizationGrpcErrorRatioHigh
+      - alert: AuthorizationAvailabilityFastBurn
         expr: |
-          sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",outcome!="OK"}[5m]))
-          /
-          clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service"}[5m])), 0.001)
-          > 0.05
+          (sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[5m])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[5m])), 0.001) > 0.0072) and (sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[1h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[1h])), 0.001) > 0.0072)
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization CheckPermission availability burns 14.4x in both 5m and 1h windows
+      - alert: AuthorizationAvailabilityMediumBurn
+        expr: |
+          (sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[30m])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[30m])), 0.001) > 0.003) and (sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[6h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[6h])), 0.001) > 0.003)
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization CheckPermission availability burns 6x in both 30m and 6h windows
+      - alert: AuthorizationAvailabilitySlowBurn
+        expr: |
+          (sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[2h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[2h])), 0.001) > 0.0015) and (sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[24h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[24h])), 0.001) > 0.0015)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: Authorization CheckPermission availability burns 3x in both 2h and 24h windows
+      - alert: AuthorizationLatency200FastBurn
+        expr: |
+          (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.2"}[5m])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[5m])), 0.001)) > 0.144) and (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.2"}[1h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[1h])), 0.001)) > 0.144)
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization CheckPermission 200ms latency budget burns 14.4x in both 5m and 1h windows
+      - alert: AuthorizationLatency200MediumBurn
+        expr: |
+          (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.2"}[30m])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[30m])), 0.001)) > 0.06) and (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.2"}[6h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[6h])), 0.001)) > 0.06)
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization CheckPermission 200ms latency budget burns 6x in both 30m and 6h windows
+      - alert: AuthorizationLatency200SlowBurn
+        expr: |
+          (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.2"}[2h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[2h])), 0.001)) > 0.03) and (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.2"}[24h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[24h])), 0.001)) > 0.03)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: Authorization CheckPermission 200ms latency budget burns 3x in both 2h and 24h windows
+      - alert: AuthorizationLatency100ReliabilityBurn
+        expr: |
+          (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.1"}[2h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[2h])), 0.001)) > 0.15) and (1 - (sum(rate(authorization_grpc_server_duration_seconds_bucket{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL",le="0.1"}[24h])) / clamp_min(sum(rate(authorization_grpc_server_duration_seconds_count{job="authorization-service",operation="CheckPermission",outcome=~"OK|PERMISSION_DENIED|UNAVAILABLE|RESOURCE_EXHAUSTED|DEADLINE_EXCEEDED|INTERNAL"}[24h])), 0.001)) > 0.15)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: Authorization CheckPermission 100ms engineering latency budget has sustained 3x burn
+      - alert: AuthorizationCheckPermissionQueueSustained
+        expr: |
+          max(authorization_check_permission_queue_depth{job="authorization-service"}) > 0
         for: 10m
         labels: {severity: warning}
         annotations:
-          summary: Authorization gRPC non-OK outcome ratio is elevated
-      - alert: AuthorizationGrpcInFlightHigh
-        expr: max(authorization_grpc_server_in_flight{job="authorization-service"}) > 100
-        for: 10m
+          summary: Authorization CheckPermission queue remains non-empty
+      - alert: AuthorizationAuditWriteFailure
+        expr: |
+          sum(increase(authorization_security_audit_failures_total{job="authorization-service"}[5m])) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization required audit persistence failed
+      - alert: AuthorizationOwnerReservationPending15Minutes
+        expr: |
+          authorization_owner_reservation_oldest_unresolved_age_seconds{job="authorization-service"} >= 900
+        for: 0m
         labels: {severity: warning}
         annotations:
-          summary: Authorization gRPC in-flight pressure is elevated
+          summary: Authorization owner-removal reservation remains unresolved for 15 minutes
+      - alert: AuthorizationOwnerReservationPendingOneHour
+        expr: |
+          authorization_owner_reservation_oldest_unresolved_age_seconds{job="authorization-service"} >= 3600
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization owner-removal reservation remains unresolved for one hour

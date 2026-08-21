@@ -90,6 +90,7 @@ public final class AuthorizationService {
           Name n = name(name);
           String d = description(description);
           List<String> p = permissions(permissions);
+          if (p.size() > 100) limit();
           quota.acquire(actor, Math.max(1, p.size()));
           return store.createRole(
               actor,

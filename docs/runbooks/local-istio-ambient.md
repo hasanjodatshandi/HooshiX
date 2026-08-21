@@ -168,18 +168,33 @@ The installation must:
 
 ## Verify
 
+The pre-edge foundation verifier is:
+
 ```bash
 make verify-local-istio-ambient
 ```
 
-The verifier must check at least:
+It must run before edge/application deployment and therefore checks only the
+Istio foundation state that exists at this stage:
 
 - all four expected Helm releases are deployed;
 - `istiod` is available;
 - Istio CNI and ztunnel are ready on every kind node;
 - running image digests match repository pins;
+- expected namespace Ambient enrollment is correct;
+- `istioctl analyze` reports no blocking configuration errors.
+
+Full workload-identity and STRICT-mTLS integration is verified only after the
+edge and application workloads exist. The repository-owned gates are:
+
+```bash
+make verify-local-traefik-edge
+make production-fidelity-verify
+```
+
+Those integration gates must check at least:
+
 - enrolled workloads run without sidecars;
-- expected namespaces have the correct Ambient label and unexpected namespaces do not;
 - every platform workload uses the expected independent ServiceAccount;
 - STRICT mTLS allows an enrolled authorized caller;
 - a non-enrolled/plaintext caller cannot bypass STRICT mTLS;
@@ -187,8 +202,7 @@ The verifier must check at least:
 - Traefik identity can reach the WAF only on approved ports;
 - WAF identity can reach BFF only on approved ports;
 - direct Traefik -> BFF application access is denied;
-- `istioctl analyze` reports no blocking configuration errors;
-- temporary smoke namespaces/resources are removed after the run.
+- temporary smoke resources are removed after the run.
 
 A green workload status alone is insufficient evidence.
 

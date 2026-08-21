@@ -30,7 +30,7 @@ login=$(curl -skS --resolve hooshix.local:8443:127.0.0.1 -b "$tmp/cookies" -o "$
 login_code=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("code","MISSING"))' "$tmp/login")
 [[ "$login/$login_code" == 401/AUTHENTICATION_FAILED ]] || fail "BFF -> Identity negative smoke mismatch: $login/$login_code"
 pg=$(k get pod -n platform-data -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].metadata.name}')
-for spec in 'authorization 1 authorization_migration' 'identity 4 identity_migration' 'notification 2 notification_migration'; do set -- $spec; db=$1; expected=$2; owner=$3; n=$(k exec -n platform-data "$pg" -- psql -U postgres -d "$db" -Atc 'select count(*) from flyway_schema_history where success'); [[ "$n" == "$expected" ]] || fail "$db Flyway count mismatch: $n"; actual=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select pg_get_userbyid(datdba) from pg_database where datname='$db'"); [[ "$actual" == "$owner" ]] || fail "$db owner mismatch: $actual"; done
+for spec in 'authorization 2 authorization_migration' 'identity 4 identity_migration' 'notification 2 notification_migration'; do set -- $spec; db=$1; expected=$2; owner=$3; n=$(k exec -n platform-data "$pg" -- psql -U postgres -d "$db" -Atc 'select count(*) from flyway_schema_history where success'); [[ "$n" == "$expected" ]] || fail "$db Flyway count mismatch: $n"; actual=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select pg_get_userbyid(datdba) from pg_database where datname='$db'"); [[ "$actual" == "$owner" ]] || fail "$db owner mismatch: $actual"; done
 matrix=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select rolname||':'||has_database_privilege(rolname,'authorization','CONNECT')||':'||has_database_privilege(rolname,'identity','CONNECT')||':'||has_database_privilege(rolname,'notification','CONNECT') from pg_roles where rolname in ('authorization_runtime','identity_runtime','notification_runtime') order by rolname")
 expected_matrix=$'authorization_runtime:true:false:false\nidentity_runtime:false:true:false\nnotification_runtime:false:false:true'
 [[ "$matrix" == "$expected_matrix" ]] || fail "runtime database CONNECT isolation mismatch"
@@ -44,6 +44,6 @@ mounted_dataset_sha=$(docker exec platform-local-worker sha256sum /var/local/hoo
 [[ "$mounted_dataset_sha" == "$dataset_sha" ]] || fail "Compromised Password mounted manifest digest mismatch"
 ready=$(k get --raw='/readyz' | tail -1); [[ "$ready" == ok ]] || fail "Kubernetes API readyz is not ok"
 mount_source=$(docker inspect platform-local-control-plane --format '{{range .Mounts}}{{if eq .Destination "/var/lib/etcd"}}{{.Source}}{{end}}{{end}}')
-[[ "$mount_source" == '/dev/shm/hooshix-kind-etcd' ]] || fail "kind etcd is not bind-mounted from the reviewed WSL tmpfs path: $mount_source"
+[[ "$mount_source" == '/dev/shm/hooshix-kind/etcd' ]] || fail "kind etcd is not bind-mounted from the reviewed WSL tmpfs path: $mount_source"
 [[ "$(findmnt -n -o FSTYPE /dev/shm)" == tmpfs ]] || fail "/dev/shm is not tmpfs on the WSL host"
 echo "Five-service staging and persistence verification PASSED"

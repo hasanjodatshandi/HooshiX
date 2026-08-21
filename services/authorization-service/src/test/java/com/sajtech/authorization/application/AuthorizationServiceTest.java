@@ -53,6 +53,20 @@ class AuthorizationServiceTest {
   }
 
   @Test
+  void createRoleRejectsMoreThanOneHundredSemanticMutationsBeforeQuota() {
+    List<String> permissions =
+        java.util.stream.IntStream.range(0, 101).mapToObj(i -> "resource.p" + i).toList();
+    assertThatThrownBy(
+            () -> service.createRole(actor, UUID.randomUUID(), "bounded", "", permissions))
+        .isInstanceOfSatisfying(
+            AuthorizationException.class,
+            e -> assertThat(e.error()).isEqualTo(AuthorizationError.LIMIT_EXCEEDED));
+    verifyNoInteractions(quota);
+    verify(store, never())
+        .createRole(any(), any(), any(), anyString(), anyString(), anyString(), anyList(), any());
+  }
+
+  @Test
   void replacePermissionsChargesActualSymmetricSetDelta() {
     UUID roleId = UUID.randomUUID(), requestId = UUID.randomUUID();
     when(store.rolePermissionKeysForQuota(actor.tenantId(), roleId))

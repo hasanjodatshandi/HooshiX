@@ -272,6 +272,7 @@ services/authorization-service/src/main/java/com/sajtech/authorization/applicati
 services/authorization-service/src/main/java/com/sajtech/authorization/application/model/RoleModel.java
 services/authorization-service/src/main/java/com/sajtech/authorization/application/port/out/AccessTokenVerifier.java
 services/authorization-service/src/main/java/com/sajtech/authorization/application/port/out/AdminQuota.java
+services/authorization-service/src/main/java/com/sajtech/authorization/application/port/out/AuthorizationSecurityTelemetry.java
 services/authorization-service/src/main/java/com/sajtech/authorization/application/port/out/AuthorizationStore.java
 services/authorization-service/src/main/java/com/sajtech/authorization/application/port/out/IntentFingerprint.java
 services/authorization-service/src/main/java/com/sajtech/authorization/configuration/AuthorizationApplication.java
@@ -280,6 +281,9 @@ services/authorization-service/src/main/java/com/sajtech/authorization/configura
 services/authorization-service/src/main/java/com/sajtech/authorization/configuration/RuntimeConfiguration.java
 services/authorization-service/src/main/java/com/sajtech/authorization/configuration/SecurityMaterialRefresher.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/health/AuthorizationReadinessHealthIndicator.java
+services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/observability/AuthorizationCheckPermissionMetrics.java
+services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/observability/AuthorizationReservationMonitor.java
+services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/observability/AuthorizationSecurityMetrics.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/observability/ObservedAdminQuota.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/persistence/JooqAuthorizationStore.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/quota/ClockSafetyGuard.java
@@ -287,6 +291,8 @@ services/authorization-service/src/main/java/com/sajtech/authorization/infrastru
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/quota/HostTimeHealth.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/quota/RedisAdminQuota.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/quota/RedisAdminQuotaCleanupWorker.java
+services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/runtime/grpc/CheckPermissionAdmissionController.java
+services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/runtime/grpc/CheckPermissionOverloadInterceptor.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/runtime/grpc/GrpcServerLifecycle.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/security/HmacIntentFingerprint.java
 services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/security/IdentityJwtVerifier.java
@@ -299,11 +305,17 @@ services/authorization-service/src/main/proto/hooshix/authorization/v1/authoriza
 services/authorization-service/src/main/resources/application-migration.yaml
 services/authorization-service/src/main/resources/application.yaml
 services/authorization-service/src/main/resources/db/migration/V1__create_authorization_schema.sql
+services/authorization-service/src/main/resources/db/migration/V2__index_unresolved_removal_preparations.sql
 services/authorization-service/src/test/java/com/sajtech/authorization/application/AuthorizationServiceTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/architecture/ArchitectureRulesTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/configuration/AuthorizationMigrationProfileIntegrationTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/observability/AuthorizationReservationMonitorTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/persistence/AuthorizationPersistenceIntegrationTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/persistence/AuthorizationRlsIntegrationTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/quota/RedisAdminQuotaIntegrationTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/runtime/grpc/AuthorizationGrpcInterceptorCompositionTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/runtime/grpc/CheckPermissionAdmissionControllerTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/runtime/grpc/CheckPermissionOverloadInterceptorTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/HmacIntentFingerprintTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/IdentityJwtVerifierTest.java
 services/compromised-password-service/.dockerignore
@@ -564,6 +576,7 @@ services/identity-service/src/test/java/com/sajtech/identity/architecture/Archit
 services/identity-service/src/test/java/com/sajtech/identity/bdd/IdentityAuthenticationBddTest.java
 services/identity-service/src/test/java/com/sajtech/identity/bdd/IdentityAuthenticationSteps.java
 services/identity-service/src/test/java/com/sajtech/identity/configuration/IdentityMigrationProfileIntegrationTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/client/authorization/GrpcAuthorizationTenantClientTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityAuthenticationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityRegistrationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantPersistenceIntegrationTest.java

@@ -94,6 +94,21 @@ edges:
     policy_refs:
       - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
 
+  - operation_id: identity.authorization-tenant-permission-check
+    caller_owner: Identity
+    dependency_id: authorization.CheckPermission
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "tenant lifecycle administration unavailable; fail closed"
+    retry_owner: none
+    fallback: "none; no permission cache/stale allow"
+    owner: Identity
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md
+      - docs/adr/0026-harden-online-authorization-overload-and-slo-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/authorization-service.md
+
   - operation_id: identity.authorization-owner-provisioning
     caller_owner: Identity
     dependency_id: authorization.ProvisionTenantOwner

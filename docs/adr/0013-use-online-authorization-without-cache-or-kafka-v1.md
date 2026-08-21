@@ -49,6 +49,8 @@ Syntax:
 maximum length: 128 characters
 ```
 
+`platform.legal_hold.manage` is the single current reserved compatibility exception because this already-approved stable platform permission contains the historical `legal_hold` segment. It is not a general underscore allowance. New permission identifiers MUST follow the canonical syntax, and the exception identifier is never renamed or reused for another meaning.
+
 `DEPRECATED` remains evaluatable for already-existing assignments during migration but cannot be newly granted/assigned. `RETIRED` or unknown keys fail closed and cannot be assigned. Permission identifiers are never reused for a new meaning.
 
 ### Tenant Roles and direct overrides
