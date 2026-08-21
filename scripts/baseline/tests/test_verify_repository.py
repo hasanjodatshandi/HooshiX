@@ -117,6 +117,37 @@ edges:
 
             self.assertTrue(any("reused by multiple files" in error for error in errors))
 
+    def test_reporting_contract_requires_machine_readable_terminal_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canonical = root / "docs/engineering/agent-communication-and-reporting.md"
+            canonical.parent.mkdir(parents=True)
+            contract = """Outcome:
+completed | partial | blocked | failed
+Remaining work:
+None | <remaining items>
+Continuation action:
+continue | stop | human
+Retryable:
+yes | no
+Human action required:
+None | <exact action>
+`Outcome: completed`
+`Remaining work: None`
+`Continuation action: stop`
+`Retryable: no`
+`Human action required: None`
+"""
+            canonical.write_text(contract, encoding="utf-8")
+            (root / "AGENTS.md").write_text(contract, encoding="utf-8")
+            self.assertEqual([], verifier.validate_agent_reporting_contract(root))
+            canonical.write_text(
+                contract.replace("Human action required:", "Human intervention:"),
+                encoding="utf-8",
+            )
+            errors = verifier.validate_agent_reporting_contract(root)
+            self.assertTrue(any("Human action required:" in error for error in errors))
+
     def test_guard_rejects_premature_reference_data_service(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

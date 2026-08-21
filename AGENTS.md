@@ -296,6 +296,27 @@ Compilation alone is never completion evidence.
 
 Follow `docs/engineering/agent-communication-and-reporting.md`.
 
+Every final report MUST include the automation-safe terminal fields owned by that canonical standard, with these exact compatibility-sensitive keys:
+
+```text
+Outcome:
+completed | partial | blocked | failed
+
+Remaining work:
+None | <remaining items>
+
+Continuation action:
+continue | stop | human
+
+Retryable:
+yes | no
+
+Human action required:
+None | <exact action>
+```
+
+`Outcome: completed` is valid only with `Remaining work: None`, `Continuation action: stop`, `Retryable: no`, and `Human action required: None`. The detailed semantics, blocker rules, source-of-truth reconciliation requirement, and final response order are canonical in `docs/engineering/agent-communication-and-reporting.md`; do not create a second interpretation here.
+
 Reports distinguish verified facts from assumptions and use exact vocabulary: `Passed`, `Failed`, `Not run`, `Not applicable`, `Partially verified`, `Inconclusive`, `Not verified`.
 
 Never claim production readiness from documentation alone.
