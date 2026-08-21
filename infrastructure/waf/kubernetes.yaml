@@ -4,6 +4,58 @@ metadata:
   name: edge-waf
   namespace: platform-edge
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge-waf
+  namespace: platform-edge
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: edge-waf}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: traefik-system}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
+      ports: [{protocol: TCP, port: 8080}, {protocol: TCP, port: 15008}]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
+      ports: [{protocol: TCP, port: 8080}, {protocol: TCP, port: 15008}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: platform-apps-waypoint}}
+      ports: [{protocol: TCP, port: 15008}]
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: edge-waf
+  namespace: platform-edge
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: edge-waf}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: edge-waf
+  namespace: platform-edge
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: edge-waf}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["prod.sajtech.internal/ns/traefik-system/sa/traefik"]
+      to:
+        - operation: {ports: ["8080"]}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -68,32 +120,6 @@ spec:
     - {name: http, port: 8080, targetPort: http}
     - {name: health, port: 9090, targetPort: health}
 ---
-apiVersion: security.istio.io/v1
-kind: PeerAuthentication
-metadata:
-  name: edge-waf
-  namespace: platform-edge
-spec:
-  selector:
-    matchLabels: {app.kubernetes.io/name: edge-waf}
-  mtls: {mode: STRICT}
----
-apiVersion: security.istio.io/v1
-kind: AuthorizationPolicy
-metadata:
-  name: edge-waf
-  namespace: platform-edge
-spec:
-  selector:
-    matchLabels: {app.kubernetes.io/name: edge-waf}
-  action: ALLOW
-  rules:
-    - from:
-        - source:
-            principals: ["prod.sajtech.internal/ns/traefik-system/sa/traefik"]
-      to:
-        - operation: {ports: ["8080"]}
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -106,29 +132,3 @@ spec:
   rules:
     - backendRefs:
         - {name: edge-waf, port: 8080}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: edge-waf
-  namespace: platform-edge
-spec:
-  podSelector: {matchLabels: {app.kubernetes.io/name: edge-waf}}
-  policyTypes: [Ingress, Egress]
-  ingress:
-    - from:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: traefik-system}}
-          podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
-      ports: [{protocol: TCP, port: 8080}, {protocol: TCP, port: 15008}]
-  egress:
-    - to:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
-      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
-    - to:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
-          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
-      ports: [{protocol: TCP, port: 8080}, {protocol: TCP, port: 15008}]
-    - to:
-        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
-          podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: platform-apps-waypoint}}
-      ports: [{protocol: TCP, port: 15008}]
