@@ -1,0 +1,109 @@
+spring:
+  application:
+    name: identity-service
+  main:
+    banner-mode: "off"
+  threads:
+    virtual:
+      enabled: true
+  config:
+    import:
+      - optional:configtree:/run/secrets/identity-db-runtime/
+      - optional:configtree:/run/secrets/identity-quota-redis/
+  datasource:
+    url: ${IDENTITY_DATABASE_URL:jdbc:postgresql://localhost:5432/identity}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 1
+      connection-timeout: 250
+      validation-timeout: 250
+      max-lifetime: 1800000
+  flyway:
+    enabled: false
+  jooq:
+    sql-dialect: POSTGRES
+
+identity:
+  grpc-port: ${IDENTITY_GRPC_PORT:9090}
+  registration-runtime-enabled: ${IDENTITY_REGISTRATION_RUNTIME_ENABLED:false}
+  authentication-runtime-enabled: ${IDENTITY_AUTHENTICATION_RUNTIME_ENABLED:false}
+  tenant-runtime-enabled: ${IDENTITY_TENANT_RUNTIME_ENABLED:false}
+  max-concurrent-calls-per-connection: ${IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION:128}
+  phone-registration-enabled: ${IDENTITY_PHONE_REGISTRATION_ENABLED:false}
+  compromised-password-target: ${IDENTITY_COMPROMISED_PASSWORD_TARGET:dns:///compromised-password-service.platform-apps.svc.cluster.local:9090}
+  compromised-password-max-in-flight: ${IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT:32}
+  notification-target: ${IDENTITY_NOTIFICATION_TARGET:dns:///notification-service.platform-apps.svc.cluster.local:9090}
+  authorization-target: ${IDENTITY_AUTHORIZATION_TARGET:dns:///authorization-service.platform-apps.svc.cluster.local:9090}
+  notification-dispatch-enabled: ${IDENTITY_NOTIFICATION_DISPATCH_ENABLED:true}
+  fingerprint-key-ring-path: ${IDENTITY_FINGERPRINT_KEY_RING_PATH:/run/secrets/identity-fingerprint/fingerprint.properties}
+  challenge-key-ring-path: ${IDENTITY_CHALLENGE_KEY_RING_PATH:/run/secrets/identity-challenge/challenge.properties}
+  handoff-key-ring-path: ${IDENTITY_HANDOFF_KEY_RING_PATH:/run/secrets/identity-handoff/handoff.properties}
+  refresh-key-ring-path: ${IDENTITY_REFRESH_KEY_RING_PATH:/run/secrets/identity-refresh/refresh.properties}
+  key-ring-maximum-staleness: ${IDENTITY_KEY_RING_MAXIMUM_STALENESS:2m}
+  argon2-max-concurrent-hashes: ${IDENTITY_ARGON2_MAX_CONCURRENT_HASHES:0}
+  quota:
+    redis-uri: ${quota_redis_uri:redis://localhost:6379}
+    hmac-key-ring-path: ${IDENTITY_QUOTA_KEY_RING_PATH:/run/secrets/identity-quota/quota.properties}
+    max-active-buckets: ${IDENTITY_QUOTA_MAX_ACTIVE_BUCKETS:0}
+    max-new-buckets-per-minute: ${IDENTITY_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE:0}
+    minimum-memory-headroom-percent: ${IDENTITY_QUOTA_MINIMUM_MEMORY_HEADROOM_PERCENT:30}
+    host-time-status-path: ${IDENTITY_QUOTA_HOST_TIME_STATUS_PATH:/run/status/identity/host-time-synchronized}
+  jwt:
+    private-key-ring-path: ${IDENTITY_JWT_PRIVATE_KEY_RING_PATH:/run/secrets/identity-jwt-private/signing.properties}
+    public-verifier-bundle-path: ${IDENTITY_JWT_PUBLIC_VERIFIER_BUNDLE_PATH:/run/config/identity-jwt-public/verifier.properties}
+    issuer: ${IDENTITY_JWT_ISSUER:https://identity.sajtech.internal}
+    allowed-audiences: ${IDENTITY_JWT_ALLOWED_AUDIENCES:authorization-service}
+
+server:
+  port: -1
+  shutdown: graceful
+
+management:
+  server:
+    port: 9092
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,identityReadiness,identityAuthenticationReadiness
+  metrics:
+    distribution:
+      percentiles-histogram:
+        identity.registration.duration: true
+        identity.authentication.duration: true
+        identity.dependency.duration: true
+        identity.password_verify.duration: true
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  opentelemetry:
+    tracing:
+      export:
+        max-queue-size: 512
+        max-batch-size: 128
+        schedule-delay: 5s
+        timeout: 2s
+        otlp:
+          connect-timeout: 1s
+          timeout: 2s
+      limits:
+        max-attributes: 32
+        max-attribute-value-length: 128
+        max-events: 32
+        max-links: 16
+
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: INFO

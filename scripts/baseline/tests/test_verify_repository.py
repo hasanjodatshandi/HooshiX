@@ -78,6 +78,26 @@ edges:
             self.assertTrue(any("actual.txt" in error for error in errors))
             self.assertTrue(any("stale.txt" in error for error in errors))
 
+    def test_repository_files_exclude_generated_local_runtime_and_gradle_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "tracked.txt").write_text("source\n", encoding="utf-8")
+            generated = [
+                root / ".local-runtime/keys/private.properties",
+                root / ".platform-runtime/staging/files/generated-secret",
+                root / "services/sample/build/generated.txt",
+                root / "services/sample/.gradle/cache.bin",
+            ]
+            for path in generated:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("generated\n", encoding="utf-8")
+
+            files = verifier.collect_repository_files(root)
+
+            self.assertIn("tracked.txt", files)
+            for path in generated:
+                self.assertNotIn(path.relative_to(root).as_posix(), files)
+
     def test_adr_register_detects_identifier_reuse(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -105,6 +125,21 @@ edges:
             errors = verifier.validate_guarded_structure(root)
 
             self.assertTrue(any("ADR-0041 trigger" in error for error in errors))
+
+    def test_guard_rejects_externalized_mcp_runtime_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            ops_path = root / "scripts/ops/mcp_server.py"
+            ops_path.parent.mkdir(parents=True)
+            ops_path.write_text("external runtime\n", encoding="utf-8")
+            context_path = root / "scripts/context/mcp_server.py"
+            context_path.parent.mkdir(parents=True)
+            context_path.write_text("external adapter\n", encoding="utf-8")
+
+            errors = verifier.validate_guarded_structure(root)
+
+            self.assertTrue(any("externalized MCP runtime prefix" in error for error in errors))
+            self.assertTrue(any("externalized MCP runtime path" in error for error in errors))
 
     def test_compromised_password_gradle_wrapper_is_executable(self) -> None:
         repository_root = Path(__file__).resolve().parents[3]

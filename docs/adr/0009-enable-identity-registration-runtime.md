@@ -23,7 +23,7 @@ Identity enables the registration runtime composition:
 - caller-side key rings load from read-only filesystem paths, refresh without replacing a valid snapshot on failure, and participate in readiness;
 - dispatcher/key-refresh telemetry contains no business identifier or PII.
 
-The runtime uses gRPC Java 1.81.0 aligned across transport, stubs, services, Protobuf generation, dependency locks, and verification metadata.
+The runtime uses the current approved gRPC Java line from the Technology Baseline, aligned across transport, stubs, services, Protobuf generation, dependency locks, and verification metadata.
 
 Production explicitly configures key staleness/refresh policies and mounted key directories. Tests disable default runtime composition except where the runtime itself is under integration test.
 

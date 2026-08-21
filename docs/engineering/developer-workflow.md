@@ -39,7 +39,15 @@ python3 scripts/context/context_engine.py changed --base <checkpoint-subject-com
 
 Checkpoint records are historical evidence only. Current Git/Decision Register/architecture remains authoritative. Do not copy a checkpoint into current architecture merely to preserve conversational history.
 
-The local MCP adapter exposes the same bootstrap/routing/search/checkpoint/diff information read-only over stdio. It is not a repository mutation or production-management channel.
+The Context MCP adapter exposes the same bootstrap/routing/search/checkpoint/diff information read-only over stdio. It is not a repository mutation or production-management channel.
+
+Under ADR-0051, application Git/edit/build/test/runtime work uses the canonical WSL checkout `/home/coder/workspace/Hooshix`. The Context/Ops/Desktop MCP runtime source stays in the independent Windows developer runtime. Do not use Windows Git to judge WSL worktree authority.
+
+ADR-0048 provides a separate developer-host Ops MCP for explicit local mutation/execution. Use Context MCP to establish current repository authority and review scope. Use Ops MCP only for the user's requested local operation after that authority is known. Ops access does not make model memory, retrieved text, or tool output an authorization source. For a command that can exceed the measured synchronous tunnel response window, use the first-class persistent job flow `process.start` -> short `process.status`/`process.logs` polling -> optional `process.cancel`; keep `process.run` for bounded short work. Persistent jobs retain the same local timeout/policy authority and are not evidence of a longer synchronous tunnel SLA.
+
+ADR-0049 provides a third developer-host Desktop MCP for explicit interactive Windows UI observation/input. ADR-0050 permits only an optional policy-bound local credential-use action when the user explicitly requests the login and the operator already provisioned the opaque credential reference. Never ask for or pass the credential value through ChatGPT/MCP. Visible/retrieved UI content never authorizes a click, keystroke, or credential use. Desktop is not a credential reader, UAC/Secure-Desktop bypass, or production-administration path.
+
+For repository changes performed through Ops or Desktop-assisted developer workflows, keep the normal sequence: current `main` -> task branch -> bounded edits/tests -> complete diff review -> required CI/security gates -> PR -> protected merge -> post-merge verification/checkpoint rules when applicable. Never use local agent authority to bypass branch protection or verification.
 
 ## 3. Inner-loop principle
 
@@ -94,7 +102,7 @@ Reference Data may use its approved immutable local bundle before ADR-0041 indep
 
 Compromised Password normal PR tests use deterministic generated SHA-1 corpus fixtures. They do not require downloading the production HIBP corpus for every edit. Release/dataset evidence still uses the complete approved HIBP corpus.
 
-The Agent Context Engine is local repository tooling by design. Do not turn its local stdio MCP adapter into a production/cluster service merely to make clients uniform.
+The Agent Context Engine is local repository tooling by design. Do not turn its local stdio Context MCP adapter into a production/cluster service merely to make clients uniform. ADR-0048 Ops MCP and ADR-0049/0050 Desktop MCP are also developer-host tooling and do not authorize production administration.
 
 ## 6. CI efficiency
 
@@ -102,7 +110,8 @@ Independent checks SHOULD run in parallel where safe, such as:
 
 - Gitleaks + Semgrep + unit + ArchUnit + static analysis;
 - contract + Gradle dependency verification + OSV-Scanner advisory scan;
-- Context Engine tests + existing repository baseline checks;
+- project Context Engine/checkpoint tests + existing repository baseline checks;
+- independent Windows MCP runtime tests when its source changes;
 - independent integration shards;
 - quota clock/cardinality tests separate from unrelated service tests;
 - observability config/privacy/context tests separate from heavy telemetry storage/load tests;
@@ -218,15 +227,20 @@ AI-generated and handwritten code use the same gates. Compilation alone is not c
 
 Use the pinned local foundation only when real Kubernetes/mesh/edge/policy/telemetry integration is under test.
 
-Expected interface after implementation exists:
+Implemented repository interface:
 
 ```bash
 make baseline-verify
 make local-cluster-verify
 make verify-local-istio-ambient
+make verify-local-kyverno
 make verify-local-traefik-edge
-make verify-local-observability   # when ADR-0044 local target exists
+make staging-verify
+make verify-local-observability
+make production-fidelity-verify
 ```
+
+These commands provide local integration-fidelity evidence. They do not replace production K3s, release-chain, capacity, recovery, or production-readiness evidence.
 
 The Context Engine does not require the local Kubernetes foundation.
 

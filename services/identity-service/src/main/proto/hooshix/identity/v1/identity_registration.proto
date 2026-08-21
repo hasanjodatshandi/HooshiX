@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package hooshix.identity.v1;
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.v1";
+
+service IdentityRegistrationService {
+  rpc RegisterLocal(RegisterLocalRequest) returns (RegisterLocalResponse);
+  rpc ResendRegistrationVerification(ResendRegistrationVerificationRequest) returns (ResendRegistrationVerificationResponse);
+  rpc ConfirmRegistration(ConfirmRegistrationRequest) returns (ConfirmRegistrationResponse);
+}
+
+enum RegistrationChannel {
+  REGISTRATION_CHANNEL_UNSPECIFIED = 0;
+  REGISTRATION_CHANNEL_EMAIL = 1;
+  REGISTRATION_CHANNEL_PHONE = 2;
+}
+
+enum RegistrationLocale {
+  REGISTRATION_LOCALE_UNSPECIFIED = 0;
+  REGISTRATION_LOCALE_FA = 1;
+  REGISTRATION_LOCALE_EN = 2;
+}
+
+message TrustedClientAddress {
+  bytes address = 1;
+}
+
+message RegisterLocalRequest {
+  string request_id = 1;
+  RegistrationChannel channel = 2;
+  string contact = 3;
+  string password = 4;
+  RegistrationLocale locale = 5;
+  string first_name = 6;
+  string last_name = 7;
+  optional string father_name = 8;
+  TrustedClientAddress client_address = 9;
+}
+
+message RegisterLocalResponse {
+  bool accepted = 1;
+}
+
+message ResendRegistrationVerificationResponse {
+  bool accepted = 1;
+}
+
+message ResendRegistrationVerificationRequest {
+  string request_id = 1;
+  RegistrationChannel channel = 2;
+  string contact = 3;
+  TrustedClientAddress client_address = 4;
+}
+
+message ConfirmRegistrationRequest {
+  string request_id = 1;
+  RegistrationChannel channel = 2;
+  string contact = 3;
+  string code = 4;
+  TrustedClientAddress client_address = 5;
+}
+
+message ConfirmRegistrationResponse {
+  bool confirmed = 1;
+}

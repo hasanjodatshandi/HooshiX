@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FindBugsFilter>
+  <Match>
+    <Package name="com.sajtech.identity.contract.v1" />
+  </Match>
+  <Match>
+    <Package name="com.sajtech.compromisedpassword.contract.v1" />
+  </Match>
+  <Match>
+    <Package name="com.sajtech.notification.contract.v1" />
+  </Match>
+  <Match>
+    <Package name="com.sajtech.authorization.contract.v1" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqRegistrationStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqNotificationOutboxStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.registration.usecase.RegisterLocalUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.registration.usecase.ResendRegistrationVerificationUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.registration.usecase.ConfirmRegistrationUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedRegistration" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedCompromisedPassword" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedSemanticQuota" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedPasswordHash" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.IdentityReadinessHealthIndicator" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqAuthenticationStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.authentication.usecase.AuthenticateLocalUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.authentication.usecase.RefreshSessionUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.authentication.usecase.LogoutCurrentUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.authentication.usecase.LogoutAllUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.authentication.usecase.IssueAudienceAccessTokenUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedAuthentication" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedLoginQuota" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedPasswordVerification" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.worker.AuthorizationOutboxDispatcher" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.tenant.TenantLifecycleService" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqTenantStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+</FindBugsFilter>

@@ -1,0 +1,93 @@
+image:
+  registry: docker.io
+  repository: traefik
+  digest: sha256:9c3b91d5fb7770853ca5c1124a23c34bf2d9b47ffaebeab2614cbaf410dcb2ac
+  pullPolicy: IfNotPresent
+versionOverride: "3.7.10"
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+deployment:
+  replicas: 1
+  additionalContainers: []
+ingressClass:
+  enabled: false
+providers:
+  kubernetesCRD:
+    enabled: false
+  kubernetesIngress:
+    enabled: false
+  kubernetesGateway:
+    enabled: true
+    namespaces: []
+gateway:
+  enabled: false
+service:
+  enabled: true
+  spec:
+    type: ClusterIP
+serviceAccount:
+  name: traefik
+ports:
+  web:
+    port: 8000
+    hostPort: 80
+    expose:
+      default: true
+    exposedPort: 80
+    forwardedHeaders:
+      insecure: false
+    proxyProtocol:
+      insecure: false
+  websecure:
+    port: 8443
+    hostPort: 443
+    expose:
+      default: true
+    exposedPort: 443
+    forwardedHeaders:
+      insecure: false
+    proxyProtocol:
+      insecure: false
+  traefik:
+    expose:
+      default: false
+api:
+  dashboard: false
+  insecure: false
+log:
+  general:
+    format: json
+    level: INFO
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    general:
+      defaultMode: keep
+    headers:
+      defaultMode: drop
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+nodeSelector:
+  ingress-ready: "true"
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+podSecurityContext:
+  runAsGroup: 65532
+  runAsNonRoot: true
+  runAsUser: 65532
+  seccompProfile:
+    type: RuntimeDefault

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FindBugsFilter>
+  <Match>
+    <Package name="com.sajtech.authorization.contract.v1" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.authorization.infrastructure.health.AuthorizationReadinessHealthIndicator" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.authorization.interfaces.observability.grpc.AuthorizationObservabilityInterceptor" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.authorization.infrastructure.persistence.JooqAuthorizationStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.authorization.application.AuthorizationService" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.authorization.interfaces.grpc.AuthorizationGrpcService" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.authorization.infrastructure.observability.ObservedAdminQuota" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+</FindBugsFilter>

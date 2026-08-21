@@ -1,0 +1,93 @@
+rules:
+  - id: identity-no-field-injection
+    languages: [java]
+    severity: ERROR
+    message: Required dependencies must use constructor injection.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+    pattern: |
+      @Autowired
+      $TYPE $FIELD;
+
+  - id: identity-no-system-output
+    languages: [java]
+    severity: ERROR
+    message: Identity runtime must use structured allow-list logging.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+    pattern-either:
+      - pattern: System.out.$METHOD(...)
+      - pattern: System.err.$METHOD(...)
+      - pattern: $EX.printStackTrace(...)
+
+  - id: identity-no-sensitive-log-keys
+    languages: [java]
+    severity: ERROR
+    message: Identity logs must not attach contact, password, verification code, request/session IDs, tokens, screening hashes, or secret material.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+    pattern-either:
+      - pattern: $LOG.addKeyValue("contact", ...)
+      - pattern: $LOG.addKeyValue("email", ...)
+      - pattern: $LOG.addKeyValue("phone", ...)
+      - pattern: $LOG.addKeyValue("password", ...)
+      - pattern: $LOG.addKeyValue("code", ...)
+      - pattern: $LOG.addKeyValue("request_id", ...)
+      - pattern: $LOG.addKeyValue("user_id", ...)
+      - pattern: $LOG.addKeyValue("sha1", ...)
+      - pattern: $LOG.addKeyValue("prefix", ...)
+      - pattern: $LOG.addKeyValue("suffix", ...)
+      - pattern: $LOG.addKeyValue("ciphertext", ...)
+      - pattern: $LOG.addKeyValue("token", ...)
+      - pattern: $LOG.addKeyValue("access_token", ...)
+      - pattern: $LOG.addKeyValue("refresh", ...)
+      - pattern: $LOG.addKeyValue("refresh_credential", ...)
+      - pattern: $LOG.addKeyValue("session", ...)
+      - pattern: $LOG.addKeyValue("session_id", ...)
+      - pattern: $LOG.addKeyValue("cookie", ...)
+      - pattern: $LOG.addKeyValue("private_key", ...)
+
+  - id: identity-no-raw-observation-error
+    languages: [java]
+    severity: ERROR
+    message: Raw exceptions must not be attached to Identity observations.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+    pattern: $OBSERVATION.error($EXCEPTION)
+
+  - id: identity-no-string-built-sql
+    languages: [java]
+    severity: ERROR
+    message: Identity SQL must remain fixed and parameterized.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+    pattern-either:
+      - pattern: $DSL.execute($SQL + $X, ...)
+      - pattern: $DSL.fetch($SQL + $X, ...)
+      - pattern: $DSL.fetchOne($SQL + $X, ...)
+
+  - id: identity-sha1-only-in-compromised-password-client
+    languages: [java]
+    severity: ERROR
+    message: SHA-1 is permitted only inside the compromised-password screening client.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+      exclude:
+        - /services/identity-service/src/main/java/com/sajtech/identity/infrastructure/client/compromisedpassword/GrpcCompromisedPasswordClient.java
+    pattern: MessageDigest.getInstance("SHA-1")
+
+  - id: identity-no-thread-sleep
+    languages: [java]
+    severity: ERROR
+    message: Identity coordination must not use Thread.sleep.
+    paths:
+      include:
+        - /services/identity-service/src/main/java
+        - /services/identity-service/src/test/java
+    pattern: Thread.sleep(...)

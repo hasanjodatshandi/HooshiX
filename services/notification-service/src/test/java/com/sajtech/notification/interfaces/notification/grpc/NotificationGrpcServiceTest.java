@@ -14,7 +14,6 @@ import com.sajtech.notification.contract.v1.SubmitNotificationResponse;
 import com.sajtech.notification.contract.v1.VerificationCodeContent;
 import io.grpc.Metadata;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,7 +46,7 @@ class NotificationGrpcServiceTest {
     service.submitNotification(validRequest(), recorder);
 
     assertThat(recorder.completed).isTrue();
-    assertThat(recorder.error).isNull();
+    assertThat(recorder.errorCode).isNull();
     assertThat(recorder.values).hasSize(1);
     assertThat(recorder.values.getFirst().getNotificationId()).isEqualTo(notificationId.toString());
     assertThat(recorder.values.getFirst().getLifecycle())
@@ -72,7 +71,7 @@ class NotificationGrpcServiceTest {
     service.submitNotification(validRequest(), recorder);
 
     assertThat(recorder.completed).isTrue();
-    assertThat(recorder.error).isNull();
+    assertThat(recorder.errorCode).isNull();
     assertThat(recorder.values.getFirst().getLifecycle())
         .isEqualTo(NotificationLifecycle.NOTIFICATION_LIFECYCLE_PROVIDER_ACCEPTED);
   }
@@ -91,12 +90,10 @@ class NotificationGrpcServiceTest {
     service.submitNotification(validRequest(), recorder);
 
     assertThat(recorder.completed).isFalse();
-    StatusRuntimeException error = (StatusRuntimeException) recorder.error;
-    assertThat(error.getStatus().getCode()).isEqualTo(Status.Code.ALREADY_EXISTS);
-    assertThat(error.getStatus().getDescription()).isEqualTo("REQUEST_ID_CONFLICT");
-    assertThat(Status.trailersFromThrowable(error).get(ERROR_CODE))
-        .isEqualTo("REQUEST_ID_CONFLICT");
-    assertThat(error.getMessage()).doesNotContain("sensitive", "recipient");
+    assertThat(recorder.errorCode).isEqualTo(Status.Code.ALREADY_EXISTS);
+    assertThat(recorder.errorDescription).isEqualTo("REQUEST_ID_CONFLICT");
+    assertThat(recorder.errorMachineCode).isEqualTo("REQUEST_ID_CONFLICT");
+    assertThat(recorder.errorMessage).doesNotContain("sensitive", "recipient");
   }
 
   @Test
@@ -115,8 +112,7 @@ class NotificationGrpcServiceTest {
     service.submitNotification(request, recorder);
 
     assertThat(recorder.completed).isFalse();
-    assertThat(Status.fromThrowable(recorder.error).getCode())
-        .isEqualTo(Status.Code.INVALID_ARGUMENT);
+    assertThat(recorder.errorCode).isEqualTo(Status.Code.INVALID_ARGUMENT);
   }
 
   private static SubmitNotificationRequest validRequest() {
@@ -133,7 +129,10 @@ class NotificationGrpcServiceTest {
 
   private static final class CapturingObserver<T> implements StreamObserver<T> {
     private final List<T> values = new ArrayList<>();
-    private Throwable error;
+    private Status.Code errorCode;
+    private String errorDescription;
+    private String errorMachineCode;
+    private String errorMessage;
     private boolean completed;
 
     @Override
@@ -143,7 +142,12 @@ class NotificationGrpcServiceTest {
 
     @Override
     public void onError(Throwable throwable) {
-      error = throwable;
+      Status status = Status.fromThrowable(throwable);
+      Metadata trailers = Status.trailersFromThrowable(throwable);
+      errorCode = status.getCode();
+      errorDescription = status.getDescription();
+      errorMachineCode = trailers == null ? null : trailers.get(ERROR_CODE);
+      errorMessage = throwable.getMessage();
     }
 
     @Override

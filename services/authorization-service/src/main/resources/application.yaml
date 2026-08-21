@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: authorization-service
+  main:
+    banner-mode: "off"
+  threads:
+    virtual:
+      enabled: true
+  config:
+    import:
+      - optional:configtree:/run/secrets/authorization-db-runtime/
+      - optional:configtree:/run/secrets/authorization-quota-redis/
+  datasource:
+    url: ${AUTHORIZATION_DATABASE_URL:jdbc:postgresql://localhost:5432/authorization}
+    username: ${AUTHORIZATION_DATABASE_USERNAME:authorization_runtime}
+    password: ${AUTHORIZATION_DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 16
+      minimum-idle: 1
+      connection-timeout: 250
+      validation-timeout: 250
+  flyway:
+    enabled: false
+  jooq:
+    sql-dialect: POSTGRES
+server:
+  port: -1
+authorization:
+  grpc-port: ${AUTHORIZATION_GRPC_PORT:9090}
+  runtime-enabled: ${AUTHORIZATION_RUNTIME_ENABLED:false}
+  max-concurrent-calls-per-connection: ${AUTHORIZATION_MAX_CONCURRENT_CALLS_PER_CONNECTION:128}
+  fingerprint-key-ring-path: ${AUTHORIZATION_FINGERPRINT_KEY_RING_PATH:/var/run/secrets/hooshix/authorization-intent.properties}
+  quota-key-ring-path: ${AUTHORIZATION_QUOTA_KEY_RING_PATH:/var/run/secrets/hooshix/authorization-quota.properties}
+  identity-jwt-verifier-bundle-path: ${AUTHORIZATION_IDENTITY_JWT_VERIFIER_BUNDLE_PATH:/var/run/secrets/hooshix/identity-jwt-verifier.properties}
+  identity-jwt-issuer: ${AUTHORIZATION_IDENTITY_JWT_ISSUER:https://identity.sajtech.internal}
+  key-ring-maximum-staleness: ${AUTHORIZATION_KEY_RING_MAXIMUM_STALENESS:PT5M}
+  quota:
+    redis-uri: ${AUTHORIZATION_QUOTA_REDIS_URI:redis://localhost:6379}
+    max-active-buckets: ${AUTHORIZATION_QUOTA_MAX_ACTIVE_BUCKETS:200000}
+    max-new-buckets-per-minute: ${AUTHORIZATION_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE:10000}
+    minimum-memory-headroom-percent: ${AUTHORIZATION_QUOTA_MINIMUM_MEMORY_HEADROOM_PERCENT:30}
+    host-time-status-path: ${AUTHORIZATION_HOST_TIME_STATUS_PATH:/run/hooshix/host-time-status}
+management:
+  server:
+    port: 9092
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,authorizationReadiness
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: INFO

@@ -12,8 +12,10 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Topic | Primary current source |
 | --- | --- |
 | Current ADRs/stable IDs | `../adr/decision-register.md` |
-| Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
-| ChatGPT Web Context Engine tunnel bridge | ADR-0047 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
+| Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + ADR-0051 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
+| ChatGPT Web Context Engine tunnel bridge | ADR-0047 + ADR-0051 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Ops MCP | ADR-0048 + ADR-0051 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |
+| ChatGPT Web developer-host Desktop MCP | ADR-0049 + ADR-0050 + ADR-0051 + `../runbooks/chatgpt-web-desktop-mcp.md` + `../technology/local-development-baseline.md` |
 | Production profile | ADR-0042 + `PRODUCTION-READINESS-CHECKLIST.md` |
 | Network/client address | ADR-0043 + `network-architecture.md` |
 | Semantic quota | ADR-0024 |
@@ -36,9 +38,15 @@ This file is a routing/source index. It does not duplicate normative architectur
 
 ADR-0046 keeps project context Git-native. `../../context/routes.json` is the canonical task-routing registry; `TASK-REVIEW-MATRIX.md` is its generated human view. Checkpoints under `../../context/checkpoints/` are historical evidence and never current architecture authority. Current Git source always outranks derived context or external/model memory.
 
-The read-only MCP adapter and local retrieval are repository/developer tooling only. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
+The project Context Engine and local retrieval are repository tooling. Under ADR-0051, the read-only Context MCP adapter and Ops/Desktop MCP implementations are independently versioned Windows developer-host tooling. Linux Git in `/home/coder/workspace/Hooshix` remains repository authority. They do not create an application runtime dependency, new bounded context, production network edge, or central cross-project memory service.
 
-ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
+The independent Windows MCP runtime Git authority is `https://github.com/hasanjodatshandi/HooshiXMcpRuntime.git`; its runtime commits/tests are developer-tool evidence only and cannot supersede HooshiX ADRs or the canonical WSL application checkout.
+
+ADR-0047 permits OpenAI Secure MCP Tunnel only as an external developer-tool bridge from ChatGPT Web to the unchanged HooshiX Context stdio MCP adapter. It does not create a HooshiX HTTP/network listener or broaden the MCP tool authority.
+
+ADR-0048 permits a separate developer-host Ops MCP using the same approved tunnel transport pattern but a separate profile/key/policy. Its bounded persistent process-job surface decouples long local execution from one synchronous response while retaining the same local policy timeout and runner-owned cancellation. Ops does not broaden Context MCP, create production authority, or make retrieved context an execution authorization source.
+
+ADR-0049 permits a third developer-host Desktop MCP for policy-gated interactive Windows UI observation/input. ADR-0050 narrowly extends that same Desktop boundary with an optional local credential-use broker: ChatGPT supplies only an opaque `credential_id`; a fixed helper resolves a policy-bound Windows Credential Manager Generic Credential after fresh app/process-image-path/SHA-256/password-target checks and never returns the credential value. Desktop remains outside production authority and does not add tools to Context or Ops.
 
 ## External primary sources used by current decisions
 
@@ -59,7 +67,27 @@ ADR-0046 uses MCP only as a read-only local interoperability adapter. The reposi
 - OpenAI tunnel-client end-user guide: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/end-user-guide.md`
 - OpenAI tunnel-client configuration reference: `https://github.com/openai/tunnel-client/blob/v0.0.11/docs/configuration.md`
 
-ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. Version/integrity/authentication facts are developer-tool inputs; they do not prove the operator PC tunnel is installed, ready, or connected to ChatGPT.
+ADR-0047 uses tunnel-client only as the outbound customer-run bridge to the existing stdio Context MCP. ADR-0048 and ADR-0049 reuse the reviewed transport pattern for separate developer-host Ops and Desktop profiles/credentials. Version/integrity/authentication facts are developer-tool inputs; they do not prove an operator-PC tunnel is installed, ready, running with the intended Windows token/session, or connected to ChatGPT.
+
+### Windows desktop automation
+
+- Microsoft WinApp CLI documentation: `https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/`
+- Microsoft WinApp CLI UI automation documentation: `https://learn.microsoft.com/windows/apps/dev-tools/winapp-cli/ui-automation`
+- Microsoft WinApp CLI repository/releases: `https://github.com/microsoft/WinAppCli`
+- Microsoft `SendInput` / `KEYBDINPUT` reference: `https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-keybdinput`
+- Microsoft `INPUT` structure reference: `https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-input`
+- Microsoft `QueryFullProcessImageNameW` reference: `https://learn.microsoft.com/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew`
+- Microsoft `CredReadW` reference: `https://learn.microsoft.com/windows/win32/api/wincred/nf-wincred-credreadw`
+- Microsoft `CREDENTIALW` reference: `https://learn.microsoft.com/windows/win32/api/wincred/ns-wincred-credentialw`
+- Microsoft UI Automation `AutomationElement.IsPasswordProperty`: `https://learn.microsoft.com/dotnet/api/system.windows.automation.automationelement.ispasswordproperty`
+- Microsoft `EM_GETPASSWORDCHAR`: `https://learn.microsoft.com/windows/win32/controls/em-getpasswordchar`
+- Microsoft edit-control styles including `ES_PASSWORD`: `https://learn.microsoft.com/windows/win32/controls/edit-control-styles`
+- Microsoft `EnumChildWindows`: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumchildwindows`
+- Microsoft `GetGUIThreadInfo` / `GUITHREADINFO`: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getguithreadinfo`
+- Microsoft `AttachThreadInput`: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-attachthreadinput`
+- Microsoft `SendInput` UIPI behavior: `https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendinput`
+
+ADR-0049 uses WinApp CLI only as pinned developer-host UI automation tooling behind HooshiX policy/MCP controls. ADR-0050 uses Windows Credential Manager/UI Automation only for a policy-bound use-without-disclosure broker. Neither decision creates production authority, a credential reader, or a UAC/Secure-Desktop bypass.
 
 ### DevSecOps security toolchain
 

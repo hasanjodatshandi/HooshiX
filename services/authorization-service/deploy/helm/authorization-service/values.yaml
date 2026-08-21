@@ -1,0 +1,76 @@
+replicaCount: 1
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+serviceAccount:
+  name: authorization-service
+service:
+  grpcPort: 9090
+  managementPort: 9092
+runtime:
+  enabled: false
+  maxConcurrentCallsPerConnection: 128
+  temporaryStorageLimit: 128Mi
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+    ephemeral-storage: 64Mi
+  limits:
+    cpu: "2"
+    memory: 1Gi
+    ephemeral-storage: 256Mi
+database:
+  jdbcUrl: ""
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: authorization-postgresql
+  port: 5432
+  runtimeSecretName: ""
+  migrationSecretName: ""
+quota:
+  redis:
+    namespace: platform-data
+    podLabels:
+      app.kubernetes.io/name: security-redis
+    port: 6379
+    connectionSecretName: ""
+  maxActiveBuckets: 0
+  maxNewBucketsPerMinute: 0
+  minimumMemoryHeadroomPercent: 30
+  hostTimeStatus:
+    configMapName: ""
+secrets:
+  fingerprintSecretName: ""
+  quotaKeySecretName: ""
+identity:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: identity-service
+  principal: prod.sajtech.internal/ns/platform-apps/sa/identity-service
+  jwtVerifierConfigMapName: ""
+  jwtIssuer: https://identity.sajtech.internal
+webBff:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: web-bff
+  principal: prod.sajtech.internal/ns/platform-apps/sa/web-bff
+resourceCallers: []
+observability:
+  tracing:
+    enabled: true
+    otlpEndpoint: ""
+    collector:
+      namespace: ""
+      podLabels: {}
+      port: 4318
+  metrics:
+    enabled: true
+    prometheus:
+      namespace: ""
+      podLabels: {}
+      principal: ""
+ambient:
+  waypointName: platform-apps-waypoint
+  waypointPrincipal: prod.sajtech.internal/ns/platform-apps/sa/platform-apps-waypoint

@@ -1,0 +1,34 @@
+image:
+  repository: registry.invalid/hooshix/web-bff
+  digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+runtime:
+  enabled: true
+  requireFetchMetadata: true
+  publicOrigin: https://app.example.com
+redis:
+  connectionSecretName: web-bff-redis
+secrets:
+  locatorSecretName: web-bff-locator
+  csrfSecretName: web-bff-csrf
+  refreshEncryptionSecretName: web-bff-refresh
+edge:
+  namespace: platform-edge
+  podLabels:
+    app.kubernetes.io/name: caddy-coraza
+  principal: prod.sajtech.internal/ns/platform-edge/sa/caddy-coraza
+observability:
+  tracing:
+    enabled: true
+    otlpEndpoint: http://otel-collector.platform-observability.svc.cluster.local:4318
+    collector:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: otel-collector
+      port: 4318
+  metrics:
+    enabled: true
+    prometheus:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: prometheus
+      principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus

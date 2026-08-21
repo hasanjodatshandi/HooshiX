@@ -1,0 +1,95 @@
+{
+  "title": "HooshiX Identity Service",
+  "schemaVersion": 41,
+  "version": 2,
+  "refresh": "30s",
+  "tags": ["hooshix", "identity"],
+  "templating": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Registration request rate by outcome",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, outcome) (rate(identity_registration_duration_seconds_count[5m]))",
+          "legendFormat": "{{operation}} {{outcome}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Registration latency p95",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(identity_registration_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Registration in flight",
+      "targets": [{"refId": "A", "expr": "identity_registration_in_flight"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Password hash in flight",
+      "targets": [{"refId": "A", "expr": "identity_password_hash_in_flight"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Authentication request rate by outcome",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, outcome) (rate(identity_authentication_duration_seconds_count[5m]))",
+          "legendFormat": "{{operation}} {{outcome}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Authentication latency p95",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(identity_authentication_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Authentication and password verification in flight",
+      "targets": [
+        {"refId": "A", "expr": "identity_authentication_in_flight", "legendFormat": "authentication"},
+        {"refId": "B", "expr": "identity_password_verify_in_flight", "legendFormat": "password verify"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Refresh credential reuse detections",
+      "targets": [
+        {"refId": "A", "expr": "increase(identity_refresh_reuse_total[5m])", "legendFormat": "reuse"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+    }
+  ]
+}

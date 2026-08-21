@@ -59,7 +59,7 @@ Every production workload:
 
 Source/repository security:
 
-- [ ] Gitleaks 8.30.1 exact native tool artifact/checksum or immutable tool digest is pinned and verified.
+- [ ] Gitleaks 8.30.0 immutable official tool image digest is pinned, verified, and passes a positive secret-detection control before repository scanning.
 - [ ] Gitleaks current-tree scan passes.
 - [ ] Gitleaks protected Git-history scan passes, including a commit-then-delete positive fixture.
 - [ ] Gitleaks output is fully redacted and does not publish discovered secret material to logs/annotations/artifacts.

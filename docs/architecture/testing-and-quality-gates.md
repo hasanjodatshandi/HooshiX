@@ -11,6 +11,7 @@ Use the smallest trustworthy layer:
 - Domain/Application unit tests;
 - ArchUnit package/layer/dependency tests;
 - focused adapter/Testcontainers tests for PostgreSQL/Redis/Kafka/SQLite/protocol behavior;
+- integrated WSL application-runtime verification after focused source/service gates when cross-service composition is in scope;
 - gRPC/Protobuf/OpenAPI/provider contract tests;
 - Flyway/RLS/security tests;
 - Gitleaks current-tree/Git-history secret-scanning tests;
@@ -192,7 +193,52 @@ Every executable service/critical path proves applicable:
 - required authoritative audit remains durable/off-host;
 - independent external black-box check detects total host loss when local monitoring is down.
 
-## 15. Complete-stack single-server test
+## 15. Developer-host Ops MCP tests
+
+ADR-0048/0051 independent Windows MCP runtime tests prove:
+
+- Context MCP still exposes exactly its five read-only tools;
+- Ops MCP exposes exactly the reviewed 13-tool surface: `ops.status`, `ops.audit_tail`, six typed filesystem tools, `process.run`, `process.start`, `process.status`, `process.logs`, and `process.cancel`, with correct read-only/destructive/open-world hints;
+- missing/malformed/unknown-field/duplicate-key/relative/out-of-range policy state fails closed;
+- out-of-root, denied-root, allowed-root deletion, and symlink/reparse escape negatives;
+- bounded UTF-8 file read/write, atomic replace, and SHA-256 overwrite precondition;
+- policy command alias only, absolute allowed cwd, bounded argv, finite timeout, process-tree termination attempt, and bounded synchronous stdout/stderr capture;
+- persistent jobs survive MCP parent exit/restart, keep the same policy timeout/environment/cwd/alias authority, and bound active jobs, retained records, stdout/stderr files, and log-page reads;
+- persistent state/request/output paths reject traversal and symlink/junction/reparse escape; raw argv is transient and absent from persistent metadata after runner pickup;
+- cancellation uses only runtime-created job ID and runner-owned process-tree termination; no arbitrary caller PID kill primitive exists;
+- secret-like parent environment values such as `CONTROL_PLANE_API_KEY` are absent from child environment;
+- audit metadata excludes file content, raw argv, raw purpose, stdout/stderr, and credentials and has bounded rotation;
+- stdio JSON-RPC output is explicit UTF-8 bytes independent of Windows text code page;
+- entry point works outside repository CWD.
+
+Host evidence separately proves real Windows policy/job-state ACLs, intended elevation state, separate Ops tunnel/profile/key, local readiness, exact tool discovery, `ops.status`, bounded mutation/execution, persistent-job start/status/log/cancel behavior, audit behavior, and rollback/revocation. Background resilience evidence distinguishes tunnel-client child exit, internal stdio MCP-child failure/unready state, complete parent Scheduled Task stop, and orphan/duplicate same-profile cleanup. Pass requires full known profile-tree cleanup before parent recovery, convergence to exactly one launcher/wrapper/tunnel chain where applicable, healthy loopback `/readyz`, bounded local diagnostics, and no runtime-key exposure. Local process timeout and end-to-end tunnel response lifetime are separate bounds. Tests must prove the configured local timeout is finite and enforced. A synchronous ChatGPT/Ops call must stay below the shortest measured effective tunnel response deadline with margin. Work that can exceed that window uses `process.start` and short `process.status`/`process.logs` polling, with `process.cancel` when cancellation is required; split/checkpoint remains a workflow option. Persistent-job success must not be reported as a longer synchronous transport SLA.
+
+Ops MCP tests do not prove production administration safety. ADR-0030 remains the production privileged-access authority.
+
+## 16. Developer-host Desktop MCP tests
+
+ADR-0049/0050/0051 independent Windows MCP runtime tests prove:
+
+- Context and Ops tool surfaces remain unchanged while Desktop exposes exactly the reviewed separate Desktop tool list/annotations, including only the ADR-0050 opaque credential-use primitive;
+- missing/malformed/unknown/duplicate/ambiguous policy state and incompatible WinApp version fail closed;
+- app allow/deny rules use the real process identity from a freshly resolved HWND before targeted actions;
+- inspect depth/selectors/output are bounded and coordinate-only mouse targets are refused;
+- screenshot permission/capture-screen opt-in, PNG validation, byte bound, MCP image representation, and temporary-file cleanup;
+- UIA/mouse/keyboard/system-key capabilities require explicit policy; caller key grammar rejects literal/raw-virtual/Secure-Attention/workstation-lock forms and only validated alphanumeric modifier chords receive internal VK normalization;
+- literal text uses a fixed isolated PowerShell/C# Unicode helper; tests prove text is stdin-only, helper argv is fixed, child environment excludes tunnel/API secrets, output is bounded UTF-8 JSON, timeout preflight occurs before injection, and structured partial/foreground failures are not automatically retried;
+- credential use is disabled by default, requires explicit bounded app/executable-path/SHA-256/selector/Generic-Credential bindings plus UIA/keyboard capability, and rejects denied apps, coordinate selectors, duplicate references/targets, unknown references, and wrong-app calls before local credential resolution;
+- `desktop.use_credential` accepts only HWND plus opaque `credential_id`; secret/selector/Credential-Manager-target caller fields are not part of the schema and additional caller fields are rejected before engine execution;
+- the fixed credential helper receives only non-secret reference metadata, sanitizes its child environment, verifies HWND/PID plus foreground state and focused UIA `IsPassword=true` before `CredReadW`; `@unique-password` must fail on multiple UIA matches and may fall back only on zero UIA matches to exactly one same-PID enabled/visible single-line native `Edit`/`WindowsForms10.EDIT.*` child with `ES_PASSWORD` plus non-zero bounded `EM_GETPASSWORDCHAR`; native focus is verified with `GetGUIThreadInfo`, the same PID/focus/foreground/password predicates are checked before every code unit, the credential buffer is freed, and no credential value/length/username/target is returned;
+- host tests distinguish native password-target recognition from UIPI delivery authority: lower-integrity Desktop/credential helper processes must not be treated as capable of injecting into higher-integrity targets, and no automatic elevation/bypass is permitted;
+- WinApp child environment excludes tunnel/API secrets and enables telemetry opt-out;
+- audit begins before sensitive observation/action, fails closed when unavailable, rotates within bound, and never stores raw typed text/selectors/window titles/screenshots/WinApp output;
+- explicit UTF-8 stdio behavior and modern/legacy MCP error handling remain deterministic.
+
+Host evidence separately proves exact WinApp package/version/integrity, protected policy/audit/capture ACLs, intended non-elevated interactive session, exact mixed-case/Unicode helper delivery plus bounded shortcut/mouse/screenshot behavior, separate Desktop tunnel/profile/key, readiness, ChatGPT tool discovery, audit behavior, and rollback/revocation. ADR-0050 host evidence additionally uses a disposable Generic Credential and a disposable/password-capable target to prove local enrollment, password-target recognition, correct injection, wrong-window/focus failure, and no credential content in audit/argv/environment before a real application credential is enabled. Background resilience also proves tunnel-client child recovery, internal MCP-child/unready recovery, parent-task recovery, full launcher/wrapper/tunnel process-tree cleanup, one-process-per-profile convergence, and continued `elevated=false` / `interactive_session=true` after recovery. Logoff/logon persistence remains a separate session-bound host test.
+
+Independent Desktop runtime tests prove the broker contract and fail-closed invariants only. They do not prove the target application's security, same-Windows-user compromise resistance, real application login behavior, or production administration safety. ADR-0030 and credential owners remain unchanged.
+
+## 17. Complete-stack single-server test
 
 Run all intended platform/application/observability components together.
 
@@ -214,7 +260,7 @@ Record:
 
 Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security load, safe concurrent WAL+AOF+Kafka+telemetry IO, and no security/admission/backup/observability bypass.
 
-## 16. CI/CD ordering
+## 18. CI/CD ordering
 
 Recommended authority order:
 
@@ -234,7 +280,7 @@ Gitleaks secret scan
 
 Independent checks may execute in parallel only when required input/evidence ordering remains correct. Scheduled OSV advisory scanning complements, but does not replace, ADR-0035 deployed-digest Grype rescanning.
 
-## 17. Definition of Done
+## 19. Definition of Done
 
 A non-trivial implementation change is not complete until applicable evidence covers architecture, contracts, persistence/migration/reference data, failure semantics, security/Authorization/tenant isolation, source/secret/dependency-advisory/final-artifact security, workload identity/network policy, **logs/metrics/traces**, deployment/render/policy, rollback/recovery, and selected profile consistency.
 

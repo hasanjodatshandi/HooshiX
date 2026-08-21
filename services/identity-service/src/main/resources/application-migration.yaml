@@ -1,0 +1,17 @@
+spring:
+  main:
+    web-application-type: none
+  config:
+    import: optional:configtree:/run/secrets/identity-db-migration/
+  flyway:
+    enabled: true
+
+server:
+  port: -1
+
+management:
+  server:
+    port: -1
+  endpoint:
+    health:
+      validate-group-membership: false

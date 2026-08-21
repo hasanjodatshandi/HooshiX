@@ -37,7 +37,21 @@ REQUIRED_BASELINE_PATHS = (
     "FILE_INDEX.txt",
     "Makefile",
     "README.md",
+    "context/bootstrap.json",
+    "context/bootstrap.schema.json",
+    "context/checkpoint.schema.json",
+    "context/routes.json",
+    "context/routes.schema.json",
     "docs/adr/decision-register.md",
+    "docs/adr/0046-adopt-git-native-agent-context-engine-v1.md",
+    "docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md",
+    "docs/adr/0048-adopt-policy-gated-developer-host-ops-mcp-v1.md",
+    "docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md",
+    "docs/adr/0050-add-policy-bound-desktop-credential-broker-v1.md",
+    "docs/adr/0051-separate-windows-mcp-runtime-from-wsl-workspace-v1.md",
+    "docs/runbooks/chatgpt-web-secure-mcp-tunnel.md",
+    "docs/runbooks/chatgpt-web-ops-mcp.md",
+    "docs/runbooks/chatgpt-web-desktop-mcp.md",
     "docs/architecture/README.md",
     "docs/architecture/SOURCES.md",
     "docs/architecture/dependency-criticality-matrix.md",
@@ -46,12 +60,22 @@ REQUIRED_BASELINE_PATHS = (
     "docs/architecture/implementation-status.md",
     "docs/engineering/build-and-ci-quality-enforcement.md",
     "docs/engineering/coding-standards.md",
+    "scripts/context/context_engine.py",
+    "scripts/context/post_merge_checkpoint.py",
+    "scripts/context/tests/test_context_engine.py",
+    "scripts/context/tests/test_post_merge_checkpoint.py",
     "scripts/baseline/tests/test_verify_repository.py",
     "scripts/baseline/verify_repository.py",
 )
 
-IGNORED_PATH_PARTS = {".git", "__pycache__", ".pytest_cache"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", "build", "__pycache__", ".pytest_cache"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
+
+EXTERNALIZED_MCP_PATHS = (
+    "scripts/context/mcp_server.py",
+    "scripts/context/tests/test_mcp_server.py",
+)
+EXTERNALIZED_MCP_PREFIXES = ("scripts/ops/", "scripts/desktop/", "ops/", "desktop/")
 
 
 @dataclass(frozen=True)
@@ -379,6 +403,18 @@ def validate_guarded_structure(root: Path) -> list[str]:
         if forbidden.exists():
             errors.append(
                 f"forbidden cross-service dumping root exists: {forbidden.relative_to(root)}"
+            )
+
+    repository_files = collect_repository_files(root)
+    for path in EXTERNALIZED_MCP_PATHS:
+        if path in repository_files:
+            errors.append(f"externalized MCP runtime path returned to HooshiX: {path}")
+    for prefix in EXTERNALIZED_MCP_PREFIXES:
+        matches = sorted(path for path in repository_files if path.startswith(prefix))
+        if matches:
+            errors.append(
+                f"externalized MCP runtime prefix returned to HooshiX: {prefix} "
+                + ", ".join(matches)
             )
     return errors
 

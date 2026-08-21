@@ -22,8 +22,9 @@ Direct Traefik -> Web BFF application routing is prohibited.
 
 ```text
 Architecture: DECIDED
-Local implementation: REQUIRED
-Evidence: NOT VERIFIED until repository automation executes successfully
+Local implementation: IMPLEMENTED
+Local execution evidence: PASSED through the repository verifier; evidence remains execution/commit specific
+Production deployment evidence: NOT VERIFIED
 ```
 
 Commands in this runbook define the required repository interface and must not

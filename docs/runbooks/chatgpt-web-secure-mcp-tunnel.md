@@ -2,7 +2,7 @@
 
 ## Scope
 
-This runbook connects ChatGPT Web to the HooshiX Git-native Context Engine on an approved always-on Windows developer PC through OpenAI Secure MCP Tunnel.
+This runbook connects ChatGPT Web to the HooshiX Git-native Context Engine on an always-on Windows developer PC through OpenAI Secure MCP Tunnel.
 
 This is developer tooling only. It does not expose HooshiX production services and does not create a production dependency.
 
@@ -11,7 +11,7 @@ Authoritative architecture decisions:
 - `docs/adr/0046-adopt-git-native-agent-context-engine-v1.md`
 - `docs/adr/0047-adopt-openai-secure-mcp-tunnel-for-chatgpt-web-context-access-v1.md`
 
-## 1. Security and authority invariants
+## 1. Security model
 
 The approved path is:
 
@@ -19,12 +19,23 @@ The approved path is:
 ChatGPT Web
 -> OpenAI Secure MCP Tunnel
 -> tunnel-client on Windows
--> HooshiX scripts/context/mcp_server.py over stdio
--> Git-native Context Engine
--> dedicated HooshiX checkout
+-> independent Windows Context MCP adapter over stdio
+-> fixed WSL bridge
+-> `/home/coder/workspace/Hooshix`
+-> project Git-native Context Engine and Linux Git authority
 ```
 
-The HooshiX MCP tool list remains exactly:
+Do not:
+
+- expose `mcp_server.py` on a public port;
+- add a public HTTP/SSE MCP wrapper;
+- add router port-forwarding for MCP;
+- add `shell.run`, arbitrary filesystem, arbitrary URL fetch, Git write, deployment, credential-read, or production tools;
+- paste OpenAI runtime/admin API keys into ChatGPT;
+- commit tunnel credentials to Git;
+- use an OpenAI admin key for the long-lived runtime daemon.
+
+The HooshiX Context MCP tool list remains exactly:
 
 ```text
 project.bootstrap
@@ -34,89 +45,46 @@ project.latest_checkpoint
 project.changed_context
 ```
 
-Do not:
+## 2. Prerequisites
 
-- expose `mcp_server.py` on a public port;
-- add a public HTTP/SSE/WebSocket MCP wrapper;
-- add router port-forwarding or an inbound Internet firewall rule for MCP;
-- add `shell.run`, arbitrary filesystem, arbitrary URL fetch, Git write, deployment, credential-read, or production tools;
-- paste OpenAI runtime/admin API keys into ChatGPT;
-- commit tunnel credentials, secret-bearing profiles, or host-local startup configuration to Git;
-- use an OpenAI admin key for the long-lived runtime daemon;
-- make a successful tunnel connection evidence that the local checkout is current;
-- automatically `reset`, `merge`, `checkout`, or otherwise rewrite the dedicated checkout to hide repository drift.
+Required on the always-on Windows host:
 
-Current Git remains authority. ChatGPT conversation state, model memory, checkpoint prose, and tunnel availability never outrank the exact repository revision returned by the Context Engine.
+- Windows 11 Pro or another reviewed supported Windows host;
+- WSL2 Ubuntu with Linux Git and Python 3 for the project Context Engine;
+- the canonical native-Linux checkout `/home/coder/workspace/Hooshix`;
+- the independent Windows Context MCP runtime;
+- OpenAI `tunnel-client` v0.0.11;
+- a tunnel created in the ChatGPT/OpenAI tunnel-management UI;
+- a restricted OpenAI runtime API key with Tunnels `Read` + `Use`.
 
-## 2. Evidence states
+Actual installed state is evidence. Documentation does not prove these prerequisites are present.
 
-Repository evidence can prove the MCP code contract, tests, documentation, and reviewed developer-tool pin. It cannot prove the operator PC is correctly configured.
+## 3. Verify the canonical WSL Context checkout
 
-Treat these as separate checks:
+ADR-0051 makes `/home/coder/workspace/Hooshix` the only approved application/context checkout for this host. Keep it on native WSL storage. Do not use `/mnt/c`, `/mnt/d`, `\\wsl.localhost`, or Windows Git as repository authority.
 
-```text
-Repository-side MCP contract       -> repository/CI evidence
-Dedicated checkout currentness     -> operator-host Git evidence
-Tunnel-client installation/digest  -> operator-host evidence
-Runtime key permissions            -> OpenAI/host evidence
-/readyz and tunnel connectivity    -> operator-host runtime evidence
-ChatGPT app tool discovery         -> real ChatGPT Web evidence
-project.bootstrap through ChatGPT  -> end-to-end evidence
-```
-
-Do not report the last six as `Passed` until they are actually executed in the operator environment.
-
-## 3. Prerequisites
-
-Required on the approved Windows host:
-
-- Windows 11 Pro or another separately reviewed supported Windows host;
-- Git;
-- Python 3 capable of running the repository Context Engine;
-- a dedicated local HooshiX checkout that is not the normal edit/work-in-progress directory;
-- OpenAI `tunnel-client` v0.0.11 under the current ADR-0047 pin;
-- a Secure MCP Tunnel created/selected in the applicable OpenAI/ChatGPT management surface;
-- a dedicated restricted OpenAI runtime API key with only the tunnel runtime permissions required by ADR-0047.
-
-Actual installed state is evidence. Documentation is not proof of installation or permission state.
-
-## 4. Dedicated Context Engine checkout
-
-Example only:
+From Windows, an operator can invoke Linux commands without changing the authority model:
 
 ```powershell
-New-Item -ItemType Directory -Force D:\HooshiXContext | Out-Null
-Set-Location D:\HooshiXContext
-git clone https://github.com/hasanjodatshandi/HooshiX.git repo
-Set-Location .\repo
-git switch main
-git pull --ff-only origin main
-```
-
-The tunnel checkout is a read source, not the operator's normal feature branch.
-
-Before trusted use, verify:
-
-```powershell
-git -C D:\HooshiXContext\repo status --short
-git -C D:\HooshiXContext\repo rev-parse HEAD
-python D:\HooshiXContext\repo\scripts\context\context_engine.py verify
-python D:\HooshiXContext\repo\scripts\context\context_engine.py bootstrap
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec git status --short
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec git rev-parse HEAD
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec python3 scripts/context/context_engine.py verify
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix --exec python3 scripts/context/context_engine.py bootstrap
 ```
 
 Expected safety condition:
 
 ```text
-Git status: no unexpected changes
+Linux Git status: no unexpected changes
 bootstrap verification: valid
 trusted_for_targeted_review: true
 ```
 
-Important: `project.bootstrap` verifies the local checkout and its authority inputs. By itself it does **not** contact GitHub or prove that local `HEAD` still equals the latest `origin/main`. Repository freshness is a separate startup/session gate below.
+The Context MCP adapter is not stored in this checkout. Its protected Windows policy fixes `Ubuntu`, `/home/coder/workspace/Hooshix`, the project Context Engine path, and `C:\Windows\System32\wsl.exe`.
 
-## 5. Install and verify tunnel-client
+## 4. Install and verify tunnel-client
 
-ADR-0047 pins OpenAI `tunnel-client` v0.0.11 for this integration until a later reviewed change updates it.
+ADR-0047 pins OpenAI `tunnel-client` v0.0.11 for the initial integration.
 
 Select the official archive for the actual Windows architecture:
 
@@ -125,7 +93,7 @@ tunnel-client-v0.0.11-windows-amd64.zip
 tunnel-client-v0.0.11-windows-arm64.zip
 ```
 
-Repository-reviewed SHA-256 values recorded for the ADR-0047 integration are:
+Release asset SHA-256 values reviewed on 2026-08-18:
 
 ```text
 windows-amd64:
@@ -135,15 +103,13 @@ windows-arm64:
 38f015a720404c8ccd5976a0d6aed18d931899697eaf208548b5eb3d0f6e8592
 ```
 
-At installation/upgrade time, compare the downloaded archive against the official release-published integrity metadata rather than relying only on a copied value in this runbook.
-
-Example:
+Verify the downloaded archive against the official release-published `SHA256SUMS.txt` / asset digest before extracting it. Example for amd64 after placing the archive in the current directory:
 
 ```powershell
 (Get-FileHash .\tunnel-client-v0.0.11-windows-amd64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
 ```
 
-Do not continue on mismatch.
+The result must exactly match the reviewed official digest. Do not continue on mismatch.
 
 After extraction:
 
@@ -153,28 +119,40 @@ After extraction:
 .\tunnel-client.exe profiles samples list
 ```
 
-The installed binary's help is the exact CLI contract for that reviewed version.
+Use the binary's current help as the exact CLI contract if a future reviewed version changes syntax.
 
-## 6. Runtime credential and local secret storage
+## 5. Create/select the tunnel in ChatGPT Web
 
-Use a dedicated **restricted runtime API key**, not an OpenAI admin key, for the long-lived daemon. ADR-0047 currently requires only:
+In ChatGPT Web:
+
+```text
+Settings
+-> Plugins
+-> New Plugin
+-> Connection: Tunnel
+-> Create tunnel
+```
+
+Create a tunnel for HooshiX context access. Record the returned `tunnel_id` locally. The runtime daemon and ChatGPT Plugin must use the same tunnel.
+
+The tunnel ID is configuration, not the runtime API credential.
+
+## 6. Create the runtime API key
+
+Create a dedicated **Restricted** OpenAI runtime API key with only:
 
 ```text
 Tunnels: Read
 Tunnels: Use
 ```
 
-Use the tunnel-client supported `env:VARNAME`, `file:/path/to/secret`, or equivalent reviewed secret-reference mechanism. The real key must not be a literal in:
+Do not select broad `All` access when the restricted tunnel permissions are sufficient.
 
-- Git;
-- profile YAML committed to Git;
-- Task Scheduler arguments;
-- shell history/transcripts;
-- screenshots;
-- logs/support bundles;
-- ChatGPT messages.
+Do not use `OPENAI_ADMIN_KEY` for `doctor` or the long-lived `run` daemon. Admin credentials are only for explicit tunnel-management CRUD.
 
-For the first interactive foreground test, one PowerShell-compatible pattern is:
+The official tunnel-client configuration supports secret-bearing values through `env:VARNAME` or `file:/path/to/secret` references. Prefer one of these references so the real API key is not placed in argv or profile YAML.
+
+For an interactive foreground test, load the environment variable without typing the secret as part of a PowerShell command line. One Windows PowerShell-compatible pattern is:
 
 ```powershell
 $secure = Read-Host 'CONTROL_PLANE_API_KEY' -AsSecureString
@@ -186,86 +164,46 @@ try {
 }
 ```
 
-Clear it after the foreground test:
+The key is then present only in the current process environment for this test. Clear it when finished:
 
 ```powershell
 Remove-Item Env:CONTROL_PLANE_API_KEY -ErrorAction SilentlyContinue
 ```
 
-For persistent operation, keep secret-bearing files and tunnel-local profile state **outside the repository**, under a host-local directory readable only by the account that runs the tunnel. Review the Windows ACL after creation. `.gitignore` is convenience only; it is not a secret-control boundary.
+For persistent operation, prefer the tunnel-client supported `file:` or protected secret-reference mechanism rather than storing a plaintext literal in a startup command, scheduled-task argument, profile, or Git file.
 
-If a key may have been exposed, revoke/rotate it before restarting the tunnel.
+Do not store the real key in this repository, shell transcripts, screenshots, logs, support bundles, or ChatGPT messages.
 
 ## 7. Configure the stdio MCP profile
 
-Inspect the installed sample/help first:
+Use the official stdio sample and the absolute independent Windows Context MCP adapter path. Supply its protected ADR-0051 policy. The policy fixes Ubuntu, `/home/coder/workspace/Hooshix`, the project Context Engine path, and `wsl.exe`.
+
+First inspect the installed binary's sample/help:
 
 ```powershell
 .\tunnel-client.exe profiles samples list
 .\tunnel-client.exe help quickstart
 ```
 
-Initialize a dedicated profile using the official stdio-local sample pattern. Replace placeholders locally:
+Then initialize a dedicated profile. Replace placeholders locally with the real tunnel ID, Python executable, and repository path:
 
 ```powershell
 .\tunnel-client.exe init `
   --sample sample_mcp_stdio_local `
   --profile hooshix-context `
   --tunnel-id <TUNNEL_ID> `
-  --mcp-command "<PYTHON_EXE> <ABSOLUTE_REPO_PATH>\scripts\context\mcp_server.py"
+  --mcp-command "<PYTHON_EXE> -B <ABSOLUTE_REPO_PATH>\scripts\context\mcp_server.py"
 ```
 
-If paths contain spaces, follow the quoting form shown by the installed tunnel-client version rather than inventing another command encoding.
+`-B` prevents Python bytecode cache files from dirtying the dedicated authority checkout. If either local path contains spaces, use the quoting form shown by the installed `tunnel-client` help/profile sample rather than guessing a different command encoding. On Windows, validate the generated command with `doctor`; if the installed parser does not preserve a backslash-form path, use the equivalent absolute forward-slash path form accepted by the installed Python executable rather than weakening the checkout or moving the MCP server.
 
-Required profile properties:
+The generated profile must keep `control_plane.api_key` as an `env:` or `file:` secret reference. Do not replace it with a literal key.
 
-- MCP child transport is stdio;
-- MCP command points to the absolute tracked `scripts/context/mcp_server.py`;
-- `control_plane.api_key` or equivalent remains an `env:`/`file:` reference, never a literal;
-- local health/admin surfaces remain loopback-only;
-- no arbitrary port forwarding or local shell target is added.
+The independent Context MCP adapter does not derive repository authority from its source path or the tunnel-client working directory. Protected local policy fixes the WSL repository root, and Linux Git inside WSL is authority. Do not use Windows Git or UNC status checks for the WSL worktree.
 
-The MCP entry point resolves repository authority from its tracked script location, not the tunnel-client working directory.
+For a host where TCP 8080 is already in use, keep the health/admin surface on loopback and select a free loopback port. The reviewed v0.0.11 client supports an ephemeral listener such as `127.0.0.1:0`; do not resolve a port conflict by binding the health/admin surface to `0.0.0.0` or another LAN/public address.
 
-## 8. Repository freshness gate before startup
-
-An always-on tunnel can be healthy while serving an old but clean checkout. Therefore **tunnel readiness and Git freshness are independent conditions**.
-
-Before starting/restarting the tunnel for trusted engineering use, update only the remote-tracking reference and fail closed if local `HEAD` is not the reviewed `origin/main`:
-
-```powershell
-$repo = 'D:\HooshiXContext\repo'
-$python = '<PYTHON_EXE>'
-
-& git -C $repo fetch --prune origin main
-if ($LASTEXITCODE -ne 0) { throw 'git fetch origin main failed' }
-
-$head = (& git -C $repo rev-parse HEAD).Trim()
-$remote = (& git -C $repo rev-parse refs/remotes/origin/main).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $remote) { throw 'origin/main cannot be resolved' }
-if ($head -ne $remote) {
-  throw "Dedicated checkout is stale: HEAD=$head origin/main=$remote. Synchronize explicitly with git pull --ff-only after review."
-}
-
-$dirty = & git -C $repo status --porcelain=v1
-if ($LASTEXITCODE -ne 0) { throw 'git status failed' }
-if ($dirty) { throw 'Dedicated checkout is dirty; tunnel startup refused' }
-
-& $python "$repo\scripts\context\context_engine.py" verify
-if ($LASTEXITCODE -ne 0) { throw 'Context Engine verification failed' }
-
-$bootstrap = (& $python "$repo\scripts\context\context_engine.py" bootstrap | ConvertFrom-Json)
-if ($LASTEXITCODE -ne 0) { throw 'Context Engine bootstrap failed' }
-if (-not $bootstrap.verification.trusted_for_targeted_review) {
-  throw 'Context bootstrap is not trusted for targeted review'
-}
-```
-
-This preflight deliberately does **not** run `reset`, `merge`, `checkout`, `rebase`, or `pull`. A stale checkout stops startup and requires an explicit operator-reviewed fast-forward synchronization. The MCP surface itself remains Git-read-only and network-free.
-
-If the host cannot reach `origin/main`, do not pretend freshness was proven. Either restore connectivity and run the gate or treat targeted current-state use as not verified.
-
-## 9. Foreground validation before persistence
+## 8. Validate before connecting ChatGPT
 
 Run:
 
@@ -273,123 +211,120 @@ Run:
 .\tunnel-client.exe doctor --profile hooshix-context --explain
 ```
 
-Resolve material errors before continuing.
+Resolve all material errors before continuing.
 
-Start in the foreground:
+Start the foreground runtime:
 
 ```powershell
 .\tunnel-client.exe run --profile hooshix-context
 ```
 
-Use the loopback URL/address reported by the installed binary and verify its local operator surfaces, including the version-appropriate equivalents of:
+Keep this terminal open for the first validation.
+
+`tunnel-client` exposes local operator health/readiness/UI surfaces. Use the URL/address reported by the binary. Verify:
 
 ```text
-/healthz -> healthy
-/readyz  -> ready
-/ui      -> expected tunnel and MCP target healthy
+/healthz -> HTTP 200
+/readyz  -> HTTP 200
+/ui      -> active tunnel and MCP target are healthy
 ```
 
-Do not add a public/LAN bind merely to make these checks easier.
+The local operator surface must remain loopback-only unless a separate reviewed change says otherwise.
 
-## 10. Configure the custom app in ChatGPT Web
+## 9. Connect the ChatGPT Plugin
 
-OpenAI's current ChatGPT developer-mode workflow uses **Apps**, not the older `Plugins -> New Plugin` creation path.
+While the foreground tunnel runtime is healthy:
 
-Use the current workspace/user flow exposed for the account, generally:
+1. return to `Settings -> Plugins -> New Plugin`;
+2. set `Connection` to `Tunnel`;
+3. refresh/select the same HooshiX tunnel;
+4. use no downstream OAuth/authentication for the current local stdio MCP when the UI offers `None`/no authentication;
+5. complete the custom Plugin setup;
+6. in a new/appropriate HooshiX chat, enable/use the Plugin.
 
-```text
-Workspace settings or Settings
--> Apps
--> Create
-```
+The runtime API key authenticates tunnel-client to the OpenAI control plane. It is not a downstream MCP application credential and must not be pasted into the Plugin authentication field.
 
-Enable Developer mode if the plan/workspace requires it. Choose the Secure MCP Tunnel/Tunnel connection option when offered, select the same tunnel used by the runtime, then **Scan Tools** before creating/publishing the app.
+The first functional check is tool discovery. Exactly five HooshiX tools must be visible.
 
-The scan must expose exactly these five tools and no others:
+Then call/use:
 
 ```text
 project.bootstrap
-project.context_for_task
-project.search
-project.latest_checkpoint
-project.changed_context
 ```
 
-All five are read-only. On workspace plans that expose action controls, keep only the intended read actions enabled.
+Verify the response reports the expected repository, branch/HEAD, authority provenance, dirty state, and bootstrap trust result.
 
-After changing MCP tool definitions, do not assume ChatGPT automatically adopts the new action schema. Refresh/rescan/review the app actions according to the current ChatGPT workspace controls before relying on the changed definition.
+Next verify a routed task through:
 
-## 11. End-to-end validation
+```text
+project.context_for_task
+```
 
-With the tunnel ready and the custom app enabled, execute real ChatGPT calls in this order:
+Successful object-shaped HooshiX tool results carry matching JSON text and structured object content. A client may display only one representation; the two representations must encode the same object. This compatibility shape does not add a tool or expose additional repository data.
 
-1. tool discovery: exactly five tools;
-2. `project.bootstrap`;
-3. `project.context_for_task` for a known task;
-4. `project.search` for a term known to produce repository matches;
-5. optionally `project.latest_checkpoint` and `project.changed_context` for bounded validation.
+Do not claim end-to-end tunnel integration is `Passed` until these real ChatGPT Web calls complete successfully.
 
-Verify `project.bootstrap` reports the same `HEAD` that passed the startup freshness gate.
+## 10. Persistent operation on the always-on PC
 
-For `project.search`, verify a **positive-result** call succeeds through the real ChatGPT tunnel path. A no-match search is not sufficient reliability evidence.
+Do not configure automatic startup until the foreground path passes.
 
-If discovery succeeds but positive-result `project.search` fails, record it as a tunnel/client/MCP integration failure. Do not work around it by adding broad filesystem or shell tools.
+For persistent operation, preserve these invariants:
 
-## 12. Persistent Windows startup
+- same reviewed tunnel-client binary/version;
+- same dedicated profile and tunnel ID;
+- same canonical clean WSL HooshiX checkout;
+- runtime key supplied through a protected supported `env:` or `file:` secret reference, not a command-line literal or Git file;
+- service account/user has only the filesystem/network permissions needed for the checkout and outbound tunnel;
+- no public inbound firewall rule is added;
+- tunnel-client local health/admin surface remains loopback-only;
+- startup/restart failure remains visible through local health/readiness and does not silently fall back to a public listener.
 
-Configure persistence only after Sections 8-11 pass in the foreground.
+Use the persistent-runtime mechanism documented by the installed OpenAI tunnel-client version. Do not invent background wrappers that lose health/readiness ownership.
 
-The persistent mechanism must preserve:
+On the verified Windows host with tunnel-client v0.0.11, a stdio MCP-child failure can make tunnel-client log `stdio MCP command failed; requesting tunnel-client shutdown` and then exit on `EOF`. Task Scheduler restart-on-failure alone was not reliable for this termination path. The reviewed host pattern therefore uses two recovery layers: a secret-free supervised wrapper restarts a terminated tunnel-client child after a bounded delay, and a separate one-minute process/health-aware watchdog clean-restarts the named Scheduled Task when the parent task is not running, the same profile has an orphan/duplicate process, or `/readyz` remains unhealthy after startup grace. The watchdog targets only the reviewed HooshiX tunnel task/profile names, does not read runtime keys, preserves one tunnel-client process per profile, and keeps health checks on loopback. On Windows, run the recurring watchdog as `SYSTEM` / `ServiceAccount` in Session 0 so the one-minute check cannot create a visible console window in the operator's desktop session. Interactive tunnel tasks that must remain in the user's session should use a GUI-subsystem hidden launcher (for example `wscript.exe` -> hidden PowerShell wrapper) rather than a direct Task Scheduler `powershell.exe` action when Windows Terminal is the default console host.
 
-- the same reviewed tunnel-client binary/version;
-- the same dedicated profile/tunnel ID;
-- the same dedicated checkout;
-- startup freshness gate before tunnel execution;
-- runtime key through a protected supported secret reference;
-- least-privilege local user/service account;
-- outbound-only tunnel networking;
-- loopback-only local operator surfaces;
-- visible non-zero failure when Git freshness, Context verification, credential loading, `doctor`, or tunnel runtime fails;
-- no concurrent duplicate tunnel-client instance for the same profile.
+On recovery, clean the full known profile process tree before restart: matching `tunnel-client.exe`, the exact supervised PowerShell wrapper, and the exact hidden `wscript.exe` launcher when present. Stopping only the Task Scheduler parent can leave a PowerShell supervisor orphaned; after its delay that orphan can create a second tunnel beside the new task. Full-tree cleanup must converge to exactly one managed profile chain.
 
-For Windows Task Scheduler or another reviewed host startup mechanism, configure it to run only after networking is available and to restart the task on unexpected process failure with a bounded retry policy. The action must execute the freshness/verification preflight before `tunnel-client run` and must not place the runtime API key in its command line.
+Keep bounded local tunnel logs and enable the Windows Task Scheduler Operational log. Do not remove MCP output/time bounds as a generic crash workaround; first reproduce a transport-size or duration threshold. Unbounded output increases memory/transport risk without fixing lifecycle recovery.
 
-Do not configure automatic startup to run `git reset --hard`, forced checkout, merge, rebase, or an unconditional pull. Repository movement must remain explicit and reviewable.
+On the verified host, the Context and Ops wrappers now request `--mcp.connection-max-ttl=1h`, while the local Context/`process.run` command bounds are 300 seconds. This does not override a shorter tunnel/control-plane command-response lifetime. On 2026-08-20, a local Ops command completed after `197968 ms` with `timed_out=false`, but separate synchronous calls still logged `MCP connection TTL reached` plus `command response deadline reached; dropping without posting a response` and lost the ChatGPT response at about 122.6 seconds in one exercised call. Treat local command timeout, MCP-connection lifetime, and end-to-end command-response lifetime as separate limits.
 
-Persistent host startup remains `NOT VERIFIED` until the real startup/reboot/restart behavior is exercised on the operator PC.
+Keep synchronous work below the shortest measured effective response window with margin. Context remains exactly five read-only tools and does not start jobs. For developer-host execution that can exceed the response window, use the separate ADR-0048 Ops `process.start`/short status-log polling/cancel surface after refreshed tool discovery, or split/checkpoint the workflow. Persistent Ops completion does not prove a longer synchronous tunnel response SLA, and the local 300-second policy bound remains independent.
 
-## 13. Normal operating procedure
+## 11. Normal operating procedure
 
-At the start of a non-trivial engineering session, and after any known `main` update that should become visible through the tunnel:
+Before relying on the tunnel for a new non-trivial engineering session:
 
-1. run/follow the repository freshness gate;
-2. if stale, review and run `git pull --ff-only origin main` explicitly, then repeat the gate;
-3. verify tunnel `/readyz`;
-4. call `project.bootstrap` from ChatGPT Web;
-5. verify the reported `HEAD` equals the revision accepted by the freshness gate;
-6. route the task with `project.context_for_task` before selecting targeted scope;
-7. use `project.search` only as bounded retrieved data with provenance;
-8. keep current Git above checkpoint/chat/model memory.
+1. synchronize the canonical WSL checkout explicitly with reviewed `main` using normal operator Git workflow;
+2. verify the checkout is clean;
+3. run Context Engine verification/bootstrap locally when practical;
+4. verify tunnel-client `/readyz`;
+5. call `project.bootstrap` from ChatGPT Web;
+6. route the task before selecting targeted documentation scope;
+7. treat current Git as higher authority than checkpoint/chat/model memory.
 
-A long-lived process is not proof of a long-lived fresh checkout.
+If `project.bootstrap` reports dirty/invalid authority state, do not force targeted review.
 
-## 14. Troubleshooting
+## 12. Troubleshooting
 
-### Tunnel/app exists but is not selectable
+### Tunnel exists but is not selectable in ChatGPT
 
 Check:
 
-- account/workspace plan and Developer mode availability;
-- workspace Apps permissions/access;
-- the tunnel-client is running;
-- local readiness is healthy;
-- the same tunnel is selected on both sides;
-- the app has been created/enabled for the current user/workspace;
-- tool actions were scanned/refreshed after any definition change.
+- ChatGPT/Platform workspace scope;
+- operator Tunnels `Read` + `Use` permission;
+- tunnel-client is still running;
+- local `/readyz` is healthy;
+- the same tunnel ID is configured on both sides;
+- allow time for newly created control-plane configuration to propagate.
 
 ### `doctor` reports missing runtime key
 
-Provide the restricted runtime key through the approved local `env:`/`file:` reference. Do not substitute an admin key and do not paste the key into ChatGPT.
+Provide `CONTROL_PLANE_API_KEY` through the approved local `env:`/`file:` secret reference with the restricted runtime key. Do not substitute an admin key and do not paste the key into ChatGPT.
+
+### `doctor` reports the health listener address is already in use
+
+Keep the listener on `127.0.0.1` and select another free loopback port or the supported ephemeral `127.0.0.1:0` form. Do not bind the operator surface to all interfaces as a workaround.
 
 ### MCP child fails to start
 
@@ -397,33 +332,30 @@ Check:
 
 - Python executable path;
 - absolute `mcp_server.py` path;
-- repository contains `context/bootstrap.json`;
-- local Python can run the sibling Context Engine;
-- tunnel-client profile quoting matches the installed binary's help.
+- repository checkout contains `context/bootstrap.json`;
+- local Python can import/run the sibling Context Engine;
+- tunnel-client profile quoting as shown by the installed binary's help.
 
 Do not fix this by exposing a public MCP server.
 
-### Bootstrap is valid but the repository may be stale
+### Tool discovery works but a tool response fails at the control-plane response boundary
 
-This is expected behavior: bootstrap proves local authority consistency, not remote freshness. Run the Section 8 fetch/compare gate and require `HEAD == origin/main` for trusted current-state use.
+If tunnel-client logs an HTTP 400 response-post/body-parsing error after forwarding a tool call:
 
-### Positive `project.search` fails through ChatGPT
+1. preserve the bounded error/request identifiers without copying credentials;
+2. run the repository MCP tests and verify the exact five-tool surface;
+3. verify the raw stdio JSON-RPC response is valid JSON;
+4. use the tunnel-client version's official embedded/minimal stdio test path to separate tunnel/control-plane transport from HooshiX Context MCP result behavior;
+5. confirm object-shaped HooshiX successes contain matching JSON `content` and `structuredContent`;
+6. do not add a public HTTP MCP wrapper or broaden authentication/tool authority to bypass the failure.
 
-Check separately:
+A passing embedded or minimal stdio tool call proves the general tunnel/control-plane/stdio path for that test. It does not by itself prove every HooshiX tool result. Retest `project.bootstrap` and `project.context_for_task` through ChatGPT Web after the repository fix is synchronized.
 
-1. local Context Engine search behavior;
-2. local stdio MCP modern `tools/call` behavior;
-3. tunnel-client health/readiness;
-4. ChatGPT app action/tool snapshot;
-5. real ChatGPT call again after a tool refresh if the server definition changed.
+### Bootstrap reports stale/dirty context
 
-Do not infer that a no-result search proves the positive-result path works.
+Stop treating the context as targeted-review trusted. Inspect/synchronize the canonical WSL checkout using explicit operator Git actions. Restart/recheck the tunnel after the repository is in the intended state.
 
-### Unexpected MCP tools appear
-
-Stop the runtime and treat this as a configuration/integrity incident. HooshiX accepts only the five ADR-0046 read-only tools.
-
-## 15. Credential/integrity incident handling
+## 13. Incident and credential handling
 
 If the runtime key may have been disclosed:
 
@@ -431,38 +363,17 @@ If the runtime key may have been disclosed:
 2. stop the affected tunnel runtime;
 3. inspect local process/log/history exposure without copying the secret into a ticket/chat/log;
 4. create a new restricted runtime key;
-5. re-run startup preflight, `doctor --explain`, readiness, and ChatGPT discovery before restoring use.
+5. rerun `doctor --explain` and `/readyz` before restoring use.
 
-If the tunnel-client archive/digest is unexpected, stop and reinstall only from the reviewed official release artifact after integrity verification.
+If unexpected MCP tools appear, stop the runtime and treat it as a configuration/integrity issue. HooshiX accepts only the five ADR-0046 read-only tools.
 
-If the dedicated checkout is dirty or diverged, stop treating it as trusted context and resolve Git state explicitly. Do not force-clean it as part of tunnel startup.
-
-## 16. Rollback
+## 14. Rollback
 
 To roll back ChatGPT Web tunnel access:
 
-1. disable/remove the custom HooshiX app connection;
-2. stop/disable the tunnel-client runtime/startup task;
+1. disable/remove the custom HooshiX Plugin connection;
+2. stop the tunnel-client runtime;
 3. revoke the dedicated runtime key if no longer needed;
-4. retain local stdio Context Engine and Git/repository fallback behavior.
+4. retain local stdio Context Engine and GitHub/repository fallback behavior.
 
-Rollback must not replace the tunnel with public MCP exposure, a general remote shell, or a write-capable MCP surface.
-
-## 17. Required operational evidence checklist
-
-Before calling the integration operationally verified, retain non-secret evidence for:
-
-- [ ] tunnel-client version and official integrity verification;
-- [ ] restricted runtime credential scope;
-- [ ] dedicated checkout clean state;
-- [ ] fetched `origin/main` and exact `HEAD == origin/main` comparison;
-- [ ] Context Engine `verify` success;
-- [ ] bootstrap `trusted_for_targeted_review=true`;
-- [ ] `doctor --explain` success;
-- [ ] local readiness success and loopback-only binding;
-- [ ] ChatGPT Apps tool scan showing exactly five read-only tools;
-- [ ] ChatGPT `project.bootstrap` returning the expected revision;
-- [ ] ChatGPT positive-result `project.search` succeeding;
-- [ ] persistent startup/reboot/restart behavior tested, if persistence is enabled.
-
-Never include the runtime/admin API key itself in evidence.
+Rollback must not replace the tunnel with public MCP exposure or a general remote shell.

@@ -1,0 +1,69 @@
+replicaCount: 1
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+serviceAccount:
+  name: web-bff
+service:
+  applicationPort: 8080
+  managementPort: 9092
+runtime:
+  enabled: false
+  requireFetchMetadata: true
+  publicOrigin: ""
+  temporaryStorageLimit: 128Mi
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+    ephemeral-storage: 64Mi
+  limits:
+    cpu: "2"
+    memory: 1Gi
+    ephemeral-storage: 256Mi
+identity:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: identity-service
+  port: 9090
+  target: dns:///identity-service.platform-apps.svc.cluster.local:9090
+authorization:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: authorization-service
+  port: 9090
+  target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
+redis:
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: security-redis
+  port: 6379
+  connectionSecretName: ""
+secrets:
+  locatorSecretName: ""
+  csrfSecretName: ""
+  refreshEncryptionSecretName: ""
+routeAudiences:
+  authorizationPrefix: authorization-service
+edge:
+  namespace: ""
+  podLabels: {}
+  principal: ""
+observability:
+  tracing:
+    enabled: true
+    otlpEndpoint: ""
+    collector:
+      namespace: ""
+      podLabels: {}
+      port: 4318
+  metrics:
+    enabled: true
+    prometheus:
+      namespace: ""
+      podLabels: {}
+      principal: ""
+ambient:
+  waypointName: platform-apps-waypoint
+  waypointPrincipal: prod.sajtech.internal/ns/platform-apps/sa/platform-apps-waypoint

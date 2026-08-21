@@ -1,8 +1,8 @@
 # Local Development Baseline
 
-- **Baseline date:** 2026-08-18
+- **Baseline date:** 2026-08-19
 - **Status:** Active local-development baseline
-- **Scope:** developer host/tooling, fast service loop, optional production-fidelity kind integration foundation, and approved ChatGPT Web Context Engine bridge.
+- **Scope:** WSL-native HooshiX application engineering, Windows-hosted independent Context/Ops/Desktop MCP tooling, fast service loop, and implemented production-fidelity kind integration foundation.
 - **Evidence rule:** a pin is a repository target, not proof it is installed.
 
 Production Technology Baseline remains authoritative for production versions.
@@ -11,8 +11,8 @@ Production Technology Baseline remains authoritative for production versions.
 
 | Component | Version/policy |
 | --- | --- |
-| Host OS | Windows 11 Pro primary target |
-| Linux environment | Ubuntu 26.04 LTS on WSL2 |
+| Host OS | Windows 11 Pro host for WSL2 and Windows-only MCP/UI tooling |
+| Application execution OS | Ubuntu 26.04 LTS on WSL2; canonical checkout `/home/coder/workspace/Hooshix` on native Linux filesystem |
 | Architecture | `linux/amd64` primary local target |
 | Java | Eclipse Temurin 25.0.4 LTS |
 | Git | 2.55.0 |
@@ -22,9 +22,12 @@ Production Technology Baseline remains authoritative for production versions.
 | Docker Compose | 5.1.4 |
 | Docker Buildx | 0.34.1 |
 | Docker cgroup | v2 + systemd driver |
-| Secret scanner | Gitleaks CLI 8.30.1; same rule/config intent as CI |
+| Secret scanner | Gitleaks CLI 8.30.0; reviewed fallback from defective 8.30.1; same rule/config intent and positive-control requirement as CI |
 | Dependency advisory scanner | OSV-Scanner 2.4.0; early declared/locked dependency feedback, not final-image authority |
 | ChatGPT Web MCP tunnel client | OpenAI `tunnel-client` 0.0.11; developer-only ADR-0047 bridge to existing read-only stdio Context MCP; official release archive/digest verification required |
+| HooshiX developer-host Ops MCP | independent Git runtime `hasanjodatshandi/HooshiXMcpRuntime` under ADR-0048/0051; mandatory local policy, separate tunnel/profile/key, synchronous `process.run` plus bounded persistent start/status/log/cancel jobs, WSL bridge for project commands, no production authority |
+| Microsoft WinApp CLI | 0.6.0; WinGet `Microsoft.WinAppCli`; developer-only ADR-0049 Desktop MCP dependency; reviewed x64 MSIX SHA-256 `dc5d323f6d1601ef3342420746f0163651176f4cc183690f0354546a36648eec`; public-preview upgrades require review |
+| HooshiX developer-host Desktop MCP | independent Windows runtime under ADR-0049/0050/0051 with fixed Windows helpers; interactive non-elevated session by default; separate policy/tunnel/profile/key; no production authority |
 
 Local convenience cannot silently change architecture-sensitive production versions or weaken CI/security semantics.
 
@@ -52,6 +55,25 @@ Local OSV-Scanner is fast feedback. Protected CI/scheduled scanning remains auth
 Local fakes/substitutes are allowed only where architecture permits and must be impossible in staging/production.
 
 ADR-0044 Day-One observability still applies to implementation code. A developer may use an in-memory/test OTLP exporter or local Collector fixture instead of starting Loki/Tempo/Prometheus for every edit. This does not replace staging/release evidence against the real stack.
+
+### Integrated WSL application runtime
+
+The canonical WSL checkout implements a repeatable fast-lane integrated runtime under `infrastructure/local/` and `scripts/local/runtime.py`. It runs pinned PostgreSQL/Redis plus all five current executable Spring Boot services together without claiming Kubernetes/mesh/edge fidelity.
+
+Repository interfaces are:
+
+```text
+make local-runtime-test
+make local-runtime-up
+make local-runtime-status
+make local-runtime-logs
+make local-runtime-down
+make local-runtime-reset
+```
+
+The local runtime generates database credentials, HMAC/AES key rings, an RSA-3072 Identity signing/verifier pair, the Web BFF self-signed HTTPS material, and the generated Compromised Password fixture only under Git-ignored `.local-runtime/`. Identity/Authorization host-time health uses an explicit local fixture and Notification uses only its `local & !staging & !production` simulated providers. These are developer-lane substitutes and are not staging/production evidence.
+
+The Web BFF local public origin is `https://localhost:18443`; PostgreSQL and Redis are loopback-bound on ports `15432` and `16379`. See `docs/runbooks/local-integrated-runtime.md`.
 
 ## 3. Application baseline
 
@@ -136,9 +158,9 @@ browser/curl -> Traefik -> Caddy/Coraza -> BFF -> internal services
 - waypoints only for an explicit tested L7 need;
 - local exposure does not claim upstream volumetric DDoS protection.
 
-## 6. Optional local observability profile
+## 6. Implemented local observability profile
 
-When testing ADR-0044 end-to-end, use the production version family/pins:
+The production-fidelity lane implements ADR-0044 end-to-end integration using the production version family/pins:
 
 ```text
 otelcol-contrib 0.157.0
@@ -191,27 +213,51 @@ GitHub Actions remains required CI target. Documentation alone is not executed e
 
 ## 8. Expected repository interfaces
 
-After implementation exists:
+Implemented fast-lane interfaces include:
 
 ```text
 make baseline-verify
-make local-cluster-verify
-make verify-local-istio-ambient
-make verify-local-traefik-edge
-make verify-local-observability
+make local-runtime-test
+make local-runtime-up
+make local-runtime-status
 ```
 
-Context Engine developer interfaces additionally include:
+Implemented production-fidelity interfaces include:
+
+```text
+make local-cluster-up
+make local-cluster-verify
+make local-istio-ambient-install
+make verify-local-istio-ambient
+make local-kyverno-install
+make verify-local-kyverno
+make local-traefik-edge-install
+make verify-local-traefik-edge
+make local-observability-install
+make verify-local-observability
+make staging-data-install
+make staging-build
+make staging-deploy
+make staging-verify
+make production-fidelity-up
+make production-fidelity-verify
+make production-fidelity-down
+```
+
+The holistic runbook is `docs/runbooks/local-production-fidelity-staging.md`. These interfaces prove local integration fidelity only; they do not turn the kind lane into production K3s or production-readiness evidence.
+
+Context Engine repository interfaces additionally include:
 
 ```text
 make context-verify
 make context-bootstrap
-python scripts/context/mcp_server.py
 ```
+
+Context/Ops/Desktop MCP adapter/runtime tests execute from the independent Windows MCP runtime, not from HooshiX. Project commands issued through Ops use the explicit WSL bridge and `/home/coder/workspace/Hooshix`. Real MCP policies, audit/capture state, tunnel keys, and ADR-0050 credential values stay outside Git.
 
 ChatGPT Web tunnel operation follows `docs/runbooks/chatgpt-web-secure-mcp-tunnel.md`; tunnel-client does not replace repository verification commands.
 
-Expected versioned platform roots may include:
+Implemented local production-fidelity platform roots include:
 
 ```text
 infrastructure/kind/
@@ -230,7 +276,11 @@ Local verifier should report installed Java/Git/Docker/containerd/kubectl/kind/H
 
 DevSecOps local/pre-push checks should report Gitleaks/Semgrep/OSV versions and pass/fail status without emitting discovered secret content. Release verification separately reports Syft/Grype/Cosign/Kyverno evidence when that boundary is active.
 
-For ADR-0047, repository evidence verifies the CWD-independent read-only stdio MCP entry point, fixed five-tool boundary, positive-search structured/text result compatibility, configured sensitive-path retrieval exclusion, and documentation/pin. Real tunnel-client installation, restricted runtime credential, local `/readyz`, remote-main freshness at startup/session time, ChatGPT custom-app tool discovery/action state, persistent restart behavior, and ChatGPT Web `project.bootstrap` plus positive-result `project.search` are host/integration evidence and remain `NOT VERIFIED` until executed on the operator PC.
+For ADR-0046/0051, HooshiX repository evidence verifies the project Context Engine and the external-runtime path guard. Independent runtime tests verify the Context adapter protocol surface. Host evidence verifies tunnel-client, restricted credentials, readiness, and live Context calls against the canonical WSL checkout.
+
+For ADR-0048/0051, the independent Windows MCP runtime verifies Ops policy/process/filesystem/audit contracts, including the bounded persistent-job surface. Host evidence verifies protected policy/job-state/key ACLs, separate tunnel state, Windows token state, exact tool discovery, `ops.status`, WSL project-command execution, long-job polling across one response window, and runner-owned cancellation.
+
+For ADR-0049/0050/0051, the independent Windows MCP runtime verifies Desktop policy/app/HWND/input/capture/credential-broker contracts. Host evidence verifies the actual interactive session, WinApp integration, tunnel state, and application-specific credential-use behavior.
 
 Observability integration verifier additionally reports Collector/Prometheus/Loki/Tempo/Grafana/Alertmanager versions/digests when that profile is active.
 

@@ -59,15 +59,13 @@ Every tool remains read-only, non-destructive, bounded, and non-open-world under
 
 Current Git authority still outranks derived context, checkpoints, ChatGPT conversation state, and model memory.
 
-The approved tunnel runtime uses a dedicated HooshiX checkout for context access. The checkout should be clean and synchronized to the intended reviewed Git state before the tunnel is considered ready for targeted-review use.
+ADR-0051 refines the checkout model. The canonical HooshiX checkout is `/home/coder/workspace/Hooshix` on the native WSL filesystem. It must be clean and synchronized to the intended reviewed Git state before targeted-review use.
 
-The MCP entry point resolves its repository root from its own tracked script location rather than relying on the tunnel-client process working directory. This prevents an arbitrary service/startup working directory from selecting the wrong Git repository or causing accidental root discovery failure.
+Under ADR-0051, the independent Windows Context MCP adapter uses protected local policy to fix the WSL distribution, canonical Linux repository root, and project Context Engine path. Repository authority is evaluated inside WSL and does not depend on the tunnel-client working directory.
 
 A dirty authority/configuration path continues to make targeted-review trust fail safe. The tunnel does not convert a dirty or stale checkout into verified current context.
 
 Repository synchronization is operator-owned Git work. The read-only MCP surface does not fetch, pull, checkout, reset, merge, commit, push, or otherwise mutate Git state.
-
-A local `project.bootstrap` result is not remote-freshness proof. Before persistent/startup tunnel use is treated as current, operator automation may fetch the fixed remote-tracking `origin/main` reference and compare it to local `HEAD`, but it must fail closed on mismatch rather than silently reset/merge/pull the dedicated checkout.
 
 ## 3. Tunnel-client version and integrity
 
@@ -110,7 +108,7 @@ The tunnel changes transport reachability, not instruction precedence.
 
 Repository search results, source comments, fixtures, generated content, and checkpoint prose remain retrieved **data**. They do not become higher-priority instructions merely because they arrived through ChatGPT Web.
 
-The Context Engine continues to enforce tracked-file-only retrieval, configured sensitive-filename/path exclusion, bounded query/result/file sizes, repository-root confinement, Git/blob/worktree provenance, and conservative routing.
+The Context Engine continues to enforce tracked-file-only retrieval, sensitive-filename exclusion, bounded query/result/file sizes, repository-root confinement, Git/blob/worktree provenance, and conservative routing.
 
 The tunnel carries only what the selected MCP tools return for an explicit ChatGPT tool call. It does not authorize arbitrary PC filesystem enumeration or arbitrary local process access.
 
@@ -118,19 +116,17 @@ The tunnel carries only what the selected MCP tools return for an explicit ChatG
 
 The supported first-use sequence is:
 
-1. create or select the tunnel in the applicable ChatGPT/OpenAI tunnel-management surface;
+1. create or select the tunnel in the ChatGPT/OpenAI tunnel management surface;
 2. install the approved `tunnel-client` release and verify its published digest;
 3. create a restricted runtime API key with Tunnels `Read` + `Use` and store it only on the operator host through the supported secret mechanism;
-4. use the official `sample_mcp_stdio_local` profile pattern to launch the absolute HooshiX `scripts/context/mcp_server.py` path with the approved Python interpreter;
-5. verify the dedicated checkout is clean, fetch/compare the intended `origin/main` state, and fail closed if local `HEAD` is stale rather than auto-mutating the checkout;
-6. run `tunnel-client doctor --profile <profile> --explain`;
-7. start `tunnel-client run --profile <profile>` and verify local `/readyz` before connecting ChatGPT;
-8. in ChatGPT developer mode, create/configure the custom MCP app under the current **Apps** workflow, select the same Secure MCP Tunnel/Tunnel connection, and scan/refresh tools;
-9. verify discovery exposes only the five approved read-only tools;
-10. call `project.bootstrap` and confirm the expected Git provenance;
-11. execute a positive-result `project.search` through the real ChatGPT path before treating search transport compatibility as verified.
+4. use the official `sample_mcp_stdio_local` profile pattern to launch the independent Windows Context MCP adapter with its protected ADR-0051 WSL policy;
+5. run `tunnel-client doctor --profile <profile> --explain`;
+6. start `tunnel-client run --profile <profile>` and verify local `/readyz` before connecting ChatGPT;
+7. in ChatGPT, configure the custom Plugin/MCP connection with `Connection: Tunnel` and select the same tunnel;
+8. verify discovery exposes only the five approved read-only tools;
+9. call `project.bootstrap` and confirm current Git provenance before targeted engineering work.
 
-Persistent Windows startup is configured only after this foreground/manual path succeeds. Persistence must preserve the same binary, profile, secret, checkout, least-privilege boundaries, and fail-closed Git-freshness preflight.
+Persistent Windows startup is configured only after this foreground/manual path succeeds. Persistence must preserve the same binary, profile, secret, checkout, and least-privilege boundaries.
 
 ## 8. Failure behavior
 
@@ -138,25 +134,22 @@ Tunnel/control-plane/key/PC/MCP-child failure means **context tooling unavailabl
 
 When tunnel context is unavailable, agents follow the existing ADR-0046/`AGENTS.md` fallback: use current repository authority through available repository tooling and do not reduce review scope because the Context Engine could not run.
 
-A failed tunnel must not trigger automatic credential disclosure, public listener creation, firewall weakening, general shell exposure, write-capable MCP fallback, or destructive Git synchronization.
+A failed tunnel must not trigger automatic credential disclosure, public listener creation, firewall weakening, general shell exposure, or write-capable MCP fallback.
 
 ## 9. Verification requirements
 
 Executable/review evidence must prove at least:
 
-- the HooshiX MCP server starts and discovers correctly when launched from a working directory outside the repository;
-- the repository root is derived from the tracked MCP entry point, not caller working directory;
+- the independent Context MCP adapter starts and discovers correctly when launched from a working directory outside either repository;
+- protected local policy fixes the WSL distribution, canonical Linux repository root, and project Context Engine path; Windows Git/UNC access is not repository authority;
 - the five-tool list is unchanged and every tool remains read-only/non-destructive;
 - unknown/write-like MCP tool requests still fail safely;
-- positive modern `project.search` results preserve MCP-compatible structured data plus serialized JSON text compatibility;
-- configured sensitive filename/path exclusions prevent matching tracked secret-directory fixtures from retrieval;
 - no HooshiX network listener is introduced;
 - tunnel documentation selects stdio child mode and does not instruct operators to expose a public MCP port;
 - tunnel runtime/admin credentials are absent from repository content and test fixtures;
 - the pinned tunnel-client release/version and official digest-verification procedure are documented;
 - operator setup requires restricted Tunnels `Read` + `Use` runtime credentials;
-- startup/operational guidance distinguishes local bootstrap validity from remote-main freshness and fails closed on stale/dirty state;
-- real end-to-end ChatGPT Web tunnel discovery, `project.bootstrap`, and positive-result `project.search` remain `NOT VERIFIED` until executed on the operator PC after merge/deployment of the reviewed revision.
+- real end-to-end ChatGPT Web tunnel discovery and `project.bootstrap` remain `NOT VERIFIED` until executed on the operator PC after merge.
 
 ## Security and performance impact
 
@@ -175,7 +168,7 @@ The only expected local overhead is the tunnel-client process plus the existing 
 
 ## Rollback considerations
 
-Rollback removes the ChatGPT Web tunnel integration and returns to local stdio MCP plus repository/Git fallback.
+Rollback removes the ChatGPT Web tunnel integration and returns to local stdio MCP plus repository/GitHub fallback.
 
 Rollback MUST NOT:
 

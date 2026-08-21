@@ -227,8 +227,53 @@ Single-server accepts outages but never weaker decisions:
 - telemetry unavailable -> no security/audit/control bypass;
 - host loss -> external monitor alerts while local observability is unavailable.
 
-## 14. Verification
+## 14. Developer-host AI Ops boundary
 
-Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, and complete-stack capacity/DR.
+ADR-0051 separates MCP runtime source from the HooshiX application repository and makes `/home/coder/workspace/Hooshix` the canonical Linux Git/application authority. ADR-0048 adds a developer-host-only Ops MCP separate from the ADR-0046 Context MCP. The Context MCP remains exact read-only repository/context authority and receives no write/execute tool.
+
+Ops security controls are:
+
+- mandatory local policy outside Git; missing/invalid policy fails startup;
+- absolute allowed roots plus denied roots for typed filesystem operations;
+- lexical authorization before existence probing and resolved-path checks against symlink/reparse escape;
+- explicit absolute executable aliases; no caller-selected executable path;
+- bounded argv, cwd, timeout, synchronous output, persistent-job count/record lifetime/output/page size, file size, listing size, and audit retention;
+- persistent job state/output is confined below protected Ops state against traversal and symlink/junction/reparse escape; raw argv is only transient runner handoff state and is removed before target execution;
+- persistent cancellation accepts only a runtime-created job ID; the fixed runner owns child process-tree termination and no caller-selected PID kill surface exists;
+- no arbitrary caller environment or stdin secret channel; child environment excludes secret-like variables including tunnel/API credentials;
+- explicit opt-in for process execution, elevated filesystem mutation, and elevated process execution;
+- separate Ops tunnel/profile/runtime key from Context tunnel;
+- local audit stores metadata/digests, not file content, raw argv, raw purpose, stdout/stderr, or credentials; bounded persistent stdout/stderr is separate protected operational state and is not audit authority;
+- no HooshiX network MCP listener or public port;
+- no production credentials or production administration authority; ADR-0030 remains unchanged.
+
+A configured elevated PowerShell/Python/cmd/interpreter alias can exercise broad Windows account authority and can bypass typed filesystem policy through the interpreter itself. This is an explicit local-host residual risk, not a sandbox claim. The operator must treat that configuration as broad developer-host administrator authority.
+
+The Ops local audit is not tamper-resistant production audit. It cannot satisfy production JIT/audit requirements.
+
+## 15. Developer-host AI Desktop boundary
+
+ADR-0049 adds a third developer-host Desktop MCP for interactive Windows UI observation/input. ADR-0050 adds an optional policy-bound local credential-use broker to that same Desktop boundary. It is separate from read-only Context and process/filesystem Ops.
+
+Desktop security controls are:
+
+- mandatory local policy outside Git with strict duplicate/unknown/missing-field rejection and exact WinApp version pin;
+- intended interactive Windows session and non-elevated token requirement by default; no UAC/Secure-Desktop/Winlogon/SAS bypass;
+- fresh HWND -> real process-name revalidation before each targeted operation, with app allow/deny policy and denied-app precedence;
+- semantic selectors for UIA/mouse actions; no arbitrary coordinate-only click/drag and no arbitrary WinApp argv;
+- separate opt-ins for screenshot/capture-screen, UIA mutation, mouse, keyboard, and system keys;
+- no clipboard-read/get-value/credential-reader/list/write/export/recording/touch/pen/process/filesystem/network-fetch tool; `desktop.use_credential` is use-without-disclosure only and is not a credential reader or general secret-input channel;
+- literal bounded text entry is explicitly non-secret and uses a fixed isolated PowerShell/C# `KEYEVENTF_UNICODE` helper; raw text goes only over bounded UTF-8 stdin, never child argv/environment/audit; the helper checks foreground HWND per UTF-16 code unit, paces delivery, drains the target queue, and rejects inputs that cannot fit the policy timeout before injection;
+- credential use is disabled by default and accepts only opaque `credential_id`; protected policy fixes app, exact executable path/SHA-256, target strategy, and Generic-Credential target; the fixed helper verifies HWND/PID plus password UIA semantics before `CredReadW`; `@unique-password` remains UIA-first and, only when UIA reports zero eligible matches, may accept exactly one same-PID enabled/visible single-line native `Edit`/`WindowsForms10.EDIT.*` child with `ES_PASSWORD` plus non-zero bounded `EM_GETPASSWORDCHAR`, then verifies exact native focus with `GetGUIThreadInfo`; the credential value stays out of MCP/Python/output/audit/argv/environment, PID/focus/foreground/password predicates are rechecked during delivery, and partial input is never automatically retried;
+- credential delivery does not bypass Windows UIPI: `SendInput` to a higher-integrity target remains unsupported/fail-closed under a lower-integrity Desktop runtime, and the broker does not auto-elevate the Desktop boundary;
+- bounded command/output/screenshot/text/depth/audit limits; temporary PNG capture is deleted after bounded readback;
+- WinApp and text-helper child environments exclude tunnel/API credential variables; WinApp children opt out of telemetry;
+- fail-closed metadata audit before sensitive observation/mutation and separate Desktop tunnel/profile/runtime key.
+
+Visible UI/screenshot content can itself contain PII or confidential data. Desktop MCP therefore gives the model/client operator-authorized screen context but does not claim visible content is secret-safe. Local Desktop audit is not production audit.
+
+## 16. Verification
+
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049/0050 Desktop policy/app/HWND/capture/input/isolated-text-helper/credential-broker/process-identity/password-target/environment/audit/UTF-8 tests.
 
 Documentation alone remains `NOT VERIFIED`.

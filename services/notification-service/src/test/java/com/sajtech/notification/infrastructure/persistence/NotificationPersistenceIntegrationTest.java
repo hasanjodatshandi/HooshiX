@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
@@ -109,14 +110,16 @@ class NotificationPersistenceIntegrationTest {
     assertThat(dsl.fetchCount(DSL.table("notification_attempt"))).isEqualTo(1);
 
     byte[] encryptedRecipient =
-        dsl.fetchOne(
-                "SELECT recipient_ciphertext FROM notification WHERE notification_id = ?",
-                first.notificationId())
+        Objects.requireNonNull(
+                dsl.fetchOne(
+                    "SELECT recipient_ciphertext FROM notification WHERE notification_id = ?",
+                    first.notificationId()))
             .get("recipient_ciphertext", byte[].class);
     byte[] encryptedText =
-        dsl.fetchOne(
-                "SELECT text_ciphertext FROM notification WHERE notification_id = ?",
-                first.notificationId())
+        Objects.requireNonNull(
+                dsl.fetchOne(
+                    "SELECT text_ciphertext FROM notification WHERE notification_id = ?",
+                    first.notificationId()))
             .get("text_ciphertext", byte[].class);
     assertThat(
             containsSubsequence(

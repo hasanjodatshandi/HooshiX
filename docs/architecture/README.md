@@ -35,10 +35,13 @@ Executable vertical slices must preserve these current architecture requirements
 - ADR-0044: structured logging, Micrometer metrics, OpenTelemetry tracing, Collector/Loki/Tempo/Prometheus/Grafana/Alertmanager integration, and external host-down detection from Day-1;
 - ADR-0045: Gitleaks secret scanning + Semgrep source SAST + Gradle integrity + OSV-Scanner early dependency advisory + Syft/Grype/Cosign/Kyverno final-artifact security chain, with distinct tool responsibilities and no duplicate scanner by default;
 - ADR-0046: Git-native verified agent bootstrap, conservative task routing, commit-bound historical checkpoints, bounded local retrieval, and read-only stdio MCP; no central cross-project memory service without a later evidence trigger;
+- ADR-0047: separate approved Secure MCP Tunnel bridge for ChatGPT Web access to the unchanged read-only Context MCP;
+- ADR-0048: separate policy-gated developer-host Ops MCP for explicit local mutation/execution, including bounded persistent process jobs for work that can exceed one synchronous tunnel response; no production administration authority and no change to Context MCP;
+- ADR-0051: WSL-native HooshiX application workspace at `/home/coder/workspace/Hooshix`; Context/Ops/Desktop MCP runtime source is independently versioned on Windows and stays outside the application repository;
 - ADR-0017/build gates: Kyverno new production policies use stable CEL-based `policies.kyverno.io/v1` APIs;
 - stable merged ADR identifiers and coherent-change PR governance.
 
-ADR-0046 is repository/developer tooling only. It does not change application services, production topology, data ownership, security authority, or runtime availability.
+ADR-0046/0047/0048 are repository/developer-host tooling only. They do not change application services, production topology, data ownership, production security authority, or runtime availability. ADR-0048 local administrator mode is not ADR-0030 production JIT authority.
 
 These are target decisions. `implementation-status.md` remains authoritative for whether code/deployment/CI/runtime evidence exists.
 
@@ -57,6 +60,7 @@ These are target decisions. `implementation-status.md` remains authoritative for
 - `PRODUCTION-READINESS-CHECKLIST.md` — production traffic gate.
 - `implementation-status.md` — actual repository implementation/evidence presence.
 - `../engineering/agent-context-engine.md` — developer/agent operating interface for ADR-0046.
+- `../runbooks/chatgpt-web-ops-mcp.md` — operator setup for the separate ADR-0048 developer-host Ops MCP.
 - `services/` — implementation-facing service contracts.
 
 ## Authority rule

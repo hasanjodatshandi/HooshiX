@@ -1,0 +1,50 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "web-bff.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "web-bff.selectorLabels" . | nindent 6 }}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "web-bff.name" . }}-waypoint
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: {{ include "web-bff.name" . }}
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: [{{ required "edge.principal is required" .Values.edge.principal | quote }}]}
+      to:
+        - operation:
+            ports: [{{ .Values.service.applicationPort | quote }}]
+            paths: ["/api/v1/*"]
+    {{- if .Values.observability.metrics.enabled }}
+    - from:
+        - source: {principals: [{{ required "metrics principal is required" .Values.observability.metrics.prometheus.principal | quote }}]}
+      to:
+        - operation: {ports: [{{ .Values.service.managementPort | quote }}]}
+    {{- end }}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "web-bff.name" . }}-ztunnel
+spec:
+  selector:
+    matchLabels:
+      {{- include "web-bff.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: [{{ required "ambient.waypointPrincipal is required" .Values.ambient.waypointPrincipal | quote }}]
+      to:
+        - operation:
+            ports: [{{ .Values.service.applicationPort | quote }}, {{ .Values.service.managementPort | quote }}]

@@ -1,0 +1,57 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: otel-collector, namespace: platform-observability-node}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: otel-collector}}
+  rules:
+    - from:
+        - source:
+            principals:
+              - prod.sajtech.internal/ns/platform-apps/sa/authorization-service
+              - prod.sajtech.internal/ns/platform-apps/sa/compromised-password-service
+              - prod.sajtech.internal/ns/platform-apps/sa/identity-service
+              - prod.sajtech.internal/ns/platform-apps/sa/notification-service
+              - prod.sajtech.internal/ns/platform-apps/sa/web-bff
+      to: [{operation: {ports: ["4317", "4318"]}}]
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability/sa/prometheus"]}}]
+      to: [{operation: {ports: ["8888"]}}]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: loki, namespace: platform-observability}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: loki}}
+  rules:
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability-node/sa/otel-collector"]}}]
+      to: [{operation: {ports: ["3100"]}}]
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability/sa/grafana"]}}]
+      to: [{operation: {ports: ["3100"]}}]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: tempo, namespace: platform-observability}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: tempo}}
+  rules:
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability-node/sa/otel-collector"]}}]
+      to: [{operation: {ports: ["4317", "4318"]}}]
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability/sa/grafana"]}}]
+      to: [{operation: {ports: ["3200"]}}]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: prometheus, namespace: platform-observability}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: prometheus}}
+  rules:
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability/sa/grafana"]}}]
+      to: [{operation: {ports: ["9090"]}}]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: alertmanager, namespace: platform-observability}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: alertmanager}}
+  rules:
+    - from: [{source: {principals: ["prod.sajtech.internal/ns/platform-observability/sa/prometheus"]}}]
+      to: [{operation: {ports: ["9093"]}}]

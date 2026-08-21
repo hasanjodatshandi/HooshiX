@@ -1,0 +1,88 @@
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $digest := required "image.digest is required" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) }}{{ fail "image.digest must be an immutable sha256 digest" }}{{ end -}}
+{{- if ne (int .Values.replicaCount) 1 }}{{ fail "Web BFF single-server profile must render exactly one replica" }}{{ end -}}
+{{- $origin := required "runtime.publicOrigin is required" .Values.runtime.publicOrigin -}}
+{{- if or (contains "*" $origin) (not (hasPrefix "https://" $origin)) }}{{ fail "runtime.publicOrigin must be exact HTTPS origin" }}{{ end -}}
+{{- $redisSecret := required "redis.connectionSecretName is required" .Values.redis.connectionSecretName -}}
+{{- $locator := required "secrets.locatorSecretName is required" .Values.secrets.locatorSecretName -}}
+{{- $csrf := required "secrets.csrfSecretName is required" .Values.secrets.csrfSecretName -}}
+{{- $refresh := required "secrets.refreshEncryptionSecretName is required" .Values.secrets.refreshEncryptionSecretName -}}
+{{- if not .Values.runtime.requireFetchMetadata }}{{ fail "production browser surface must require Fetch Metadata" }}{{ end -}}
+{{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
+{{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
+{{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "web-bff.name" . }}
+  labels:
+    {{- include "web-bff.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  selector:
+    matchLabels:
+      {{- include "web-bff.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "web-bff.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | quote }}
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: application
+          image: "{{ $repository }}@{{ $digest }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          ports:
+            - {name: http, containerPort: {{ .Values.service.applicationPort }}, protocol: TCP}
+            - {name: management, containerPort: {{ .Values.service.managementPort }}, protocol: TCP}
+          env:
+            - {name: WEB_BFF_HTTP_PORT, value: {{ .Values.service.applicationPort | quote }}}
+            - {name: WEB_BFF_MANAGEMENT_PORT, value: {{ .Values.service.managementPort | quote }}}
+            - {name: WEB_BFF_RUNTIME_ENABLED, value: {{ .Values.runtime.enabled | quote }}}
+            - {name: WEB_BFF_REQUIRE_FETCH_METADATA, value: {{ .Values.runtime.requireFetchMetadata | quote }}}
+            - {name: WEB_BFF_PUBLIC_ORIGIN, value: {{ $origin | quote }}}
+            - {name: WEB_BFF_IDENTITY_TARGET, value: {{ .Values.identity.target | quote }}}
+            - {name: WEB_BFF_AUTHORIZATION_TARGET, value: {{ .Values.authorization.target | quote }}}
+            - {name: WEB_BFF_LOCATOR_KEY_RING_PATH, value: /run/secrets/web-bff-locator/locator.properties}
+            - {name: WEB_BFF_CSRF_KEY_RING_PATH, value: /run/secrets/web-bff-csrf/csrf.properties}
+            - {name: WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH, value: /run/secrets/web-bff-refresh/refresh.properties}
+            - {name: WEB_BFF_ROUTE_AUDIENCES_AUTHORIZATION_PREFIX, value: {{ .Values.routeAudiences.authorizationPrefix | quote }}}
+            - {name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT, value: {{ $traceEndpoint | quote }}}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe: {httpGet: {path: /actuator/health/readiness, port: management}, periodSeconds: 10, failureThreshold: 60}
+          readinessProbe: {httpGet: {path: /actuator/health/readiness, port: management}, periodSeconds: 10, timeoutSeconds: 2, failureThreshold: 3}
+          livenessProbe: {httpGet: {path: /actuator/health/liveness, port: management}, periodSeconds: 20, timeoutSeconds: 2, failureThreshold: 3}
+          volumeMounts:
+            - {name: redis, mountPath: /run/secrets/web-bff-redis, readOnly: true}
+            - {name: locator, mountPath: /run/secrets/web-bff-locator, readOnly: true}
+            - {name: csrf, mountPath: /run/secrets/web-bff-csrf, readOnly: true}
+            - {name: refresh, mountPath: /run/secrets/web-bff-refresh, readOnly: true}
+            - {name: temporary, mountPath: /tmp}
+      volumes:
+        - name: redis
+          secret: {secretName: {{ $redisSecret | quote }}, defaultMode: 0440}
+        - name: locator
+          secret: {secretName: {{ $locator | quote }}, defaultMode: 0440, items: [{key: locator.properties, path: locator.properties}]}
+        - name: csrf
+          secret: {secretName: {{ $csrf | quote }}, defaultMode: 0440, items: [{key: csrf.properties, path: csrf.properties}]}
+        - name: refresh
+          secret: {secretName: {{ $refresh | quote }}, defaultMode: 0440, items: [{key: refresh.properties, path: refresh.properties}]}
+        - name: temporary
+          emptyDir: {sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}}

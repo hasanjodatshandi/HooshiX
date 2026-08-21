@@ -1,0 +1,5 @@
+# Web BFF Observability
+
+Spring MVC observation and the OpenTelemetry starter provide HTTP server request metrics and traces on the private management surface. Internal gRPC calls emit `web_bff.dependency.duration` plus client spans with fixed dependency/operation/outcome tags, and Redis session operations emit `web_bff.redis.duration` with fixed operation/outcome tags. Telemetry remains low-cardinality. Cookie/session/pre-auth/provider/internal token, state/nonce/verifier/CSRF secret, raw client IP, User/Tenant/Membership identifiers, request IDs, and full request/response bodies are prohibited labels or span attributes.
+
+Prometheus reaches `/actuator/prometheus` only through the management NetworkPolicy/Istio rule. Readiness additionally fails closed when the runtime kill switch is off, session key material is stale, or authoritative Redis session state is unavailable.

@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: postgresql, namespace: platform-data}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: postgresql}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: authorization-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: notification-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-data}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: postgres-bootstrap}}
+      ports: [{protocol: TCP, port: 5432}, {protocol: TCP, port: 15008}]
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: security-redis, namespace: platform-data}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: security-redis}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: authorization-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
+      ports: [{protocol: TCP, port: 6379}, {protocol: TCP, port: 15008}]
+  egress: []
