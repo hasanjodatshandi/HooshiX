@@ -25,6 +25,7 @@ import com.sajtech.identity.infrastructure.security.session.HmacSessionCredentia
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
 import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
 import io.grpc.BindableService;
@@ -572,9 +573,19 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  @Primary
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  ObservedTenantLifecycle observedTenantLifecycle(
+      com.sajtech.identity.application.tenant.TenantLifecycleService delegate,
+      ObservationRegistry observations,
+      MeterRegistry meters) {
+    return new ObservedTenantLifecycle(delegate, observations, meters);
+  }
+
+  @Bean
   @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
   com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService tenantGrpc(
-      com.sajtech.identity.application.tenant.TenantLifecycleService service) {
+      ObservedTenantLifecycle service) {
     return new com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService(service);
   }
 
@@ -603,10 +614,17 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  IdentityAdmissionInterceptor identityAdmission(
+      IdentityProperties properties, MeterRegistry meters) {
+    return new IdentityAdmissionInterceptor(properties.maxGlobalConcurrentCalls(), meters);
+  }
+
+  @Bean
   GrpcServerLifecycle grpcLifecycle(
       IdentityProperties p,
       List<BindableService> services,
       SafeTracingServerInterceptor tracing,
+      IdentityAdmissionInterceptor admission,
       @Value("${identity.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
@@ -616,7 +634,8 @@ public class RuntimeConfiguration {
             || p.authenticationRuntimeEnabled()
             || p.tenantRuntimeEnabled(),
         services,
-        tracing);
+        tracing,
+        admission);
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "notificationChannel")

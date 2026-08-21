@@ -65,6 +65,34 @@ groups:
           service: identity-service
         annotations:
           summary: Identity password verification remains continuously occupied
+      - alert: IdentityGrpcAdmissionRejected
+        expr: rate(identity_grpc_admission_rejected_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity global gRPC admission is rejecting work
+      - alert: IdentityTenantUnavailableRateHigh
+        expr: |
+          sum(rate(identity_tenant_duration_seconds_count{outcome=~"AUTHORIZATION_UNAVAILABLE|SESSION_STATE_INVALID"}[5m]))
+          /
+          clamp_min(sum(rate(identity_tenant_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity tenant lifecycle unavailable rate is above 1%
+      - alert: IdentityGrpcAdmissionSaturationHigh
+        expr: identity_grpc_admission_in_flight / clamp_min(identity_grpc_admission_limit, 1) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity global gRPC admission utilization is above 80%
       - alert: IdentityRefreshReuseDetected
         expr: increase(identity_refresh_reuse_total[5m]) > 0
         for: 0m

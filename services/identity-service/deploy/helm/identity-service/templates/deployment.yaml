@@ -95,6 +95,7 @@ spec:
             - {name: IDENTITY_JWT_ALLOWED_AUDIENCES, value: {{ join "," .Values.jwt.allowedAudiences | quote }}}
             {{- end }}
             - {name: IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION, value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}}
+            - {name: IDENTITY_MAX_GLOBAL_CONCURRENT_CALLS, value: {{ .Values.runtime.maxGlobalConcurrentCalls | quote }}}
             - {name: IDENTITY_ARGON2_MAX_CONCURRENT_HASHES, value: {{ .Values.runtime.argon2MaxConcurrentHashes | quote }}}
             - {name: IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT, value: {{ .Values.runtime.compromisedPasswordMaxInFlight | quote }}}
             - {name: IDENTITY_PHONE_REGISTRATION_ENABLED, value: {{ .Values.runtime.phoneRegistrationEnabled | quote }}}

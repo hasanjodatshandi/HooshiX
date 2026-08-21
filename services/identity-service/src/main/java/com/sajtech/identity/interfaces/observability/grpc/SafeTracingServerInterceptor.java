@@ -41,11 +41,16 @@ public final class SafeTracingServerInterceptor implements ServerInterceptor {
     Context parent =
         W3CTraceContextPropagator.getInstance()
             .extract(Context.root(), headers, TRACE_CONTEXT_GETTER);
+    String rpcMethod =
+        call.getMethodDescriptor() == null
+            ? "unknown"
+            : call.getMethodDescriptor().getBareMethodName();
     Span span =
         tracer
-            .spanBuilder("identity.registration")
+            .spanBuilder("identity.grpc")
             .setParent(parent)
             .setSpanKind(SpanKind.SERVER)
+            .setAttribute("rpc.method", rpcMethod)
             .startSpan();
     Context spanContext = parent.with(span);
     AtomicBoolean ended = new AtomicBoolean();

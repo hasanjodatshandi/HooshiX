@@ -4,6 +4,7 @@ import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
+import io.grpc.ServerServiceDefinition;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -30,7 +31,8 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
       int maxConcurrentCallsPerConnection,
       boolean enabled,
       List<BindableService> services,
-      ServerInterceptor interceptor) {
+      ServerInterceptor tracingInterceptor,
+      ServerInterceptor admissionInterceptor) {
     if (bindAddress == null
         || bindAddress.isBlank()
         || port <= 0
@@ -39,7 +41,8 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
       throw new IllegalArgumentException("Identity gRPC configuration is invalid");
     }
     Objects.requireNonNull(services);
-    Objects.requireNonNull(interceptor);
+    Objects.requireNonNull(tracingInterceptor);
+    Objects.requireNonNull(admissionInterceptor);
     if (!enabled) {
       server = null;
       executor = null;
@@ -56,8 +59,11 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
             .maxInboundMessageSize(MAX_INBOUND_MESSAGE_BYTES)
             .maxInboundMetadataSize(MAX_INBOUND_METADATA_BYTES);
     for (BindableService service : services) {
-      builder.addService(
-          ServerInterceptors.intercept(Objects.requireNonNull(service), interceptor));
+      ServerServiceDefinition tracedService =
+          ServerInterceptors.intercept(Objects.requireNonNull(service), tracingInterceptor);
+      ServerServiceDefinition admittedService =
+          ServerInterceptors.intercept(tracedService, admissionInterceptor);
+      builder.addService(admittedService);
     }
     server = builder.build();
   }

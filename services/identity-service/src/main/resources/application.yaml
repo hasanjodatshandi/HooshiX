@@ -29,6 +29,7 @@ identity:
   authentication-runtime-enabled: ${IDENTITY_AUTHENTICATION_RUNTIME_ENABLED:false}
   tenant-runtime-enabled: ${IDENTITY_TENANT_RUNTIME_ENABLED:false}
   max-concurrent-calls-per-connection: ${IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION:128}
+  max-global-concurrent-calls: ${IDENTITY_MAX_GLOBAL_CONCURRENT_CALLS:128}
   phone-registration-enabled: ${IDENTITY_PHONE_REGISTRATION_ENABLED:false}
   compromised-password-target: ${IDENTITY_COMPROMISED_PASSWORD_TARGET:dns:///compromised-password-service.platform-apps.svc.cluster.local:9090}
   compromised-password-max-in-flight: ${IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT:32}
@@ -79,6 +80,7 @@ management:
       percentiles-histogram:
         identity.registration.duration: true
         identity.authentication.duration: true
+        identity.tenant.duration: true
         identity.dependency.duration: true
         identity.password_verify.duration: true
   otlp:

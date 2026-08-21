@@ -89,6 +89,10 @@
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
   <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedTenantLifecycle" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
     <Class name="com.sajtech.identity.infrastructure.observability.ObservedLoginQuota" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
