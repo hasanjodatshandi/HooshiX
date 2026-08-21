@@ -263,7 +263,21 @@ Host verification on 2026-08-20 started a WSL job that slept for 135 seconds. `p
 
 After a process-tool surface upgrade, an already-open ChatGPT/client session can retain an earlier discovery schema. On the exercised 2026-08-20 deployment, direct live MCP `tools/list` returned all 13 tools and `ops.status` returned persistent limits while the existing conversation still exposed the earlier connector schema. Refresh/reconnect the Ops client or start a refreshed session, then verify exact tool discovery before concluding the live server is stale.
 
-Do not remove the local five-minute process bound, job/output bounds, watchdog, or tunnel health checks to work around a transport deadline. Split/checkpoint remains valid when a workflow benefits from smaller engineering units or when the refreshed persistent tools are unavailable.
+If the current client still exposes only the earlier schema, use the reviewed independent-runtime compatibility helper rather than holding a long target command inside `process.run`:
+
+```text
+D:\Projects\HooshiXMcpRuntime\scripts\ops\job_cli.py
+
+short process.run -> policy `python` -> job_cli.py start -> persistent job_id
+short process.run -> policy `python` -> job_cli.py status/logs
+short process.run -> policy `python` -> job_cli.py cancel (optional)
+```
+
+`job_cli.py` delegates to the same `OpsEngine` persistent-job methods. It does not add a shell, PID-kill path, timeout bypass, new filesystem authority, or second job store. Start still validates the policy command alias, absolute allowed `cwd`, argv limits, elevation state, sanitized child environment, and finite timeout. Status/log/cancel retain the same runtime-created job-ID, path, output, paging, and runner-owned cancellation controls. The compatibility invocation itself is a short `process.run` Python process, so do not pass secrets in target argv. PR #4 makes helper JSON output explicit UTF-8 bytes so Unicode logs do not depend on the Windows console code page.
+
+Host verification on 2026-08-20 used this path from a client that still exposed the earlier nine-tool schema. The short wrapper started a WSL job that completed after `135158 ms` with exit code `0` and bounded output while each observation call remained short; another compatibility job reached terminal `cancelled` by job ID. This is evidence that stale discovery no longer couples long target execution to one response. It does not change the 300-second local command ceiling or prove a longer synchronous tunnel SLA.
+
+Refresh/reconnect remains the preferred way to obtain the first-class 13-tool surface. Do not remove the local five-minute process bound, job/output bounds, watchdog, or tunnel health checks to work around a transport deadline. Split/checkpoint remains valid when a workflow benefits from smaller engineering units or when neither the refreshed persistent tools nor the reviewed compatibility helper is available.
 
 Preserve:
 
