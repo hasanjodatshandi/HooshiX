@@ -17,6 +17,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -95,6 +96,27 @@ class DatasetBuilderTest {
       assertThat(rows.getLong(2)).isEqualTo(7);
       assertThat(rows.next()).isFalse();
     }
+  }
+
+  @Test
+  void publishesManifestBeforeSqliteSoSqliteIsTheFinalReleaseCommitPoint() throws Exception {
+    Path source = tempDirectory.resolve("publication-order.txt");
+    Files.writeString(source, "ABCDE" + "1".repeat(35) + ":1\n", StandardCharsets.US_ASCII);
+    Path sqlite = tempDirectory.resolve("publication-order.sqlite");
+    Path manifest = tempDirectory.resolve("publication-order.json");
+    var publishedTargets = new ArrayList<Path>();
+    DatasetBuilder builder =
+        new DatasetBuilder(
+            (temporary, target) -> {
+              publishedTargets.add(target);
+              Files.move(temporary, target);
+            });
+
+    builder.build(request(source, sqlite, manifest, sha256(source)));
+
+    assertThat(publishedTargets).containsExactly(manifest, sqlite);
+    assertThat(manifest).exists();
+    assertThat(sqlite).exists();
   }
 
   @Test

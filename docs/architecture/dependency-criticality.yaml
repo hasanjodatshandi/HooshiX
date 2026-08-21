@@ -36,7 +36,7 @@ edges:
 
   - operation_id: identity.password-credential-write
     caller_owner: Identity
-    dependency_id: compromised-password.LookupCompromisedPasswordRange
+    dependency_id: compromised-password.LookupPrefix
     class: AUTHORITATIVE_SECURITY
     failure_action: "reject unchecked password; stale/corrupt/missing/incompatible dataset never becomes clean result"
     retry_owner: none

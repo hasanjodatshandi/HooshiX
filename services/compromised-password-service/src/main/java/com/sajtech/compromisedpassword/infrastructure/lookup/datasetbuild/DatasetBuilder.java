@@ -43,6 +43,16 @@ public final class DatasetBuilder {
           + "ON CONFLICT(prefix, hash) DO UPDATE SET occurrence_count = "
           + "compromised_password.occurrence_count + excluded.occurrence_count";
 
+  private final Publication publication;
+
+  public DatasetBuilder() {
+    this(DatasetBuilder::publish);
+  }
+
+  DatasetBuilder(Publication publication) {
+    this.publication = Objects.requireNonNull(publication, "publication");
+  }
+
   public DatasetReleaseManifest build(DatasetBuildRequest request) {
     Path temporarySqlite = null;
     Path temporaryManifest = null;
@@ -88,10 +98,10 @@ public final class DatasetBuilder {
           manifest.toJson(),
           StandardCharsets.UTF_8,
           StandardOpenOption.TRUNCATE_EXISTING);
-      publish(temporarySqlite, request.sqliteOutputPath());
-      publishedSqlite = true;
-      publish(temporaryManifest, request.manifestOutputPath());
+      publication.publish(temporaryManifest, request.manifestOutputPath());
       publishedManifest = true;
+      publication.publish(temporarySqlite, request.sqliteOutputPath());
+      publishedSqlite = true;
       return manifest;
     } catch (DatasetBuildException exception) {
       rollbackPublishedOutputs(request, publishedSqlite, publishedManifest);
@@ -363,6 +373,11 @@ public final class DatasetBuilder {
     } catch (IOException ignored) {
       // Best-effort cleanup only. The requested final outputs are never overwritten.
     }
+  }
+
+  @FunctionalInterface
+  interface Publication {
+    void publish(Path temporary, Path target) throws IOException;
   }
 
   private record BuildInputResult(long sourceLineCount, String sourceArtifactSha256) {}
