@@ -755,6 +755,7 @@ services/web-bff/src/main/java/com/sajtech/webbff/configuration/WebBffProperties
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/AuthorizationBffClient.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/IdentityBffClient.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/health/WebBffReadinessHealthIndicator.java
+services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptor.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/observability/BffDependencyObservabilityInterceptor.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilter.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/security/SessionCrypto.java
@@ -770,9 +771,11 @@ services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityTenant
 services/web-bff/src/main/resources/application.yaml
 services/web-bff/src/test/java/com/sajtech/webbff/architecture/ArchitectureRulesTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/configuration/WebBffApplicationPropertiesTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptorTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilterTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/SessionCryptoTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/TrustedClientAddressTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/keyring/FileBackedKeyRingTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/session/RedisBffSessionRepositoryIntegrationTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserAuthControllerTest.java

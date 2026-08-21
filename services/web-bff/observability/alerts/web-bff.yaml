@@ -17,3 +17,9 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: Web BFF HTTP 5xx ratio is elevated
+      - alert: WebBffDependencyAdmissionRejected
+        expr: increase(web_bff_dependency_admission_rejected_total{job="web-bff"}[5m]) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Web BFF downstream dependency admission is shedding requests
