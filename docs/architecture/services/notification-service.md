@@ -219,7 +219,11 @@ Infrastructure NTP/Chrony health is a platform/node signal, not an application d
 
 Metric labels never contain recipient, raw/pseudonymous request identifiers, codes, provider message IDs, ciphertext, or free-form errors.
 
-## 16. Verification
+## 16. Current repository evidence
+
+The current implemented slice includes Flyway V3 integrity constraints, cross-definition template activation protection, SELECT-only runtime privileges for published template tables, key-ID rebinding rejection, strict Email/SMS semantic/template validation, and bounded global gRPC admission with no application queue. Current local verification passes strict Gradle/Testcontainers, Buf, Semgrep, OSV-Scanner, Gitleaks current-tree/full-history fixtures and scans, exact Helm rendering, observability artifacts, exact runtime-image construction, and the complete local production-fidelity kind/staging verifier. The production-fidelity execution verifies three Notification Flyway migrations and the template-table runtime privilege boundary after deployment. Production Liara/IPPanel dispatch remains not implemented and not verified.
+
+## 17. Verification
 
 Notification changes require applicable tests for:
 

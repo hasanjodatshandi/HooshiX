@@ -9,7 +9,8 @@ import java.util.Locale;
 
 public final class NotificationRecipientCanonicalizer {
   private static final int MAX_EMAIL_LENGTH = 254;
-  private static final String EMAIL_LOCAL_PATTERN = "[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+";
+  private static final String EMAIL_ATOM = "[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+";
+  private static final String EMAIL_LOCAL_PATTERN = EMAIL_ATOM + "(?:[.]" + EMAIL_ATOM + ")*";
   private static final String E164_PATTERN = "\\+[1-9][0-9]{7,14}";
 
   public String canonicalize(NotificationChannel channel, String rawRecipient) {

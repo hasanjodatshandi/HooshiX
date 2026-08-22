@@ -38,6 +38,46 @@ class BoundedTemplateRendererTest {
   }
 
   @Test
+  void rejectsVerificationTemplateThatOmitsRequiredTypedParameter() {
+    var template =
+        new NotificationTemplateVersion(
+            UUID.randomUUID(),
+            NotificationChannel.EMAIL,
+            NotificationSemanticType.REGISTRATION_VERIFICATION_CODE,
+            "en",
+            "a".repeat(64),
+            "Verify",
+            "This message expires in {expires_minutes} minutes",
+            "<p>Code {code} expires in {expires_minutes} minutes</p>");
+    var content =
+        new VerificationCodeContent(
+            NotificationSemanticType.REGISTRATION_VERIFICATION_CODE, "12345678", 10);
+
+    assertThatThrownBy(() -> renderer.render(template, content))
+        .isInstanceOf(NotificationSubmissionException.class);
+  }
+
+  @Test
+  void rejectsSemanticTypeMismatchBetweenTemplateAndTypedContent() {
+    var template =
+        new NotificationTemplateVersion(
+            UUID.randomUUID(),
+            NotificationChannel.EMAIL,
+            NotificationSemanticType.MFA_VERIFICATION_CODE,
+            "en",
+            "a".repeat(64),
+            "Verify",
+            "Code {code} expires {expires_minutes}",
+            "<p>Code {code} expires {expires_minutes}</p>");
+    var content =
+        new VerificationCodeContent(
+            NotificationSemanticType.REGISTRATION_VERIFICATION_CODE, "12345678", 10);
+
+    assertThatThrownBy(() -> renderer.render(template, content))
+        .isInstanceOf(NotificationSubmissionException.class);
+  }
+
+  @Test
   void rejectsUnknownPlaceholder() {
     var template =
         new NotificationTemplateVersion(
@@ -55,5 +95,34 @@ class BoundedTemplateRendererTest {
 
     assertThatThrownBy(() -> renderer.render(template, content))
         .isInstanceOf(NotificationSubmissionException.class);
+  }
+
+  @Test
+  void rejectsInvalidChannelSpecificTemplateShape() {
+    assertThatThrownBy(
+            () ->
+                new NotificationTemplateVersion(
+                    UUID.randomUUID(),
+                    NotificationChannel.EMAIL,
+                    NotificationSemanticType.PASSWORD_CHANGED_NOTICE,
+                    "en",
+                    "a".repeat(64),
+                    "Password changed",
+                    "Your password changed",
+                    null))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThatThrownBy(
+            () ->
+                new NotificationTemplateVersion(
+                    UUID.randomUUID(),
+                    NotificationChannel.SMS,
+                    NotificationSemanticType.REGISTRATION_VERIFICATION_CODE,
+                    "en",
+                    "a".repeat(64),
+                    "Not allowed",
+                    "Code {code} expires {expires_minutes}",
+                    null))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

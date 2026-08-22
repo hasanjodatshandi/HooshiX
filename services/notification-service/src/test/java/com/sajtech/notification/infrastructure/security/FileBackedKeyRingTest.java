@@ -33,6 +33,37 @@ class FileBackedKeyRingTest {
         .hasMessageContaining("stale");
   }
 
+  @Test
+  void rejectsKeyIdRebindingAndKeepsPreviousSnapshot() throws Exception {
+    Path path = tempDirectory.resolve("immutable-keys.properties");
+    byte[] original = new byte[32];
+    byte[] replacement = new byte[32];
+    java.util.Arrays.fill(original, (byte) 7);
+    java.util.Arrays.fill(replacement, (byte) 11);
+    String originalValue =
+        String.join(
+            System.lineSeparator(),
+            "active_key_id=v1",
+            "key.v1=" + Base64.getEncoder().encodeToString(original),
+            "");
+    Files.writeString(path, originalValue, StandardCharsets.UTF_8);
+    FileBackedKeyRing ring =
+        new FileBackedKeyRing(path, "AES", 32, Clock.systemUTC(), Duration.ofHours(1));
+
+    String reboundValue =
+        String.join(
+            System.lineSeparator(),
+            "active_key_id=v1",
+            "key.v1=" + Base64.getEncoder().encodeToString(replacement),
+            "");
+    Files.writeString(path, reboundValue, StandardCharsets.UTF_8);
+
+    assertThatThrownBy(ring::refresh)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("rebound");
+    assertThat(ring.activeKey().key().getEncoded()).containsExactly(original);
+  }
+
   private static final class MutableClock extends Clock {
     private Instant instant;
 

@@ -25,5 +25,21 @@ public record NotificationTemplateVersion(
     if (!contentSha256.matches("[0-9a-f]{64}")) {
       throw new IllegalArgumentException("Template digest must be canonical SHA-256 hex");
     }
+    if (!semanticType.supportsChannel(channel)) {
+      throw new IllegalArgumentException("Template semantic type is not supported for its channel");
+    }
+    if (textTemplate.isBlank()) {
+      throw new IllegalArgumentException("Template text body is required");
+    }
+    if (channel == NotificationChannel.EMAIL
+        && (subjectTemplate == null
+            || subjectTemplate.isBlank()
+            || htmlTemplate == null
+            || htmlTemplate.isBlank())) {
+      throw new IllegalArgumentException("Email template requires subject, text and HTML bodies");
+    }
+    if (channel == NotificationChannel.SMS && (subjectTemplate != null || htmlTemplate != null)) {
+      throw new IllegalArgumentException("SMS template must contain only a text body");
+    }
   }
 }

@@ -28,6 +28,7 @@ public final class JooqNotificationTemplateCatalog implements NotificationTempla
             FROM notification_template_definition d
             JOIN notification_template_activation a ON a.definition_id = d.definition_id
             JOIN notification_template_version v ON v.version_id = a.active_version_id
+              AND v.definition_id = d.definition_id
             WHERE d.channel = ? AND d.semantic_type = ? AND d.locale = ?
               AND v.state = 'PUBLISHED'
             """,

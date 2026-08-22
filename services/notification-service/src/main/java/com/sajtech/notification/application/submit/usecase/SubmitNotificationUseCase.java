@@ -144,8 +144,7 @@ public final class SubmitNotificationUseCase implements SubmitNotification {
   }
 
   private static void validateDeadline(CanonicalNotificationIntent intent, Instant now) {
-    if (intent.semanticType().isTimeBound()
-        && (intent.messageNotAfter() == null || !intent.messageNotAfter().isAfter(now))) {
+    if (intent.messageNotAfter() != null && !intent.messageNotAfter().isAfter(now)) {
       throw new NotificationSubmissionException(
           NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST,
           "Notification delivery deadline has expired");
