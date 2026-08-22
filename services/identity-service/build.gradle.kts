@@ -18,6 +18,11 @@ java {
 }
 
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
 dependencies {
     implementation("com.sajtech.hooshix:protobuf-contracts:1.0.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
