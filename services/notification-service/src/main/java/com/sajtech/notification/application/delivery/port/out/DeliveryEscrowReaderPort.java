@@ -1,8 +1,8 @@
 package com.sajtech.notification.application.delivery.port.out;
 
 import com.sajtech.notification.application.delivery.model.DecryptedDeliveryPayload;
-import java.util.UUID;
+import com.sajtech.notification.application.delivery.model.DeliveryEscrowEnvelope;
 
 public interface DeliveryEscrowReaderPort {
-  DecryptedDeliveryPayload decrypt(UUID notificationId, UUID attemptId);
+  DecryptedDeliveryPayload decrypt(DeliveryEscrowEnvelope envelope);
 }

@@ -1,11 +1,12 @@
 package com.sajtech.notification.infrastructure.persistence;
 
+import com.sajtech.notification.application.delivery.port.out.DeliveryDatabaseTimePort;
 import com.sajtech.notification.application.submit.port.out.DatabaseTimePort;
 import java.time.OffsetDateTime;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 
-public final class PostgresDatabaseTime implements DatabaseTimePort {
+public final class PostgresDatabaseTime implements DatabaseTimePort, DeliveryDatabaseTimePort {
   private final DSLContext dsl;
 
   public PostgresDatabaseTime(DSLContext dsl) {

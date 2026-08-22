@@ -34,6 +34,8 @@ identity:
   compromised-password-target: ${IDENTITY_COMPROMISED_PASSWORD_TARGET:dns:///compromised-password-service.platform-apps.svc.cluster.local:9090}
   compromised-password-max-in-flight: ${IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT:32}
   notification-target: ${IDENTITY_NOTIFICATION_TARGET:dns:///notification-service.platform-apps.svc.cluster.local:9090}
+  notification-result-grpc-port: ${IDENTITY_NOTIFICATION_RESULT_GRPC_PORT:9091}
+  notification-result-runtime-enabled: ${IDENTITY_NOTIFICATION_RESULT_RUNTIME_ENABLED:false}
   authorization-target: ${IDENTITY_AUTHORIZATION_TARGET:dns:///authorization-service.platform-apps.svc.cluster.local:9090}
   notification-dispatch-enabled: ${IDENTITY_NOTIFICATION_DISPATCH_ENABLED:true}
   fingerprint-key-ring-path: ${IDENTITY_FINGERPRINT_KEY_RING_PATH:/run/secrets/identity-fingerprint/fingerprint.properties}

@@ -31,4 +31,25 @@
         <Class name="com.sajtech.notification.infrastructure.observability.NotificationReadinessHealthIndicator"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.persistence.JooqDeliveryAttemptRepository"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.persistence.JooqDeliveryReconciliationRepository"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.persistence.JooqNotificationResultOutboxRepository"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.observability.NotificationDeliveryMetrics"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.notification.infrastructure.runtime.result.NotificationResultDispatcher"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

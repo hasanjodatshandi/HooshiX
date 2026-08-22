@@ -9,7 +9,7 @@ import java.util.UUID;
 public interface NotificationOutboxStore {
   List<NotificationOutboxRecord> claimDue(Instant now, int batch, Duration lease);
 
-  void markSubmitted(UUID outboxId, Instant now);
+  void markSubmitted(UUID outboxId, UUID notificationId, Instant now);
 
   void reschedule(
       UUID outboxId, int attemptCount, Instant nextAttempt, Instant now, String safeErrorClass);

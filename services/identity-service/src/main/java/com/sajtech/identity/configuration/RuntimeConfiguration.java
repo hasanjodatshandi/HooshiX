@@ -3,7 +3,9 @@ package com.sajtech.identity.configuration;
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.*;
+import com.sajtech.identity.application.notification.port.in.ReportNotificationResult;
 import com.sajtech.identity.application.notification.port.out.*;
+import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
 import com.sajtech.identity.application.registration.service.*;
 import com.sajtech.identity.application.registration.usecase.*;
@@ -25,6 +27,7 @@ import com.sajtech.identity.infrastructure.security.session.HmacSessionCredentia
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
 import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
@@ -155,6 +158,16 @@ public class RuntimeConfiguration {
   @Bean
   NotificationOutboxStore notificationOutboxStore(DSLContext dsl) {
     return new JooqNotificationOutboxStore(dsl);
+  }
+
+  @Bean
+  NotificationResultStore notificationResultStore(DSLContext dsl) {
+    return new JooqNotificationResultStore(dsl);
+  }
+
+  @Bean
+  ReportNotificationResult reportNotificationResult(NotificationResultStore store) {
+    return new ReportNotificationResultUseCase(store);
   }
 
   @Bean
@@ -634,6 +647,27 @@ public class RuntimeConfiguration {
             || p.authenticationRuntimeEnabled()
             || p.tenantRuntimeEnabled(),
         services,
+        tracing,
+        admission);
+  }
+
+  @Bean(name = "notificationResultGrpcLifecycle")
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "notification-result-runtime-enabled",
+      havingValue = "true")
+  GrpcServerLifecycle notificationResultGrpcLifecycle(
+      IdentityProperties p,
+      ReportNotificationResult report,
+      SafeTracingServerInterceptor tracing,
+      IdentityAdmissionInterceptor admission,
+      @Value("${identity.notification-result-grpc-bind-address:0.0.0.0}") String bindAddress) {
+    return new GrpcServerLifecycle(
+        bindAddress,
+        p.notificationResultGrpcPort(),
+        p.maxConcurrentCallsPerConnection(),
+        true,
+        List.of(new IdentityNotificationResultGrpcService(report)),
         tracing,
         admission);
   }

@@ -2,6 +2,7 @@ package com.sajtech.identity.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.sajtech.identity.application.notification.model.*;
 import com.sajtech.identity.application.registration.model.*;
 import com.sajtech.identity.domain.registration.valueobject.*;
 import java.time.*;
@@ -63,6 +64,62 @@ class IdentityRegistrationPersistenceIntegrationTest {
     store = new JooqRegistrationStore(dsl);
     outboxStore = new JooqNotificationOutboxStore(dsl);
     tx = new SpringTransactionRunner(new DataSourceTransactionManager(source));
+  }
+
+  @Test
+  void notificationTerminalResultIsIdempotentAndConflictsFailClosed() {
+    Instant now = Instant.parse("2026-08-22T20:00:00Z");
+    CanonicalContact contact =
+        new CanonicalContact(
+            RegistrationChannel.EMAIL, "callback@example.com", "callback@example.com");
+    UUID notificationId = UUID.randomUUID();
+    UUID outboxId = UUID.randomUUID();
+    PreparedRegistration prepared =
+        new PreparedRegistration(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            outboxId,
+            UUID.randomUUID(),
+            contact,
+            new RegistrationProfile("First", "Last", null),
+            "",
+            RegistrationLocale.EN,
+            new byte[32],
+            "k1",
+            new EncryptedHandoff("k2", new byte[12], new byte[32]),
+            now,
+            now.plusSeconds(600));
+    tx.required(
+        () -> {
+          store.lockContactKey(contact);
+          store.insertRegistration(prepared);
+          return null;
+        });
+    dsl.execute(
+        "UPDATE identity_notification_outbox SET state='SUBMITTED',notification_id=?,submitted_at=CAST(? AS TIMESTAMP WITH TIME ZONE),payload_nonce=NULL,payload_ciphertext=NULL WHERE outbox_id=?",
+        notificationId,
+        OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
+        outboxId);
+    JooqNotificationResultStore results = new JooqNotificationResultStore(dsl);
+    NotificationTerminalResult delivered =
+        new NotificationTerminalResult(
+            notificationId, NotificationTerminalLifecycle.DELIVERED, now.plusSeconds(30));
+
+    assertThat(results.apply(delivered)).isEqualTo(NotificationResultApplyOutcome.APPLIED);
+    assertThat(results.apply(delivered)).isEqualTo(NotificationResultApplyOutcome.REPLAY);
+    assertThat(
+            results.apply(
+                new NotificationTerminalResult(
+                    notificationId,
+                    NotificationTerminalLifecycle.FAILED_PERMANENT,
+                    now.plusSeconds(31))))
+        .isEqualTo(NotificationResultApplyOutcome.CONFLICT);
+    assertThat(
+            results.apply(
+                new NotificationTerminalResult(
+                    UUID.randomUUID(), NotificationTerminalLifecycle.DELIVERED, now)))
+        .isEqualTo(NotificationResultApplyOutcome.NOT_FOUND);
   }
 
   @Test
