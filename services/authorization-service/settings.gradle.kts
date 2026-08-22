@@ -7,7 +7,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { mavenCentral() }
+    repositories { mavenLocal(); mavenCentral() }
 }
 
 rootProject.name = "authorization-service"

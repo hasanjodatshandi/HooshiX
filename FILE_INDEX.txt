@@ -39,6 +39,16 @@ context/checkpoints/20260822T180614Z-post-merge-pr-98-finalize-the-application-i
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
+contracts/protobuf-contracts/README.md
+contracts/protobuf-contracts/buf.yaml
+contracts/protobuf-contracts/build.gradle.kts
+contracts/protobuf-contracts/settings.gradle.kts
+contracts/protobuf-contracts/src/main/proto/hooshix/authorization/v1/authorization.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/compromisedpassword/v1/compromised_password.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_authentication.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_registration.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_tenant.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/notification/v1/notification.proto
 deploy/clusters/production/README.md
 deploy/releases/production/README.md
 deploy/staging/authorization-service.yaml
@@ -97,6 +107,7 @@ docs/adr/0048-adopt-policy-gated-developer-host-ops-mcp-v1.md
 docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md
 docs/adr/0050-add-policy-bound-desktop-credential-broker-v1.md
 docs/adr/0051-separate-windows-mcp-runtime-from-wsl-workspace-v1.md
+docs/adr/0052-versioned-protobuf-contract-package-and-service-decoupling-v1.md
 docs/adr/decision-register.md
 docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
@@ -276,7 +287,6 @@ scripts/production/verify.py
 scripts/production/verify_release.py
 services/authorization-service/.dockerignore
 services/authorization-service/Dockerfile
-services/authorization-service/buf.yaml
 services/authorization-service/build.gradle.kts
 services/authorization-service/config/spotbugs/exclude.xml
 services/authorization-service/container/pins.env
@@ -343,7 +353,6 @@ services/authorization-service/src/main/java/com/sajtech/authorization/infrastru
 services/authorization-service/src/main/java/com/sajtech/authorization/interfaces/grpc/AuthorizationGrpcService.java
 services/authorization-service/src/main/java/com/sajtech/authorization/interfaces/grpc/JwtActorServerInterceptor.java
 services/authorization-service/src/main/java/com/sajtech/authorization/interfaces/observability/grpc/AuthorizationObservabilityInterceptor.java
-services/authorization-service/src/main/proto/hooshix/authorization/v1/authorization.proto
 services/authorization-service/src/main/resources/application-migration.yaml
 services/authorization-service/src/main/resources/application.yaml
 services/authorization-service/src/main/resources/db/migration/V1__create_authorization_schema.sql
@@ -365,7 +374,6 @@ services/authorization-service/src/test/java/com/sajtech/authorization/infrastru
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/security/keyring/FileBackedKeyRingTest.java
 services/compromised-password-service/.dockerignore
 services/compromised-password-service/Dockerfile
-services/compromised-password-service/buf.yaml
 services/compromised-password-service/build.gradle.kts
 services/compromised-password-service/config/spotbugs/exclude.xml
 services/compromised-password-service/container/pins.env
@@ -419,7 +427,6 @@ services/compromised-password-service/src/main/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/infrastructure/runtime/grpc/GrpcServerLifecycle.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/interfaces/lookup/grpc/CompromisedPasswordGrpcService.java
 services/compromised-password-service/src/main/java/com/sajtech/compromisedpassword/interfaces/observability/grpc/SafeTracingServerInterceptor.java
-services/compromised-password-service/src/main/proto/hooshix/compromisedpassword/v1/compromised_password.proto
 services/compromised-password-service/src/main/resources/application.yaml
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/architecture/ArchitectureRulesTest.java
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/domain/lookup/valueobject/CompromisedHashMatchTest.java
@@ -433,7 +440,6 @@ services/compromised-password-service/src/test/java/com/sajtech/compromisedpassw
 services/compromised-password-service/src/test/java/com/sajtech/compromisedpassword/runtime/CompromisedPasswordRuntimeIntegrationTest.java
 services/identity-service/.dockerignore
 services/identity-service/Dockerfile
-services/identity-service/buf.yaml
 services/identity-service/build.gradle.kts
 services/identity-service/config/spotbugs/exclude.xml
 services/identity-service/container/pins.env
@@ -603,9 +609,6 @@ services/identity-service/src/main/java/com/sajtech/identity/interfaces/observab
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/SafeTracingServerInterceptor.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/registration/grpc/IdentityRegistrationGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/tenant/grpc/IdentityTenantGrpcService.java
-services/identity-service/src/main/proto/hooshix/identity/v1/identity_authentication.proto
-services/identity-service/src/main/proto/hooshix/identity/v1/identity_registration.proto
-services/identity-service/src/main/proto/hooshix/identity/v1/identity_tenant.proto
 services/identity-service/src/main/resources/application-migration.yaml
 services/identity-service/src/main/resources/application.yaml
 services/identity-service/src/main/resources/db/migration/V1__create_identity_registration_schema.sql
@@ -645,7 +648,6 @@ services/identity-service/src/test/java/com/sajtech/identity/interfaces/registra
 services/identity-service/src/test/resources/features/identity_authentication.feature
 services/notification-service/.dockerignore
 services/notification-service/Dockerfile
-services/notification-service/buf.yaml
 services/notification-service/build.gradle.kts
 services/notification-service/config/spotbugs/exclude.xml
 services/notification-service/container/pins.env
@@ -733,7 +735,6 @@ services/notification-service/src/main/java/com/sajtech/notification/infrastruct
 services/notification-service/src/main/java/com/sajtech/notification/interfaces/notification/grpc/NotificationAdmissionInterceptor.java
 services/notification-service/src/main/java/com/sajtech/notification/interfaces/notification/grpc/NotificationGrpcService.java
 services/notification-service/src/main/java/com/sajtech/notification/interfaces/observability/grpc/SafeTracingServerInterceptor.java
-services/notification-service/src/main/proto/hooshix/notification/v1/notification.proto
 services/notification-service/src/main/resources/application-migration.yaml
 services/notification-service/src/main/resources/application.yaml
 services/notification-service/src/main/resources/db/migration/V1__create_notification_schema.sql
