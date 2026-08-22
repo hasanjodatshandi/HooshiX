@@ -127,6 +127,7 @@ Authorization and Web BFF application services are implemented as current reposi
 The bootstrap baseline makes these current repository invariants executable:
 
 - `FILE_INDEX.txt` must exactly match the clean repository file set and remain sorted;
+- the automation-safe final-report contract retains the exact `Outcome`, `Remaining work`, `Continuation action`, `Retryable`, and `Human action required` keys and canonical token sets used by local task-supervision automation;
 - ADR file identifiers, headings, and the Decision Register must remain consistent and non-reused;
 - dependency-registry version/classes/required edge fields/policy references must match the current schema constraints enforced by the bootstrap verifier;
 - the dependency Markdown operation list must match canonical YAML exactly and in canonical order;

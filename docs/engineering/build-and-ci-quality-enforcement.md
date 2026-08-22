@@ -195,6 +195,7 @@ Applicable checks include:
 CI SHOULD enforce when implemented:
 
 - no broken relative links;
+- the automation-safe agent final-report contract retains the exact `Outcome`, `Remaining work`, `Continuation action`, `Retryable`, and `Human action required` keys plus canonical token sets;
 - Decision Register/source/task/index coverage;
 - ADR filename/heading ID match;
 - no duplicate/reused/renumbered merged ADR identifiers;

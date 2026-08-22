@@ -77,6 +77,23 @@ EXTERNALIZED_MCP_PATHS = (
 )
 EXTERNALIZED_MCP_PREFIXES = ("scripts/ops/", "scripts/desktop/", "ops/", "desktop/")
 
+REPORTING_PROTOCOL_FIELDS = (
+    "Outcome:",
+    "Remaining work:",
+    "Continuation action:",
+    "Retryable:",
+    "Human action required:",
+)
+REPORTING_PROTOCOL_VALUE_MARKERS = (
+    "completed | partial | blocked | failed",
+    "continue | stop | human",
+    "yes | no",
+)
+REPORTING_PROTOCOL_PATHS = (
+    "AGENTS.md",
+    "docs/engineering/agent-communication-and-reporting.md",
+)
+
 
 @dataclass(frozen=True)
 class DependencyEdge:
@@ -390,6 +407,44 @@ def validate_source_references(root: Path) -> list[str]:
     return sorted(set(errors))
 
 
+def validate_agent_reporting_contract(root: Path) -> list[str]:
+    errors: list[str] = []
+    texts: dict[str, str] = {}
+    for relative in REPORTING_PROTOCOL_PATHS:
+        path = root / relative
+        if not path.is_file():
+            errors.append(f"missing reporting protocol authority: {relative}")
+            continue
+        text = read_text(path)
+        texts[relative] = text
+        for field_name in REPORTING_PROTOCOL_FIELDS:
+            if field_name not in text:
+                errors.append(f"{relative} is missing reporting protocol field: {field_name}")
+
+    canonical = texts.get("docs/engineering/agent-communication-and-reporting.md")
+    if canonical is not None:
+        for marker in REPORTING_PROTOCOL_VALUE_MARKERS:
+            if marker not in canonical:
+                errors.append(
+                    "agent-communication-and-reporting.md is missing reporting protocol token set: "
+                    + marker
+                )
+        completed_markers = (
+            "`Outcome: completed`",
+            "`Remaining work: None`",
+            "`Continuation action: stop`",
+            "`Retryable: no`",
+            "`Human action required: None`",
+        )
+        for marker in completed_markers:
+            if marker not in canonical:
+                errors.append(
+                    "agent-communication-and-reporting.md is missing completed-terminal invariant: "
+                    + marker
+                )
+    return errors
+
+
 def validate_guarded_structure(root: Path) -> list[str]:
     errors: list[str] = []
     reference_service = root / "services/reference-data-service"
@@ -426,6 +481,7 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         validate_adr_register(root),
         validate_dependency_registry(root),
         validate_source_references(root),
+        validate_agent_reporting_contract(root),
         validate_guarded_structure(root),
     )
     return [error for result in checks for error in result]
