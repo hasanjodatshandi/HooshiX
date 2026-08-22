@@ -132,6 +132,7 @@ class AuthorizationRlsIntegrationTest {
         .isNotEqualTo(ROLE);
     for (String table :
         List.of(
+            "authorization_tenant_projection",
             "authorization_membership_projection",
             "authorization_role",
             "authorization_role_permission",
@@ -147,6 +148,23 @@ class AuthorizationRlsIntegrationTest {
       assertThat(row.get("relrowsecurity", Boolean.class)).isTrue();
       assertThat(row.get("relforcerowsecurity", Boolean.class)).isTrue();
     }
+  }
+
+  @Test
+  void tenantProjectionIsolatedByForcedRls() {
+    Integer visible =
+        runtime.transactionResult(
+            c -> {
+              DSLContext tx = DSL.using(c);
+              tx.fetchValue(
+                  "SELECT set_config('app.current_tenant_id', ?, true)", tenantA.toString());
+              return ((Number)
+                      tx.fetchValue(
+                          "SELECT count(*) FROM authorization_tenant_projection WHERE tenant_id=?",
+                          tenantB))
+                  .intValue();
+            });
+    assertThat(visible).isZero();
   }
 
   @Test
