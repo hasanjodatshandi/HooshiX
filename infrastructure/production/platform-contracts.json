@@ -1,0 +1,132 @@
+{
+  "admission": {
+    "digest_required": true,
+    "failure_policy": "Fail",
+    "kyverno": "1.18.2",
+    "legacy_policy_types_allowed": false,
+    "policy_api": "policies.kyverno.io/v1",
+    "provenance_required": true,
+    "signature_required": true,
+    "signed_cyclonedx_sbom_required": true,
+    "validation_action": "Deny"
+  },
+  "edge": {
+    "direct_bff_bypass_denied": true,
+    "direct_origin_internet_denied": true,
+    "exact_external_l4_cidr_trust_required": true,
+    "forwarded_headers_insecure": false,
+    "gateway_api": "1.5.1",
+    "proxy_protocol": "v2",
+    "proxy_protocol_insecure": false,
+    "traefik": "3.7.10",
+    "traefik_chart": "41.2.0",
+    "waf_required": true
+  },
+  "gitops": {
+    "argocd": "3.4.2",
+    "desired_state_authority": "git",
+    "direct_unreviewed_production_mutation": false,
+    "helm": "4.2.4",
+    "production_rebuild": false,
+    "same_digest_staging_to_production": true
+  },
+  "kafka": {
+    "acl_isolation": true,
+    "brokers": 1,
+    "business_source_of_truth": false,
+    "combined_kraft_role": true,
+    "controllers": 1,
+    "min_insync_replicas": 1,
+    "producer_acks": "all",
+    "producer_idempotence": true,
+    "replication_factor": 1,
+    "tls_required": true,
+    "unclean_leader_election": false,
+    "version": "4.2.1"
+  },
+  "observability": {
+    "alertmanager": "0.33.1",
+    "authoritative_audit_uses_ordinary_telemetry_only": false,
+    "external_host_down_monitor_required": true,
+    "grafana": "13.1.3",
+    "loki": "3.7.4",
+    "otel_collector": "0.157.0",
+    "otlp_public_ingress": false,
+    "prometheus": "3.13.2",
+    "tempo": "3.0.2"
+  },
+  "platform": {
+    "calico": "3.32.1",
+    "calico_dataplane": "standard",
+    "disabled_k3s_components": [
+      "flannel",
+      "network-policy",
+      "servicelb",
+      "traefik"
+    ],
+    "embedded_datastore": "sqlite",
+    "istio_ambient": "1.30.3",
+    "k3s": "v1.35.6+k3s1",
+    "kubernetes": "1.35.6",
+    "mesh_id": "platform-prod",
+    "schedulable_workload_nodes": 1,
+    "secrets_encryption": true,
+    "servers": 1,
+    "strict_mtls": true,
+    "trust_domain": "prod.sajtech.internal"
+  },
+  "postgresql": {
+    "application_pool_budget_percent_max": 70,
+    "barman_plugin": "0.13.0",
+    "cert_manager": "1.20.3",
+    "cloudnativepg": "1.30.0",
+    "instances": 1,
+    "physical_clusters": 1,
+    "postgresql": "18.4",
+    "reserved_connections_percent_min": 30,
+    "runtime_migration_role_isolation": true,
+    "service_database_isolation": true,
+    "tls_required": true
+  },
+  "profile": "production-single-server",
+  "redis": {
+    "acl_isolation": true,
+    "aof": true,
+    "appendfsync": "everysec",
+    "instances": 1,
+    "maxmemory_policy": "noeviction",
+    "memory_headroom_percent_min": 30,
+    "tls_required": true,
+    "version": "8.2.8"
+  },
+  "release": {
+    "cosign": "3.0.6",
+    "exact_oidc_identity_required": true,
+    "grype": "0.117.0",
+    "grype_fail_on": "high",
+    "production_rebuild": false,
+    "provenance_required": true,
+    "signed_cyclonedx_sbom_required": true,
+    "syft": "1.51.0"
+  },
+  "schema_version": 1,
+  "secrets": {
+    "application_hot_path_openbao_calls": false,
+    "external_secrets_operator": "2.8.0",
+    "openbao": "2.6.1",
+    "openbao_instances": 1,
+    "secret_values_in_git": false,
+    "shamir_shares": 3,
+    "shamir_threshold": 2,
+    "storage": "raft-pvc"
+  },
+  "workloads": {
+    "availability_pdb_enabled": false,
+    "default_service_account_allowed": false,
+    "deny_by_default_network": true,
+    "hpa_enabled": false,
+    "immutable_digest_required": true,
+    "least_privilege_istio_authorization": true,
+    "replicas": 1
+  }
+}

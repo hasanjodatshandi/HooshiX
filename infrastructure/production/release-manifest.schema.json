@@ -1,0 +1,334 @@
+{
+  "$id": "https://hooshix.invalid/schemas/production-release-manifest-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capacity_evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu_headroom_percent": {
+          "minimum": 30,
+          "type": "number"
+        },
+        "memory_headroom_percent": {
+          "minimum": 30,
+          "type": "number"
+        },
+        "passed": {
+          "const": true
+        },
+        "reference": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference",
+        "passed",
+        "cpu_headroom_percent",
+        "memory_headroom_percent"
+      ],
+      "type": "object"
+    },
+    "compromised_password_dataset": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "max_prefix_cardinality": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_serialized_response_bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "retrieval_completed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "source_kind": {
+          "const": "HIBP_PWNED_PASSWORDS_SHA1"
+        }
+      },
+      "required": [
+        "source_kind",
+        "artifact_sha256",
+        "manifest_sha256",
+        "retrieval_completed_at",
+        "max_prefix_cardinality",
+        "max_serialized_response_bytes"
+      ],
+      "type": "object"
+    },
+    "cosign": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate_identity": {
+          "const": "https://github.com/hasanjodatshandi/HooshiX/.github/workflows/production-release.yml@refs/heads/main"
+        },
+        "certificate_oidc_issuer": {
+          "const": "https://token.actions.githubusercontent.com"
+        }
+      },
+      "required": [
+        "certificate_identity",
+        "certificate_oidc_issuer"
+      ],
+      "type": "object"
+    },
+    "external_evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "cold_dr_exercise": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "external_blackbox_monitor": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "notification_provider_delivery": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "offhost_security_audit_sink": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "offsite_postgresql_backup_target": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "openbao_unseal_custody": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "upstream_ddos_provider": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "wireguard_peer_inventory": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "external_blackbox_monitor",
+        "offhost_security_audit_sink",
+        "offsite_postgresql_backup_target",
+        "openbao_unseal_custody",
+        "upstream_ddos_provider",
+        "wireguard_peer_inventory",
+        "cold_dr_exercise",
+        "notification_provider_delivery"
+      ],
+      "type": "object"
+    },
+    "external_l4_source_cidrs": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "git_revision": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "images": {
+      "additionalProperties": false,
+      "properties": {
+        "authorization-service": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "compromised-password-service": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "identity-service": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "notification-service": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "web-bff": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "authorization-service",
+        "compromised-password-service",
+        "identity-service",
+        "notification-service",
+        "web-bff"
+      ],
+      "type": "object"
+    },
+    "profile": {
+      "const": "production-single-server"
+    },
+    "public_hostname": {
+      "maxLength": 253,
+      "minLength": 1,
+      "pattern": "^(?=.{1,253}$)(?:[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "secret_refs": {
+      "additionalProperties": false,
+      "properties": {
+        "kafka_tls": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "notification_providers": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "openbao": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "postgresql_backup": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "production_tls": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "redis_tls": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "production_tls",
+        "postgresql_backup",
+        "openbao",
+        "redis_tls",
+        "kafka_tls",
+        "notification_providers"
+      ],
+      "type": "object"
+    },
+    "service_capacity": {
+      "additionalProperties": false,
+      "properties": {
+        "authorization": {
+          "additionalProperties": false,
+          "properties": {
+            "global_concurrency": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "global_queue_capacity": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "max_caller_buckets": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "per_caller_concurrency": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "per_caller_queue_capacity": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "quota_max_active_buckets": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "quota_max_new_buckets_per_minute": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "global_concurrency",
+            "per_caller_concurrency",
+            "global_queue_capacity",
+            "per_caller_queue_capacity",
+            "max_caller_buckets",
+            "quota_max_active_buckets",
+            "quota_max_new_buckets_per_minute"
+          ],
+          "type": "object"
+        },
+        "identity": {
+          "additionalProperties": false,
+          "properties": {
+            "argon2_max_concurrent_hashes": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "compromised_password_max_in_flight": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "quota_max_active_buckets": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "quota_max_new_buckets_per_minute": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "argon2_max_concurrent_hashes",
+            "compromised_password_max_in_flight",
+            "quota_max_active_buckets",
+            "quota_max_new_buckets_per_minute"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "authorization",
+        "identity"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "profile",
+    "git_revision",
+    "public_hostname",
+    "images",
+    "cosign",
+    "external_l4_source_cidrs",
+    "capacity_evidence",
+    "service_capacity",
+    "compromised_password_dataset",
+    "external_evidence",
+    "secret_refs"
+  ],
+  "title": "HooshiX production release manifest",
+  "type": "object"
+}

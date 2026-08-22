@@ -1,0 +1,22 @@
+# Managed production SSH policy. Public TCP/22 remains denied by the host/network perimeter.
+# Authorized user credentials must be hardware-backed OpenSSH FIDO2 security-key credentials.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PubkeyAuthentication yes
+PubkeyAcceptedAlgorithms sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com
+PubkeyAuthOptions touch-required verify-required
+AuthenticationMethods publickey
+PermitEmptyPasswords no
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitTunnel no
+GatewayPorts no
+PermitUserEnvironment no
+ClientAliveInterval 60
+ClientAliveCountMax 2
+MaxAuthTries 3
+MaxSessions 2
+LogLevel VERBOSE

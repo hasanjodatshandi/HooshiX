@@ -1,0 +1,10 @@
+# HooshiX production-single-server K3s server configuration.
+# Environment-specific addresses and tokens are supplied outside Git.
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+flannel-backend: none
+disable-network-policy: true
+disable:
+  - servicelb
+  - traefik
+protect-kernel-defaults: true

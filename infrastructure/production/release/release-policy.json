@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "syft": "1.51.0",
+  "grype": "0.117.0",
+  "cosign": "3.0.6",
+  "image_reference_must_be_digest": true,
+  "cyclonedx_sbom_required": true,
+  "grype_severities_blocking": ["Critical", "High"],
+  "signature_required": true,
+  "provenance_attestation_required": true,
+  "signed_sbom_attestation_required": true,
+  "exact_oidc_issuer_subject_required": true,
+  "continuous_rescan_required": true,
+  "vex_exception_requires_owner_expiry": true
+}
