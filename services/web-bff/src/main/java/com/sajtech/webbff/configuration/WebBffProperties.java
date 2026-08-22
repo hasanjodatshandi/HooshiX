@@ -19,6 +19,8 @@ public record WebBffProperties(
     Path refreshEncryptionKeyRingPath,
     Duration hmacKeyMaximumStaleness,
     Duration encryptionKeyMaximumStaleness,
+    int identityMaximumConcurrentCalls,
+    int authorizationMaximumConcurrentCalls,
     Map<String, String> routeAudiences) {
   public WebBffProperties {
     if (publicOrigin == null
@@ -51,6 +53,8 @@ public record WebBffProperties(
     if (publicOrigin.getPort() != -1
         && (publicOrigin.getPort() < 1 || publicOrigin.getPort() > 65535))
       throw new IllegalArgumentException("Web BFF public origin port is invalid");
+    if (identityMaximumConcurrentCalls < 1 || authorizationMaximumConcurrentCalls < 1)
+      throw new IllegalArgumentException("Web BFF dependency concurrency limits must be positive");
     routeAudiences = Map.copyOf(routeAudiences == null ? Map.of() : routeAudiences);
     if (routeAudiences.entrySet().stream()
         .anyMatch(

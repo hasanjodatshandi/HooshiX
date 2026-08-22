@@ -2,11 +2,14 @@ package com.sajtech.webbff.configuration;
 
 import com.sajtech.webbff.infrastructure.client.*;
 import com.sajtech.webbff.infrastructure.health.WebBffReadinessHealthIndicator;
+import com.sajtech.webbff.infrastructure.observability.*;
 import com.sajtech.webbff.infrastructure.security.*;
 import com.sajtech.webbff.infrastructure.security.keyring.FileBackedKeyRing;
 import com.sajtech.webbff.infrastructure.session.RedisBffSessionRepository;
 import io.grpc.*;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -76,13 +79,21 @@ public class RuntimeConfiguration {
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "webBffIdentityChannel")
-  ManagedChannel identityChannel(WebBffProperties p) {
-    return channel(p.identityTarget());
+  ManagedChannel identityChannel(
+      WebBffProperties p, OpenTelemetry telemetry, MeterRegistry meters) {
+    return channel(
+        p.identityTarget(), "identity", p.identityMaximumConcurrentCalls(), telemetry, meters);
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "webBffAuthorizationChannel")
-  ManagedChannel authorizationChannel(WebBffProperties p) {
-    return channel(p.authorizationTarget());
+  ManagedChannel authorizationChannel(
+      WebBffProperties p, OpenTelemetry telemetry, MeterRegistry meters) {
+    return channel(
+        p.authorizationTarget(),
+        "authorization",
+        p.authorizationMaximumConcurrentCalls(),
+        telemetry,
+        meters);
   }
 
   @Bean
@@ -110,11 +121,19 @@ public class RuntimeConfiguration {
     return bean;
   }
 
-  private static ManagedChannel channel(String target) {
+  private static ManagedChannel channel(
+      String target,
+      String dependency,
+      int maximumConcurrentCalls,
+      OpenTelemetry telemetry,
+      MeterRegistry meters) {
     return NettyChannelBuilder.forTarget(target)
         .usePlaintext()
         .disableRetry()
         .maxInboundMessageSize(64 * 1024)
+        .intercept(
+            new BffDependencyAdmissionInterceptor(dependency, maximumConcurrentCalls, meters),
+            new BffDependencyObservabilityInterceptor(dependency, telemetry, meters))
         .build();
   }
 }

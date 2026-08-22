@@ -156,6 +156,8 @@ class BrowserSecurityFilterTest {
         Path.of("refresh"),
         Duration.ofMinutes(5),
         Duration.ofHours(1),
+        128,
+        128,
         Map.of("/api/v1/authorization", "authorization-service"));
   }
 }
