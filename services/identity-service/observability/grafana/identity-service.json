@@ -3,8 +3,13 @@
   "schemaVersion": 41,
   "version": 2,
   "refresh": "30s",
-  "tags": ["hooshix", "identity"],
-  "templating": {"list": []},
+  "tags": [
+    "hooshix",
+    "identity"
+  ],
+  "templating": {
+    "list": []
+  },
   "panels": [
     {
       "id": 1,
@@ -17,7 +22,12 @@
           "legendFormat": "{{operation}} {{outcome}}"
         }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "id": 2,
@@ -30,21 +40,46 @@
           "legendFormat": "{{operation}}"
         }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
     },
     {
       "id": 3,
       "type": "timeseries",
       "title": "Registration in flight",
-      "targets": [{"refId": "A", "expr": "identity_registration_in_flight"}],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "identity_registration_in_flight"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
     },
     {
       "id": 4,
       "type": "timeseries",
       "title": "Password hash in flight",
-      "targets": [{"refId": "A", "expr": "identity_password_hash_in_flight"}],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "identity_password_hash_in_flight"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
     },
     {
       "id": 5,
@@ -57,7 +92,12 @@
           "legendFormat": "{{operation}} {{outcome}}"
         }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      }
     },
     {
       "id": 6,
@@ -70,44 +110,158 @@
           "legendFormat": "{{operation}}"
         }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      }
     },
     {
       "id": 7,
       "type": "timeseries",
       "title": "Authentication and password verification in flight",
       "targets": [
-        {"refId": "A", "expr": "identity_authentication_in_flight", "legendFormat": "authentication"},
-        {"refId": "B", "expr": "identity_password_verify_in_flight", "legendFormat": "password verify"}
+        {
+          "refId": "A",
+          "expr": "identity_authentication_in_flight",
+          "legendFormat": "authentication"
+        },
+        {
+          "refId": "B",
+          "expr": "identity_password_verify_in_flight",
+          "legendFormat": "password verify"
+        }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
     },
     {
       "id": 8,
       "type": "timeseries",
       "title": "Refresh credential reuse detections",
       "targets": [
-        {"refId": "A", "expr": "increase(identity_refresh_reuse_total[5m])", "legendFormat": "reuse"}
+        {
+          "refId": "A",
+          "expr": "increase(identity_refresh_reuse_total[5m])",
+          "legendFormat": "reuse"
+        }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
     },
     {
       "id": 9,
       "type": "timeseries",
       "title": "Authorization outbox oldest unresolved age",
       "targets": [
-        {"refId": "A", "expr": "identity_authorization_outbox_oldest_pending_age_seconds", "legendFormat": "age seconds"}
+        {
+          "refId": "A",
+          "expr": "identity_authorization_outbox_oldest_pending_age_seconds",
+          "legendFormat": "age seconds"
+        }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      }
     },
     {
       "id": 10,
       "type": "timeseries",
       "title": "Authorization outbox definitive failures",
       "targets": [
-        {"refId": "A", "expr": "sum by (operation) (increase(identity_authorization_outbox_definitive_failures_total[5m]))", "legendFormat": "{{operation}}"}
+        {
+          "refId": "A",
+          "expr": "sum by (operation) (increase(identity_authorization_outbox_definitive_failures_total[5m]))",
+          "legendFormat": "{{operation}}"
+        }
       ],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Tenant lifecycle request rate by outcome",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, outcome) (rate(identity_tenant_duration_seconds_count[5m]))",
+          "legendFormat": "{{operation}} {{outcome}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Tenant lifecycle latency p95",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(identity_tenant_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{operation}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Identity global admission and tenant in flight",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "identity_grpc_admission_in_flight",
+          "legendFormat": "global admission in flight"
+        },
+        {
+          "refId": "D",
+          "expr": "identity_grpc_admission_limit",
+          "legendFormat": "global admission limit"
+        },
+        {
+          "refId": "B",
+          "expr": "identity_tenant_in_flight",
+          "legendFormat": "tenant in flight"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(identity_grpc_admission_rejected_total[5m])",
+          "legendFormat": "global admission rejected / sec"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      }
     }
   ]
 }

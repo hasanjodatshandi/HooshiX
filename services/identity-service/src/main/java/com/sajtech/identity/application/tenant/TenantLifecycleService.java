@@ -4,6 +4,7 @@ import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.tenant.model.*;
+import com.sajtech.identity.application.tenant.port.in.TenantLifecycle;
 import com.sajtech.identity.application.tenant.port.out.*;
 import com.sajtech.identity.application.tenant.service.TenantIntentEncoder;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
@@ -13,7 +14,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-public final class TenantLifecycleService {
+public final class TenantLifecycleService implements TenantLifecycle {
   private static final Pattern SLUG = Pattern.compile("[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])");
   private static final Set<String> RESERVED =
       Set.of("admin", "api", "system", "platform", "www", "support");

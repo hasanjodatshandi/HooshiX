@@ -12,6 +12,7 @@ public record IdentityProperties(
     boolean authenticationRuntimeEnabled,
     boolean tenantRuntimeEnabled,
     int maxConcurrentCallsPerConnection,
+    int maxGlobalConcurrentCalls,
     boolean phoneRegistrationEnabled,
     String compromisedPasswordTarget,
     int compromisedPasswordMaxInFlight,
@@ -34,6 +35,7 @@ public record IdentityProperties(
       throw new IllegalArgumentException("Identity gRPC port is invalid");
     }
     if (maxConcurrentCallsPerConnection <= 0
+        || maxGlobalConcurrentCalls <= 0
         || compromisedPasswordMaxInFlight <= 0
         || argon2MaxConcurrentHashes <= 0) {
       throw new IllegalArgumentException("Identity concurrency configuration is invalid");

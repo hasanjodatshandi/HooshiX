@@ -497,6 +497,7 @@ services/identity-service/src/main/java/com/sajtech/identity/application/tenant/
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/SelectableTenantList.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/TenantCreation.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/TenantSelection.java
+services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/in/TenantLifecycle.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/out/AuthorizationTenantPort.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/out/TenantStore.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/service/TenantIntentEncoder.java
@@ -524,6 +525,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/obse
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedPasswordVerification.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedRegistration.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedSemanticQuota.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedTenantLifecycle.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/AuthorizationOutboxTelemetryQuery.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqAuthenticationStore.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqNotificationOutboxStore.java
@@ -552,6 +554,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/work
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/worker/IdentityRetentionWorker.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/worker/NotificationOutboxDispatcher.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/authentication/grpc/IdentityAuthenticationGrpcService.java
+services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/IdentityAdmissionInterceptor.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/SafeTracingServerInterceptor.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/registration/grpc/IdentityRegistrationGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/tenant/grpc/IdentityTenantGrpcService.java
@@ -564,6 +567,7 @@ services/identity-service/src/main/resources/db/migration/V1__create_identity_re
 services/identity-service/src/main/resources/db/migration/V2__create_identity_authentication_session_schema.sql
 services/identity-service/src/main/resources/db/migration/V3__create_identity_tenant_membership_schema.sql
 services/identity-service/src/main/resources/db/migration/V4__index_authorization_outbox_oldest_unresolved.sql
+services/identity-service/src/main/resources/db/migration/V5__enforce_identity_tenant_context_integrity.sql
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/AuthenticateLocalUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/IssueAudienceAccessTokenUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/LogoutCurrentUseCaseTest.java
@@ -577,17 +581,21 @@ services/identity-service/src/test/java/com/sajtech/identity/bdd/IdentityAuthent
 services/identity-service/src/test/java/com/sajtech/identity/bdd/IdentityAuthenticationSteps.java
 services/identity-service/src/test/java/com/sajtech/identity/configuration/IdentityMigrationProfileIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/client/authorization/GrpcAuthorizationTenantClientTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/observability/ObservedTenantLifecycleTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityAuthenticationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityRegistrationPersistenceIntegrationTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantContextIntegrityIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantRlsIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/ClockSafetyGuardTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/RedisSemanticQuotaIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/challenge/HmacChallengeSecretTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/jwt/RsaJwtAccessTokenSignerTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/keyring/FileBackedKeyRingTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/password/Argon2idPasswordHasherTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/session/HmacSessionCredentialTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/authentication/grpc/IdentityAuthenticationContractTest.java
+services/identity-service/src/test/java/com/sajtech/identity/interfaces/observability/grpc/IdentityAdmissionInterceptorTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/registration/grpc/IdentityRegistrationContractTest.java
 services/identity-service/src/test/resources/features/identity_authentication.feature
 services/notification-service/.dockerignore

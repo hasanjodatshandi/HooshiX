@@ -134,6 +134,51 @@ class RsaJwtAccessTokenSignerTest {
         .hasMessageContaining("3072");
   }
 
+  @Test
+  void rejectsKidRebindingAndKeepsPreviousSignerSnapshot() throws Exception {
+    KeyPair original = keyPair(3072);
+    KeyPair replacement = keyPair(3072);
+    Path privatePath = temp.resolve("rebind-private.properties");
+    Path publicPath = temp.resolve("rebind-public.properties");
+    writePair(privatePath, publicPath, "stable-kid", original);
+    FileBackedRsaSigningKeyRing ring =
+        new FileBackedRsaSigningKeyRing(
+            privatePath, publicPath, Clock.systemUTC(), Duration.ofMinutes(5));
+
+    writePair(privatePath, publicPath, "stable-kid", replacement);
+
+    assertThatThrownBy(ring::refresh)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("cannot be rebound");
+    assertThat(ring.activeKey().keyId()).isEqualTo("stable-kid");
+    assertThat(ring.activeKey().publicKey().getModulus())
+        .isEqualTo(((java.security.interfaces.RSAPublicKey) original.getPublic()).getModulus());
+  }
+
+  private static void writePair(Path privatePath, Path publicPath, String keyId, KeyPair pair)
+      throws Exception {
+    Files.writeString(
+        privatePath,
+        String.join(
+            System.lineSeparator(),
+            "active_key_id=" + keyId,
+            "key."
+                + keyId
+                + "="
+                + Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded()),
+            ""));
+    Files.writeString(
+        publicPath,
+        String.join(
+            System.lineSeparator(),
+            "current_key_id=" + keyId,
+            "key."
+                + keyId
+                + "="
+                + Base64.getEncoder().encodeToString(pair.getPublic().getEncoded()),
+            ""));
+  }
+
   private static KeyPair keyPair(int bits) throws Exception {
     KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
     generator.initialize(bits);

@@ -3,6 +3,7 @@ package com.sajtech.identity.interfaces.tenant.grpc;
 import com.google.protobuf.Timestamp;
 import com.sajtech.identity.application.tenant.*;
 import com.sajtech.identity.application.tenant.model.*;
+import com.sajtech.identity.application.tenant.port.in.TenantLifecycle;
 import com.sajtech.identity.contract.v1.*;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -11,9 +12,9 @@ import java.util.UUID;
 
 public final class IdentityTenantGrpcService
     extends IdentityTenantServiceGrpc.IdentityTenantServiceImplBase {
-  private final TenantLifecycleService service;
+  private final TenantLifecycle service;
 
-  public IdentityTenantGrpcService(TenantLifecycleService service) {
+  public IdentityTenantGrpcService(TenantLifecycle service) {
     this.service = service;
   }
 
