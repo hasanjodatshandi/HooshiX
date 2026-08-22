@@ -18,6 +18,7 @@
 .semgrep/notification-service.yml
 .semgrep/web-bff.yml
 .shellcheckrc
+.vscode/settings.json
 AGENTS.md
 FILE_INDEX.txt
 Makefile

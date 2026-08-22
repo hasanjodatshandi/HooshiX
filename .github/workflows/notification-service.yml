@@ -42,6 +42,13 @@ jobs:
           distribution: temurin
           java-version: '25.0.4'
 
+
+      - name: Publish HooshiX Protobuf contract package to local Maven cache
+        run: |
+          set -euo pipefail
+          cd contracts/protobuf-contracts
+          ../../services/identity-service/gradlew publishToMavenLocal --no-daemon --no-configuration-cache
+
       - name: Verify Java and Gradle wrapper pins
         working-directory: ${{ env.SERVICE_DIR }}
         run: |
