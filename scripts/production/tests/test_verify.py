@@ -16,4 +16,9 @@ class ProductionProfileTest(unittest.TestCase):
         d=copy.deepcopy(self.profile); d["edge"]["proxy_protocol_insecure"]=True; d["human_access"]["public_ssh_denied"]=False; e=verify.validate_profile(d); self.assertTrue(any("edge trust" in x for x in e)); self.assertTrue(any("human production access" in x for x in e))
     def test_rejects_missing_external_evidence_contract(self):
         d=copy.deepcopy(self.profile); d["required_external_inputs"].remove("external_blackbox_monitor"); self.assertTrue(any("external production evidence" in x for x in verify.validate_profile(d)))
+    def test_rescan_requires_precommissioning_inventory_guard(self):
+        workflow=(verify.ROOT/".github/workflows/production-vulnerability-rescan.yml").read_text(encoding="utf-8")
+        self.assertEqual([],verify.validate_rescan_workflow_contract(workflow))
+        weakened=workflow.replace("if: steps.production_inventory.outputs.present == 'true'", "if: always()", 1)
+        self.assertTrue(any("conditional on tracked inventory" in x for x in verify.validate_rescan_workflow_contract(weakened)))
 if __name__=="__main__":unittest.main()
