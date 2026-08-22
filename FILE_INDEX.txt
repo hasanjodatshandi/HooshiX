@@ -36,6 +36,7 @@ context/checkpoints/20260822T154103Z-make-the-scheduled-production-deployed-dige
 context/checkpoints/20260822T155021Z-post-merge-pr-96-finalize-the-pre-commissioning-production-deplo.json
 context/checkpoints/20260822T175836Z-add-a-current-application-implementation-roadmap-that-survives-c.json
 context/checkpoints/20260822T180614Z-post-merge-pr-98-finalize-the-application-implementation-roadmap.json
+context/checkpoints/20260822T231253Z-finalize-public-registration-vertical-slice-openapi-delivery-lif.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
