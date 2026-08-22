@@ -163,6 +163,7 @@ infrastructure/observability/collector.yaml
 infrastructure/observability/networkpolicy.yaml
 infrastructure/observability/pins.env
 infrastructure/observability/prometheus.yaml
+infrastructure/production/profile.json
 infrastructure/registry/pins.env
 infrastructure/staging/authorizationpolicy.yaml
 infrastructure/staging/compromised-password-pv.yaml
@@ -234,6 +235,8 @@ scripts/platform/tests/test_deterministic_bootstrap.py
 scripts/platform/tests/test_git_provenance.py
 scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
+scripts/production/tests/test_verify.py
+scripts/production/verify.py
 services/authorization-service/.dockerignore
 services/authorization-service/Dockerfile
 services/authorization-service/buf.yaml
