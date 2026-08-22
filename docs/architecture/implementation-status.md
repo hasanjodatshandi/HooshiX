@@ -114,7 +114,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Kafka | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | OpenBao + External Secrets | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
-| Cross-service CI/security/supply-chain release gates | DESIGNED | PARTIAL | reusable Semgrep/OSV/Gitleaks-capable workflows are present for the implemented Java services and the baseline now invokes Authorization/Web BFF suites; prior protected Compromised Password/Notification/Identity suites plus aggregator passed on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`; Syft/Grype/Cosign/Kyverno release evidence remains NOT VERIFIED |
+| Cross-service CI/security/supply-chain release gates | DESIGNED | PARTIAL | reusable Semgrep/OSV/Gitleaks-capable workflows are present for the implemented Java services; repository Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation are IMPLEMENTED; real production release/rescan/admission execution remains NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | three-node local Collector DaemonSet, bounded queues/privacy config, exact read-only pod-log hostPath, metrics, and OTLP integration PASSED |
 | Prometheus/Alertmanager/Grafana | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned deployments, five-service/Collector target health, Grafana datasource, and no-plugin-update hardening PASSED |
 | Loki log backend | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | Collector -> Loki safe-log canary, privacy-filter negative, and backend-outage non-authority behavior PASSED |
@@ -148,7 +148,7 @@ The bootstrap baseline makes these current repository invariants executable:
 
 Service-specific CI adds stricter checks for implemented code, OSV locked-dependency advisory scanning, migrations where applicable, offline dataset-build tooling where applicable, runtime compatibility validation, telemetry/privacy controls, contracts, and deployment/runtime-image artifacts. Repository governance does not replace runtime/staging/release evidence.
 
-ADR-0045 documents additional target gates. All five implemented Java service Gitleaks workflows are implemented; protected execution evidence remains commit-specific, with prior Identity merged-main evidence on `main@a3766bd`, while current Identity, Notification, and Compromised Password local fixture/tree/history execution passes. Syft/Grype/Cosign/Kyverno must not be reported as implemented until their repository workflows/policies exist and execute successfully. OSV-Scanner must not be reported as final-image vulnerability evidence.
+ADR-0045 documents the selected control chain. All five implemented Java service Gitleaks workflows are implemented, and repository Syft/Grype/Cosign release workflows plus stable Kyverno release-policy generation now exist and pass repository verification. These repository controls must not be reported as real production execution/enforcement until the production registry, signer, vulnerability feed, deployed digests, and production admission controller produce the required evidence. OSV-Scanner must not be reported as final-image vulnerability evidence.
 
 ## Implementation/release gates still not evidenced
 
@@ -156,9 +156,9 @@ Current architecture still requires evidence that this repository slice does not
 
 - real Windows/ChatGPT Web ADR-0049 remaining evidence for an actual logoff/logon cycle and stop/revoke/rollback behavior; protected policy/session/tunnel/`desktop.status`/GUI smoke/persistent-task/recovery evidence is already recorded above;
 - ADR-0050 remaining host evidence for provisioned wrong-window/focus/ambiguous-password negatives and rollback/rotation behavior; EOrgsetad process-image/SHA-256, legacy native-password-control diagnosis, Medium-integrity `asInvoker` credential injection, and application login are verified for the exercised host/session, while the initial inherited High-integrity launch remains correctly incompatible with lower-integrity Desktop `SendInput`;
-- final-image Syft CycloneDX generation bound to exact image digest;
-- Grype final-image/SBOM vulnerability policy, feed freshness, exception/VEX behavior, and deployed-digest rescanning;
-- Cosign exact-digest signature, provenance, and signed-SBOM attestation plus Kyverno admission positives/negatives;
+- real production final-image Syft CycloneDX generation bound to the exact deployed/released image digest;
+- real production Grype final-image/SBOM vulnerability execution, feed freshness, exception/VEX behavior, and deployed-digest rescanning;
+- real production Cosign exact-digest signature/provenance/signed-SBOM execution plus production Kyverno admission enforcement positives/negatives;
 - approved official complete HIBP Pwned Passwords SHA-1 acquisition/provenance/tool/licensing evidence, current freshness <=35 days, and a reviewed production dataset release artifact built from that local source;
 - real complete-corpus row count, maximum prefix cardinality, exact serialized-response measurements and reviewed production runtime compatibility limits with safety margin;
 - representative complete-corpus disk-backed p95/p99, saturation, and profile-specific runtime/recovery evidence for Compromised Password;
