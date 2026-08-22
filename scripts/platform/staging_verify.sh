@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
-source "$ROOT/.platform-runtime/staging/images.env"
+state="$ROOT/.platform-runtime/staging/images.env"
+[[ -f "$state" ]] || fail "staging image provenance state is missing; run staging-build"
+source "$state"
+python3 "$ROOT/scripts/platform/git_provenance.py" --root "$ROOT" verify --revision "$BUILD_GIT_REVISION" --source-state "$BUILD_SOURCE_STATE" --worktree-sha256 "$BUILD_WORKTREE_SHA256" >/dev/null
 for service in compromised-password-service notification-service authorization-service identity-service web-bff; do
   status=$(h status "$service" -n platform-apps -o json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["status"])')
   [[ "$status" == deployed ]] || fail "$service Helm release is not deployed: $status"

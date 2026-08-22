@@ -193,6 +193,7 @@ scripts/platform/edge_delete.sh
 scripts/platform/edge_foundation_verify.sh
 scripts/platform/edge_install.sh
 scripts/platform/edge_verify.sh
+scripts/platform/git_provenance.py
 scripts/platform/istio_delete.sh
 scripts/platform/istio_foundation_verify.sh
 scripts/platform/istio_install.sh
@@ -230,6 +231,7 @@ scripts/platform/staging_prepare.py
 scripts/platform/staging_secrets_apply.sh
 scripts/platform/staging_verify.sh
 scripts/platform/tests/test_deterministic_bootstrap.py
+scripts/platform/tests/test_git_provenance.py
 scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
 services/authorization-service/.dockerignore
