@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "public_path": ["internet", "upstream-ddos", "external-l4", "traefik", "edge-waf", "web-bff"],
+  "external_l4": {"proxy_protocol": "v2", "exact_source_cidrs_required": true},
+  "traefik": {"proxy_protocol_insecure": false, "forwarded_headers_insecure": false, "direct_internet_origin_denied": true},
+  "web_bff": {"direct_public_reachability": false, "waf_only": true},
+  "management": {"wireguard_only": true, "public_tcp_22_denied": true, "kubernetes_api_public": false}
+}

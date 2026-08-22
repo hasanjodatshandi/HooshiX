@@ -1,0 +1,145 @@
+{
+  "base_commit": "988363c83f3629d4337feb404e380997d6c0182a",
+  "branch": "audit/production-infrastructure-conformance",
+  "changed_paths": [
+    ".github/workflows/production-release.yml",
+    ".github/workflows/production-vulnerability-rescan.yml",
+    "FILE_INDEX.txt",
+    "Makefile",
+    "deploy/clusters/production/README.md",
+    "deploy/releases/production/README.md",
+    "docs/architecture/devsecops-security-toolchain.md",
+    "docs/architecture/implementation-status.md",
+    "infrastructure/production/README.md",
+    "infrastructure/production/data/data-policy.json",
+    "infrastructure/production/gitops/application.yaml",
+    "infrastructure/production/host/access-policy.json",
+    "infrastructure/production/host/sshd_config",
+    "infrastructure/production/k3s/config.yaml",
+    "infrastructure/production/network/trust-policy.json",
+    "infrastructure/production/observability/observability-policy.json",
+    "infrastructure/production/platform-contracts.json",
+    "infrastructure/production/profile.json",
+    "infrastructure/production/recovery/recovery-policy.json",
+    "infrastructure/production/release-manifest.schema.json",
+    "infrastructure/production/release-tools.env",
+    "infrastructure/production/release/release-policy.json",
+    "scripts/production/build_provenance.py",
+    "scripts/production/install_release_tools.sh",
+    "scripts/production/readiness.py",
+    "scripts/production/release_supply_chain.sh",
+    "scripts/production/render_gitops.py",
+    "scripts/production/tests/test_readiness.py",
+    "scripts/production/tests/test_release.py",
+    "scripts/production/tests/test_render_gitops.py",
+    "scripts/production/tests/test_verify.py",
+    "scripts/production/verify.py",
+    "scripts/production/verify_release.py"
+  ],
+  "checkpoint_id": "20260822T134906Z-complete-the-final-production-infrastructure-conformance-audit-f",
+  "completed": [
+    "Reconciled current Git main, task branch, PR #92, and prior CI before every Git lifecycle side effect.",
+    "Implemented production-single-server machine-readable platform, data, network, secrets, observability, recovery, host-access, release, and GitOps contracts without storing production secret values or inventing provider evidence.",
+    "Implemented checksum-pinned Syft, Grype, and Cosign release tooling, exact-digest release verification, protected keyless signing/provenance/SBOM evidence, retained release evidence, and two-hour deployed-digest rescanning.",
+    "Implemented deterministic exact-digest Helm production rendering and stable fail-closed Kyverno ValidatingPolicy and ImageValidatingPolicy output.",
+    "Hardened OpenSSH production policy to security-key-only algorithms with required FIDO user presence and user verification, no root/password/keyboard-interactive authentication, and no forwarding/tunneling.",
+    "Reconciled current implementation-status and DevSecOps documentation without claiming production runtime or readiness evidence."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "docs/adr/0042-define-single-server-production-profile-v1.md",
+        "docs/architecture/PRODUCTION-READINESS-CHECKLIST.md"
+      ],
+      "summary": "Production repository implementation remains separate from production readiness; provider, registry, capacity, backup, host-access, external-monitor, corpus, and cold-DR evidence stay external and fail closed when absent."
+    },
+    {
+      "authority_refs": [
+        "docs/adr/0035-automate-sbom-vulnerability-response-and-deployment-gates-v1.md",
+        "docs/adr/0038-harden-vulnerability-exceptions-threat-intelligence-and-ownership-v1.md",
+        "docs/adr/0045-standardize-devsecops-scanning-and-artifact-security-v1.md"
+      ],
+      "summary": "Final artifacts use immutable digests with Syft CycloneDX, Grype final-artifact gating, Cosign signature/SLSA provenance/signed SBOM, and stable Kyverno fail-closed admission generation."
+    },
+    {
+      "authority_refs": [
+        "docs/adr/0042-define-single-server-production-profile-v1.md",
+        "docs/architecture/network-architecture.md"
+      ],
+      "summary": "Normal production management remains WireGuard-only with hardware FIDO2 OpenSSH and bounded reviewed JIT privilege; public SSH and non-FIDO user keys are not accepted by the repository policy."
+    }
+  ],
+  "next_actions": [
+    "Regenerate FILE_INDEX after checkpoint creation, verify repository baseline, commit the checkpoint, and push PR #92.",
+    "Require protected CI success and merge PR #92 through branch protection.",
+    "Verify exact merged main and complete the post-merge checkpoint lifecycle without recursion."
+  ],
+  "objective": "Complete the final Production Infrastructure conformance audit for the production-single-server profile with repository-owned GitOps, host, data, secrets, edge, observability, release, recovery, and fail-closed evidence controls on PR #92.",
+  "project_id": "hooshix",
+  "pull_request": 92,
+  "recorded_at_utc": "2026-08-22T13:49:06Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "Production platform runtime and provider-specific configuration are not claimed; repository contracts intentionally fail closed until external environment evidence exists.",
+    "The work checkpoint records implementation commit 23ca02bcadee6c9b4a8e74d3ee48077a676bc9df; protected CI, PR merge, and post-merge verification occur after this checkpoint."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [],
+    "review_mode": "full-read",
+    "routes": [
+      "production-infrastructure",
+      "runtime-deployment",
+      "network-security",
+      "devsecops-release",
+      "recovery-readiness"
+    ]
+  },
+  "subject_commit": "23ca02bcadee6c9b4a8e74d3ee48077a676bc9df",
+  "unfinished": [
+    "Commit this work checkpoint, push PR #92 final head, pass protected CI, mark the PR ready, merge it, verify exact merged main, and create/merge the required post-merge checkpoint follow-up PR."
+  ],
+  "verification": {
+    "failed": [],
+    "not_run": [
+      {
+        "check": "Protected GitHub Actions on final PR #92 head",
+        "evidence": "Not run yet because the work checkpoint must be committed and pushed before final protected CI."
+      },
+      {
+        "check": "Real production runtime/release/readiness evidence",
+        "evidence": "Intentionally not claimed. External production environment evidence remains required by the Production Readiness Checklist."
+      }
+    ],
+    "passed": [
+      {
+        "check": "Complete repository baseline",
+        "evidence": "make baseline-verify passed on implementation subject 23ca02bcadee6c9b4a8e74d3ee48077a676bc9df: 10 baseline, 11 platform, 26 production, 15 context, and 8 local tests; repository verification passed with 814 indexed files, 51 ADRs, and 27 dependency edges."
+      },
+      {
+        "check": "Production release tool integrity smoke",
+        "evidence": "Checksum-pinned Syft 1.51.0, Grype 0.117.0, and Cosign 3.0.6 downloads verified; exact versions passed; Grype database update/status passed."
+      },
+      {
+        "check": "Synthetic exact-digest production render",
+        "evidence": "All five service Helm charts rendered through scripts/production/render_gitops.py with a valid synthetic release manifest; generated YAML parsed successfully."
+      },
+      {
+        "check": "Kyverno stable admission server-side validation",
+        "evidence": "Generated production ValidatingPolicy and ImageValidatingPolicy were accepted by Kubernetes/Kyverno 1.18.2 using kubectl apply --dry-run=server; no cluster state was persisted."
+      },
+      {
+        "check": "OpenSSH production hardening parser validation",
+        "evidence": "System sshd -T accepted the repository policy with isolated temporary host key and materialized security-key-only accepted algorithms plus touch-required and verify-required options; root/password/keyboard-interactive/forwarding remained disabled."
+      },
+      {
+        "check": "Secret scanning",
+        "evidence": "Pinned Gitleaks 8.30.0 current-tree and full Git-history scans passed with 100 percent redaction before checkpoint creation."
+      },
+      {
+        "check": "Diff integrity",
+        "evidence": "Final staged diff passed git diff --check; executable modes are limited to executable production scripts and workflow/document modes are non-executable."
+      }
+    ]
+  }
+}

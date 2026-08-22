@@ -1,0 +1,46 @@
+{
+  "audit": {
+    "off_host_required": true,
+    "shell_history_authoritative": false,
+    "surfaces": [
+      "os",
+      "sudo",
+      "kubernetes",
+      "database"
+    ]
+  },
+  "human_authentication": {
+    "hardware_fido2_required": true,
+    "keyboard_interactive_authentication": false,
+    "mechanism": "openssh-fido2",
+    "password_authentication": false,
+    "root_login": false,
+    "shared_keys": false,
+    "user_presence_required": true,
+    "user_verification_required": true
+  },
+  "jit": {
+    "reason_or_ticket_required": true,
+    "standing_admin": false,
+    "write_minutes_max": 30,
+    "write_reviewers_min": 2
+  },
+  "management_overlay": "wireguard",
+  "profile": "production-single-server",
+  "public_ssh_denied": true,
+  "required_external_inputs": [
+    "wireguard_peer_inventory",
+    "management_interface_and_cidrs",
+    "host_firewall_evidence",
+    "host_package_integrity",
+    "host_time_sync_evidence",
+    "offhost_security_audit_sink"
+  ],
+  "schema_version": 1,
+  "ssh_bind_scope": "management-interface-only",
+  "wireguard": {
+    "minimal_routes_required": true,
+    "peer_model": "independent-per-device",
+    "private_keys_in_git": false
+  }
+}

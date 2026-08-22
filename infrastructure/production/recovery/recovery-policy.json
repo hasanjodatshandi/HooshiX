@@ -1,0 +1,44 @@
+{
+  "openbao": {
+    "encrypted_off_pvc_snapshot_frequency_hours_max": 1,
+    "restore_unseal_evidence_required": true,
+    "rpo_minutes_max": 60
+  },
+  "platform": {
+    "clean_gitops_rebuild_required": true,
+    "cold_dr_frequency": "quarterly",
+    "external_host_loss_detection_required": true,
+    "rto_minutes_max": 240
+  },
+  "postgresql": {
+    "backup_verify_every_cycle": true,
+    "base_backup_frequency_hours_max": 24,
+    "continuous_wal_archive": true,
+    "isolated_restore_frequency": "monthly",
+    "monthly_retained_artifact_months": 12,
+    "pitr_window_days": 35,
+    "rpo_minutes_max": 5,
+    "shared_cluster_restore_isolated_first": true
+  },
+  "profile": "production-single-server",
+  "schema_version": 1,
+  "traffic_enable_evidence": [
+    "recovery_point",
+    "postgresql_rpo",
+    "openbao_rpo",
+    "platform_rto",
+    "data_schema_rls_integrity",
+    "erasure_legal_hold_reconciliation",
+    "secret_workload_identity",
+    "edge_waf_client_identity",
+    "quota_clock_capacity_state",
+    "authorization_mfa_security_negatives",
+    "kafka_redis_reconciliation",
+    "compromised_password_corpus_age_integrity",
+    "local_observability_health",
+    "external_host_monitor_outage_detection",
+    "authoritative_audit_health",
+    "known_residual_risk",
+    "approver"
+  ]
+}

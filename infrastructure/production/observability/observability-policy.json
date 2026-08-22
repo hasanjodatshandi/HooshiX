@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "collector": "0.157.0",
+  "prometheus": "3.13.2",
+  "alertmanager": "0.33.1",
+  "loki": {"version": "3.7.4", "mode": "single-binary", "ha": false},
+  "tempo": {"version": "3.0.2", "mode": "monolithic", "ha": false},
+  "grafana": "13.1.3",
+  "otlp_public_ingress": false,
+  "external_host_down_monitor_required": true,
+  "authoritative_privileged_audit_separate": true,
+  "telemetry_failure_changes_business_authority": false
+}
