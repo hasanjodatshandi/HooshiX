@@ -53,7 +53,7 @@ Required coverage:
 - Git history relevant to the protected repository;
 - source, scripts, CI, manifests, values, fixtures, and documentation.
 
-The protected CI/release implementation uses the pinned native Gitleaks tool artifact and verifies its official checksum/digest. Output is fully redacted and must not export discovered secret values to CI logs or artifacts.
+The protected CI implementation uses the immutable-digest official Gitleaks container image pinned by the service workflows. Output and tool identity are verified by the workflow controls. Output is fully redacted and must not export discovered secret values to CI logs or artifacts.
 
 A real committed credential is not remediated merely by deleting the latest line. When exposure is plausible:
 
@@ -168,7 +168,7 @@ At the current repository state:
 
 - repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, and Web BFF;
 - OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, and Web BFF and is wired into PR/push/scheduled repository security workflows; prior protected Compromised Password/Notification/Identity advisory scans passed on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`;
-- Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in the Identity, Compromised Password, and Notification security workflows with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; current Notification and Compromised Password local fixtures/current-tree/full-current-history execution passed, and prior protected Identity current-tree/full-history execution passed on `main@a3766bd`; protected Notification evidence remains commit-specific;
+- Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in all five implemented Java service security workflows with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; current Identity, Notification, and Compromised Password local fixture/current-tree/full-current-history executions passed, and prior protected Identity current-tree/full-history execution passed on `main@a3766bd`; protected evidence remains commit-specific;
 - final-image Syft SBOM generation is **NOT PRESENT / NOT VERIFIED**;
 - final-image/SBOM Grype vulnerability gating is **NOT PRESENT / NOT VERIFIED**;
 - Cosign signing/provenance/SBOM attestation release automation is **NOT PRESENT / NOT VERIFIED**;
