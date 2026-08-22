@@ -1,0 +1,75 @@
+{
+  "base_commit": "da8a7e6e364dee8f14e1555d39f1e9d9aa545437",
+  "branch": "context/pr94-work-linkage-recovery",
+  "changed_paths": [
+    "FILE_INDEX.txt",
+    "docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md",
+    "docs/architecture/PRODUCTION-DECISION-SUMMARY.md",
+    "docs/architecture/implementation-status.md"
+  ],
+  "checkpoint_id": "20260822T144413Z-recover-missing-pr-94-linkage-for-the-exact-pre-merge-production",
+  "completed": [
+    "Recorded the exact pre-merge PR #94 head as a standalone immutable linkage-recovery checkpoint because the original work checkpoint omitted pull_request metadata.",
+    "Preserved the original work checkpoint unchanged.",
+    "Bound this recovery record to PR #94 without changing implementation, architecture, security controls, or runtime state."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "docs/engineering/agent-context-engine.md",
+        "docs/engineering/repository-change-workflow.md"
+      ],
+      "summary": "Repair missing PR linkage by appending a new commit-bound historical record rather than rewriting the original checkpoint after CI and merge."
+    },
+    {
+      "authority_refs": [
+        "AGENTS.md",
+        "context/checkpoints/20260822T142409Z-reconcile-current-production-infrastructure-conformance-status-d.json"
+      ],
+      "summary": "The subject commit remains the exact protected PR #94 head and current Git remains authority over both historical records."
+    }
+  ],
+  "next_actions": [
+    "Create the PR #94 post-merge checkpoint from exact base and merge commits and publish both historical recovery records in the focused checkpoint-only follow-up."
+  ],
+  "objective": "Recover missing PR #94 linkage for the exact pre-merge Production Infrastructure documentation reconciliation state.",
+  "project_id": "hooshix",
+  "pull_request": 94,
+  "recorded_at_utc": "2026-08-22T14:44:13Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "This record was created after merge solely to repair missing PR-linkage metadata; it does not replace or rewrite the original pre-merge work checkpoint."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [],
+    "review_mode": "full-read",
+    "routes": [
+      "documentation-governance",
+      "production-infrastructure",
+      "devsecops-release"
+    ]
+  },
+  "subject_commit": "1fd181488f8e7e8f481880b5db16862cf34ddce7",
+  "unfinished": [
+    "Create and publish the required post-merge checkpoint for PR #94 using this immutable linkage-recovery record as source."
+  ],
+  "verification": {
+    "failed": [],
+    "not_run": [],
+    "passed": [
+      {
+        "check": "Exact pre-merge subject",
+        "evidence": "The recovery worktree is at PR #94 head 1fd181488f8e7e8f481880b5db16862cf34ddce7."
+      },
+      {
+        "check": "Protected PR #94 baseline",
+        "evidence": "GitHub Actions run 32546212642 completed successfully on exact head 1fd181488f8e7e8f481880b5db16862cf34ddce7."
+      },
+      {
+        "check": "Original checkpoint immutability",
+        "evidence": "The existing checkpoint context/checkpoints/20260822T142409Z-reconcile-current-production-infrastructure-conformance-status-d.json is not modified by this recovery record."
+      }
+    ]
+  }
+}
