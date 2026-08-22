@@ -445,6 +445,28 @@ def validate_agent_reporting_contract(root: Path) -> list[str]:
     return errors
 
 
+
+def validate_contract_package_boundary(root: Path) -> list[str]:
+    errors: list[str] = []
+    contract_proto = root / "contracts/protobuf-contracts/src/main/proto"
+    if not contract_proto.is_dir():
+        errors.append("missing canonical contract package proto directory")
+        return errors
+
+    for service in (root / "services").glob("*/src/main/proto"):
+        errors.append(f"service-local canonical proto ownership exists: {service.relative_to(root)}")
+
+    for service in (root / "services").glob("*/build.gradle.kts"):
+        text = read_text(service)
+        if "../" in text and "src/main/proto" in text:
+            errors.append(f"service build references external proto source path: {service.relative_to(root)}")
+
+    contract_build = root / "contracts/protobuf-contracts/build.gradle.kts"
+    if not contract_build.is_file():
+        errors.append("missing contract package build definition")
+
+    return errors
+
 def validate_guarded_structure(root: Path) -> list[str]:
     errors: list[str] = []
     reference_service = root / "services/reference-data-service"
@@ -482,6 +504,7 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         validate_dependency_registry(root),
         validate_source_references(root),
         validate_agent_reporting_contract(root),
+        validate_contract_package_boundary(root),
         validate_guarded_structure(root),
     )
     return [error for result in checks for error in result]

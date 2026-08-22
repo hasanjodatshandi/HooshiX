@@ -8,8 +8,8 @@ plugins {
 }
 group="com.sajtech";version="0.1.0-SNAPSHOT"
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
-sourceSets { main { proto { srcDir("../identity-service/src/main/proto"); srcDir("../authorization-service/src/main/proto") } } }
 dependencies {
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.0.0")
   implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
   implementation(platform("io.netty:netty-bom:4.2.16.Final"))
   implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -31,6 +31,8 @@ dependencies {
   testImplementation("org.testcontainers:testcontainers")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+
 protobuf { protoc { artifact="com.google.protobuf:protoc:3.25.8" }; plugins { maybeCreate("grpc").artifact="io.grpc:protoc-gen-grpc-java:1.83.1" }; generateProtoTasks { all().forEach { it.plugins.maybeCreate("grpc") } } }
 spotless { java { target("src/**/*.java"); googleJavaFormat("1.36.1"); removeUnusedImports(); trimTrailingWhitespace(); endWithNewline() }; format("misc") { target("*.gradle.kts","*.properties","src/**/*.yaml","contracts/**/*.yaml","Dockerfile"); trimTrailingWhitespace(); endWithNewline() } }
 configure<SpotBugsExtension> { toolVersion.set("4.10.3"); ignoreFailures.set(false); excludeFilter.set(file("config/spotbugs/exclude.xml")) }

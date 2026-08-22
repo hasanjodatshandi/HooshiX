@@ -18,6 +18,7 @@ java {
 }
 
 dependencies {
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.0.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
@@ -51,6 +52,8 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+
 
 protobuf {
     protoc {
