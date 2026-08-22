@@ -12,7 +12,8 @@
     "docs/architecture/SOURCES.md",
     "context/routes.json",
     "docs/adr/decision-register.md",
-    "docs/architecture/implementation-status.md"
+    "docs/architecture/implementation-status.md",
+    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md"
   ],
   "full_read_roots": [
     "docs"

@@ -71,3 +71,7 @@ Current decisions also require the ADR-0040 offline HIBP SHA-1 compromised-passw
 OpenBao, end-user MFA, Authorization decision semantics, and production runtime boundaries are unchanged by the Agent Context Engine.
 
 Architecture documentation or a passing source CI gate does not imply that the planned production platform is implemented or production-verified. Use `docs/architecture/implementation-status.md` and `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md` for that distinction.
+
+## Application continuation
+
+For current application progress and the ordered next implementation milestone, use `docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md` after reconciling current Git and `docs/architecture/implementation-status.md`. Production Commissioning & Readiness is currently deferred from the application sequence until the owner explicitly reactivates it.

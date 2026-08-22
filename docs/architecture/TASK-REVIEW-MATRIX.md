@@ -13,6 +13,7 @@ Always read these current sources first:
 - `docs/architecture/SOURCES.md`
 - `docs/adr/decision-register.md`
 - `docs/architecture/implementation-status.md`
+- `docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md`
 
 | Change area | Review mode | Minimum current sources |
 | --- | --- | --- |
