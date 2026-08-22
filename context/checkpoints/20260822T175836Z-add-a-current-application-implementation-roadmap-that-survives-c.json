@@ -1,0 +1,83 @@
+{
+  "base_commit": "6debe2537e9b9558e4ef4e46518be0255209a473",
+  "branch": "docs/application-implementation-roadmap",
+  "changed_paths": [
+    "FILE_INDEX.txt",
+    "README.md",
+    "context/bootstrap.json",
+    "context/routes.json",
+    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+    "docs/architecture/README.md",
+    "docs/architecture/SOURCES.md",
+    "docs/architecture/TASK-REVIEW-MATRIX.md"
+  ],
+  "checkpoint_id": "20260822T175836Z-add-a-current-application-implementation-roadmap-that-survives-c",
+  "completed": [
+    "Added the application implementation roadmap with current backend state, ordered milestones, and Production Commissioning and Readiness explicitly deferred.",
+    "Added the roadmap to Context bootstrap authority paths and global task-routing sources so new sessions receive it by default.",
+    "Updated architecture source indexes and README continuation guidance and regenerated the task matrix and file index."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "AGENTS.md",
+        "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+        "docs/architecture/implementation-status.md"
+      ],
+      "summary": "Current Git and current architecture remain higher authority than roadmap or checkpoint state; roadmap disagreement must be reconciled rather than replaying side effects."
+    },
+    {
+      "authority_refs": [
+        "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md"
+      ],
+      "summary": "Inter-service contract independence is the next application milestone, followed by Notification Delivery Runtime v1; Production Commissioning and Readiness is deferred until owner reactivation."
+    }
+  ],
+  "next_actions": [
+    "Commit and push this work checkpoint, run protected PR checks, review the final PR diff, and merge PR #98 when green."
+  ],
+  "objective": "Add a current application implementation roadmap that survives chat boundaries and identifies the next real milestone after Git reconciliation.",
+  "project_id": "hooshix",
+  "pull_request": 98,
+  "recorded_at_utc": "2026-08-22T17:58:36Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "The roadmap can become stale if a milestone PR changes implementation state without updating it; current Git and implementation-status remain authoritative and the roadmap requires same-PR reconciliation."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [],
+    "review_mode": "full-read",
+    "routes": [
+      "documentation-governance",
+      "agent-context-engine"
+    ]
+  },
+  "subject_commit": "80156a640cc803463be86e0fbeb98b32af532c98",
+  "unfinished": [
+    "Protected PR verification and merge are still required."
+  ],
+  "verification": {
+    "failed": [],
+    "not_run": [
+      {
+        "check": "Protected PR CI",
+        "evidence": "Pending publication of the final checkpointed PR head."
+      }
+    ],
+    "passed": [
+      {
+        "check": "Repository baseline",
+        "evidence": "make baseline-verify passed with 822 indexed files, 51 ADRs, and 27 dependency edges."
+      },
+      {
+        "check": "Roadmap continuation assertions",
+        "evidence": "Roadmap milestone markers and bootstrap/routes inclusion checks passed."
+      },
+      {
+        "check": "Diff whitespace",
+        "evidence": "git diff --check passed."
+      }
+    ]
+  }
+}
