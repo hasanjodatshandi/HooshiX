@@ -49,9 +49,10 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
   }
 
   @Override
-  public void markSubmitted(UUID id, Instant now) {
+  public void markSubmitted(UUID id, UUID notificationId, Instant now) {
     dsl.execute(
-        "UPDATE identity_notification_outbox SET state='SUBMITTED',submitted_at=CAST(? AS TIMESTAMP WITH TIME ZONE),claimed_until=NULL,payload_nonce=NULL,payload_ciphertext=NULL,last_error_class=NULL,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
+        "UPDATE identity_notification_outbox SET state='SUBMITTED',notification_id=?,submitted_at=CAST(? AS TIMESTAMP WITH TIME ZONE),claimed_until=NULL,payload_nonce=NULL,payload_ciphertext=NULL,last_error_class=NULL,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
+        notificationId,
         ts(now),
         ts(now),
         id);

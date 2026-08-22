@@ -25,6 +25,9 @@ notification:
   grpc-port: 9090
   max-concurrent-calls-per-connection: 128
   caller-service: identity-service
+  delivery-runtime-enabled: ${NOTIFICATION_DELIVERY_RUNTIME_ENABLED:false}
+  identity-result-target: ${NOTIFICATION_IDENTITY_RESULT_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9091}
+  provider-configuration-path: ${NOTIFICATION_PROVIDER_CONFIGURATION_PATH:/run/secrets/notification-providers/providers.properties}
   fingerprint-key-ring-path: ${NOTIFICATION_FINGERPRINT_KEY_RING_PATH:/run/secrets/notification-fingerprint/fingerprint.properties}
   delivery-key-ring-path: ${NOTIFICATION_DELIVERY_KEY_RING_PATH:/run/secrets/notification-delivery/delivery.properties}
   key-ring-maximum-staleness: 2m

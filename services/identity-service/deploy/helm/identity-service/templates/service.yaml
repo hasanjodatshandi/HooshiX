@@ -13,6 +13,12 @@ spec:
       port: {{ .Values.service.grpcPort }}
       targetPort: grpc
       protocol: TCP
+    {{- if .Values.runtime.notificationResultRuntimeEnabled }}
+    - name: notification-result
+      port: {{ .Values.service.notificationResultGrpcPort }}
+      targetPort: notification-result
+      protocol: TCP
+    {{- end }}
     - name: management
       port: {{ .Values.service.managementPort }}
       targetPort: management

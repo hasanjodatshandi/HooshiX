@@ -3,6 +3,9 @@ package com.sajtech.notification.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sajtech.notification.application.delivery.model.ProviderDispatchOutcome;
+import com.sajtech.notification.application.delivery.model.ProviderReconciliationOutcome;
+import com.sajtech.notification.application.delivery.model.ProviderReconciliationStatus;
 import com.sajtech.notification.application.submit.NotificationSubmissionError;
 import com.sajtech.notification.application.submit.NotificationSubmissionException;
 import com.sajtech.notification.application.submit.model.SubmitNotificationCommand;
@@ -17,7 +20,9 @@ import com.sajtech.notification.application.template.service.TemplateContentDige
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import com.sajtech.notification.domain.notification.model.NotificationLifecycle;
 import com.sajtech.notification.domain.notification.model.NotificationSemanticType;
+import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
 import com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrow;
+import com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrowReader;
 import com.sajtech.notification.infrastructure.security.fingerprint.FileBackedHmacIntentFingerprint;
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
 import java.nio.charset.StandardCharsets;
@@ -169,6 +174,61 @@ class NotificationPersistenceIntegrationTest {
                     "UPDATE notification SET channel = 'SMS', semantic_type = 'PASSWORD_CHANGED_NOTICE' WHERE notification_id = ?",
                     accepted.notificationId()))
         .isInstanceOf(DataAccessException.class);
+  }
+
+  @Test
+  void deliveryClaimIsSingleOwnerAndTerminalDeliveryErasesEscrowAndCreatesResultOutbox()
+      throws Exception {
+    SubmitNotificationUseCase useCase = createUseCase();
+    Instant deadline = new PostgresDatabaseTime(dsl).now().plus(Duration.ofMinutes(10));
+    var accepted = useCase.submit(command(UUID.randomUUID(), "12345678", deadline));
+    JooqDeliveryAttemptRepository attempts = new JooqDeliveryAttemptRepository(dsl);
+
+    var claims = attempts.claimDue(25, Duration.ofSeconds(30));
+    assertThat(claims).hasSize(1);
+    assertThat(attempts.claimDue(25, Duration.ofSeconds(30))).isEmpty();
+    var claim = claims.getFirst();
+    FileBackedKeyRing deliveryKeys =
+        new FileBackedKeyRing(
+            tempDirectory.resolve("delivery.properties"),
+            "AES",
+            32,
+            Clock.systemUTC(),
+            Duration.ofHours(1));
+    var decrypted = new AesGcmDeliveryEscrowReader(deliveryKeys).decrypt(claim.escrow());
+    assertThat(decrypted.recipient()).isEqualTo("person@example.com");
+    assertThat(decrypted.text()).contains("12345678");
+
+    attempts.recordProviderAccepted(
+        claim,
+        ProviderDispatchOutcome.live(
+            ProviderAttemptClassification.DEFINITIVE_ACCEPTED, "SMTP_250", null),
+        Duration.ofSeconds(1));
+    dsl.execute(
+        "UPDATE notification_attempt SET next_action_at=clock_timestamp() WHERE attempt_id=?",
+        claim.attemptId());
+    JooqDeliveryReconciliationRepository reconciliation =
+        new JooqDeliveryReconciliationRepository(dsl);
+    var observation = reconciliation.claimDue(25, Duration.ofSeconds(30));
+    assertThat(observation).hasSize(1);
+    reconciliation.recordDelivered(
+        observation.getFirst(),
+        ProviderReconciliationOutcome.live(
+            ProviderReconciliationStatus.DELIVERED, "FIXTURE_DELIVERED", null));
+
+    var row =
+        Objects.requireNonNull(
+            dsl.fetchOne(
+                "SELECT lifecycle,recipient_ciphertext,text_ciphertext FROM notification WHERE notification_id=?",
+                accepted.notificationId()));
+    assertThat(row.get("lifecycle", String.class)).isEqualTo("DELIVERED");
+    assertThat(row.get("recipient_ciphertext", byte[].class)).isNull();
+    assertThat(row.get("text_ciphertext", byte[].class)).isNull();
+    assertThat(
+            dsl.fetchCount(
+                DSL.table("notification_result_outbox"),
+                DSL.field("notification_id").eq(accepted.notificationId())))
+        .isEqualTo(1);
   }
 
   @Test

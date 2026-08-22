@@ -56,6 +56,20 @@ spec:
           port: {{ .Values.database.port }}
         - protocol: TCP
           port: 15008
+    {{- if .Values.runtime.deliveryRuntimeEnabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.identity.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.identity.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.identity.resultPort }}
+        - protocol: TCP
+          port: 15008
+    {{- end }}
     {{- if .Values.observability.tracing.enabled }}
     - to:
         - namespaceSelector:

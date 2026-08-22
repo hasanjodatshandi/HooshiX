@@ -67,9 +67,9 @@ DEFERRED   intentionally excluded from the current application implementation se
 
 | Order | Milestone | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 0 | Inter-service contract independence | `NEXT` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. When complete, mark this `COMPLETED` and move `NEXT` to milestone 1. |
-| 1 | Notification Delivery Runtime v1 | `PLANNED` | Implement bounded dispatch claiming, durable pre-provider `DISPATCHING`, provider adapter execution, ambiguity-safe reconciliation, retry/observation rules, terminal result outbox, and Identity result callback with Day-One observability/tests. |
-| 2 | Public Registration Vertical Slice + OpenAPI | `PLANNED` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
+| 0 | Inter-service contract independence | `COMPLETED` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. When complete, mark this `COMPLETED` and move `NEXT` to milestone 1. |
+| 1 | Notification Delivery Runtime v1 | `COMPLETED` | Implement bounded dispatch claiming, durable pre-provider `DISPATCHING`, provider adapter execution, ambiguity-safe reconciliation, retry/observation rules, terminal result outbox, and Identity result callback with Day-One observability/tests. |
+| 2 | Public Registration Vertical Slice + OpenAPI | `NEXT` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
 | 3 | Frontend Foundation + Account Onboarding | `PLANNED` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
 | 4 | Identity Profile & Contact Management | `PLANNED` | Implement profile read/update plus Contact add/verify/resend/set-primary/remove semantics across Identity, BFF/OpenAPI, UI, persistence, security, and tests. |
 | 5 | Password Policy Decision + Password Lifecycle | `PLANNED` | First resolve the currently undefined concrete password composition/minimum-length policy through current architecture; then implement change/forgot/reset, compromised-password screening, recent-auth/MFA rules, and session revocation. Do not guess the missing policy in code. |
@@ -87,22 +87,22 @@ DEFERRED   intentionally excluded from the current application implementation se
 At the current state, the next coherent engineering task is:
 
 ```text
-Milestone 0 — Inter-service contract independence
+Milestone 2 — Public Registration Vertical Slice + OpenAPI
 ```
 
 The target invariant is:
 
 ```text
-canonical inter-service wire schemas -> neutral repository contract registry
-provider bounded context             -> semantic/version ownership
-provider service build               -> consumes canonical registry
-consumer service build               -> consumes canonical registry
-consumer -> provider source tree      -> prohibited
-consumer -> provider build artifact   -> prohibited
-shared Domain/business model          -> prohibited
+canonical public HTTP contract  -> BFF-owned OpenAPI authority
+register/resend/confirm          -> BFF -> Identity -> Notification
+Identity business authority      -> remains in Identity
+Notification delivery authority  -> remains in Notification
+browser security/quota/errors    -> enforced at the BFF/public boundary
+RFC 9457 + contract tests        -> required
+integrated registration journey  -> required before milestone completion
 ```
 
-The neutral contract registry is a schema authority, not an independent service, runtime dependency, shared database, shared Domain library, or permission to leak generated transport types into Domain/Application code.
+The public slice must reuse the implemented service contracts and callback semantics. It must not copy Identity or Notification business logic into the BFF.
 
 ## 6. Rules for updating this roadmap
 

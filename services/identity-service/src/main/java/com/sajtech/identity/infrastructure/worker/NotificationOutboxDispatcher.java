@@ -8,6 +8,7 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.time.*;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,8 +92,8 @@ public final class NotificationOutboxDispatcher implements SmartLifecycle {
       var handoff =
           escrow.decrypt(
               record.outboxId(), record.escrowKeyId(), record.nonce(), record.ciphertext());
-      notification.submit(record, handoff);
-      store.markSubmitted(record.outboxId(), clock.instant());
+      UUID notificationId = notification.submit(record, handoff);
+      store.markSubmitted(record.outboxId(), notificationId, clock.instant());
     } catch (StatusRuntimeException exception) {
       handleGrpc(record, exception.getStatus().getCode());
     } catch (IllegalStateException exception) {

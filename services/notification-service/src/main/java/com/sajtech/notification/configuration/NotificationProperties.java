@@ -9,6 +9,9 @@ public record NotificationProperties(
     int grpcPort,
     int maxConcurrentCallsPerConnection,
     String callerService,
+    boolean deliveryRuntimeEnabled,
+    String identityResultTarget,
+    Path providerConfigurationPath,
     Path fingerprintKeyRingPath,
     Path deliveryKeyRingPath,
     Duration keyRingMaximumStaleness) {
@@ -19,11 +22,18 @@ public record NotificationProperties(
     if (maxConcurrentCallsPerConnection <= 0) {
       throw new IllegalArgumentException("Notification gRPC concurrency must be positive");
     }
-    if (callerService == null || callerService.isBlank()) {
-      throw new IllegalArgumentException("Notification caller service identity is required");
+    if (callerService == null
+        || callerService.isBlank()
+        || identityResultTarget == null
+        || identityResultTarget.isBlank()) {
+      throw new IllegalArgumentException(
+          "Notification service identity and callback target are required");
     }
-    if (fingerprintKeyRingPath == null || deliveryKeyRingPath == null) {
-      throw new IllegalArgumentException("Notification key-ring paths are required");
+    if (providerConfigurationPath == null
+        || fingerprintKeyRingPath == null
+        || deliveryKeyRingPath == null) {
+      throw new IllegalArgumentException(
+          "Notification provider/key configuration paths are required");
     }
     if (keyRingMaximumStaleness == null
         || keyRingMaximumStaleness.isZero()

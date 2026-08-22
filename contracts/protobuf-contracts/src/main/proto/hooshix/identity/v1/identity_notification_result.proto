@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package hooshix.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+import "hooshix/notification/v1/notification.proto";
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.v1";
+
+service IdentityNotificationResultService {
+  rpc ReportNotificationResult(ReportNotificationResultRequest) returns (ReportNotificationResultResponse);
+}
+
+message ReportNotificationResultRequest {
+  string notification_id = 1;
+  hooshix.notification.v1.NotificationLifecycle terminal_lifecycle = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+message ReportNotificationResultResponse {
+  bool accepted = 1;
+}

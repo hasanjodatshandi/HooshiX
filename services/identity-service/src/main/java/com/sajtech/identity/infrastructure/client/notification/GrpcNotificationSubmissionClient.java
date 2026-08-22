@@ -18,7 +18,7 @@ public final class GrpcNotificationSubmissionClient implements NotificationSubmi
   }
 
   @Override
-  public void submit(NotificationOutboxRecord record, DecryptedHandoff handoff) {
+  public java.util.UUID submit(NotificationOutboxRecord record, DecryptedHandoff handoff) {
     Timestamp notAfter =
         Timestamp.newBuilder()
             .setSeconds(record.messageNotAfter().getEpochSecond())
@@ -48,6 +48,11 @@ public final class GrpcNotificationSubmissionClient implements NotificationSubmi
         && response.getLifecycle() != NotificationLifecycle.NOTIFICATION_LIFECYCLE_PROVIDER_ACCEPTED
         && response.getLifecycle() != NotificationLifecycle.NOTIFICATION_LIFECYCLE_DELIVERED) {
       throw new IllegalStateException("Notification returned an incompatible acceptance lifecycle");
+    }
+    try {
+      return java.util.UUID.fromString(response.getNotificationId());
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalStateException("Notification returned an invalid identifier", exception);
     }
   }
 }

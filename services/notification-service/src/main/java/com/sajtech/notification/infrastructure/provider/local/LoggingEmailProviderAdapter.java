@@ -2,6 +2,8 @@ package com.sajtech.notification.infrastructure.provider.local;
 
 import com.sajtech.notification.application.delivery.model.ProviderDispatchMessage;
 import com.sajtech.notification.application.delivery.model.ProviderDispatchOutcome;
+import com.sajtech.notification.application.delivery.model.ProviderReconciliationOutcome;
+import com.sajtech.notification.application.delivery.model.ProviderReconciliationRequest;
 import com.sajtech.notification.application.delivery.port.out.NotificationProviderGateway;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import org.slf4j.Logger;
@@ -32,6 +34,14 @@ public final class LoggingEmailProviderAdapter implements NotificationProviderGa
         .addKeyValue("eventCode", "NOTIFICATION_EMAIL_SIMULATED")
         .log("Local Email notification simulation completed");
     return ProviderDispatchOutcome.simulated();
+  }
+
+  @Override
+  public ProviderReconciliationOutcome reconcile(ProviderReconciliationRequest request) {
+    if (request == null || request.channel() != channel()) {
+      throw new IllegalArgumentException("Local provider reconciliation channel is invalid");
+    }
+    return ProviderReconciliationOutcome.simulated();
   }
 
   private static void requireEmail(ProviderDispatchMessage message) {

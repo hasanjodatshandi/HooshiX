@@ -116,4 +116,8 @@
     <Class name="com.sajtech.identity.infrastructure.persistence.JooqTenantStore" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqNotificationResultStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>
