@@ -7,6 +7,22 @@ public interface IdentityGateway {
   LoginResult login(
       UUID requestId, String channel, String contact, String password, byte[] clientAddress);
 
+  RegisterResult register(
+      UUID requestId,
+      String channel,
+      String contact,
+      String password,
+      String locale,
+      String firstName,
+      String lastName,
+      String fatherName,
+      byte[] clientAddress);
+
+  boolean resendRegistration(UUID requestId, String channel, String contact, byte[] clientAddress);
+
+  boolean confirmRegistration(
+      UUID requestId, String channel, String contact, String code, byte[] clientAddress);
+
   ListResult listTenants(String refresh);
 
   SelectResult selectTenant(UUID requestId, String refresh, UUID membershipId, String audience);
@@ -27,6 +43,8 @@ public interface IdentityGateway {
     AUTHENTICATED_ONBOARDING,
     TENANT_AUTHENTICATED
   }
+
+  record RegisterResult(boolean accepted) {}
 
   record LoginResult(
       UUID userId,

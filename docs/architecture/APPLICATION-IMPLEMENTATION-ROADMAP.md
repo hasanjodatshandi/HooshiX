@@ -35,14 +35,13 @@ services/authorization-service
 services/web-bff
 ```
 
-The implemented foundation already includes substantial registration, local authentication/session/JWT, Tenant/Membership/Invitation, Authorization, durable Notification acceptance primitives, Compromised Password screening, local integrated runtime, local production-fidelity staging, observability, and repository/release security controls.
+The implemented foundation already includes substantial registration, local authentication/session/JWT, Tenant/Membership/Invitation, Authorization, Notification delivery/reconciliation/result-callback runtime, Compromised Password screening, the canonical BFF public registration OpenAPI slice, local integrated runtime, local production-fidelity staging, observability, and repository/release security controls.
 
 The application is not yet a complete end-user product. Current material gaps are:
 
-- no browser frontend implementation;
-- no canonical public OpenAPI contract yet;
-- no complete browser -> registration -> verification -> login onboarding journey;
-- Notification durable acceptance exists, but delivery worker/provider/reconciliation/result-callback runtime is incomplete;
+- no browser frontend implementation, generated frontend BFF client, or Playwright onboarding journey yet;
+- the public registration OpenAPI/register/resend/confirm backend slice exists, but the end-user registration/verification/login UI is not implemented;
+- real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
 - Identity Profile/Contact management, password change/recovery, MFA/TOTP, Google OIDC/ExternalIdentity, and erasure are incomplete;
 - remaining Tenant lifecycle operations are incomplete;
 - application Kafka runtime is not yet required by an implemented asynchronous use case;
@@ -69,8 +68,8 @@ DEFERRED   intentionally excluded from the current application implementation se
 | ---: | --- | --- | --- |
 | 0 | Inter-service contract independence | `COMPLETED` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. When complete, mark this `COMPLETED` and move `NEXT` to milestone 1. |
 | 1 | Notification Delivery Runtime v1 | `COMPLETED` | Implement bounded dispatch claiming, durable pre-provider `DISPATCHING`, provider adapter execution, ambiguity-safe reconciliation, retry/observation rules, terminal result outbox, and Identity result callback with Day-One observability/tests. |
-| 2 | Public Registration Vertical Slice + OpenAPI | `NEXT` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
-| 3 | Frontend Foundation + Account Onboarding | `PLANNED` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
+| 2 | Public Registration Vertical Slice + OpenAPI | `COMPLETED` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
+| 3 | Frontend Foundation + Account Onboarding | `NEXT` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
 | 4 | Identity Profile & Contact Management | `PLANNED` | Implement profile read/update plus Contact add/verify/resend/set-primary/remove semantics across Identity, BFF/OpenAPI, UI, persistence, security, and tests. |
 | 5 | Password Policy Decision + Password Lifecycle | `PLANNED` | First resolve the currently undefined concrete password composition/minimum-length policy through current architecture; then implement change/forgot/reset, compromised-password screening, recent-auth/MFA rules, and session revocation. Do not guess the missing policy in code. |
 | 6 | MFA/TOTP | `PLANNED` | Implement TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, and security evidence. |
@@ -87,22 +86,22 @@ DEFERRED   intentionally excluded from the current application implementation se
 At the current state, the next coherent engineering task is:
 
 ```text
-Milestone 2 — Public Registration Vertical Slice + OpenAPI
+Milestone 3 — Frontend Foundation + Account Onboarding
 ```
 
 The target invariant is:
 
 ```text
-canonical public HTTP contract  -> BFF-owned OpenAPI authority
-register/resend/confirm          -> BFF -> Identity -> Notification
-Identity business authority      -> remains in Identity
-Notification delivery authority  -> remains in Notification
-browser security/quota/errors    -> enforced at the BFF/public boundary
-RFC 9457 + contract tests        -> required
-integrated registration journey  -> required before milestone completion
+reviewed React/TypeScript baseline   -> no speculative framework surface
+BFF OpenAPI                         -> generated/validated browser client boundary
+registration/verification/login     -> uses implemented BFF public contracts
+session/Tenant selection            -> server-side session authority preserved
+fa/en + RTL/LTR                     -> first-class UI behavior
+accessibility                       -> required in the first onboarding slice
+critical Playwright journey         -> required before milestone completion
 ```
 
-The public slice must reuse the implemented service contracts and callback semantics. It must not copy Identity or Notification business logic into the BFF.
+The frontend must consume the BFF public contract. It must not call Identity, Notification, Authorization, or other internal services directly.
 
 ## 6. Rules for updating this roadmap
 

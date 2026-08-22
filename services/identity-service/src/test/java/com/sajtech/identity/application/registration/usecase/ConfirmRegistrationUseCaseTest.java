@@ -33,6 +33,65 @@ import org.junit.jupiter.api.Test;
 
 class ConfirmRegistrationUseCaseTest {
   @Test
+  void validProofConsumesQuotaConfirmsAndClaimsConfirmedDedup() {
+    Instant now = Instant.parse("2026-08-18T00:00:00Z");
+    UUID challengeId = UUID.randomUUID();
+    TrackingStore store = new TrackingStore(UUID.randomUUID(), UUID.randomUUID(), challengeId, now);
+    TrackingQuota quota = new TrackingQuota();
+    IntentFingerprintPort fingerprints =
+        new IntentFingerprintPort() {
+          @Override
+          public FingerprintDigest digest(byte[] material) {
+            return new FingerprintDigest(new byte[32], "v1", "k1");
+          }
+
+          @Override
+          public boolean matches(byte[] material, CommandDedupRecord stored) {
+            return true;
+          }
+        };
+    ChallengeSecretPort challenges =
+        new ChallengeSecretPort() {
+          @Override
+          public GeneratedChallenge generate(UUID id) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public boolean matches(UUID id, String code, byte[] storedVerifier, String keyId) {
+            assertThat(id).isEqualTo(challengeId);
+            assertThat(code).isEqualTo("12345678");
+            return true;
+          }
+        };
+    ConfirmRegistrationUseCase useCase =
+        new ConfirmRegistrationUseCase(
+            new ContactCanonicalizer(),
+            new FingerprintMaterialEncoder(),
+            fingerprints,
+            new IdempotencyGuard(fingerprints),
+            quota,
+            challenges,
+            new DirectTransactionRunner(),
+            store,
+            Clock.fixed(now, ZoneOffset.UTC));
+
+    boolean confirmed =
+        useCase.confirm(
+            new ConfirmRegistrationCommand(
+                UUID.randomUUID(),
+                RegistrationChannel.EMAIL,
+                "Person@Example.com",
+                "12345678",
+                new byte[] {(byte) 203, 0, 113, 8}));
+
+    assertThat(confirmed).isTrue();
+    assertThat(quota.calls).isEqualTo(1);
+    assertThat(store.confirmed).isTrue();
+    assertThat(store.dedupOutcome).isEqualTo("CONFIRMED");
+  }
+
+  @Test
   void malformedProofStillConsumesQuotaAndCountsAgainstChallengeAttemptLimit() {
     Instant now = Instant.parse("2026-08-18T00:00:00Z");
     UUID challengeId = UUID.randomUUID();
@@ -90,6 +149,7 @@ class ConfirmRegistrationUseCaseTest {
     assertThat(quota.calls).isEqualTo(1);
     assertThat(store.failedAttempts).isEqualTo(1);
     assertThat(store.dedupOutcome).isEqualTo("REJECTED_PROOF");
+    assertThat(store.confirmed).isFalse();
   }
 
   private static final class TrackingQuota implements SemanticQuotaPort {
@@ -114,6 +174,7 @@ class ConfirmRegistrationUseCaseTest {
     private final LockedChallenge challenge;
     private int failedAttempts;
     private String dedupOutcome;
+    private boolean confirmed;
 
     TrackingStore(UUID userId, UUID contactId, UUID challengeId, Instant now) {
       reservation =
@@ -184,7 +245,7 @@ class ConfirmRegistrationUseCaseTest {
 
     @Override
     public void confirm(UUID userId, UUID contactId, UUID challengeId, Instant now) {
-      throw new AssertionError("Malformed proof must not confirm");
+      confirmed = true;
     }
 
     @Override

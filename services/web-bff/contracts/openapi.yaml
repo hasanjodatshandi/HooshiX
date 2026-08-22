@@ -1,0 +1,242 @@
+openapi: 3.1.0
+info:
+  title: HooshiX Web BFF Public API
+  version: 1.0.0
+  description: Canonical browser-facing REST contract owned by Web BFF.
+servers:
+  - url: /
+paths:
+  /api/v1/identity/registration:
+    post:
+      operationId: registerLocalIdentity
+      summary: Start local account registration
+      description: Same-origin browser request. Trusted client-address context is injected by the approved edge.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '202':
+          description: Registration handoff accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedResponse'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/RegistrationRejected' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/v1/identity/registration/resend:
+    post:
+      operationId: resendRegistrationVerification
+      summary: Request another registration verification challenge
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendRequest'
+      responses:
+        '202':
+          description: Resend request accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedResponse'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/RegistrationRejected' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/v1/identity/registration/confirm:
+    post:
+      operationId: confirmRegistration
+      summary: Confirm registration verification challenge
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmRequest'
+      responses:
+        '200':
+          description: Verification result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmedResponse'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/RegistrationRejected' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: true
+      description: Caller-generated UUIDv4 idempotency identity. Replays use the same value.
+      schema:
+        type: string
+        format: uuid
+        pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+  schemas:
+    RegistrationChannel:
+      type: string
+      enum: [EMAIL, PHONE]
+    RegistrationLocale:
+      type: string
+      enum: [fa, en]
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, contact, password, locale, firstName, lastName]
+      properties:
+        channel: { $ref: '#/components/schemas/RegistrationChannel' }
+        contact:
+          type: string
+          minLength: 1
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Transport bound only. Identity remains password-policy authority.
+        locale: { $ref: '#/components/schemas/RegistrationLocale' }
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        fatherName:
+          type: string
+          maxLength: 120
+    ResendRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, contact]
+      properties:
+        channel: { $ref: '#/components/schemas/RegistrationChannel' }
+        contact:
+          type: string
+          minLength: 1
+          maxLength: 254
+    ConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, contact, code]
+      properties:
+        channel: { $ref: '#/components/schemas/RegistrationChannel' }
+        contact:
+          type: string
+          minLength: 1
+          maxLength: 254
+        code:
+          type: string
+          minLength: 8
+          maxLength: 8
+          pattern: '^[0-9]{8}$'
+    AcceptedResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted]
+      properties:
+        accepted: { type: boolean }
+    ConfirmedResponse:
+      type: object
+      additionalProperties: false
+      required: [confirmed]
+      properties:
+        confirmed: { type: boolean }
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+          maxLength: 120
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{0,63}$'
+        instance:
+          type: string
+          maxLength: 1024
+  responses:
+    InvalidRequest:
+      description: Request validation failed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InvalidSession:
+      description: A supplied browser session is invalid.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Browser-origin or session-bound request protection rejected the request.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RegistrationRejected:
+      description: Registration precondition was not satisfied. Response is non-enumerating.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PayloadTooLarge:
+      description: Request exceeded the public body bound.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnsupportedMediaType:
+      description: Multipart public requests are not supported.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited:
+      description: Semantic registration quota was exceeded.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    DependencyUnavailable:
+      description: An authoritative registration dependency is unavailable.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: Unexpected BFF failure with no implementation detail exposure.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }

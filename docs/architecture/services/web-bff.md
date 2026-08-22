@@ -177,6 +177,9 @@ BFF evidence covers:
 - OIDC PKCE/state/nonce/pre-auth/replay/redirect;
 - server-side session/token custody/rotation/revocation;
 - CSRF/Origin/Fetch Metadata/CORS/CSP/cache/security headers;
+- canonical OpenAPI registration paths/schemas and stable RFC 9457 problem responses;
+- anonymous same-origin register/resend behavior, trusted client-address forwarding, and session-bound CSRF when a cookie exists;
+- BFF -> Identity register/resend/confirm gRPC mapping and non-enumerating registration failures;
 - route->audience mapping and browser arbitrary-audience denial;
 - downstream workload/deadline/cancellation/no-stale-authority behavior;
 - Reference Data local-vs-remote trigger/migration consistency;
@@ -186,6 +189,20 @@ BFF evidence covers:
 
 The BFF is repository-complete for the implemented slice only when applicable source/contracts/tests/build/deploy/security/observability/CI artifacts exist and execute. Local fast-lane and production-fidelity kind/staging runtime evidence now exists as described below; production runtime evidence remains `NOT VERIFIED`.
 
+## 12. Public Registration facade
+
+The canonical public registration contract is BFF-owned OpenAPI 3.1 under `services/web-bff/contracts/openapi.yaml`. The reviewed routes are:
+
+```text
+POST /api/v1/identity/registration
+POST /api/v1/identity/registration/resend
+POST /api/v1/identity/registration/confirm
+```
+
+These routes are anonymous-capable same-origin browser writes. Origin and Fetch Metadata remain mandatory; if a browser session cookie is present, the request remains session-bound and CSRF is mandatory. Trusted client address comes only from the approved WAF-injected `X-HooshiX-Client-IP` internal header and is not part of the public OpenAPI contract.
+
+Web BFF performs transport validation and non-enumerating RFC 9457 error mapping only. Identity remains registration/password/contact/challenge authority, Identity owns ADR-0024 registration semantic quota, and Notification remains delivery authority. The BFF -> Identity registration edge is `AUTHORITATIVE_SECURITY`, one-attempt, finite-deadline, no-fallback, and fail-closed.
+
 ## Current repository implementation evidence
 
-The current repository contains the first executable Web BFF repository slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement, local authentication/logout, Tenant lifecycle/selection routes, Authorization-management routes, exact audience brokerage, Application ports with ArchUnit enforcement, security-aware readiness, wired gRPC dependency observability, zero-queue bounded per-dependency concurrency admission, HTTP/gRPC/Redis observability, hardened edge-only deployment artifacts, dependency locks, service-owned security workflow, and key-ring refresh that rejects reuse of an existing key identifier with different key material while retaining the last valid snapshot. Canonical WSL Java 25 verification passes the strict Gradle/unit/architecture/SpotBugs/bootJar gate and Redis Testcontainers integration. The repository-owned integrated WSL runtime runs Web BFF with its runtime flag enabled, repository `application.yaml`, generated local key material, pinned Redis, and local self-signed HTTPS at `https://localhost:18443` while all four internal services are simultaneously running. Readiness is `UP`, unknown-resource handling returns bounded `404 / NOT_FOUND`, and browser-session bootstrap returns `201 / PREAUTH` and a valid bootstrapped session reaches Identity over gRPC, where an unknown local-login identity returns the expected non-enumerating `401 / AUTHENTICATION_FAILED`; this is fast local application evidence. The separate production-fidelity local kind/staging lane also verifies Web BFF Ready behind Traefik -> WAF, exact-digest deployment, browser bootstrap, direct Traefik -> BFF denial, and approved WAF -> BFF mesh identity. Protected PR baseline run `32261626399` passed the Web BFF Redis integration, architecture, SpotBugs, Semgrep, OSV, Gitleaks, Helm/render, observability-artifact, runtime-image, generated-file, and aggregate repository gates on implementation head `7de8b17`. Production edge/WAF runtime, Google OIDC/provider behavior, and production readiness remain `NOT VERIFIED`.
+The current repository contains the executable Web BFF slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement, local authentication/logout, Tenant lifecycle/selection routes, Authorization-management routes, exact audience brokerage, and the canonical OpenAPI 3.1 public registration facade for register/resend/confirm. Registration uses the trusted WAF-derived client address, preserves Identity business/quota authority, returns stable non-enumerating RFC 9457 problems, and registers the BFF -> Identity edge as `AUTHORITATIVE_SECURITY` with no retry owner or fallback. Application ports retain ArchUnit enforcement; dependency observability/admission, Redis/session observability, hardened edge-only deployment artifacts, dependency locks, service-owned security workflow, and key-ring refresh controls remain in place. Canonical WSL Java 25 `check` passes unit, OpenAPI contract, HTTP controller, browser-security, in-process BFF -> Identity gRPC, Redis integration, architecture, SpotBugs, and formatting gates. The latest repository-owned integrated WSL execution brought all five application services `UP`/Ready and verified live anonymous same-origin registration with `202 / accepted=true`, durable Identity registration state, durable Identity -> Notification handoff, Notification `ACCEPTED` registration-verification intent, and live resend with a fresh active challenge and submitted Notification outbox. Confirm mapping is verified without extracting encrypted OTP material by the BFF -> Identity confirm transport test plus Identity `ConfirmRegistration` tests. Production edge/runtime and production provider execution remain `NOT VERIFIED`.
