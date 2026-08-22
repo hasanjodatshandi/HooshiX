@@ -34,6 +34,7 @@ context/checkpoints/20260822T144413Z-recover-missing-pr-94-linkage-for-the-exact
 context/checkpoints/20260822T144447Z-post-merge-pr-94-finalize-current-production-infrastructure-conf.json
 context/checkpoints/20260822T154103Z-make-the-scheduled-production-deployed-digest-vulnerability-resc.json
 context/checkpoints/20260822T155021Z-post-merge-pr-96-finalize-the-pre-commissioning-production-deplo.json
+context/checkpoints/20260822T175836Z-add-a-current-application-implementation-roadmap-that-survives-c.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
@@ -96,6 +97,7 @@ docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md
 docs/adr/0050-add-policy-bound-desktop-credential-broker-v1.md
 docs/adr/0051-separate-windows-mcp-runtime-from-wsl-workspace-v1.md
 docs/adr/decision-register.md
+docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
 docs/architecture/PRODUCTION-READINESS-CHECKLIST.md
