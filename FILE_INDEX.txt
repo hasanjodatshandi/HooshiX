@@ -27,6 +27,7 @@ context/bootstrap.schema.json
 context/checkpoint.schema.json
 context/checkpoints/20260817T062054Z-implement-git-native-agent-context-engine-v1.json
 context/checkpoints/20260817T120535Z-post-merge-pr-54-finalize-git-native-agent-context-engine-v1-aft.json
+context/checkpoints/20260822T134906Z-complete-the-final-production-infrastructure-conformance-audit-f.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
