@@ -158,6 +158,7 @@ def validate_static_contracts(profile: dict) -> list[str]:
     add(errors, upload_pin in release_workflow and "retention-days: 90" in release_workflow, "production release evidence must be retained by the pinned immutable artifact action")
     add(errors, "cron: '23 */2 * * *'" in rescan_workflow and "grype db update" in rescan_workflow and "--fail-on high" in rescan_workflow, "production deployed-digest rescan must run at least every two hours and fail closed on High/Critical findings")
     add(errors, upload_pin in rescan_workflow and "retention-days: 90" in rescan_workflow, "production rescan evidence must be retained by the pinned immutable artifact action")
+    errors.extend(validate_rescan_workflow_contract(rescan_workflow))
     scan_paths = list(PRODUCTION.rglob("*.yaml")) + list(PRODUCTION.rglob("*.yml")) + list((ROOT/"deploy/clusters/production").rglob("*.yaml"))
     for path in scan_paths:
         text = path.read_text(encoding="utf-8")
@@ -165,6 +166,31 @@ def validate_static_contracts(profile: dict) -> list[str]:
         if re.search(r"(?m)^apiVersion:\s*kyverno\.io/v1\s*$", text) and re.search(r"(?m)^kind:\s*(ClusterPolicy|Policy)\s*$", text): errors.append(f"legacy Kyverno policy API is prohibited: {path.relative_to(ROOT)}")
         if re.search(r"(?m)^apiVersion:\s*kyverno\.io/v2\s*$", text) and re.search(r"(?m)^kind:\s*(CleanupPolicy|ClusterCleanupPolicy)\s*$", text): errors.append(f"legacy Kyverno cleanup API is prohibited: {path.relative_to(ROOT)}")
         if re.search(r"(?m)^kind:\s*Secret\s*$", text): errors.append(f"production Git must not contain Kubernetes Secret value manifests: {path.relative_to(ROOT)}")
+    return errors
+
+def validate_rescan_workflow_contract(text: str) -> list[str]:
+    errors: list[str] = []
+    inventory = "- name: Detect tracked production inventory"
+    install = "- name: Install pinned release tools"
+    credentials = "- name: Configure protected registry credentials"
+    rescan = "- name: Rescan tracked production digests with fresh Grype data"
+    guard = "if: steps.production_inventory.outputs.present == 'true'"
+    no_inventory = "No tracked production release manifests exist; no deployed digest inventory is claimed."
+    add(errors, "id: production_inventory" in text and "present=false" in text and "present=true" in text,
+        "production rescan must expose an explicit tracked-inventory decision")
+    add(errors, no_inventory in text and "no-production-inventory.txt" in text,
+        "production rescan must retain explicit no-inventory evidence before commissioning")
+    newline_printf = "printf '%s" + chr(92) + "n'"
+    add(errors, text.count(newline_printf) >= 2,
+        "production rescan evidence lines must use literal newline printf formatting")
+    try:
+        positions = [text.index(marker) for marker in (inventory, install, credentials, rescan)]
+        add(errors, positions == sorted(positions),
+            "production rescan must detect inventory before tools, registry credentials, and image scanning")
+    except ValueError:
+        errors.append("production rescan workflow is missing a required inventory/tool/credential/scan step")
+    add(errors, text.count(guard) >= 3,
+        "production rescan tools, registry credentials, and digest scanning must be conditional on tracked inventory")
     return errors
 
 def validate_repository() -> list[str]:
