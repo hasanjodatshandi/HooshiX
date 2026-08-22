@@ -28,6 +28,8 @@ dependencies {
   }
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
+  testImplementation("org.yaml:snakeyaml:2.6")
+  testImplementation("io.grpc:grpc-inprocess:1.83.1")
   testImplementation("org.testcontainers:testcontainers")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

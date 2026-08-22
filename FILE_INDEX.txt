@@ -36,6 +36,7 @@ context/checkpoints/20260822T154103Z-make-the-scheduled-production-deployed-dige
 context/checkpoints/20260822T155021Z-post-merge-pr-96-finalize-the-pre-commissioning-production-deplo.json
 context/checkpoints/20260822T175836Z-add-a-current-application-implementation-roadmap-that-survives-c.json
 context/checkpoints/20260822T180614Z-post-merge-pr-98-finalize-the-application-implementation-roadmap.json
+context/checkpoints/20260822T231253Z-finalize-public-registration-vertical-slice-openapi-delivery-lif.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
@@ -812,6 +813,7 @@ services/web-bff/Dockerfile
 services/web-bff/build.gradle.kts
 services/web-bff/config/spotbugs/exclude.xml
 services/web-bff/container/pins.env
+services/web-bff/contracts/openapi.yaml
 services/web-bff/deploy/helm/web-bff/Chart.yaml
 services/web-bff/deploy/helm/web-bff/ci/test-values.yaml
 services/web-bff/deploy/helm/web-bff/templates/_helpers.tpl
@@ -863,9 +865,11 @@ services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BffExceptionHa
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BrowserAuthController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/HttpSupport.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityTenantController.java
+services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/RegistrationController.java
 services/web-bff/src/main/resources/application.yaml
 services/web-bff/src/test/java/com/sajtech/webbff/architecture/ArchitectureRulesTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/configuration/WebBffApplicationPropertiesTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityBffRegistrationClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptorTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilterTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/SessionCryptoTest.java
@@ -875,3 +879,5 @@ services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/session/RedisBf
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserAuthControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserResponseContractTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiRegistrationContractTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/RegistrationControllerTest.java
