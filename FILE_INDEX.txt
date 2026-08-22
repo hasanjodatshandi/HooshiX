@@ -32,6 +32,7 @@ context/checkpoints/20260822T140931Z-post-merge-pr-92-finalize-production-infras
 context/checkpoints/20260822T142409Z-reconcile-current-production-infrastructure-conformance-status-d.json
 context/checkpoints/20260822T144413Z-recover-missing-pr-94-linkage-for-the-exact-pre-merge-production.json
 context/checkpoints/20260822T144447Z-post-merge-pr-94-finalize-current-production-infrastructure-conf.json
+context/checkpoints/20260822T154103Z-make-the-scheduled-production-deployed-digest-vulnerability-resc.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
