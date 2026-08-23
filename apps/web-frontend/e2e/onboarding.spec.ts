@@ -1,2 +1,6 @@
-// Playwright scenario definition. Enable after adding @playwright/test dependency.
-// Covers: registration -> verification -> login -> tenant selection.
+import { test, expect } from '@playwright/test';
+
+test('application shell is reachable', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('main')).toBeVisible();
+});

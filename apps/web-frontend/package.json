@@ -8,13 +8,15 @@
   "scripts": {
     "build": "tsc -b && vite build",
     "lint": "tsc --noEmit",
-    "generate:api": "./scripts/generate-openapi-client.sh"
+    "generate:api": "./scripts/generate-openapi-client.sh",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "latest",

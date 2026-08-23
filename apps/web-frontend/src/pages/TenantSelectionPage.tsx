@@ -11,5 +11,5 @@ export function TenantSelectionPage() {
   await bffClient.selectTenant(t.membershipId);
   dispatch(actions.tenantSelected(t.tenantId));
  }
- return <main><h1>Tenant Selection</h1>{tenants.map(t=><button key={t.membershipId} onClick={()=>select(t)}>{t.name}</button>)}</main>;
+ return <main aria-labelledby="tenant-title"><h1 id="tenant-title">Tenant Selection</h1>{tenants.map(t=><button key={t.membershipId} onClick={()=>select(t)}>{t.name}</button>)}</main>;
 }

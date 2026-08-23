@@ -30,5 +30,5 @@ export function VerificationFlow() {
     }
   }
 
-  return <section><h2>Verification</h2><input value={code} onChange={(e) => setCode(e.target.value)} /><button onClick={confirm}>Confirm</button><p>{state}</p><p>{error}</p></section>;
+  return <section aria-labelledby="verification-title"><h2 id="verification-title">Verification</h2><label htmlFor="verification-code">Code</label><input id="verification-code" aria-label="Verification code" value={code} onChange={(e) => setCode(e.target.value)} /><button type="button" onClick={confirm}>Confirm</button><p>{state}</p><p>{error}</p></section>;
 }

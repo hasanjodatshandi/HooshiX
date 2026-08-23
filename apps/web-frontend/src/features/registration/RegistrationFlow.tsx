@@ -30,5 +30,5 @@ export function RegistrationFlow() {
     }
   }
 
-  return <section><h2>Registration</h2><input value={contact} onChange={(e) => dispatch(actions.registrationStarted(e.target.value))} /><button onClick={submit}>Continue</button><p>{status}</p><p>{error}</p></section>;
+  return <section aria-labelledby="registration-title"><h2 id="registration-title">Registration</h2><label htmlFor="registration-contact">Contact</label><input id="registration-contact" aria-label="Registration contact" value={contact} onChange={(e) => dispatch(actions.registrationStarted(e.target.value))} /><button type="button" onClick={submit}>Continue</button><p>{status}</p><p>{error}</p></section>;
 }
