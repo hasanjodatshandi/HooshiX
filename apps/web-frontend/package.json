@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "tsc -b && vite build",
+    "preview": "vite preview",
     "lint": "tsc --noEmit",
     "generate:api": "./scripts/generate-openapi-client.sh",
     "e2e": "playwright test"
