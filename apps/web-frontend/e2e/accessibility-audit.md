@@ -1,10 +1,9 @@
 # Accessibility audit
 
-Checks:
-- Keyboard navigation for onboarding flow
-- Labels for form controls
-- Heading landmarks
-- Document language and direction
-- Error messages remain visible
+## Milestone 4 Profile
 
-Manual review remains required with browser accessibility tooling.
+Covered checks:
+
+- Profile content is rendered inside application shell.
+- Contact list uses semantic list markup.
+- Interactive contact controls use native button/input elements.

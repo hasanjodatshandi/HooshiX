@@ -4,4 +4,5 @@ export const routes = {
   login: '/login',
   tenantSelection: '/tenant-select',
   application: '/application',
+  profile: '/profile',
 } as const;

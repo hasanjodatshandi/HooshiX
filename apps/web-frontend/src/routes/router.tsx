@@ -3,6 +3,7 @@ import { ApplicationPage } from '../pages/ApplicationPage';
 import { LoginPage } from '../pages/LoginPage';
 import { TenantSelectionPage } from '../pages/TenantSelectionPage';
 import { VerificationFlow } from '../features/verification/VerificationFlow';
+import { ProfileFlow } from '../features/profile/ProfileFlow';
 import { VerificationGuard, AuthenticatedGuard } from './guards';
 import { routes } from './routes';
 
@@ -21,6 +22,10 @@ export function Router() {
 
   if (path === routes.tenantSelection) {
     return <AuthenticatedGuard><TenantSelectionPage /></AuthenticatedGuard>;
+  }
+
+  if (path === routes.profile) {
+    return <AuthenticatedGuard><ProfileFlow /></AuthenticatedGuard>;
   }
 
   if (path === routes.application) {

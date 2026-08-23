@@ -69,6 +69,40 @@ export async function selectTenant(membershipId: string): Promise<TenantSelectio
   return post<TenantSelectionResponse>('/api/v1/identity/tenant-selection', { membershipId });
 }
 
+
+export type Profile = { id: string; firstName: string; lastName: string; fatherName?: string };
+export type Contact = { id: string; type: string; value: string; verified: boolean; primary: boolean };
+
+export async function getProfile(): Promise<Profile> {
+  const r = await fetch('/api/v1/identity/profile', { credentials: 'same-origin' });
+  if (!r.ok) throw new Error('profile failed');
+  return r.json();
+}
+
+export async function getContacts(): Promise<Contact[]> {
+  const r = await fetch('/api/v1/identity/contacts', { credentials: 'same-origin' });
+  if (!r.ok) throw new Error('contacts failed');
+  return r.json();
+}
+
+export async function verifyContact(id: string, code: string): Promise<{verified:boolean}> {
+  return post<{verified:boolean}>(`/api/v1/identity/contacts/${id}/verify`, { code });
+}
+
+export async function setPrimaryContact(id: string): Promise<{accepted:boolean}> {
+  return post<{accepted:boolean}>(`/api/v1/identity/contacts/${id}/primary`, {});
+}
+
+export async function removeContact(id: string): Promise<{accepted:boolean}> {
+  const r = await fetch(`/api/v1/identity/contacts/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+  if (!r.ok) throw new Error('remove contact failed');
+  return r.json();
+}
+
+export async function addContact(body: {type: string; value: string}): Promise<{id:string}> {
+  return post<{id:string}>('/api/v1/identity/contacts', body);
+}
+
 export const bffClient = {
   login,
   listTenants,
@@ -76,4 +110,10 @@ export const bffClient = {
   register: (body: RegisterRequest) => post<AcceptedResponse>('/api/v1/identity/registration', body),
   resend: (body: ResendRequest) => post<AcceptedResponse>('/api/v1/identity/registration/resend', body),
   confirm: (body: ConfirmRequest) => post<ConfirmedResponse>('/api/v1/identity/registration/confirm', body),
+  getProfile,
+  getContacts,
+  addContact,
+  verifyContact,
+  setPrimaryContact,
+  removeContact,
 };
