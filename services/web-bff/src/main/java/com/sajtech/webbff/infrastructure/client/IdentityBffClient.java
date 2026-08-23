@@ -301,16 +301,71 @@ public final class IdentityBffClient implements IdentityGateway {
   }
 
   public Profile profile(String refresh) {
-    var r=profileStub().getProfile(GetProfileRequest.newBuilder().setRefreshCredential(refresh).build());
-    return new Profile(uuid(r.getProfileId()), r.getFirstName(), r.getLastName(), r.getFatherName());
+    var r =
+        profileStub()
+            .getProfile(GetProfileRequest.newBuilder().setRefreshCredential(refresh).build());
+    return new Profile(
+        uuid(r.getProfileId()), r.getFirstName(), r.getLastName(), r.getFatherName());
   }
+
   public List<Contact> contacts(String refresh) {
-    return profileStub().listContacts(ListContactsRequest.newBuilder().setRefreshCredential(refresh).build()).getContactsList().stream().map(c -> new Contact(uuid(c.getContactId()), c.getType(), c.getValue(), c.getVerified(), c.getPrimary())).toList();
+    return profileStub()
+        .listContacts(ListContactsRequest.newBuilder().setRefreshCredential(refresh).build())
+        .getContactsList()
+        .stream()
+        .map(
+            c ->
+                new Contact(
+                    uuid(c.getContactId()),
+                    c.getType(),
+                    c.getValue(),
+                    c.getVerified(),
+                    c.getPrimary()))
+        .toList();
   }
-  public UUID addContact(String refresh,String type,String value) { return uuid(profileStub().addContact(AddContactRequest.newBuilder().setRefreshCredential(refresh).setType(type).setValue(value).build()).getContactId()); }
-  public boolean verifyContact(String refresh,UUID id,String code) { return profileStub().verifyContact(VerifyContactRequest.newBuilder().setRefreshCredential(refresh).setContactId(id.toString()).setCode(code).build()).getVerified(); }
-  public boolean setPrimaryContact(String refresh,UUID id) { return profileStub().setPrimaryContact(SetPrimaryContactRequest.newBuilder().setRefreshCredential(refresh).setContactId(id.toString()).build()).getAccepted(); }
-  public boolean removeContact(String refresh,UUID id) { return profileStub().removeContact(RemoveContactRequest.newBuilder().setRefreshCredential(refresh).setContactId(id.toString()).build()).getAccepted(); }
+
+  public UUID addContact(String refresh, String type, String value) {
+    return uuid(
+        profileStub()
+            .addContact(
+                AddContactRequest.newBuilder()
+                    .setRefreshCredential(refresh)
+                    .setType(type)
+                    .setValue(value)
+                    .build())
+            .getContactId());
+  }
+
+  public boolean verifyContact(String refresh, UUID id, String code) {
+    return profileStub()
+        .verifyContact(
+            VerifyContactRequest.newBuilder()
+                .setRefreshCredential(refresh)
+                .setContactId(id.toString())
+                .setCode(code)
+                .build())
+        .getVerified();
+  }
+
+  public boolean setPrimaryContact(String refresh, UUID id) {
+    return profileStub()
+        .setPrimaryContact(
+            SetPrimaryContactRequest.newBuilder()
+                .setRefreshCredential(refresh)
+                .setContactId(id.toString())
+                .build())
+        .getAccepted();
+  }
+
+  public boolean removeContact(String refresh, UUID id) {
+    return profileStub()
+        .removeContact(
+            RemoveContactRequest.newBuilder()
+                .setRefreshCredential(refresh)
+                .setContactId(id.toString())
+                .build())
+        .getAccepted();
+  }
 
   private IdentityAuthenticationServiceGrpc.IdentityAuthenticationServiceBlockingStub tokenStub() {
     return IdentityAuthenticationServiceGrpc.newBlockingStub(channel)
@@ -318,7 +373,8 @@ public final class IdentityBffClient implements IdentityGateway {
   }
 
   private IdentityProfileServiceGrpc.IdentityProfileServiceBlockingStub profileStub() {
-    return IdentityProfileServiceGrpc.newBlockingStub(channel).withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
+    return IdentityProfileServiceGrpc.newBlockingStub(channel)
+        .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
   }
 
   private IdentityTenantServiceGrpc.IdentityTenantServiceBlockingStub tenantStub() {

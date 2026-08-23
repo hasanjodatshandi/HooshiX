@@ -36,10 +36,15 @@ public interface IdentityGateway {
   void removeMembership(UUID requestId, String refresh, UUID membershipId);
 
   Profile profile(String refresh);
+
   List<Contact> contacts(String refresh);
+
   UUID addContact(String refresh, String type, String value);
+
   boolean verifyContact(String refresh, UUID contactId, String code);
+
   boolean setPrimaryContact(String refresh, UUID contactId);
+
   boolean removeContact(String refresh, UUID contactId);
 
   String issueAudienceToken(UUID requestId, String refresh, String audience);
@@ -86,6 +91,8 @@ public interface IdentityGateway {
   record InvitationCreated(UUID invitationId, Instant expiresAt) {}
 
   record AcceptedInvitation(UUID tenantId, UUID membershipId) {}
+
   record Profile(UUID id, String firstName, String lastName, String fatherName) {}
+
   record Contact(UUID id, String type, String value, boolean verified, boolean primary) {}
 }
