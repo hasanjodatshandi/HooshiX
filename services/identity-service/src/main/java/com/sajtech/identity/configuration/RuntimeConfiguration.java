@@ -6,6 +6,8 @@ import com.sajtech.identity.application.authentication.usecase.*;
 import com.sajtech.identity.application.notification.port.in.ReportNotificationResult;
 import com.sajtech.identity.application.notification.port.out.*;
 import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
+import com.sajtech.identity.application.profile.port.in.ProfileManagement;
+import com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
 import com.sajtech.identity.application.registration.service.*;
 import com.sajtech.identity.application.registration.usecase.*;
@@ -30,6 +32,7 @@ import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticatio
 import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
+import com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
 import io.grpc.BindableService;
 import io.grpc.ManagedChannel;
@@ -168,6 +171,18 @@ public class RuntimeConfiguration {
   @Bean
   ReportNotificationResult reportNotificationResult(NotificationResultStore store) {
     return new ReportNotificationResultUseCase(store);
+  }
+
+  @Bean
+  ProfileManagement profileManagement(
+      com.sajtech.identity.application.profile.port.out.ProfileContactStore store) {
+    return new ProfileManagementUseCase(store);
+  }
+
+  @Bean
+  com.sajtech.identity.application.profile.port.out.ProfileContactStore profileContactStore(
+      DSLContext dsl) {
+    return new com.sajtech.identity.infrastructure.persistence.JooqProfileContactStore(dsl);
   }
 
   @Bean
@@ -431,6 +446,18 @@ public class RuntimeConfiguration {
       havingValue = "true")
   IdentityRegistrationGrpcService registrationGrpc(ObservedRegistration observed) {
     return new IdentityRegistrationGrpcService(observed, observed, observed);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityProfileGrpcService profileGrpc(
+      ProfileManagement profileManagement,
+      RefreshCredentialLookup lookup,
+      AuthenticationStore store) {
+    return new IdentityProfileGrpcService(profileManagement, lookup, store);
   }
 
   @Bean
