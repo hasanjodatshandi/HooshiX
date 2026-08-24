@@ -27,8 +27,39 @@ jobs:
       - name: Show Python runtime
         run: python3 --version
 
-      - name: Verify repository baseline
-        run: make baseline-verify
+      - name: Inspect baseline verifier inputs
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          sha256sum scripts/baseline/verify_repository.py
+          python3 - <<'PYEOF'
+          from pathlib import Path
+          print(Path("scripts/baseline/verify_repository.py").read_text(encoding="utf-8").splitlines()[-25:])
+          PYEOF
+
+      - name: Verify baseline tests
+        run: make baseline-test
+
+      - name: Verify platform tests
+        run: make platform-test
+
+      - name: Verify production
+        run: make production-verify
+
+      - name: Verify context tests
+        run: make context-test
+
+      - name: Verify context engine
+        run: make context-verify
+
+      - name: Verify context matrix
+        run: make context-matrix-check
+
+      - name: Verify local runtime
+        run: make local-runtime-test
+
+      - name: Verify repository baseline index
+        run: python3 scripts/baseline/verify_repository.py
 
   compromised-password-security:
     name: Compromised Password security suite

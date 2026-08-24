@@ -29,6 +29,7 @@ apps/web-frontend/.nvmrc
 apps/web-frontend/README.md
 apps/web-frontend/e2e/accessibility-audit.md
 apps/web-frontend/e2e/onboarding.spec.ts
+apps/web-frontend/e2e/password-recovery.spec.ts
 apps/web-frontend/e2e/profile.spec.ts
 apps/web-frontend/index.html
 apps/web-frontend/package-lock.json
@@ -42,6 +43,8 @@ apps/web-frontend/src/app/ApplicationShell.tsx
 apps/web-frontend/src/errors/getErrorMessage.ts
 apps/web-frontend/src/errors/problem.ts
 apps/web-frontend/src/features/login/LoginFlow.tsx
+apps/web-frontend/src/features/password/ChangePasswordFlow.tsx
+apps/web-frontend/src/features/password/PasswordRecoveryFlow.tsx
 apps/web-frontend/src/features/profile/ProfileFlow.tsx
 apps/web-frontend/src/features/registration/RegistrationFlow.tsx
 apps/web-frontend/src/features/verification/VerificationFlow.tsx
@@ -92,6 +95,7 @@ contracts/protobuf-contracts/src/main/proto/hooshix/authorization/v1/authorizati
 contracts/protobuf-contracts/src/main/proto/hooshix/compromisedpassword/v1/compromised_password.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_authentication.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_notification_result.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_password.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_profile.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_registration.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_tenant.proto
@@ -557,6 +561,18 @@ services/identity-service/src/main/java/com/sajtech/identity/application/notific
 services/identity-service/src/main/java/com/sajtech/identity/application/notification/port/out/NotificationResultStore.java
 services/identity-service/src/main/java/com/sajtech/identity/application/notification/port/out/NotificationSubmissionPort.java
 services/identity-service/src/main/java/com/sajtech/identity/application/notification/usecase/ReportNotificationResultUseCase.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/model/PasswordPolicy.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/in/ChangePassword.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/in/ChangePasswordCommand.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/in/ConfirmPasswordRecovery.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/in/ConfirmPasswordRecoveryCommand.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/in/RequestPasswordRecovery.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/in/RequestPasswordRecoveryCommand.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/out/PasswordLifecycleStore.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/port/out/PasswordRecoveryStore.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/usecase/ChangePasswordUseCase.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/usecase/ConfirmPasswordRecoveryUseCase.java
+services/identity-service/src/main/java/com/sajtech/identity/application/password/usecase/RequestPasswordRecoveryUseCase.java
 services/identity-service/src/main/java/com/sajtech/identity/application/profile/model/ProfileUpdateCommand.java
 services/identity-service/src/main/java/com/sajtech/identity/application/profile/port/in/ProfileManagement.java
 services/identity-service/src/main/java/com/sajtech/identity/application/profile/port/out/ProfileContactStore.java
@@ -668,6 +684,7 @@ services/identity-service/src/main/java/com/sajtech/identity/interfaces/authenti
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/notification/grpc/IdentityNotificationResultGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/IdentityAdmissionInterceptor.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/SafeTracingServerInterceptor.java
+services/identity-service/src/main/java/com/sajtech/identity/interfaces/password/grpc/IdentityPasswordGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/profile/grpc/IdentityProfileGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/registration/grpc/IdentityRegistrationGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/tenant/grpc/IdentityTenantGrpcService.java
@@ -679,6 +696,7 @@ services/identity-service/src/main/resources/db/migration/V3__create_identity_te
 services/identity-service/src/main/resources/db/migration/V4__index_authorization_outbox_oldest_unresolved.sql
 services/identity-service/src/main/resources/db/migration/V5__enforce_identity_tenant_context_integrity.sql
 services/identity-service/src/main/resources/db/migration/V6__track_notification_delivery_results.sql
+services/identity-service/src/main/resources/db/migration/V7__create_identity_password_recovery_schema.sql
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/AuthenticateLocalUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/IssueAudienceAccessTokenUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/LogoutCurrentUseCaseTest.java
@@ -918,6 +936,7 @@ services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BrowserAuthCon
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/HttpSupport.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityProfileController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityTenantController.java
+services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/PasswordController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/RegistrationController.java
 services/web-bff/src/main/resources/application.yaml
 services/web-bff/src/test/java/com/sajtech/webbff/architecture/ArchitectureRulesTest.java

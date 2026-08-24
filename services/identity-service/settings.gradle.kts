@@ -1,7 +1,7 @@
 pluginManagement {
     repositories {
         gradlePluginPortal()
-        mavenCentral()
+        mavenLocal(); mavenCentral()
     }
 }
 
@@ -9,7 +9,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         mavenLocal()
-        mavenCentral()
+        mavenLocal(); mavenCentral()
     }
 }
 

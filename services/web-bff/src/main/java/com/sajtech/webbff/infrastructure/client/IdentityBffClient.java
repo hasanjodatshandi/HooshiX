@@ -295,6 +295,46 @@ public final class IdentityBffClient implements IdentityGateway {
     };
   }
 
+  @Override
+  public boolean changePassword(String refresh, String currentPassword, String newPassword) {
+    return passwordStub()
+        .changePassword(
+            com.sajtech.identity.contract.v1.ChangePasswordRequest.newBuilder()
+                .setRefreshCredential(refresh)
+                .setCurrentPassword(currentPassword)
+                .setNewPassword(newPassword)
+                .build())
+        .getChanged();
+  }
+
+  @Override
+  public boolean requestPasswordRecovery(String contact) {
+    return passwordStub()
+        .requestPasswordRecovery(
+            com.sajtech.identity.contract.v1.RequestPasswordRecoveryRequest.newBuilder()
+                .setPrimaryContact(contact)
+                .build())
+        .getAccepted();
+  }
+
+  @Override
+  public boolean confirmPasswordRecovery(String contact, String code, String newPassword) {
+    return passwordStub()
+        .confirmPasswordRecovery(
+            com.sajtech.identity.contract.v1.ConfirmPasswordRecoveryRequest.newBuilder()
+                .setPrimaryContact(contact)
+                .setCode(code)
+                .setNewPassword(newPassword)
+                .build())
+        .getChanged();
+  }
+
+  private com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc
+          .IdentityPasswordServiceBlockingStub
+      passwordStub() {
+    return com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc.newBlockingStub(channel);
+  }
+
   private IdentityAuthenticationServiceGrpc.IdentityAuthenticationServiceBlockingStub stub() {
     return IdentityAuthenticationServiceGrpc.newBlockingStub(channel)
         .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);

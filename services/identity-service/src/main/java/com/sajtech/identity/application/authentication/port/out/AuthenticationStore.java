@@ -9,6 +9,10 @@ import java.util.UUID;
 public interface AuthenticationStore {
   Optional<LocalCredentialRecord> findVerifiedLocalCredential(CanonicalContact contact);
 
+  default Optional<LocalCredentialRecord> findLocalCredential(UUID userId) {
+    return Optional.empty();
+  }
+
   Optional<LocalCredentialRecord> lockVerifiedLocalCredential(
       UUID userId, CanonicalContact contact);
 
@@ -32,6 +36,10 @@ public interface AuthenticationStore {
   void revokeFamily(UUID refreshFamilyId, RefreshFamilyRevocationReason reason, Instant now);
 
   void revokeAllFamilies(UUID userId, RefreshFamilyRevocationReason reason, Instant now);
+
+  default void updatePasswordHash(UUID userId, String passwordHash, Instant now) {
+    throw new UnsupportedOperationException("Password mutation is not supported by this store");
+  }
 
   int deleteFamiliesBefore(Instant cutoff, int batch);
 }

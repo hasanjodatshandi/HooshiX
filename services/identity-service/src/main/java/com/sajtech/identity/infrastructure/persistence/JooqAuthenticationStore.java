@@ -21,6 +21,20 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public Optional<LocalCredentialRecord> findLocalCredential(UUID userId) {
+    return dsl.fetchOptional(
+            """
+            SELECT u.user_id, u.status, cr.password_hash
+            FROM identity_user u
+            JOIN identity_credential cr ON cr.user_id = u.user_id
+            WHERE u.user_id = ?
+            LIMIT 1
+            """,
+            userId)
+        .map(JooqAuthenticationStore::mapLocalCredential);
+  }
+
+  @Override
   public Optional<LocalCredentialRecord> findVerifiedLocalCredential(CanonicalContact contact) {
     return dsl.fetchOptional(
             """
@@ -291,6 +305,21 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
             ts(now),
             userId);
     if (changed > 0) audit("IDENTITY_ALL_SESSIONS_REVOKED", userId, now);
+  }
+
+  @Override
+  public void updatePasswordHash(UUID userId, String passwordHash, Instant now) {
+    int changed =
+        dsl.execute(
+            """
+            UPDATE identity_credential
+            SET password_hash = ?, updated_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
+            WHERE user_id = ?
+            """,
+            passwordHash,
+            ts(now),
+            userId);
+    if (changed != 1) throw invalidState();
   }
 
   @Override

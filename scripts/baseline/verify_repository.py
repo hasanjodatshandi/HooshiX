@@ -10,6 +10,7 @@ security, or production readiness for services that do not exist yet.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -68,7 +69,7 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/baseline/verify_repository.py",
 )
 
-IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", "node_modules", "dist", "test-results"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
 
 EXTERNALIZED_MCP_PATHS = (
@@ -126,15 +127,26 @@ def _strip_scalar(value: str) -> str:
 
 def collect_repository_files(root: Path) -> set[str]:
     files: set[str] = set()
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root)
-        if any(part in IGNORED_PATH_PARTS for part in relative.parts):
-            continue
-        if path.suffix in IGNORED_SUFFIXES:
-            continue
-        files.add(relative.as_posix())
+    for current, directories, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        directories[:] = [
+            directory
+            for directory in directories
+            if directory not in IGNORED_PATH_PARTS
+        ]
+        for filename in filenames:
+            path = current_path / filename
+            try:
+                if path.is_symlink():
+                    continue
+                if path.suffix in IGNORED_SUFFIXES:
+                    continue
+                relative = path.relative_to(root)
+            except (OSError, ValueError):
+                continue
+            if any(part in IGNORED_PATH_PARTS for part in relative.parts):
+                continue
+            files.add(relative.as_posix())
     return files
 
 
@@ -497,25 +509,33 @@ def validate_guarded_structure(root: Path) -> list[str]:
 
 
 def validate_repository(root: Path = ROOT) -> list[str]:
-    checks: Iterable[list[str]] = (
-        validate_required_paths(root),
-        validate_file_index(root),
-        validate_adr_register(root),
-        validate_dependency_registry(root),
-        validate_source_references(root),
-        validate_agent_reporting_contract(root),
-        validate_contract_package_boundary(root),
-        validate_guarded_structure(root),
+    checks: tuple[tuple[str, callable], ...] = (
+        ("required_paths", lambda: validate_required_paths(root)),
+        ("file_index", lambda: validate_file_index(root)),
+        ("adr_register", lambda: validate_adr_register(root)),
+        ("dependency_registry", lambda: validate_dependency_registry(root)),
+        ("source_references", lambda: validate_source_references(root)),
+        ("agent_reporting", lambda: validate_agent_reporting_contract(root)),
+        ("contract_package_boundary", lambda: validate_contract_package_boundary(root)),
+        ("guarded_structure", lambda: validate_guarded_structure(root)),
     )
-    return [error for result in checks for error in result]
+    errors: list[str] = []
+    for name, validator in checks:
+        try:
+            result = validator()
+            errors.extend([f"{name}: {error!r}" for error in result if error])
+        except Exception as exc:
+            raise
+    return errors
 
 
 def main() -> int:
     errors = validate_repository(ROOT)
     if errors:
         print("Repository baseline verification FAILED:")
+        print(f"error_count={len(errors)}")
         for error in errors:
-            print(f"- {error}")
+            print(f"- {error!r}")
         return 1
 
     adr_count = len(
