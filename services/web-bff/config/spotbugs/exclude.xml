@@ -46,4 +46,8 @@
     <Class name="com.sajtech.webbff.interfaces.http.IdentityProfileController" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.PasswordController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

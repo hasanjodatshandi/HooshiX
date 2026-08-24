@@ -6,10 +6,10 @@ import com.sajtech.identity.application.authentication.usecase.*;
 import com.sajtech.identity.application.notification.port.in.ReportNotificationResult;
 import com.sajtech.identity.application.notification.port.out.*;
 import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
+import com.sajtech.identity.application.password.port.in.*;
 import com.sajtech.identity.application.profile.port.in.ProfileManagement;
 import com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
-import com.sajtech.identity.application.password.port.in.*;
 import com.sajtech.identity.application.registration.service.*;
 import com.sajtech.identity.application.registration.usecase.*;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
@@ -33,8 +33,8 @@ import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticatio
 import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
-import com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService;
 import com.sajtech.identity.interfaces.password.grpc.IdentityPasswordGrpcService;
+import com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
 import io.grpc.BindableService;
 import io.grpc.ManagedChannel;
@@ -574,7 +574,8 @@ public class RuntimeConfiguration {
       ChangePassword changePassword,
       RequestPasswordRecovery requestPasswordRecovery,
       ConfirmPasswordRecovery confirmPasswordRecovery) {
-    return new IdentityPasswordGrpcService(changePassword, requestPasswordRecovery, confirmPasswordRecovery);
+    return new IdentityPasswordGrpcService(
+        changePassword, requestPasswordRecovery, confirmPasswordRecovery);
   }
 
   @Bean

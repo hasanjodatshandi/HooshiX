@@ -132,4 +132,16 @@
     <Class name="com.sajtech.identity.infrastructure.persistence.JooqProfileContactStore" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.password.usecase.ChangePasswordUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.password.usecase.ConfirmPasswordRecoveryUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.password.usecase.RequestPasswordRecoveryUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>
