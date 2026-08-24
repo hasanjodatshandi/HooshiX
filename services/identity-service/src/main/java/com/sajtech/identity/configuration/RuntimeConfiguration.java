@@ -9,6 +9,7 @@ import com.sajtech.identity.application.notification.usecase.ReportNotificationR
 import com.sajtech.identity.application.profile.port.in.ProfileManagement;
 import com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
+import com.sajtech.identity.application.password.port.in.*;
 import com.sajtech.identity.application.registration.service.*;
 import com.sajtech.identity.application.registration.usecase.*;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;

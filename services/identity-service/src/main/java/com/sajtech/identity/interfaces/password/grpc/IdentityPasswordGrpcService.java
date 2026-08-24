@@ -2,7 +2,12 @@ package com.sajtech.identity.interfaces.password.grpc;
 
 import com.sajtech.identity.application.password.port.in.*;
 import com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc;
-import com.sajtech.identity.contract.v1.IdentityPassword.*;
+import com.sajtech.identity.contract.v1.ChangePasswordRequest;
+import com.sajtech.identity.contract.v1.ChangePasswordResponse;
+import com.sajtech.identity.contract.v1.RequestPasswordRecoveryRequest;
+import com.sajtech.identity.contract.v1.RequestPasswordRecoveryResponse;
+import com.sajtech.identity.contract.v1.ConfirmPasswordRecoveryRequest;
+import com.sajtech.identity.contract.v1.ConfirmPasswordRecoveryResponse;
 import io.grpc.stub.StreamObserver;
 
 public final class IdentityPasswordGrpcService extends IdentityPasswordServiceGrpc.IdentityPasswordServiceImplBase {
