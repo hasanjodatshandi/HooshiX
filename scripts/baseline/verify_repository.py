@@ -509,8 +509,12 @@ def validate_repository(root: Path = ROOT) -> list[str]:
     )
     errors: list[str] = []
     for name, result in checks:
-        print(f"baseline_debug {name}={result!r}")
-        errors.extend([f"{name}: {error!r}" for error in result if error])
+        try:
+            print(f"baseline_debug {name}={result!r}")
+            errors.extend([f"{name}: {error!r}" for error in result if error])
+        except Exception as exc:
+            print(f"baseline_debug {name}_exception={exc!r}")
+            raise
     return errors
 
 
