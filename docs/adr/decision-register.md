@@ -58,6 +58,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0050 | policy-bound developer-host Desktop credential broker for local use-without-disclosure |
 | ADR-0051 | WSL-native HooshiX workspace with independently versioned Windows Context/Ops/Desktop MCP runtime |
 | ADR-0052 | Versioned Protobuf contract package and service decoupling |
+| ADR-0053 | Identity password policy v1 |
 
 ## Superseded ADR identifiers
 
