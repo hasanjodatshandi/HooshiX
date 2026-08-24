@@ -497,17 +497,17 @@ def validate_guarded_structure(root: Path) -> list[str]:
 
 
 def validate_repository(root: Path = ROOT) -> list[str]:
-    checks: Iterable[list[str]] = (
-        validate_required_paths(root),
-        validate_file_index(root),
-        validate_adr_register(root),
-        validate_dependency_registry(root),
-        validate_source_references(root),
-        validate_agent_reporting_contract(root),
-        validate_contract_package_boundary(root),
-        validate_guarded_structure(root),
+    checks: tuple[tuple[str, list[str]], ...] = (
+        ("required_paths", validate_required_paths(root)),
+        ("file_index", validate_file_index(root)),
+        ("adr_register", validate_adr_register(root)),
+        ("dependency_registry", validate_dependency_registry(root)),
+        ("source_references", validate_source_references(root)),
+        ("agent_reporting", validate_agent_reporting_contract(root)),
+        ("contract_package_boundary", validate_contract_package_boundary(root)),
+        ("guarded_structure", validate_guarded_structure(root)),
     )
-    return [error for result in checks for error in result]
+    return [error for name, result in checks for error in result]
 
 
 def main() -> int:
