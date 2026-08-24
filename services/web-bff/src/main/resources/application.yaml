@@ -41,6 +41,8 @@ web-bff:
   refresh-encryption-key-ring-path: ${WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH:/var/run/secrets/hooshix/web-bff-refresh.properties}
   hmac-key-maximum-staleness: ${WEB_BFF_HMAC_KEY_MAXIMUM_STALENESS:PT5M}
   encryption-key-maximum-staleness: ${WEB_BFF_ENCRYPTION_KEY_MAXIMUM_STALENESS:PT1H}
+  identity-maximum-concurrent-calls: ${WEB_BFF_IDENTITY_MAXIMUM_CONCURRENT_CALLS:128}
+  authorization-maximum-concurrent-calls: ${WEB_BFF_AUTHORIZATION_MAXIMUM_CONCURRENT_CALLS:128}
   route-audiences:
     "[/api/v1/authorization]": authorization-service
 logging:

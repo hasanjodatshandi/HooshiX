@@ -89,6 +89,10 @@
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
   <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedTenantLifecycle" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
     <Class name="com.sajtech.identity.infrastructure.observability.ObservedLoginQuota" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
@@ -110,6 +114,22 @@
   </Match>
   <Match>
     <Class name="com.sajtech.identity.infrastructure.persistence.JooqTenantStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqNotificationResultStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqProfileContactStore" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
 </FindBugsFilter>

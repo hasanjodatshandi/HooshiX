@@ -36,7 +36,7 @@ edges:
 
   - operation_id: identity.password-credential-write
     caller_owner: Identity
-    dependency_id: compromised-password.LookupCompromisedPasswordRange
+    dependency_id: compromised-password.LookupPrefix
     class: AUTHORITATIVE_SECURITY
     failure_action: "reject unchecked password; stale/corrupt/missing/incompatible dataset never becomes clean result"
     retry_owner: none
@@ -93,6 +93,21 @@ edges:
     owner: Identity
     policy_refs:
       - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
+
+  - operation_id: identity.authorization-tenant-permission-check
+    caller_owner: Identity
+    dependency_id: authorization.CheckPermission
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "tenant lifecycle administration unavailable; fail closed"
+    retry_owner: none
+    fallback: "none; no permission cache/stale allow"
+    owner: Identity
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md
+      - docs/adr/0026-harden-online-authorization-overload-and-slo-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/authorization-service.md
 
   - operation_id: identity.authorization-owner-provisioning
     caller_owner: Identity
@@ -225,6 +240,21 @@ edges:
     policy_refs:
       - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
       - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/web-bff.md
+
+  - operation_id: web-bff.identity-registration
+    caller_owner: Web BFF
+    dependency_id: identity.IdentityRegistrationService
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "registration unavailable or rejected according to Identity result; fail closed"
+    retry_owner: none
+    fallback: none
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0009-enable-identity-registration-runtime.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/adr/0024-harden-semantic-quota-time-safety-v1.md
       - docs/architecture/services/identity-service.md
       - docs/architecture/services/web-bff.md
 

@@ -59,6 +59,8 @@ spec:
             - {name: WEB_BFF_PUBLIC_ORIGIN, value: {{ $origin | quote }}}
             - {name: WEB_BFF_IDENTITY_TARGET, value: {{ .Values.identity.target | quote }}}
             - {name: WEB_BFF_AUTHORIZATION_TARGET, value: {{ .Values.authorization.target | quote }}}
+            - {name: WEB_BFF_IDENTITY_MAXIMUM_CONCURRENT_CALLS, value: {{ .Values.runtime.identityMaximumConcurrentCalls | quote }}}
+            - {name: WEB_BFF_AUTHORIZATION_MAXIMUM_CONCURRENT_CALLS, value: {{ .Values.runtime.authorizationMaximumConcurrentCalls | quote }}}
             - {name: WEB_BFF_LOCATOR_KEY_RING_PATH, value: /run/secrets/web-bff-locator/locator.properties}
             - {name: WEB_BFF_CSRF_KEY_RING_PATH, value: /run/secrets/web-bff-csrf/csrf.properties}
             - {name: WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH, value: /run/secrets/web-bff-refresh/refresh.properties}

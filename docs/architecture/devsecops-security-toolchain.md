@@ -53,7 +53,7 @@ Required coverage:
 - Git history relevant to the protected repository;
 - source, scripts, CI, manifests, values, fixtures, and documentation.
 
-The protected CI/release implementation uses the pinned native Gitleaks tool artifact and verifies its official checksum/digest. Output is fully redacted and must not export discovered secret values to CI logs or artifacts.
+The protected CI implementation uses the immutable-digest official Gitleaks container image pinned by the service workflows. Output and tool identity are verified by the workflow controls. Output is fully redacted and must not export discovered secret values to CI logs or artifacts.
 
 A real committed credential is not remediated merely by deleting the latest line. When exposure is plausible:
 
@@ -168,11 +168,11 @@ At the current repository state:
 
 - repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, and Web BFF;
 - OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, and Web BFF and is wired into PR/push/scheduled repository security workflows; prior protected Compromised Password/Notification/Identity advisory scans passed on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`;
-- Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in the Identity security workflow with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; local fixtures/current-tree/full-current-history execution passed, and protected Identity current-tree/full-history execution passed on `main@a3766bd`;
-- final-image Syft SBOM generation is **NOT PRESENT / NOT VERIFIED**;
-- final-image/SBOM Grype vulnerability gating is **NOT PRESENT / NOT VERIFIED**;
-- Cosign signing/provenance/SBOM attestation release automation is **NOT PRESENT / NOT VERIFIED**;
-- Kyverno production admission implementation is **NOT PRESENT / NOT VERIFIED**;
+- Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in all five implemented Java service security workflows with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; current Identity, Notification, and Compromised Password local fixture/current-tree/full-current-history executions passed, and prior protected Identity current-tree/full-history execution passed on `main@a3766bd`; protected evidence remains commit-specific;
+- final-image Syft SBOM generation is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** in the protected production release workflow and is retained as digest-bound CycloneDX evidence;
+- final-image/SBOM Grype vulnerability gating is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** with retained scan/database metadata plus a scheduled two-hour tracked-production-digest rescan path;
+- Cosign signing/provenance/SBOM attestation release automation is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** and is restricted to the protected main production-release workflow identity with GitHub OIDC;
+- Kyverno production admission generation is **IMPLEMENTED / PRODUCTION CLUSTER EXECUTION NOT VERIFIED** using stable policies.kyverno.io/v1 fail-closed release allow-list and image-validation policy output;
 - Trivy and OWASP Dependency-Check are **NOT SELECTED**, not missing required implementation.
 
 `implementation-status.md` is the repository-level status authority and must stay aligned with actual files/checks.
@@ -194,4 +194,4 @@ Before the selected DevSecOps chain is reported as complete, executable evidence
 - no secret values in scanner logs/artifacts;
 - no bypass from scanner/feed outage or stale evidence.
 
-Documentation-only completion remains `NOT VERIFIED` for executable controls that do not yet exist.
+Repository implementation is not production evidence. Real production registry, signer, Grype feed/database, release-image, admission-controller, and deployed-digest executions remain NOT VERIFIED until protected workflows and the production environment produce the required evidence.

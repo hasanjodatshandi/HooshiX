@@ -12,10 +12,13 @@ public record IdentityProperties(
     boolean authenticationRuntimeEnabled,
     boolean tenantRuntimeEnabled,
     int maxConcurrentCallsPerConnection,
+    int maxGlobalConcurrentCalls,
     boolean phoneRegistrationEnabled,
     String compromisedPasswordTarget,
     int compromisedPasswordMaxInFlight,
     String notificationTarget,
+    int notificationResultGrpcPort,
+    boolean notificationResultRuntimeEnabled,
     String authorizationTarget,
     boolean notificationDispatchEnabled,
     Path fingerprintKeyRingPath,
@@ -30,10 +33,14 @@ public record IdentityProperties(
     if (tenantRuntimeEnabled && !authenticationRuntimeEnabled) {
       throw new IllegalArgumentException("Identity tenant runtime requires authentication runtime");
     }
-    if (grpcPort <= 0 || grpcPort > 65535) {
+    if (grpcPort <= 0
+        || grpcPort > 65535
+        || notificationResultGrpcPort <= 0
+        || notificationResultGrpcPort > 65535) {
       throw new IllegalArgumentException("Identity gRPC port is invalid");
     }
     if (maxConcurrentCallsPerConnection <= 0
+        || maxGlobalConcurrentCalls <= 0
         || compromisedPasswordMaxInFlight <= 0
         || argon2MaxConcurrentHashes <= 0) {
       throw new IllegalArgumentException("Identity concurrency configuration is invalid");

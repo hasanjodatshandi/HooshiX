@@ -33,3 +33,19 @@ spec:
           podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
       ports: [{protocol: TCP, port: 6379}, {protocol: TCP, port: 15008}]
   egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: postgres-bootstrap, namespace: platform-data}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: postgres-bootstrap}}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-data}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: postgresql}}
+      ports: [{protocol: TCP, port: 5432}, {protocol: TCP, port: 15008}]

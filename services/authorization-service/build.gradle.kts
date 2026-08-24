@@ -15,6 +15,7 @@ version = "0.1.0-SNAPSHOT"
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
 dependencies {
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.1.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation(platform("io.netty:netty-bom:4.2.16.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -46,6 +47,8 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+
 
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:3.25.8" }

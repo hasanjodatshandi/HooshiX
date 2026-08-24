@@ -26,6 +26,15 @@ spec:
       to:
         - operation:
             ports: [{{ .Values.service.grpcPort | quote }}]
+    {{- if .Values.runtime.notificationResultRuntimeEnabled }}
+    - from:
+        - source:
+            principals:
+              - {{ required "notification.principal is required" .Values.notification.principal | quote }}
+      to:
+        - operation:
+            ports: [{{ .Values.service.notificationResultGrpcPort | quote }}]
+    {{- end }}
     {{- if .Values.observability.metrics.enabled }}
     - from:
         - source:

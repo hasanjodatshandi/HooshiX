@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
-source "$ROOT/.platform-runtime/staging/images.env"
+state="$ROOT/.platform-runtime/staging/images.env"
+[[ -f "$state" ]] || fail "staging image provenance state is missing; run staging-build"
+source "$state"
+python3 "$ROOT/scripts/platform/git_provenance.py" --root "$ROOT" verify --revision "$BUILD_GIT_REVISION" --source-state "$BUILD_SOURCE_STATE" --worktree-sha256 "$BUILD_WORKTREE_SHA256" >/dev/null
 for service in compromised-password-service notification-service authorization-service identity-service web-bff; do
   status=$(h status "$service" -n platform-apps -o json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["status"])')
   [[ "$status" == deployed ]] || fail "$service Helm release is not deployed: $status"
@@ -30,10 +33,18 @@ login=$(curl -skS --resolve hooshix.local:8443:127.0.0.1 -b "$tmp/cookies" -o "$
 login_code=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("code","MISSING"))' "$tmp/login")
 [[ "$login/$login_code" == 401/AUTHENTICATION_FAILED ]] || fail "BFF -> Identity negative smoke mismatch: $login/$login_code"
 pg=$(k get pod -n platform-data -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].metadata.name}')
-for spec in 'authorization 1 authorization_migration' 'identity 4 identity_migration' 'notification 2 notification_migration'; do set -- $spec; db=$1; expected=$2; owner=$3; n=$(k exec -n platform-data "$pg" -- psql -U postgres -d "$db" -Atc 'select count(*) from flyway_schema_history where success'); [[ "$n" == "$expected" ]] || fail "$db Flyway count mismatch: $n"; actual=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select pg_get_userbyid(datdba) from pg_database where datname='$db'"); [[ "$actual" == "$owner" ]] || fail "$db owner mismatch: $actual"; done
+for spec in 'authorization 3 authorization_migration' 'identity 5 identity_migration' 'notification 3 notification_migration'; do set -- $spec; db=$1; expected=$2; owner=$3; n=$(k exec -n platform-data "$pg" -- psql -U postgres -d "$db" -Atc 'select count(*) from flyway_schema_history where success'); [[ "$n" == "$expected" ]] || fail "$db Flyway count mismatch: $n"; actual=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select pg_get_userbyid(datdba) from pg_database where datname='$db'"); [[ "$actual" == "$owner" ]] || fail "$db owner mismatch: $actual"; done
 matrix=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select rolname||':'||has_database_privilege(rolname,'authorization','CONNECT')||':'||has_database_privilege(rolname,'identity','CONNECT')||':'||has_database_privilege(rolname,'notification','CONNECT') from pg_roles where rolname in ('authorization_runtime','identity_runtime','notification_runtime') order by rolname")
 expected_matrix=$'authorization_runtime:true:false:false\nidentity_runtime:false:true:false\nnotification_runtime:false:false:true'
 [[ "$matrix" == "$expected_matrix" ]] || fail "runtime database CONNECT isolation mismatch"
+authorization_tenant_rls=$(k exec -n platform-data "$pg" -- psql -U postgres -d authorization -Atc "SELECT relrowsecurity||':'||relforcerowsecurity FROM pg_class WHERE oid='authorization_tenant_projection'::regclass")
+[[ "$authorization_tenant_rls" == true:true ]] || fail "authorization tenant projection forced RLS mismatch: $authorization_tenant_rls"
+template_privileges=$(k exec -n platform-data "$pg" -- psql -U postgres -d notification -Atc "SELECT table_name||':'||has_table_privilege('notification_runtime','public.'||table_name,'SELECT')||':'||has_table_privilege('notification_runtime','public.'||table_name,'INSERT')||':'||has_table_privilege('notification_runtime','public.'||table_name,'UPDATE')||':'||has_table_privilege('notification_runtime','public.'||table_name,'DELETE') FROM (VALUES ('notification_template_activation'),('notification_template_audit'),('notification_template_definition'),('notification_template_version')) AS t(table_name) ORDER BY table_name")
+expected_template_privileges=$'notification_template_activation:true:false:false:false
+notification_template_audit:true:false:false:false
+notification_template_definition:true:false:false:false
+notification_template_version:true:false:false:false'
+[[ "$template_privileges" == "$expected_template_privileges" ]] || fail "notification runtime template privileges mismatch: $template_privileges"
 dataset_state="$ROOT/.platform-runtime/staging/dataset.env"
 [[ -f "$dataset_state" ]] || fail "generated staging dataset state is missing"
 dataset_line=$(cat "$dataset_state"); [[ "$dataset_line" =~ ^COMPROMISED_PASSWORD_MANIFEST_SHA256=([0-9a-f]{64})$ ]] || fail "generated staging dataset state is invalid"
@@ -44,6 +55,6 @@ mounted_dataset_sha=$(docker exec platform-local-worker sha256sum /var/local/hoo
 [[ "$mounted_dataset_sha" == "$dataset_sha" ]] || fail "Compromised Password mounted manifest digest mismatch"
 ready=$(k get --raw='/readyz' | tail -1); [[ "$ready" == ok ]] || fail "Kubernetes API readyz is not ok"
 mount_source=$(docker inspect platform-local-control-plane --format '{{range .Mounts}}{{if eq .Destination "/var/lib/etcd"}}{{.Source}}{{end}}{{end}}')
-[[ "$mount_source" == '/dev/shm/hooshix-kind-etcd' ]] || fail "kind etcd is not bind-mounted from the reviewed WSL tmpfs path: $mount_source"
+[[ "$mount_source" == '/dev/shm/hooshix-kind/etcd' ]] || fail "kind etcd is not bind-mounted from the reviewed WSL tmpfs path: $mount_source"
 [[ "$(findmnt -n -o FSTYPE /dev/shm)" == tmpfs ]] || fail "/dev/shm is not tmpfs on the WSL host"
 echo "Five-service staging and persistence verification PASSED"

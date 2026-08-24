@@ -83,11 +83,16 @@ spec:
             capabilities: {drop: ["ALL"]}
           ports:
             - {name: grpc, containerPort: {{ .Values.service.grpcPort }}, protocol: TCP}
+            {{- if .Values.runtime.notificationResultRuntimeEnabled }}
+            - {name: notification-result, containerPort: {{ .Values.service.notificationResultGrpcPort }}, protocol: TCP}
+            {{- end }}
             - {name: management, containerPort: {{ .Values.service.managementPort }}, protocol: TCP}
           env:
             - {name: IDENTITY_DATABASE_URL, value: {{ $jdbcUrl | quote }}}
             - {name: IDENTITY_GRPC_PORT, value: {{ .Values.service.grpcPort | quote }}}
             - {name: IDENTITY_REGISTRATION_RUNTIME_ENABLED, value: {{ .Values.runtime.registrationRuntimeEnabled | quote }}}
+            - {name: IDENTITY_NOTIFICATION_RESULT_RUNTIME_ENABLED, value: {{ .Values.runtime.notificationResultRuntimeEnabled | quote }}}
+            - {name: IDENTITY_NOTIFICATION_RESULT_GRPC_PORT, value: {{ .Values.service.notificationResultGrpcPort | quote }}}
             - {name: IDENTITY_AUTHENTICATION_RUNTIME_ENABLED, value: {{ .Values.runtime.authenticationRuntimeEnabled | quote }}}
             - {name: IDENTITY_TENANT_RUNTIME_ENABLED, value: {{ .Values.runtime.tenantRuntimeEnabled | quote }}}
             {{- if .Values.runtime.authenticationRuntimeEnabled }}
@@ -95,6 +100,7 @@ spec:
             - {name: IDENTITY_JWT_ALLOWED_AUDIENCES, value: {{ join "," .Values.jwt.allowedAudiences | quote }}}
             {{- end }}
             - {name: IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION, value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}}
+            - {name: IDENTITY_MAX_GLOBAL_CONCURRENT_CALLS, value: {{ .Values.runtime.maxGlobalConcurrentCalls | quote }}}
             - {name: IDENTITY_ARGON2_MAX_CONCURRENT_HASHES, value: {{ .Values.runtime.argon2MaxConcurrentHashes | quote }}}
             - {name: IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT, value: {{ .Values.runtime.compromisedPasswordMaxInFlight | quote }}}
             - {name: IDENTITY_PHONE_REGISTRATION_ENABLED, value: {{ .Values.runtime.phoneRegistrationEnabled | quote }}}

@@ -11,6 +11,13 @@ service:
 runtime:
   enabled: false
   maxConcurrentCallsPerConnection: 128
+  checkPermission:
+    globalConcurrency: 0
+    perCallerConcurrency: 0
+    globalQueueCapacity: 0
+    perCallerQueueCapacity: 0
+    maxCallerBuckets: 0
+    queueWait: PT0.025S
   temporaryStorageLimit: 128Mi
 resources:
   requests:

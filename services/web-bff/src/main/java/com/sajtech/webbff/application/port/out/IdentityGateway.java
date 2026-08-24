@@ -7,6 +7,22 @@ public interface IdentityGateway {
   LoginResult login(
       UUID requestId, String channel, String contact, String password, byte[] clientAddress);
 
+  RegisterResult register(
+      UUID requestId,
+      String channel,
+      String contact,
+      String password,
+      String locale,
+      String firstName,
+      String lastName,
+      String fatherName,
+      byte[] clientAddress);
+
+  boolean resendRegistration(UUID requestId, String channel, String contact, byte[] clientAddress);
+
+  boolean confirmRegistration(
+      UUID requestId, String channel, String contact, String code, byte[] clientAddress);
+
   ListResult listTenants(String refresh);
 
   SelectResult selectTenant(UUID requestId, String refresh, UUID membershipId, String audience);
@@ -19,6 +35,18 @@ public interface IdentityGateway {
 
   void removeMembership(UUID requestId, String refresh, UUID membershipId);
 
+  Profile profile(String refresh);
+
+  List<Contact> contacts(String refresh);
+
+  UUID addContact(String refresh, String type, String value);
+
+  boolean verifyContact(String refresh, UUID contactId, String code);
+
+  boolean setPrimaryContact(String refresh, UUID contactId);
+
+  boolean removeContact(String refresh, UUID contactId);
+
   String issueAudienceToken(UUID requestId, String refresh, String audience);
 
   void logout(UUID requestId, String refresh);
@@ -27,6 +55,8 @@ public interface IdentityGateway {
     AUTHENTICATED_ONBOARDING,
     TENANT_AUTHENTICATED
   }
+
+  record RegisterResult(boolean accepted) {}
 
   record LoginResult(
       UUID userId,
@@ -61,4 +91,8 @@ public interface IdentityGateway {
   record InvitationCreated(UUID invitationId, Instant expiresAt) {}
 
   record AcceptedInvitation(UUID tenantId, UUID membershipId) {}
+
+  record Profile(UUID id, String firstName, String lastName, String fatherName) {}
+
+  record Contact(UUID id, String type, String value, boolean verified, boolean primary) {}
 }

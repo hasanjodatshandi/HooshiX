@@ -126,6 +126,10 @@ Do not execute without explicit confirmation when confirmation is required.
 
 ## 9. Failure/blocker reporting
 
+An intermediate failure does not justify an incomplete final status while a safe, authorized recovery action remains available in the current response. For a terminal-condition task, follow `AGENTS.md` §14.1: diagnose recoverable failures, use materially distinct bounded recovery attempts, re-verify, and continue. A progress checkpoint or conversation-turn boundary is not a final task boundary.
+
+Before reporting `partial` or `blocked`, record the exact unsatisfied terminal condition, blocker evidence, recovery actions attempted, why available tools cannot safely advance the task, and any exact external or user action required. If no new external input is required and the next safe action is available, execute it instead of ending.
+
 When incomplete:
 
 ```text
@@ -154,6 +158,41 @@ Use precisely:
 - `Not verified:` required implementation/evidence artifact absent or uninspected.
 
 Avoid unsupported language such as “should work”, “fully secure”, “production-ready”, “all good”, or “nothing else is affected”.
+
+## 10.1 Automation-safe terminal report protocol
+
+Every final report uses these exact machine-readable keys in addition to the human-readable evidence required by this standard:
+
+```text
+Outcome:
+completed | partial | blocked | failed
+
+Remaining work:
+None | <remaining items>
+
+Continuation action:
+continue | stop | human
+
+Retryable:
+yes | no
+
+Human action required:
+None | <exact action>
+```
+
+These fields describe whether local task-supervision automation may safely continue. They do not grant authority, broaden tool permissions, or authorize a side effect. Current Git/repository/runtime state remains the source of truth. After a UI, delivery, transport, or tool interruption, reconcile the real source of truth before repeating any mutation, deployment, commit, message, or other side effect.
+
+Required invariants:
+
+- `Outcome: completed` is valid only with `Remaining work: None`, `Continuation action: stop`, `Retryable: no`, and `Human action required: None`. Automation treats only that complete tuple as successful terminal completion.
+- `Continuation action: continue` means a safe authorized next action remains, no new external/user input is required, and automatic continuation may proceed. A transient `blocked`/`failed` report may use `continue` only with `Retryable: yes` and only after source-of-truth reconciliation.
+- `Continuation action: human` means progress requires an external/user action that the agent cannot perform with current authority. It requires `Retryable: no` and a concrete non-`None` `Human action required` value.
+- `Continuation action: stop` means automation must not send another continuation. For a non-`completed` outcome, the report must state the unresolved condition and why no safe automatic continuation remains.
+- `Retryable: yes` means a bounded automated retry/continuation is safe after current-state reconciliation. `Retryable: no` means automation must not retry the failed/blocked action automatically.
+- `Remaining work: None` is prohibited for `partial`, `blocked`, or `failed` when actual required work remains.
+- Human prose, an apparently idle UI, a missing spinner, or a transport timeout is never equivalent to `Outcome: completed`.
+
+The key names and token values above are compatibility-sensitive. Change them only in one coherent change that updates the agent contract, repository enforcement, and any consuming local automation.
 
 ## 11. Required implementation report
 
@@ -205,6 +244,15 @@ Risks and limitations:
 Remaining work:
 - <required next action or None>
 
+Continuation action:
+continue | stop | human
+
+Retryable:
+yes | no
+
+Human action required:
+None | <exact action>
+
 Architecture report:
 <required report fields>
 ```
@@ -213,7 +261,7 @@ Architecture report:
 
 Report `completed` only when requested behavior/artifact is implemented, affected files/contracts/configuration inspected, current Git/PR diff reviewed, applicable checks passed, current architecture/Definition of Done checked, limitations disclosed, and no known blocker remains within scope.
 
-If a material required check could not run, report `partial` unless genuinely not applicable.
+If a material required check could not run, first apply the recovery discipline in `AGENTS.md` §14.1. Report `partial` only when the check remains unavailable after applicable safe recovery and the missing evidence is material. Use `Not applicable` only when it is genuinely irrelevant.
 
 ## 14. Prohibited reporting
 

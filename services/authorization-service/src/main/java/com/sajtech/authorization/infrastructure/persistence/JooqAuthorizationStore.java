@@ -2,6 +2,7 @@ package com.sajtech.authorization.infrastructure.persistence;
 
 import com.sajtech.authorization.application.*;
 import com.sajtech.authorization.application.model.*;
+import com.sajtech.authorization.application.port.out.AuthorizationSecurityTelemetry;
 import com.sajtech.authorization.application.port.out.AuthorizationStore;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -44,9 +45,11 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
   private static final List<String> MEMBER_PERMISSIONS =
       List.of("membership.read", "role.read", "tenant.read");
   private final DSLContext dsl;
+  private final AuthorizationSecurityTelemetry securityTelemetry;
 
-  public JooqAuthorizationStore(DSLContext dsl) {
+  public JooqAuthorizationStore(DSLContext dsl, AuthorizationSecurityTelemetry securityTelemetry) {
     this.dsl = Objects.requireNonNull(dsl);
+    this.securityTelemetry = Objects.requireNonNull(securityTelemetry);
   }
 
   @Override
@@ -55,7 +58,7 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
   }
 
   private boolean check(DSLContext tx, UUID tenantId, UUID membershipId, String key) {
-    setTenant(tx, tenantId);
+    configureCheckPermissionTransaction(tx, tenantId);
     Boolean result =
         boolValue(
             tx, CHECK_PERMISSION_SQL, tenantId, membershipId, key, tenantId, membershipId, key);
@@ -182,12 +185,12 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           DSLContext tx = DSL.using(c);
           Replay replay = replay(tx, requestId, "PROVISION_OWNER", fp);
           if (replay.present()) return;
+          setTenant(tx, tenantId);
           execute(
               tx,
               "INSERT INTO authorization_tenant_projection(tenant_id,lifecycle,updated_at) VALUES (?, 'ACTIVE', ?) ON CONFLICT (tenant_id) DO UPDATE SET lifecycle='ACTIVE',updated_at=EXCLUDED.updated_at",
               tenantId,
               now);
-          setTenant(tx, tenantId);
           ensureSystemRoles(tx, tenantId, now);
           execute(
               tx,
@@ -281,6 +284,7 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
           DSLContext tx = DSL.using(c);
           Replay replay = replay(tx, requestId, "TENANT_LIFECYCLE", fp);
           if (replay.present()) return;
+          setTenant(tx, tenantId);
           int changed =
               execute(
                   tx,
@@ -545,6 +549,11 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
     } catch (java.security.NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 is unavailable", e);
     }
+  }
+
+  static void configureCheckPermissionTransaction(DSLContext tx, UUID tenantId) {
+    setTenant(tx, tenantId);
+    tx.fetchValue("SELECT set_config('statement_timeout', '100ms', true)");
   }
 
   private static void setTenant(DSLContext tx, UUID tenantId) {
@@ -1195,7 +1204,7 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
         now);
   }
 
-  private static void audit(
+  private void audit(
       DSLContext tx,
       String event,
       UUID tenantId,
@@ -1207,7 +1216,7 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
     audit(tx, event, null, tenantId, actor, target, result, reason, now);
   }
 
-  private static void audit(
+  private void audit(
       DSLContext tx,
       String event,
       UUID requestId,
@@ -1217,18 +1226,26 @@ public final class JooqAuthorizationStore implements AuthorizationStore {
       String result,
       String reason,
       Instant now) {
-    execute(
-        tx,
-        "INSERT INTO authorization_audit(audit_id,event_code,request_id,tenant_id,actor_user_id,target_id,result_code,reason,catalog_version,occurred_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
-        UUID.randomUUID(),
-        event,
-        requestId,
-        tenantId,
-        actor,
-        target,
-        result,
-        reason,
-        now);
+    try {
+      execute(
+          tx,
+          "INSERT INTO authorization_audit(audit_id,event_code,request_id,tenant_id,actor_user_id,target_id,result_code,reason,catalog_version,occurred_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
+          UUID.randomUUID(),
+          event,
+          requestId,
+          tenantId,
+          actor,
+          target,
+          result,
+          reason,
+          now);
+    } catch (RuntimeException failure) {
+      try {
+        securityTelemetry.auditFailure();
+      } catch (RuntimeException ignored) {
+      }
+      throw failure;
+    }
   }
 
   private static String stringValue(DSLContext tx, String sql, Object... bindings) {

@@ -238,6 +238,33 @@ Before changing code identify owner/use case, contracts, transactions, sync/asyn
 
 Prefer smallest correct coherent change. Do not absorb unrelated refactoring.
 
+### 14.1 Terminal-condition execution and recoverable failures
+
+When the user defines an explicit end state such as `finish`, `complete to the end`, `do not stop until ...`, `merge and verify main`, or an equivalent terminal condition, treat the request as a terminal-condition task.
+
+The agent MUST continue execution in the current response until one of these conditions is true:
+
+1. every explicit terminal condition is satisfied and verified;
+2. safety, policy, authorization, or an irreversible-action confirmation requirement prohibits further execution; or
+3. a concrete blocker remains that cannot be removed with the currently available authorized tools, information, or synchronous execution path.
+
+An intermediate operation failure is not by itself a blocker or a reason to end with `partial`. Recoverable examples include command syntax or quoting errors, Windows-to-WSL interpolation errors, bounded process timeouts, transient tool failures, a local service that the agent is authorized and able to start or repair, safely reconcilable Git state, and CI or deployment failures with a known safe recovery path.
+
+For a recoverable failure, the agent MUST:
+
+1. identify the failed operation and its evidence;
+2. diagnose the cause to the extent needed for a safe next action;
+3. use a materially different safe recovery action when the cause is understood;
+4. retry or use an alternate authorized path;
+5. re-verify the affected condition; and
+6. continue to the next unsatisfied terminal condition.
+
+Do not repeat an identical failing action without changed evidence or conditions. Use bounded retries. A progress update, checkpoint, pending intermediate state, or conversation-turn boundary is not a final task boundary. When an external operation is pending, use available bounded synchronous status or wait mechanisms while they can materially advance the requested terminal condition. Never promise background completion.
+
+`partial` or `blocked` is permitted only when at least one required terminal condition remains unverified and no safe action available in the current response can materially advance it. The final report MUST state the exact remaining terminal condition, blocker evidence, materially distinct recovery actions attempted, why the available tools cannot bypass the blocker, and the exact external or user action required, or `None` when no such action exists. If no new external input is required and a safe next action is known and available, the agent MUST execute that action instead of ending the task.
+
+This rule does not permit false completion. `completed` still requires the verification evidence defined by this repository.
+
 ## 15. Mandatory code-generation preflight
 
 Before generating/modifying implementation code, explicitly review:
@@ -268,6 +295,27 @@ Compilation alone is never completion evidence.
 ## 16. Reporting
 
 Follow `docs/engineering/agent-communication-and-reporting.md`.
+
+Every final report MUST include the automation-safe terminal fields owned by that canonical standard, with these exact compatibility-sensitive keys:
+
+```text
+Outcome:
+completed | partial | blocked | failed
+
+Remaining work:
+None | <remaining items>
+
+Continuation action:
+continue | stop | human
+
+Retryable:
+yes | no
+
+Human action required:
+None | <exact action>
+```
+
+`Outcome: completed` is valid only with `Remaining work: None`, `Continuation action: stop`, `Retryable: no`, and `Human action required: None`. The detailed semantics, blocker rules, source-of-truth reconciliation requirement, and final response order are canonical in `docs/engineering/agent-communication-and-reporting.md`; do not create a second interpretation here.
 
 Reports distinguish verified facts from assumptions and use exact vocabulary: `Passed`, `Failed`, `Not run`, `Not applicable`, `Partially verified`, `Inconclusive`, `Not verified`.
 

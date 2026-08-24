@@ -6,6 +6,7 @@ cleanup() {
   k delete pod mesh-traefik-positive -n traefik-system --ignore-not-found --wait=false >/dev/null 2>&1 || true
   k delete pod mesh-waf-positive -n platform-edge --ignore-not-found --wait=false >/dev/null 2>&1 || true
   k delete pod mesh-unauthorized -n default --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  k delete pod authorization-identity-policy -n platform-apps --ignore-not-found --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 for d in edge-waf:platform-edge web-bff:platform-apps authorization-service:platform-apps identity-service:platform-apps notification-service:platform-apps compromised-password-service:platform-apps; do
@@ -68,6 +69,44 @@ k wait --for=condition=Ready pod/mesh-waf-positive -n platform-edge --timeout=60
 code=$(k exec -n platform-edge mesh-waf-positive -- curl -sS -m 8 -o /dev/null -w '%{http_code}' -X POST http://web-bff.platform-apps.svc.cluster.local:8080/api/v1/auth/session/bootstrap -H 'Origin: https://hooshix.local:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty')
 [[ "$code" == 201 ]] || fail "WAF ServiceAccount -> Web BFF approved identity path expected 201, got $code"
 k delete pod mesh-waf-positive -n platform-edge --wait=true >/dev/null
+cat <<POD | k apply -f - >/dev/null
+apiVersion: v1
+kind: Pod
+metadata:
+  name: authorization-identity-policy
+  namespace: platform-apps
+  labels: {app.kubernetes.io/name: identity-service}
+spec:
+  serviceAccountName: identity-service
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+  containers:
+    - name: curl
+      image: $CURL_IMAGE
+      command: [sleep, "300"]
+      securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+POD
+k wait --for=condition=Ready pod/authorization-identity-policy -n platform-apps --timeout=60s >/dev/null
+authorization_grpc='http://authorization-service.platform-apps.svc.cluster.local:9090/hooshix.authorization.v1.AuthorizationService/CheckPermission'
+grpc_probe() {
+  local caller_id=$1
+  if [[ -n "$caller_id" ]]; then
+    k exec -n platform-apps authorization-identity-policy -- sh -c "printf '\000\000\000\000\000' | curl --http2-prior-knowledge -sS -D - -o /dev/null -X POST '$authorization_grpc' -H 'content-type: application/grpc' -H 'te: trailers' -H 'x-hooshix-authorization-caller: $caller_id' --data-binary @-" | tr -d '\r'
+  else
+    k exec -n platform-apps authorization-identity-policy -- sh -c "printf '\000\000\000\000\000' | curl --http2-prior-knowledge -sS -D - -o /dev/null -X POST '$authorization_grpc' -H 'content-type: application/grpc' -H 'te: trailers' --data-binary @-" | tr -d '\r'
+  fi
+}
+allowed_headers=$(grpc_probe "identity-service")
+echo "$allowed_headers" | grep -Fxq 'grpc-status: 3' || fail "Identity principal + bound caller header did not reach Authorization CheckPermission"
+echo "$allowed_headers" | grep -Fxq 'grpc-message: INVALID_ARGUMENT' || fail "Identity principal + bound caller header did not reach Authorization application validation"
+wrong_headers=$(grpc_probe "workflow-service")
+echo "$wrong_headers" | grep -Fxq 'grpc-status: 7' || fail "Identity principal spoofed another Authorization caller class"
+echo "$wrong_headers" | grep -Fxq 'grpc-message: RBAC: access denied' || fail "Identity principal spoof denial was not enforced by the Authorization waypoint"
+missing_headers=$(grpc_probe "")
+echo "$missing_headers" | grep -Fxq 'grpc-status: 7' || fail "Identity principal reached Authorization CheckPermission without bound caller header"
+echo "$missing_headers" | grep -Fxq 'grpc-message: RBAC: access denied' || fail "Missing Authorization caller header was not denied by the waypoint"
+k delete pod authorization-identity-policy -n platform-apps --wait=true >/dev/null
 cat <<POD | k apply -f - >/dev/null
 apiVersion: v1
 kind: Pod

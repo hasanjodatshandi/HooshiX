@@ -70,6 +70,8 @@ public final class IdentityJwtVerifier implements AccessTokenVerifier {
         keys.put(id, publicKey(p.getProperty(name)));
       }
     if (keys.size() > 3 || !keys.keySet().equals(refs)) throw unavailable(null);
+    Snapshot previous = snapshot.get();
+    if (previous != null) requireNoKeyIdRebinding(previous.keys(), keys);
     snapshot.set(new Snapshot(Map.copyOf(keys), clock.instant()));
   }
 
@@ -162,6 +164,27 @@ public final class IdentityJwtVerifier implements AccessTokenVerifier {
       }
     } catch (Exception e) {
       throw unavailable(e);
+    }
+  }
+
+  private static void requireNoKeyIdRebinding(
+      Map<String, RSAPublicKey> previous, Map<String, RSAPublicKey> candidate) {
+    for (Map.Entry<String, RSAPublicKey> entry : previous.entrySet()) {
+      RSAPublicKey replacement = candidate.get(entry.getKey());
+      if (replacement != null && !sameKey(entry.getValue(), replacement)) throw unavailable(null);
+    }
+  }
+
+  private static boolean sameKey(RSAPublicKey left, RSAPublicKey right) {
+    byte[] leftBytes = left.getEncoded();
+    byte[] rightBytes = right.getEncoded();
+    try {
+      return leftBytes != null
+          && rightBytes != null
+          && MessageDigest.isEqual(leftBytes, rightBytes);
+    } finally {
+      if (leftBytes != null) Arrays.fill(leftBytes, (byte) 0);
+      if (rightBytes != null) Arrays.fill(rightBytes, (byte) 0);
     }
   }
 

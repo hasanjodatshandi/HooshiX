@@ -60,7 +60,41 @@ class BrowserSecurityFilterTest {
     FilterChain chain = mock(FilterChain.class);
     filter.doFilter(request, response, chain);
     assertThat(response.getStatus()).isEqualTo(403);
-    assertThat(response.getContentAsString()).contains("fetch-metadata-required");
+    assertThat(response.getContentAsString()).contains("FETCH_METADATA_REQUIRED");
+    verifyNoInteractions(chain);
+  }
+
+  @Test
+  void anonymousRegistrationRequiresOriginAndFetchMetadataButNoSessionOrCsrf() throws Exception {
+    var request = post("/api/v1/identity/registration");
+    request.addHeader("Origin", "https://app.example.com");
+    request.addHeader("Sec-Fetch-Site", "same-origin");
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    verify(chain).doFilter(any(), same(response));
+    verifyNoInteractions(sessions);
+  }
+
+  @Test
+  void registrationWithSessionCookieStillRequiresSessionBoundCsrf() throws Exception {
+    BrowserSession session = session();
+    when(sessions.load("cookie")).thenReturn(Optional.of(session));
+    when(sessions.csrfMatches(session, null)).thenReturn(false);
+    var request = post("/api/v1/identity/registration/resend");
+    request.addHeader("Origin", "https://app.example.com");
+    request.addHeader("Sec-Fetch-Site", "same-origin");
+    request.setCookies(new Cookie(BrowserSecurityFilter.COOKIE, "cookie"));
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(403);
+    assertThat(response.getContentAsString()).contains("CSRF_INVALID");
     verifyNoInteractions(chain);
   }
 
@@ -156,6 +190,8 @@ class BrowserSecurityFilterTest {
         Path.of("refresh"),
         Duration.ofMinutes(5),
         Duration.ofHours(1),
+        128,
+        128,
         Map.of("/api/v1/authorization", "authorization-service"));
   }
 }

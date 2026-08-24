@@ -3,7 +3,7 @@ groups:
     rules:
       - alert: NotificationSubmitUnavailableRateHigh
         expr: |
-          sum(rate(notification_submit_duration_seconds_count{outcome=~"NOTIFICATION_UNAVAILABLE|TEMPLATE_NOT_ACTIVE"}[5m]))
+          sum(rate(notification_submit_duration_seconds_count{outcome=~"NOTIFICATION_UNAVAILABLE|TEMPLATE_NOT_ACTIVE|UNAVAILABLE"}[5m]))
           /
           clamp_min(sum(rate(notification_submit_duration_seconds_count[5m])), 0.001)
           > 0.01
@@ -13,6 +13,14 @@ groups:
           service: notification-service
         annotations:
           summary: Notification durable handoff unavailable rate is above 1%
+      - alert: NotificationSubmitAdmissionRejected
+        expr: rate(notification_submit_admission_rejected_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: page
+          service: notification-service
+        annotations:
+          summary: Notification submission admission is rejecting work
       - alert: NotificationSubmitSaturationHigh
         expr: notification_submit_in_flight > 100
         for: 5m

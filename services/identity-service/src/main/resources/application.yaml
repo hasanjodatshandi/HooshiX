@@ -29,10 +29,13 @@ identity:
   authentication-runtime-enabled: ${IDENTITY_AUTHENTICATION_RUNTIME_ENABLED:false}
   tenant-runtime-enabled: ${IDENTITY_TENANT_RUNTIME_ENABLED:false}
   max-concurrent-calls-per-connection: ${IDENTITY_MAX_CONCURRENT_CALLS_PER_CONNECTION:128}
+  max-global-concurrent-calls: ${IDENTITY_MAX_GLOBAL_CONCURRENT_CALLS:128}
   phone-registration-enabled: ${IDENTITY_PHONE_REGISTRATION_ENABLED:false}
   compromised-password-target: ${IDENTITY_COMPROMISED_PASSWORD_TARGET:dns:///compromised-password-service.platform-apps.svc.cluster.local:9090}
   compromised-password-max-in-flight: ${IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT:32}
   notification-target: ${IDENTITY_NOTIFICATION_TARGET:dns:///notification-service.platform-apps.svc.cluster.local:9090}
+  notification-result-grpc-port: ${IDENTITY_NOTIFICATION_RESULT_GRPC_PORT:9091}
+  notification-result-runtime-enabled: ${IDENTITY_NOTIFICATION_RESULT_RUNTIME_ENABLED:false}
   authorization-target: ${IDENTITY_AUTHORIZATION_TARGET:dns:///authorization-service.platform-apps.svc.cluster.local:9090}
   notification-dispatch-enabled: ${IDENTITY_NOTIFICATION_DISPATCH_ENABLED:true}
   fingerprint-key-ring-path: ${IDENTITY_FINGERPRINT_KEY_RING_PATH:/run/secrets/identity-fingerprint/fingerprint.properties}
@@ -79,6 +82,7 @@ management:
       percentiles-histogram:
         identity.registration.duration: true
         identity.authentication.duration: true
+        identity.tenant.duration: true
         identity.dependency.duration: true
         identity.password_verify.duration: true
   otlp:

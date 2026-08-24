@@ -38,4 +38,12 @@
     <Class name="com.sajtech.webbff.infrastructure.observability.BffDependencyObservabilityInterceptor" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.RegistrationController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.IdentityProfileController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

@@ -4,14 +4,20 @@ import com.sajtech.authorization.contract.v1.*;
 import com.sajtech.identity.application.tenant.*;
 import com.sajtech.identity.application.tenant.port.out.AuthorizationTenantPort;
 import io.grpc.*;
+import io.grpc.stub.MetadataUtils;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 public final class GrpcAuthorizationTenantClient implements AuthorizationTenantPort {
-  private final ManagedChannel channel;
+  private static final Metadata.Key<String> CALLER =
+      Metadata.Key.of("x-hooshix-authorization-caller", Metadata.ASCII_STRING_MARSHALLER);
+  private final Channel channel;
 
   public GrpcAuthorizationTenantClient(ManagedChannel channel) {
-    this.channel = channel;
+    Metadata caller = new Metadata();
+    caller.put(CALLER, "identity-service");
+    this.channel =
+        ClientInterceptors.intercept(channel, MetadataUtils.newAttachHeadersInterceptor(caller));
   }
 
   @Override

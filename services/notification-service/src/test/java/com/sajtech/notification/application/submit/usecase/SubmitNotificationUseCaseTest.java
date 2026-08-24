@@ -9,6 +9,7 @@ import com.sajtech.notification.application.submit.model.AcceptedNotificationWri
 import com.sajtech.notification.application.submit.model.EncryptedDeliveryPayload;
 import com.sajtech.notification.application.submit.model.EncryptedField;
 import com.sajtech.notification.application.submit.model.FingerprintDigest;
+import com.sajtech.notification.application.submit.model.PasswordChangedNoticeContent;
 import com.sajtech.notification.application.submit.model.StoredAcceptedNotification;
 import com.sajtech.notification.application.submit.model.SubmitNotificationCommand;
 import com.sajtech.notification.application.submit.model.VerificationCodeContent;
@@ -73,6 +74,44 @@ class SubmitNotificationUseCaseTest {
     assertThat(fingerprints.verifications).isEqualTo(1);
   }
 
+  @Test
+  void passwordChangedNoticeRejectsSmsBeforeFreshWork() {
+    SubmitNotificationCommand unsupported =
+        new SubmitNotificationCommand(
+            REQUEST_ID,
+            NotificationChannel.SMS,
+            "+989121234567",
+            "fa",
+            null,
+            new PasswordChangedNoticeContent());
+
+    assertThatThrownBy(() -> useCase.submit(unsupported))
+        .isInstanceOf(NotificationSubmissionException.class)
+        .extracting(exception -> ((NotificationSubmissionException) exception).error())
+        .isEqualTo(NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST);
+    assertThat(databaseTime.reads).isZero();
+    assertThat(fingerprints.computes).isZero();
+  }
+
+  @Test
+  void freshNonTimeBoundIntentRejectsExpiredCallerDeadline() {
+    databaseTime.now = Instant.parse("2026-08-16T00:10:00Z");
+    SubmitNotificationCommand expired =
+        new SubmitNotificationCommand(
+            REQUEST_ID,
+            NotificationChannel.EMAIL,
+            "person@example.com",
+            "en",
+            Instant.parse("2026-08-16T00:09:59Z"),
+            new PasswordChangedNoticeContent());
+
+    assertThatThrownBy(() -> useCase.submit(expired))
+        .isInstanceOf(NotificationSubmissionException.class)
+        .extracting(exception -> ((NotificationSubmissionException) exception).error())
+        .isEqualTo(NotificationSubmissionError.INVALID_NOTIFICATION_REQUEST);
+    assertThat(databaseTime.reads).isEqualTo(1);
+  }
+
   private SubmitNotificationUseCase createUseCase() {
     NotificationIntentFactory intentFactory =
         new NotificationIntentFactory(
@@ -112,7 +151,7 @@ class SubmitNotificationUseCaseTest {
             "a".repeat(64),
             "Verify",
             "Code {code} expires in {expires_minutes} minutes",
-            null);
+            "<p>Code {code} expires in {expires_minutes} minutes</p>");
     return (channel, semanticType, locale) -> Optional.of(version);
   }
 

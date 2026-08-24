@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "postgresql": {"version": "18.4", "cloudnativepg": "1.30.0", "barman_plugin": "0.13.0", "instances": 1, "physical_clusters": 1, "tls_required": true, "distinct_service_databases": true, "runtime_migration_role_isolation": true, "forced_rls_required": true, "application_pool_budget_percent_max": 70, "reserved_connections_percent_min": 30, "continuous_wal_archive": true, "pitr_window_days": 35, "base_backup_frequency_hours_max": 24},
+  "redis": {"version": "8.2.8", "instances": 1, "tls_required": true, "acl_isolation": true, "maxmemory_policy": "noeviction", "aof": true, "appendfsync": "everysec", "business_source_of_truth": false},
+  "kafka": {"version": "4.2.1", "brokers": 1, "controllers": 1, "combined_kraft_role": true, "replication_factor": 1, "min_insync_replicas": 1, "producer_acks": "all", "producer_idempotence": true, "unclean_leader_election": false, "tls_required": true, "acl_isolation": true, "business_source_of_truth": false}
+}

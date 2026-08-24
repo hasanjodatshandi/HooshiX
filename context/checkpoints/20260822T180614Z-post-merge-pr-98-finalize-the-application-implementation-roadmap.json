@@ -1,0 +1,71 @@
+{
+  "base_commit": "6debe2537e9b9558e4ef4e46518be0255209a473",
+  "branch": "main",
+  "changed_paths": [
+    "FILE_INDEX.txt",
+    "README.md",
+    "context/bootstrap.json",
+    "context/routes.json",
+    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+    "docs/architecture/README.md",
+    "docs/architecture/SOURCES.md",
+    "docs/architecture/TASK-REVIEW-MATRIX.md"
+  ],
+  "checkpoint_id": "20260822T180614Z-post-merge-pr-98-finalize-the-application-implementation-roadmap",
+  "checkpoint_kind": "post-merge",
+  "completed": [
+    "PR #98 protected CI passed on exact head 55ed86159ca4ef453f4926886154054677e811c3.",
+    "PR #98 merged to main as 0ae74f928db6b03d4e2a2a4a4736a69fedad8ed9.",
+    "Canonical main was synchronized to the exact merge and the complete repository baseline passed with 823 indexed files, 51 ADRs, and 27 dependency edges.",
+    "The roadmap is now a Context bootstrap authority and global routing source, with inter-service contract independence as the next application milestone and Production Commissioning and Readiness deferred."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "AGENTS.md",
+        "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+        "docs/architecture/implementation-status.md"
+      ],
+      "summary": "Current Git remains authority over the roadmap and historical checkpoints; new sessions use the roadmap only after source-of-truth reconciliation."
+    }
+  ],
+  "next_actions": [],
+  "objective": "Finalize the application implementation roadmap after PR #98 merge.",
+  "project_id": "hooshix",
+  "pull_request": 98,
+  "recorded_at_utc": "2026-08-22T18:06:14Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "Future milestone changes must reconcile the roadmap in the same coherent PR; stale roadmap text cannot outrank current Git."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [],
+    "review_mode": "full-read",
+    "routes": [
+      "documentation-governance",
+      "agent-context-engine"
+    ]
+  },
+  "source_checkpoint": "context/checkpoints/20260822T175836Z-add-a-current-application-implementation-roadmap-that-survives-c.json",
+  "subject_commit": "0ae74f928db6b03d4e2a2a4a4736a69fedad8ed9",
+  "unfinished": [],
+  "verification": {
+    "failed": [],
+    "not_run": [],
+    "passed": [
+      {
+        "check": "Protected PR #98 baseline",
+        "evidence": "GitHub Actions run 32555758705 passed Repository structure, all five service security suites, and Baseline verify on exact PR head."
+      },
+      {
+        "check": "PR #98 merge",
+        "evidence": "GitHub reports merge commit 0ae74f928db6b03d4e2a2a4a4736a69fedad8ed9."
+      },
+      {
+        "check": "Post-merge repository baseline",
+        "evidence": "make baseline-verify passed on exact merged main with 823 indexed files, 51 ADRs, and 27 dependency edges."
+      }
+    ]
+  }
+}

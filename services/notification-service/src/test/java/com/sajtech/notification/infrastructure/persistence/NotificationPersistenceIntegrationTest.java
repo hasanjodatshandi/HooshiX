@@ -3,6 +3,9 @@ package com.sajtech.notification.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.sajtech.notification.application.delivery.model.ProviderDispatchOutcome;
+import com.sajtech.notification.application.delivery.model.ProviderReconciliationOutcome;
+import com.sajtech.notification.application.delivery.model.ProviderReconciliationStatus;
 import com.sajtech.notification.application.submit.NotificationSubmissionError;
 import com.sajtech.notification.application.submit.NotificationSubmissionException;
 import com.sajtech.notification.application.submit.model.SubmitNotificationCommand;
@@ -17,7 +20,9 @@ import com.sajtech.notification.application.template.service.TemplateContentDige
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import com.sajtech.notification.domain.notification.model.NotificationLifecycle;
 import com.sajtech.notification.domain.notification.model.NotificationSemanticType;
+import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
 import com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrow;
+import com.sajtech.notification.infrastructure.security.escrow.AesGcmDeliveryEscrowReader;
 import com.sajtech.notification.infrastructure.security.fingerprint.FileBackedHmacIntentFingerprint;
 import com.sajtech.notification.infrastructure.security.keyring.FileBackedKeyRing;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +39,7 @@ import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -141,6 +147,99 @@ class NotificationPersistenceIntegrationTest {
         .extracting(exception -> ((NotificationSubmissionException) exception).error())
         .isEqualTo(NotificationSubmissionError.REQUEST_ID_CONFLICT);
     assertThat(dsl.fetchCount(DSL.table("notification"))).isEqualTo(1);
+  }
+
+  @Test
+  void migrationRejectsCrossDefinitionActivationAndInvalidChannelSemanticState() throws Exception {
+    assertThatThrownBy(
+            () ->
+                dsl.execute(
+                    "UPDATE notification_template_activation SET active_version_id = ? WHERE definition_id = ?",
+                    UUID.fromString("22222222-2222-4222-8222-222222222203"),
+                    UUID.fromString("11111111-1111-4111-8111-111111111101")))
+        .isInstanceOf(DataAccessException.class);
+
+    SubmitNotificationUseCase useCase = createUseCase();
+    Instant messageNotAfter = new PostgresDatabaseTime(dsl).now().plus(Duration.ofMinutes(10));
+    var accepted =
+        useCase.submit(
+            command(
+                UUID.fromString("550e8400-e29b-41d4-a716-446655440001"),
+                "12345678",
+                messageNotAfter));
+
+    assertThatThrownBy(
+            () ->
+                dsl.execute(
+                    "UPDATE notification SET channel = 'SMS', semantic_type = 'PASSWORD_CHANGED_NOTICE' WHERE notification_id = ?",
+                    accepted.notificationId()))
+        .isInstanceOf(DataAccessException.class);
+  }
+
+  @Test
+  void deliveryClaimIsSingleOwnerAndTerminalDeliveryErasesEscrowAndCreatesResultOutbox()
+      throws Exception {
+    SubmitNotificationUseCase useCase = createUseCase();
+    Instant deadline = new PostgresDatabaseTime(dsl).now().plus(Duration.ofMinutes(10));
+    var accepted = useCase.submit(command(UUID.randomUUID(), "12345678", deadline));
+    JooqDeliveryAttemptRepository attempts = new JooqDeliveryAttemptRepository(dsl);
+
+    var claims = attempts.claimDue(25, Duration.ofSeconds(30));
+    assertThat(claims).hasSize(1);
+    assertThat(attempts.claimDue(25, Duration.ofSeconds(30))).isEmpty();
+    var claim = claims.getFirst();
+    FileBackedKeyRing deliveryKeys =
+        new FileBackedKeyRing(
+            tempDirectory.resolve("delivery.properties"),
+            "AES",
+            32,
+            Clock.systemUTC(),
+            Duration.ofHours(1));
+    var decrypted = new AesGcmDeliveryEscrowReader(deliveryKeys).decrypt(claim.escrow());
+    assertThat(decrypted.recipient()).isEqualTo("person@example.com");
+    assertThat(decrypted.text()).contains("12345678");
+
+    attempts.recordProviderAccepted(
+        claim,
+        ProviderDispatchOutcome.live(
+            ProviderAttemptClassification.DEFINITIVE_ACCEPTED, "SMTP_250", null),
+        Duration.ofSeconds(1));
+    dsl.execute(
+        "UPDATE notification_attempt SET next_action_at=clock_timestamp() WHERE attempt_id=?",
+        claim.attemptId());
+    JooqDeliveryReconciliationRepository reconciliation =
+        new JooqDeliveryReconciliationRepository(dsl);
+    var observation = reconciliation.claimDue(25, Duration.ofSeconds(30));
+    assertThat(observation).hasSize(1);
+    reconciliation.recordDelivered(
+        observation.getFirst(),
+        ProviderReconciliationOutcome.live(
+            ProviderReconciliationStatus.DELIVERED, "FIXTURE_DELIVERED", null));
+
+    var row =
+        Objects.requireNonNull(
+            dsl.fetchOne(
+                "SELECT lifecycle,recipient_ciphertext,text_ciphertext FROM notification WHERE notification_id=?",
+                accepted.notificationId()));
+    assertThat(row.get("lifecycle", String.class)).isEqualTo("DELIVERED");
+    assertThat(row.get("recipient_ciphertext", byte[].class)).isNull();
+    assertThat(row.get("text_ciphertext", byte[].class)).isNull();
+    assertThat(
+            dsl.fetchCount(
+                DSL.table("notification_result_outbox"),
+                DSL.field("notification_id").eq(accepted.notificationId())))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void migrationCreatesProviderCorrelationAndPendingCallbackIndexes() {
+    var indexes =
+        dsl.fetch(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename IN ('provider_receipt_evidence', 'notification_result_outbox')")
+            .getValues("indexname", String.class);
+
+    assertThat(indexes)
+        .contains("provider_receipt_correlation_idx", "notification_result_outbox_pending_idx");
   }
 
   private SubmitNotificationUseCase createUseCase() throws Exception {

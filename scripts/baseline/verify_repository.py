@@ -68,7 +68,7 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/baseline/verify_repository.py",
 )
 
-IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", "build", "__pycache__", ".pytest_cache"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
 
 EXTERNALIZED_MCP_PATHS = (
@@ -76,6 +76,23 @@ EXTERNALIZED_MCP_PATHS = (
     "scripts/context/tests/test_mcp_server.py",
 )
 EXTERNALIZED_MCP_PREFIXES = ("scripts/ops/", "scripts/desktop/", "ops/", "desktop/")
+
+REPORTING_PROTOCOL_FIELDS = (
+    "Outcome:",
+    "Remaining work:",
+    "Continuation action:",
+    "Retryable:",
+    "Human action required:",
+)
+REPORTING_PROTOCOL_VALUE_MARKERS = (
+    "completed | partial | blocked | failed",
+    "continue | stop | human",
+    "yes | no",
+)
+REPORTING_PROTOCOL_PATHS = (
+    "AGENTS.md",
+    "docs/engineering/agent-communication-and-reporting.md",
+)
 
 
 @dataclass(frozen=True)
@@ -390,6 +407,66 @@ def validate_source_references(root: Path) -> list[str]:
     return sorted(set(errors))
 
 
+def validate_agent_reporting_contract(root: Path) -> list[str]:
+    errors: list[str] = []
+    texts: dict[str, str] = {}
+    for relative in REPORTING_PROTOCOL_PATHS:
+        path = root / relative
+        if not path.is_file():
+            errors.append(f"missing reporting protocol authority: {relative}")
+            continue
+        text = read_text(path)
+        texts[relative] = text
+        for field_name in REPORTING_PROTOCOL_FIELDS:
+            if field_name not in text:
+                errors.append(f"{relative} is missing reporting protocol field: {field_name}")
+
+    canonical = texts.get("docs/engineering/agent-communication-and-reporting.md")
+    if canonical is not None:
+        for marker in REPORTING_PROTOCOL_VALUE_MARKERS:
+            if marker not in canonical:
+                errors.append(
+                    "agent-communication-and-reporting.md is missing reporting protocol token set: "
+                    + marker
+                )
+        completed_markers = (
+            "`Outcome: completed`",
+            "`Remaining work: None`",
+            "`Continuation action: stop`",
+            "`Retryable: no`",
+            "`Human action required: None`",
+        )
+        for marker in completed_markers:
+            if marker not in canonical:
+                errors.append(
+                    "agent-communication-and-reporting.md is missing completed-terminal invariant: "
+                    + marker
+                )
+    return errors
+
+
+
+def validate_contract_package_boundary(root: Path) -> list[str]:
+    errors: list[str] = []
+    contract_proto = root / "contracts/protobuf-contracts/src/main/proto"
+    if not contract_proto.is_dir():
+        errors.append("missing canonical contract package proto directory")
+        return errors
+
+    for service in (root / "services").glob("*/src/main/proto"):
+        errors.append(f"service-local canonical proto ownership exists: {service.relative_to(root)}")
+
+    for service in (root / "services").glob("*/build.gradle.kts"):
+        text = read_text(service)
+        if "../" in text and "src/main/proto" in text:
+            errors.append(f"service build references external proto source path: {service.relative_to(root)}")
+
+    contract_build = root / "contracts/protobuf-contracts/build.gradle.kts"
+    if not contract_build.is_file():
+        errors.append("missing contract package build definition")
+
+    return errors
+
 def validate_guarded_structure(root: Path) -> list[str]:
     errors: list[str] = []
     reference_service = root / "services/reference-data-service"
@@ -426,6 +503,8 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         validate_adr_register(root),
         validate_dependency_registry(root),
         validate_source_references(root),
+        validate_agent_reporting_contract(root),
+        validate_contract_package_boundary(root),
         validate_guarded_structure(root),
     )
     return [error for result in checks for error in result]

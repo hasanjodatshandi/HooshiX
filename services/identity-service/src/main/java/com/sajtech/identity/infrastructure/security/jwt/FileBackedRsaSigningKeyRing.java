@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -15,6 +16,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,9 +71,17 @@ public final class FileBackedRsaSigningKeyRing {
     if (privateKey == null || publicKey == null || !matches(privateKey, publicKey)) {
       throw new IllegalStateException("Active JWT signing key does not match verifier bundle");
     }
+    Snapshot previous = snapshot.get();
+    if (previous != null) {
+      requireNoKeyIdRebinding(previous.privateKeys(), privateKeys, "private");
+      requireNoKeyIdRebinding(previous.publicKeys(), publicBundle.keys(), "public");
+    }
     snapshot.set(
         new Snapshot(
-            new RsaSigningKeyMaterial(activeKeyId, privateKey, publicKey), clock.instant()));
+            new RsaSigningKeyMaterial(activeKeyId, privateKey, publicKey),
+            privateKeys,
+            publicBundle.keys(),
+            clock.instant()));
   }
 
   public RsaSigningKeyMaterial activeKey() {
@@ -197,6 +207,31 @@ public final class FileBackedRsaSigningKeyRing {
     }
   }
 
+  private static void requireNoKeyIdRebinding(
+      Map<String, ? extends java.security.Key> previous,
+      Map<String, ? extends java.security.Key> candidate,
+      String keyKind) {
+    for (Map.Entry<String, ? extends java.security.Key> entry : previous.entrySet()) {
+      java.security.Key replacement = candidate.get(entry.getKey());
+      if (replacement != null && !sameKey(entry.getValue(), replacement)) {
+        throw new IllegalStateException("JWT " + keyKind + " key identifier cannot be rebound");
+      }
+    }
+  }
+
+  private static boolean sameKey(java.security.Key left, java.security.Key right) {
+    byte[] leftBytes = left.getEncoded();
+    byte[] rightBytes = right.getEncoded();
+    try {
+      return leftBytes != null
+          && rightBytes != null
+          && MessageDigest.isEqual(leftBytes, rightBytes);
+    } finally {
+      if (leftBytes != null) Arrays.fill(leftBytes, (byte) 0);
+      if (rightBytes != null) Arrays.fill(rightBytes, (byte) 0);
+    }
+  }
+
   private static void require3072(BigInteger modulus) {
     if (modulus.bitLength() != RSA_BITS) {
       throw new IllegalStateException("JWT RSA key must be exactly 3072 bits");
@@ -230,5 +265,9 @@ public final class FileBackedRsaSigningKeyRing {
 
   private record PublicBundle(Map<String, RSAPublicKey> keys) {}
 
-  private record Snapshot(RsaSigningKeyMaterial active, Instant loadedAt) {}
+  private record Snapshot(
+      RsaSigningKeyMaterial active,
+      Map<String, RSAPrivateKey> privateKeys,
+      Map<String, RSAPublicKey> publicKeys,
+      Instant loadedAt) {}
 }

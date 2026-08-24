@@ -1,0 +1,99 @@
+{
+  "base_commit": "dd909b00c059217e734c43941b932b835ce800bd",
+  "branch": "feat/public-registration-openapi",
+  "changed_paths": [
+    "FILE_INDEX.txt",
+    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+    "docs/architecture/dependency-criticality-matrix.md",
+    "docs/architecture/dependency-criticality.yaml",
+    "docs/architecture/implementation-status.md",
+    "docs/architecture/services/web-bff.md",
+    "services/identity-service/src/test/java/com/sajtech/identity/application/registration/usecase/ConfirmRegistrationUseCaseTest.java",
+    "services/web-bff/build.gradle.kts",
+    "services/web-bff/config/spotbugs/exclude.xml",
+    "services/web-bff/contracts/openapi.yaml",
+    "services/web-bff/gradle.lockfile",
+    "services/web-bff/src/main/java/com/sajtech/webbff/application/BffError.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/IdentityGateway.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/IdentityBffClient.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilter.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BffExceptionHandler.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/RegistrationController.java",
+    "services/web-bff/src/main/resources/application.yaml",
+    "services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityBffRegistrationClientTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilterTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiRegistrationContractTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/RegistrationControllerTest.java"
+  ],
+  "checkpoint_id": "20260822T231253Z-finalize-public-registration-vertical-slice-openapi-delivery-lif",
+  "completed": [
+    "Verified actual branch state before continuation.",
+    "Confirmed no existing PR before creating PR #102.",
+    "Created PR #102 for the existing implementation commit."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "AGENTS.md",
+        "context/checkpoint.schema.json",
+        "scripts/context/context_engine.py"
+      ],
+      "summary": "Source of truth remains the current Git state; previous completion text was not used as evidence for delivery steps."
+    },
+    {
+      "authority_refs": [
+        "context/checkpoint.schema.json",
+        "scripts/context/context_engine.py"
+      ],
+      "summary": "Checkpoint is created after PR creation and before protected CI/merge."
+    }
+  ],
+  "next_actions": [
+    "Wait for protected PR checks, review PR #102, merge when green, then create post-merge checkpoint."
+  ],
+  "objective": "Finalize Public Registration Vertical Slice + OpenAPI delivery lifecycle after source-of-truth verification.",
+  "project_id": "hooshix",
+  "pull_request": 102,
+  "recorded_at_utc": "2026-08-22T23:12:53Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "Production provider execution remains NOT VERIFIED."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [
+      "web-bff",
+      "identity-service"
+    ],
+    "review_mode": "full-read",
+    "routes": [
+      "web-bff",
+      "identity-registration",
+      "delivery-governance"
+    ]
+  },
+  "subject_commit": "66531902aa89e6a04cab90db298752a1d177f055",
+  "unfinished": [
+    "Protected CI, final PR review, merge, and post-merge verification."
+  ],
+  "verification": {
+    "failed": [],
+    "not_run": [
+      {
+        "check": "Protected PR CI",
+        "evidence": "Pending PR #102."
+      }
+    ],
+    "passed": [
+      {
+        "check": "Repository baseline",
+        "evidence": "make baseline-verify passed with 882 indexed files, 52 ADRs, and 28 dependency edges."
+      },
+      {
+        "check": "Service checks",
+        "evidence": "Web BFF and Identity strict Gradle checks passed."
+      }
+    ]
+  }
+}

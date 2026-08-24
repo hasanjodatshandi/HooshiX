@@ -48,7 +48,31 @@ class DeterministicBootstrapTest(unittest.TestCase):
         self.assertIn("CALICO_CNI_AMD64_DIGEST", creator)
         self.assertIn("CALICO_NODE_AMD64_DIGEST", creator)
         self.assertIn("CALICO_CONTROLLERS_AMD64_DIGEST", creator)
+        self.assertIn("ETCD_TMPFS_PARENT=/dev/shm/hooshix-kind", creator)
+        self.assertIn("ETCD_TMPFS_DIR=$ETCD_TMPFS_PARENT/etcd", creator)
+        self.assertIn('-v "$ETCD_TMPFS_PARENT:/hooshix-kind"', creator)
+        self.assertIn('find /hooshix-kind -mindepth 1 -delete', creator)
+        self.assertIn('chown "$HOST_UID:$HOST_GID" /hooshix-kind', creator)
+        self.assertIn('rmdir "$ETCD_TMPFS_PARENT"', creator)
+        self.assertNotIn('-v /dev/shm:', creator)
 
+    def test_kind_operator_authority_and_tmpfs_mount_are_verified(self) -> None:
+        verifier = (ROOT / "scripts/platform/kind_verify.sh").read_text(encoding="utf-8")
+        cluster = (ROOT / "infrastructure/kind/cluster.yaml").read_text(encoding="utf-8")
+        staging = (ROOT / "scripts/platform/staging_verify.sh").read_text(encoding="utf-8")
+        self.assertIn("auth can-i", verifier)
+        self.assertIn("kind operator context lacks expected local cluster-admin authority", verifier)
+        self.assertIn("hostPath: /dev/shm/hooshix-kind/etcd", cluster)
+        self.assertIn("/dev/shm/hooshix-kind/etcd", staging)
+
+    def test_pre_edge_istio_verify_is_foundation_only(self) -> None:
+        istio = (ROOT / "scripts/platform/istio_verify.sh").read_text(encoding="utf-8")
+        edge = (ROOT / "scripts/platform/edge_verify.sh").read_text(encoding="utf-8")
+        platform = (ROOT / "scripts/platform/platform_verify.sh").read_text(encoding="utf-8")
+        self.assertIn("istio_foundation_verify.sh", istio)
+        self.assertNotIn("mesh_identity_verify.sh", istio)
+        self.assertIn("mesh_identity_verify.sh", edge)
+        self.assertIn("edge_verify.sh", platform)
 
 if __name__ == "__main__":
     unittest.main()

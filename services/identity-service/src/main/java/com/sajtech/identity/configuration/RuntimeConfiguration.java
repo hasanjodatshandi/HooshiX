@@ -3,7 +3,11 @@ package com.sajtech.identity.configuration;
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.*;
+import com.sajtech.identity.application.notification.port.in.ReportNotificationResult;
 import com.sajtech.identity.application.notification.port.out.*;
+import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
+import com.sajtech.identity.application.profile.port.in.ProfileManagement;
+import com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
 import com.sajtech.identity.application.registration.service.*;
 import com.sajtech.identity.application.registration.usecase.*;
@@ -25,7 +29,10 @@ import com.sajtech.identity.infrastructure.security.session.HmacSessionCredentia
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
 import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
+import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
+import com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
 import io.grpc.BindableService;
 import io.grpc.ManagedChannel;
@@ -154,6 +161,28 @@ public class RuntimeConfiguration {
   @Bean
   NotificationOutboxStore notificationOutboxStore(DSLContext dsl) {
     return new JooqNotificationOutboxStore(dsl);
+  }
+
+  @Bean
+  NotificationResultStore notificationResultStore(DSLContext dsl) {
+    return new JooqNotificationResultStore(dsl);
+  }
+
+  @Bean
+  ReportNotificationResult reportNotificationResult(NotificationResultStore store) {
+    return new ReportNotificationResultUseCase(store);
+  }
+
+  @Bean
+  ProfileManagement profileManagement(
+      com.sajtech.identity.application.profile.port.out.ProfileContactStore store) {
+    return new ProfileManagementUseCase(store);
+  }
+
+  @Bean
+  com.sajtech.identity.application.profile.port.out.ProfileContactStore profileContactStore(
+      DSLContext dsl) {
+    return new com.sajtech.identity.infrastructure.persistence.JooqProfileContactStore(dsl);
   }
 
   @Bean
@@ -424,6 +453,18 @@ public class RuntimeConfiguration {
       prefix = "identity",
       name = "authentication-runtime-enabled",
       havingValue = "true")
+  IdentityProfileGrpcService profileGrpc(
+      ProfileManagement profileManagement,
+      RefreshCredentialLookup lookup,
+      AuthenticationStore store) {
+    return new IdentityProfileGrpcService(profileManagement, lookup, store);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
   AuthenticateLocalUseCase authenticateLocalCore(
       ContactCanonicalizer contacts,
       PasswordNormalizer passwords,
@@ -572,9 +613,19 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  @Primary
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  ObservedTenantLifecycle observedTenantLifecycle(
+      com.sajtech.identity.application.tenant.TenantLifecycleService delegate,
+      ObservationRegistry observations,
+      MeterRegistry meters) {
+    return new ObservedTenantLifecycle(delegate, observations, meters);
+  }
+
+  @Bean
   @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
   com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService tenantGrpc(
-      com.sajtech.identity.application.tenant.TenantLifecycleService service) {
+      ObservedTenantLifecycle service) {
     return new com.sajtech.identity.interfaces.tenant.grpc.IdentityTenantGrpcService(service);
   }
 
@@ -603,10 +654,17 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  IdentityAdmissionInterceptor identityAdmission(
+      IdentityProperties properties, MeterRegistry meters) {
+    return new IdentityAdmissionInterceptor(properties.maxGlobalConcurrentCalls(), meters);
+  }
+
+  @Bean
   GrpcServerLifecycle grpcLifecycle(
       IdentityProperties p,
       List<BindableService> services,
       SafeTracingServerInterceptor tracing,
+      IdentityAdmissionInterceptor admission,
       @Value("${identity.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
@@ -616,7 +674,29 @@ public class RuntimeConfiguration {
             || p.authenticationRuntimeEnabled()
             || p.tenantRuntimeEnabled(),
         services,
-        tracing);
+        tracing,
+        admission);
+  }
+
+  @Bean(name = "notificationResultGrpcLifecycle")
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "notification-result-runtime-enabled",
+      havingValue = "true")
+  GrpcServerLifecycle notificationResultGrpcLifecycle(
+      IdentityProperties p,
+      ReportNotificationResult report,
+      SafeTracingServerInterceptor tracing,
+      IdentityAdmissionInterceptor admission,
+      @Value("${identity.notification-result-grpc-bind-address:0.0.0.0}") String bindAddress) {
+    return new GrpcServerLifecycle(
+        bindAddress,
+        p.notificationResultGrpcPort(),
+        p.maxConcurrentCallsPerConnection(),
+        true,
+        List.of(new IdentityNotificationResultGrpcService(report)),
+        tracing,
+        admission);
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "notificationChannel")

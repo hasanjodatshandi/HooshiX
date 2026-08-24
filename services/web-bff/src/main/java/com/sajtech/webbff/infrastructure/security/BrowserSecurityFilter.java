@@ -14,6 +14,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public final class BrowserSecurityFilter extends OncePerRequestFilter {
   public static final String SESSION_ATTRIBUTE = BrowserSecurityContext.SESSION_ATTRIBUTE;
   public static final String COOKIE = BrowserSecurityContext.COOKIE_NAME;
+  private static final Set<String> ANONYMOUS_UNSAFE =
+      Set.of(
+          "/api/v1/auth/session/bootstrap",
+          "/api/v1/identity/registration",
+          "/api/v1/identity/registration/resend",
+          "/api/v1/identity/registration/confirm");
   private final WebBffProperties properties;
   private final RedisBffSessionRepository sessions;
 
@@ -32,42 +38,42 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
       return;
     }
     if (!properties.runtimeEnabled()) {
-      problem(response, 503, "runtime-disabled");
+      problem(response, request, 503, "RUNTIME_DISABLED");
       return;
     }
     int max = request.getRequestURI().startsWith("/api/v1/auth/") ? 64 * 1024 : 256 * 1024;
     String ct = request.getContentType();
     if (ct != null && ct.toLowerCase(Locale.ROOT).startsWith("multipart/")) {
-      problem(response, 415, "multipart-not-supported");
+      problem(response, request, 415, "MULTIPART_NOT_SUPPORTED");
       return;
     }
     long len = request.getContentLengthLong();
     if (len > max) {
-      problem(response, 413, "payload-too-large");
+      problem(response, request, 413, "PAYLOAD_TOO_LARGE");
       return;
     }
     HttpServletRequest effective = request;
     if (hasBody(request.getMethod())) {
       byte[] body = readBounded(request, max);
       if (body == null) {
-        problem(response, 413, "payload-too-large");
+        problem(response, request, 413, "PAYLOAD_TOO_LARGE");
         return;
       }
       effective = new CachedRequest(request, body);
     }
     boolean unsafe = unsafe(request.getMethod());
     if (unsafe && !origin().equals(request.getHeader("Origin"))) {
-      problem(response, 403, "invalid-origin");
+      problem(response, request, 403, "INVALID_ORIGIN");
       return;
     }
     if (unsafe) {
       String site = request.getHeader("Sec-Fetch-Site");
       if (site == null && properties.requireFetchMetadata()) {
-        problem(response, 403, "fetch-metadata-required");
+        problem(response, request, 403, "FETCH_METADATA_REQUIRED");
         return;
       }
       if (site != null && !"same-origin".equals(site)) {
-        problem(response, 403, "cross-site-request");
+        problem(response, request, 403, "CROSS_SITE_REQUEST");
         return;
       }
     }
@@ -77,21 +83,21 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
       session = sessions.load(cookie).orElse(null);
       if (session == null) {
         clearCookie(response);
-        problem(response, 401, "invalid-session");
+        problem(response, request, 401, "INVALID_SESSION");
         return;
       }
       effective.setAttribute(SESSION_ATTRIBUTE, session);
       if (unsafe && !sessions.csrfMatches(session, request.getHeader("X-CSRF-Token"))) {
-        problem(response, 403, "csrf-invalid");
+        problem(response, request, 403, "CSRF_INVALID");
         return;
       }
       if (!sessions.touch(session)) {
         clearCookie(response);
-        problem(response, 401, "invalid-session");
+        problem(response, request, 401, "INVALID_SESSION");
         return;
       }
-    } else if (unsafe && !"/api/v1/auth/session/bootstrap".equals(request.getRequestURI())) {
-      problem(response, 401, "session-required");
+    } else if (unsafe && !ANONYMOUS_UNSAFE.contains(request.getRequestURI())) {
+      problem(response, request, 401, "SESSION_REQUIRED");
       return;
     }
     chain.doFilter(effective, response);
@@ -164,13 +170,18 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
     r.setHeader("Cache-Control", "no-store");
   }
 
-  private static void problem(HttpServletResponse r, int status, String code) throws IOException {
+  private static void problem(
+      HttpServletResponse r, HttpServletRequest request, int status, String code)
+      throws IOException {
     r.setStatus(status);
     r.setContentType("application/problem+json");
     r.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    String type = "urn:hooshix:problem:" + code.toLowerCase(Locale.ROOT).replace('_', '-');
     r.getWriter()
         .write(
-            "{\"type\":\"about:blank\",\"title\":\"Request rejected\",\"status\":"
+            "{\"type\":\""
+                + type
+                + "\",\"title\":\"Request rejected\",\"status\":"
                 + status
                 + ",\"code\":\""
                 + code

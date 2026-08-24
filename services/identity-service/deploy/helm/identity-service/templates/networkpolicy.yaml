@@ -20,6 +20,20 @@ spec:
           port: {{ .Values.service.grpcPort }}
         - protocol: TCP
           port: 15008
+    {{- if .Values.runtime.notificationResultRuntimeEnabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.notification.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.notification.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.notificationResultGrpcPort }}
+        - protocol: TCP
+          port: 15008
+    {{- end }}
     {{- if .Values.observability.metrics.enabled }}
     - from:
         - namespaceSelector:

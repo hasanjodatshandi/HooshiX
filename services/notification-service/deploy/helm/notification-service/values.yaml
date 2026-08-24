@@ -13,6 +13,7 @@ service:
   managementPort: 9092
 
 runtime:
+  deliveryRuntimeEnabled: false
   maxConcurrentCallsPerConnection: 128
   temporaryStorageLimit: 256Mi
 
@@ -38,9 +39,12 @@ database:
 secrets:
   fingerprintSecretName: ""
   deliverySecretName: ""
+  providerSecretName: ""
 
 identity:
   namespace: platform-apps
+  resultPort: 9091
+  resultTarget: dns:///identity-service.platform-apps.svc.cluster.local:9091
   podLabels:
     app.kubernetes.io/name: identity-service
   principal: prod.sajtech.internal/ns/platform-apps/sa/identity-service

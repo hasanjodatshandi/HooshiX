@@ -8,7 +8,10 @@ import jakarta.servlet.http.*;
 import java.net.URI;
 import java.util.Map;
 import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -34,41 +37,59 @@ public final class BffExceptionHandler {
           case INVALID_ORIGIN, FETCH_METADATA_REQUIRED, CSRF_INVALID, AUTHORIZATION_DENIED -> 403;
           case RATE_LIMITED -> 429;
           case DEPENDENCY_UNAVAILABLE, RUNTIME_DISABLED -> 503;
-          case TENANT_SELECTION_REQUIRED -> 409;
+          case TENANT_SELECTION_REQUIRED, REGISTRATION_REJECTED -> 409;
           case INVALID_REQUEST -> 400;
         };
-    return problem(status, e.error().name());
+    return problem(status, e.error().name(), request.getRequestURI());
   }
 
   @ExceptionHandler(NoResourceFoundException.class)
-  ResponseEntity<Map<String, Object>> notFound(NoResourceFoundException e) {
-    return problem(404, "NOT_FOUND");
+  ResponseEntity<Map<String, Object>> notFound(
+      NoResourceFoundException e, HttpServletRequest request) {
+    return problem(404, "NOT_FOUND", request.getRequestURI());
   }
 
-  @ExceptionHandler({MethodArgumentNotValidException.class, IllegalArgumentException.class})
-  ResponseEntity<Map<String, Object>> invalid(Exception e) {
-    return problem(400, "INVALID_REQUEST");
+  @ExceptionHandler({
+    MethodArgumentNotValidException.class,
+    MissingRequestHeaderException.class,
+    HttpMessageNotReadableException.class,
+    IllegalArgumentException.class
+  })
+  ResponseEntity<Map<String, Object>> invalid(Exception e, HttpServletRequest request) {
+    return problem(400, "INVALID_REQUEST", request.getRequestURI());
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  ResponseEntity<Map<String, Object>> unsupportedMedia(
+      HttpMediaTypeNotSupportedException e, HttpServletRequest request) {
+    return problem(415, "UNSUPPORTED_MEDIA_TYPE", request.getRequestURI());
   }
 
   @ExceptionHandler(Exception.class)
-  ResponseEntity<Map<String, Object>> unexpected(Exception e) {
-    return problem(500, "INTERNAL_ERROR");
+  ResponseEntity<Map<String, Object>> unexpected(Exception e, HttpServletRequest request) {
+    return problem(500, "INTERNAL_ERROR", request.getRequestURI());
   }
 
-  private static ResponseEntity<Map<String, Object>> problem(int status, String code) {
+  private static ResponseEntity<Map<String, Object>> problem(
+      int status, String code, String instance) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_PROBLEM_JSON);
     headers.setCacheControl(CacheControl.noStore());
     return new ResponseEntity<>(
         Map.of(
             "type",
-            URI.create("about:blank").toString(),
+            URI.create(
+                    "urn:hooshix:problem:"
+                        + code.toLowerCase(java.util.Locale.ROOT).replace('_', '-'))
+                .toString(),
             "title",
             title(status),
             "status",
             status,
             "code",
-            code),
+            code,
+            "instance",
+            instance),
         headers,
         HttpStatusCode.valueOf(status));
   }

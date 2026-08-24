@@ -7,6 +7,7 @@ import com.sajtech.authorization.application.model.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.flywaydb.core.Flyway;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -29,6 +30,7 @@ class AuthorizationPersistenceIntegrationTest {
   private static final Instant NOW = Instant.parse("2026-08-19T12:00:00Z");
   private DSLContext admin, runtime;
   private JooqAuthorizationStore store;
+  private AtomicInteger auditFailures;
 
   @BeforeAll
   static void start() {
@@ -68,7 +70,8 @@ class AuthorizationPersistenceIntegrationTest {
         new DriverManagerDataSource(
             POSTGRES.getJdbcUrl(), "authorization_runtime_test", "runtime_test_password");
     runtime = DSL.using(new TransactionAwareDataSourceProxy(runtimeSource), SQLDialect.POSTGRES);
-    store = new JooqAuthorizationStore(runtime);
+    auditFailures = new AtomicInteger();
+    store = new JooqAuthorizationStore(runtime, auditFailures::incrementAndGet);
     store.projectPermissionCatalog(catalog(), 1, NOW);
   }
 
@@ -140,6 +143,28 @@ class AuthorizationPersistenceIntegrationTest {
         .isInstanceOfSatisfying(
             AuthorizationException.class,
             e -> assertThat(e.error()).isEqualTo(AuthorizationError.REQUEST_ID_CONFLICT));
+  }
+
+  @Test
+  void requiredAuditWriteFailureRollsBackMutationAndEmitsBoundedSignal() {
+    UUID tenant = UUID.randomUUID();
+    admin.execute("REVOKE INSERT ON authorization_audit FROM authorization_runtime_test");
+    assertThatThrownBy(
+            () ->
+                store.provisionOwner(
+                    UUID.randomUUID(),
+                    digest(7),
+                    tenant,
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    NOW))
+        .isInstanceOf(org.jooq.exception.DataAccessException.class);
+    assertThat(auditFailures.get()).isEqualTo(1);
+    Number tenantRows =
+        (Number)
+            admin.fetchValue(
+                "SELECT count(*) FROM authorization_tenant_projection WHERE tenant_id=?", tenant);
+    assertThat(tenantRows.intValue()).isZero();
   }
 
   @Test

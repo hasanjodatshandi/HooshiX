@@ -264,9 +264,10 @@ class IdentityTenantPersistenceIntegrationTest {
         .isZero();
 
     String indexDefinition =
-        dsl.fetchValue(
-                "SELECT indexdef FROM pg_indexes WHERE indexname='identity_authorization_outbox_oldest_unresolved_idx'")
-            .toString();
+        java.util.Objects.requireNonNull(
+            (String)
+                dsl.fetchValue(
+                    "SELECT indexdef FROM pg_indexes WHERE indexname='identity_authorization_outbox_oldest_unresolved_idx'"));
     assertThat(indexDefinition)
         .contains("(created_at, outbox_id)")
         .contains("PENDING")

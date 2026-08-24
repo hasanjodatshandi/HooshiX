@@ -219,7 +219,11 @@ Infrastructure NTP/Chrony health is a platform/node signal, not an application d
 
 Metric labels never contain recipient, raw/pseudonymous request identifiers, codes, provider message IDs, ciphertext, or free-form errors.
 
-## 16. Verification
+## 16. Current repository evidence
+
+The current implemented slice now includes Flyway V4 delivery-runtime state, bounded SKIP LOCKED dispatch claims, durable pre-provider DISPATCHING identity, authenticated AES-GCM delivery-time decryption, retry attempt creation, stale-dispatch recovery, ambiguity-safe provider reconciliation, terminal escrow erasure, durable terminal-result callbacks to Identity, and Day-One delivery worker metrics. Production adapter code is present for Liara authenticated SMTP with STARTTLS required and finite mail timeouts, and for IPPanel Edge Webservice SMS with 500 ms connect / 1500 ms total request timeouts, no automatic HTTP retry, one-recipient exact-content dispatch, accepted-response correlation identifiers, and recipient-level report mapping for statuses 0 through 4. The provider configuration is loaded from a secret-mounted properties file only when the delivery runtime gate is enabled; local logging adapters remain simulated and are never selected as live providers. Current local Gradle unit/integration/architecture/SpotBugs/Spotless verification and pinned provider fixtures pass. Real provider credentials and network egress, SPF/DKIM/DMARC, external provider execution, deployed staging/production delivery, and production readiness remain NOT VERIFIED.
+
+## 17. Verification
 
 Notification changes require applicable tests for:
 

@@ -7,12 +7,15 @@ serviceAccount:
   name: identity-service
 service:
   grpcPort: 9090
+  notificationResultGrpcPort: 9091
   managementPort: 9092
 runtime:
   registrationRuntimeEnabled: false
+  notificationResultRuntimeEnabled: false
   authenticationRuntimeEnabled: false
   tenantRuntimeEnabled: false
   maxConcurrentCallsPerConnection: 128
+  maxGlobalConcurrentCalls: 128
   argon2MaxConcurrentHashes: 0
   compromisedPasswordMaxInFlight: 32
   phoneRegistrationEnabled: false
@@ -78,6 +81,7 @@ authorization:
   target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
 notification:
   namespace: platform-apps
+  principal: prod.sajtech.internal/ns/platform-apps/sa/notification-service
   podLabels:
     app.kubernetes.io/name: notification-service
   port: 9090

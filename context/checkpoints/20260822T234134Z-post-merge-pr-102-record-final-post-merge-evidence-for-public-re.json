@@ -1,0 +1,98 @@
+{
+  "base_commit": "dd909b00c059217e734c43941b932b835ce800bd",
+  "branch": "main",
+  "changed_paths": [
+    "FILE_INDEX.txt",
+    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+    "docs/architecture/dependency-criticality-matrix.md",
+    "docs/architecture/dependency-criticality.yaml",
+    "docs/architecture/implementation-status.md",
+    "docs/architecture/services/web-bff.md",
+    "services/identity-service/src/test/java/com/sajtech/identity/application/registration/usecase/ConfirmRegistrationUseCaseTest.java",
+    "services/web-bff/build.gradle.kts",
+    "services/web-bff/config/spotbugs/exclude.xml",
+    "services/web-bff/contracts/openapi.yaml",
+    "services/web-bff/gradle.lockfile",
+    "services/web-bff/src/main/java/com/sajtech/webbff/application/BffError.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/IdentityGateway.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/IdentityBffClient.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilter.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BffExceptionHandler.java",
+    "services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/RegistrationController.java",
+    "services/web-bff/src/main/resources/application.yaml",
+    "services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityBffRegistrationClientTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/security/BrowserSecurityFilterTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiRegistrationContractTest.java",
+    "services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/RegistrationControllerTest.java"
+  ],
+  "checkpoint_id": "20260822T234134Z-post-merge-pr-102-record-final-post-merge-evidence-for-public-re",
+  "checkpoint_kind": "post-merge",
+  "completed": [
+    "PR #102 merged to main at cd8a7e9cf8241cd0d8cd77fad1b585bd91a6f58c.",
+    "Protected repository, Web BFF, Identity, Notification, Authorization, Compromised Password, and baseline checks passed on the final PR head.",
+    "Public Registration + OpenAPI milestone implementation, documentation, dependency registry, and work checkpoint were merged."
+  ],
+  "decisions": [
+    {
+      "authority_refs": [
+        "AGENTS.md",
+        "docs/adr/0046-adopt-git-native-agent-context-engine-v1.md"
+      ],
+      "summary": "Current Git main remains the source of truth; this checkpoint is historical evidence only."
+    },
+    {
+      "authority_refs": [
+        "docs/adr/0046-adopt-git-native-agent-context-engine-v1.md"
+      ],
+      "summary": "This follow-up is checkpoint-only and does not recursively require another post-merge checkpoint."
+    }
+  ],
+  "next_actions": [
+    "Merge the checkpoint-only follow-up PR after required checks pass; no recursive post-merge checkpoint is required."
+  ],
+  "objective": "Record final post-merge evidence for Public Registration Vertical Slice + OpenAPI after PR #102 merged to main.",
+  "project_id": "hooshix",
+  "pull_request": 102,
+  "recorded_at_utc": "2026-08-22T23:41:34Z",
+  "repository": "hasanjodatshandi/HooshiX",
+  "risks": [
+    "Production edge/runtime and real Liara/IPPanel provider execution remain NOT VERIFIED and outside this milestone."
+  ],
+  "schema_version": 1,
+  "scope": {
+    "bounded_contexts": [
+      "web-bff",
+      "identity-service"
+    ],
+    "review_mode": "full-read",
+    "routes": [
+      "web-bff",
+      "identity-registration",
+      "delivery-governance"
+    ]
+  },
+  "source_checkpoint": "context/checkpoints/20260822T231253Z-finalize-public-registration-vertical-slice-openapi-delivery-lif.json",
+  "subject_commit": "cd8a7e9cf8241cd0d8cd77fad1b585bd91a6f58c",
+  "unfinished": [
+    "Transport this post-merge checkpoint through the focused checkpoint-only follow-up PR."
+  ],
+  "verification": {
+    "failed": [],
+    "not_run": [],
+    "passed": [
+      {
+        "check": "Protected PR #102 CI",
+        "evidence": "Repository structure, Web BFF, Identity, Notification, Authorization, Compromised Password, and Baseline verify all passed."
+      },
+      {
+        "check": "Merge verification",
+        "evidence": "PR #102 is MERGED and origin/main resolved to cd8a7e9cf8241cd0d8cd77fad1b585bd91a6f58c."
+      },
+      {
+        "check": "Local pre-merge repository baseline",
+        "evidence": "make baseline-verify passed with 883 indexed files, 52 ADRs, and 28 dependency edges after the work checkpoint index fix."
+      }
+    ]
+  }
+}

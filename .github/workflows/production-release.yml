@@ -1,0 +1,105 @@
+name: Production release evidence
+on:
+  workflow_dispatch:
+    inputs:
+      release_manifest_path:
+        description: Tracked reviewed production release manifest under deploy/releases/production
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: production-release
+    timeout-minutes: 60
+    steps:
+      - name: Check out protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release metadata
+        id: metadata
+        shell: bash
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest_path }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$RELEASE_MANIFEST" =~ ^deploy/releases/production/[A-Za-z0-9._/-]+\.json$ ]]
+          [[ "$RELEASE_MANIFEST" != *'..'* ]]
+          git ls-files --error-unmatch -- "$RELEASE_MANIFEST" >/dev/null
+          python3 scripts/production/verify_release.py --manifest "$RELEASE_MANIFEST"
+          python3 - "$RELEASE_MANIFEST" "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          manifest=json.load(open(sys.argv[1],encoding='utf-8'))
+          with open(sys.argv[2],'a',encoding='utf-8') as output:
+              print('git_revision='+manifest['git_revision'],file=output)
+              print('cosign_identity='+manifest['cosign']['certificate_identity'],file=output)
+              print('cosign_issuer='+manifest['cosign']['certificate_oidc_issuer'],file=output)
+          PY
+      - name: Install pinned release tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/hooshix-release-bin"
+          echo "$RUNNER_TEMP/hooshix-release-bin" >> "$GITHUB_PATH"
+      - name: Configure protected registry credentials
+        shell: bash
+        env:
+          REGISTRY_DOCKER_CONFIG_JSON: ${{ secrets.PRODUCTION_REGISTRY_DOCKER_CONFIG_JSON }}
+        run: |
+          set -euo pipefail
+          [[ -n "$REGISTRY_DOCKER_CONFIG_JSON" ]]
+          install -d -m 0700 "$RUNNER_TEMP/docker-config"
+          printf '%s' "$REGISTRY_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/docker-config/config.json"
+          chmod 0600 "$RUNNER_TEMP/docker-config/config.json"
+          python3 -m json.tool "$RUNNER_TEMP/docker-config/config.json" >/dev/null
+      - name: Refresh vulnerability database once
+        shell: bash
+        run: |
+          set -euo pipefail
+          grype db update
+          grype db status -o json | python3 -m json.tool >/dev/null
+      - name: Generate SBOM, block High/Critical, sign and attest exact digests
+        shell: bash
+        env:
+          RELEASE_MANIFEST: ${{ inputs.release_manifest_path }}
+          DOCKER_CONFIG: ${{ runner.temp }}/docker-config
+          GIT_REVISION: ${{ steps.metadata.outputs.git_revision }}
+          COSIGN_IDENTITY: ${{ steps.metadata.outputs.cosign_identity }}
+          COSIGN_ISSUER: ${{ steps.metadata.outputs.cosign_issuer }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/release-evidence"
+          while IFS=$'\t' read -r service image; do
+            provenance="$RUNNER_TEMP/provenance-$(printf '%s' "$image" | sha256sum | awk '{print $1}').json"
+            python3 scripts/production/build_provenance.py \
+              --manifest "$RELEASE_MANIFEST" \
+              --image "$image" \
+              --invocation-id "github:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
+              --output "$provenance"
+            SERVICE_NAME="$service" IMAGE_REF="$image" PROVENANCE_FILE="$provenance" EVIDENCE_DIR="$RUNNER_TEMP/release-evidence" \
+              scripts/production/release_supply_chain.sh
+          done < <(python3 - "$RELEASE_MANIFEST" <<'PY'
+          import json,sys
+          manifest=json.load(open(sys.argv[1],encoding='utf-8'))
+          for service in ('authorization-service','compromised-password-service','identity-service','notification-service','web-bff'):
+              print(service+'\t'+manifest['images'][service])
+          PY
+          )
+          cat "$RUNNER_TEMP"/release-evidence/*.receipt
+      - name: Retain immutable release evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-evidence
+          if-no-files-found: error
+          retention-days: 90

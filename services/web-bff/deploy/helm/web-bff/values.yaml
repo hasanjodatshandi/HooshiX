@@ -13,6 +13,8 @@ runtime:
   requireFetchMetadata: true
   publicOrigin: ""
   temporaryStorageLimit: 128Mi
+  identityMaximumConcurrentCalls: 128
+  authorizationMaximumConcurrentCalls: 128
 resources:
   requests:
     cpu: 200m

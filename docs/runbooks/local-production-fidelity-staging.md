@@ -46,6 +46,7 @@ Alertmanager 0.33.1
 ```
 
 Application images are built from the current source with Eclipse Temurin 25.0.4 and pushed to the loopback local registry. Deployments use the exact recorded image digest.
+The staging image state also records exact Git `HEAD`, clean/dirty source state, and a SHA-256 over tracked plus non-ignored untracked worktree files. Build, deploy, and verification fail if that source provenance changes between stages. Dirty development work remains testable, but only a `clean` source state is exact commit evidence. A new all-service build replaces the prior image-state file before the first image build, so a partial build cannot silently reuse stale service digests.
 
 ## Security and data boundaries
 
@@ -59,6 +60,7 @@ Application images are built from the current source with Eclipse Temurin 25.0.4
 - Kyverno uses stable CEL policy APIs and blocks mutable image references and unsafe workload shapes. Its five local `linux/amd64` controller/init images are host-cached, mirrored into the loopback kind registry with digest-preservation checks, and referenced by those reviewed platform-specific manifest digests when the byte-identical vendored installer is rendered.
 - The node Collector exception is restricted to the exact `otel-collector` identity/image/security context and read-only `/var/log/pods`; other host paths are denied.
 - Local PostgreSQL uses distinct migration/runtime roles and databases for Authorization, Identity, and Notification. Runtime roles are non-superuser/non-owner and cross-service `CONNECT` is denied.
+- Staging datastore NetworkPolicy and Istio authorization are applied before datastore workloads. The PostgreSQL bootstrap job denies ingress and permits egress only for DNS and PostgreSQL/HBONE. WAF NetworkPolicy, strict mTLS, and AuthorizationPolicy resources are created before the WAF pod and public route.
 - Local Redis uses `noeviction`, AOF, and `appendfsync everysec`.
 - Staging credentials, TLS/key material, generated image state, and verification logs remain under Git-ignored `.platform-runtime/` or Kubernetes Secrets created from local generated state. They are not production secrets.
 - Compromised Password uses a deterministic `GENERATED_TEST_FIXTURE`, not the production HIBP corpus. The exact generated manifest SHA-256 is bound into the deployed service at runtime and verified against the mounted manifest.
@@ -93,10 +95,10 @@ Info-level `istioctl analyze` diagnostics are reported but are not equivalent to
 The kind control-plane etcd data directory is bind-mounted from the WSL host tmpfs path:
 
 ```text
-/dev/shm/hooshix-kind-etcd -> /var/lib/etcd
+/dev/shm/hooshix-kind/etcd -> /var/lib/etcd
 ```
 
-This is a local WSL integration workaround for the measured host-filesystem fsync behavior. It is intentionally ephemeral and is not a production durability design. The staging verifier checks both the exact Docker mount source and that `/dev/shm` is `tmpfs`.
+The dedicated parent `/dev/shm/hooshix-kind` may become root-owned if Docker restores a kind node after WSL has cleared tmpfs. Repository cleanup therefore mounts only that dedicated parent into the pinned kind node image, deletes only its contents, restores the parent to the invoking numeric UID/GID, and then removes it. It never mounts all of `/dev/shm` writable and does not require broad host elevation. The storage remains intentionally ephemeral and is not a production durability design. The staging verifier checks both the exact Docker mount source and that `/dev/shm` is `tmpfs`.
 
 ## Evidence boundary
 
