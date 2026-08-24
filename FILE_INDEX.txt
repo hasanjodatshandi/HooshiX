@@ -155,6 +155,7 @@ docs/adr/0049-adopt-policy-gated-developer-host-desktop-mcp-v1.md
 docs/adr/0050-add-policy-bound-desktop-credential-broker-v1.md
 docs/adr/0051-separate-windows-mcp-runtime-from-wsl-workspace-v1.md
 docs/adr/0052-versioned-protobuf-contract-package-and-service-decoupling-v1.md
+docs/adr/0053-define-identity-password-policy-v1.md
 docs/adr/decision-register.md
 docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
