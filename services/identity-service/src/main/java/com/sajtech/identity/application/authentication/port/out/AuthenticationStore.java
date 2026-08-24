@@ -33,7 +33,9 @@ public interface AuthenticationStore {
 
   void revokeAllFamilies(UUID userId, RefreshFamilyRevocationReason reason, Instant now);
 
-  void updatePasswordHash(UUID userId, String passwordHash, Instant now);
+  default void updatePasswordHash(UUID userId, String passwordHash, Instant now) {
+    throw new UnsupportedOperationException("Password mutation is not supported by this store");
+  }
 
   int deleteFamiliesBefore(Instant cutoff, int batch);
 }
