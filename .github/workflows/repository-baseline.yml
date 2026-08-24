@@ -27,6 +27,16 @@ jobs:
       - name: Show Python runtime
         run: python3 --version
 
+      - name: Inspect baseline verifier inputs
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          sha256sum scripts/baseline/verify_repository.py
+          python3 - <<'PYEOF'
+          from pathlib import Path
+          print(Path("scripts/baseline/verify_repository.py").read_text(encoding="utf-8").splitlines()[-25:])
+          PYEOF
+
       - name: Verify repository baseline
         run: make baseline-verify
 
