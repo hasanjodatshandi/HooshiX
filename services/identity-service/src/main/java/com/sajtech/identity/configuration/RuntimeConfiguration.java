@@ -33,6 +33,7 @@ import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationRes
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
 import com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService;
+import com.sajtech.identity.interfaces.password.grpc.IdentityPasswordGrpcService;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
 import io.grpc.BindableService;
 import io.grpc.ManagedChannel;
@@ -561,6 +562,18 @@ public class RuntimeConfiguration {
       havingValue = "true")
   IdentityAuthenticationGrpcService authenticationGrpc(ObservedAuthentication observed) {
     return new IdentityAuthenticationGrpcService(observed, observed, observed, observed, observed);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityPasswordGrpcService passwordGrpc(
+      ChangePassword changePassword,
+      RequestPasswordRecovery requestPasswordRecovery,
+      ConfirmPasswordRecovery confirmPasswordRecovery) {
+    return new IdentityPasswordGrpcService(changePassword, requestPasswordRecovery, confirmPasswordRecovery);
   }
 
   @Bean
