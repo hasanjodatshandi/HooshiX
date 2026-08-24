@@ -40,11 +40,17 @@ jobs:
       - name: Verify repository baseline
         run: |
           set -euxo pipefail
+          echo 'running baseline-test'
           make baseline-test
+          echo 'running platform-test'
           make platform-test
+          echo 'running production-verify'
           make production-verify
+          echo 'running context-test'
           make context-test
+          echo 'running context-verify'
           make context-verify
+          echo 'running context-matrix-check'
           make context-matrix-check
           make local-runtime-test
           python3 scripts/baseline/verify_repository.py
