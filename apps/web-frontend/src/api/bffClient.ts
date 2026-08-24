@@ -103,6 +103,16 @@ export async function addContact(body: {type: string; value: string}): Promise<{
   return post<{id:string}>('/api/v1/identity/contacts', body);
 }
 
+export async function changePassword(body: {refreshCredential:string; currentPassword:string; newPassword:string}): Promise<{accepted:boolean}> {
+  return post<{accepted:boolean}>('/api/v1/password/change', body);
+}
+export async function requestPasswordRecovery(contact:string): Promise<{accepted:boolean}> {
+  return post<{accepted:boolean}>('/api/v1/password/recovery/request', {contact});
+}
+export async function confirmPasswordRecovery(body:{contact:string; code:string; newPassword:string}): Promise<{accepted:boolean}> {
+  return post<{accepted:boolean}>('/api/v1/password/recovery/confirm', body);
+}
+
 export const bffClient = {
   login,
   listTenants,
@@ -116,4 +126,7 @@ export const bffClient = {
   verifyContact,
   setPrimaryContact,
   removeContact,
+  changePassword,
+  requestPasswordRecovery,
+  confirmPasswordRecovery,
 };
