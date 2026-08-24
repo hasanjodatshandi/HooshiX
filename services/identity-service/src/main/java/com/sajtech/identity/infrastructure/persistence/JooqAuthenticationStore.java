@@ -294,6 +294,21 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public void updatePasswordHash(UUID userId, String passwordHash, Instant now) {
+    int changed =
+        dsl.execute(
+            """
+            UPDATE identity_credential
+            SET password_hash = ?, updated_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
+            WHERE user_id = ?
+            """,
+            passwordHash,
+            ts(now),
+            userId);
+    if (changed != 1) throw invalidState();
+  }
+
+  @Override
   public int deleteFamiliesBefore(Instant cutoff, int batch) {
     if (batch <= 0 || batch > 256)
       throw new IllegalArgumentException("Session cleanup batch is invalid");

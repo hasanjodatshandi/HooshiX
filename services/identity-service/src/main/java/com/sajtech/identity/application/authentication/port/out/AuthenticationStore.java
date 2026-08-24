@@ -33,5 +33,7 @@ public interface AuthenticationStore {
 
   void revokeAllFamilies(UUID userId, RefreshFamilyRevocationReason reason, Instant now);
 
+  void updatePasswordHash(UUID userId, String passwordHash, Instant now);
+
   int deleteFamiliesBefore(Instant cutoff, int batch);
 }

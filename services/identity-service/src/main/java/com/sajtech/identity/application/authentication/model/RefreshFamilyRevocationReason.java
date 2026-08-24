@@ -6,5 +6,6 @@ public enum RefreshFamilyRevocationReason {
   LOGOUT_ALL,
   REFRESH_REUSE,
   EXPIRED,
-  USER_INACTIVE
+  USER_INACTIVE,
+  PASSWORD_CHANGED
 }
