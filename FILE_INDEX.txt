@@ -66,6 +66,7 @@ apps/web-frontend/src/state/appState.tsx
 apps/web-frontend/src/state/flow.ts
 apps/web-frontend/src/state/storage.ts
 apps/web-frontend/src/state/validation.ts
+apps/web-frontend/src/validation/userInput.ts
 apps/web-frontend/tsconfig.json
 apps/web-frontend/vite.config.ts
 context/bootstrap.json
@@ -580,9 +581,14 @@ services/identity-service/src/main/java/com/sajtech/identity/application/passwor
 services/identity-service/src/main/java/com/sajtech/identity/application/password/usecase/ChangePasswordUseCase.java
 services/identity-service/src/main/java/com/sajtech/identity/application/password/usecase/ConfirmPasswordRecoveryUseCase.java
 services/identity-service/src/main/java/com/sajtech/identity/application/password/usecase/RequestPasswordRecoveryUseCase.java
-services/identity-service/src/main/java/com/sajtech/identity/application/profile/model/ProfileUpdateCommand.java
+services/identity-service/src/main/java/com/sajtech/identity/application/profile/ProfileError.java
+services/identity-service/src/main/java/com/sajtech/identity/application/profile/ProfileException.java
+services/identity-service/src/main/java/com/sajtech/identity/application/profile/model/LockedContactChallenge.java
+services/identity-service/src/main/java/com/sajtech/identity/application/profile/model/PreparedContactChallenge.java
+services/identity-service/src/main/java/com/sajtech/identity/application/profile/model/ProfileCommandRecord.java
 services/identity-service/src/main/java/com/sajtech/identity/application/profile/port/in/ProfileManagement.java
 services/identity-service/src/main/java/com/sajtech/identity/application/profile/port/out/ProfileContactStore.java
+services/identity-service/src/main/java/com/sajtech/identity/application/profile/service/ProfileFingerprintEncoder.java
 services/identity-service/src/main/java/com/sajtech/identity/application/profile/usecase/ProfileManagementUseCase.java
 services/identity-service/src/main/java/com/sajtech/identity/application/registration/RegistrationError.java
 services/identity-service/src/main/java/com/sajtech/identity/application/registration/RegistrationException.java
@@ -656,6 +662,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/obse
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedPasswordHash.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedPasswordLifecycle.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedPasswordVerification.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedProfileManagement.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedRegistration.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedSemanticQuota.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedTenantLifecycle.java
@@ -677,6 +684,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/quot
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/quota/RedisSemanticQuota.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/runtime/grpc/GrpcServerLifecycle.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/security/challenge/HmacChallengeSecret.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/security/challenge/HmacContactVerificationSecret.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/security/challenge/HmacPasswordRecoverySecret.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/security/escrow/AesGcmNotificationEscrow.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/security/fingerprint/HmacIntentFingerprint.java
@@ -708,11 +716,13 @@ services/identity-service/src/main/resources/db/migration/V5__enforce_identity_t
 services/identity-service/src/main/resources/db/migration/V6__track_notification_delivery_results.sql
 services/identity-service/src/main/resources/db/migration/V7__create_identity_password_recovery_schema.sql
 services/identity-service/src/main/resources/db/migration/V8__complete_identity_password_lifecycle.sql
+services/identity-service/src/main/resources/db/migration/V9__secure_profile_contact_lifecycle.sql
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/AuthenticateLocalUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/IssueAudienceAccessTokenUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/LogoutCurrentUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/RefreshSessionUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/password/usecase/PasswordLifecycleUseCaseTest.java
+services/identity-service/src/test/java/com/sajtech/identity/application/profile/usecase/ProfileManagementUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/registration/service/ContactCanonicalizerTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/registration/usecase/ConfirmRegistrationUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/registration/usecase/RegisterLocalUseCaseTest.java
@@ -871,6 +881,7 @@ services/notification-service/src/main/resources/db/migration/V1__create_notific
 services/notification-service/src/main/resources/db/migration/V2__seed_registration_verification_templates.sql
 services/notification-service/src/main/resources/db/migration/V3__enforce_notification_template_and_deadline_integrity.sql
 services/notification-service/src/main/resources/db/migration/V4__complete_delivery_runtime.sql
+services/notification-service/src/main/resources/db/migration/V5__add_contact_verification_templates.sql
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/service/ProviderAttemptPlannerTest.java
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/usecase/RunDeliveryBatchServiceTest.java
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/usecase/RunReconciliationBatchServiceTest.java
@@ -951,8 +962,11 @@ services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityProfil
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityTenantController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/PasswordController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/RegistrationController.java
+services/web-bff/src/main/java/com/sajtech/webbff/interfaces/validation/UnicodeCodePointSize.java
+services/web-bff/src/main/java/com/sajtech/webbff/interfaces/validation/UnicodeCodePointSizeValidator.java
 services/web-bff/src/main/resources/application.yaml
 services/web-bff/src/test/java/com/sajtech/webbff/architecture/ArchitectureRulesTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/configuration/StrictJsonConfigurationTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/configuration/WebBffApplicationPropertiesTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityBffRegistrationClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptorTest.java
@@ -967,3 +981,4 @@ services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserRespons
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiRegistrationContractTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/PasswordControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/RegistrationControllerTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/interfaces/validation/UnicodeCodePointSizeValidatorTest.java

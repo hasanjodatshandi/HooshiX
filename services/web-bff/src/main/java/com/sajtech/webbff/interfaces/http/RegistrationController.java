@@ -2,8 +2,10 @@ package com.sajtech.webbff.interfaces.http;
 
 import com.sajtech.webbff.application.port.out.IdentityGateway;
 import com.sajtech.webbff.application.port.out.TrustedClientAddressPort;
+import com.sajtech.webbff.interfaces.validation.UnicodeCodePointSize;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
@@ -73,11 +75,11 @@ public final class RegistrationController {
   public record Register(
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
       @NotBlank @Size(max = 254) String contact,
-      @NotBlank @Size(max = 4096) String password,
+      @NotNull @UnicodeCodePointSize(min = 12, max = 128) String password,
       @NotBlank @Pattern(regexp = "fa|en") String locale,
-      @NotBlank @Size(max = 120) String firstName,
-      @NotBlank @Size(max = 120) String lastName,
-      @Size(max = 120) String fatherName) {}
+      @NotBlank @UnicodeCodePointSize(max = 120) String firstName,
+      @NotBlank @UnicodeCodePointSize(max = 120) String lastName,
+      @UnicodeCodePointSize(max = 120) String fatherName) {}
 
   public record Resend(
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,

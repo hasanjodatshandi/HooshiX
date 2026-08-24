@@ -53,6 +53,19 @@ class BrowserSecurityFilterTest {
   }
 
   @Test
+  void crossOriginRequestIsRejectedWithoutReadingItsBody() throws Exception {
+    var request = post("/api/v1/auth/session/bootstrap");
+    request.addHeader("Origin", "https://evil.example");
+    request.addHeader("Sec-Fetch-Site", "cross-site");
+    request.setContent("x".repeat(32 * 1024).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    var response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, mock(FilterChain.class));
+
+    assertThat(response.getStatus()).isEqualTo(403);
+  }
+
+  @Test
   void missingFetchMetadataFailsClosedOnUnsafeBrowserSurface() throws Exception {
     var request = post("/api/v1/auth/session/bootstrap");
     request.addHeader("Origin", "https://app.example.com");
@@ -80,6 +93,19 @@ class BrowserSecurityFilterTest {
   }
 
   @Test
+  void emptyBootstrapBodyDoesNotRequireAJsonContentType() throws Exception {
+    var request = new MockHttpServletRequest("POST", "/api/v1/auth/session/bootstrap");
+    request.addHeader("Origin", "https://app.example.com");
+    request.addHeader("Sec-Fetch-Site", "same-origin");
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    verify(chain).doFilter(any(), same(response));
+  }
+
+  @Test
   void anonymousPasswordRecoveryRequiresOriginButNoBrowserSession() throws Exception {
     var request = post("/api/v1/password/recovery/request");
     request.addHeader("Origin", "https://app.example.com");
@@ -92,6 +118,27 @@ class BrowserSecurityFilterTest {
     assertThat(response.getStatus()).isEqualTo(200);
     verify(chain).doFilter(any(), same(response));
     verifyNoInteractions(sessions);
+  }
+
+  @Test
+  void unsafeBodyRequiresJsonAndHasAUniformTightLimit() throws Exception {
+    var wrongType = post("/api/v1/identity/registration");
+    wrongType.addHeader("Origin", "https://app.example.com");
+    wrongType.addHeader("Sec-Fetch-Site", "same-origin");
+    wrongType.setContentType("text/plain");
+    var wrongTypeResponse = new MockHttpServletResponse();
+    filter.doFilter(wrongType, wrongTypeResponse, mock(FilterChain.class));
+    assertThat(wrongTypeResponse.getStatus()).isEqualTo(415);
+    assertThat(wrongTypeResponse.getContentAsString()).contains("JSON_REQUIRED");
+
+    var oversized = post("/api/v1/identity/registration");
+    oversized.addHeader("Origin", "https://app.example.com");
+    oversized.addHeader("Sec-Fetch-Site", "same-origin");
+    oversized.setContent(
+        "x".repeat(16 * 1024 + 1).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    var oversizedResponse = new MockHttpServletResponse();
+    filter.doFilter(oversized, oversizedResponse, mock(FilterChain.class));
+    assertThat(oversizedResponse.getStatus()).isEqualTo(413);
   }
 
   @Test

@@ -74,8 +74,8 @@ public final class NotificationGrpcService
 
   private static UUID parseCanonicalUuid(String value) {
     UUID uuid = UUID.fromString(value);
-    if (!uuid.toString().equals(value)) {
-      throw new IllegalArgumentException("request_id must be canonical lowercase UUID");
+    if (!uuid.toString().equals(value) || uuid.version() != 4) {
+      throw new IllegalArgumentException("request_id must be canonical lowercase UUIDv4");
     }
     return uuid;
   }
@@ -105,6 +105,11 @@ public final class NotificationGrpcService
               NotificationSemanticType.MFA_VERIFICATION_CODE,
               request.getMfaVerificationCode().getCode(),
               request.getMfaVerificationCode().getExpiresMinutes());
+      case CONTACT_VERIFICATION_CODE ->
+          verification(
+              NotificationSemanticType.CONTACT_VERIFICATION_CODE,
+              request.getContactVerificationCode().getCode(),
+              request.getContactVerificationCode().getExpiresMinutes());
       case PASSWORD_CHANGED_NOTICE -> new PasswordChangedNoticeContent();
       default -> throw new IllegalArgumentException("Notification semantic content is required");
     };

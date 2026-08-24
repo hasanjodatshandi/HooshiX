@@ -1,5 +1,6 @@
 package com.sajtech.identity.application.registration.usecase;
 
+import com.sajtech.identity.application.password.model.PasswordPolicy;
 import com.sajtech.identity.application.registration.RegistrationError;
 import com.sajtech.identity.application.registration.RegistrationException;
 import com.sajtech.identity.application.registration.model.*;
@@ -77,6 +78,12 @@ public final class RegisterLocalUseCase implements RegisterLocal {
     RegistrationProfile profile =
         profiles.canonicalize(command.firstName(), command.lastName(), command.fatherName());
     String password = passwords.normalize(command.password());
+    try {
+      PasswordPolicy.validate(password);
+    } catch (IllegalArgumentException exception) {
+      throw new RegistrationException(
+          RegistrationError.INVALID_ARGUMENT, "Password input is invalid");
+    }
     byte[] material = fingerprintEncoder.register(contact, password, command.locale(), profile);
     try {
       Optional<CommandDedupRecord> replay = store.findDedup(command.requestId());

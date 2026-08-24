@@ -1,6 +1,6 @@
 package com.sajtech.identity.application.registration.usecase;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 import com.sajtech.identity.application.registration.model.CommandDedupRecord;
 import com.sajtech.identity.application.registration.model.DecryptedHandoff;
@@ -73,6 +73,29 @@ class RegisterLocalUseCaseTest {
     assertThat(store.inserted).isNotNull();
     assertThat(store.inserted.challengeId()).isNotEqualTo(oldChallenge);
     assertThat(store.dedupClaimedBeforeInsert).isTrue();
+  }
+
+  @Test
+  void passwordLengthPolicyIsEnforcedBeforeQuotaOrPersistenceWork() {
+    TrackingTransactions tx = new TrackingTransactions();
+    FakeStore store = new FakeStore();
+    RegisterLocalCommand valid = command("750e8400-e29b-41d4-a716-446655440000");
+    RegisterLocalCommand weak =
+        new RegisterLocalCommand(
+            valid.requestId(),
+            valid.channel(),
+            valid.contact(),
+            "short",
+            valid.locale(),
+            valid.firstName(),
+            valid.lastName(),
+            valid.fatherName(),
+            valid.clientAddress());
+
+    assertThatThrownBy(() -> useCase(tx, store).register(weak))
+        .isInstanceOf(RuntimeException.class);
+    assertThat(tx.calls).isZero();
+    assertThat(store.inserted).isNull();
   }
 
   private static RegisterLocalUseCase useCase(TrackingTransactions tx, FakeStore store) {

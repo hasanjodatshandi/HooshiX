@@ -37,15 +37,20 @@ public interface IdentityGateway {
 
   Profile profile(String refresh);
 
+  boolean updateProfile(
+      UUID requestId, String refresh, String firstName, String lastName, String fatherName);
+
   List<Contact> contacts(String refresh);
 
-  UUID addContact(String refresh, String type, String value);
+  UUID addContact(UUID requestId, String refresh, String type, String value, String locale);
 
-  boolean verifyContact(String refresh, UUID contactId, String code);
+  boolean resendContactVerification(UUID requestId, String refresh, UUID contactId);
 
-  boolean setPrimaryContact(String refresh, UUID contactId);
+  boolean verifyContact(UUID requestId, String refresh, UUID contactId, String code);
 
-  boolean removeContact(String refresh, UUID contactId);
+  boolean setPrimaryContact(UUID requestId, String refresh, UUID contactId);
+
+  boolean removeContact(UUID requestId, String refresh, UUID contactId);
 
   String issueAudienceToken(UUID requestId, String refresh, String audience);
 

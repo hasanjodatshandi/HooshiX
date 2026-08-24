@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
@@ -158,11 +159,10 @@ class AuthorizationRlsIntegrationTest {
               DSLContext tx = DSL.using(c);
               tx.fetchValue(
                   "SELECT set_config('app.current_tenant_id', ?, true)", tenantA.toString());
-              return ((Number)
-                      tx.fetchValue(
-                          "SELECT count(*) FROM authorization_tenant_projection WHERE tenant_id=?",
-                          tenantB))
-                  .intValue();
+              return requiredInt(
+                  tx,
+                  "SELECT count(*) FROM authorization_tenant_projection WHERE tenant_id=?",
+                  tenantB);
             });
     assertThat(visible).isZero();
   }
@@ -190,14 +190,11 @@ class AuthorizationRlsIntegrationTest {
               DSLContext tx = DSL.using(c);
               JooqAuthorizationStore.configureCheckPermissionTransaction(tx, tenantA);
               assertThat(tx.fetchValue("SHOW statement_timeout")).isEqualTo("100ms");
-              assertThat(
-                      ((Number) tx.fetchValue("SELECT count(*) FROM authorization_role"))
-                          .intValue())
-                  .isEqualTo(3);
-              return ((Number) tx.fetchValue("SELECT pg_backend_pid()")).intValue();
+              assertThat(requiredInt(tx, "SELECT count(*) FROM authorization_role")).isEqualTo(3);
+              return requiredInt(tx, "SELECT pg_backend_pid()");
             });
     assertThat(rawRoleCount()).isZero();
-    assertThat(((Number) runtime.fetchValue("SELECT pg_backend_pid()")).intValue()).isEqualTo(pid);
+    assertThat(requiredInt(runtime, "SELECT pg_backend_pid()")).isEqualTo(pid);
     assertThatThrownBy(
             () ->
                 runtime.transaction(
@@ -206,20 +203,24 @@ class AuthorizationRlsIntegrationTest {
                       tx.fetchValue(
                           "SELECT set_config('app.current_tenant_id', ?, true)",
                           tenantB.toString());
-                      assertThat(
-                              ((Number) tx.fetchValue("SELECT count(*) FROM authorization_role"))
-                                  .intValue())
+                      assertThat(requiredInt(tx, "SELECT count(*) FROM authorization_role"))
                           .isEqualTo(3);
                       throw new RollbackMarker();
                     }))
         .isInstanceOf(RollbackMarker.class);
     assertThat(rawRoleCount()).isZero();
-    assertThat(((Number) runtime.fetchValue("SELECT pg_backend_pid()")).intValue()).isEqualTo(pid);
+    assertThat(requiredInt(runtime, "SELECT pg_backend_pid()")).isEqualTo(pid);
   }
 
   private int rawRoleCount() {
-    Number n = (Number) runtime.fetchValue("SELECT count(*) FROM authorization_role");
-    return n.intValue();
+    return requiredInt(runtime, "SELECT count(*) FROM authorization_role");
+  }
+
+  private static int requiredInt(DSLContext context, String query, Object... bindings) {
+    Number value =
+        Objects.requireNonNull(
+            (Number) context.fetchValue(query, bindings), "Expected query to return one number");
+    return value.intValue();
   }
 
   private static FingerprintDigest digest(int seed) {

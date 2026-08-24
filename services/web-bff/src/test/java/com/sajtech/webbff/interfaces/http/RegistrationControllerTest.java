@@ -24,7 +24,7 @@ class RegistrationControllerTest {
             any(),
             eq("EMAIL"),
             eq("person@example.com"),
-            eq("password"),
+            eq("Strong password"),
             eq("en"),
             eq("First"),
             eq("Last"),
@@ -48,7 +48,7 @@ class RegistrationControllerTest {
                 .header("X-HooshiX-Client-IP", "192.0.2.44")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"channel\":\"EMAIL\",\"contact\":\"person@example.com\",\"password\":\"password\",\"locale\":\"en\",\"firstName\":\"First\",\"lastName\":\"Last\"}"))
+                    "{\"channel\":\"EMAIL\",\"contact\":\"person@example.com\",\"password\":\"Strong password\",\"locale\":\"en\",\"firstName\":\"First\",\"lastName\":\"Last\"}"))
         .andExpect(status().isAccepted())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.accepted").value(true));

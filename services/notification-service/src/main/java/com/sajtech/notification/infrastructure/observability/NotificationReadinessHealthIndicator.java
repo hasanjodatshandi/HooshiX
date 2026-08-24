@@ -41,6 +41,11 @@ public final class NotificationReadinessHealthIndicator implements HealthIndicat
               .isEmpty()) {
             return Health.down().withDetail("category", "TEMPLATE_NOT_ACTIVE").build();
           }
+          if (templates
+              .findActive(channel, NotificationSemanticType.CONTACT_VERIFICATION_CODE, locale)
+              .isEmpty()) {
+            return Health.down().withDetail("category", "TEMPLATE_NOT_ACTIVE").build();
+          }
         }
       }
       return Health.up().build();

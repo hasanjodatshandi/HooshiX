@@ -24,6 +24,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
+    if (response.status === 401) csrfToken = null;
     const problem = await response.json().catch(() => null);
     if (problem?.code) throw new BffProblemError(problem);
     throw new Error('bff request failed');
@@ -46,7 +47,7 @@ export async function bootstrapSession(): Promise<SessionResponse> {
 }
 
 export async function login(body: { contact: string; password: string }): Promise<SessionResponse> {
-  await bootstrapSession();
+  if (!csrfToken) await bootstrapSession();
   return fetch('/api/v1/auth/local', {
     method: 'POST',
     credentials: 'same-origin',
@@ -58,7 +59,10 @@ export async function login(body: { contact: string; password: string }): Promis
     },
     body: JSON.stringify({ channel: 'EMAIL', ...body }),
   }).then(async (r) => {
-    if (!r.ok) throw new Error('login failed');
+    if (!r.ok) {
+      if (r.status === 401) csrfToken = null;
+      throw new Error('login failed');
+    }
     return rememberCsrf(await r.json() as SessionResponse);
   });
 }
@@ -96,8 +100,27 @@ export async function getContacts(): Promise<Contact[]> {
   return r.json();
 }
 
+export async function updateProfile(body: {firstName: string; lastName: string; fatherName?: string}): Promise<{accepted:boolean}> {
+  const response = await fetch('/api/v1/identity/profile', {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: {
+      'content-type': 'application/json',
+      'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error('profile update failed');
+  return response.json();
+}
+
 export async function verifyContact(id: string, code: string): Promise<{verified:boolean}> {
   return post<{verified:boolean}>(`/api/v1/identity/contacts/${id}/verify`, { code });
+}
+
+export async function resendContactVerification(id: string): Promise<{accepted:boolean}> {
+  return post<{accepted:boolean}>(`/api/v1/identity/contacts/${id}/resend`, {});
 }
 
 export async function setPrimaryContact(id: string): Promise<{accepted:boolean}> {
@@ -105,12 +128,19 @@ export async function setPrimaryContact(id: string): Promise<{accepted:boolean}>
 }
 
 export async function removeContact(id: string): Promise<{accepted:boolean}> {
-  const r = await fetch(`/api/v1/identity/contacts/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+  const r = await fetch(`/api/v1/identity/contacts/${id}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers: {
+      'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+    },
+  });
   if (!r.ok) throw new Error('remove contact failed');
   return r.json();
 }
 
-export async function addContact(body: {type: string; value: string}): Promise<{id:string}> {
+export async function addContact(body: {type: string; value: string; locale: string}): Promise<{id:string}> {
   return post<{id:string}>('/api/v1/identity/contacts', body);
 }
 
@@ -136,8 +166,10 @@ export const bffClient = {
   resend: (body: ResendRequest) => post<AcceptedResponse>('/api/v1/identity/registration/resend', body),
   confirm: (body: ConfirmRequest) => post<ConfirmedResponse>('/api/v1/identity/registration/confirm', body),
   getProfile,
+  updateProfile,
   getContacts,
   addContact,
+  resendContactVerification,
   verifyContact,
   setPrimaryContact,
   removeContact,

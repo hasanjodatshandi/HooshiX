@@ -39,6 +39,7 @@ public final class GrpcNotificationSubmissionClient implements NotificationSubmi
     switch (record.contentType()) {
       case REGISTRATION_VERIFICATION -> request.setRegistrationVerificationCode(content);
       case PASSWORD_RECOVERY -> request.setPasswordRecoveryCode(content);
+      case CONTACT_VERIFICATION -> request.setContactVerificationCode(content);
     }
     SubmitNotificationResponse response =
         NotificationServiceGrpc.newBlockingStub(channel)

@@ -22,6 +22,7 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
           "/api/v1/identity/registration/confirm",
           "/api/v1/password/recovery/request",
           "/api/v1/password/recovery/confirm");
+  private static final int MAX_JSON_BODY_BYTES = 16 * 1024;
   private final WebBffProperties properties;
   private final RedisBffSessionRepository sessions;
 
@@ -43,26 +44,7 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
       problem(response, request, 503, "RUNTIME_DISABLED");
       return;
     }
-    int max = request.getRequestURI().startsWith("/api/v1/auth/") ? 64 * 1024 : 256 * 1024;
-    String ct = request.getContentType();
-    if (ct != null && ct.toLowerCase(Locale.ROOT).startsWith("multipart/")) {
-      problem(response, request, 415, "MULTIPART_NOT_SUPPORTED");
-      return;
-    }
-    long len = request.getContentLengthLong();
-    if (len > max) {
-      problem(response, request, 413, "PAYLOAD_TOO_LARGE");
-      return;
-    }
     HttpServletRequest effective = request;
-    if (hasBody(request.getMethod())) {
-      byte[] body = readBounded(request, max);
-      if (body == null) {
-        problem(response, request, 413, "PAYLOAD_TOO_LARGE");
-        return;
-      }
-      effective = new CachedRequest(request, body);
-    }
     boolean unsafe = unsafe(request.getMethod());
     if (unsafe && !origin().equals(request.getHeader("Origin"))) {
       problem(response, request, 403, "INVALID_ORIGIN");
@@ -102,7 +84,35 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
       problem(response, request, 401, "SESSION_REQUIRED");
       return;
     }
+    if (hasBody(request.getMethod())) {
+      long len = request.getContentLengthLong();
+      if (len > MAX_JSON_BODY_BYTES) {
+        problem(response, request, 413, "PAYLOAD_TOO_LARGE");
+        return;
+      }
+      if (len > 0 && !isJson(request.getContentType())) {
+        problem(response, request, 415, "JSON_REQUIRED");
+        return;
+      }
+      byte[] body = readBounded(request, MAX_JSON_BODY_BYTES);
+      if (body == null) {
+        problem(response, request, 413, "PAYLOAD_TOO_LARGE");
+        return;
+      }
+      if (body.length > 0 && !isJson(request.getContentType())) {
+        problem(response, request, 415, "JSON_REQUIRED");
+        return;
+      }
+      effective = new CachedRequest(request, body);
+      if (session != null) effective.setAttribute(SESSION_ATTRIBUTE, session);
+    }
     chain.doFilter(effective, response);
+  }
+
+  private static boolean isJson(String contentType) {
+    if (contentType == null) return false;
+    String mediaType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+    return "application/json".equals(mediaType) || mediaType.endsWith("+json");
   }
 
   private static byte[] readBounded(HttpServletRequest r, int max) throws IOException {

@@ -37,4 +37,27 @@ class HmacChallengeSecretTest {
     assertThat(secrets.matches(id, "00000000", generated.verifier(), generated.keyId()))
         .isEqualTo("00000000".equals(generated.code()));
   }
+
+  @Test
+  void contactAndRegistrationProofNamespacesCannotVerifyEachOther() throws Exception {
+    Path ring = temp.resolve("purpose.properties");
+    byte[] key = new byte[32];
+    Arrays.fill(key, (byte) 7);
+    Files.writeString(
+        ring, "active_key_id=v1\nkey.v1=" + Base64.getEncoder().encodeToString(key) + "\n");
+    FileBackedKeyRing keys =
+        new FileBackedKeyRing(ring, "HmacSHA256", 32, Clock.systemUTC(), Duration.ofHours(1));
+    HmacChallengeSecret registration = new HmacChallengeSecret(keys);
+    HmacContactVerificationSecret contact = new HmacContactVerificationSecret(keys);
+    UUID challengeId = UUID.randomUUID();
+    var registrationProof = registration.generate(challengeId);
+
+    assertThat(
+            contact.matches(
+                challengeId,
+                registrationProof.code(),
+                registrationProof.verifier(),
+                registrationProof.keyId()))
+        .isFalse();
+  }
 }

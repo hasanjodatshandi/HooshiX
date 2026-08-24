@@ -134,7 +134,7 @@ public final class BrowserAuthController {
   public record LocalLoginRequest(
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
       @NotBlank @Size(max = 254) String contact,
-      @NotBlank @Size(max = 1024) String password) {}
+      @NotNull @Size(min = 1, max = 4096) String password) {}
 
   public record SessionResponse(String csrfToken, String mode) {}
 }

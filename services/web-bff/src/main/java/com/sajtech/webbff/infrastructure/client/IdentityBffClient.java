@@ -10,6 +10,7 @@ import io.grpc.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public final class IdentityBffClient implements IdentityGateway {
   private final ManagedChannel channel;
@@ -385,70 +386,127 @@ public final class IdentityBffClient implements IdentityGateway {
   }
 
   public Profile profile(String refresh) {
-    var r =
-        profileStub()
-            .getProfile(GetProfileRequest.newBuilder().setRefreshCredential(refresh).build());
-    return new Profile(
-        uuid(r.getProfileId()), r.getFirstName(), r.getLastName(), r.getFatherName());
+    return profileCall(
+        () -> {
+          var r =
+              profileStub()
+                  .getProfile(GetProfileRequest.newBuilder().setRefreshCredential(refresh).build());
+          return new Profile(
+              uuid(r.getProfileId()), r.getFirstName(), r.getLastName(), r.getFatherName());
+        });
   }
 
   public List<Contact> contacts(String refresh) {
-    return profileStub()
-        .listContacts(ListContactsRequest.newBuilder().setRefreshCredential(refresh).build())
-        .getContactsList()
-        .stream()
-        .map(
-            c ->
-                new Contact(
-                    uuid(c.getContactId()),
-                    c.getType(),
-                    c.getValue(),
-                    c.getVerified(),
-                    c.getPrimary()))
-        .toList();
+    return profileCall(
+        () ->
+            profileStub()
+                .listContacts(
+                    ListContactsRequest.newBuilder().setRefreshCredential(refresh).build())
+                .getContactsList()
+                .stream()
+                .map(
+                    c ->
+                        new Contact(
+                            uuid(c.getContactId()),
+                            c.getType(),
+                            c.getValue(),
+                            c.getVerified(),
+                            c.getPrimary()))
+                .toList());
   }
 
-  public UUID addContact(String refresh, String type, String value) {
-    return uuid(
-        profileStub()
-            .addContact(
-                AddContactRequest.newBuilder()
-                    .setRefreshCredential(refresh)
-                    .setType(type)
-                    .setValue(value)
-                    .build())
-            .getContactId());
+  @Override
+  public boolean updateProfile(
+      UUID requestId, String refresh, String firstName, String lastName, String fatherName) {
+    return profileCall(
+        () ->
+            profileStub()
+                .updateProfile(
+                    UpdateProfileRequest.newBuilder()
+                        .setRefreshCredential(refresh)
+                        .setRequestId(requestId.toString())
+                        .setFirstName(firstName)
+                        .setLastName(lastName)
+                        .setFatherName(fatherName == null ? "" : fatherName)
+                        .build())
+                .getUpdated());
   }
 
-  public boolean verifyContact(String refresh, UUID id, String code) {
-    return profileStub()
-        .verifyContact(
-            VerifyContactRequest.newBuilder()
-                .setRefreshCredential(refresh)
-                .setContactId(id.toString())
-                .setCode(code)
-                .build())
-        .getVerified();
+  public UUID addContact(UUID requestId, String refresh, String type, String value, String locale) {
+    return profileCall(
+        () ->
+            uuid(
+                profileStub()
+                    .addContact(
+                        AddContactRequest.newBuilder()
+                            .setRefreshCredential(refresh)
+                            .setType(type)
+                            .setValue(value)
+                            .setRequestId(requestId.toString())
+                            .setLocale(locale)
+                            .build())
+                    .getContactId()));
   }
 
-  public boolean setPrimaryContact(String refresh, UUID id) {
-    return profileStub()
-        .setPrimaryContact(
-            SetPrimaryContactRequest.newBuilder()
-                .setRefreshCredential(refresh)
-                .setContactId(id.toString())
-                .build())
-        .getAccepted();
+  public boolean resendContactVerification(UUID requestId, String refresh, UUID id) {
+    return profileCall(
+        () ->
+            profileStub()
+                .resendContactVerification(
+                    ResendContactVerificationRequest.newBuilder()
+                        .setRefreshCredential(refresh)
+                        .setContactId(id.toString())
+                        .setRequestId(requestId.toString())
+                        .build())
+                .getAccepted());
   }
 
-  public boolean removeContact(String refresh, UUID id) {
-    return profileStub()
-        .removeContact(
-            RemoveContactRequest.newBuilder()
-                .setRefreshCredential(refresh)
-                .setContactId(id.toString())
-                .build())
-        .getAccepted();
+  public boolean verifyContact(UUID requestId, String refresh, UUID id, String code) {
+    return profileCall(
+        () ->
+            profileStub()
+                .verifyContact(
+                    VerifyContactRequest.newBuilder()
+                        .setRefreshCredential(refresh)
+                        .setContactId(id.toString())
+                        .setCode(code)
+                        .setRequestId(requestId.toString())
+                        .build())
+                .getVerified());
+  }
+
+  public boolean setPrimaryContact(UUID requestId, String refresh, UUID id) {
+    return profileCall(
+        () ->
+            profileStub()
+                .setPrimaryContact(
+                    SetPrimaryContactRequest.newBuilder()
+                        .setRefreshCredential(refresh)
+                        .setContactId(id.toString())
+                        .setRequestId(requestId.toString())
+                        .build())
+                .getAccepted());
+  }
+
+  public boolean removeContact(UUID requestId, String refresh, UUID id) {
+    return profileCall(
+        () ->
+            profileStub()
+                .removeContact(
+                    RemoveContactRequest.newBuilder()
+                        .setRefreshCredential(refresh)
+                        .setContactId(id.toString())
+                        .setRequestId(requestId.toString())
+                        .build())
+                .getAccepted());
+  }
+
+  private static <T> T profileCall(Supplier<T> call) {
+    try {
+      return call.get();
+    } catch (StatusRuntimeException exception) {
+      throw map(exception);
+    }
   }
 
   private IdentityAuthenticationServiceGrpc.IdentityAuthenticationServiceBlockingStub tokenStub() {
@@ -524,7 +582,11 @@ public final class IdentityBffClient implements IdentityGateway {
 
   private static UUID uuid(String v) {
     try {
-      return UUID.fromString(v);
+      UUID result = UUID.fromString(v);
+      if (result.version() != 4 || !result.toString().equals(v)) {
+        throw new IllegalArgumentException("UUID is not canonical UUIDv4");
+      }
+      return result;
     } catch (IllegalArgumentException e) {
       throw new BffException(BffError.DEPENDENCY_UNAVAILABLE, "Identity returned invalid UUID", e);
     }

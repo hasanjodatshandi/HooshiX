@@ -1,6 +1,14 @@
 spring:
   application:
     name: web-bff
+  jackson:
+    deserialization:
+      fail-on-trailing-tokens: true
+      fail-on-unknown-properties: true
+    mapper:
+      allow-coercion-of-scalars: false
+    read:
+      strict-duplicate-detection: true
   main:
     banner-mode: "off"
   threads:
