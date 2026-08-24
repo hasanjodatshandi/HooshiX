@@ -19,6 +19,16 @@ public final class RefreshCredentialLookup {
 
   public Optional<LockedRefreshCredential> lock(
       AuthenticationStore store, String encodedCredential) {
+    return lookup(store, encodedCredential, true);
+  }
+
+  public Optional<LockedRefreshCredential> find(
+      AuthenticationStore store, String encodedCredential) {
+    return lookup(store, encodedCredential, false);
+  }
+
+  private Optional<LockedRefreshCredential> lookup(
+      AuthenticationStore store, String encodedCredential, boolean lock) {
     List<RefreshDigest> candidates;
     try {
       candidates = credentials.digestCandidates(encodedCredential);
@@ -30,7 +40,8 @@ public final class RefreshCredentialLookup {
           AuthenticationError.SESSION_STATE_INVALID, "Refresh verification key set is invalid");
     }
     for (RefreshDigest candidate : candidates) {
-      Optional<LockedRefreshCredential> found = store.lockRefreshCredential(candidate);
+      Optional<LockedRefreshCredential> found =
+          lock ? store.lockRefreshCredential(candidate) : store.findRefreshCredential(candidate);
       if (found.isPresent()) return found;
     }
     return Optional.empty();

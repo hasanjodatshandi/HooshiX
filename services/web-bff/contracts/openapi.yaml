@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HooshiX Web BFF Public API
-  version: 1.0.0
+  version: 1.1.0
   description: Canonical browser-facing REST contract owned by Web BFF.
 servers:
   - url: /
@@ -91,6 +91,77 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/DependencyUnavailable' }
         '500': { $ref: '#/components/responses/InternalError' }
+  /api/v1/password/change:
+    post:
+      operationId: changePassword
+      summary: Change the authenticated user's local password
+      description: The browser supplies no refresh credential. The BFF uses and atomically rotates its server-held refresh credential and CSRF state.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200':
+          description: Password and browser security state changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordChangedResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/PasswordRejected' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/v1/password/recovery/request:
+    post:
+      operationId: requestPasswordRecovery
+      summary: Request a non-enumerating password-recovery challenge
+      description: The trusted edge injects exact client-address context; browser input cannot supply it.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordRecoveryRequest' }
+      responses:
+        '200':
+          description: Request accepted regardless of account existence.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptedResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/v1/password/recovery/confirm:
+    post:
+      operationId: confirmPasswordRecovery
+      summary: Confirm a password-recovery challenge and reset the password
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordRecoveryConfirmRequest' }
+      responses:
+        '200':
+          description: Password reset result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptedResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/PasswordRejected' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
 components:
   parameters:
     RequestId:
@@ -161,6 +232,50 @@ components:
           minLength: 8
           maxLength: 8
           pattern: '^[0-9]{8}$'
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        newPassword:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          description: Transport bound only. Identity remains password-policy authority.
+    PasswordRecoveryRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, contact]
+      properties:
+        channel: { $ref: '#/components/schemas/RegistrationChannel' }
+        contact:
+          type: string
+          minLength: 1
+          maxLength: 254
+    PasswordRecoveryConfirmRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, contact, code, newPassword]
+      properties:
+        channel: { $ref: '#/components/schemas/RegistrationChannel' }
+        contact:
+          type: string
+          minLength: 1
+          maxLength: 254
+        code:
+          type: string
+          minLength: 8
+          maxLength: 8
+          pattern: '^[0-9]{8}$'
+        newPassword:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          description: Transport bound only. Identity remains password-policy authority.
     AcceptedResponse:
       type: object
       additionalProperties: false
@@ -173,6 +288,17 @@ components:
       required: [confirmed]
       properties:
         confirmed: { type: boolean }
+    PasswordChangedResponse:
+      type: object
+      additionalProperties: false
+      required: [changed, csrfToken]
+      properties:
+        changed: { type: boolean }
+        csrfToken:
+          type: string
+          minLength: 32
+          maxLength: 512
+          description: Rotated in-memory CSRF token. It is not a refresh credential and must not be persisted.
     Problem:
       type: object
       additionalProperties: false
@@ -212,6 +338,11 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
     RegistrationRejected:
       description: Registration precondition was not satisfied. Response is non-enumerating.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PasswordRejected:
+      description: Password lifecycle precondition was not satisfied without exposing account existence or credential details.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }

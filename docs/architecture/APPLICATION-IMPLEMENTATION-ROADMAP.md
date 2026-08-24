@@ -1,7 +1,7 @@
 # Application Implementation Roadmap — Current Execution Authority
 
 - **Status:** Active implementation-sequencing authority
-- **Last full application review:** 2026-08-22
+- **Last full application review:** 2026-08-25
 - **Scope:** HooshiX application implementation order and continuation across chats/agents
 - **Production Commissioning & Readiness:** DEFERRED until explicitly reactivated by the owner
 
@@ -39,10 +39,9 @@ The implemented foundation already includes substantial registration, local auth
 
 The application is not yet a complete end-user product. Current material gaps are:
 
-- no browser frontend implementation, generated frontend BFF client, or Playwright onboarding journey yet;
-- the public registration OpenAPI/register/resend/confirm backend slice exists, but the end-user registration/verification/login UI is not implemented;
+- the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
-- Identity Profile/Contact management, password change/recovery, MFA/TOTP, Google OIDC/ExternalIdentity, and erasure are incomplete;
+- MFA/TOTP, Google OIDC/ExternalIdentity, and erasure are incomplete;
 - remaining Tenant lifecycle operations are incomplete;
 - application Kafka runtime is not yet required by an implemented asynchronous use case;
 - Reference Data independent service remains intentionally gated by ADR-0041;
@@ -69,10 +68,10 @@ DEFERRED   intentionally excluded from the current application implementation se
 | 0 | Inter-service contract independence | `COMPLETED` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. When complete, mark this `COMPLETED` and move `NEXT` to milestone 1. |
 | 1 | Notification Delivery Runtime v1 | `COMPLETED` | Implement bounded dispatch claiming, durable pre-provider `DISPATCHING`, provider adapter execution, ambiguity-safe reconciliation, retry/observation rules, terminal result outbox, and Identity result callback with Day-One observability/tests. |
 | 2 | Public Registration Vertical Slice + OpenAPI | `COMPLETED` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
-| 3 | Frontend Foundation + Account Onboarding | `NEXT` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
-| 4 | Identity Profile & Contact Management | `PLANNED` | Implement profile read/update plus Contact add/verify/resend/set-primary/remove semantics across Identity, BFF/OpenAPI, UI, persistence, security, and tests. |
-| 5 | Password Policy Decision + Password Lifecycle | `PLANNED` | ADR-0053 defines the concrete password policy. Implement change/forgot/reset, compromised-password screening, recent-auth/MFA rules, and session revocation according to the approved contract. |
-| 6 | MFA/TOTP | `PLANNED` | Implement TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, and security evidence. |
+| 3 | Frontend Foundation + Account Onboarding | `COMPLETED` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
+| 4 | Identity Profile & Contact Management | `COMPLETED` | Implement profile read/update plus Contact add/verify/resend/set-primary/remove semantics across Identity, BFF/OpenAPI, UI, persistence, security, and tests. |
+| 5 | Password Policy Decision + Password Lifecycle | `COMPLETED` | ADR-0053 defines the concrete password policy. Implement change/forgot/reset, compromised-password screening, recent-auth/MFA rules, and session revocation according to the approved contract. |
+| 6 | MFA/TOTP | `NEXT` | Implement TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, and security evidence. |
 | 7 | Google OIDC / ExternalIdentity | `PLANNED` | Implement BFF Authorization Code + PKCE/state/nonce flow, Identity issuer+subject binding/link semantics, collision protection, provider-token custody, MFA continuation, UI, and negative tests. |
 | 8 | Complete Tenant lifecycle | `PLANNED` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
 | 9 | Data Subject Erasure + Kafka | `PLANNED` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
@@ -86,22 +85,22 @@ DEFERRED   intentionally excluded from the current application implementation se
 At the current state, the next coherent engineering task is:
 
 ```text
-Milestone 3 — Frontend Foundation + Account Onboarding
+Milestone 6 — MFA/TOTP
 ```
 
 The target invariant is:
 
 ```text
-reviewed React/TypeScript baseline   -> no speculative framework surface
-BFF OpenAPI                         -> generated/validated browser client boundary
-registration/verification/login     -> uses implemented BFF public contracts
-session/Tenant selection            -> server-side session authority preserved
-fa/en + RTL/LTR                     -> first-class UI behavior
-accessibility                       -> required in the first onboarding slice
-critical Playwright journey         -> required before milestone completion
+TOTP enrollment/challenge           -> encrypted material, fixed bounds, anti-replay
+recovery codes                      -> hashed, single-use, atomic consumption
+recent authentication               -> <=5 minutes for material MFA-state changes
+password/Google primary proof       -> cannot bypass active MFA
+session security state              -> rotate current and revoke other families
+BFF OpenAPI/UI                      -> no factor secret in browser persistence
+security tests                      -> no downgrade, replay, or recovery bypass
 ```
 
-The frontend must consume the BFF public contract. It must not call Identity, Notification, Authorization, or other internal services directly.
+The browser must continue to consume only the BFF public contract. MFA authority and secret material remain in Identity; browser persistence must not become credential or factor authority.
 
 ## 6. Rules for updating this roadmap
 

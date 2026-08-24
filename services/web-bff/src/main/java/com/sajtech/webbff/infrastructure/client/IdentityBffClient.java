@@ -296,43 +296,87 @@ public final class IdentityBffClient implements IdentityGateway {
   }
 
   @Override
-  public boolean changePassword(String refresh, String currentPassword, String newPassword) {
-    return passwordStub()
-        .changePassword(
-            com.sajtech.identity.contract.v1.ChangePasswordRequest.newBuilder()
-                .setRefreshCredential(refresh)
-                .setCurrentPassword(currentPassword)
-                .setNewPassword(newPassword)
-                .build())
-        .getChanged();
+  public PasswordChangeResult changePassword(
+      UUID requestId, String refresh, String currentPassword, String newPassword) {
+    try {
+      var response =
+          passwordStub()
+              .changePassword(
+                  ChangePasswordRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setCurrentPassword(currentPassword)
+                      .setNewPassword(newPassword)
+                      .build());
+      return new PasswordChangeResult(
+          response.getRefreshCredential(),
+          instant(response.getRefreshIdleExpiresAt()),
+          instant(response.getRefreshAbsoluteExpiresAt()));
+    } catch (StatusRuntimeException e) {
+      throw mapPassword(e);
+    }
   }
 
   @Override
-  public boolean requestPasswordRecovery(String contact) {
-    return passwordStub()
-        .requestPasswordRecovery(
-            com.sajtech.identity.contract.v1.RequestPasswordRecoveryRequest.newBuilder()
-                .setPrimaryContact(contact)
-                .build())
-        .getAccepted();
+  public boolean requestPasswordRecovery(
+      UUID requestId, String channelName, String contact, byte[] clientAddress) {
+    try {
+      return passwordStub()
+          .requestPasswordRecovery(
+              RequestPasswordRecoveryRequest.newBuilder()
+                  .setRequestId(requestId.toString())
+                  .setChannel(authenticationChannel(channelName))
+                  .setPrimaryContact(contact)
+                  .setClientAddress(passwordClientAddress(clientAddress))
+                  .build())
+          .getAccepted();
+    } catch (StatusRuntimeException e) {
+      throw mapPassword(e);
+    }
   }
 
   @Override
-  public boolean confirmPasswordRecovery(String contact, String code, String newPassword) {
-    return passwordStub()
-        .confirmPasswordRecovery(
-            com.sajtech.identity.contract.v1.ConfirmPasswordRecoveryRequest.newBuilder()
-                .setPrimaryContact(contact)
-                .setCode(code)
-                .setNewPassword(newPassword)
-                .build())
-        .getChanged();
+  public boolean confirmPasswordRecovery(
+      UUID requestId,
+      String channelName,
+      String contact,
+      String code,
+      String newPassword,
+      byte[] clientAddress) {
+    try {
+      return passwordStub()
+          .confirmPasswordRecovery(
+              ConfirmPasswordRecoveryRequest.newBuilder()
+                  .setRequestId(requestId.toString())
+                  .setChannel(authenticationChannel(channelName))
+                  .setPrimaryContact(contact)
+                  .setCode(code)
+                  .setNewPassword(newPassword)
+                  .setClientAddress(passwordClientAddress(clientAddress))
+                  .build())
+          .getChanged();
+    } catch (StatusRuntimeException e) {
+      throw mapPassword(e);
+    }
   }
 
   private com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc
           .IdentityPasswordServiceBlockingStub
       passwordStub() {
-    return com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc.newBlockingStub(channel);
+    return com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc.newBlockingStub(channel)
+        .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
+  }
+
+  private static AuthenticationChannel authenticationChannel(String value) {
+    return switch (value) {
+      case "EMAIL" -> AuthenticationChannel.AUTHENTICATION_CHANNEL_EMAIL;
+      case "PHONE" -> AuthenticationChannel.AUTHENTICATION_CHANNEL_PHONE;
+      default -> throw new BffException(BffError.INVALID_REQUEST, "Password channel is invalid");
+    };
+  }
+
+  private static PasswordTrustedClientAddress passwordClientAddress(byte[] value) {
+    return PasswordTrustedClientAddress.newBuilder().setAddress(ByteString.copyFrom(value)).build();
   }
 
   private IdentityAuthenticationServiceGrpc.IdentityAuthenticationServiceBlockingStub stub() {
@@ -436,6 +480,24 @@ public final class IdentityBffClient implements IdentityGateway {
       default ->
           new BffException(
               BffError.DEPENDENCY_UNAVAILABLE, "Identity registration is unavailable", e);
+    };
+  }
+
+  private static BffException mapPassword(StatusRuntimeException e) {
+    String description = e.getStatus().getDescription();
+    return switch (e.getStatus().getCode()) {
+      case UNAUTHENTICATED ->
+          "INVALID_SESSION".equals(description)
+              ? new BffException(BffError.AUTHENTICATION_FAILED, "Password session is invalid", e)
+              : new BffException(BffError.PASSWORD_REJECTED, "Password proof was rejected", e);
+      case PERMISSION_DENIED, FAILED_PRECONDITION ->
+          new BffException(BffError.PASSWORD_REJECTED, "Password request was rejected", e);
+      case RESOURCE_EXHAUSTED ->
+          new BffException(BffError.RATE_LIMITED, "Password request quota exceeded", e);
+      case INVALID_ARGUMENT ->
+          new BffException(BffError.INVALID_REQUEST, "Password request is invalid", e);
+      default ->
+          new BffException(BffError.DEPENDENCY_UNAVAILABLE, "Password service is unavailable", e);
     };
   }
 

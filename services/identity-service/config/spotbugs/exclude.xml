@@ -144,4 +144,12 @@
     <Class name="com.sajtech.identity.application.password.usecase.RequestPasswordRecoveryUseCase" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqPasswordRecoveryStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedPasswordLifecycle" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

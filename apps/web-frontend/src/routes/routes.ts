@@ -5,4 +5,6 @@ export const routes = {
   tenantSelection: '/tenant-select',
   application: '/application',
   profile: '/profile',
+  passwordRecovery: '/password/recovery',
+  passwordChange: '/password/change',
 } as const;

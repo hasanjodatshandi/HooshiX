@@ -1,46 +1,97 @@
 package com.sajtech.webbff.interfaces.http;
 
-import com.sajtech.webbff.application.port.out.IdentityGateway;
+import com.sajtech.webbff.application.model.*;
+import com.sajtech.webbff.application.port.out.*;
+import jakarta.servlet.http.*;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.*;
+import java.time.Clock;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/password")
 public final class PasswordController {
   private final IdentityGateway identity;
+  private final BrowserSessionPort sessions;
+  private final TrustedClientAddressPort addresses;
+  private final Clock clock;
 
-  public PasswordController(IdentityGateway identity) {
+  public PasswordController(
+      IdentityGateway identity,
+      BrowserSessionPort sessions,
+      TrustedClientAddressPort addresses,
+      Clock clock) {
     this.identity = identity;
+    this.sessions = sessions;
+    this.addresses = addresses;
+    this.clock = clock;
   }
 
   @PostMapping("/change")
-  public Accepted change(@Valid @RequestBody Change body) {
-    return new Accepted(
+  public ResponseEntity<PasswordChanged> change(
+      @RequestHeader("X-Request-Id") String requestId,
+      @Valid @RequestBody Change body,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    BrowserSession old = HttpSupport.authenticated(request);
+    var changed =
         identity.changePassword(
-            body.refreshCredential(), body.currentPassword(), body.newPassword()));
+            HttpSupport.requestId(requestId),
+            old.refreshCredential(),
+            body.currentPassword(),
+            body.newPassword());
+    BrowserSessionGrant grant =
+        sessions.rotateSecurityState(
+            old, changed.refreshCredential(), changed.idleExpiresAt(), changed.absoluteExpiresAt());
+    HttpSupport.setCookie(
+        response,
+        grant.cookieValue(),
+        HttpSupport.maxAge(clock.instant(), grant.session().idleExpiresAt()));
+    return ResponseEntity.ok(new PasswordChanged(true, grant.csrfToken()));
   }
 
   @PostMapping("/recovery/request")
-  public Accepted request(@Valid @RequestBody RecoveryRequest body) {
-    return new Accepted(identity.requestPasswordRecovery(body.contact()));
+  public Accepted request(
+      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("X-HooshiX-Client-IP") String clientIp,
+      @Valid @RequestBody RecoveryRequest body) {
+    return new Accepted(
+        identity.requestPasswordRecovery(
+            HttpSupport.requestId(requestId),
+            body.channel(),
+            body.contact(),
+            addresses.parse(clientIp)));
   }
 
   @PostMapping("/recovery/confirm")
-  public Accepted confirm(@Valid @RequestBody RecoveryConfirm body) {
+  public Accepted confirm(
+      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("X-HooshiX-Client-IP") String clientIp,
+      @Valid @RequestBody RecoveryConfirm body) {
     return new Accepted(
-        identity.confirmPasswordRecovery(body.contact(), body.code(), body.newPassword()));
+        identity.confirmPasswordRecovery(
+            HttpSupport.requestId(requestId),
+            body.channel(),
+            body.contact(),
+            body.code(),
+            body.newPassword(),
+            addresses.parse(clientIp)));
   }
 
   public record Accepted(boolean accepted) {}
 
-  public record Change(
-      @NotBlank String refreshCredential,
-      @NotBlank String currentPassword,
-      @NotBlank String newPassword) {}
+  public record PasswordChanged(boolean changed, String csrfToken) {}
 
-  public record RecoveryRequest(@NotBlank String contact) {}
+  public record Change(@NotBlank String currentPassword, @NotBlank String newPassword) {}
+
+  public record RecoveryRequest(
+      @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
+      @NotBlank @Size(max = 254) String contact) {}
 
   public record RecoveryConfirm(
-      @NotBlank String contact, @NotBlank String code, @NotBlank String newPassword) {}
+      @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
+      @NotBlank @Size(max = 254) String contact,
+      @NotBlank @Pattern(regexp = "[0-9]{8}") String code,
+      @NotBlank @Size(max = 1024) String newPassword) {}
 }

@@ -70,7 +70,7 @@ REQUIRED_BASELINE_PATHS = (
 )
 
 IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", "node_modules", "dist", "test-results"}
-IGNORED_SUFFIXES = {".pyc", ".pyo"}
+IGNORED_SUFFIXES = {".pyc", ".pyo", ".tsbuildinfo"}
 
 EXTERNALIZED_MCP_PATHS = (
     "scripts/context/mcp_server.py",

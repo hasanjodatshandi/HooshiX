@@ -8,6 +8,7 @@ import java.util.UUID;
 public record NotificationOutboxRecord(
     UUID outboxId,
     UUID requestId,
+    NotificationContentType contentType,
     RegistrationChannel channel,
     RegistrationLocale locale,
     String escrowKeyId,

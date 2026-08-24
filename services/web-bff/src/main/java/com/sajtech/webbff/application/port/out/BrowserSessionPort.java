@@ -35,6 +35,9 @@ public interface BrowserSessionPort {
       UUID tenantId,
       UUID membershipId);
 
+  BrowserSessionGrant rotateSecurityState(
+      BrowserSession old, String rotatedRefresh, Instant identityIdle, Instant identityAbsolute);
+
   void destroy(BrowserSession session);
 
   void eraseUser(UUID userId);

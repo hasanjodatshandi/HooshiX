@@ -37,7 +37,7 @@ public final class BffExceptionHandler {
           case INVALID_ORIGIN, FETCH_METADATA_REQUIRED, CSRF_INVALID, AUTHORIZATION_DENIED -> 403;
           case RATE_LIMITED -> 429;
           case DEPENDENCY_UNAVAILABLE, RUNTIME_DISABLED -> 503;
-          case TENANT_SELECTION_REQUIRED, REGISTRATION_REJECTED -> 409;
+          case TENANT_SELECTION_REQUIRED, REGISTRATION_REJECTED, PASSWORD_REJECTED -> 409;
           case INVALID_REQUEST -> 400;
         };
     return problem(status, e.error().name(), request.getRequestURI());

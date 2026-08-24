@@ -12,8 +12,7 @@ import org.yaml.snakeyaml.Yaml;
 
 class OpenApiRegistrationContractTest {
   @Test
-  void canonicalContractDefinesOnlyReviewedRegistrationRoutesAndRfc9457ProblemShape()
-      throws Exception {
+  void canonicalContractDefinesReviewedIdentityRoutesAndRfc9457ProblemShape() throws Exception {
     Map<String, Object> document;
     try (InputStream input = Files.newInputStream(Path.of("contracts/openapi.yaml"))) {
       document = new Yaml().load(input);
@@ -25,11 +24,18 @@ class OpenApiRegistrationContractTest {
         .containsExactly(
             "/api/v1/identity/registration",
             "/api/v1/identity/registration/resend",
-            "/api/v1/identity/registration/confirm");
+            "/api/v1/identity/registration/confirm",
+            "/api/v1/password/change",
+            "/api/v1/password/recovery/request",
+            "/api/v1/password/recovery/confirm");
     assertThat(responses(paths, "/api/v1/identity/registration"))
         .containsKeys("202", "400", "403", "409", "429", "503");
     assertThat(responses(paths, "/api/v1/identity/registration/resend")).containsKey("202");
     assertThat(responses(paths, "/api/v1/identity/registration/confirm")).containsKey("200");
+    assertThat(responses(paths, "/api/v1/password/change"))
+        .containsKeys("200", "400", "401", "403", "409", "429", "503");
+    assertThat(responses(paths, "/api/v1/password/recovery/request")).containsKey("200");
+    assertThat(responses(paths, "/api/v1/password/recovery/confirm")).containsKey("200");
 
     Map<String, Object> components = map(document.get("components"));
     Map<String, Object> schemas = map(components.get("schemas"));
@@ -45,6 +51,13 @@ class OpenApiRegistrationContractTest {
     assertThat(password.get("maxLength")).isEqualTo(4096);
     assertThat(password.get("description").toString())
         .contains("Identity remains password-policy authority");
+
+    Map<String, Object> change = map(schemas.get("ChangePasswordRequest"));
+    assertThat(change.get("additionalProperties")).isEqualTo(Boolean.FALSE);
+    assertThat(map(change.get("properties"))).doesNotContainKey("refreshCredential");
+    Map<String, Object> recovery = map(schemas.get("PasswordRecoveryConfirmRequest"));
+    assertThat(map(map(recovery.get("properties")).get("code")).get("pattern"))
+        .isEqualTo("^[0-9]{8}$");
 
     Map<String, Object> parameters = map(components.get("parameters"));
     assertThat(map(parameters.get("RequestId"))).containsEntry("name", "X-Request-Id");

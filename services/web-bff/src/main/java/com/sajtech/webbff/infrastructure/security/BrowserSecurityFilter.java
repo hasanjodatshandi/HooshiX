@@ -19,7 +19,9 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
           "/api/v1/auth/session/bootstrap",
           "/api/v1/identity/registration",
           "/api/v1/identity/registration/resend",
-          "/api/v1/identity/registration/confirm");
+          "/api/v1/identity/registration/confirm",
+          "/api/v1/password/recovery/request",
+          "/api/v1/password/recovery/confirm");
   private final WebBffProperties properties;
   private final RedisBffSessionRepository sessions;
 

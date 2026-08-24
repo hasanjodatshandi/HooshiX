@@ -80,6 +80,21 @@ class BrowserSecurityFilterTest {
   }
 
   @Test
+  void anonymousPasswordRecoveryRequiresOriginButNoBrowserSession() throws Exception {
+    var request = post("/api/v1/password/recovery/request");
+    request.addHeader("Origin", "https://app.example.com");
+    request.addHeader("Sec-Fetch-Site", "same-origin");
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    verify(chain).doFilter(any(), same(response));
+    verifyNoInteractions(sessions);
+  }
+
+  @Test
   void registrationWithSessionCookieStillRequiresSessionBoundCsrf() throws Exception {
     BrowserSession session = session();
     when(sessions.load("cookie")).thenReturn(Optional.of(session));

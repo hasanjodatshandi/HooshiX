@@ -7,8 +7,11 @@ import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.authentication.port.out.SessionCredentialPort;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.RefreshSessionUseCase;
+import com.sajtech.identity.application.password.port.out.PreparedPasswordRecovery;
+import com.sajtech.identity.application.registration.model.EncryptedHandoff;
 import com.sajtech.identity.domain.registration.valueobject.CanonicalContact;
 import com.sajtech.identity.domain.registration.valueobject.RegistrationChannel;
+import com.sajtech.identity.domain.registration.valueobject.RegistrationLocale;
 import java.time.*;
 import java.util.List;
 import java.util.Objects;
@@ -220,6 +223,73 @@ class IdentityAuthenticationPersistenceIntegrationTest {
     assertThat(dsl.fetchCount(DSL.table("identity_refresh_family"))).isZero();
     assertThat(dsl.fetchCount(DSL.table("identity_refresh_credential"))).isZero();
     assertThat(dsl.fetchCount(DSL.table("identity_security_audit"))).isEqualTo(1);
+  }
+
+  @Test
+  void passwordRecoveryChallengeAndNotificationHandoffCommitWithSingleOwner() {
+    UUID contactId = UUID.randomUUID();
+    CanonicalContact contact =
+        new CanonicalContact(RegistrationChannel.EMAIL, "person@example.com", "Person@example.com");
+    dsl.execute(
+        "INSERT INTO identity_credential(user_id,password_hash,algorithm,created_at,updated_at) VALUES (?,?,'ARGON2ID',CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))",
+        userId,
+        "$argon2id$stored",
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+    dsl.execute(
+        "INSERT INTO identity_contact(contact_id,user_id,contact_type,canonical_value,delivery_value,verified_at,primary_active,created_at,updated_at) VALUES (?,?,?,?,?,CAST(? AS TIMESTAMP WITH TIME ZONE),TRUE,CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))",
+        contactId,
+        userId,
+        "EMAIL",
+        contact.canonicalValue(),
+        contact.deliveryValue(),
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+    UUID requestId = UUID.randomUUID();
+    UUID challengeId = UUID.randomUUID();
+    UUID outboxId = UUID.randomUUID();
+    JooqPasswordRecoveryStore recovery = new JooqPasswordRecoveryStore(dsl);
+
+    tx.required(
+        () -> {
+          recovery.create(
+              new PreparedPasswordRecovery(
+                  requestId,
+                  challengeId,
+                  outboxId,
+                  UUID.randomUUID(),
+                  userId,
+                  contactId,
+                  contact,
+                  RegistrationLocale.FA,
+                  new byte[32],
+                  "recovery-k1",
+                  new EncryptedHandoff("escrow-k1", new byte[12], new byte[32]),
+                  NOW,
+                  NOW.plus(Duration.ofMinutes(10))));
+          return null;
+        });
+
+    assertThat(recovery.requestAlreadyAccepted(requestId)).isTrue();
+    assertThat(recovery.findTargetByContact(contact)).isPresent();
+    var outbox =
+        Objects.requireNonNull(
+            dsl.fetchOne(
+                "SELECT challenge_id,password_recovery_challenge_id,content_type FROM identity_notification_outbox WHERE outbox_id=?",
+                outboxId));
+    assertThat(outbox.get("challenge_id", UUID.class)).isNull();
+    assertThat(outbox.get("password_recovery_challenge_id", UUID.class)).isEqualTo(challengeId);
+    assertThat(outbox.get("content_type", String.class)).isEqualTo("PASSWORD_RECOVERY");
+
+    UUID confirmationId = UUID.randomUUID();
+    tx.required(
+        () -> {
+          recovery.markUsed(challengeId, confirmationId, NOW.plusSeconds(1));
+          return null;
+        });
+    assertThat(recovery.confirmationAlreadyCompleted(confirmationId)).isTrue();
+    assertThat(recovery.findActiveByContact(contact.canonicalValue(), NOW)).isEmpty();
   }
 
   private PreparedSession session(UUID family, RefreshDigest digest) {

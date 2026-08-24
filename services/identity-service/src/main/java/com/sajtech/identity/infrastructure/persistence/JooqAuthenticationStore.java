@@ -35,6 +35,20 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public Optional<LocalCredentialRecord> lockLocalCredential(UUID userId) {
+    return dsl.fetchOptional(
+            """
+            SELECT cr.user_id,u.status,cr.password_hash
+            FROM identity_credential cr
+            JOIN identity_user u ON u.user_id=cr.user_id
+            WHERE cr.user_id=?
+            FOR UPDATE OF cr,u
+            """,
+            userId)
+        .map(JooqAuthenticationStore::mapLocalCredential);
+  }
+
+  @Override
   public Optional<LocalCredentialRecord> findVerifiedLocalCredential(CanonicalContact contact) {
     return dsl.fetchOptional(
             """
@@ -191,6 +205,7 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
             SELECT rc.credential_id, rc.refresh_family_id, rc.state AS credential_state,
                    f.session_id, f.user_id, f.state AS family_state, f.session_mode,
                    f.selected_tenant_id, f.selected_membership_id,
+                   f.authenticated_at,
                    f.idle_expires_at, f.absolute_expires_at, u.status AS user_status
             FROM identity_refresh_credential rc
             JOIN identity_refresh_family f ON f.refresh_family_id = rc.refresh_family_id
@@ -203,6 +218,25 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
             digest.version(),
             digest.digest(),
             candidateUser.get())
+        .map(JooqAuthenticationStore::mapLockedRefresh);
+  }
+
+  @Override
+  public Optional<LockedRefreshCredential> findRefreshCredential(RefreshDigest digest) {
+    return dsl.fetchOptional(
+            """
+            SELECT rc.credential_id, rc.refresh_family_id, rc.state AS credential_state,
+                   f.session_id, f.user_id, f.state AS family_state, f.session_mode,
+                   f.selected_tenant_id, f.selected_membership_id, f.authenticated_at,
+                   f.idle_expires_at, f.absolute_expires_at, u.status AS user_status
+            FROM identity_refresh_credential rc
+            JOIN identity_refresh_family f ON f.refresh_family_id = rc.refresh_family_id
+            JOIN identity_user u ON u.user_id = f.user_id
+            WHERE rc.digest_key_id = ? AND rc.digest_version = ? AND rc.token_digest = ?
+            """,
+            digest.keyId(),
+            digest.version(),
+            digest.digest())
         .map(JooqAuthenticationStore::mapLockedRefresh);
   }
 
@@ -308,6 +342,37 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public void revokeOtherFamilies(
+      UUID userId, UUID retainedFamilyId, RefreshFamilyRevocationReason reason, Instant now) {
+    dsl.execute(
+        """
+        UPDATE identity_refresh_credential rc
+        SET state = 'REVOKED', retired_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
+        WHERE rc.state = 'ACTIVE' AND rc.refresh_family_id IN (
+          SELECT refresh_family_id FROM identity_refresh_family
+          WHERE user_id = ? AND refresh_family_id <> ? AND state = 'ACTIVE'
+        )
+        """,
+        ts(now),
+        userId,
+        retainedFamilyId);
+    int changed =
+        dsl.execute(
+            """
+            UPDATE identity_refresh_family
+            SET state = 'REVOKED', revoked_at = CAST(? AS TIMESTAMP WITH TIME ZONE),
+                revocation_reason = ?, updated_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
+            WHERE user_id = ? AND refresh_family_id <> ? AND state = 'ACTIVE'
+            """,
+            ts(now),
+            reason.name(),
+            ts(now),
+            userId,
+            retainedFamilyId);
+    if (changed > 0) audit("IDENTITY_OTHER_SESSIONS_REVOKED", userId, now);
+  }
+
+  @Override
   public void updatePasswordHash(UUID userId, String passwordHash, Instant now) {
     int changed =
         dsl.execute(
@@ -386,6 +451,7 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
         AuthenticationSessionMode.valueOf(record.get("session_mode", String.class)),
         record.get("selected_tenant_id", UUID.class),
         record.get("selected_membership_id", UUID.class),
+        record.get("authenticated_at", OffsetDateTime.class).toInstant(),
         record.get("idle_expires_at", OffsetDateTime.class).toInstant(),
         record.get("absolute_expires_at", OffsetDateTime.class).toInstant());
   }

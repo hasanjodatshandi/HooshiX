@@ -1,7 +1,60 @@
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { bffClient } from '../../api/bffClient';
+import { getErrorMessage } from '../../errors/getErrorMessage';
 
 export function PasswordRecoveryFlow() {
- const [contact,setContact]=useState(''); const [code,setCode]=useState(''); const [password,setPassword]=useState(''); const [sent,setSent]=useState(false);
- return <section><h1>Password recovery</h1><input value={contact} onChange={e=>setContact(e.target.value)} placeholder="contact"/><button onClick={()=>void bffClient.requestPasswordRecovery(contact).then(()=>setSent(true))}>Request</button>{sent && <><input value={code} onChange={e=>setCode(e.target.value)} placeholder="code"/><input value={password} onChange={e=>setPassword(e.target.value)} placeholder="new password"/><button onClick={()=>void bffClient.confirmPasswordRecovery({contact,code,newPassword:password})}>Confirm</button></>}</section>;
+  const [contact, setContact] = useState('');
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [stage, setStage] = useState<'request' | 'confirm' | 'complete'>('request');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function request(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await bffClient.requestPasswordRecovery(contact);
+      setStage('confirm');
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await bffClient.confirmPasswordRecovery({ contact, code, newPassword: password });
+      setCode('');
+      setPassword('');
+      setStage('complete');
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <section aria-labelledby="password-recovery-title">
+    <h1 id="password-recovery-title">Password recovery</h1>
+    {stage === 'request' && <form onSubmit={request}>
+      <label htmlFor="recovery-contact">Email</label>
+      <input id="recovery-contact" type="email" autoComplete="email" required value={contact} onChange={(event) => setContact(event.target.value)} />
+      <button type="submit" disabled={busy}>Send recovery code</button>
+    </form>}
+    {stage === 'confirm' && <form onSubmit={confirm}>
+      <label htmlFor="recovery-code">Eight-digit code</label>
+      <input id="recovery-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" required value={code} onChange={(event) => setCode(event.target.value)} />
+      <label htmlFor="recovery-password">New password</label>
+      <input id="recovery-password" type="password" autoComplete="new-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+      <button type="submit" disabled={busy}>Reset password</button>
+    </form>}
+    <p role="status">{stage === 'complete' ? 'Password reset complete' : ''}</p>
+    <p role="alert">{error}</p>
+  </section>;
 }

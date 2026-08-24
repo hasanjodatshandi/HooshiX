@@ -243,6 +243,22 @@ edges:
       - docs/architecture/services/identity-service.md
       - docs/architecture/services/web-bff.md
 
+  - operation_id: web-bff.identity-password-lifecycle
+    caller_owner: Web BFF
+    dependency_id: identity.IdentityPasswordService
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "password change/recovery unavailable or rejected according to Identity result; fail closed"
+    retry_owner: none
+    fallback: "none; no browser credential authority or local password decision"
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/adr/0024-harden-semantic-quota-time-safety-v1.md
+      - docs/adr/0053-define-identity-password-policy-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/web-bff.md
+
   - operation_id: web-bff.identity-registration
     caller_owner: Web BFF
     dependency_id: identity.IdentityRegistrationService

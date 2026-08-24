@@ -25,7 +25,7 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
           var rows =
               tx.fetch(
                   """
-        SELECT outbox_id,request_id,channel,locale,escrow_key_id,payload_nonce,payload_ciphertext,message_not_after,attempt_count
+        SELECT outbox_id,request_id,content_type,channel,locale,escrow_key_id,payload_nonce,payload_ciphertext,message_not_after,attempt_count
         FROM identity_notification_outbox
         WHERE payload_ciphertext IS NOT NULL AND next_attempt_at <= CAST(? AS TIMESTAMP WITH TIME ZONE)
           AND (state='PENDING' OR (state='CLAIMED' AND claimed_until <= CAST(? AS TIMESTAMP WITH TIME ZONE)))
@@ -113,6 +113,8 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
     return new NotificationOutboxRecord(
         r.get("outbox_id", UUID.class),
         r.get("request_id", UUID.class),
+        com.sajtech.identity.application.notification.model.NotificationContentType.valueOf(
+            r.get("content_type", String.class)),
         "EMAIL".equals(r.get("channel", String.class))
             ? RegistrationChannel.EMAIL
             : RegistrationChannel.PHONE,

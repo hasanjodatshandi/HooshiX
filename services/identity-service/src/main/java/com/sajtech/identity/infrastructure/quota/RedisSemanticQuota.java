@@ -250,6 +250,16 @@ return {'ALLOWED',tostring(redis_now),tostring(active+new_count),tostring(window
                 new Bucket(120, 5000, 3600000));
         case CONFIRM_REGISTRATION ->
             new Policy(null, new Bucket(120, 500, 1800000), new Bucket(240, 500, 1800000));
+        case REQUEST_PASSWORD_RECOVERY ->
+            new Policy(
+                new Bucket(5, 600000, 7200000),
+                new Bucket(30, 10000, 3600000),
+                new Bucket(60, 10000, 3600000));
+        case CONFIRM_PASSWORD_RECOVERY ->
+            new Policy(
+                new Bucket(10, 60000, 1800000),
+                new Bucket(60, 1000, 1800000),
+                new Bucket(120, 1000, 1800000));
       };
     }
   }
