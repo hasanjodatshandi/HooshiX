@@ -507,7 +507,11 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         ("contract_package_boundary", validate_contract_package_boundary(root)),
         ("guarded_structure", validate_guarded_structure(root)),
     )
-    return [f"{name}: {error!r}" for name, result in checks for error in result if error]
+    errors: list[str] = []
+    for name, result in checks:
+        print(f"baseline_debug {name}={result!r}")
+        errors.extend([f"{name}: {error!r}" for error in result if error])
+    return errors
 
 
 def main() -> int:
