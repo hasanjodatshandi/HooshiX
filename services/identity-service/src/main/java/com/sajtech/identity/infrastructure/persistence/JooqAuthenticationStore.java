@@ -21,6 +21,20 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public Optional<LocalCredentialRecord> findLocalCredential(UUID userId) {
+    return dsl.fetchOptional(
+            """
+            SELECT u.user_id, u.status, cr.password_hash
+            FROM identity_user u
+            JOIN identity_credential cr ON cr.user_id = u.user_id
+            WHERE u.user_id = ?
+            LIMIT 1
+            """,
+            userId)
+        .map(JooqAuthenticationStore::mapLocalCredential);
+  }
+
+  @Override
   public Optional<LocalCredentialRecord> findVerifiedLocalCredential(CanonicalContact contact) {
     return dsl.fetchOptional(
             """
