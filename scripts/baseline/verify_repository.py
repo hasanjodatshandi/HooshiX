@@ -497,19 +497,20 @@ def validate_guarded_structure(root: Path) -> list[str]:
 
 
 def validate_repository(root: Path = ROOT) -> list[str]:
-    checks: tuple[tuple[str, list[str]], ...] = (
-        ("required_paths", validate_required_paths(root)),
-        ("file_index", validate_file_index(root)),
-        ("adr_register", validate_adr_register(root)),
-        ("dependency_registry", validate_dependency_registry(root)),
-        ("source_references", validate_source_references(root)),
-        ("agent_reporting", validate_agent_reporting_contract(root)),
-        ("contract_package_boundary", validate_contract_package_boundary(root)),
-        ("guarded_structure", validate_guarded_structure(root)),
+    checks: tuple[tuple[str, callable], ...] = (
+        ("required_paths", lambda: validate_required_paths(root)),
+        ("file_index", lambda: validate_file_index(root)),
+        ("adr_register", lambda: validate_adr_register(root)),
+        ("dependency_registry", lambda: validate_dependency_registry(root)),
+        ("source_references", lambda: validate_source_references(root)),
+        ("agent_reporting", lambda: validate_agent_reporting_contract(root)),
+        ("contract_package_boundary", lambda: validate_contract_package_boundary(root)),
+        ("guarded_structure", lambda: validate_guarded_structure(root)),
     )
     errors: list[str] = []
-    for name, result in checks:
+    for name, validator in checks:
         try:
+            result = validator()
             print(f"baseline_debug {name}={result!r}")
             errors.extend([f"{name}: {error!r}" for error in result if error])
         except Exception as exc:
