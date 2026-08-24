@@ -151,8 +151,11 @@ def validate_file_index(root: Path) -> list[str]:
     if not index_path.is_file():
         return ["FILE_INDEX.txt is missing"]
 
+    print(f"baseline_debug file_index_root={root}")
     expected = collect_repository_files(root)
+    print(f"baseline_debug file_index_expected_count={len(expected)}")
     indexed_lines = [line.strip() for line in read_text(index_path).splitlines() if line.strip()]
+    print(f"baseline_debug file_index_indexed_count={len(indexed_lines)}")
     indexed = set(indexed_lines)
     errors: list[str] = []
 
