@@ -126,15 +126,26 @@ def _strip_scalar(value: str) -> str:
 
 def collect_repository_files(root: Path) -> set[str]:
     files: set[str] = set()
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(root)
-        if any(part in IGNORED_PATH_PARTS for part in relative.parts):
-            continue
-        if path.suffix in IGNORED_SUFFIXES:
-            continue
-        files.add(relative.as_posix())
+    for current, directories, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        directories[:] = [
+            directory
+            for directory in directories
+            if directory not in IGNORED_PATH_PARTS
+        ]
+        for filename in filenames:
+            path = current_path / filename
+            try:
+                if path.is_symlink():
+                    continue
+                if path.suffix in IGNORED_SUFFIXES:
+                    continue
+                relative = path.relative_to(root)
+            except (OSError, ValueError):
+                continue
+            if any(part in IGNORED_PATH_PARTS for part in relative.parts):
+                continue
+            files.add(relative.as_posix())
     return files
 
 
