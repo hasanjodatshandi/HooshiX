@@ -507,7 +507,7 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         ("contract_package_boundary", validate_contract_package_boundary(root)),
         ("guarded_structure", validate_guarded_structure(root)),
     )
-    return [error for name, result in checks for error in result]
+    return [error for name, result in checks for error in result if error]
 
 
 def main() -> int:
