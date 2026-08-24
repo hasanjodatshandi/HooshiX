@@ -514,8 +514,9 @@ def main() -> int:
     errors = validate_repository(ROOT)
     if errors:
         print("Repository baseline verification FAILED:")
+        print(f"error_count={len(errors)}")
         for error in errors:
-            print(f"- {error}")
+            print(f"- {error!r}")
         return 1
 
     adr_count = len(
