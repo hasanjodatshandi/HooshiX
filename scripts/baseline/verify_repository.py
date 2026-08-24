@@ -69,7 +69,7 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/baseline/verify_repository.py",
 )
 
-IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", "node_modules"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
 
 EXTERNALIZED_MCP_PATHS = (
@@ -163,11 +163,8 @@ def validate_file_index(root: Path) -> list[str]:
     if not index_path.is_file():
         return ["FILE_INDEX.txt is missing"]
 
-    print(f"baseline_debug file_index_root={root}")
     expected = collect_repository_files(root)
-    print(f"baseline_debug file_index_expected_count={len(expected)}")
     indexed_lines = [line.strip() for line in read_text(index_path).splitlines() if line.strip()]
-    print(f"baseline_debug file_index_indexed_count={len(indexed_lines)}")
     indexed = set(indexed_lines)
     errors: list[str] = []
 
@@ -525,12 +522,9 @@ def validate_repository(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
     for name, validator in checks:
         try:
-            print(f"baseline_debug_start {name}")
             result = validator()
-            print(f"baseline_debug_end {name}={result!r}")
             errors.extend([f"{name}: {error!r}" for error in result if error])
         except Exception as exc:
-            print(f"baseline_debug {name}_exception={exc!r}")
             raise
     return errors
 
