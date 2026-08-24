@@ -29,7 +29,7 @@ public final class RequestPasswordRecoveryUseCase implements RequestPasswordReco
    store.create(id,target.get().userId(),target.get().contactId(),generated.verifier(),generated.keyId(),expires);
    // durable notification handoff: encrypted payload only
    var outboxId=UUID.randomUUID();
-   var encrypted=escrow.encrypt(outboxId, null, RegistrationLocale.FA, generated.code());
-   outbox.markSubmitted(outboxId, null, clock.instant());
+   var encrypted=escrow.encrypt(outboxId, target.get().contact(), RegistrationLocale.FA, generated.code());
+   // outbox insertion belongs to the durable recovery store transaction; no submission here
  }
 }

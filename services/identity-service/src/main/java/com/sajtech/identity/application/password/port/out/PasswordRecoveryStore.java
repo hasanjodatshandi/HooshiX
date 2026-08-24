@@ -8,5 +8,5 @@ public interface PasswordRecoveryStore {
   void create(UUID challengeId, UUID userId, UUID contactId, byte[] verifier, String keyId, Instant expiresAt);
   Optional<RecoveryTarget> findTargetByContact(String contact);
 
-  record RecoveryTarget(UUID userId, UUID contactId) {}
+  record RecoveryTarget(UUID userId, UUID contactId, com.sajtech.identity.domain.registration.valueobject.CanonicalContact contact) {}
 }
