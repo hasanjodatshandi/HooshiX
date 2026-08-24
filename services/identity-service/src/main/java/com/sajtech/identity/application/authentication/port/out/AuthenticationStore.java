@@ -9,7 +9,9 @@ import java.util.UUID;
 public interface AuthenticationStore {
   Optional<LocalCredentialRecord> findVerifiedLocalCredential(CanonicalContact contact);
 
-  Optional<LocalCredentialRecord> findLocalCredential(UUID userId);
+  default Optional<LocalCredentialRecord> findLocalCredential(UUID userId) {
+    return Optional.empty();
+  }
 
   Optional<LocalCredentialRecord> lockVerifiedLocalCredential(
       UUID userId, CanonicalContact contact);
