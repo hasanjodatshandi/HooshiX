@@ -51,6 +51,10 @@ public interface IdentityGateway {
 
   void logout(UUID requestId, String refresh);
 
+  boolean changePassword(String refresh, String currentPassword, String newPassword);
+  boolean requestPasswordRecovery(String contact);
+  boolean confirmPasswordRecovery(String contact, String code, String newPassword);
+
   enum SessionMode {
     AUTHENTICATED_ONBOARDING,
     TENANT_AUTHENTICATED
