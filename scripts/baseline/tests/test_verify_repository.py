@@ -172,6 +172,85 @@ None | <exact action>
             self.assertTrue(any("externalized MCP runtime prefix" in error for error in errors))
             self.assertTrue(any("externalized MCP runtime path" in error for error in errors))
 
+    def test_current_contract_package_boundary_is_valid(self) -> None:
+        repository_root = Path(__file__).resolve().parents[3]
+
+        self.assertEqual([], verifier.validate_contract_package_boundary(repository_root))
+
+    def test_contract_gate_rejects_unversioned_unvalidated_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            contract = root / "contracts/protobuf-contracts"
+            proto = contract / "src/main/proto/hooshix/sample/sample.proto"
+            proto.parent.mkdir(parents=True)
+            proto.write_text(
+                '''syntax = "proto3";
+package hooshix.sample;
+option java_package = "com.sajtech.sample.contract";
+service SampleService { rpc Get(GetRequest) returns (GetResponse); }
+message GetRequest { string id = 1; }
+message GetResponse {}
+''',
+                encoding="utf-8",
+            )
+            (contract / "build.gradle.kts").write_text(
+                'version = "1.0.0"\n', encoding="utf-8"
+            )
+
+            errors = verifier.validate_contract_package_boundary(root)
+
+            self.assertTrue(any("proto path is not versioned" in error for error in errors))
+            self.assertTrue(any("package is not versioned" in error for error in errors))
+            self.assertTrue(any("missing validation import" in error for error in errors))
+            self.assertTrue(any("has no schema validation" in error for error in errors))
+
+    def test_contract_gate_rejects_consumer_version_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            contract = root / "contracts/protobuf-contracts"
+            proto = contract / "src/main/proto/hooshix/sample/v1/sample.proto"
+            proto.parent.mkdir(parents=True)
+            proto.write_text(
+                '''syntax = "proto3";
+package hooshix.sample.v1;
+import "buf/validate/validate.proto";
+option java_package = "com.sajtech.sample.contract.v1";
+service SampleService { rpc Get(GetRequest) returns (GetResponse); }
+message GetRequest { string id = 1 [(buf.validate.field).string.uuid = true]; }
+message GetResponse {}
+''',
+                encoding="utf-8",
+            )
+            examples = contract / "examples/sample/v1"
+            examples.mkdir(parents=True)
+            (examples / "get.valid.json").write_text("{}\n", encoding="utf-8")
+            (contract / "build.gradle.kts").write_text(
+                '''version = "1.4.0"
+api("build.buf:protovalidate:1.2.2")
+val prepareBufDependencies = true
+''',
+                encoding="utf-8",
+            )
+            consumer = root / "services/sample-service/build.gradle.kts"
+            consumer.parent.mkdir(parents=True)
+            consumer.write_text(
+                'implementation("com.sajtech.hooshix:protobuf-contracts:1.3.0")\n',
+                encoding="utf-8",
+            )
+
+            errors = verifier.validate_contract_package_boundary(root)
+
+            self.assertTrue(any("consumer version mismatch" in error for error in errors))
+
+            (examples / "get.valid.json").unlink()
+            errors = verifier.validate_contract_package_boundary(root)
+            self.assertTrue(
+                any(
+                    "published service has no valid consumer example" in error
+                    for error in errors
+                )
+            )
+
     def test_compromised_password_gradle_wrapper_is_executable(self) -> None:
         repository_root = Path(__file__).resolve().parents[3]
         wrapper = repository_root / "services/compromised-password-service/gradlew"

@@ -1,5 +1,6 @@
 package com.sajtech.notification.configuration;
 
+import com.sajtech.hooshix.contract.validation.ContractValidationServerInterceptor;
 import com.sajtech.notification.application.delivery.port.in.*;
 import com.sajtech.notification.application.delivery.port.out.*;
 import com.sajtech.notification.application.delivery.service.*;
@@ -371,10 +372,17 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  ContractValidationServerInterceptor contractValidation(MeterRegistry meters) {
+    var rejections = meters.counter("hooshix.contract.validation.rejections");
+    return new ContractValidationServerInterceptor(ignored -> rejections.increment());
+  }
+
+  @Bean
   GrpcServerLifecycle grpcServerLifecycle(
       NotificationProperties properties,
       NotificationGrpcService service,
       SafeTracingServerInterceptor tracingInterceptor,
+      ContractValidationServerInterceptor validationInterceptor,
       NotificationAdmissionInterceptor admissionInterceptor,
       @Value("${notification.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
@@ -383,6 +391,7 @@ public class RuntimeConfiguration {
         properties.maxConcurrentCallsPerConnection(),
         service,
         tracingInterceptor,
+        validationInterceptor,
         admissionInterceptor);
   }
 

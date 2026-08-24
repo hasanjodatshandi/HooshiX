@@ -27,6 +27,8 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Access-token signing | RS256 / RSA-3072 / 90-day rotation | ADR-0023 |
 | Internal synchronous API | gRPC + Protobuf | current architecture |
 | gRPC Java | 1.83.1 | runtime/Netty/stubs/codegen/testing aligned in locks; includes upstream Netty server stream-limit bypass fix |
+| Protobuf Java/compiler | 4.34.2 | contract code generation and Spring Boot-managed service runtime aligned |
+| Protobuf validation | Protovalidate Java 1.2.2 | schema annotations plus fail-closed server interceptor; dependency locks and checksums required |
 | External/browser API | REST + OpenAPI through BFF | current architecture |
 | Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 | ADR-0015 profile-aware durability |
 | Event/API schema | Protobuf | Git + Buf governance |

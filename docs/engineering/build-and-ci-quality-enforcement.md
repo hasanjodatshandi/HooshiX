@@ -86,7 +86,7 @@ Trivy and OWASP Dependency-Check are not current default HooshiX gates. They may
 
 Applicable:
 
-- Buf lint/breaking for Protobuf;
+- Buf lint/build/breaking for Protobuf plus executable Protovalidate request/example tests;
 - OpenAPI compatibility/bounds/security behavior;
 - Flyway validation/migration compatibility;
 - PostgreSQL role/RLS/cross-service negative tests;

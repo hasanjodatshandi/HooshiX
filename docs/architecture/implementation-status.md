@@ -8,6 +8,11 @@ Architecture documents describe approved targets. A target path named in documen
 
 At this revision the repository contains architecture documentation, the repository-governance baseline, the ADR-0046 Git-native Agent Context Engine and project context metadata, and executable service implementations. Under ADR-0051, Context/Ops/Desktop MCP runtime source is independently versioned on Windows and is not part of HooshiX. The canonical application checkout is `/home/coder/workspace/Hooshix` on native WSL storage. Executable services are under:
 
+The neutral Protobuf contract artifact is version 1.4.0. It includes versioned Protovalidate
+request rules, generic fail-closed gRPC server enforcement, tested protobuf-JSON consumer examples
+for every published service contract, dependency locks/checksums, and repository gates against
+version, validation, example, and server-wiring drift.
+
 ```text
 services/compromised-password-service/
 services/notification-service/

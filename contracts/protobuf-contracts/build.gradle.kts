@@ -4,8 +4,16 @@ plugins {
     `maven-publish`
 }
 
+val prepareBufDependencies = tasks.register<Sync>("prepareBufDependencies") {
+    dependsOn("extractIncludeProto")
+    from(layout.buildDirectory.dir("extracted-include-protos/main")) {
+        include("buf/validate/validate.proto")
+    }
+    into(layout.buildDirectory.dir("buf-dependencies"))
+}
+
 group = "com.sajtech.hooshix"
-version = "1.3.0"
+version = "1.4.0"
 
 java {
     withSourcesJar()
@@ -14,13 +22,26 @@ java {
 repositories { mavenCentral() }
 
 dependencies {
-    api("com.google.protobuf:protobuf-java:3.25.8")
+    api("com.google.protobuf:protobuf-java:4.34.2")
     api("io.grpc:grpc-protobuf:1.83.1")
     api("io.grpc:grpc-stub:1.83.1")
+    api("build.buf:protovalidate:1.2.2")
+
+    testImplementation("io.grpc:grpc-inprocess:1.83.1")
+    testImplementation("com.google.protobuf:protobuf-java-util:4.34.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.1")
+}
+
+tasks.test { useJUnitPlatform() }
+tasks.named("processResources") { dependsOn(prepareBufDependencies) }
+
+dependencyLocking {
+    lockAllConfigurations()
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:3.25.8" }
+    protoc { artifact = "com.google.protobuf:protoc:4.34.2" }
     plugins { create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.83.1" } }
     generateProtoTasks { all().forEach { it.plugins { create("grpc") } } }
 }

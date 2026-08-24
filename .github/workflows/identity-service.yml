@@ -47,7 +47,8 @@ jobs:
         run: |
           set -euo pipefail
           cd contracts/protobuf-contracts
-          ../../services/identity-service/gradlew publishToMavenLocal --no-daemon --no-configuration-cache
+          ../../services/identity-service/gradlew publishToMavenLocal \
+            --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify Java and Gradle wrapper pins
         working-directory: ${{ env.SERVICE_DIR }}
@@ -256,11 +257,9 @@ jobs:
           set -euo pipefail
           /tmp/buf lint
           /tmp/buf build -o /tmp/identity-contract.binpb
-          if git cat-file -e origin/main:services/identity-service/src/main/proto 2>/dev/null; then
-            git update-ref refs/heads/buf-ci-main refs/remotes/origin/main
-            trap 'git update-ref -d refs/heads/buf-ci-main || true' EXIT
-            /tmp/buf breaking --against '../../.git#branch=buf-ci-main,subdir=services/identity-service'
-          fi
+          git update-ref refs/heads/buf-ci-main refs/remotes/origin/main
+          trap 'git update-ref -d refs/heads/buf-ci-main || true' EXIT
+          /tmp/buf breaking --against '../../.git#branch=buf-ci-main,subdir=contracts/protobuf-contracts/src/main/proto'
 
       - name: Run pinned Semgrep policy
         run: |

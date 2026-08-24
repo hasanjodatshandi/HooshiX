@@ -33,6 +33,7 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
       int maxConcurrentCallsPerConnection,
       BindableService service,
       ServerInterceptor tracingInterceptor,
+      ServerInterceptor validationInterceptor,
       ServerInterceptor admissionInterceptor) {
     if (bindAddress == null || bindAddress.isBlank() || port <= 0 || port > 65_535) {
       throw new IllegalArgumentException("Invalid gRPC bind address or port");
@@ -43,12 +44,15 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
     }
     Objects.requireNonNull(service, "service");
     Objects.requireNonNull(tracingInterceptor, "tracingInterceptor");
+    Objects.requireNonNull(validationInterceptor, "validationInterceptor");
     Objects.requireNonNull(admissionInterceptor, "admissionInterceptor");
     requestExecutor = Executors.newVirtualThreadPerTaskExecutor();
     ServerServiceDefinition tracedService =
         ServerInterceptors.intercept(service, tracingInterceptor);
+    ServerServiceDefinition validatedService =
+        ServerInterceptors.intercept(tracedService, validationInterceptor);
     ServerServiceDefinition admittedService =
-        ServerInterceptors.intercept(tracedService, admissionInterceptor);
+        ServerInterceptors.intercept(validatedService, admissionInterceptor);
     server =
         NettyServerBuilder.forAddress(new InetSocketAddress(bindAddress, port))
             .executor(requestExecutor)

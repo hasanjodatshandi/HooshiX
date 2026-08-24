@@ -1,8 +1,13 @@
 syntax = "proto3";
+
 package hooshix.identity.v1;
+
+import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+
 option java_multiple_files = true;
 option java_package = "com.sajtech.identity.contract.v1";
+
 service IdentityTenantService {
   rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
   rpc ListSelectableTenants(ListSelectableTenantsRequest) returns (ListSelectableTenantsResponse);
@@ -11,16 +16,89 @@ service IdentityTenantService {
   rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
   rpc RemoveMembership(RemoveMembershipRequest) returns (RemoveMembershipResponse);
 }
-message CreateTenantRequest { string request_id=1; string refresh_credential=2; string name=3; string slug=4; }
-message CreateTenantResponse { string tenant_id=1; string creator_membership_id=2; string lifecycle=3; }
-message ListSelectableTenantsRequest { string refresh_credential=1; }
-message SelectableTenant { string tenant_id=1; string membership_id=2; string name=3; string slug=4; }
-message ListSelectableTenantsResponse { repeated SelectableTenant tenants=1; string suggested_membership_id=2; }
-message SelectTenantRequest { string request_id=1; string refresh_credential=2; string membership_id=3; string audience=4; }
-message SelectTenantResponse { string identity_session_id=1; string refresh_family_id=2; string refresh_credential=3; google.protobuf.Timestamp refresh_idle_expires_at=4; google.protobuf.Timestamp refresh_absolute_expires_at=5; string tenant_id=6; string membership_id=7; string access_token=8; google.protobuf.Timestamp access_token_expires_at=9; }
-message InviteExistingUserRequest { string request_id=1; string refresh_credential=2; string target_contact_id=3; }
-message InviteExistingUserResponse { string invitation_id=1; google.protobuf.Timestamp expires_at=2; }
-message AcceptInvitationRequest { string request_id=1; string refresh_credential=2; string invitation_id=3; }
-message AcceptInvitationResponse { string membership_id=1; string tenant_id=2; }
-message RemoveMembershipRequest { string request_id=1; string refresh_credential=2; string membership_id=3; }
-message RemoveMembershipResponse { bool accepted=1; }
+
+message CreateTenantRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 120
+  }];
+  string slug = 4 [(buf.validate.field).string = {pattern: "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$"}];
+}
+
+message CreateTenantResponse {
+  string tenant_id = 1;
+  string creator_membership_id = 2;
+  string lifecycle = 3;
+}
+
+message ListSelectableTenantsRequest {
+  string refresh_credential = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+}
+
+message SelectableTenant {
+  string tenant_id = 1;
+  string membership_id = 2;
+  string name = 3;
+  string slug = 4;
+}
+
+message ListSelectableTenantsResponse {
+  repeated SelectableTenant tenants = 1;
+  string suggested_membership_id = 2;
+}
+
+message SelectTenantRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string membership_id = 3 [(buf.validate.field).string.uuid = true];
+  string audience = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+}
+
+message SelectTenantResponse {
+  string identity_session_id = 1;
+  string refresh_family_id = 2;
+  string refresh_credential = 3;
+  google.protobuf.Timestamp refresh_idle_expires_at = 4;
+  google.protobuf.Timestamp refresh_absolute_expires_at = 5;
+  string tenant_id = 6;
+  string membership_id = 7;
+  string access_token = 8;
+  google.protobuf.Timestamp access_token_expires_at = 9;
+}
+
+message InviteExistingUserRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string target_contact_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message InviteExistingUserResponse {
+  string invitation_id = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message AcceptInvitationRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string invitation_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message AcceptInvitationResponse {
+  string membership_id = 1;
+  string tenant_id = 2;
+}
+
+message RemoveMembershipRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string membership_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message RemoveMembershipResponse {
+  bool accepted = 1;
+}
