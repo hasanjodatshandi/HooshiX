@@ -6,6 +6,9 @@ import com.sajtech.identity.application.authentication.AuthenticationError;
 import com.sajtech.identity.application.authentication.AuthenticationException;
 import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.authentication.port.out.*;
+import com.sajtech.identity.application.mfa.model.*;
+import com.sajtech.identity.application.mfa.port.out.MfaAuthenticationGate;
+import com.sajtech.identity.application.mfa.port.out.MfaCryptographyPort;
 import com.sajtech.identity.application.registration.service.ContactCanonicalizer;
 import com.sajtech.identity.application.registration.service.PasswordNormalizer;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
@@ -100,6 +103,38 @@ class AuthenticateLocalUseCaseTest {
     assertThat(store.created.idleExpiresAt()).isEqualTo(session.idleExpiresAt());
     assertThat(store.created.absoluteExpiresAt()).isEqualTo(session.absoluteExpiresAt());
     assertThat(quota.successes).isEqualTo(1);
+  }
+
+  @Test
+  void activeMfaIssuesOnlyAnOpaqueFiveMinuteChallengeAndNoSessionCredentials() {
+    UUID userId = UUID.randomUUID();
+    store.local = new LocalCredentialRecord(userId, "ACTIVE", "$argon2id$stored");
+    verifier.result = true;
+    FakeMfaGate mfa = new FakeMfaGate();
+    AuthenticateLocalUseCase mfaAware =
+        new AuthenticateLocalUseCase(
+            new ContactCanonicalizer(),
+            new PasswordNormalizer(),
+            quota,
+            verifier,
+            new FakeCredentials(),
+            new DirectTransactionRunner(),
+            store,
+            ignored -> AuthenticationTenantSelection.onboarding(),
+            mfa,
+            new FakeMfaCryptography(),
+            Clock.fixed(NOW, ZoneOffset.UTC));
+
+    AuthenticationSession session = mfaAware.authenticate(command());
+
+    assertThat(session.mode()).isEqualTo(AuthenticationSessionMode.MFA_REQUIRED);
+    assertThat(session.mfaChallenge()).isEqualTo("m".repeat(43));
+    assertThat(session.sessionId()).isNull();
+    assertThat(session.refreshCredential()).isNull();
+    assertThat(store.created).isNull();
+    assertThat(mfa.userId).isEqualTo(userId);
+    assertThat(mfa.challenge.encoded()).isEqualTo("m".repeat(43));
+    assertThat(mfa.expiresAt).isEqualTo(NOW.plus(Duration.ofMinutes(5)));
   }
 
   @Test
@@ -229,6 +264,63 @@ class AuthenticateLocalUseCaseTest {
     @Override
     public java.util.List<RefreshDigest> digestCandidates(String encodedCredential) {
       throw new UnsupportedOperationException();
+    }
+  }
+
+  private static final class FakeMfaGate implements MfaAuthenticationGate {
+    private UUID userId;
+    private GeneratedMfaChallenge challenge;
+    private Instant expiresAt;
+
+    @Override
+    public boolean requiresMfa(UUID ignored) {
+      return true;
+    }
+
+    @Override
+    public void replaceLoginChallenge(
+        UUID challengeId,
+        UUID userId,
+        GeneratedMfaChallenge challenge,
+        Instant now,
+        Instant expiresAt) {
+      this.userId = userId;
+      this.challenge = challenge;
+      this.expiresAt = expiresAt;
+    }
+  }
+
+  private static final class FakeMfaCryptography implements MfaCryptographyPort {
+    @Override
+    public GeneratedTotpSecret generateTotpSecret(UUID userId, UUID enrollmentId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public java.util.OptionalLong verifyTotp(
+        UUID userId, UUID enrollmentId, EncryptedTotpSecret encrypted, String code, Instant now) {
+      return java.util.OptionalLong.empty();
+    }
+
+    @Override
+    public GeneratedMfaChallenge generateChallenge() {
+      return new GeneratedMfaChallenge(
+          "m".repeat(43), new MfaDigest(new byte[32], "k1", "mfa-challenge-hmac-v1"));
+    }
+
+    @Override
+    public java.util.List<MfaDigest> challengeDigestCandidates(String encoded) {
+      return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<GeneratedRecoveryCode> generateRecoveryCodes(UUID enrollmentId) {
+      return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<MfaDigest> recoveryDigestCandidates(UUID enrollmentId, String encoded) {
+      return java.util.List.of();
     }
   }
 

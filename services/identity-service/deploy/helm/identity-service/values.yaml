@@ -54,6 +54,7 @@ secrets:
   fingerprintSecretName: ""
   challengeSecretName: ""
   handoffSecretName: ""
+  mfaSecretName: ""
   quotaKeySecretName: ""
   refreshSecretName: ""
   jwtPrivateSecretName: ""

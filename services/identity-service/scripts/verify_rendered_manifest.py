@@ -44,6 +44,8 @@ def main():
     require(text,r"IDENTITY_JWT_ALLOWED_AUDIENCES","JWT audience allow-list missing")
     require(text,r"name: refresh-key","refresh HMAC secret mount missing")
     require(text,r"identity-refresh","refresh HMAC secret path/name missing")
+    require(text,r"name: mfa-key","MFA AES key-ring mount missing")
+    require(text,r"identity-mfa","MFA AES key-ring path/name missing")
     require(text,r"name: jwt-private-key","JWT private signing secret mount missing")
     require(text,r"identity-jwt-private","JWT private signing path/name missing")
     require(text,r"name: jwt-public-bundle","JWT public verifier bundle mount missing")

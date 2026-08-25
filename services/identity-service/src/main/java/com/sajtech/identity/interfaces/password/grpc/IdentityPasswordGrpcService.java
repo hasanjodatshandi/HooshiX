@@ -92,7 +92,18 @@ public final class IdentityPasswordGrpcService
               request.getPrimaryContact(),
               request.getCode(),
               request.getNewPassword(),
-              address(request.getClientAddress().getAddress())));
+              address(request.getClientAddress().getAddress()),
+              request.hasMfaProof()
+                  ? new com.sajtech.identity.application.mfa.model.MfaProof(
+                      switch (request.getMfaProof().getType()) {
+                        case MFA_PROOF_TYPE_TOTP ->
+                            com.sajtech.identity.application.mfa.model.MfaProofType.TOTP;
+                        case MFA_PROOF_TYPE_RECOVERY_CODE ->
+                            com.sajtech.identity.application.mfa.model.MfaProofType.RECOVERY_CODE;
+                        default -> throw new IllegalArgumentException("Unsupported MFA proof type");
+                      },
+                      request.getMfaProof().getCode())
+                  : null));
       observer.onNext(ConfirmPasswordRecoveryResponse.newBuilder().setChanged(true).build());
       observer.onCompleted();
     } catch (PasswordException exception) {

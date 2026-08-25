@@ -28,8 +28,8 @@ class OpenApiControllerContractTest {
     Set<Route> controllerRoutes = controllerRoutes();
 
     assertThat(document.get("openapi")).isEqualTo("3.1.0");
-    assertThat(map(document.get("info")).get("version")).isEqualTo("1.2.0");
-    assertThat(openApiRoutes).hasSize(36).containsExactlyInAnyOrderElementsOf(controllerRoutes);
+    assertThat(map(document.get("info")).get("version")).isEqualTo("1.3.0");
+    assertThat(openApiRoutes).hasSize(43).containsExactlyInAnyOrderElementsOf(controllerRoutes);
   }
 
   @Test
@@ -104,6 +104,7 @@ class OpenApiControllerContractTest {
     Set<String> anonymousOperations =
         Set.of(
             "/api/v1/auth/session/bootstrap#post",
+            "/api/v1/auth/session/csrf#post",
             "/api/v1/identity/registration#post",
             "/api/v1/identity/registration/resend#post",
             "/api/v1/identity/registration/confirm#post",
@@ -154,6 +155,7 @@ class OpenApiControllerContractTest {
         .isEqualTo("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
     assertThat(map(schemas.get("UuidV4")).get("pattern"))
         .isEqualTo("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
+    assertThat(list(map(schemas.get("MfaProofRequest")).get("oneOf"))).hasSize(2);
     assertThat(map(map(parameters.get("PageSize")).get("schema")))
         .containsEntry("minimum", 1)
         .containsEntry("maximum", 200)

@@ -17,6 +17,7 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
   private static final Set<String> ANONYMOUS_UNSAFE =
       Set.of(
           "/api/v1/auth/session/bootstrap",
+          "/api/v1/auth/session/csrf",
           "/api/v1/identity/registration",
           "/api/v1/identity/registration/resend",
           "/api/v1/identity/registration/confirm",
@@ -71,7 +72,9 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
         return;
       }
       effective.setAttribute(SESSION_ATTRIBUTE, session);
-      if (unsafe && !sessions.csrfMatches(session, request.getHeader("X-CSRF-Token"))) {
+      if (unsafe
+          && !"/api/v1/auth/session/csrf".equals(request.getRequestURI())
+          && !sessions.csrfMatches(session, request.getHeader("X-CSRF-Token"))) {
         problem(response, request, 403, "CSRF_INVALID");
         return;
       }

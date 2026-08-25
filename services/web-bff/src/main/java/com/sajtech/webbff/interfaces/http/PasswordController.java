@@ -77,7 +77,10 @@ public final class PasswordController {
             body.contact(),
             body.code(),
             body.newPassword(),
-            addresses.parse(clientIp)));
+            addresses.parse(clientIp),
+            body.mfaProof() == null
+                ? null
+                : new IdentityGateway.MfaProof(body.mfaProof().type(), body.mfaProof().code())));
   }
 
   public record Accepted(boolean accepted) {}
@@ -96,5 +99,10 @@ public final class PasswordController {
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
       @NotBlank @Size(max = 254) String contact,
       @NotBlank @Pattern(regexp = "[0-9]{8}") String code,
-      @NotNull @UnicodeCodePointSize(min = 12, max = 128) String newPassword) {}
+      @NotNull @UnicodeCodePointSize(min = 12, max = 128) String newPassword,
+      @Valid RecoveryMfaProof mfaProof) {}
+
+  public record RecoveryMfaProof(
+      @NotBlank @Pattern(regexp = "TOTP|RECOVERY_CODE") String type,
+      @NotBlank @Pattern(regexp = "(?:[0-9]{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})") String code) {}
 }

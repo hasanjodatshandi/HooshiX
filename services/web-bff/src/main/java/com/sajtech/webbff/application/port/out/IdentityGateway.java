@@ -68,11 +68,44 @@ public interface IdentityGateway {
       String contact,
       String code,
       String newPassword,
+      byte[] clientAddress,
+      MfaProof mfaProof);
+
+  default boolean confirmPasswordRecovery(
+      UUID requestId,
+      String channel,
+      String contact,
+      String code,
+      String newPassword,
+      byte[] clientAddress) {
+    return confirmPasswordRecovery(
+        requestId, channel, contact, code, newPassword, clientAddress, null);
+  }
+
+  MfaStatus mfaStatus(UUID requestId, String refresh);
+
+  TotpEnrollmentStart startTotpEnrollment(
+      UUID requestId, String refresh, byte[] clientAddress, MfaProof currentProof);
+
+  MfaMutation confirmTotpEnrollment(
+      UUID requestId,
+      String refresh,
+      String enrollmentChallenge,
+      String totpCode,
       byte[] clientAddress);
+
+  MfaMutation disableTotp(UUID requestId, String refresh, MfaProof proof, byte[] clientAddress);
+
+  MfaMutation rotateRecoveryCodes(
+      UUID requestId, String refresh, MfaProof proof, byte[] clientAddress);
+
+  LoginResult completeMfaAuthentication(
+      UUID requestId, String challenge, MfaProof proof, byte[] clientAddress);
 
   enum SessionMode {
     AUTHENTICATED_ONBOARDING,
-    TENANT_AUTHENTICATED
+    TENANT_AUTHENTICATED,
+    MFA_REQUIRED
   }
 
   record RegisterResult(boolean accepted) {}
@@ -86,7 +119,31 @@ public interface IdentityGateway {
       Instant absoluteExpiresAt,
       SessionMode mode,
       UUID selectedTenantId,
-      UUID selectedMembershipId) {}
+      UUID selectedMembershipId,
+      String mfaChallenge) {
+    public LoginResult(
+        UUID userId,
+        String identitySessionId,
+        UUID refreshFamilyId,
+        String refreshCredential,
+        Instant idleExpiresAt,
+        Instant absoluteExpiresAt,
+        SessionMode mode,
+        UUID selectedTenantId,
+        UUID selectedMembershipId) {
+      this(
+          userId,
+          identitySessionId,
+          refreshFamilyId,
+          refreshCredential,
+          idleExpiresAt,
+          absoluteExpiresAt,
+          mode,
+          selectedTenantId,
+          selectedMembershipId,
+          null);
+    }
+  }
 
   record TenantChoice(UUID tenantId, UUID membershipId, String name, String slug) {}
 
@@ -117,4 +174,17 @@ public interface IdentityGateway {
 
   record PasswordChangeResult(
       String refreshCredential, Instant idleExpiresAt, Instant absoluteExpiresAt) {}
+
+  record MfaProof(String type, String code) {}
+
+  record MfaStatus(boolean totpEnabled, int recoveryCodesRemaining) {}
+
+  record TotpEnrollmentStart(
+      String enrollmentChallenge, String base32Secret, String otpauthUri, Instant expiresAt) {}
+
+  record MfaMutation(LoginResult session, List<String> recoveryCodes) {
+    public MfaMutation {
+      recoveryCodes = List.copyOf(recoveryCodes);
+    }
+  }
 }

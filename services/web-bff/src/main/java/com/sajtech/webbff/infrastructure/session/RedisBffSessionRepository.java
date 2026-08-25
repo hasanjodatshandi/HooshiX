@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 
 public final class RedisBffSessionRepository implements BrowserSessionPort, AutoCloseable {
   private static final Duration PREAUTH = Duration.ofMinutes(10),
+      MFA_PREAUTH = Duration.ofMinutes(5),
       IDLE = Duration.ofDays(7),
       ABSOLUTE = Duration.ofDays(30),
       TOUCH = Duration.ofMinutes(5);
@@ -82,7 +83,7 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
             "");
     create(opaque.locator(), fields, absolute);
     return new BrowserSessionGrant(
-        opaque.cookieValue(), csrf.clear(), decode(opaque.locator(), fields, null));
+        opaque.cookieValue(), csrf.clear(), decode(opaque.locator(), fields, null, null));
   }
 
   public Optional<BrowserSession> load(String cookie) {
@@ -102,6 +103,7 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
       return Optional.empty();
     }
     String refresh = null;
+    String mfaChallenge = null;
     if (f.containsKey("refresh_ciphertext")) {
       try {
         refresh =
@@ -116,7 +118,73 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
         return Optional.empty();
       }
     }
-    return Optional.of(decode(locator, f, refresh));
+    if (f.containsKey("mfa_ciphertext")) {
+      try {
+        mfaChallenge =
+            crypto.decryptMfaChallenge(
+                locator,
+                new EncryptedValue(
+                    req(f, "mfa_key_id"), req(f, "mfa_nonce"), req(f, "mfa_ciphertext")));
+      } catch (RuntimeException exception) {
+        destroyLocator(locator, f);
+        return Optional.empty();
+      }
+    }
+    return Optional.of(decode(locator, f, refresh, mfaChallenge));
+  }
+
+  @Override
+  public BrowserSessionGrant rotateMfaPreauth(
+      BrowserSession old, UUID userId, String mfaChallenge, Instant challengeExpiresAt) {
+    if (old == null
+        || (old.mode() != BrowserSessionMode.PREAUTH
+            && old.mode() != BrowserSessionMode.MFA_PREAUTH)
+        || userId == null
+        || mfaChallenge == null
+        || challengeExpiresAt == null) {
+      throw new IllegalArgumentException("MFA pre-auth session is incomplete");
+    }
+    Instant now = clock.instant();
+    Instant absolute = min(now.plus(MFA_PREAUTH), challengeExpiresAt);
+    if (!now.isBefore(absolute)) {
+      throw new IllegalArgumentException("MFA pre-auth session lifetime is invalid");
+    }
+    var opaque = crypto.issueSessionToken();
+    var csrf = crypto.issueCsrf();
+    var encrypted = crypto.encryptMfaChallenge(opaque.locator(), mfaChallenge);
+    String locatorKeyId = opaque.locator().split(":", 5)[3];
+    String userIndex = crypto.userSessionIndex(locatorKeyId, userId);
+    Map<String, String> fields =
+        base(
+            BrowserSessionMode.MFA_PREAUTH,
+            userId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            csrf.keyId(),
+            csrf.digestHex(),
+            now,
+            absolute,
+            absolute,
+            userIndex);
+    fields.put("mfa_key_id", encrypted.keyId());
+    fields.put("mfa_nonce", encrypted.nonce());
+    fields.put("mfa_ciphertext", encrypted.ciphertext());
+    Long result =
+        connection
+            .sync()
+            .eval(
+                ROTATE,
+                ScriptOutputType.INTEGER,
+                new String[] {old.locator(), opaque.locator()},
+                args(fields, absolute));
+    if (result == null || result != 1L) {
+      throw new IllegalStateException("BFF MFA session rotation failed");
+    }
+    return new BrowserSessionGrant(
+        opaque.cookieValue(), csrf.clear(), decode(opaque.locator(), fields, null, mfaChallenge));
   }
 
   public boolean csrfMatches(BrowserSession session, String clear) {
@@ -323,7 +391,9 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
     if (result == null || result != 1L)
       throw new IllegalStateException("BFF session rotation failed");
     return new BrowserSessionGrant(
-        opaque.cookieValue(), csrf.clear(), decode(opaque.locator(), fields, refreshCredential));
+        opaque.cookieValue(),
+        csrf.clear(),
+        decode(opaque.locator(), fields, refreshCredential, null));
   }
 
   private void create(String locator, Map<String, String> fields, Instant expiry) {
@@ -382,7 +452,8 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
     return f;
   }
 
-  private static BrowserSession decode(String locator, Map<String, String> f, String refresh) {
+  private static BrowserSession decode(
+      String locator, Map<String, String> f, String refresh, String mfaChallenge) {
     return new BrowserSession(
         locator,
         BrowserSessionMode.valueOf(req(f, "mode")),
@@ -397,7 +468,8 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
         time(f, "created_at"),
         time(f, "last_seen_at"),
         time(f, "idle_expires_at"),
-        time(f, "absolute_expires_at"));
+        time(f, "absolute_expires_at"),
+        mfaChallenge);
   }
 
   private void destroyLocator(String locator, Map<String, String> f) {

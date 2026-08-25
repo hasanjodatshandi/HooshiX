@@ -5,6 +5,9 @@ import com.sajtech.identity.application.authentication.AuthenticationException;
 import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.authentication.port.in.AuthenticateLocal;
 import com.sajtech.identity.application.authentication.port.out.*;
+import com.sajtech.identity.application.mfa.model.GeneratedMfaChallenge;
+import com.sajtech.identity.application.mfa.port.out.MfaAuthenticationGate;
+import com.sajtech.identity.application.mfa.port.out.MfaCryptographyPort;
 import com.sajtech.identity.application.registration.RegistrationException;
 import com.sajtech.identity.application.registration.service.ContactCanonicalizer;
 import com.sajtech.identity.application.registration.service.PasswordNormalizer;
@@ -29,6 +32,8 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
   private final TransactionRunner transactions;
   private final AuthenticationStore store;
   private final AuthenticationTenantSelectionPort tenantSelection;
+  private final MfaAuthenticationGate mfa;
+  private final MfaCryptographyPort mfaCryptography;
   private final Clock clock;
 
   public AuthenticateLocalUseCase(
@@ -40,6 +45,8 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
       TransactionRunner transactions,
       AuthenticationStore store,
       AuthenticationTenantSelectionPort tenantSelection,
+      MfaAuthenticationGate mfa,
+      MfaCryptographyPort mfaCryptography,
       Clock clock) {
     this.contacts = contacts;
     this.passwords = passwords;
@@ -49,7 +56,33 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
     this.transactions = transactions;
     this.store = store;
     this.tenantSelection = tenantSelection;
+    this.mfa = mfa;
+    this.mfaCryptography = mfaCryptography;
     this.clock = clock;
+  }
+
+  public AuthenticateLocalUseCase(
+      ContactCanonicalizer contacts,
+      PasswordNormalizer passwords,
+      LoginQuotaPort quota,
+      PasswordVerificationPort verifier,
+      SessionCredentialPort credentials,
+      TransactionRunner transactions,
+      AuthenticationStore store,
+      AuthenticationTenantSelectionPort tenantSelection,
+      Clock clock) {
+    this(
+        contacts,
+        passwords,
+        quota,
+        verifier,
+        credentials,
+        transactions,
+        store,
+        tenantSelection,
+        DisabledMfaGate.INSTANCE,
+        DisabledMfaCryptography.INSTANCE,
+        clock);
   }
 
   public AuthenticateLocalUseCase(
@@ -70,6 +103,8 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
         transactions,
         store,
         userId -> AuthenticationTenantSelection.onboarding(),
+        DisabledMfaGate.INSTANCE,
+        DisabledMfaCryptography.INSTANCE,
         clock);
   }
 
@@ -99,6 +134,7 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
         transactions.required(
             () -> tenantSelection.resolveAfterPrimaryAuthentication(found.userId()));
     GeneratedRefreshCredential refresh = credentials.newRefreshCredential();
+    GeneratedMfaChallenge mfaChallenge = mfaCryptography.generateChallenge();
     PreparedSession prepared =
         new PreparedSession(
             UUID.randomUUID(),
@@ -114,36 +150,50 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
             selection.tenantId(),
             selection.membershipId());
 
-    transactions.required(
-        () -> {
-          LocalCredentialRecord locked =
-              store
-                  .lockVerifiedLocalCredential(found.userId(), contact)
-                  .orElseThrow(AuthenticateLocalUseCase::invalidCredentials);
-          if (!"ACTIVE".equals(locked.userStatus())
-              || !sameHash(found.passwordHash(), locked.passwordHash())) {
-            throw invalidCredentials();
-          }
-          store.expireDueFamilies(found.userId(), now);
-          int active = store.countActiveFamilies(found.userId());
-          if (active < 0 || active > ACTIVE_FAMILY_LIMIT) {
-            throw new AuthenticationException(
-                AuthenticationError.SESSION_STATE_INVALID, "Session family state is invalid");
-          }
-          if (active == ACTIVE_FAMILY_LIMIT) {
-            UUID oldest =
-                store
-                    .oldestActiveFamily(found.userId())
-                    .orElseThrow(
-                        () ->
-                            new AuthenticationException(
-                                AuthenticationError.SESSION_STATE_INVALID,
-                                "Session family state is invalid"));
-            store.revokeFamily(oldest, RefreshFamilyRevocationReason.ACTIVE_FAMILY_LIMIT, now);
-          }
-          store.createSession(prepared);
-          return null;
-        });
+    boolean mfaRequired =
+        transactions.required(
+            () -> {
+              LocalCredentialRecord locked =
+                  store
+                      .lockVerifiedLocalCredential(found.userId(), contact)
+                      .orElseThrow(AuthenticateLocalUseCase::invalidCredentials);
+              if (!"ACTIVE".equals(locked.userStatus())
+                  || !sameHash(found.passwordHash(), locked.passwordHash())) {
+                throw invalidCredentials();
+              }
+              if (mfa.requiresMfa(found.userId())) {
+                mfa.replaceLoginChallenge(
+                    UUID.randomUUID(),
+                    found.userId(),
+                    mfaChallenge,
+                    now,
+                    now.plus(Duration.ofMinutes(5)));
+                return true;
+              }
+              store.expireDueFamilies(found.userId(), now);
+              int active = store.countActiveFamilies(found.userId());
+              if (active < 0 || active > ACTIVE_FAMILY_LIMIT) {
+                throw new AuthenticationException(
+                    AuthenticationError.SESSION_STATE_INVALID, "Session family state is invalid");
+              }
+              if (active == ACTIVE_FAMILY_LIMIT) {
+                UUID oldest =
+                    store
+                        .oldestActiveFamily(found.userId())
+                        .orElseThrow(
+                            () ->
+                                new AuthenticationException(
+                                    AuthenticationError.SESSION_STATE_INVALID,
+                                    "Session family state is invalid"));
+                store.revokeFamily(oldest, RefreshFamilyRevocationReason.ACTIVE_FAMILY_LIMIT, now);
+              }
+              store.createSession(prepared);
+              return false;
+            });
+
+    if (mfaRequired) {
+      return AuthenticationSession.mfaRequired(found.userId(), mfaChallenge.encoded());
+    }
 
     return new AuthenticationSession(
         prepared.sessionId(),
@@ -171,5 +221,70 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
   private static AuthenticationException invalidCredentials() {
     return new AuthenticationException(
         AuthenticationError.INVALID_CREDENTIALS, "Authentication credentials are invalid");
+  }
+
+  private enum DisabledMfaGate implements MfaAuthenticationGate {
+    INSTANCE;
+
+    @Override
+    public boolean requiresMfa(UUID userId) {
+      return false;
+    }
+
+    @Override
+    public void replaceLoginChallenge(
+        UUID challengeId,
+        UUID userId,
+        GeneratedMfaChallenge challenge,
+        Instant now,
+        Instant expiresAt) {
+      throw new UnsupportedOperationException("MFA is disabled");
+    }
+  }
+
+  private enum DisabledMfaCryptography implements MfaCryptographyPort {
+    INSTANCE;
+
+    @Override
+    public com.sajtech.identity.application.mfa.model.GeneratedTotpSecret generateTotpSecret(
+        UUID userId, UUID enrollmentId) {
+      throw new UnsupportedOperationException("MFA is disabled");
+    }
+
+    @Override
+    public java.util.OptionalLong verifyTotp(
+        UUID userId,
+        UUID enrollmentId,
+        com.sajtech.identity.application.mfa.model.EncryptedTotpSecret encrypted,
+        String code,
+        Instant now) {
+      return java.util.OptionalLong.empty();
+    }
+
+    @Override
+    public GeneratedMfaChallenge generateChallenge() {
+      return new GeneratedMfaChallenge(
+          "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          new com.sajtech.identity.application.mfa.model.MfaDigest(
+              new byte[32], "disabled", "disabled"));
+    }
+
+    @Override
+    public java.util.List<com.sajtech.identity.application.mfa.model.MfaDigest>
+        challengeDigestCandidates(String encoded) {
+      return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<com.sajtech.identity.application.mfa.model.GeneratedRecoveryCode>
+        generateRecoveryCodes(UUID enrollmentId) {
+      return java.util.List.of();
+    }
+
+    @Override
+    public java.util.List<com.sajtech.identity.application.mfa.model.MfaDigest>
+        recoveryDigestCandidates(UUID enrollmentId, String encoded) {
+      return java.util.List.of();
+    }
   }
 }

@@ -10,14 +10,14 @@ Maven coordinates:
 
 Example:
 
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.4.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.5.0")
 
 The JAR contains generated Protobuf and gRPC transport classes, Protovalidate rules, and the
 `ContractValidationServerInterceptor` used to enforce those rules at a server boundary.
 
-The current 1.4.0 release adds backward-compatible request validation annotations, executable
-consumer examples, and a reusable fail-closed gRPC request-validation interceptor. It retains all
-1.3.0 operations and wire field numbers.
+The current 1.5.0 release adds the backward-compatible Identity MFA lifecycle and authentication
+challenge contracts, including type-specific TOTP/recovery-code validation and an executable
+consumer example. It retains all 1.4.0 operations and wire field numbers.
 
 ## Validation
 

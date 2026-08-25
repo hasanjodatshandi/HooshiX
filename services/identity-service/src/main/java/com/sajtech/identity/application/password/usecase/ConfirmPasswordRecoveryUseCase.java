@@ -2,6 +2,11 @@ package com.sajtech.identity.application.password.usecase;
 
 import com.sajtech.identity.application.authentication.model.RefreshFamilyRevocationReason;
 import com.sajtech.identity.application.authentication.port.out.AuthenticationStore;
+import com.sajtech.identity.application.mfa.model.MfaProof;
+import com.sajtech.identity.application.mfa.model.MfaProofType;
+import com.sajtech.identity.application.mfa.port.out.MfaCryptographyPort;
+import com.sajtech.identity.application.mfa.port.out.MfaQuotaPort;
+import com.sajtech.identity.application.mfa.port.out.MfaStore;
 import com.sajtech.identity.application.password.PasswordError;
 import com.sajtech.identity.application.password.PasswordException;
 import com.sajtech.identity.application.password.model.PasswordPolicy;
@@ -20,6 +25,7 @@ import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import com.sajtech.identity.domain.registration.valueobject.CanonicalContact;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.OptionalLong;
 
 public final class ConfirmPasswordRecoveryUseCase implements ConfirmPasswordRecovery {
   private final PasswordRecoveryStore recovery;
@@ -32,6 +38,38 @@ public final class ConfirmPasswordRecoveryUseCase implements ConfirmPasswordReco
   private final SemanticQuotaPort quota;
   private final TransactionRunner transactions;
   private final Clock clock;
+  private final MfaStore mfa;
+  private final MfaCryptographyPort mfaCryptography;
+  private final MfaQuotaPort mfaQuota;
+
+  public ConfirmPasswordRecoveryUseCase(
+      PasswordRecoveryStore recovery,
+      PasswordRecoverySecretPort secrets,
+      AuthenticationStore authentication,
+      PasswordHashPort hashes,
+      CompromisedPasswordPort compromised,
+      PasswordNormalizer passwords,
+      ContactCanonicalizer contacts,
+      SemanticQuotaPort quota,
+      TransactionRunner transactions,
+      MfaStore mfa,
+      MfaCryptographyPort mfaCryptography,
+      MfaQuotaPort mfaQuota,
+      Clock clock) {
+    this.recovery = recovery;
+    this.secrets = secrets;
+    this.authentication = authentication;
+    this.hashes = hashes;
+    this.compromised = compromised;
+    this.passwords = passwords;
+    this.contacts = contacts;
+    this.quota = quota;
+    this.transactions = transactions;
+    this.mfa = mfa;
+    this.mfaCryptography = mfaCryptography;
+    this.mfaQuota = mfaQuota;
+    this.clock = clock;
+  }
 
   public ConfirmPasswordRecoveryUseCase(
       PasswordRecoveryStore recovery,
@@ -44,16 +82,20 @@ public final class ConfirmPasswordRecoveryUseCase implements ConfirmPasswordReco
       SemanticQuotaPort quota,
       TransactionRunner transactions,
       Clock clock) {
-    this.recovery = recovery;
-    this.secrets = secrets;
-    this.authentication = authentication;
-    this.hashes = hashes;
-    this.compromised = compromised;
-    this.passwords = passwords;
-    this.contacts = contacts;
-    this.quota = quota;
-    this.transactions = transactions;
-    this.clock = clock;
+    this(
+        recovery,
+        secrets,
+        authentication,
+        hashes,
+        compromised,
+        passwords,
+        contacts,
+        quota,
+        transactions,
+        null,
+        null,
+        null,
+        clock);
   }
 
   @Override
@@ -84,6 +126,8 @@ public final class ConfirmPasswordRecoveryUseCase implements ConfirmPasswordReco
         recovery
             .findActiveByContact(contact.canonicalValue(), now)
             .orElseThrow(ConfirmPasswordRecoveryUseCase::invalidProof);
+    boolean mfaRequired = mfa != null && mfa.requiresMfa(observed.userId());
+    if (mfaRequired) mfaQuota.consumeRecoverySource(command.clientAddress());
     if (!secrets.matches(observed.id(), command.code(), observed.verifier(), observed.keyId())) {
       recordFailedProof(contact, observed.id(), command.code(), now);
       throw invalidProof();
@@ -108,13 +152,47 @@ public final class ConfirmPasswordRecoveryUseCase implements ConfirmPasswordReco
                 recovery.recordFailedProof(locked.id(), now);
                 return Outcome.INVALID;
               }
+              if (mfa != null) {
+                var active = mfa.lockActiveEnrollment(locked.userId()).orElse(null);
+                if (active != null
+                    && (!mfaRequired || !acceptMfaProof(active, command.mfaProof(), now))) {
+                  return Outcome.INVALID_MFA;
+                }
+              }
               authentication.updatePasswordHash(locked.userId(), nextHash, now);
               authentication.revokeAllFamilies(
                   locked.userId(), RefreshFamilyRevocationReason.PASSWORD_CHANGED, now);
               recovery.markUsed(locked.id(), command.requestId(), now);
               return Outcome.COMPLETED;
             });
+    if (outcome == Outcome.INVALID_MFA) {
+      if (!mfaRequired) mfaQuota.consumeRecoverySource(command.clientAddress());
+      mfaQuota.recordRecoveryFailure(observed.userId());
+      throw invalidProof();
+    }
     if (outcome != Outcome.COMPLETED) throw invalidProof();
+  }
+
+  private boolean acceptMfaProof(MfaStore.ActiveEnrollment active, MfaProof proof, Instant now) {
+    if (proof == null) return false;
+    if (proof.type() == MfaProofType.TOTP) {
+      OptionalLong timestep =
+          mfaCryptography.verifyTotp(
+              active.userId(), active.enrollmentId(), active.secret(), proof.code(), now);
+      if (timestep.isEmpty()
+          || (active.lastAcceptedTimestep() != null
+              && timestep.getAsLong() <= active.lastAcceptedTimestep())) return false;
+      mfa.acceptTotp(active.enrollmentId(), timestep.getAsLong(), now);
+      return true;
+    }
+    if (proof.type() == MfaProofType.RECOVERY_CODE) {
+      return mfa.consumeRecoveryCode(
+          active.userId(),
+          active.enrollmentId(),
+          mfaCryptography.recoveryDigestCandidates(active.enrollmentId(), proof.code()),
+          now);
+    }
+    return false;
   }
 
   private void recordFailedProof(
@@ -133,7 +211,8 @@ public final class ConfirmPasswordRecoveryUseCase implements ConfirmPasswordReco
 
   private enum Outcome {
     COMPLETED,
-    INVALID
+    INVALID,
+    INVALID_MFA
   }
 
   private static PasswordException invalid() {

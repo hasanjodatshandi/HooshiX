@@ -7,6 +7,9 @@ import java.util.UUID;
 public interface BrowserSessionPort {
   BrowserSessionGrant bootstrap();
 
+  BrowserSessionGrant rotateMfaPreauth(
+      BrowserSession old, UUID userId, String mfaChallenge, Instant challengeExpiresAt);
+
   BrowserSessionGrant rotateAuthenticated(
       BrowserSession old,
       UUID userId,

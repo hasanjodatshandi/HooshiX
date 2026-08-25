@@ -243,6 +243,21 @@ edges:
       - docs/architecture/services/identity-service.md
       - docs/architecture/services/web-bff.md
 
+  - operation_id: web-bff.identity-mfa
+    caller_owner: Web BFF
+    dependency_id: identity.IdentityMfaService
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "MFA login or lifecycle operation unavailable; fail closed; no Session completion or state-change claim"
+    retry_owner: none
+    fallback: "none; no local proof, stale challenge, factor downgrade, or browser credential authority"
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0012-define-identity-tenant-session-external-and-mfa-v1.md
+      - docs/adr/0016-define-web-bff-browser-oidc-and-session-security-v1.md
+      - docs/adr/0024-harden-semantic-quota-time-safety-v1.md
+      - docs/architecture/services/identity-service.md
+      - docs/architecture/services/web-bff.md
+
   - operation_id: web-bff.identity-password-lifecycle
     caller_owner: Web BFF
     dependency_id: identity.IdentityPasswordService

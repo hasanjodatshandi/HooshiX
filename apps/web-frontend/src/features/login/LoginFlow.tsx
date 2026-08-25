@@ -4,6 +4,8 @@ import { useAppState } from '../../state/appState';
 import { getErrorMessage } from '../../errors/getErrorMessage';
 import * as actions from '../../state/appActions';
 import { canonicalEmail, normalizedCurrentPassword } from '../../validation/userInput';
+import { navigate } from '../../navigation/navigate';
+import { routes } from '../../routes/routes';
 
 export function LoginFlow() {
   const { dispatch } = useAppState();
@@ -17,11 +19,15 @@ export function LoginFlow() {
     setBusy(true);
     setError('');
     try {
-      await bffClient.login({
+      const session = await bffClient.login({
         contact: canonicalEmail(contact),
         password: normalizedCurrentPassword(password),
       });
       setPassword('');
+      if (session.mode === 'MFA_PREAUTH') {
+        navigate(routes.loginMfa);
+        return;
+      }
       dispatch(actions.loginSucceeded());
     } catch (cause) {
       setError(getErrorMessage(cause));

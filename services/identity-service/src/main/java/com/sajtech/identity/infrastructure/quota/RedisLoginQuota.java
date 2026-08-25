@@ -3,6 +3,10 @@ package com.sajtech.identity.infrastructure.quota;
 import com.sajtech.identity.application.authentication.AuthenticationError;
 import com.sajtech.identity.application.authentication.AuthenticationException;
 import com.sajtech.identity.application.authentication.port.out.LoginQuotaPort;
+import com.sajtech.identity.application.mfa.MfaError;
+import com.sajtech.identity.application.mfa.MfaException;
+import com.sajtech.identity.application.mfa.model.MfaQuotaOperation;
+import com.sajtech.identity.application.mfa.port.out.MfaQuotaPort;
 import com.sajtech.identity.application.registration.RegistrationError;
 import com.sajtech.identity.application.registration.RegistrationException;
 import com.sajtech.identity.domain.registration.valueobject.CanonicalContact;
@@ -16,7 +20,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
+public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, AutoCloseable {
   private static final Duration BUDGET = Duration.ofMillis(75);
   private static final String ACTIVE_KEY = "identity:quota:v1:active-count";
   private static final String ALLOCATION_KEY = "identity:quota:v1:allocation-window";
@@ -24,6 +28,10 @@ public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
   private static final Bucket LOGIN_EXACT = new Bucket(120, 500, 900_000);
   private static final Bucket LOGIN_AGGREGATE = new Bucket(240, 500, 900_000);
   private static final Bucket LOGIN_FAILURE = new Bucket(8, 60_000, 900_000);
+  private static final Bucket MFA_USER = new Bucket(5, 600_000, 7_200_000);
+  private static final Bucket MFA_EXACT = new Bucket(30, 60_000, 3_600_000);
+  private static final Bucket MFA_AGGREGATE = new Bucket(60, 60_000, 3_600_000);
+  private static final Bucket MFA_RECOVERY_SUBJECT = new Bucket(6, 900_000, 7_200_000);
   private static final String CONSUME_SCRIPT =
       """
       local app_now=tonumber(ARGV[1])
@@ -52,22 +60,22 @@ public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
       local arg=5
       for i=1,dim_count do
         local key=KEYS[3+i]
-        local hard=tonumber(ARGV[arg]); local cap=tonumber(ARGV[arg+1]); local interval=tonumber(ARGV[arg+2]); local horizon=tonumber(ARGV[arg+3]); arg=arg+4
+        local hard=tonumber(ARGV[arg]); local cap=tonumber(ARGV[arg+1]); local interval=tonumber(ARGV[arg+2]); local horizon=tonumber(ARGV[arg+3]); local cost=tonumber(ARGV[arg+4]); arg=arg+5
         local tokens=tonumber(redis.call('HGET',key,'tokens') or tostring(cap*1000000))
         local last=tonumber(redis.call('HGET',key,'last_ms') or tostring(redis_now))
         local elapsed=math.max(0,redis_now-last)
         local accepted_last=math.max(last,redis_now)
         local refill=math.floor(elapsed*1000000/interval)
         tokens=math.min(cap*1000000,tokens+refill)
-        if hard==1 and tokens<1000000 then any_denied=true end
-        proposed[i]={key=key,hard=hard,cap=cap,interval=interval,horizon=horizon,tokens=tokens,last=accepted_last}
+        if hard==1 and tokens<cost*1000000 then any_denied=true end
+        proposed[i]={key=key,hard=hard,cap=cap,interval=interval,horizon=horizon,cost=cost,tokens=tokens,last=accepted_last}
       end
       if any_denied then return {'QUOTA_EXCEEDED'} end
       for i=1,dim_count do
         local p=proposed[i]
         local existed=redis.call('EXISTS',p.key)
         local tokens=p.tokens
-        if p.hard==1 then tokens=tokens-1000000 elseif tokens>=1000000 then tokens=tokens-1000000 end
+        if p.hard==1 then tokens=tokens-p.cost*1000000 elseif tokens>=p.cost*1000000 then tokens=tokens-p.cost*1000000 end
         redis.call('HSET',p.key,'tokens',tokens,'last_ms',p.last,'last_used_ms',redis_now,'capacity',p.cap,'interval_ms',p.interval,'cleanup_horizon_ms',p.horizon)
         redis.call('ZADD',index_key,redis_now,p.key)
         if existed==0 then redis.call('INCR',active_key) end
@@ -185,6 +193,60 @@ public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
     }
   }
 
+  @Override
+  public void consume(MfaQuotaOperation operation, java.util.UUID userId, byte[] clientAddress) {
+    try {
+      long started = System.nanoTime();
+      long appNow = healthyTime();
+      requireMemoryHeadroom(started);
+      QuotaKeyEncoder.MfaKeys encoded =
+          keys.encodeMfa("MFA_" + operation.name(), userId, clientAddress);
+      consume(
+          started,
+          appNow,
+          List.of(
+              new Dimension(encoded.userKey(), true, MFA_USER),
+              new Dimension(encoded.exactIpKey(), true, MFA_EXACT),
+              new Dimension(encoded.aggregateNetworkKey(), false, MFA_AGGREGATE)));
+    } catch (AuthenticationException exception) {
+      throw mfaQuota(exception);
+    }
+  }
+
+  @Override
+  public void consumeRecoverySource(byte[] clientAddress) {
+    try {
+      long started = System.nanoTime();
+      long appNow = healthyTime();
+      requireMemoryHeadroom(started);
+      QuotaKeyEncoder.LoginSourceKeys encoded = keys.encodeMfaRecoverySource(clientAddress);
+      consume(
+          started,
+          appNow,
+          List.of(
+              new Dimension(encoded.exactIpKey(), true, MFA_EXACT, 2),
+              new Dimension(encoded.aggregateNetworkKey(), false, MFA_AGGREGATE, 2)));
+    } catch (AuthenticationException exception) {
+      throw mfaQuota(exception);
+    }
+  }
+
+  @Override
+  public void recordRecoveryFailure(java.util.UUID userId) {
+    try {
+      long started = System.nanoTime();
+      long appNow = healthyTime();
+      requireMemoryHeadroom(started);
+      consume(
+          started,
+          appNow,
+          List.of(
+              new Dimension(keys.encodeMfaRecoverySubject(userId), true, MFA_RECOVERY_SUBJECT, 2)));
+    } catch (AuthenticationException exception) {
+      throw mfaQuota(exception);
+    }
+  }
+
   private void consume(long started, long appNow, List<Dimension> dimensions) {
     List<String> redisKeys = new ArrayList<>();
     redisKeys.add(ACTIVE_KEY);
@@ -201,6 +263,7 @@ public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
       argv.add(Integer.toString(dimension.policy().capacity()));
       argv.add(Long.toString(dimension.policy().refillIntervalMs()));
       argv.add(Long.toString(dimension.policy().cleanupHorizonMs()));
+      argv.add(Integer.toString(dimension.cost()));
     }
     try {
       Object result =
@@ -296,6 +359,17 @@ public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
         : new AuthenticationException(AuthenticationError.QUOTA_UNAVAILABLE, safe, cause);
   }
 
+  private static MfaException mfaQuota(AuthenticationException exception) {
+    MfaError error =
+        switch (exception.error()) {
+          case QUOTA_EXCEEDED -> MfaError.QUOTA_EXCEEDED;
+          case QUOTA_TIME_SOURCE_UNHEALTHY -> MfaError.QUOTA_TIME_SOURCE_UNHEALTHY;
+          case QUOTA_CAPACITY_UNHEALTHY -> MfaError.QUOTA_CAPACITY_UNHEALTHY;
+          default -> MfaError.QUOTA_UNAVAILABLE;
+        };
+    return new MfaException(error, "MFA quota is unavailable");
+  }
+
   public boolean connectivityHealthy() {
     try {
       return "PONG".equals(connection.sync().ping());
@@ -312,5 +386,9 @@ public final class RedisLoginQuota implements LoginQuotaPort, AutoCloseable {
 
   private record Bucket(int capacity, long refillIntervalMs, long cleanupHorizonMs) {}
 
-  private record Dimension(String key, boolean hard, Bucket policy) {}
+  private record Dimension(String key, boolean hard, Bucket policy, int cost) {
+    Dimension(String key, boolean hard, Bucket policy) {
+      this(key, hard, policy, 1);
+    }
+  }
 }

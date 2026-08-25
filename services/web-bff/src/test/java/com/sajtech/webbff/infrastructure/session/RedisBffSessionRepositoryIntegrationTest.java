@@ -107,6 +107,28 @@ class RedisBffSessionRepositoryIntegrationTest {
     assertThat(keys).allMatch(k -> k.startsWith("web-bff:session:v1:"));
   }
 
+  @Test
+  void mfaPreauthRotationStoresOnlyEncryptedChallengeAndCannotActAsAuthenticatedSession() {
+    BrowserSessionGrant preauth = sessions.bootstrap();
+    UUID userId = UUID.randomUUID();
+    String challenge = "M".repeat(43);
+
+    BrowserSessionGrant mfa =
+        sessions.rotateMfaPreauth(
+            preauth.session(), userId, challenge, clock.instant().plus(Duration.ofMinutes(5)));
+
+    assertThat(sessions.load(preauth.cookieValue())).isEmpty();
+    BrowserSession loaded = sessions.load(mfa.cookieValue()).orElseThrow();
+    assertThat(loaded.mode()).isEqualTo(BrowserSessionMode.MFA_PREAUTH);
+    assertThat(loaded.userId()).isEqualTo(userId);
+    assertThat(loaded.mfaChallenge()).isEqualTo(challenge);
+    assertThat(loaded.refreshCredential()).isNull();
+    assertThat(loaded.authenticated()).isFalse();
+    Map<String, String> raw = sessions.connection().sync().hgetall(loaded.locator());
+    assertThat(raw).doesNotContainValue(challenge);
+    assertThat(raw).containsKeys("mfa_key_id", "mfa_nonce", "mfa_ciphertext");
+  }
+
   private FileBackedKeyRing ring(String name, byte fill, String algorithm, Duration stale)
       throws Exception {
     Path p = temp.resolve(name + ".properties");

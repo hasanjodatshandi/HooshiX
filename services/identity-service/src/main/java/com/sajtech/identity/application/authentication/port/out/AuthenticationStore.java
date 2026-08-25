@@ -45,6 +45,10 @@ public interface AuthenticationStore {
 
   void revokeAllFamilies(UUID userId, RefreshFamilyRevocationReason reason, Instant now);
 
+  default void markMfaAuthenticated(UUID refreshFamilyId, Instant now) {
+    throw new UnsupportedOperationException("MFA assurance mutation is not supported");
+  }
+
   default void revokeOtherFamilies(
       UUID userId, UUID retainedFamilyId, RefreshFamilyRevocationReason reason, Instant now) {
     throw new UnsupportedOperationException("Selective family revocation is not supported");

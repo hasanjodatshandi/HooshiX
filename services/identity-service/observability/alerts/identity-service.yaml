@@ -105,6 +105,34 @@ groups:
           service: identity-service
         annotations:
           summary: Identity Profile/Contact in-flight work is near the transport bound
+      - alert: IdentityMfaUnavailableRateHigh
+        expr: |
+          sum(rate(identity_mfa_duration_seconds_count{outcome=~"QUOTA_UNAVAILABLE|QUOTA_TIME_SOURCE_UNHEALTHY|QUOTA_CAPACITY_UNHEALTHY|STATE_CONFLICT|INTERNAL"}[5m]))
+          /
+          clamp_min(sum(rate(identity_mfa_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity MFA security dependency or state unavailable rate is above 1%
+      - alert: IdentityMfaProofRejectionSpike
+        expr: rate(identity_mfa_proof_rejections_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity MFA proof rejection rate is elevated
+      - alert: IdentityMfaSaturationHigh
+        expr: identity_mfa_in_flight > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity MFA in-flight work is near the transport bound
       - alert: IdentityGrpcAdmissionRejected
         expr: rate(identity_grpc_admission_rejected_total[5m]) > 0
         for: 5m

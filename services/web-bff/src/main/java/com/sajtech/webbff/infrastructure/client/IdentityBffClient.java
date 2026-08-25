@@ -118,6 +118,24 @@ public final class IdentityBffClient implements IdentityGateway {
                           AuthenticationTrustedClientAddress.newBuilder()
                               .setAddress(ByteString.copyFrom(clientAddress)))
                       .build());
+      SessionMode sessionMode = mode(r.getSessionMode());
+      if (sessionMode == SessionMode.MFA_REQUIRED) {
+        if (!r.getMfaChallenge().matches("[A-Za-z0-9_-]{43}")) {
+          throw new BffException(
+              BffError.DEPENDENCY_UNAVAILABLE, "Identity returned invalid MFA challenge");
+        }
+        return new LoginResult(
+            uuid(r.getUserId()),
+            null,
+            null,
+            null,
+            null,
+            null,
+            sessionMode,
+            null,
+            null,
+            r.getMfaChallenge());
+      }
       return new LoginResult(
           uuid(r.getUserId()),
           r.getIdentitySessionId(),
@@ -125,9 +143,10 @@ public final class IdentityBffClient implements IdentityGateway {
           r.getRefreshCredential(),
           instant(r.getRefreshIdleExpiresAt()),
           instant(r.getRefreshAbsoluteExpiresAt()),
-          mode(r.getSessionMode()),
+          sessionMode,
           optionalUuid(r.getSelectedTenantId()),
-          optionalUuid(r.getSelectedMembershipId()));
+          optionalUuid(r.getSelectedMembershipId()),
+          null);
     } catch (StatusRuntimeException e) {
       throw map(e);
     }
@@ -343,19 +362,19 @@ public final class IdentityBffClient implements IdentityGateway {
       String contact,
       String code,
       String newPassword,
-      byte[] clientAddress) {
+      byte[] clientAddress,
+      MfaProof mfaProof) {
     try {
-      return passwordStub()
-          .confirmPasswordRecovery(
-              ConfirmPasswordRecoveryRequest.newBuilder()
-                  .setRequestId(requestId.toString())
-                  .setChannel(authenticationChannel(channelName))
-                  .setPrimaryContact(contact)
-                  .setCode(code)
-                  .setNewPassword(newPassword)
-                  .setClientAddress(passwordClientAddress(clientAddress))
-                  .build())
-          .getChanged();
+      ConfirmPasswordRecoveryRequest.Builder request =
+          ConfirmPasswordRecoveryRequest.newBuilder()
+              .setRequestId(requestId.toString())
+              .setChannel(authenticationChannel(channelName))
+              .setPrimaryContact(contact)
+              .setCode(code)
+              .setNewPassword(newPassword)
+              .setClientAddress(passwordClientAddress(clientAddress));
+      if (mfaProof != null) request.setMfaProof(mfaProof(mfaProof));
+      return passwordStub().confirmPasswordRecovery(request.build()).getChanged();
     } catch (StatusRuntimeException e) {
       throw mapPassword(e);
     }
@@ -366,6 +385,169 @@ public final class IdentityBffClient implements IdentityGateway {
       passwordStub() {
     return com.sajtech.identity.contract.v1.IdentityPasswordServiceGrpc.newBlockingStub(channel)
         .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
+  }
+
+  @Override
+  public MfaStatus mfaStatus(UUID requestId, String refresh) {
+    try {
+      var response =
+          mfaStub()
+              .getMfaStatus(
+                  GetMfaStatusRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .build());
+      return new MfaStatus(
+          response.getTotpEnabled(), Math.toIntExact(response.getRecoveryCodesRemaining()));
+    } catch (StatusRuntimeException exception) {
+      throw mapMfa(exception);
+    }
+  }
+
+  @Override
+  public TotpEnrollmentStart startTotpEnrollment(
+      UUID requestId, String refresh, byte[] clientAddress, MfaProof currentProof) {
+    try {
+      StartTotpEnrollmentRequest.Builder request =
+          StartTotpEnrollmentRequest.newBuilder()
+              .setRequestId(requestId.toString())
+              .setRefreshCredential(refresh)
+              .setClientAddress(authenticationClientAddress(clientAddress));
+      if (currentProof != null) request.setCurrentProof(mfaProof(currentProof));
+      var response = mfaStub().startTotpEnrollment(request.build());
+      return new TotpEnrollmentStart(
+          response.getEnrollmentChallenge(),
+          response.getBase32Secret(),
+          response.getOtpauthUri(),
+          instant(response.getExpiresAt()));
+    } catch (StatusRuntimeException exception) {
+      throw mapMfa(exception);
+    }
+  }
+
+  @Override
+  public MfaMutation confirmTotpEnrollment(
+      UUID requestId,
+      String refresh,
+      String enrollmentChallenge,
+      String totpCode,
+      byte[] clientAddress) {
+    try {
+      var response =
+          mfaStub()
+              .confirmTotpEnrollment(
+                  ConfirmTotpEnrollmentRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setEnrollmentChallenge(enrollmentChallenge)
+                      .setTotpCode(totpCode)
+                      .setClientAddress(authenticationClientAddress(clientAddress))
+                      .build());
+      return mutation(response.getSession(), response.getRecoveryCodesList());
+    } catch (StatusRuntimeException exception) {
+      throw mapMfa(exception);
+    }
+  }
+
+  @Override
+  public MfaMutation disableTotp(
+      UUID requestId, String refresh, MfaProof proof, byte[] clientAddress) {
+    try {
+      var response =
+          mfaStub()
+              .disableTotp(
+                  DisableTotpRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setProof(mfaProof(proof))
+                      .setClientAddress(authenticationClientAddress(clientAddress))
+                      .build());
+      return mutation(response.getSession(), List.of());
+    } catch (StatusRuntimeException exception) {
+      throw mapMfa(exception);
+    }
+  }
+
+  @Override
+  public MfaMutation rotateRecoveryCodes(
+      UUID requestId, String refresh, MfaProof proof, byte[] clientAddress) {
+    try {
+      var response =
+          mfaStub()
+              .rotateRecoveryCodes(
+                  RotateRecoveryCodesRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setProof(mfaProof(proof))
+                      .setClientAddress(authenticationClientAddress(clientAddress))
+                      .build());
+      return mutation(response.getSession(), response.getRecoveryCodesList());
+    } catch (StatusRuntimeException exception) {
+      throw mapMfa(exception);
+    }
+  }
+
+  @Override
+  public LoginResult completeMfaAuthentication(
+      UUID requestId, String challenge, MfaProof proof, byte[] clientAddress) {
+    try {
+      var response =
+          mfaStub()
+              .completeMfaAuthentication(
+                  CompleteMfaAuthenticationRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setMfaChallenge(challenge)
+                      .setProof(mfaProof(proof))
+                      .setClientAddress(authenticationClientAddress(clientAddress))
+                      .build());
+      return session(response.getSession());
+    } catch (StatusRuntimeException exception) {
+      throw mapMfa(exception);
+    }
+  }
+
+  private IdentityMfaServiceGrpc.IdentityMfaServiceBlockingStub mfaStub() {
+    return IdentityMfaServiceGrpc.newBlockingStub(channel)
+        .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
+  }
+
+  private static MfaMutation mutation(
+      MfaSessionCredentials credentials, List<String> recoveryCodes) {
+    return new MfaMutation(session(credentials), recoveryCodes);
+  }
+
+  private static LoginResult session(MfaSessionCredentials value) {
+    return new LoginResult(
+        uuid(value.getUserId()),
+        value.getIdentitySessionId(),
+        uuid(value.getRefreshFamilyId()),
+        value.getRefreshCredential(),
+        instant(value.getRefreshIdleExpiresAt()),
+        instant(value.getRefreshAbsoluteExpiresAt()),
+        mode(value.getSessionMode()),
+        optionalUuid(value.getSelectedTenantId()),
+        optionalUuid(value.getSelectedMembershipId()),
+        null);
+  }
+
+  private static com.sajtech.identity.contract.v1.MfaProof mfaProof(MfaProof value) {
+    if (value == null) throw new BffException(BffError.INVALID_REQUEST, "MFA proof is required");
+    return com.sajtech.identity.contract.v1.MfaProof.newBuilder()
+        .setType(
+            switch (value.type()) {
+              case "TOTP" -> MfaProofType.MFA_PROOF_TYPE_TOTP;
+              case "RECOVERY_CODE" -> MfaProofType.MFA_PROOF_TYPE_RECOVERY_CODE;
+              default ->
+                  throw new BffException(BffError.INVALID_REQUEST, "MFA proof type is invalid");
+            })
+        .setCode(value.code())
+        .build();
+  }
+
+  private static AuthenticationTrustedClientAddress authenticationClientAddress(byte[] value) {
+    return AuthenticationTrustedClientAddress.newBuilder()
+        .setAddress(ByteString.copyFrom(value))
+        .build();
   }
 
   private static AuthenticationChannel authenticationChannel(String value) {
@@ -559,6 +741,20 @@ public final class IdentityBffClient implements IdentityGateway {
     };
   }
 
+  private static BffException mapMfa(StatusRuntimeException e) {
+    return switch (e.getStatus().getCode()) {
+      case UNAUTHENTICATED ->
+          new BffException(BffError.AUTHENTICATION_FAILED, "MFA proof was rejected", e);
+      case RESOURCE_EXHAUSTED ->
+          new BffException(BffError.RATE_LIMITED, "MFA request quota exceeded", e);
+      case FAILED_PRECONDITION, ABORTED ->
+          new BffException(BffError.INVALID_REQUEST, "MFA request precondition failed", e);
+      case INVALID_ARGUMENT ->
+          new BffException(BffError.INVALID_REQUEST, "MFA request is invalid", e);
+      default -> new BffException(BffError.DEPENDENCY_UNAVAILABLE, "MFA is unavailable", e);
+    };
+  }
+
   private static BffException map(StatusRuntimeException e) {
     return switch (e.getStatus().getCode()) {
       case UNAUTHENTICATED ->
@@ -610,6 +806,7 @@ public final class IdentityBffClient implements IdentityGateway {
       case AUTHENTICATION_SESSION_MODE_AUTHENTICATED_ONBOARDING ->
           SessionMode.AUTHENTICATED_ONBOARDING;
       case AUTHENTICATION_SESSION_MODE_TENANT_AUTHENTICATED -> SessionMode.TENANT_AUTHENTICATED;
+      case AUTHENTICATION_SESSION_MODE_MFA_REQUIRED -> SessionMode.MFA_REQUIRED;
       default ->
           throw new BffException(
               BffError.DEPENDENCY_UNAVAILABLE, "Identity returned unexpected session mode");

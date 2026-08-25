@@ -46,22 +46,29 @@ public final class IdentityAuthenticationGrpcService
                   request.getContact(),
                   request.getPassword(),
                   address(request.getClientAddress().getAddress())));
-      observer.onNext(
+      AuthenticateLocalResponse.Builder response =
           AuthenticateLocalResponse.newBuilder()
-              .setIdentitySessionId(session.sessionId())
-              .setRefreshFamilyId(session.refreshFamilyId().toString())
-              .setRefreshCredential(session.refreshCredential())
-              .setRefreshIdleExpiresAt(timestamp(session.idleExpiresAt()))
-              .setRefreshAbsoluteExpiresAt(timestamp(session.absoluteExpiresAt()))
               .setSessionMode(mode(session.mode()))
-              .setUserId(session.userId().toString())
-              .setSelectedTenantId(
-                  session.selectedTenantId() == null ? "" : session.selectedTenantId().toString())
-              .setSelectedMembershipId(
-                  session.selectedMembershipId() == null
-                      ? ""
-                      : session.selectedMembershipId().toString())
-              .build());
+              .setUserId(session.userId().toString());
+      if (session.mode()
+          == com.sajtech.identity.application.authentication.model.AuthenticationSessionMode
+              .MFA_REQUIRED) {
+        response.setMfaChallenge(session.mfaChallenge());
+      } else {
+        response
+            .setIdentitySessionId(session.sessionId())
+            .setRefreshFamilyId(session.refreshFamilyId().toString())
+            .setRefreshCredential(session.refreshCredential())
+            .setRefreshIdleExpiresAt(timestamp(session.idleExpiresAt()))
+            .setRefreshAbsoluteExpiresAt(timestamp(session.absoluteExpiresAt()))
+            .setSelectedTenantId(
+                session.selectedTenantId() == null ? "" : session.selectedTenantId().toString())
+            .setSelectedMembershipId(
+                session.selectedMembershipId() == null
+                    ? ""
+                    : session.selectedMembershipId().toString());
+      }
+      observer.onNext(response.build());
       observer.onCompleted();
     } catch (AuthenticationException exception) {
       observer.onError(status(exception).asRuntimeException());
@@ -195,6 +202,9 @@ public final class IdentityAuthenticationGrpcService
       case TENANT_AUTHENTICATED ->
           com.sajtech.identity.contract.v1.AuthenticationSessionMode
               .AUTHENTICATION_SESSION_MODE_TENANT_AUTHENTICATED;
+      case MFA_REQUIRED ->
+          com.sajtech.identity.contract.v1.AuthenticationSessionMode
+              .AUTHENTICATION_SESSION_MODE_MFA_REQUIRED;
     };
   }
 

@@ -123,6 +123,13 @@ public final class SessionCrypto {
     }
   }
 
+  public EncryptedValue encryptMfaChallenge(String locator, String challenge) {
+    if (challenge == null || !challenge.matches("[A-Za-z0-9_-]{43}")) {
+      throw new IllegalArgumentException("MFA challenge is invalid");
+    }
+    return encrypt(locator, challenge, "mfa-challenge");
+  }
+
   public String decryptRefresh(String locator, EncryptedValue value) {
     if (locator == null || value == null)
       throw new IllegalArgumentException("Encrypted refresh value is missing");
@@ -149,6 +156,64 @@ public final class SessionCrypto {
     }
   }
 
+  public String decryptMfaChallenge(String locator, EncryptedValue value) {
+    String challenge = decrypt(locator, value, "mfa-challenge");
+    if (!challenge.matches("[A-Za-z0-9_-]{43}")) {
+      throw new IllegalStateException("MFA challenge is malformed");
+    }
+    return challenge;
+  }
+
+  private EncryptedValue encrypt(String locator, String value, String purpose) {
+    if (locator == null || value == null || value.isBlank() || value.length() > 1024) {
+      throw new IllegalArgumentException("Encrypted session value is invalid");
+    }
+    var key = encryptionKeys.activeKey();
+    byte[] nonce = random(12);
+    byte[] plaintext = value.getBytes(StandardCharsets.UTF_8);
+    try {
+      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+      cipher.init(Cipher.ENCRYPT_MODE, key.key(), new GCMParameterSpec(128, nonce));
+      cipher.updateAAD(aad(locator, key.keyId(), purpose));
+      byte[] encrypted = cipher.doFinal(plaintext);
+      return new EncryptedValue(
+          key.keyId(), B64.encodeToString(nonce), B64.encodeToString(encrypted));
+    } catch (GeneralSecurityException exception) {
+      throw new IllegalStateException("Session encryption is unavailable", exception);
+    } finally {
+      Arrays.fill(nonce, (byte) 0);
+      Arrays.fill(plaintext, (byte) 0);
+    }
+  }
+
+  private String decrypt(String locator, EncryptedValue value, String purpose) {
+    if (locator == null || value == null) {
+      throw new IllegalArgumentException("Encrypted session value is missing");
+    }
+    byte[] nonce = B64(value.nonce());
+    byte[] ciphertext = B64(value.ciphertext());
+    try {
+      if (nonce.length != 12 || ciphertext.length < 16 || ciphertext.length > 2048) {
+        throw new IllegalArgumentException("Encrypted session value is invalid");
+      }
+      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+      cipher.init(
+          Cipher.DECRYPT_MODE, encryptionKeys.key(value.keyId()), new GCMParameterSpec(128, nonce));
+      cipher.updateAAD(aad(locator, value.keyId(), purpose));
+      byte[] clear = cipher.doFinal(ciphertext);
+      try {
+        return new String(clear, StandardCharsets.UTF_8);
+      } finally {
+        Arrays.fill(clear, (byte) 0);
+      }
+    } catch (GeneralSecurityException | IllegalArgumentException exception) {
+      throw new IllegalStateException("Session decryption is unavailable", exception);
+    } finally {
+      Arrays.fill(nonce, (byte) 0);
+      Arrays.fill(ciphertext, (byte) 0);
+    }
+  }
+
   private String locator(String keyId, String token) {
     return "web-bff:session:v1:"
         + keyId
@@ -158,6 +223,11 @@ public final class SessionCrypto {
 
   private static byte[] aad(String locator, String keyId) {
     return ("hooshix:web-bff:refresh:v1\0" + keyId + "\0" + locator)
+        .getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static byte[] aad(String locator, String keyId, String purpose) {
+    return ("hooshix:web-bff:" + purpose + ":v1\0" + keyId + "\0" + locator)
         .getBytes(StandardCharsets.UTF_8);
   }
 

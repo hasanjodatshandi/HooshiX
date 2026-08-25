@@ -225,7 +225,7 @@ message GetResponse {}
             examples.mkdir(parents=True)
             (examples / "get.valid.json").write_text("{}\n", encoding="utf-8")
             (contract / "build.gradle.kts").write_text(
-                '''version = "1.4.0"
+                '''version = "1.5.0"
 api("build.buf:protovalidate:1.2.2")
 val prepareBufDependencies = true
 ''',

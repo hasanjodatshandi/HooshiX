@@ -41,6 +41,7 @@ identity:
   fingerprint-key-ring-path: ${IDENTITY_FINGERPRINT_KEY_RING_PATH:/run/secrets/identity-fingerprint/fingerprint.properties}
   challenge-key-ring-path: ${IDENTITY_CHALLENGE_KEY_RING_PATH:/run/secrets/identity-challenge/challenge.properties}
   handoff-key-ring-path: ${IDENTITY_HANDOFF_KEY_RING_PATH:/run/secrets/identity-handoff/handoff.properties}
+  mfa-key-ring-path: ${IDENTITY_MFA_KEY_RING_PATH:/run/secrets/identity-mfa/mfa.properties}
   refresh-key-ring-path: ${IDENTITY_REFRESH_KEY_RING_PATH:/run/secrets/identity-refresh/refresh.properties}
   key-ring-maximum-staleness: ${IDENTITY_KEY_RING_MAXIMUM_STALENESS:2m}
   argon2-max-concurrent-hashes: ${IDENTITY_ARGON2_MAX_CONCURRENT_HASHES:0}
@@ -82,6 +83,7 @@ management:
       percentiles-histogram:
         identity.registration.duration: true
         identity.authentication.duration: true
+        identity.mfa.duration: true
         identity.password_lifecycle.duration: true
         identity.tenant.duration: true
         identity.dependency.duration: true

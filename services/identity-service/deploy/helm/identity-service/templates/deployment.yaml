@@ -13,6 +13,7 @@
 {{- $fingerprint := required "secrets.fingerprintSecretName is required" .Values.secrets.fingerprintSecretName -}}
 {{- $challenge := required "secrets.challengeSecretName is required" .Values.secrets.challengeSecretName -}}
 {{- $handoff := required "secrets.handoffSecretName is required" .Values.secrets.handoffSecretName -}}
+{{- $mfa := required "secrets.mfaSecretName is required" .Values.secrets.mfaSecretName -}}
 {{- $quotaKey := required "secrets.quotaKeySecretName is required" .Values.secrets.quotaKeySecretName -}}
 {{- $quotaRedis := required "quota.redis.connectionSecretName is required" .Values.quota.redis.connectionSecretName -}}
 {{- $hostTime := required "quota.hostTimeStatus.configMapName is required" .Values.quota.hostTimeStatus.configMapName -}}
@@ -122,6 +123,7 @@ spec:
             - {name: fingerprint-key, mountPath: /run/secrets/identity-fingerprint, readOnly: true}
             - {name: challenge-key, mountPath: /run/secrets/identity-challenge, readOnly: true}
             - {name: handoff-key, mountPath: /run/secrets/identity-handoff, readOnly: true}
+            - {name: mfa-key, mountPath: /run/secrets/identity-mfa, readOnly: true}
             - {name: quota-key, mountPath: /run/secrets/identity-quota, readOnly: true}
             {{- if .Values.runtime.authenticationRuntimeEnabled }}
             - {name: refresh-key, mountPath: /run/secrets/identity-refresh, readOnly: true}
@@ -142,6 +144,8 @@ spec:
           secret: {secretName: {{ $challenge | quote }}, defaultMode: 0440, items: [{key: challenge.properties, path: challenge.properties}]}
         - name: handoff-key
           secret: {secretName: {{ $handoff | quote }}, defaultMode: 0440, items: [{key: handoff.properties, path: handoff.properties}]}
+        - name: mfa-key
+          secret: {secretName: {{ $mfa | quote }}, defaultMode: 0440, items: [{key: mfa.properties, path: mfa.properties}]}
         - name: quota-key
           secret: {secretName: {{ $quotaKey | quote }}, defaultMode: 0440, items: [{key: quota.properties, path: quota.properties}]}
         {{- if .Values.runtime.authenticationRuntimeEnabled }}
