@@ -27,8 +27,6 @@ apps/web-frontend/.env.example
 apps/web-frontend/.gitignore
 apps/web-frontend/.nvmrc
 apps/web-frontend/README.md
-apps/web-frontend/dist/assets/index-B8wcs8VD.js
-apps/web-frontend/dist/index.html
 apps/web-frontend/e2e/accessibility-audit.md
 apps/web-frontend/e2e/onboarding.spec.ts
 apps/web-frontend/e2e/password-recovery.spec.ts
@@ -68,7 +66,6 @@ apps/web-frontend/src/state/appState.tsx
 apps/web-frontend/src/state/flow.ts
 apps/web-frontend/src/state/storage.ts
 apps/web-frontend/src/state/validation.ts
-apps/web-frontend/test-results/.last-run.json
 apps/web-frontend/tsconfig.json
 apps/web-frontend/vite.config.ts
 context/bootstrap.json
