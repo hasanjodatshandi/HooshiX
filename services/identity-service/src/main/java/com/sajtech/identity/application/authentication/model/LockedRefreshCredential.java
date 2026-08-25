@@ -16,7 +16,39 @@ public record LockedRefreshCredential(
     UUID selectedMembershipId,
     Instant authenticatedAt,
     Instant idleExpiresAt,
-    Instant absoluteExpiresAt) {
+    Instant absoluteExpiresAt,
+    Instant mfaAuthenticatedAt) {
+  public LockedRefreshCredential(
+      UUID credentialId,
+      UUID refreshFamilyId,
+      String sessionId,
+      UUID userId,
+      String credentialState,
+      String familyState,
+      String userStatus,
+      AuthenticationSessionMode sessionMode,
+      UUID selectedTenantId,
+      UUID selectedMembershipId,
+      Instant authenticatedAt,
+      Instant idleExpiresAt,
+      Instant absoluteExpiresAt) {
+    this(
+        credentialId,
+        refreshFamilyId,
+        sessionId,
+        userId,
+        credentialState,
+        familyState,
+        userStatus,
+        sessionMode,
+        selectedTenantId,
+        selectedMembershipId,
+        authenticatedAt,
+        idleExpiresAt,
+        absoluteExpiresAt,
+        null);
+  }
+
   public LockedRefreshCredential(
       UUID credentialId,
       UUID refreshFamilyId,
@@ -42,7 +74,8 @@ public record LockedRefreshCredential(
         null,
         authenticatedAt,
         idleExpiresAt,
-        absoluteExpiresAt);
+        absoluteExpiresAt,
+        null);
   }
 
   public LockedRefreshCredential(
@@ -65,9 +98,12 @@ public record LockedRefreshCredential(
         familyState,
         userStatus,
         sessionMode,
+        null,
+        null,
         Instant.EPOCH,
         idleExpiresAt,
-        absoluteExpiresAt);
+        absoluteExpiresAt,
+        null);
   }
 
   public LockedRefreshCredential(
@@ -96,6 +132,7 @@ public record LockedRefreshCredential(
         selectedMembershipId,
         Instant.EPOCH,
         idleExpiresAt,
-        absoluteExpiresAt);
+        absoluteExpiresAt,
+        null);
   }
 }

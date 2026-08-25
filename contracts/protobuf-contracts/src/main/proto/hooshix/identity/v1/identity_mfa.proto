@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package hooshix.identity.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "hooshix/identity/v1/identity_authentication.proto";
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.v1";
+
+service IdentityMfaService {
+  rpc GetMfaStatus(GetMfaStatusRequest) returns (GetMfaStatusResponse);
+  rpc StartTotpEnrollment(StartTotpEnrollmentRequest) returns (StartTotpEnrollmentResponse);
+  rpc ConfirmTotpEnrollment(ConfirmTotpEnrollmentRequest) returns (ConfirmTotpEnrollmentResponse);
+  rpc DisableTotp(DisableTotpRequest) returns (DisableTotpResponse);
+  rpc RotateRecoveryCodes(RotateRecoveryCodesRequest) returns (RotateRecoveryCodesResponse);
+  rpc CompleteMfaAuthentication(CompleteMfaAuthenticationRequest) returns (CompleteMfaAuthenticationResponse);
+}
+
+enum MfaProofType {
+  MFA_PROOF_TYPE_UNSPECIFIED = 0;
+  MFA_PROOF_TYPE_TOTP = 1;
+  MFA_PROOF_TYPE_RECOVERY_CODE = 2;
+}
+
+message MfaProof {
+  option (buf.validate.message).cel = {
+    id: "mfa_proof.code_shape"
+    message: "code must match the selected MFA proof type"
+    expression: "(this.type == 1 && this.code.matches('^[0-9]{6}$')) || (this.type == 2 && this.code.matches('^[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$'))"
+  };
+
+  MfaProofType type = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string code = 2 [(buf.validate.field).string = {
+    min_len: 6
+    max_len: 19
+  }];
+}
+
+message MfaSessionCredentials {
+  option (buf.validate.message).cel = {
+    id: "mfa_session_credentials.tenant_context_shape"
+    message: "tenant context must be absent for onboarding and complete for tenant-authenticated sessions"
+    expression: "(this.session_mode == 1 && this.selected_tenant_id == '' && this.selected_membership_id == '') || (this.session_mode == 2 && this.selected_tenant_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && this.selected_membership_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'))"
+  };
+
+  string identity_session_id = 1 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string refresh_family_id = 2 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 3 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  google.protobuf.Timestamp refresh_idle_expires_at = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp refresh_absolute_expires_at = 5 [(buf.validate.field).required = true];
+  AuthenticationSessionMode session_mode = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    in: 1
+    in: 2
+  }];
+  string user_id = 7 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string selected_tenant_id = 8 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string selected_membership_id = 9 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+}
+
+message GetMfaStatusRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+}
+
+message GetMfaStatusResponse {
+  bool totp_enabled = 1;
+  uint32 recovery_codes_remaining = 2 [(buf.validate.field).uint32 = {lte: 10}];
+}
+
+message StartTotpEnrollmentRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  AuthenticationTrustedClientAddress client_address = 3 [(buf.validate.field).required = true];
+  MfaProof current_proof = 4;
+}
+
+message StartTotpEnrollmentResponse {
+  string enrollment_challenge = 1 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string base32_secret = 2 [(buf.validate.field).string = {pattern: "^[A-Z2-7]{52}$"}];
+  string otpauth_uri = 3 [(buf.validate.field).string = {
+    prefix: "otpauth://totp/"
+    max_len: 512
+  }];
+  google.protobuf.Timestamp expires_at = 4 [(buf.validate.field).required = true];
+}
+
+message ConfirmTotpEnrollmentRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string enrollment_challenge = 3 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string totp_code = 4 [(buf.validate.field).string = {pattern: "^[0-9]{6}$"}];
+  AuthenticationTrustedClientAddress client_address = 5 [(buf.validate.field).required = true];
+}
+
+message ConfirmTotpEnrollmentResponse {
+  repeated string recovery_codes = 1 [(buf.validate.field).repeated = {
+    min_items: 10
+    max_items: 10
+    unique: true
+    items: {
+      string: {pattern: "^[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$"}
+    }
+  }];
+  MfaSessionCredentials session = 2 [(buf.validate.field).required = true];
+}
+
+message DisableTotpRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  MfaProof proof = 3 [(buf.validate.field).required = true];
+  AuthenticationTrustedClientAddress client_address = 4 [(buf.validate.field).required = true];
+}
+
+message DisableTotpResponse {
+  MfaSessionCredentials session = 1 [(buf.validate.field).required = true];
+}
+
+message RotateRecoveryCodesRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  MfaProof proof = 3 [(buf.validate.field).required = true];
+  AuthenticationTrustedClientAddress client_address = 4 [(buf.validate.field).required = true];
+}
+
+message RotateRecoveryCodesResponse {
+  repeated string recovery_codes = 1 [(buf.validate.field).repeated = {
+    min_items: 10
+    max_items: 10
+    unique: true
+    items: {
+      string: {pattern: "^[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$"}
+    }
+  }];
+  MfaSessionCredentials session = 2 [(buf.validate.field).required = true];
+}
+
+message CompleteMfaAuthenticationRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string mfa_challenge = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  MfaProof proof = 3 [(buf.validate.field).required = true];
+  AuthenticationTrustedClientAddress client_address = 4 [(buf.validate.field).required = true];
+}
+
+message CompleteMfaAuthenticationResponse {
+  MfaSessionCredentials session = 1 [(buf.validate.field).required = true];
+}

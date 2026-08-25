@@ -7,6 +7,9 @@ import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.authentication.port.out.SessionCredentialPort;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.RefreshSessionUseCase;
+import com.sajtech.identity.application.mfa.MfaError;
+import com.sajtech.identity.application.mfa.MfaException;
+import com.sajtech.identity.application.mfa.model.*;
 import com.sajtech.identity.application.password.port.out.PreparedPasswordRecovery;
 import com.sajtech.identity.application.registration.model.EncryptedHandoff;
 import com.sajtech.identity.domain.registration.valueobject.CanonicalContact;
@@ -161,6 +164,29 @@ class IdentityAuthenticationPersistenceIntegrationTest {
   }
 
   @Test
+  void mfaAssuranceTimeIsPersistedWhenCurrentRefreshRotates() {
+    RefreshDigest oldDigest = digest((byte) 91);
+    RefreshDigest nextDigest = digest((byte) 92);
+    UUID family = UUID.randomUUID();
+    tx.required(
+        () -> {
+          store.createSession(session(family, oldDigest));
+          LockedRefreshCredential locked = store.lockRefreshCredential(oldDigest).orElseThrow();
+          store.markMfaAuthenticated(family, NOW.plusSeconds(60));
+          store.rotateRefresh(
+              locked,
+              UUID.randomUUID(),
+              nextDigest,
+              NOW.plusSeconds(60),
+              NOW.plus(Duration.ofDays(7)));
+          return null;
+        });
+
+    LockedRefreshCredential rotated = store.lockRefreshCredential(nextDigest).orElseThrow();
+    assertThat(rotated.mfaAuthenticatedAt()).isEqualTo(NOW.plusSeconds(60));
+  }
+
+  @Test
   void simultaneousRefreshSerializesAndSecondPredecessorUseRevokesFamily() throws Exception {
     RefreshDigest oldDigest = digest((byte) 3);
     UUID family = UUID.randomUUID();
@@ -292,6 +318,134 @@ class IdentityAuthenticationPersistenceIntegrationTest {
     assertThat(recovery.findActiveByContact(contact.canonicalValue(), NOW)).isEmpty();
   }
 
+  @Test
+  void mfaTotpTimestepAndRecoveryCodeConsumptionAreAtomicAndNonReplayable() {
+    JooqMfaStore mfa = new JooqMfaStore(dsl);
+    UUID enrollmentId = UUID.randomUUID();
+    insertActiveMfaEnrollment(enrollmentId, 100L);
+    List<GeneratedRecoveryCode> original = recoveryCodes((byte) 10);
+    tx.required(
+        () -> {
+          mfa.replaceRecoveryCodes(userId, enrollmentId, original, NOW);
+          return null;
+        });
+
+    assertThat(mfa.requiresMfa(userId)).isTrue();
+    assertThat(mfa.status(userId)).isEqualTo(new MfaStatus(true, 10));
+    tx.required(
+        () -> {
+          mfa.acceptTotp(enrollmentId, 101L, NOW.plusSeconds(30));
+          return null;
+        });
+    assertThatThrownBy(
+            () ->
+                tx.required(
+                    () -> {
+                      mfa.acceptTotp(enrollmentId, 101L, NOW.plusSeconds(31));
+                      return null;
+                    }))
+        .isInstanceOfSatisfying(
+            MfaException.class,
+            exception -> assertThat(exception.error()).isEqualTo(MfaError.REPLAYED_PROOF));
+
+    GeneratedRecoveryCode used = original.getFirst();
+    assertThat(
+            tx.required(
+                () ->
+                    mfa.consumeRecoveryCode(
+                        userId, enrollmentId, List.of(used.digest()), NOW.plusSeconds(40))))
+        .isTrue();
+    assertThat(
+            tx.required(
+                () ->
+                    mfa.consumeRecoveryCode(
+                        userId, enrollmentId, List.of(used.digest()), NOW.plusSeconds(41))))
+        .isFalse();
+    assertThat(mfa.status(userId)).isEqualTo(new MfaStatus(true, 9));
+
+    List<GeneratedRecoveryCode> replacement = recoveryCodes((byte) 40);
+    tx.required(
+        () -> {
+          mfa.replaceRecoveryCodes(userId, enrollmentId, replacement, NOW.plusSeconds(50));
+          return null;
+        });
+    assertThat(mfa.status(userId)).isEqualTo(new MfaStatus(true, 10));
+    assertThat(
+            tx.required(
+                () ->
+                    mfa.consumeRecoveryCode(
+                        userId,
+                        enrollmentId,
+                        List.of(original.get(1).digest()),
+                        NOW.plusSeconds(51))))
+        .isFalse();
+  }
+
+  @Test
+  void newPrimaryProofSupersedesPriorMfaLoginChallengeAndFifthFailureExhaustsIt() {
+    JooqMfaStore mfa = new JooqMfaStore(dsl);
+    var first = challenge((byte) 1);
+    var second = challenge((byte) 2);
+    UUID firstId = UUID.randomUUID();
+    UUID secondId = UUID.randomUUID();
+
+    tx.required(
+        () -> {
+          mfa.replaceLoginChallenge(firstId, userId, first, NOW, NOW.plus(Duration.ofMinutes(5)));
+          mfa.replaceLoginChallenge(
+              secondId, userId, second, NOW.plusSeconds(1), NOW.plus(Duration.ofMinutes(5)));
+          return null;
+        });
+
+    assertThat(mfa.findLoginChallenge(List.of(first.digest())).orElseThrow().state())
+        .isEqualTo("SUPERSEDED");
+    assertThat(mfa.findLoginChallenge(List.of(second.digest())).orElseThrow().state())
+        .isEqualTo("ACTIVE");
+    tx.required(
+        () -> {
+          mfa.recordLoginFailure(secondId, 5, NOW.plusSeconds(2));
+          return null;
+        });
+    assertThat(mfa.findLoginChallenge(List.of(second.digest())).orElseThrow().state())
+        .isEqualTo("EXHAUSTED");
+  }
+
+  @Test
+  void mfaRetentionErasesExpiredPendingSecretsAndBoundsChallengeEvidenceCleanup() {
+    JooqMfaStore mfa = new JooqMfaStore(dsl);
+    GeneratedMfaChallenge pendingChallenge = challenge((byte) 3);
+    GeneratedMfaChallenge loginChallenge = challenge((byte) 4);
+    UUID pendingId = UUID.randomUUID();
+    UUID loginId = UUID.randomUUID();
+    Instant expiresAt = NOW.plus(Duration.ofMinutes(5));
+
+    tx.required(
+        () -> {
+          mfa.replacePendingEnrollment(
+              new com.sajtech.identity.application.mfa.port.out.MfaStore.PreparedPendingEnrollment(
+                  pendingId,
+                  userId,
+                  null,
+                  pendingChallenge,
+                  new EncryptedTotpSecret("mfa-k1", new byte[12], new byte[48]),
+                  null,
+                  expiresAt,
+                  NOW),
+              NOW);
+          mfa.replaceLoginChallenge(loginId, userId, loginChallenge, NOW, expiresAt);
+          return null;
+        });
+
+    assertThat(mfa.deletePendingEnrollmentsBefore(expiresAt.minusNanos(1_000), 128)).isZero();
+    assertThat(mfa.deletePendingEnrollmentsBefore(expiresAt, 128)).isEqualTo(1);
+    assertThat(mfa.lockPendingEnrollment(List.of(pendingChallenge.digest()))).isEmpty();
+    assertThat(mfa.deleteLoginChallengesBefore(expiresAt, 128)).isZero();
+    assertThat(mfa.deleteLoginChallengesBefore(expiresAt.plusNanos(1_000), 128)).isEqualTo(1);
+    assertThat(mfa.findLoginChallenge(List.of(loginChallenge.digest()))).isEmpty();
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> mfa.deletePendingEnrollmentsBefore(expiresAt, 257));
+  }
+
   private PreparedSession session(UUID family, RefreshDigest digest) {
     return new PreparedSession(
         family,
@@ -317,6 +471,46 @@ class IdentityAuthenticationPersistenceIntegrationTest {
         user,
         OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
         OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+  }
+
+  private void insertActiveMfaEnrollment(UUID enrollmentId, long timestep) {
+    dsl.execute(
+        """
+        INSERT INTO identity_totp_enrollment(
+          enrollment_id,user_id,state,secret_key_id,secret_version,secret_nonce,
+          secret_ciphertext,last_accepted_timestep,activated_at,created_at,updated_at)
+        VALUES (?,?,'ACTIVE','mfa-k1','mfa-aes-gcm-v1',?,?,?,CAST(? AS TIMESTAMP WITH TIME ZONE),
+                CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))
+        """,
+        enrollmentId,
+        userId,
+        new byte[12],
+        new byte[48],
+        timestep,
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+  }
+
+  private static List<GeneratedRecoveryCode> recoveryCodes(byte start) {
+    return java.util.stream.IntStream.range(0, 10)
+        .mapToObj(
+            index -> {
+              byte[] digest = new byte[32];
+              digest[0] = (byte) (start + index);
+              return new GeneratedRecoveryCode(
+                  "AAAA-BBBB-CCCC-" + "ABCDEFGHJK".charAt(index) + "DDD",
+                  new MfaDigest(digest, "mfa-k1", "mfa-recovery-hmac-v1"));
+            })
+        .toList();
+  }
+
+  private static GeneratedMfaChallenge challenge(byte marker) {
+    byte[] digest = new byte[32];
+    digest[0] = marker;
+    return new GeneratedMfaChallenge(
+        (marker == 1 ? "A" : "B").repeat(43),
+        new MfaDigest(digest, "mfa-k1", "mfa-challenge-hmac-v1"));
   }
 
   private static final class FixedSessionCredentials implements SessionCredentialPort {

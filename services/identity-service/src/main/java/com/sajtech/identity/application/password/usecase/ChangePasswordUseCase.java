@@ -8,6 +8,7 @@ import com.sajtech.identity.application.authentication.port.out.AuthenticationSt
 import com.sajtech.identity.application.authentication.port.out.PasswordVerificationPort;
 import com.sajtech.identity.application.authentication.port.out.SessionCredentialPort;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
+import com.sajtech.identity.application.mfa.port.out.MfaAuthenticationGate;
 import com.sajtech.identity.application.password.PasswordError;
 import com.sajtech.identity.application.password.PasswordException;
 import com.sajtech.identity.application.password.model.PasswordPolicy;
@@ -36,6 +37,29 @@ public final class ChangePasswordUseCase implements ChangePassword {
   private final PasswordNormalizer normalizer;
   private final TransactionRunner transactions;
   private final Clock clock;
+  private final MfaAuthenticationGate mfa;
+
+  public ChangePasswordUseCase(
+      AuthenticationStore store,
+      SessionCredentialPort credentials,
+      PasswordVerificationPort verifier,
+      PasswordHashPort hashes,
+      CompromisedPasswordPort compromised,
+      PasswordNormalizer normalizer,
+      TransactionRunner transactions,
+      MfaAuthenticationGate mfa,
+      Clock clock) {
+    this.store = store;
+    this.lookup = new RefreshCredentialLookup(credentials);
+    this.credentials = credentials;
+    this.verifier = verifier;
+    this.hashes = hashes;
+    this.compromised = compromised;
+    this.normalizer = normalizer;
+    this.transactions = transactions;
+    this.mfa = mfa;
+    this.clock = clock;
+  }
 
   public ChangePasswordUseCase(
       AuthenticationStore store,
@@ -46,15 +70,16 @@ public final class ChangePasswordUseCase implements ChangePassword {
       PasswordNormalizer normalizer,
       TransactionRunner transactions,
       Clock clock) {
-    this.store = store;
-    this.lookup = new RefreshCredentialLookup(credentials);
-    this.credentials = credentials;
-    this.verifier = verifier;
-    this.hashes = hashes;
-    this.compromised = compromised;
-    this.normalizer = normalizer;
-    this.transactions = transactions;
-    this.clock = clock;
+    this(
+        store,
+        credentials,
+        verifier,
+        hashes,
+        compromised,
+        normalizer,
+        transactions,
+        DisabledMfaGate.INSTANCE,
+        clock);
   }
 
   @Override
@@ -69,7 +94,7 @@ public final class ChangePasswordUseCase implements ChangePassword {
         lookup
             .find(store, command.refreshCredential())
             .orElseThrow(ChangePasswordUseCase::invalidSession);
-    requireUsableRecentSession(observed, now);
+    requireUsableRecentSession(observed, now, mfa.requiresMfa(observed.userId()));
     LocalCredentialRecord observedCredential =
         store
             .findLocalCredential(observed.userId())
@@ -94,7 +119,7 @@ public final class ChangePasswordUseCase implements ChangePassword {
                   .lock(store, command.refreshCredential())
                   .orElseThrow(ChangePasswordUseCase::invalidSession);
           requireSameSession(observed, locked);
-          requireUsableRecentSession(locked, now);
+          requireUsableRecentSession(locked, now, mfa.requiresMfa(locked.userId()));
           LocalCredentialRecord currentCredential =
               store
                   .lockLocalCredential(locked.userId())
@@ -124,7 +149,8 @@ public final class ChangePasswordUseCase implements ChangePassword {
     }
   }
 
-  private static void requireUsableRecentSession(LockedRefreshCredential session, Instant now) {
+  private static void requireUsableRecentSession(
+      LockedRefreshCredential session, Instant now, boolean requireMfaAssurance) {
     if (!"ACTIVE".equals(session.credentialState())
         || !"ACTIVE".equals(session.familyState())
         || !"ACTIVE".equals(session.userStatus())
@@ -133,6 +159,12 @@ public final class ChangePasswordUseCase implements ChangePassword {
     if (session.authenticatedAt().plus(RECENT_AUTH).isBefore(now)) {
       throw new PasswordException(
           PasswordError.RECENT_AUTHENTICATION_REQUIRED, "Recent authentication is required");
+    }
+    if (requireMfaAssurance
+        && (session.mfaAuthenticatedAt() == null
+            || session.mfaAuthenticatedAt().plus(RECENT_AUTH).isBefore(now))) {
+      throw new PasswordException(
+          PasswordError.RECENT_AUTHENTICATION_REQUIRED, "Recent MFA authentication is required");
     }
   }
 
@@ -165,5 +197,24 @@ public final class ChangePasswordUseCase implements ChangePassword {
 
   private static PasswordException invalidSession() {
     return new PasswordException(PasswordError.INVALID_SESSION, "Password session is invalid");
+  }
+
+  private enum DisabledMfaGate implements MfaAuthenticationGate {
+    INSTANCE;
+
+    @Override
+    public boolean requiresMfa(java.util.UUID userId) {
+      return false;
+    }
+
+    @Override
+    public void replaceLoginChallenge(
+        java.util.UUID challengeId,
+        java.util.UUID userId,
+        com.sajtech.identity.application.mfa.model.GeneratedMfaChallenge challenge,
+        Instant now,
+        Instant expiresAt) {
+      throw new UnsupportedOperationException("MFA is disabled");
+    }
   }
 }

@@ -51,7 +51,30 @@ class IdentityMigrationProfileIntegrationTest {
           var result =
               statement.executeQuery("SELECT count(*) FROM flyway_schema_history WHERE success")) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(9);
+        assertThat(result.getInt(1)).isEqualTo(10);
+      }
+      try (var connection =
+              DriverManager.getConnection(
+                  POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+          var statement = connection.createStatement();
+          var result =
+              statement.executeQuery(
+                  """
+                  SELECT
+                    to_regclass('identity_totp_enrollment') IS NOT NULL,
+                    to_regclass('identity_totp_pending_enrollment') IS NOT NULL,
+                    to_regclass('identity_mfa_recovery_code') IS NOT NULL,
+                    to_regclass('identity_mfa_login_challenge') IS NOT NULL,
+                    EXISTS (
+                      SELECT 1 FROM information_schema.columns
+                      WHERE table_name = 'identity_refresh_family'
+                        AND column_name = 'mfa_authenticated_at'
+                    )
+                  """)) {
+        assertThat(result.next()).isTrue();
+        for (int column = 1; column <= 5; column++) {
+          assertThat(result.getBoolean(column)).isTrue();
+        }
       }
     } finally {
       if (context.isActive()) {

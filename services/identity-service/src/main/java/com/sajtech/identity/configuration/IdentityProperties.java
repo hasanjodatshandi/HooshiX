@@ -24,6 +24,7 @@ public record IdentityProperties(
     Path fingerprintKeyRingPath,
     Path challengeKeyRingPath,
     Path handoffKeyRingPath,
+    Path mfaKeyRingPath,
     Path refreshKeyRingPath,
     Duration keyRingMaximumStaleness,
     int argon2MaxConcurrentHashes,
@@ -56,6 +57,7 @@ public record IdentityProperties(
     if (fingerprintKeyRingPath == null
         || challengeKeyRingPath == null
         || handoffKeyRingPath == null
+        || mfaKeyRingPath == null
         || refreshKeyRingPath == null
         || keyRingMaximumStaleness == null
         || keyRingMaximumStaleness.isZero()

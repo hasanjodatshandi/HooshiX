@@ -59,6 +59,18 @@ export function verificationCode(raw: string): string {
   return value;
 }
 
+export function totpCode(raw: string): string {
+  const value = raw.trim();
+  if (!/^[0-9]{6}$/.test(value)) invalid('TOTP code');
+  return value;
+}
+
+export function recoveryCode(raw: string): string {
+  const value = raw.trim().toUpperCase();
+  if (!/^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$/.test(value)) invalid('recovery code');
+  return value;
+}
+
 function invalid(field: string): never {
   throw new Error(`Invalid ${field} format`);
 }

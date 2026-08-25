@@ -1,12 +1,14 @@
 import { type FormEvent, useState } from 'react';
-import { bffClient } from '../../api/bffClient';
+import { bffClient, type MfaProof } from '../../api/bffClient';
 import { getErrorMessage } from '../../errors/getErrorMessage';
-import { canonicalEmail, normalizedNewPassword, verificationCode } from '../../validation/userInput';
+import { canonicalEmail, normalizedNewPassword, recoveryCode, totpCode, verificationCode } from '../../validation/userInput';
 
 export function PasswordRecoveryFlow() {
   const [contact, setContact] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  const [mfaType, setMfaType] = useState<MfaProof['type']>('TOTP');
+  const [mfaCode, setMfaCode] = useState('');
   const [stage, setStage] = useState<'request' | 'confirm' | 'complete'>('request');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -34,9 +36,11 @@ export function PasswordRecoveryFlow() {
         contact: canonicalEmail(contact),
         code: verificationCode(code),
         newPassword: normalizedNewPassword(password),
+        ...(mfaCode ? { mfaProof: { type: mfaType, code: mfaType === 'TOTP' ? totpCode(mfaCode) : recoveryCode(mfaCode) } } : {}),
       });
       setCode('');
       setPassword('');
+      setMfaCode('');
       setStage('complete');
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -57,6 +61,16 @@ export function PasswordRecoveryFlow() {
       <input id="recovery-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} required value={code} onChange={(event) => setCode(event.target.value)} />
       <label htmlFor="recovery-password">New password</label>
       <input id="recovery-password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} />
+      <fieldset>
+        <legend>Two-factor proof (required when enabled)</legend>
+        <label htmlFor="recovery-mfa-type">Proof type</label>
+        <select id="recovery-mfa-type" value={mfaType} onChange={(event) => { setMfaType(event.target.value as MfaProof['type']); setMfaCode(''); }}>
+          <option value="TOTP">Authenticator code</option>
+          <option value="RECOVERY_CODE">Recovery code</option>
+        </select>
+        <label htmlFor="recovery-mfa-code">Two-factor proof</label>
+        <input id="recovery-mfa-code" autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} />
+      </fieldset>
       <button type="submit" disabled={busy}>Reset password</button>
     </form>}
     <p role="status">{stage === 'complete' ? 'Password reset complete' : ''}</p>

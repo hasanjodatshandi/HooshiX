@@ -45,6 +45,13 @@ test('authenticated change never exposes a refresh credential to browser code', 
     );
   });
   let body: Record<string, unknown> | undefined;
+  await page.route('**/api/v1/auth/session/csrf', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"csrfToken":"recovered-csrf-token-with-more-than-32-characters","mode":"AUTHENTICATED_ONBOARDING"}',
+    });
+  });
   await page.route('**/api/v1/password/change', async (route) => {
     body = route.request().postDataJSON();
     await route.fulfill({

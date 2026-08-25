@@ -162,6 +162,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the authenticated user's MFA state */
+        get: operations["getIdentityMfaStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/mfa/totp/enrollment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start initial TOTP enrollment or an authenticated replacement
+         * @description Returns the Base32 secret once for authenticator configuration. Replacing active TOTP requires a current MFA proof.
+         */
+        post: operations["startIdentityTotpEnrollment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/mfa/totp/enrollment/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a pending TOTP enrollment
+         * @description Recovery codes are returned exactly once and must be stored offline by the user.
+         */
+        post: operations["confirmIdentityTotpEnrollment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/mfa/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disable TOTP after a current MFA proof */
+        delete: operations["disableIdentityTotp"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/mfa/recovery-codes/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke and replace all unused MFA recovery codes
+         * @description The replacement codes are returned exactly once.
+         */
+        post: operations["rotateIdentityMfaRecoveryCodes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/password/change": {
         parameters: {
             query?: never;
@@ -239,6 +333,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/session/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recover an in-memory CSRF token after browser document reload
+         * @description Rotates the server-side browser session and CSRF state under exact same-origin Origin and Fetch Metadata checks. Existing Identity refresh credentials and MFA challenges remain encrypted server-side and are never returned to browser JavaScript.
+         */
+        post: operations["rotateBrowserCsrf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/local": {
         parameters: {
             query?: never;
@@ -253,6 +367,26 @@ export interface paths {
          * @description Browser JavaScript sends neither trusted client address nor refresh credential; the approved edge and BFF retain those authorities.
          */
         post: operations["loginWithLocalPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete a cookie-bound MFA login challenge
+         * @description The opaque Identity challenge remains encrypted in the server-side BFF session and is never returned to browser JavaScript.
+         */
+        post: operations["completeBrowserMfaAuthentication"];
         delete?: never;
         options?: never;
         head?: never;
@@ -525,6 +659,86 @@ export interface components {
             password: string;
         };
         /** @example {
+         *       "type": "TOTP",
+         *       "code": "123456"
+         *     } */
+        MfaProofRequest: {
+            /**
+             * @example TOTP
+             * @constant
+             */
+            type: "TOTP";
+            /** @example 123456 */
+            code: string;
+        } | {
+            /**
+             * @example RECOVERY_CODE
+             * @constant
+             */
+            type: "RECOVERY_CODE";
+            /** @example AAAA-BBBB-CCCC-DDDD */
+            code: string;
+        };
+        /** @example {
+         *       "currentProof": {
+         *         "type": "TOTP",
+         *         "code": "123456"
+         *       }
+         *     } */
+        StartTotpEnrollmentRequest: {
+            currentProof?: components["schemas"]["MfaProofRequest"] | null;
+        };
+        /** @example {
+         *       "enrollmentChallenge": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY",
+         *       "totpCode": "123456"
+         *     } */
+        ConfirmTotpEnrollmentRequest: {
+            /** @example YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY */
+            enrollmentChallenge: string;
+            /** @example 123456 */
+            totpCode: string;
+        };
+        /** @example {
+         *       "totpEnabled": true,
+         *       "recoveryCodesRemaining": 10
+         *     } */
+        MfaStatusResponse: {
+            /** @example true */
+            totpEnabled: boolean;
+            /** @example 10 */
+            recoveryCodesRemaining: number;
+        };
+        /** @example {
+         *       "enrollmentChallenge": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY",
+         *       "base32Secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+         *       "otpauthUri": "otpauth://totp/SajTech%3Asynthetic?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&issuer=SajTech&algorithm=SHA256&digits=6&period=30",
+         *       "expiresAt": "2026-01-01T00:10:00Z"
+         *     } */
+        TotpEnrollmentResponse: {
+            readonly enrollmentChallenge: string;
+            readonly base32Secret: string;
+            readonly otpauthUri: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        /** @example {
+         *       "recoveryCodes": [
+         *         "AAAA-BBBB-CCCC-DDDD",
+         *         "EEEE-FFFF-GGGG-HHHH",
+         *         "IIII-JJJJ-KKKK-LLLL",
+         *         "MMMM-NNNN-OOOO-PPPP",
+         *         "QQQQ-RRRR-SSSS-TTTT",
+         *         "UUUU-VVVV-WWWW-XXXX",
+         *         "YYYY-ZZZZ-2222-3333",
+         *         "4444-5555-6666-7777",
+         *         "ABCD-EFGH-IJKL-MNOP",
+         *         "QRST-UVWX-YZ23-4567"
+         *       ]
+         *     } */
+        RecoveryCodesResponse: {
+            readonly recoveryCodes: string[];
+        };
+        /** @example {
          *       "name": "Sample Tenant",
          *       "slug": "sample-tenant"
          *     } */
@@ -694,6 +908,7 @@ export interface components {
             code: string;
             /** @description NFC-normalized Unicode code-point policy. No composition rule is imposed. */
             newPassword: string;
+            mfaProof?: components["schemas"]["MfaProofRequest"] | null;
         };
         /** @example {
          *       "id": "11111111-1111-4111-8111-111111111111",
@@ -794,7 +1009,7 @@ export interface components {
              * @example PREAUTH
              * @enum {string}
              */
-            mode: "PREAUTH" | "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
+            mode: "PREAUTH" | "MFA_PREAUTH" | "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
         };
         /** @example {
          *       "mode": "TENANT_AUTHENTICATED",
@@ -806,7 +1021,7 @@ export interface components {
              * @example TENANT_AUTHENTICATED
              * @enum {string}
              */
-            mode: "PREAUTH" | "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
+            mode: "PREAUTH" | "MFA_PREAUTH" | "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
             /** @example true */
             authenticated: boolean;
             /** @example true */
@@ -1487,6 +1702,166 @@ export interface operations {
             503: components["responses"]["DependencyUnavailable"];
         };
     };
+    getIdentityMfaStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current MFA state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaStatusResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    startIdentityTotpEnrollment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartTotpEnrollmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Pending TOTP enrollment. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpEnrollmentResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    confirmIdentityTotpEnrollment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmTotpEnrollmentRequest"];
+            };
+        };
+        responses: {
+            /** @description TOTP enabled and recovery codes issued once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    disableIdentityTotp: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaProofRequest"];
+            };
+        };
+        responses: {
+            /** @description TOTP disabled and browser security state rotated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    rotateIdentityMfaRecoveryCodes: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaProofRequest"];
+            };
+        };
+        responses: {
+            /** @description Replacement recovery codes issued once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodesResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
     changePassword: {
         parameters: {
             query?: never;
@@ -1619,6 +1994,35 @@ export interface operations {
             503: components["responses"]["DependencyUnavailable"];
         };
     };
+    rotateBrowserCsrf: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rotated browser session and in-memory CSRF token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
     loginWithLocalPassword: {
         parameters: {
             query?: never;
@@ -1650,6 +2054,40 @@ export interface operations {
             401: components["responses"]["InvalidSession"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["RegistrationRejected"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    completeBrowserMfaAuthentication: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaProofRequest"];
+            };
+        };
+        responses: {
+            /** @description MFA-authenticated browser session state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["RateLimited"];
             503: components["responses"]["DependencyUnavailable"];
         };

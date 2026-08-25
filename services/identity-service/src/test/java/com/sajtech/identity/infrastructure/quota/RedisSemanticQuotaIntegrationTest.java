@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sajtech.identity.application.authentication.AuthenticationError;
 import com.sajtech.identity.application.authentication.AuthenticationException;
+import com.sajtech.identity.application.mfa.MfaError;
+import com.sajtech.identity.application.mfa.MfaException;
+import com.sajtech.identity.application.mfa.model.MfaQuotaOperation;
 import com.sajtech.identity.application.registration.RegistrationError;
 import com.sajtech.identity.application.registration.RegistrationException;
 import com.sajtech.identity.application.registration.model.QuotaOperation;
@@ -22,6 +25,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -263,6 +267,53 @@ class RedisSemanticQuotaIntegrationTest {
           .isInstanceOf(AuthenticationException.class)
           .extracting(error -> ((AuthenticationException) error).error())
           .isEqualTo(AuthenticationError.QUOTA_TIME_SOURCE_UNHEALTHY);
+    }
+  }
+
+  @Test
+  void mfaEnrollmentHasIndependentFiveAttemptUserGateWithNoSecurityTtl() throws Exception {
+    UUID userId = UUID.randomUUID();
+    byte[] address = {(byte) 203, 0, 113, 44};
+    try (LoginQuotaFixture fixture = loginQuotaFixture(Clock.systemUTC(), 1000, 1000)) {
+      for (int attempt = 0; attempt < 5; attempt++) {
+        fixture.quota().consume(MfaQuotaOperation.ENROLL, userId, address);
+      }
+
+      assertThatThrownBy(() -> fixture.quota().consume(MfaQuotaOperation.ENROLL, userId, address))
+          .isInstanceOf(MfaException.class)
+          .extracting(error -> ((MfaException) error).error())
+          .isEqualTo(MfaError.QUOTA_EXCEEDED);
+
+      String userKey = fixture.encoder().encodeMfa("MFA_ENROLL", userId, address).userKey();
+      RedisClient client = RedisClient.create(redisUri());
+      try (StatefulRedisConnection<String, String> connection = client.connect()) {
+        assertThat(connection.sync().ttl(userKey)).isEqualTo(-1L);
+      } finally {
+        client.shutdown();
+      }
+    }
+  }
+
+  @Test
+  void recoveryPressureChargesCostTwoToSourceAndFailedSubject() throws Exception {
+    byte[] address = {(byte) 198, 51, 100, 19};
+    UUID userId = UUID.randomUUID();
+    try (LoginQuotaFixture fixture = loginQuotaFixture(Clock.systemUTC(), 1000, 1000)) {
+      for (int attempt = 0; attempt < 15; attempt++) {
+        fixture.quota().consumeRecoverySource(address);
+      }
+      assertThatThrownBy(() -> fixture.quota().consumeRecoverySource(address))
+          .isInstanceOf(MfaException.class)
+          .extracting(error -> ((MfaException) error).error())
+          .isEqualTo(MfaError.QUOTA_EXCEEDED);
+
+      for (int attempt = 0; attempt < 3; attempt++) {
+        fixture.quota().recordRecoveryFailure(userId);
+      }
+      assertThatThrownBy(() -> fixture.quota().recordRecoveryFailure(userId))
+          .isInstanceOf(MfaException.class)
+          .extracting(error -> ((MfaException) error).error())
+          .isEqualTo(MfaError.QUOTA_EXCEEDED);
     }
   }
 

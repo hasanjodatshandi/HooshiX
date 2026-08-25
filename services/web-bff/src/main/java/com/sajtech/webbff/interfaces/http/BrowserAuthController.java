@@ -43,6 +43,38 @@ public final class BrowserAuthController {
         .body(new SessionResponse(grant.csrfToken(), grant.session().mode().name()));
   }
 
+  @PostMapping("/session/csrf")
+  public SessionResponse rotateCsrf(HttpServletRequest request, HttpServletResponse response) {
+    BrowserSession old =
+        (BrowserSession) request.getAttribute(BrowserSecurityContext.SESSION_ATTRIBUTE);
+    BrowserSessionGrant grant;
+    if (old == null) {
+      grant = sessions.bootstrap();
+    } else {
+      grant =
+          switch (old.mode()) {
+            case PREAUTH -> {
+              sessions.destroy(old);
+              yield sessions.bootstrap();
+            }
+            case MFA_PREAUTH ->
+                sessions.rotateMfaPreauth(
+                    old,
+                    old.userId(),
+                    requiredChallenge(old.mfaChallenge()),
+                    old.absoluteExpiresAt());
+            case AUTHENTICATED_ONBOARDING, TENANT_AUTHENTICATED ->
+                sessions.rotateSecurityState(
+                    old, old.refreshCredential(), old.idleExpiresAt(), old.absoluteExpiresAt());
+          };
+    }
+    HttpSupport.setCookie(
+        response,
+        grant.cookieValue(),
+        HttpSupport.maxAge(clock.instant(), grant.session().idleExpiresAt()));
+    return new SessionResponse(grant.csrfToken(), grant.session().mode().name());
+  }
+
   @PostMapping("/local")
   public SessionResponse login(
       @RequestHeader("X-Request-Id") String requestId,
@@ -51,7 +83,7 @@ public final class BrowserAuthController {
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession old = HttpSupport.session(request);
-    if (old.mode() != BrowserSessionMode.PREAUTH)
+    if (old.mode() != BrowserSessionMode.PREAUTH && old.mode() != BrowserSessionMode.MFA_PREAUTH)
       throw new BffException(BffError.INVALID_REQUEST, "Pre-auth session is required");
     var result =
         identity.login(
@@ -82,6 +114,12 @@ public final class BrowserAuthController {
                   result.absoluteExpiresAt(),
                   requiredContext(result.selectedTenantId()),
                   requiredContext(result.selectedMembershipId()));
+          case MFA_REQUIRED ->
+              sessions.rotateMfaPreauth(
+                  old,
+                  result.userId(),
+                  requiredChallenge(result.mfaChallenge()),
+                  clock.instant().plusSeconds(300));
           default ->
               throw new BffException(
                   BffError.DEPENDENCY_UNAVAILABLE, "Unexpected Identity session mode");
@@ -91,6 +129,60 @@ public final class BrowserAuthController {
         grant.cookieValue(),
         HttpSupport.maxAge(clock.instant(), grant.session().idleExpiresAt()));
     return new SessionResponse(grant.csrfToken(), grant.session().mode().name());
+  }
+
+  @PostMapping("/mfa/complete")
+  public SessionResponse completeMfa(
+      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("X-HooshiX-Client-IP") String clientIp,
+      @Valid @RequestBody MfaProofRequest body,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    BrowserSession old = HttpSupport.session(request);
+    if (old.mode() != BrowserSessionMode.MFA_PREAUTH || old.mfaChallenge() == null) {
+      throw new BffException(BffError.INVALID_REQUEST, "MFA pre-auth session is required");
+    }
+    var result =
+        identity.completeMfaAuthentication(
+            HttpSupport.requestId(requestId),
+            old.mfaChallenge(),
+            new IdentityGateway.MfaProof(body.type(), body.code()),
+            addresses.parse(clientIp));
+    BrowserSessionGrant grant = rotateCompleted(old, result);
+    HttpSupport.setCookie(
+        response,
+        grant.cookieValue(),
+        HttpSupport.maxAge(clock.instant(), grant.session().idleExpiresAt()));
+    return new SessionResponse(grant.csrfToken(), grant.session().mode().name());
+  }
+
+  private BrowserSessionGrant rotateCompleted(
+      BrowserSession old, IdentityGateway.LoginResult result) {
+    return switch (result.mode()) {
+      case AUTHENTICATED_ONBOARDING ->
+          sessions.rotateAuthenticated(
+              old,
+              result.userId(),
+              result.identitySessionId(),
+              result.refreshFamilyId(),
+              result.refreshCredential(),
+              result.idleExpiresAt(),
+              result.absoluteExpiresAt());
+      case TENANT_AUTHENTICATED ->
+          sessions.rotateAuthenticatedTenant(
+              old,
+              result.userId(),
+              result.identitySessionId(),
+              result.refreshFamilyId(),
+              result.refreshCredential(),
+              result.idleExpiresAt(),
+              result.absoluteExpiresAt(),
+              requiredContext(result.selectedTenantId()),
+              requiredContext(result.selectedMembershipId()));
+      case MFA_REQUIRED ->
+          throw new BffException(
+              BffError.DEPENDENCY_UNAVAILABLE, "Identity returned an incomplete MFA session");
+    };
   }
 
   @PostMapping("/logout")
@@ -131,10 +223,29 @@ public final class BrowserAuthController {
     return value;
   }
 
+  private static String requiredChallenge(String value) {
+    if (value == null || !value.matches("[A-Za-z0-9_-]{43}")) {
+      throw new BffException(BffError.DEPENDENCY_UNAVAILABLE, "Identity MFA challenge is invalid");
+    }
+    return value;
+  }
+
   public record LocalLoginRequest(
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
       @NotBlank @Size(max = 254) String contact,
       @NotNull @Size(min = 1, max = 4096) String password) {}
+
+  public record MfaProofRequest(
+      @NotBlank @Pattern(regexp = "TOTP|RECOVERY_CODE") String type,
+      @NotBlank @Pattern(regexp = "(?:[0-9]{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})") String code) {
+    @AssertTrue(message = "MFA proof type and code shape must agree")
+    public boolean isConsistent() {
+      return ("TOTP".equals(type) && code != null && code.matches("[0-9]{6}"))
+          || ("RECOVERY_CODE".equals(type)
+              && code != null
+              && code.matches("[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}"));
+    }
+  }
 
   public record SessionResponse(String csrfToken, String mode) {}
 }

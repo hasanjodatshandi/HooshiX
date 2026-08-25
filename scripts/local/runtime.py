@@ -125,7 +125,7 @@ def generate_key_material(values: dict[str, str]) -> dict[str, Path]:
     ensure_dirs()
     paths = {name: write_symmetric_ring(name) for name in (
         "authorization-intent", "authorization-quota", "identity-fingerprint",
-        "identity-challenge", "identity-handoff", "identity-refresh", "identity-quota",
+        "identity-challenge", "identity-handoff", "identity-mfa", "identity-refresh", "identity-quota",
         "notification-fingerprint", "notification-delivery", "web-bff-locator",
         "web-bff-csrf", "web-bff-refresh")}
     private_path = KEYS / "identity-jwt-private.properties"
@@ -440,6 +440,7 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "IDENTITY_FINGERPRINT_KEY_RING_PATH": str(keys["identity-fingerprint"]),
         "IDENTITY_CHALLENGE_KEY_RING_PATH": str(keys["identity-challenge"]),
         "IDENTITY_HANDOFF_KEY_RING_PATH": str(keys["identity-handoff"]),
+        "IDENTITY_MFA_KEY_RING_PATH": str(keys["identity-mfa"]),
         "IDENTITY_REFRESH_KEY_RING_PATH": str(keys["identity-refresh"]),
         "IDENTITY_QUOTA_KEY_RING_PATH": str(keys["identity-quota"]),
         "IDENTITY_QUOTA_HOST_TIME_STATUS_PATH": str(HOST_TIME),

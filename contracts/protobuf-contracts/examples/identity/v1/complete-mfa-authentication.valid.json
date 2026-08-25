@@ -1,0 +1,11 @@
+{
+  "requestId": "723e4567-e89b-42d3-a456-426614174000",
+  "mfaChallenge": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY",
+  "proof": {
+    "type": "MFA_PROOF_TYPE_TOTP",
+    "code": "123456"
+  },
+  "clientAddress": {
+    "address": "fwAAAQ=="
+  }
+}

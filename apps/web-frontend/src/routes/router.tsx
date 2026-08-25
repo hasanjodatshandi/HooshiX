@@ -6,6 +6,8 @@ import { VerificationFlow } from '../features/verification/VerificationFlow';
 import { ProfileFlow } from '../features/profile/ProfileFlow';
 import { ChangePasswordFlow } from '../features/password/ChangePasswordFlow';
 import { PasswordRecoveryFlow } from '../features/password/PasswordRecoveryFlow';
+import { MfaLoginFlow } from '../features/mfa/MfaLoginFlow';
+import { MfaSettingsFlow } from '../features/mfa/MfaSettingsFlow';
 import { VerificationGuard, AuthenticatedGuard } from './guards';
 import { routes } from './routes';
 
@@ -22,6 +24,10 @@ export function Router() {
     return <LoginPage />;
   }
 
+  if (path === routes.loginMfa) {
+    return <MfaLoginFlow />;
+  }
+
   if (path === routes.tenantSelection) {
     return <AuthenticatedGuard><TenantSelectionPage /></AuthenticatedGuard>;
   }
@@ -36,6 +42,11 @@ export function Router() {
 
   if (path === routes.passwordChange) {
     return <AuthenticatedGuard><ChangePasswordFlow /></AuthenticatedGuard>;
+  }
+
+
+  if (path === routes.mfa) {
+    return <AuthenticatedGuard><MfaSettingsFlow /></AuthenticatedGuard>;
   }
 
   if (path === routes.application) {

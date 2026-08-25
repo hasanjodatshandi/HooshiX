@@ -1,7 +1,7 @@
 # Application Implementation Roadmap — Current Execution Authority
 
 - **Status:** Active implementation-sequencing authority
-- **Last full application review:** 2026-08-25
+- **Last full application review:** 2026-08-26
 - **Scope:** HooshiX application implementation order and continuation across chats/agents
 - **Production Commissioning & Readiness:** DEFERRED until explicitly reactivated by the owner
 
@@ -41,7 +41,7 @@ The application is not yet a complete end-user product. Current material gaps ar
 
 - the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
-- MFA/TOTP, Google OIDC/ExternalIdentity, and erasure are incomplete;
+- Google OIDC/ExternalIdentity and erasure are incomplete;
 - remaining Tenant lifecycle operations are incomplete;
 - application Kafka runtime is not yet required by an implemented asynchronous use case;
 - Reference Data independent service remains intentionally gated by ADR-0041;
@@ -78,9 +78,9 @@ The following is the one ordered application-completion sequence. Do not start a
 
 | Order | Completion step | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.2.0 covers all 36 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
-| 2 | MFA/TOTP | `NEXT` | Implement TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, and security evidence. |
-| 3 | Google OIDC / ExternalIdentity | `PLANNED` | Implement BFF Authorization Code + PKCE/state/nonce flow, Identity issuer+subject binding/link semantics, collision protection, provider-token custody, MFA continuation, UI, and negative tests. |
+| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.3.0 covers all 43 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
+| 2 | MFA/TOTP | `COMPLETED` | TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, CSRF reload recovery, and repository security evidence are implemented. Deployed production evidence remains a separate readiness concern. |
+| 3 | Google OIDC / ExternalIdentity | `NEXT` | Implement BFF Authorization Code + PKCE/state/nonce flow, Identity issuer+subject binding/link semantics, collision protection, provider-token custody, MFA continuation, UI, and negative tests. |
 | 4 | Complete Tenant lifecycle | `PLANNED` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
 | 5 | Data Subject Erasure + Kafka | `PLANNED` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
 | 6 | Core AI Product Architecture | `PLANNED` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
@@ -98,22 +98,23 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Step 2 — MFA/TOTP
+Step 3 — Google OIDC / ExternalIdentity
 ```
 
 The target invariant is:
 
 ```text
-TOTP enrollment/challenge           -> encrypted material, fixed bounds, anti-replay
-recovery codes                      -> hashed, single-use, atomic consumption
-recent authentication               -> <=5 minutes for material MFA-state changes
-password/Google primary proof       -> cannot bypass active MFA
-session security state              -> rotate current and revoke other families
-BFF OpenAPI/UI                      -> no factor secret in browser persistence
-security tests                      -> no downgrade, replay, or recovery bypass
+authorization request               -> exact redirect, state, nonce, PKCE S256, bounded pre-auth
+provider token custody              -> BFF only; no provider token reaches browser or Identity
+Identity binding                    -> issuer + subject only; email never authorizes auto-link
+collision/linking                   -> explicit authenticated account flow and recent assurance
+active TOTP                         -> provider primary proof still enters the same MFA continuation
+session security state              -> server-side rotation and replay-safe callback completion
+BFF OpenAPI/UI                      -> stable errors, no token or verifier persistence
+security tests                      -> redirect/state/nonce/code replay and identity-collision negatives
 ```
 
-The browser must continue to consume only the BFF public contract. MFA authority and secret material remain in Identity; browser persistence must not become credential or factor authority.
+The browser must continue to consume only the BFF public contract. Provider tokens remain in BFF custody; Identity receives only reviewed provider evidence and remains issuer+subject binding and Session/MFA authority.
 
 ## 7. Rules for updating this roadmap
 

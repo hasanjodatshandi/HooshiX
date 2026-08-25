@@ -18,7 +18,7 @@ java {
 }
 
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.4.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.5.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")

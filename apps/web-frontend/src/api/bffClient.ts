@@ -15,6 +15,10 @@ export type TenantSelectionResponse = Schemas['TenantSelectionResponse'];
 export type Profile = Schemas['ProfileResponse'];
 export type Contact = Schemas['ContactResponse'];
 export type PasswordChangedResponse = Schemas['PasswordChangedResponse'];
+export type MfaProof = Schemas['MfaProofRequest'];
+export type MfaStatus = Schemas['MfaStatusResponse'];
+export type TotpEnrollment = Schemas['TotpEnrollmentResponse'];
+export type RecoveryCodes = Schemas['RecoveryCodesResponse'];
 
 type LocalLoginRequest = Schemas['LocalLoginRequest'];
 type SelectTenantRequest = Schemas['SelectTenantRequest'];
@@ -24,6 +28,8 @@ type AddContactRequest = Schemas['AddContactRequest'];
 type ChangePasswordRequest = Schemas['ChangePasswordRequest'];
 type PasswordRecoveryRequest = Schemas['PasswordRecoveryRequest'];
 type PasswordRecoveryConfirmRequest = Schemas['PasswordRecoveryConfirmRequest'];
+type StartTotpEnrollmentRequest = Schemas['StartTotpEnrollmentRequest'];
+type ConfirmTotpEnrollmentRequest = Schemas['ConfirmTotpEnrollmentRequest'];
 
 function requestId(): string {
   return crypto.randomUUID();
@@ -34,6 +40,26 @@ let csrfToken: string | null = null;
 function rememberCsrf(response: SessionResponse): SessionResponse {
   csrfToken = response.csrfToken;
   return response;
+}
+
+async function ensureCsrf(): Promise<void> {
+  if (csrfToken) return;
+  const recover = () => fetch('/api/v1/auth/session/csrf', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'x-request-id': requestId() },
+    });
+  let response = await recover();
+  if (response.status === 401) response = await recover();
+  if (!response.ok) return problem(response, 'CSRF recovery failed');
+  rememberCsrf(await response.json() as SessionResponse);
+}
+
+async function problem(response: Response, fallback: string): Promise<never> {
+  if (response.status === 401) csrfToken = null;
+  const value = await response.json().catch(() => null);
+  if (value?.code) throw new BffProblemError(value);
+  throw new Error(fallback);
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -48,10 +74,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    if (response.status === 401) csrfToken = null;
-    const problem = await response.json().catch(() => null);
-    if (problem?.code) throw new BffProblemError(problem);
-    throw new Error('bff request failed');
+    return problem(response, 'bff request failed');
   }
   return response.json() as Promise<T>;
 }
@@ -66,10 +89,7 @@ async function postWithoutBody<T>(path: string): Promise<T> {
     },
   });
   if (!response.ok) {
-    if (response.status === 401) csrfToken = null;
-    const problem = await response.json().catch(() => null);
-    if (problem?.code) throw new BffProblemError(problem);
-    throw new Error('bff request failed');
+    return problem(response, 'bff request failed');
   }
   return response.json() as Promise<T>;
 }
@@ -89,7 +109,7 @@ export async function bootstrapSession(): Promise<SessionResponse> {
 export async function login(
   body: Pick<LocalLoginRequest, 'contact' | 'password'>,
 ): Promise<SessionResponse> {
-  if (!csrfToken) await bootstrapSession();
+  await ensureCsrf();
   return fetch('/api/v1/auth/local', {
     method: 'POST',
     credentials: 'same-origin',
@@ -100,12 +120,58 @@ export async function login(
     },
     body: JSON.stringify({ channel: 'EMAIL', ...body }),
   }).then(async (r) => {
-    if (!r.ok) {
-      if (r.status === 401) csrfToken = null;
-      throw new Error('login failed');
-    }
+    if (!r.ok) return problem(r, 'login failed');
     return rememberCsrf(await r.json() as SessionResponse);
   });
+}
+
+export async function completeMfaAuthentication(body: MfaProof): Promise<SessionResponse> {
+  await ensureCsrf();
+  return rememberCsrf(await post<SessionResponse>('/api/v1/auth/mfa/complete', body));
+}
+
+export async function getMfaStatus(): Promise<MfaStatus> {
+  const response = await fetch('/api/v1/identity/mfa', {
+    credentials: 'same-origin',
+    headers: { 'x-request-id': requestId() },
+  });
+  if (!response.ok) return problem(response, 'MFA status failed');
+  return response.json() as Promise<MfaStatus>;
+}
+
+export async function startTotpEnrollment(
+  currentProof?: MfaProof,
+): Promise<TotpEnrollment> {
+  await ensureCsrf();
+  const body: StartTotpEnrollmentRequest = currentProof ? { currentProof } : {};
+  return post<TotpEnrollment>('/api/v1/identity/mfa/totp/enrollment', body);
+}
+
+export async function confirmTotpEnrollment(
+  body: ConfirmTotpEnrollmentRequest,
+): Promise<RecoveryCodes> {
+  await ensureCsrf();
+  return post<RecoveryCodes>('/api/v1/identity/mfa/totp/enrollment/confirm', body);
+}
+
+export async function disableTotp(body: MfaProof): Promise<void> {
+  await ensureCsrf();
+  const response = await fetch('/api/v1/identity/mfa/totp', {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers: {
+      'content-type': 'application/json',
+      'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) return problem(response, 'disable MFA failed');
+}
+
+export async function rotateRecoveryCodes(body: MfaProof): Promise<RecoveryCodes> {
+  await ensureCsrf();
+  return post<RecoveryCodes>('/api/v1/identity/mfa/recovery-codes/rotate', body);
 }
 
 
@@ -116,6 +182,7 @@ export async function listTenants(): Promise<TenantList> {
 }
 
 export async function selectTenant(membershipId: string): Promise<TenantSelectionResponse> {
+  await ensureCsrf();
   const body: SelectTenantRequest = { membershipId };
   const response = await post<TenantSelectionResponse>('/api/v1/identity/tenant-selection', body);
   csrfToken = response.csrfToken;
@@ -136,6 +203,7 @@ export async function getContacts(): Promise<Contact[]> {
 }
 
 export async function updateProfile(body: UpdateProfileRequest): Promise<AcceptedResponse> {
+  await ensureCsrf();
   const response = await fetch('/api/v1/identity/profile', {
     method: 'PUT',
     credentials: 'same-origin',
@@ -151,19 +219,23 @@ export async function updateProfile(body: UpdateProfileRequest): Promise<Accepte
 }
 
 export async function verifyContact(id: string, code: string): Promise<Schemas['VerifiedResponse']> {
+  await ensureCsrf();
   const body: VerifyContactRequest = { code };
   return post<Schemas['VerifiedResponse']>(`/api/v1/identity/contacts/${id}/verify`, body);
 }
 
 export async function resendContactVerification(id: string): Promise<AcceptedResponse> {
+  await ensureCsrf();
   return postWithoutBody<AcceptedResponse>(`/api/v1/identity/contacts/${id}/resend`);
 }
 
 export async function setPrimaryContact(id: string): Promise<AcceptedResponse> {
+  await ensureCsrf();
   return postWithoutBody<AcceptedResponse>(`/api/v1/identity/contacts/${id}/primary`);
 }
 
 export async function removeContact(id: string): Promise<AcceptedResponse> {
+  await ensureCsrf();
   const r = await fetch(`/api/v1/identity/contacts/${id}`, {
     method: 'DELETE',
     credentials: 'same-origin',
@@ -177,10 +249,12 @@ export async function removeContact(id: string): Promise<AcceptedResponse> {
 }
 
 export async function addContact(body: AddContactRequest): Promise<Schemas['CreatedContactResponse']> {
+  await ensureCsrf();
   return post<Schemas['CreatedContactResponse']>('/api/v1/identity/contacts', body);
 }
 
 export async function changePassword(body: ChangePasswordRequest): Promise<PasswordChangedResponse> {
+  await ensureCsrf();
   const response = await post<PasswordChangedResponse>('/api/v1/password/change', body);
   csrfToken = response.csrfToken;
   return response;
@@ -198,6 +272,7 @@ export async function confirmPasswordRecovery(
 
 export const bffClient = {
   login,
+  completeMfaAuthentication,
   listTenants,
   selectTenant,
   register: (body: RegisterRequest) => post<AcceptedResponse>('/api/v1/identity/registration', body),
@@ -214,4 +289,9 @@ export const bffClient = {
   changePassword,
   requestPasswordRecovery,
   confirmPasswordRecovery,
+  getMfaStatus,
+  startTotpEnrollment,
+  confirmTotpEnrollment,
+  disableTotp,
+  rotateRecoveryCodes,
 };

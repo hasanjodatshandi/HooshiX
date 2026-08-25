@@ -26,6 +26,7 @@ enum AuthenticationSessionMode {
   AUTHENTICATION_SESSION_MODE_UNSPECIFIED = 0;
   AUTHENTICATION_SESSION_MODE_AUTHENTICATED_ONBOARDING = 1;
   AUTHENTICATION_SESSION_MODE_TENANT_AUTHENTICATED = 2;
+  AUTHENTICATION_SESSION_MODE_MFA_REQUIRED = 3;
 }
 
 message AuthenticationTrustedClientAddress {
@@ -57,15 +58,30 @@ message AuthenticateLocalRequest {
 }
 
 message AuthenticateLocalResponse {
-  string identity_session_id = 1;
-  string refresh_family_id = 2;
-  string refresh_credential = 3;
+  option (buf.validate.message).cel = {
+    id: "authenticate_local_response.session_shape"
+    message: "MFA-required responses contain only an opaque challenge; completed responses contain session credentials"
+    expression: "(this.session_mode == 3 && this.mfa_challenge.matches('^[A-Za-z0-9_-]{43}$') && this.identity_session_id == '' && this.refresh_family_id == '' && this.refresh_credential == '' && !has(this.refresh_idle_expires_at) && !has(this.refresh_absolute_expires_at) && this.user_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')) || ((this.session_mode == 1 || this.session_mode == 2) && this.mfa_challenge == '' && this.identity_session_id.matches('^[A-Za-z0-9_-]{43}$') && this.refresh_family_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && this.refresh_credential.matches('^[A-Za-z0-9_-]{43}$') && has(this.refresh_idle_expires_at) && has(this.refresh_absolute_expires_at) && this.user_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'))"
+  };
+  option (buf.validate.message).cel = {
+    id: "authenticate_local_response.tenant_context_shape"
+    message: "tenant context must be absent for onboarding/MFA continuation and complete for tenant-authenticated sessions"
+    expression: "((this.session_mode == 1 || this.session_mode == 3) && this.selected_tenant_id == '' && this.selected_membership_id == '') || (this.session_mode == 2 && this.selected_tenant_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && this.selected_membership_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'))"
+  };
+
+  string identity_session_id = 1 [(buf.validate.field).string = {pattern: "^$|^[A-Za-z0-9_-]{43}$"}];
+  string refresh_family_id = 2 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 3 [(buf.validate.field).string = {pattern: "^$|^[A-Za-z0-9_-]{43}$"}];
   google.protobuf.Timestamp refresh_idle_expires_at = 4;
   google.protobuf.Timestamp refresh_absolute_expires_at = 5;
-  AuthenticationSessionMode session_mode = 6;
-  string user_id = 7;
-  string selected_tenant_id = 8;
-  string selected_membership_id = 9;
+  AuthenticationSessionMode session_mode = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string user_id = 7 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string selected_tenant_id = 8 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string selected_membership_id = 9 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string mfa_challenge = 10 [(buf.validate.field).string = {pattern: "^$|^[A-Za-z0-9_-]{43}$"}];
 }
 
 message RefreshSessionRequest {

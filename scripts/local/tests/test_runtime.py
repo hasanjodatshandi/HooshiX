@@ -69,7 +69,7 @@ class LocalRuntimeContractTest(unittest.TestCase):
             "authorization_runtime", "identity_runtime", "notification_runtime", "web_bff_tls")}
         keys = {name: ROOT / ".local-runtime" / "keys" / f"{name}.properties" for name in (
             "authorization-intent", "authorization-quota", "identity-jwt-public",
-            "identity-fingerprint", "identity-challenge", "identity-handoff", "identity-refresh",
+            "identity-fingerprint", "identity-challenge", "identity-handoff", "identity-mfa", "identity-refresh",
             "identity-quota", "identity-jwt-private", "notification-fingerprint",
             "notification-delivery", "web-bff-locator", "web-bff-csrf", "web-bff-refresh")}
         keys["web-bff-tls"] = ROOT / ".local-runtime" / "tls" / "web-bff.p12"

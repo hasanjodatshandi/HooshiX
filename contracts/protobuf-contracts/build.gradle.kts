@@ -13,7 +13,7 @@ val prepareBufDependencies = tasks.register<Sync>("prepareBufDependencies") {
 }
 
 group = "com.sajtech.hooshix"
-version = "1.4.0"
+version = "1.5.0"
 
 java {
     withSourcesJar()

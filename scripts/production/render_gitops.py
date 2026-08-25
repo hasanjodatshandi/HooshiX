@@ -96,6 +96,7 @@ secrets:
   fingerprintSecretName: identity-fingerprint
   challengeSecretName: identity-challenge
   handoffSecretName: identity-handoff
+  mfaSecretName: identity-mfa
   quotaKeySecretName: identity-quota
   refreshSecretName: identity-refresh
   jwtPrivateSecretName: identity-jwt-private

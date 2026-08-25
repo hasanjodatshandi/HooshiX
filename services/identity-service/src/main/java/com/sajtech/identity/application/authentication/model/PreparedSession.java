@@ -15,7 +15,37 @@ public record PreparedSession(
     Instant absoluteExpiresAt,
     AuthenticationSessionMode mode,
     UUID selectedTenantId,
-    UUID selectedMembershipId) {
+    UUID selectedMembershipId,
+    Instant mfaAuthenticatedAt) {
+  public PreparedSession(
+      UUID refreshFamilyId,
+      String sessionId,
+      UUID userId,
+      UUID credentialId,
+      RefreshDigest refreshDigest,
+      Instant authenticatedAt,
+      Instant createdAt,
+      Instant idleExpiresAt,
+      Instant absoluteExpiresAt,
+      AuthenticationSessionMode mode,
+      UUID selectedTenantId,
+      UUID selectedMembershipId) {
+    this(
+        refreshFamilyId,
+        sessionId,
+        userId,
+        credentialId,
+        refreshDigest,
+        authenticatedAt,
+        createdAt,
+        idleExpiresAt,
+        absoluteExpiresAt,
+        mode,
+        selectedTenantId,
+        selectedMembershipId,
+        null);
+  }
+
   public PreparedSession(
       UUID refreshFamilyId,
       String sessionId,
@@ -37,6 +67,7 @@ public record PreparedSession(
         idleExpiresAt,
         absoluteExpiresAt,
         AuthenticationSessionMode.AUTHENTICATED_ONBOARDING,
+        null,
         null,
         null);
   }

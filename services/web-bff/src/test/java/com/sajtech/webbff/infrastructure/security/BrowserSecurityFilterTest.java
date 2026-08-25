@@ -179,6 +179,25 @@ class BrowserSecurityFilterTest {
   }
 
   @Test
+  void sameOriginCsrfRecoveryMayRotateLoadedSessionWithoutTheLostToken() throws Exception {
+    BrowserSession session = session();
+    when(sessions.load("cookie")).thenReturn(Optional.of(session));
+    when(sessions.touch(session)).thenReturn(true);
+    var request = new MockHttpServletRequest("POST", "/api/v1/auth/session/csrf");
+    request.addHeader("Origin", "https://app.example.com");
+    request.addHeader("Sec-Fetch-Site", "same-origin");
+    request.setCookies(new Cookie(BrowserSecurityFilter.COOKIE, "cookie"));
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    verify(sessions, never()).csrfMatches(any(), any());
+    verify(sessions).touch(session);
+    verify(chain).doFilter(any(), same(response));
+  }
+
+  @Test
   void loadedSessionUsesSharedControllerSecurityContextAttribute() throws Exception {
     BrowserSession session = session();
     when(sessions.load("cookie")).thenReturn(Optional.of(session));

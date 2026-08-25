@@ -157,11 +157,13 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
         """
         INSERT INTO identity_refresh_family(
           refresh_family_id,session_id,user_id,state,session_mode,selected_tenant_id,selected_membership_id,authentication_method,
-          authenticated_at,created_at,last_activity_at,idle_expires_at,absolute_expires_at,updated_at)
+          authenticated_at,created_at,last_activity_at,idle_expires_at,absolute_expires_at,updated_at,
+          mfa_authenticated_at)
         VALUES (?,? ,?,'ACTIVE',?,?,?,'LOCAL_PASSWORD',
           CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
           CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
-          CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))
+          CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
+          CAST(? AS TIMESTAMP WITH TIME ZONE))
         """,
         session.refreshFamilyId(),
         session.sessionId(),
@@ -174,7 +176,8 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
         ts(session.createdAt()),
         ts(session.idleExpiresAt()),
         ts(session.absoluteExpiresAt()),
-        ts(session.createdAt()));
+        ts(session.createdAt()),
+        session.mfaAuthenticatedAt() == null ? null : ts(session.mfaAuthenticatedAt()));
     insertCredential(
         session.credentialId(),
         session.refreshFamilyId(),
@@ -205,7 +208,7 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
             SELECT rc.credential_id, rc.refresh_family_id, rc.state AS credential_state,
                    f.session_id, f.user_id, f.state AS family_state, f.session_mode,
                    f.selected_tenant_id, f.selected_membership_id,
-                   f.authenticated_at,
+                   f.authenticated_at, f.mfa_authenticated_at,
                    f.idle_expires_at, f.absolute_expires_at, u.status AS user_status
             FROM identity_refresh_credential rc
             JOIN identity_refresh_family f ON f.refresh_family_id = rc.refresh_family_id
@@ -228,6 +231,7 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
             SELECT rc.credential_id, rc.refresh_family_id, rc.state AS credential_state,
                    f.session_id, f.user_id, f.state AS family_state, f.session_mode,
                    f.selected_tenant_id, f.selected_membership_id, f.authenticated_at,
+                   f.mfa_authenticated_at,
                    f.idle_expires_at, f.absolute_expires_at, u.status AS user_status
             FROM identity_refresh_credential rc
             JOIN identity_refresh_family f ON f.refresh_family_id = rc.refresh_family_id
@@ -342,6 +346,22 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public void markMfaAuthenticated(UUID refreshFamilyId, Instant now) {
+    int changed =
+        dsl.execute(
+            """
+            UPDATE identity_refresh_family
+            SET mfa_authenticated_at = CAST(? AS TIMESTAMP WITH TIME ZONE),
+                updated_at = CAST(? AS TIMESTAMP WITH TIME ZONE)
+            WHERE refresh_family_id = ? AND state = 'ACTIVE'
+            """,
+            ts(now),
+            ts(now),
+            refreshFamilyId);
+    if (changed != 1) throw invalidState();
+  }
+
+  @Override
   public void revokeOtherFamilies(
       UUID userId, UUID retainedFamilyId, RefreshFamilyRevocationReason reason, Instant now) {
     dsl.execute(
@@ -453,7 +473,10 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
         record.get("selected_membership_id", UUID.class),
         record.get("authenticated_at", OffsetDateTime.class).toInstant(),
         record.get("idle_expires_at", OffsetDateTime.class).toInstant(),
-        record.get("absolute_expires_at", OffsetDateTime.class).toInstant());
+        record.get("absolute_expires_at", OffsetDateTime.class).toInstant(),
+        record.get("mfa_authenticated_at", OffsetDateTime.class) == null
+            ? null
+            : record.get("mfa_authenticated_at", OffsetDateTime.class).toInstant());
   }
 
   private static AuthenticationException invalidState() {

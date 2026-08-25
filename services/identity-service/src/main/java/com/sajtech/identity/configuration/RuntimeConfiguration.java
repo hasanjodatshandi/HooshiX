@@ -4,6 +4,9 @@ import com.sajtech.hooshix.contract.validation.ContractValidationServerIntercept
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.*;
+import com.sajtech.identity.application.mfa.port.in.*;
+import com.sajtech.identity.application.mfa.port.out.*;
+import com.sajtech.identity.application.mfa.usecase.MfaUseCase;
 import com.sajtech.identity.application.notification.port.in.ReportNotificationResult;
 import com.sajtech.identity.application.notification.port.out.*;
 import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
@@ -32,11 +35,13 @@ import com.sajtech.identity.infrastructure.security.fingerprint.HmacIntentFinger
 import com.sajtech.identity.infrastructure.security.jwt.FileBackedRsaSigningKeyRing;
 import com.sajtech.identity.infrastructure.security.jwt.RsaJwtAccessTokenSigner;
 import com.sajtech.identity.infrastructure.security.keyring.FileBackedKeyRing;
+import com.sajtech.identity.infrastructure.security.mfa.JcaMfaCryptography;
 import com.sajtech.identity.infrastructure.security.password.Argon2idPasswordHasher;
 import com.sajtech.identity.infrastructure.security.session.HmacSessionCredential;
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
 import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.mfa.grpc.IdentityMfaGrpcService;
 import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
@@ -89,6 +94,11 @@ public class RuntimeConfiguration {
     return new FileBackedKeyRing(p.handoffKeyRingPath(), "AES", 32, c, p.keyRingMaximumStaleness());
   }
 
+  @Bean("mfaKeyRing")
+  FileBackedKeyRing mfaKeyRing(IdentityProperties p, Clock c) {
+    return new FileBackedKeyRing(p.mfaKeyRingPath(), "AES", 32, c, p.keyRingMaximumStaleness());
+  }
+
   @Bean("quotaKeyRing")
   FileBackedKeyRing quotaKeyRing(IdentityProperties p, Clock c) {
     return new FileBackedKeyRing(
@@ -123,8 +133,9 @@ public class RuntimeConfiguration {
       @Qualifier("fingerprintKeyRing") FileBackedKeyRing a,
       @Qualifier("challengeKeyRing") FileBackedKeyRing b,
       @Qualifier("handoffKeyRing") FileBackedKeyRing c,
-      @Qualifier("quotaKeyRing") FileBackedKeyRing d) {
-    return new IdentityKeyRingRefresher(a, b, c, d);
+      @Qualifier("quotaKeyRing") FileBackedKeyRing d,
+      @Qualifier("mfaKeyRing") FileBackedKeyRing e) {
+    return new IdentityKeyRingRefresher(a, b, c, d, e);
   }
 
   @Bean
@@ -177,6 +188,18 @@ public class RuntimeConfiguration {
   @Bean
   AuthenticationStore authenticationStore(DSLContext dsl) {
     return new JooqAuthenticationStore(dsl);
+  }
+
+  @Bean
+  MfaStore mfaStore(DSLContext dsl) {
+    return new JooqMfaStore(dsl);
+  }
+
+  @Bean
+  MfaCryptographyPort mfaCryptography(
+      @Qualifier("mfaKeyRing") FileBackedKeyRing encryption,
+      @Qualifier("challengeKeyRing") FileBackedKeyRing digests) {
+    return new JcaMfaCryptography(encryption, digests);
   }
 
   @Bean
@@ -532,9 +555,67 @@ public class RuntimeConfiguration {
       TransactionRunner tx,
       AuthenticationStore store,
       AuthenticationTenantSelectionPort tenantSelection,
+      MfaStore mfa,
+      MfaCryptographyPort mfaCryptography,
       Clock clock) {
     return new AuthenticateLocalUseCase(
-        contacts, passwords, quota, verifier, credentials, tx, store, tenantSelection, clock);
+        contacts,
+        passwords,
+        quota,
+        verifier,
+        credentials,
+        tx,
+        store,
+        tenantSelection,
+        mfa,
+        mfaCryptography,
+        clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  MfaUseCase mfaCore(
+      MfaStore mfa,
+      MfaCryptographyPort cryptography,
+      @Qualifier("loginQuotaCore") RedisLoginQuota quota,
+      AuthenticationStore authentication,
+      RefreshCredentialLookup refreshLookup,
+      SessionCredentialPort credentials,
+      AuthenticationTenantSelectionPort tenantSelection,
+      TransactionRunner tx,
+      Clock clock) {
+    return new MfaUseCase(
+        mfa,
+        cryptography,
+        quota,
+        authentication,
+        refreshLookup,
+        credentials,
+        tenantSelection,
+        tx,
+        clock);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ObservedMfa observedMfa(MfaUseCase mfa, ObservationRegistry observations, MeterRegistry meters) {
+    return new ObservedMfa(mfa, mfa, observations, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityMfaGrpcService mfaGrpc(ObservedMfa mfa) {
+    return new IdentityMfaGrpcService(mfa, mfa);
   }
 
   @Bean
@@ -634,9 +715,10 @@ public class RuntimeConfiguration {
       CompromisedPasswordPort compromised,
       PasswordNormalizer passwords,
       TransactionRunner tx,
+      MfaStore mfa,
       Clock clock) {
     return new ChangePasswordUseCase(
-        store, credentials, verifier, hashes, compromised, passwords, tx, clock);
+        store, credentials, verifier, hashes, compromised, passwords, tx, mfa, clock);
   }
 
   @Bean
@@ -670,6 +752,9 @@ public class RuntimeConfiguration {
       ContactCanonicalizer contacts,
       SemanticQuotaPort quota,
       TransactionRunner tx,
+      MfaStore mfa,
+      MfaCryptographyPort mfaCryptography,
+      @Qualifier("loginQuotaCore") RedisLoginQuota mfaQuota,
       Clock clock) {
     return new ConfirmPasswordRecoveryUseCase(
         recovery,
@@ -681,6 +766,9 @@ public class RuntimeConfiguration {
         contacts,
         quota,
         tx,
+        mfa,
+        mfaCryptography,
+        mfaQuota,
         clock);
   }
 
@@ -875,9 +963,10 @@ public class RuntimeConfiguration {
       RegistrationStore registrationStore,
       AuthenticationStore authenticationStore,
       com.sajtech.identity.application.profile.port.out.ProfileContactStore profileContactStore,
+      MfaStore mfaStore,
       Clock clock) {
     return new IdentityRetentionWorker(
-        outboxStore, registrationStore, authenticationStore, profileContactStore, clock);
+        outboxStore, registrationStore, authenticationStore, profileContactStore, mfaStore, clock);
   }
 
   @Bean
@@ -902,8 +991,9 @@ public class RuntimeConfiguration {
       @Qualifier("fingerprintKeyRing") FileBackedKeyRing a,
       @Qualifier("challengeKeyRing") FileBackedKeyRing b,
       @Qualifier("handoffKeyRing") FileBackedKeyRing c,
-      @Qualifier("quotaKeyRing") FileBackedKeyRing d) {
-    return new IdentityReadinessHealthIndicator(dsl, quota, hostTime, a, b, c, d);
+      @Qualifier("quotaKeyRing") FileBackedKeyRing d,
+      @Qualifier("mfaKeyRing") FileBackedKeyRing e) {
+    return new IdentityReadinessHealthIndicator(dsl, quota, hostTime, a, b, c, d, e);
   }
 
   @Bean("identityAuthenticationReadiness")

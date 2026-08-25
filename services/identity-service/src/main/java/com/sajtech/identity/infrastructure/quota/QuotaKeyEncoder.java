@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.HexFormat;
+import java.util.UUID;
 import javax.crypto.Mac;
 
 public final class QuotaKeyEncoder {
@@ -55,6 +56,47 @@ public final class QuotaKeyEncoder {
   public String encodeLoginSubject(CanonicalContact contact) {
     if (contact == null) throw new IllegalArgumentException("Login contact is required");
     return contactKey(keys.activeKey(), "LOGIN", contact);
+  }
+
+  public MfaKeys encodeMfa(String operation, UUID userId, byte[] address) {
+    if (operation == null || !operation.matches("[A-Z_]{3,32}") || userId == null) {
+      throw new IllegalArgumentException("MFA quota identity is invalid");
+    }
+    byte[] exact = normalizeAddress(address);
+    byte[] aggregate = aggregate(exact);
+    KeyRingMaterial material = keys.activeKey();
+    return new MfaKeys(
+        key(material, "user", operation, userId.toString().getBytes(StandardCharsets.US_ASCII)),
+        key(material, "client-ip-exact", operation, new byte[] {(byte) exact.length}, exact),
+        key(
+            material,
+            "client-network-aggregate",
+            operation,
+            new byte[] {(byte) aggregate.length},
+            aggregate));
+  }
+
+  public LoginSourceKeys encodeMfaRecoverySource(byte[] address) {
+    byte[] exact = normalizeAddress(address);
+    byte[] aggregate = aggregate(exact);
+    KeyRingMaterial material = keys.activeKey();
+    return new LoginSourceKeys(
+        key(material, "client-ip-exact", "MFA_RECOVERY", new byte[] {(byte) exact.length}, exact),
+        key(
+            material,
+            "client-network-aggregate",
+            "MFA_RECOVERY",
+            new byte[] {(byte) aggregate.length},
+            aggregate));
+  }
+
+  public String encodeMfaRecoverySubject(UUID userId) {
+    if (userId == null) throw new IllegalArgumentException("MFA quota user is required");
+    return key(
+        keys.activeKey(),
+        "user",
+        "MFA_RECOVERY",
+        userId.toString().getBytes(StandardCharsets.US_ASCII));
   }
 
   private static String contactKey(
@@ -117,4 +159,6 @@ public final class QuotaKeyEncoder {
       String keyId, String contactKey, String exactIpKey, String aggregateNetworkKey) {}
 
   public record LoginSourceKeys(String exactIpKey, String aggregateNetworkKey) {}
+
+  public record MfaKeys(String userKey, String exactIpKey, String aggregateNetworkKey) {}
 }
