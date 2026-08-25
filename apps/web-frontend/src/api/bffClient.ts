@@ -5,6 +5,13 @@ function requestId(): string {
   return crypto.randomUUID();
 }
 
+let csrfToken: string | null = null;
+
+function rememberCsrf(response: SessionResponse): SessionResponse {
+  csrfToken = response.csrfToken;
+  return response;
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
@@ -12,6 +19,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: {
       'content-type': 'application/json',
       'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -33,7 +41,7 @@ export async function bootstrapSession(): Promise<SessionResponse> {
     headers: { 'x-request-id': requestId() },
   }).then(async (r) => {
     if (!r.ok) throw new Error('session bootstrap failed');
-    return r.json();
+    return rememberCsrf(await r.json() as SessionResponse);
   });
 }
 
@@ -46,11 +54,12 @@ export async function login(body: { contact: string; password: string }): Promis
       'content-type': 'application/json',
       'x-request-id': requestId(),
       'x-hooshix-client-ip': 'browser',
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
     },
     body: JSON.stringify({ channel: 'EMAIL', ...body }),
   }).then(async (r) => {
     if (!r.ok) throw new Error('login failed');
-    return r.json();
+    return rememberCsrf(await r.json() as SessionResponse);
   });
 }
 
@@ -66,7 +75,9 @@ export async function listTenants(): Promise<TenantList> {
 }
 
 export async function selectTenant(membershipId: string): Promise<TenantSelectionResponse> {
-  return post<TenantSelectionResponse>('/api/v1/identity/tenant-selection', { membershipId });
+  const response = await post<TenantSelectionResponse>('/api/v1/identity/tenant-selection', { membershipId });
+  csrfToken = response.csrfToken;
+  return response;
 }
 
 
@@ -103,14 +114,18 @@ export async function addContact(body: {type: string; value: string}): Promise<{
   return post<{id:string}>('/api/v1/identity/contacts', body);
 }
 
-export async function changePassword(body: {refreshCredential:string; currentPassword:string; newPassword:string}): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>('/api/v1/password/change', body);
+export type PasswordChangedResponse = { changed: boolean; csrfToken: string };
+
+export async function changePassword(body: {currentPassword:string; newPassword:string}): Promise<PasswordChangedResponse> {
+  const response = await post<PasswordChangedResponse>('/api/v1/password/change', body);
+  csrfToken = response.csrfToken;
+  return response;
 }
 export async function requestPasswordRecovery(contact:string): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>('/api/v1/password/recovery/request', {contact});
+  return post<{accepted:boolean}>('/api/v1/password/recovery/request', {channel: 'EMAIL', contact});
 }
 export async function confirmPasswordRecovery(body:{contact:string; code:string; newPassword:string}): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>('/api/v1/password/recovery/confirm', body);
+  return post<{accepted:boolean}>('/api/v1/password/recovery/confirm', {channel: 'EMAIL', ...body});
 }
 
 export const bffClient = {

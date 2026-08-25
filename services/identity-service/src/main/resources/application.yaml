@@ -82,6 +82,7 @@ management:
       percentiles-histogram:
         identity.registration.duration: true
         identity.authentication.duration: true
+        identity.password_lifecycle.duration: true
         identity.tenant.duration: true
         identity.dependency.duration: true
         identity.password_verify.duration: true

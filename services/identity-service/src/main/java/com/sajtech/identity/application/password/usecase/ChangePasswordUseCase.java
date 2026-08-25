@@ -1,17 +1,32 @@
 package com.sajtech.identity.application.password.usecase;
 
+import com.sajtech.identity.application.authentication.model.GeneratedRefreshCredential;
+import com.sajtech.identity.application.authentication.model.LocalCredentialRecord;
 import com.sajtech.identity.application.authentication.model.LockedRefreshCredential;
 import com.sajtech.identity.application.authentication.model.RefreshFamilyRevocationReason;
-import com.sajtech.identity.application.authentication.port.out.*;
+import com.sajtech.identity.application.authentication.port.out.AuthenticationStore;
+import com.sajtech.identity.application.authentication.port.out.PasswordVerificationPort;
+import com.sajtech.identity.application.authentication.port.out.SessionCredentialPort;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
+import com.sajtech.identity.application.password.PasswordError;
+import com.sajtech.identity.application.password.PasswordException;
 import com.sajtech.identity.application.password.model.PasswordPolicy;
-import com.sajtech.identity.application.password.port.in.*;
-import com.sajtech.identity.application.registration.port.out.*;
+import com.sajtech.identity.application.password.port.in.ChangePassword;
+import com.sajtech.identity.application.password.port.in.ChangePasswordCommand;
+import com.sajtech.identity.application.password.port.in.PasswordChangeSession;
+import com.sajtech.identity.application.registration.port.out.CompromisedPasswordPort;
+import com.sajtech.identity.application.registration.port.out.PasswordHashPort;
 import com.sajtech.identity.application.registration.service.PasswordNormalizer;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 
 public final class ChangePasswordUseCase implements ChangePassword {
+  private static final Duration RECENT_AUTH = Duration.ofMinutes(5);
+  private static final Duration IDLE_LIFETIME = Duration.ofDays(7);
   private final AuthenticationStore store;
   private final RefreshCredentialLookup lookup;
   private final SessionCredentialPort credentials;
@@ -43,24 +58,112 @@ public final class ChangePasswordUseCase implements ChangePassword {
   }
 
   @Override
-  public void change(ChangePasswordCommand command) {
-    if (command == null || command.refreshCredential() == null)
-      throw new IllegalArgumentException("invalid request");
-    String next = normalizer.normalize(command.newPassword());
-    PasswordPolicy.validate(next);
+  public PasswordChangeSession change(ChangePasswordCommand command) {
+    if (command == null
+        || command.requestId() == null
+        || command.refreshCredential() == null
+        || command.currentPassword() == null
+        || command.newPassword() == null) throw invalid();
+    Instant now = clock.instant();
+    LockedRefreshCredential observed =
+        lookup
+            .find(store, command.refreshCredential())
+            .orElseThrow(ChangePasswordUseCase::invalidSession);
+    requireUsableRecentSession(observed, now);
+    LocalCredentialRecord observedCredential =
+        store
+            .findLocalCredential(observed.userId())
+            .orElseThrow(ChangePasswordUseCase::invalidCredentials);
+    String current = normalize(command.currentPassword());
+    if (!verifier.matches(current, observedCredential.passwordHash())) throw invalidCredentials();
+
+    String next = normalize(command.newPassword());
+    try {
+      PasswordPolicy.validate(next);
+    } catch (IllegalArgumentException exception) {
+      throw invalid();
+    }
     compromised.requireNotCompromised(next);
-    transactions.required(
+    String nextHash = hashes.hash(next);
+    GeneratedRefreshCredential rotated = credentials.newRefreshCredential();
+
+    return transactions.required(
         () -> {
-          LockedRefreshCredential session =
-              lookup.lock(store, command.refreshCredential()).orElseThrow();
-          var current = store.findLocalCredential(session.userId()).orElseThrow();
-          if (!verifier.matches(
-              normalizer.normalize(command.currentPassword()), current.passwordHash()))
-            throw new IllegalArgumentException("invalid credentials");
-          store.updatePasswordHash(session.userId(), hashes.hash(next), clock.instant());
-          store.revokeAllFamilies(
-              session.userId(), RefreshFamilyRevocationReason.PASSWORD_CHANGED, clock.instant());
-          return null;
+          LockedRefreshCredential locked =
+              lookup
+                  .lock(store, command.refreshCredential())
+                  .orElseThrow(ChangePasswordUseCase::invalidSession);
+          requireSameSession(observed, locked);
+          requireUsableRecentSession(locked, now);
+          LocalCredentialRecord currentCredential =
+              store
+                  .lockLocalCredential(locked.userId())
+                  .orElseThrow(ChangePasswordUseCase::invalidCredentials);
+          if (!"ACTIVE".equals(currentCredential.userStatus())
+              || !sameHash(observedCredential.passwordHash(), currentCredential.passwordHash())) {
+            throw invalidCredentials();
+          }
+          Instant nextIdle = min(now.plus(IDLE_LIFETIME), locked.absoluteExpiresAt());
+          if (!now.isBefore(nextIdle)) throw invalidSession();
+          store.updatePasswordHash(locked.userId(), nextHash, now);
+          store.rotateRefresh(locked, java.util.UUID.randomUUID(), rotated.digest(), now, nextIdle);
+          store.revokeOtherFamilies(
+              locked.userId(),
+              locked.refreshFamilyId(),
+              RefreshFamilyRevocationReason.PASSWORD_CHANGED,
+              now);
+          return new PasswordChangeSession(rotated.encoded(), nextIdle, locked.absoluteExpiresAt());
         });
+  }
+
+  private String normalize(String value) {
+    try {
+      return normalizer.normalize(value);
+    } catch (RuntimeException exception) {
+      throw invalid();
+    }
+  }
+
+  private static void requireUsableRecentSession(LockedRefreshCredential session, Instant now) {
+    if (!"ACTIVE".equals(session.credentialState())
+        || !"ACTIVE".equals(session.familyState())
+        || !"ACTIVE".equals(session.userStatus())
+        || !now.isBefore(session.idleExpiresAt())
+        || !now.isBefore(session.absoluteExpiresAt())) throw invalidSession();
+    if (session.authenticatedAt().plus(RECENT_AUTH).isBefore(now)) {
+      throw new PasswordException(
+          PasswordError.RECENT_AUTHENTICATION_REQUIRED, "Recent authentication is required");
+    }
+  }
+
+  private static void requireSameSession(
+      LockedRefreshCredential observed, LockedRefreshCredential locked) {
+    if (!observed.userId().equals(locked.userId())
+        || !observed.refreshFamilyId().equals(locked.refreshFamilyId())
+        || !observed.credentialId().equals(locked.credentialId())) throw invalidSession();
+  }
+
+  private static boolean sameHash(String expected, String actual) {
+    return expected != null
+        && actual != null
+        && MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static Instant min(Instant left, Instant right) {
+    return left.isBefore(right) ? left : right;
+  }
+
+  private static PasswordException invalid() {
+    return new PasswordException(PasswordError.INVALID_ARGUMENT, "Password request is invalid");
+  }
+
+  private static PasswordException invalidCredentials() {
+    return new PasswordException(
+        PasswordError.INVALID_CREDENTIALS, "Password credentials are invalid");
+  }
+
+  private static PasswordException invalidSession() {
+    return new PasswordException(PasswordError.INVALID_SESSION, "Password session is invalid");
   }
 }

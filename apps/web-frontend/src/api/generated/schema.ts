@@ -58,6 +58,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/password/change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the authenticated user's local password
+         * @description The browser supplies no refresh credential. The BFF uses and atomically rotates its server-held refresh credential and CSRF state.
+         */
+        post: operations["changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password/recovery/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a non-enumerating password-recovery challenge
+         * @description The trusted edge injects exact client-address context; browser input cannot supply it.
+         */
+        post: operations["requestPasswordRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/password/recovery/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm a password-recovery challenge and reset the password */
+        post: operations["confirmPasswordRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -85,11 +142,32 @@ export interface components {
             contact: string;
             code: string;
         };
+        ChangePasswordRequest: {
+            currentPassword: string;
+            /** @description Transport bound only. Identity remains password-policy authority. */
+            newPassword: string;
+        };
+        PasswordRecoveryRequest: {
+            channel: components["schemas"]["RegistrationChannel"];
+            contact: string;
+        };
+        PasswordRecoveryConfirmRequest: {
+            channel: components["schemas"]["RegistrationChannel"];
+            contact: string;
+            code: string;
+            /** @description Transport bound only. Identity remains password-policy authority. */
+            newPassword: string;
+        };
         AcceptedResponse: {
             accepted: boolean;
         };
         ConfirmedResponse: {
             confirmed: boolean;
+        };
+        PasswordChangedResponse: {
+            changed: boolean;
+            /** @description Rotated in-memory CSRF token. It is not a refresh credential and must not be persisted. */
+            csrfToken: string;
         };
         Problem: {
             /** Format: uri-reference */
@@ -130,6 +208,15 @@ export interface components {
         };
         /** @description Registration precondition was not satisfied. Response is non-enumerating. */
         RegistrationRejected: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Password lifecycle precondition was not satisfied without exposing account existence or credential details. */
+        PasswordRejected: {
             headers: {
                 [name: string]: unknown;
             };
@@ -296,6 +383,105 @@ export interface operations {
             409: components["responses"]["RegistrationRejected"];
             413: components["responses"]["PayloadTooLarge"];
             415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Password and browser security state changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordChangedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["PasswordRejected"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    requestPasswordRecovery: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Request accepted regardless of account existence. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    confirmPasswordRecovery: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordRecoveryConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Password reset result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["PasswordRejected"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["DependencyUnavailable"];

@@ -232,6 +232,28 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
         absolute);
   }
 
+  @Override
+  public BrowserSessionGrant rotateSecurityState(
+      BrowserSession old, String rotatedRefresh, Instant identityIdle, Instant identityAbsolute) {
+    if (old == null || !old.authenticated() || rotatedRefresh == null)
+      throw new IllegalArgumentException("Security-state rotation is incomplete");
+    Instant now = clock.instant(),
+        absolute = min(old.absoluteExpiresAt(), identityAbsolute),
+        idle = min(now.plus(IDLE), min(identityIdle, absolute));
+    return rotate(
+        old,
+        old.userId(),
+        old.identitySessionId(),
+        old.refreshFamilyId(),
+        rotatedRefresh,
+        old.selectedTenantId(),
+        old.selectedMembershipId(),
+        old.mode(),
+        now,
+        idle,
+        absolute);
+  }
+
   public void destroy(BrowserSession session) {
     if (session != null) {
       Map<String, String> f =

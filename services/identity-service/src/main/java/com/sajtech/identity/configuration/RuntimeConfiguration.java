@@ -7,6 +7,9 @@ import com.sajtech.identity.application.notification.port.in.ReportNotificationR
 import com.sajtech.identity.application.notification.port.out.*;
 import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
 import com.sajtech.identity.application.password.port.in.*;
+import com.sajtech.identity.application.password.port.out.PasswordRecoverySecretPort;
+import com.sajtech.identity.application.password.port.out.PasswordRecoveryStore;
+import com.sajtech.identity.application.password.usecase.*;
 import com.sajtech.identity.application.profile.port.in.ProfileManagement;
 import com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
@@ -20,6 +23,7 @@ import com.sajtech.identity.infrastructure.persistence.*;
 import com.sajtech.identity.infrastructure.quota.*;
 import com.sajtech.identity.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.identity.infrastructure.security.challenge.HmacChallengeSecret;
+import com.sajtech.identity.infrastructure.security.challenge.HmacPasswordRecoverySecret;
 import com.sajtech.identity.infrastructure.security.escrow.AesGcmNotificationEscrow;
 import com.sajtech.identity.infrastructure.security.fingerprint.HmacIntentFingerprint;
 import com.sajtech.identity.infrastructure.security.jwt.FileBackedRsaSigningKeyRing;
@@ -141,6 +145,12 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  PasswordRecoverySecretPort passwordRecoverySecrets(
+      @Qualifier("challengeKeyRing") FileBackedKeyRing keys) {
+    return new HmacPasswordRecoverySecret(keys);
+  }
+
+  @Bean
   NotificationEscrowPort escrow(@Qualifier("handoffKeyRing") FileBackedKeyRing keys) {
     return new AesGcmNotificationEscrow(keys);
   }
@@ -158,6 +168,11 @@ public class RuntimeConfiguration {
   @Bean
   AuthenticationStore authenticationStore(DSLContext dsl) {
     return new JooqAuthenticationStore(dsl);
+  }
+
+  @Bean
+  PasswordRecoveryStore passwordRecoveryStore(DSLContext dsl) {
+    return new JooqPasswordRecoveryStore(dsl);
   }
 
   @Bean
@@ -570,12 +585,86 @@ public class RuntimeConfiguration {
       prefix = "identity",
       name = "authentication-runtime-enabled",
       havingValue = "true")
-  IdentityPasswordGrpcService passwordGrpc(
-      ChangePassword changePassword,
-      RequestPasswordRecovery requestPasswordRecovery,
-      ConfirmPasswordRecovery confirmPasswordRecovery) {
-    return new IdentityPasswordGrpcService(
-        changePassword, requestPasswordRecovery, confirmPasswordRecovery);
+  ChangePasswordUseCase changePasswordCore(
+      AuthenticationStore store,
+      SessionCredentialPort credentials,
+      PasswordVerificationPort verifier,
+      PasswordHashPort hashes,
+      CompromisedPasswordPort compromised,
+      PasswordNormalizer passwords,
+      TransactionRunner tx,
+      Clock clock) {
+    return new ChangePasswordUseCase(
+        store, credentials, verifier, hashes, compromised, passwords, tx, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  RequestPasswordRecoveryUseCase requestPasswordRecoveryCore(
+      PasswordRecoveryStore store,
+      PasswordRecoverySecretPort secrets,
+      NotificationEscrowPort escrow,
+      ContactCanonicalizer contacts,
+      SemanticQuotaPort quota,
+      TransactionRunner tx,
+      Clock clock) {
+    return new RequestPasswordRecoveryUseCase(store, secrets, escrow, contacts, quota, tx, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ConfirmPasswordRecoveryUseCase confirmPasswordRecoveryCore(
+      PasswordRecoveryStore recovery,
+      PasswordRecoverySecretPort secrets,
+      AuthenticationStore authentication,
+      PasswordHashPort hashes,
+      CompromisedPasswordPort compromised,
+      PasswordNormalizer passwords,
+      ContactCanonicalizer contacts,
+      SemanticQuotaPort quota,
+      TransactionRunner tx,
+      Clock clock) {
+    return new ConfirmPasswordRecoveryUseCase(
+        recovery,
+        secrets,
+        authentication,
+        hashes,
+        compromised,
+        passwords,
+        contacts,
+        quota,
+        tx,
+        clock);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ObservedPasswordLifecycle observedPasswordLifecycle(
+      ChangePasswordUseCase change,
+      RequestPasswordRecoveryUseCase request,
+      ConfirmPasswordRecoveryUseCase confirm,
+      ObservationRegistry observations,
+      MeterRegistry meters) {
+    return new ObservedPasswordLifecycle(change, request, confirm, observations, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityPasswordGrpcService passwordGrpc(ObservedPasswordLifecycle password) {
+    return new IdentityPasswordGrpcService(password, password, password);
   }
 
   @Bean

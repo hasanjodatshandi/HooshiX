@@ -13,6 +13,10 @@ public interface AuthenticationStore {
     return Optional.empty();
   }
 
+  default Optional<LocalCredentialRecord> lockLocalCredential(UUID userId) {
+    return findLocalCredential(userId);
+  }
+
   Optional<LocalCredentialRecord> lockVerifiedLocalCredential(
       UUID userId, CanonicalContact contact);
 
@@ -26,6 +30,10 @@ public interface AuthenticationStore {
 
   Optional<LockedRefreshCredential> lockRefreshCredential(RefreshDigest digest);
 
+  default Optional<LockedRefreshCredential> findRefreshCredential(RefreshDigest digest) {
+    return Optional.empty();
+  }
+
   void rotateRefresh(
       LockedRefreshCredential current,
       UUID newCredentialId,
@@ -36,6 +44,11 @@ public interface AuthenticationStore {
   void revokeFamily(UUID refreshFamilyId, RefreshFamilyRevocationReason reason, Instant now);
 
   void revokeAllFamilies(UUID userId, RefreshFamilyRevocationReason reason, Instant now);
+
+  default void revokeOtherFamilies(
+      UUID userId, UUID retainedFamilyId, RefreshFamilyRevocationReason reason, Instant now) {
+    throw new UnsupportedOperationException("Selective family revocation is not supported");
+  }
 
   default void updatePasswordHash(UUID userId, String passwordHash, Instant now) {
     throw new UnsupportedOperationException("Password mutation is not supported by this store");

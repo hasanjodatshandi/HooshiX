@@ -51,11 +51,19 @@ public interface IdentityGateway {
 
   void logout(UUID requestId, String refresh);
 
-  boolean changePassword(String refresh, String currentPassword, String newPassword);
+  PasswordChangeResult changePassword(
+      UUID requestId, String refresh, String currentPassword, String newPassword);
 
-  boolean requestPasswordRecovery(String contact);
+  boolean requestPasswordRecovery(
+      UUID requestId, String channel, String contact, byte[] clientAddress);
 
-  boolean confirmPasswordRecovery(String contact, String code, String newPassword);
+  boolean confirmPasswordRecovery(
+      UUID requestId,
+      String channel,
+      String contact,
+      String code,
+      String newPassword,
+      byte[] clientAddress);
 
   enum SessionMode {
     AUTHENTICATED_ONBOARDING,
@@ -101,4 +109,7 @@ public interface IdentityGateway {
   record Profile(UUID id, String firstName, String lastName, String fatherName) {}
 
   record Contact(UUID id, String type, String value, boolean verified, boolean primary) {}
+
+  record PasswordChangeResult(
+      String refreshCredential, Instant idleExpiresAt, Instant absoluteExpiresAt) {}
 }

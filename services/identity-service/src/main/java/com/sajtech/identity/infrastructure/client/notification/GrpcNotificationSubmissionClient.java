@@ -26,7 +26,7 @@ public final class GrpcNotificationSubmissionClient implements NotificationSubmi
             .build();
     VerificationCodeContent content =
         VerificationCodeContent.newBuilder().setCode(handoff.code()).setExpiresMinutes(10).build();
-    SubmitNotificationRequest request =
+    SubmitNotificationRequest.Builder request =
         SubmitNotificationRequest.newBuilder()
             .setRequestId(record.requestId().toString())
             .setChannel(
@@ -35,13 +35,15 @@ public final class GrpcNotificationSubmissionClient implements NotificationSubmi
                     : NotificationChannel.NOTIFICATION_CHANNEL_SMS)
             .setRecipient(handoff.recipient())
             .setLocale(handoff.locale().canonical())
-            .setMessageNotAfter(notAfter)
-            .setRegistrationVerificationCode(content)
-            .build();
+            .setMessageNotAfter(notAfter);
+    switch (record.contentType()) {
+      case REGISTRATION_VERIFICATION -> request.setRegistrationVerificationCode(content);
+      case PASSWORD_RECOVERY -> request.setPasswordRecoveryCode(content);
+    }
     SubmitNotificationResponse response =
         NotificationServiceGrpc.newBlockingStub(channel)
             .withDeadlineAfter(DEADLINE_MS, TimeUnit.MILLISECONDS)
-            .submitNotification(request);
+            .submitNotification(request.build());
     if (response.getLifecycle() != NotificationLifecycle.NOTIFICATION_LIFECYCLE_ACCEPTED
         && response.getLifecycle() != NotificationLifecycle.NOTIFICATION_LIFECYCLE_DISPATCHING
         && response.getLifecycle() != NotificationLifecycle.NOTIFICATION_LIFECYCLE_RETRY_WAIT

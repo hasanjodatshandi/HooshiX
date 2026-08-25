@@ -65,6 +65,26 @@ groups:
           service: identity-service
         annotations:
           summary: Identity password verification remains continuously occupied
+      - alert: IdentityPasswordLifecycleUnavailableRateHigh
+        expr: |
+          sum(rate(identity_password_lifecycle_duration_seconds_count{outcome=~"DEPENDENCY_UNAVAILABLE|QUOTA_UNAVAILABLE|QUOTA_TIME_SOURCE_UNHEALTHY|QUOTA_CAPACITY_UNHEALTHY|SESSION_STATE_INVALID|INTERNAL"}[5m]))
+          /
+          clamp_min(sum(rate(identity_password_lifecycle_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity password lifecycle unavailable or internal-error rate is above 1%
+      - alert: IdentityPasswordLifecycleSaturationHigh
+        expr: identity_password_lifecycle_in_flight > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity password lifecycle in-flight work is near the transport bound
       - alert: IdentityGrpcAdmissionRejected
         expr: rate(identity_grpc_admission_rejected_total[5m]) > 0
         for: 5m
