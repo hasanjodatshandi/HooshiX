@@ -152,4 +152,8 @@
     <Class name="com.sajtech.identity.infrastructure.observability.ObservedPasswordLifecycle" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedProfileManagement" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

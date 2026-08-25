@@ -58,6 +58,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the authenticated user's profile */
+        get: operations["getIdentityProfile"];
+        /** Canonically update the authenticated user's profile */
+        put: operations["updateIdentityProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated user's bounded active contact set */
+        get: operations["listIdentityContacts"];
+        put?: never;
+        /** Add an unverified contact and enqueue its verification challenge */
+        post: operations["addIdentityContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/contacts/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace an eligible contact verification challenge */
+        post: operations["resendIdentityContactVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/contacts/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm an eight-digit contact verification challenge */
+        post: operations["verifyIdentityContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/contacts/{id}/primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a verified contact primary with recent authentication */
+        post: operations["setPrimaryIdentityContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a non-primary contact while retaining a verified contact */
+        delete: operations["removeIdentityContact"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/password/change": {
         parameters: {
             query?: never;
@@ -126,7 +230,7 @@ export interface components {
         RegisterRequest: {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
-            /** @description Transport bound only. Identity remains password-policy authority. */
+            /** @description NFC-normalized Unicode code-point policy. No composition rule is imposed. */
             password: string;
             locale: components["schemas"]["RegistrationLocale"];
             firstName: string;
@@ -144,7 +248,7 @@ export interface components {
         };
         ChangePasswordRequest: {
             currentPassword: string;
-            /** @description Transport bound only. Identity remains password-policy authority. */
+            /** @description NFC-normalized Unicode code-point policy. No composition rule is imposed. */
             newPassword: string;
         };
         PasswordRecoveryRequest: {
@@ -155,8 +259,43 @@ export interface components {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
             code: string;
-            /** @description Transport bound only. Identity remains password-policy authority. */
+            /** @description NFC-normalized Unicode code-point policy. No composition rule is imposed. */
             newPassword: string;
+        };
+        ProfileResponse: {
+            /** Format: uuid */
+            id: string;
+            firstName: string;
+            lastName: string;
+            fatherName?: string;
+        };
+        UpdateProfileRequest: {
+            firstName: string;
+            lastName: string;
+            fatherName?: string;
+        };
+        ContactResponse: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["RegistrationChannel"];
+            value: string;
+            verified: boolean;
+            primary: boolean;
+        };
+        AddContactRequest: {
+            type: components["schemas"]["RegistrationChannel"];
+            value: string;
+            locale: components["schemas"]["RegistrationLocale"];
+        };
+        VerifyContactRequest: {
+            code: string;
+        };
+        CreatedContactResponse: {
+            /** Format: uuid */
+            id: string;
+        };
+        VerifiedResponse: {
+            verified: boolean;
         };
         AcceptedResponse: {
             accepted: boolean;
@@ -273,6 +412,7 @@ export interface components {
     parameters: {
         /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
         RequestId: string;
+        ContactId: string;
     };
     requestBodies: never;
     headers: never;
@@ -385,6 +525,238 @@ export interface operations {
             415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    getIdentityProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            401: components["responses"]["InvalidSession"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    updateIdentityProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Profile updated idempotently. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listIdentityContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active contacts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactResponse"][];
+                };
+            };
+            401: components["responses"]["InvalidSession"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    addIdentityContact: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddContactRequest"];
+            };
+        };
+        responses: {
+            /** @description Contact challenge accepted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedContactResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    resendIdentityContactVerification: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path: {
+                id: components["parameters"]["ContactId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resend accepted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    verifyIdentityContact: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path: {
+                id: components["parameters"]["ContactId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyContactRequest"];
+            };
+        };
+        responses: {
+            /** @description Verification result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifiedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    setPrimaryIdentityContact: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path: {
+                id: components["parameters"]["ContactId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Primary contact changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    removeIdentityContact: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+            };
+            path: {
+                id: components["parameters"]["ContactId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contact removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
             503: components["responses"]["DependencyUnavailable"];
         };
     };

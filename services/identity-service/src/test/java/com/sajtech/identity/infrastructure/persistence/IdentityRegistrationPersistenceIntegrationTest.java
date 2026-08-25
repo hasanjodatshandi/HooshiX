@@ -3,6 +3,8 @@ package com.sajtech.identity.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.*;
 
 import com.sajtech.identity.application.notification.model.*;
+import com.sajtech.identity.application.profile.ProfileException;
+import com.sajtech.identity.application.profile.model.*;
 import com.sajtech.identity.application.registration.model.*;
 import com.sajtech.identity.domain.registration.valueobject.*;
 import java.time.*;
@@ -198,5 +200,107 @@ class IdentityRegistrationPersistenceIntegrationTest {
     assertThat(row.get("canonical_value", String.class)).isEqualTo("person@example.com");
     assertThat(row.get("delivery_value", String.class)).isEqualTo("Person@Example.com");
     assertThat(dsl.fetchCount(DSL.table("registration_reservation"))).isZero();
+  }
+
+  @Test
+  void profileContactStoreEnforcesChallengePrimaryRemovalAndDedupInvariants() {
+    Instant now = Instant.parse("2026-08-25T12:00:00Z");
+    UUID userId = UUID.randomUUID();
+    dsl.execute(
+        "INSERT INTO identity_user(user_id,status,created_at,updated_at) VALUES (?,'ACTIVE',CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))",
+        userId,
+        OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+    dsl.execute(
+        "INSERT INTO identity_profile(user_id,first_name,last_name,created_at,updated_at) VALUES (?,?,?,CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))",
+        userId,
+        "First",
+        "Last",
+        OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
+        OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+    JooqProfileContactStore profiles = new JooqProfileContactStore(dsl);
+    CanonicalContact first =
+        new CanonicalContact(RegistrationChannel.EMAIL, "first@example.com", "first@example.com");
+    PreparedContactChallenge firstPrepared = preparedContact(first, now);
+
+    tx.required(
+        () -> {
+          profiles.lockUser(userId);
+          profiles.lockContactKey(first);
+          assertThat(profiles.countActiveContacts(userId)).isZero();
+          assertThat(profiles.contactKeyUnavailable(first, null, now)).isFalse();
+          profiles.insertContactChallenge(userId, firstPrepared);
+          return null;
+        });
+    assertThat(profiles.contactKeyUnavailable(first, null, now.plusSeconds(1))).isTrue();
+    assertThat(profiles.contactKeyUnavailable(first, firstPrepared.contactId(), now.plusSeconds(1)))
+        .isFalse();
+    assertThat(profiles.contactKeyUnavailable(first, null, now.plusSeconds(601))).isFalse();
+    assertThat(profiles.findContacts(userId, 11)).hasSize(1);
+    LockedContactChallenge firstLocked =
+        tx.required(
+            () -> {
+              profiles.lockUser(userId);
+              return profiles.lockLatestChallenge(userId, firstPrepared.contactId()).orElseThrow();
+            });
+    tx.required(
+        () -> {
+          profiles.lockUser(userId);
+          profiles.confirmContact(firstLocked, now.plusSeconds(1));
+          return null;
+        });
+    assertThat(profiles.findContacts(userId, 11).getFirst().primary()).isTrue();
+    assertThat(profiles.contactKeyUnavailable(first, null, now.plusSeconds(602))).isTrue();
+
+    CanonicalContact second =
+        new CanonicalContact(RegistrationChannel.EMAIL, "second@example.com", "second@example.com");
+    PreparedContactChallenge secondPrepared = preparedContact(second, now.plusSeconds(2));
+    tx.required(
+        () -> {
+          profiles.lockUser(userId);
+          profiles.lockContactKey(second);
+          profiles.insertContactChallenge(userId, secondPrepared);
+          LockedContactChallenge challenge =
+              profiles.lockLatestChallenge(userId, secondPrepared.contactId()).orElseThrow();
+          profiles.confirmContact(challenge, now.plusSeconds(3));
+          assertThat(profiles.setPrimary(userId, secondPrepared.contactId(), now.plusSeconds(4)))
+              .isTrue();
+          assertThat(profiles.remove(userId, firstPrepared.contactId(), now.plusSeconds(5)))
+              .isTrue();
+          return null;
+        });
+    assertThatThrownBy(
+            () ->
+                tx.required(
+                    () -> {
+                      profiles.lockUser(userId);
+                      profiles.remove(userId, secondPrepared.contactId(), now.plusSeconds(6));
+                      return null;
+                    }))
+        .isInstanceOf(ProfileException.class);
+
+    UUID requestId = UUID.randomUUID();
+    FingerprintDigest digest = new FingerprintDigest(new byte[32], "v1", "k1");
+    assertThat(
+            profiles.tryInsertCommand(
+                requestId, userId, "UPDATE_PROFILE", digest, "UPDATED", null, now))
+        .isTrue();
+    assertThat(profiles.findCommand(requestId)).isPresent();
+    assertThat(profiles.deleteCommandsBefore(now.plusSeconds(1), 128)).isEqualTo(1);
+  }
+
+  private static PreparedContactChallenge preparedContact(CanonicalContact contact, Instant now) {
+    return new PreparedContactChallenge(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        contact,
+        RegistrationLocale.EN,
+        new byte[32],
+        "k1",
+        new EncryptedHandoff("e1", new byte[12], new byte[32]),
+        now,
+        now.plusSeconds(600));
   }
 }

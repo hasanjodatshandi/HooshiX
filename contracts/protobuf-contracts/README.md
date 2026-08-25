@@ -10,13 +10,13 @@ Maven coordinates:
 
 Example:
 
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.2.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.3.0")
 
 The JAR contains generated Protobuf and gRPC transport classes produced from canonical proto schemas.
 
-The current 1.2.0 release extends the Identity password lifecycle with request idempotency,
-trusted-client quota context, and refresh-family rotation while retaining the 1.1.0
-IdentityNotificationResultService callback.
+The current 1.3.0 release adds backward-compatible Profile/Contact mutation request identities,
+contact-verification resend, and purpose-specific contact verification Notification content. It
+retains the 1.2.0 password lifecycle and the 1.1.0 IdentityNotificationResultService callback.
 
 ## Versioning
 

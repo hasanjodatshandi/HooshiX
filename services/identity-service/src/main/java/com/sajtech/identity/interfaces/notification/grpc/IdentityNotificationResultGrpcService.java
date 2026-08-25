@@ -11,6 +11,8 @@ import java.util.UUID;
 
 public final class IdentityNotificationResultGrpcService
     extends IdentityNotificationResultServiceGrpc.IdentityNotificationResultServiceImplBase {
+  private static final long MIN_TIMESTAMP_SECONDS = -62_135_596_800L;
+  private static final long MAX_TIMESTAMP_SECONDS = 253_402_300_799L;
   private final ReportNotificationResult report;
 
   public IdentityNotificationResultGrpcService(ReportNotificationResult report) {
@@ -24,10 +26,9 @@ public final class IdentityNotificationResultGrpcService
     try {
       NotificationTerminalResult result =
           new NotificationTerminalResult(
-              UUID.fromString(request.getNotificationId()),
+              canonicalUuidV4(request.getNotificationId()),
               terminal(request.getTerminalLifecycle()),
-              Instant.ofEpochSecond(
-                  request.getOccurredAt().getSeconds(), request.getOccurredAt().getNanos()));
+              instant(request.getOccurredAt().getSeconds(), request.getOccurredAt().getNanos()));
       NotificationResultApplyOutcome outcome = report.report(result);
       if (outcome == NotificationResultApplyOutcome.NOT_FOUND) {
         responseObserver.onError(Status.NOT_FOUND.asRuntimeException());
@@ -56,5 +57,24 @@ public final class IdentityNotificationResultGrpcService
       default ->
           throw new IllegalArgumentException("Notification result lifecycle must be terminal");
     };
+  }
+
+  private static UUID canonicalUuidV4(String value) {
+    UUID result = UUID.fromString(value);
+    if (result.version() != 4 || !result.toString().equals(value)) {
+      throw new IllegalArgumentException("Notification ID is invalid");
+    }
+    return result;
+  }
+
+  private static Instant instant(long seconds, int nanos) {
+    if (seconds < MIN_TIMESTAMP_SECONDS
+        || seconds > MAX_TIMESTAMP_SECONDS
+        || nanos < 0
+        || nanos > 999_999_999
+        || nanos % 1_000 != 0) {
+      throw new IllegalArgumentException("Timestamp is invalid");
+    }
+    return Instant.ofEpochSecond(seconds, nanos);
   }
 }

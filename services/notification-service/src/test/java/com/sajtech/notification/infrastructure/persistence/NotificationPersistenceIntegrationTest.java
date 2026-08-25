@@ -242,6 +242,27 @@ class NotificationPersistenceIntegrationTest {
         .contains("provider_receipt_correlation_idx", "notification_result_outbox_pending_idx");
   }
 
+  @Test
+  void migrationPublishesDigestVerifiedContactVerificationTemplatesForEverySupportedRoute() {
+    JooqNotificationTemplateCatalog catalog =
+        new JooqNotificationTemplateCatalog(dsl, new TemplateContentDigest());
+
+    for (NotificationChannel channel : NotificationChannel.values()) {
+      for (String locale : java.util.List.of("en", "fa")) {
+        var template =
+            catalog
+                .findActive(channel, NotificationSemanticType.CONTACT_VERIFICATION_CODE, locale)
+                .orElseThrow();
+
+        assertThat(template.channel()).isEqualTo(channel);
+        assertThat(template.semanticType())
+            .isEqualTo(NotificationSemanticType.CONTACT_VERIFICATION_CODE);
+        assertThat(template.locale()).isEqualTo(locale);
+        assertThat(template.textTemplate()).contains("{code}", "{expires_minutes}");
+      }
+    }
+  }
+
   private SubmitNotificationUseCase createUseCase() throws Exception {
     Path fingerprintPath = tempDirectory.resolve("fingerprint.properties");
     Path deliveryPath = tempDirectory.resolve("delivery.properties");

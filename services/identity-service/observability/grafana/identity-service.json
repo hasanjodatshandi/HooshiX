@@ -1,7 +1,7 @@
 {
   "title": "HooshiX Identity Service",
   "schemaVersion": 41,
-  "version": 3,
+  "version": 4,
   "refresh": "30s",
   "tags": [
     "hooshix",
@@ -302,6 +302,47 @@
         "w": 12,
         "x": 12,
         "y": 56
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Profile request rate by outcome",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, outcome) (rate(identity_profile_duration_seconds_count[5m]))",
+          "legendFormat": "{{operation}} {{outcome}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Profile p95 and in flight",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(identity_profile_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{operation}} p95"
+        },
+        {
+          "refId": "B",
+          "expr": "identity_profile_in_flight",
+          "legendFormat": "in flight"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
       }
     }
   ]

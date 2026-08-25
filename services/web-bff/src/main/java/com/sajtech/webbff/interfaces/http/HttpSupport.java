@@ -41,7 +41,7 @@ final class HttpSupport {
   static UUID id(String value) {
     try {
       UUID id = UUID.fromString(value);
-      if (!id.toString().equals(value)) throw invalid();
+      if (id.version() != 4 || !id.toString().equals(value)) throw invalid();
       return id;
     } catch (RuntimeException e) {
       throw invalid();

@@ -5,17 +5,25 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ProfileManagement {
-  ProfileContactStore.ProfileRecord profile(UUID userId);
+  ProfileContactStore.ProfileRecord profile(String refreshCredential);
 
-  void update(UUID userId, String firstName, String lastName, String fatherName);
+  void update(
+      String refreshCredential,
+      UUID requestId,
+      String firstName,
+      String lastName,
+      String fatherName);
 
-  List<ProfileContactStore.ContactRecord> contacts(UUID userId);
+  List<ProfileContactStore.ContactRecord> contacts(String refreshCredential);
 
-  UUID addContact(UUID userId, String type, String value);
+  UUID addContact(
+      String refreshCredential, UUID requestId, String type, String value, String locale);
 
-  boolean verifyContact(UUID userId, UUID contactId, String code);
+  boolean resendContactVerification(String refreshCredential, UUID requestId, UUID contactId);
 
-  boolean primary(UUID userId, UUID contactId);
+  boolean verifyContact(String refreshCredential, UUID requestId, UUID contactId, String code);
 
-  boolean remove(UUID userId, UUID contactId);
+  boolean primary(String refreshCredential, UUID requestId, UUID contactId);
+
+  boolean remove(String refreshCredential, UUID requestId, UUID contactId);
 }

@@ -2,6 +2,7 @@ package com.sajtech.identity.infrastructure.worker;
 
 import com.sajtech.identity.application.authentication.port.out.AuthenticationStore;
 import com.sajtech.identity.application.notification.port.out.NotificationOutboxStore;
+import com.sajtech.identity.application.profile.port.out.ProfileContactStore;
 import com.sajtech.identity.application.registration.port.out.RegistrationStore;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,6 +24,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   private final NotificationOutboxStore outboxStore;
   private final RegistrationStore registrationStore;
   private final AuthenticationStore authenticationStore;
+  private final ProfileContactStore profileContactStore;
   private final Clock clock;
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(
@@ -33,10 +35,12 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
       NotificationOutboxStore outboxStore,
       RegistrationStore registrationStore,
       AuthenticationStore authenticationStore,
+      ProfileContactStore profileContactStore,
       Clock clock) {
     this.outboxStore = outboxStore;
     this.registrationStore = registrationStore;
     this.authenticationStore = authenticationStore;
+    this.profileContactStore = profileContactStore;
     this.clock = clock;
   }
 
@@ -68,6 +72,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
       Instant now = clock.instant();
       int erased = outboxStore.eraseExpiredSensitive(now, BATCH);
       registrationStore.deleteDedupBefore(now.minus(DEDUP_RETENTION), BATCH);
+      profileContactStore.deleteCommandsBefore(now.minus(DEDUP_RETENTION), BATCH);
       authenticationStore.deleteFamiliesBefore(now.minus(SESSION_REUSE_EVIDENCE_RETENTION), BATCH);
       if (erased > 0) {
         LOGGER

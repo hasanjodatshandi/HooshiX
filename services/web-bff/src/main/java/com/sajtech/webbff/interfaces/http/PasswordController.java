@@ -2,6 +2,7 @@ package com.sajtech.webbff.interfaces.http;
 
 import com.sajtech.webbff.application.model.*;
 import com.sajtech.webbff.application.port.out.*;
+import com.sajtech.webbff.interfaces.validation.UnicodeCodePointSize;
 import jakarta.servlet.http.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -83,7 +84,9 @@ public final class PasswordController {
 
   public record PasswordChanged(boolean changed, String csrfToken) {}
 
-  public record Change(@NotBlank String currentPassword, @NotBlank String newPassword) {}
+  public record Change(
+      @NotNull @Size(min = 1, max = 4096) String currentPassword,
+      @NotNull @UnicodeCodePointSize(min = 12, max = 128) String newPassword) {}
 
   public record RecoveryRequest(
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
@@ -93,5 +96,5 @@ public final class PasswordController {
       @NotBlank @Pattern(regexp = "EMAIL|PHONE") String channel,
       @NotBlank @Size(max = 254) String contact,
       @NotBlank @Pattern(regexp = "[0-9]{8}") String code,
-      @NotBlank @Size(max = 1024) String newPassword) {}
+      @NotNull @UnicodeCodePointSize(min = 12, max = 128) String newPassword) {}
 }

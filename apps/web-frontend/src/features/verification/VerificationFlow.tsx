@@ -4,6 +4,7 @@ import { useAppState } from '../../state/appState';
 import { getErrorMessage } from '../../errors/getErrorMessage';
 import { navigate } from '../../navigation/navigate';
 import * as actions from '../../state/appActions';
+import { canonicalEmail, verificationCode } from '../../validation/userInput';
 
 export function VerificationFlow() {
   const [code, setCode] = useState('');
@@ -19,8 +20,8 @@ export function VerificationFlow() {
     try {
       await bffClient.confirm({
       channel: 'EMAIL',
-      contact,
-      code,
+      contact: canonicalEmail(contact),
+      code: verificationCode(code),
       });
     dispatch(actions.verificationCompleted());
 
@@ -30,5 +31,5 @@ export function VerificationFlow() {
     }
   }
 
-  return <section aria-labelledby="verification-title"><h2 id="verification-title">Verification</h2><label htmlFor="verification-code">Code</label><input id="verification-code" aria-label="Verification code" value={code} onChange={(e) => setCode(e.target.value)} /><button type="button" onClick={confirm}>Confirm</button><p>{state}</p><p>{error}</p></section>;
+  return <section aria-labelledby="verification-title"><h2 id="verification-title">Verification</h2><label htmlFor="verification-code">Code</label><input id="verification-code" aria-label="Verification code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} /><button type="button" onClick={confirm}>Confirm</button><p>{state}</p><p>{error}</p></section>;
 }

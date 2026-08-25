@@ -48,6 +48,7 @@ message SubmitNotificationRequest {
     VerificationCodeContent password_recovery_code = 11;
     VerificationCodeContent mfa_verification_code = 12;
     PasswordChangedNoticeContent password_changed_notice = 13;
+    VerificationCodeContent contact_verification_code = 14;
   }
 }
 

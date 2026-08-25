@@ -25,6 +25,12 @@ class OpenApiRegistrationContractTest {
             "/api/v1/identity/registration",
             "/api/v1/identity/registration/resend",
             "/api/v1/identity/registration/confirm",
+            "/api/v1/identity/profile",
+            "/api/v1/identity/contacts",
+            "/api/v1/identity/contacts/{id}/resend",
+            "/api/v1/identity/contacts/{id}/verify",
+            "/api/v1/identity/contacts/{id}/primary",
+            "/api/v1/identity/contacts/{id}",
             "/api/v1/password/change",
             "/api/v1/password/recovery/request",
             "/api/v1/password/recovery/confirm");
@@ -32,6 +38,8 @@ class OpenApiRegistrationContractTest {
         .containsKeys("202", "400", "403", "409", "429", "503");
     assertThat(responses(paths, "/api/v1/identity/registration/resend")).containsKey("202");
     assertThat(responses(paths, "/api/v1/identity/registration/confirm")).containsKey("200");
+    assertThat(responses(paths, "/api/v1/identity/contacts/{id}/verify")).containsKey("200");
+    assertThat(map(paths.get("/api/v1/identity/profile"))).containsKeys("get", "put");
     assertThat(responses(paths, "/api/v1/password/change"))
         .containsKeys("200", "400", "401", "403", "409", "429", "503");
     assertThat(responses(paths, "/api/v1/password/recovery/request")).containsKey("200");
@@ -47,10 +55,9 @@ class OpenApiRegistrationContractTest {
     Map<String, Object> register = map(schemas.get("RegisterRequest"));
     assertThat(register.get("additionalProperties")).isEqualTo(Boolean.FALSE);
     Map<String, Object> password = map(map(register.get("properties")).get("password"));
-    assertThat(password.get("minLength")).isEqualTo(1);
-    assertThat(password.get("maxLength")).isEqualTo(4096);
-    assertThat(password.get("description").toString())
-        .contains("Identity remains password-policy authority");
+    assertThat(password.get("minLength")).isEqualTo(12);
+    assertThat(password.get("maxLength")).isEqualTo(128);
+    assertThat(password.get("description").toString()).contains("Unicode code-point policy");
 
     Map<String, Object> change = map(schemas.get("ChangePasswordRequest"));
     assertThat(change.get("additionalProperties")).isEqualTo(Boolean.FALSE);

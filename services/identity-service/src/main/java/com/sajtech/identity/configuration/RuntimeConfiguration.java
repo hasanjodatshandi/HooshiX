@@ -11,6 +11,7 @@ import com.sajtech.identity.application.password.port.out.PasswordRecoverySecret
 import com.sajtech.identity.application.password.port.out.PasswordRecoveryStore;
 import com.sajtech.identity.application.password.usecase.*;
 import com.sajtech.identity.application.profile.port.in.ProfileManagement;
+import com.sajtech.identity.application.profile.service.ProfileFingerprintEncoder;
 import com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase;
 import com.sajtech.identity.application.registration.port.out.*;
 import com.sajtech.identity.application.registration.service.*;
@@ -23,6 +24,7 @@ import com.sajtech.identity.infrastructure.persistence.*;
 import com.sajtech.identity.infrastructure.quota.*;
 import com.sajtech.identity.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.identity.infrastructure.security.challenge.HmacChallengeSecret;
+import com.sajtech.identity.infrastructure.security.challenge.HmacContactVerificationSecret;
 import com.sajtech.identity.infrastructure.security.challenge.HmacPasswordRecoverySecret;
 import com.sajtech.identity.infrastructure.security.escrow.AesGcmNotificationEscrow;
 import com.sajtech.identity.infrastructure.security.fingerprint.HmacIntentFingerprint;
@@ -139,9 +141,15 @@ public class RuntimeConfiguration {
     return new HmacIntentFingerprint(keys);
   }
 
-  @Bean
+  @Bean("registrationChallengeSecrets")
   ChallengeSecretPort challengeSecrets(@Qualifier("challengeKeyRing") FileBackedKeyRing keys) {
     return new HmacChallengeSecret(keys);
+  }
+
+  @Bean("contactChallengeSecrets")
+  ChallengeSecretPort contactChallengeSecrets(
+      @Qualifier("challengeKeyRing") FileBackedKeyRing keys) {
+    return new HmacContactVerificationSecret(keys);
   }
 
   @Bean
@@ -191,9 +199,44 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  ProfileManagement profileManagement(
-      com.sajtech.identity.application.profile.port.out.ProfileContactStore store) {
-    return new ProfileManagementUseCase(store);
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ProfileManagementUseCase profileCore(
+      com.sajtech.identity.application.profile.port.out.ProfileContactStore store,
+      AuthenticationStore authenticationStore,
+      RefreshCredentialLookup lookup,
+      ContactCanonicalizer contacts,
+      ProfileCanonicalizer profiles,
+      IntentFingerprintPort fingerprints,
+      @Qualifier("contactChallengeSecrets") ChallengeSecretPort challenges,
+      NotificationEscrowPort escrow,
+      TransactionRunner transactions,
+      Clock clock) {
+    return new ProfileManagementUseCase(
+        store,
+        authenticationStore,
+        lookup,
+        contacts,
+        profiles,
+        new ProfileFingerprintEncoder(),
+        fingerprints,
+        challenges,
+        escrow,
+        transactions,
+        clock);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ProfileManagement observedProfile(
+      ProfileManagementUseCase core, ObservationRegistry observations, MeterRegistry meters) {
+    return new ObservedProfileManagement(core, observations, meters);
   }
 
   @Bean
@@ -391,7 +434,7 @@ public class RuntimeConfiguration {
       SemanticQuotaPort quota,
       CompromisedPasswordPort compromised,
       PasswordHashPort hashes,
-      ChallengeSecretPort challenges,
+      @Qualifier("registrationChallengeSecrets") ChallengeSecretPort challenges,
       NotificationEscrowPort escrow,
       TransactionRunner tx,
       RegistrationStore store,
@@ -421,7 +464,7 @@ public class RuntimeConfiguration {
       IntentFingerprintPort fingerprints,
       IdempotencyGuard idempotency,
       SemanticQuotaPort quota,
-      ChallengeSecretPort challenges,
+      @Qualifier("registrationChallengeSecrets") ChallengeSecretPort challenges,
       NotificationEscrowPort escrow,
       TransactionRunner tx,
       RegistrationStore store,
@@ -437,7 +480,7 @@ public class RuntimeConfiguration {
       IntentFingerprintPort fingerprints,
       IdempotencyGuard idempotency,
       SemanticQuotaPort quota,
-      ChallengeSecretPort challenges,
+      @Qualifier("registrationChallengeSecrets") ChallengeSecretPort challenges,
       TransactionRunner tx,
       RegistrationStore store,
       Clock clock) {
@@ -470,11 +513,8 @@ public class RuntimeConfiguration {
       prefix = "identity",
       name = "authentication-runtime-enabled",
       havingValue = "true")
-  IdentityProfileGrpcService profileGrpc(
-      ProfileManagement profileManagement,
-      RefreshCredentialLookup lookup,
-      AuthenticationStore store) {
-    return new IdentityProfileGrpcService(profileManagement, lookup, store);
+  IdentityProfileGrpcService profileGrpc(ProfileManagement profileManagement) {
+    return new IdentityProfileGrpcService(profileManagement);
   }
 
   @Bean
@@ -823,8 +863,10 @@ public class RuntimeConfiguration {
       NotificationOutboxStore outboxStore,
       RegistrationStore registrationStore,
       AuthenticationStore authenticationStore,
+      com.sajtech.identity.application.profile.port.out.ProfileContactStore profileContactStore,
       Clock clock) {
-    return new IdentityRetentionWorker(outboxStore, registrationStore, authenticationStore, clock);
+    return new IdentityRetentionWorker(
+        outboxStore, registrationStore, authenticationStore, profileContactStore, clock);
   }
 
   @Bean

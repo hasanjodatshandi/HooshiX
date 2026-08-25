@@ -7,22 +7,25 @@ service IdentityProfileService {
  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
  rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
  rpc AddContact(AddContactRequest) returns (AddContactResponse);
+ rpc ResendContactVerification(ResendContactVerificationRequest) returns (ResendContactVerificationResponse);
  rpc VerifyContact(VerifyContactRequest) returns (VerifyContactResponse);
  rpc SetPrimaryContact(SetPrimaryContactRequest) returns (SetPrimaryContactResponse);
  rpc RemoveContact(RemoveContactRequest) returns (RemoveContactResponse);
 }
 message GetProfileRequest { string refresh_credential=1; }
 message GetProfileResponse { string profile_id=1; string first_name=2; string last_name=3; string father_name=4; }
-message UpdateProfileRequest { string refresh_credential=1; string first_name=2; string last_name=3; string father_name=4; }
+message UpdateProfileRequest { string refresh_credential=1; string first_name=2; string last_name=3; string father_name=4; string request_id=5; }
 message UpdateProfileResponse { bool updated=1; }
 message Contact { string contact_id=1; string value=2; string type=3; bool verified=4; bool primary=5; }
 message ListContactsRequest { string refresh_credential=1; }
 message ListContactsResponse { repeated Contact contacts=1; }
-message AddContactRequest { string refresh_credential=1; string value=2; string type=3; }
+message AddContactRequest { string refresh_credential=1; string value=2; string type=3; string request_id=4; string locale=5; }
 message AddContactResponse { string contact_id=1; bool accepted=2; }
-message VerifyContactRequest { string refresh_credential=1; string contact_id=2; string code=3; }
+message ResendContactVerificationRequest { string refresh_credential=1; string contact_id=2; string request_id=3; }
+message ResendContactVerificationResponse { bool accepted=1; }
+message VerifyContactRequest { string refresh_credential=1; string contact_id=2; string code=3; string request_id=4; }
 message VerifyContactResponse { bool verified=1; }
-message SetPrimaryContactRequest { string refresh_credential=1; string contact_id=2; }
+message SetPrimaryContactRequest { string refresh_credential=1; string contact_id=2; string request_id=3; }
 message SetPrimaryContactResponse { bool accepted=1; }
-message RemoveContactRequest { string refresh_credential=1; string contact_id=2; }
+message RemoveContactRequest { string refresh_credential=1; string contact_id=2; string request_id=3; }
 message RemoveContactResponse { bool accepted=1; }

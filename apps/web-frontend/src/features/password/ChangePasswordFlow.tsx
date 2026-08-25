@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { bffClient } from '../../api/bffClient';
 import { getErrorMessage } from '../../errors/getErrorMessage';
+import { normalizedCurrentPassword, normalizedNewPassword } from '../../validation/userInput';
 
 export function ChangePasswordFlow() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -13,7 +14,10 @@ export function ChangePasswordFlow() {
     setStatus('saving');
     setError('');
     try {
-      await bffClient.changePassword({ currentPassword, newPassword });
+      await bffClient.changePassword({
+        currentPassword: normalizedCurrentPassword(currentPassword),
+        newPassword: normalizedNewPassword(newPassword),
+      });
       setCurrentPassword('');
       setNewPassword('');
       setStatus('changed');
@@ -29,7 +33,7 @@ export function ChangePasswordFlow() {
       <label htmlFor="current-password">Current password</label>
       <input id="current-password" name="currentPassword" type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
       <label htmlFor="new-password">New password</label>
-      <input id="new-password" name="newPassword" type="password" autoComplete="new-password" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+      <input id="new-password" name="newPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
       <button type="submit" disabled={status === 'saving'}>Save password</button>
     </form>
     <p role="status">{status === 'changed' ? 'Password changed' : ''}</p>

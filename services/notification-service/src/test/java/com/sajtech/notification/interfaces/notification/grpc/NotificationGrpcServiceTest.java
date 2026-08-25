@@ -115,6 +115,23 @@ class NotificationGrpcServiceTest {
     assertThat(recorder.errorCode).isEqualTo(Status.Code.INVALID_ARGUMENT);
   }
 
+  @Test
+  void rejectsCanonicalUuidThatIsNotVersionFour() {
+    SubmitNotificationRequest request =
+        validRequest().toBuilder().setRequestId("550e8400-e29b-11d4-a716-446655440000").build();
+    NotificationGrpcService service =
+        new NotificationGrpcService(
+            command -> {
+              throw new AssertionError("invalid request must not reach application use case");
+            });
+    CapturingObserver<SubmitNotificationResponse> recorder = new CapturingObserver<>();
+
+    service.submitNotification(request, recorder);
+
+    assertThat(recorder.completed).isFalse();
+    assertThat(recorder.errorCode).isEqualTo(Status.Code.INVALID_ARGUMENT);
+  }
+
   private static SubmitNotificationRequest validRequest() {
     return SubmitNotificationRequest.newBuilder()
         .setRequestId("550e8400-e29b-41d4-a716-446655440000")

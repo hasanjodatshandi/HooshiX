@@ -69,7 +69,11 @@ public final class NotificationRecipientCanonicalizer {
     return value
         .codePoints()
         .anyMatch(
-            codePoint -> Character.isISOControl(codePoint) || Character.isWhitespace(codePoint));
+            codePoint ->
+                Character.isISOControl(codePoint)
+                    || Character.isWhitespace(codePoint)
+                    || Character.getType(codePoint) == Character.FORMAT
+                    || Character.getType(codePoint) == Character.SPACE_SEPARATOR);
   }
 
   private static NotificationSubmissionException invalidRecipient() {
