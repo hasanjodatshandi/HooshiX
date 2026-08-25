@@ -35,9 +35,9 @@ apps/web-frontend/index.html
 apps/web-frontend/package-lock.json
 apps/web-frontend/package.json
 apps/web-frontend/playwright.config.ts
+apps/web-frontend/scripts/check-openapi-client.sh
 apps/web-frontend/scripts/generate-openapi-client.sh
 apps/web-frontend/src/api/bffClient.ts
-apps/web-frontend/src/api/generated/registration.ts
 apps/web-frontend/src/api/generated/schema.ts
 apps/web-frontend/src/app/ApplicationShell.tsx
 apps/web-frontend/src/errors/getErrorMessage.ts
@@ -994,7 +994,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/session/RedisBf
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserAuthControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserResponseContractTest.java
-services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiRegistrationContractTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiControllerContractTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/PasswordControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/RegistrationControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/validation/UnicodeCodePointSizeValidatorTest.java

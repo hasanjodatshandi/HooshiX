@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "generate:api": "./scripts/generate-openapi-client.sh",
+    "check:api": "./scripts/check-openapi-client.sh",
     "e2e": "playwright test"
   },
   "dependencies": {

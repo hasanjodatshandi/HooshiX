@@ -219,14 +219,424 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/session/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a pre-authentication browser session
+         * @description Creates an HttpOnly session cookie and returns an in-memory CSRF token. Origin and Fetch Metadata are required.
+         */
+        post: operations["bootstrapBrowserSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authenticate a pre-authentication browser session with a local password
+         * @description Browser JavaScript sends neither trusted client address nor refresh credential; the approved edge and BFF retain those authorities.
+         */
+        post: operations["loginWithLocalPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the authenticated browser session */
+        post: operations["logoutBrowserSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read non-sensitive browser session state */
+        get: operations["getBrowserSessionState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List tenants available to the authenticated user */
+        get: operations["listIdentityTenants"];
+        put?: never;
+        /** Create a tenant for the authenticated user */
+        post: operations["createIdentityTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/tenant-selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Select an active tenant membership */
+        post: operations["selectIdentityTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Invite an existing contact to the selected tenant */
+        post: operations["inviteIdentityTenantMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations/{invitationId}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a tenant invitation */
+        post: operations["acceptIdentityTenantInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/memberships/{membershipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a membership from the selected tenant */
+        delete: operations["removeIdentityTenantMembership"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List permission definitions in the selected tenant */
+        get: operations["listAuthorizationPermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List roles in the selected tenant */
+        get: operations["listAuthorizationRoles"];
+        put?: never;
+        /** Create a role in the selected tenant */
+        post: operations["createAuthorizationRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/roles/{roleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a role in the selected tenant */
+        get: operations["getAuthorizationRole"];
+        /** Update a role with optimistic version control */
+        put: operations["updateAuthorizationRole"];
+        post?: never;
+        /** Archive a role with optimistic version control */
+        delete: operations["archiveAuthorizationRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/roles/{roleId}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace role permissions with optimistic version control */
+        put: operations["replaceAuthorizationRolePermissions"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/memberships/{membershipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read authorization state for a membership */
+        get: operations["getAuthorizationMembership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/memberships/{membershipId}/roles/{roleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign a role to a membership */
+        post: operations["assignAuthorizationRole"];
+        /** Remove a role from a membership */
+        delete: operations["removeAuthorizationRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/authorization/memberships/{membershipId}/overrides/{permissionKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a direct permission override for a membership */
+        put: operations["setAuthorizationMembershipOverride"];
+        post?: never;
+        /** Remove a direct permission override for a membership */
+        delete: operations["removeAuthorizationMembershipOverride"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @enum {string} */
+        /**
+         * Format: uuid
+         * @example 11111111-1111-4111-8111-111111111111
+         */
+        UuidV4: string;
+        /** @example {
+         *       "channel": "EMAIL",
+         *       "contact": "person@example.test",
+         *       "password": "CorrectHorseBatteryStaple!2026"
+         *     } */
+        LocalLoginRequest: {
+            channel: components["schemas"]["RegistrationChannel"];
+            /** @example person@example.test */
+            contact: string;
+            /** @example CorrectHorseBatteryStaple!2026 */
+            password: string;
+        };
+        /** @example {
+         *       "name": "Sample Tenant",
+         *       "slug": "sample-tenant"
+         *     } */
+        CreateTenantRequest: {
+            /** @example Sample Tenant */
+            name: string;
+            /** @example sample-tenant */
+            slug: string;
+        };
+        /** @example {
+         *       "membershipId": "11111111-1111-4111-8111-111111111111"
+         *     } */
+        SelectTenantRequest: {
+            membershipId: components["schemas"]["UuidV4"];
+        };
+        /** @example {
+         *       "targetContactId": "11111111-1111-4111-8111-111111111111"
+         *     } */
+        InviteRequest: {
+            targetContactId: components["schemas"]["UuidV4"];
+        };
+        /** @example {
+         *       "name": "Sample role",
+         *       "description": "Synthetic role",
+         *       "permissionKeys": [
+         *         "document.read"
+         *       ]
+         *     } */
+        CreateRoleRequest: {
+            /** @example Sample role */
+            name: string;
+            /** @example Synthetic role */
+            description?: string | null;
+            /** @example [
+             *       "document.read"
+             *     ] */
+            permissionKeys: string[];
+        };
+        /** @example {
+         *       "expectedVersion": 1,
+         *       "name": "Sample role",
+         *       "description": "Synthetic role"
+         *     } */
+        UpdateRoleRequest: {
+            /**
+             * Format: int64
+             * @example 1
+             */
+            expectedVersion: number;
+            /** @example Sample role */
+            name: string;
+            /** @example Synthetic role */
+            description?: string | null;
+        };
+        /** @example {
+         *       "expectedVersion": 1,
+         *       "permissionKeys": [
+         *         "document.read"
+         *       ],
+         *       "reason": "Synthetic access review"
+         *     } */
+        ReplacePermissionsRequest: {
+            /**
+             * Format: int64
+             * @example 1
+             */
+            expectedVersion: number;
+            /** @example [
+             *       "document.read"
+             *     ] */
+            permissionKeys: string[];
+            /** @example Synthetic access review */
+            reason: string;
+        };
+        /** @example {
+         *       "reason": "Synthetic access review"
+         *     } */
+        ReasonRequest: {
+            /** @example Synthetic access review */
+            reason: string;
+        };
+        /** @example {
+         *       "decision": "GRANT",
+         *       "reason": "Synthetic access review"
+         *     } */
+        OverrideRequest: {
+            /**
+             * @example GRANT
+             * @enum {string}
+             */
+            decision: "GRANT" | "DENY";
+            /** @example Synthetic access review */
+            reason: string;
+        };
+        /**
+         * @example EMAIL
+         * @enum {string}
+         */
         RegistrationChannel: "EMAIL" | "PHONE";
-        /** @enum {string} */
+        /**
+         * @example en
+         * @enum {string}
+         */
         RegistrationLocale: "fa" | "en";
+        /** @example {
+         *       "channel": "EMAIL",
+         *       "contact": "person@example.test",
+         *       "password": "CorrectHorseBatteryStaple!2026",
+         *       "locale": "en",
+         *       "firstName": "Sample",
+         *       "lastName": "Person"
+         *     } */
         RegisterRequest: {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
@@ -235,26 +645,49 @@ export interface components {
             locale: components["schemas"]["RegistrationLocale"];
             firstName: string;
             lastName: string;
-            fatherName?: string;
+            fatherName?: string | null;
         };
+        /** @example {
+         *       "channel": "EMAIL",
+         *       "contact": "person@example.test"
+         *     } */
         ResendRequest: {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
         };
+        /** @example {
+         *       "channel": "EMAIL",
+         *       "contact": "person@example.test",
+         *       "code": "12345678"
+         *     } */
         ConfirmRequest: {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
             code: string;
         };
+        /** @example {
+         *       "currentPassword": "ExistingPassword!2025",
+         *       "newPassword": "CorrectHorseBatteryStaple!2026"
+         *     } */
         ChangePasswordRequest: {
             currentPassword: string;
             /** @description NFC-normalized Unicode code-point policy. No composition rule is imposed. */
             newPassword: string;
         };
+        /** @example {
+         *       "channel": "EMAIL",
+         *       "contact": "person@example.test"
+         *     } */
         PasswordRecoveryRequest: {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
         };
+        /** @example {
+         *       "channel": "EMAIL",
+         *       "contact": "person@example.test",
+         *       "code": "12345678",
+         *       "newPassword": "CorrectHorseBatteryStaple!2026"
+         *     } */
         PasswordRecoveryConfirmRequest: {
             channel: components["schemas"]["RegistrationChannel"];
             contact: string;
@@ -262,52 +695,317 @@ export interface components {
             /** @description NFC-normalized Unicode code-point policy. No composition rule is imposed. */
             newPassword: string;
         };
+        /** @example {
+         *       "id": "11111111-1111-4111-8111-111111111111",
+         *       "firstName": "Sample",
+         *       "lastName": "Person",
+         *       "fatherName": "Example"
+         *     } */
         ProfileResponse: {
-            /** Format: uuid */
-            id: string;
+            id: components["schemas"]["UuidV4"];
             firstName: string;
             lastName: string;
-            fatherName?: string;
+            fatherName?: string | null;
         };
+        /** @example {
+         *       "firstName": "Sample",
+         *       "lastName": "Person",
+         *       "fatherName": "Example"
+         *     } */
         UpdateProfileRequest: {
             firstName: string;
             lastName: string;
-            fatherName?: string;
+            fatherName?: string | null;
         };
+        /** @example {
+         *       "id": "11111111-1111-4111-8111-111111111111",
+         *       "type": "EMAIL",
+         *       "value": "person@example.test",
+         *       "verified": true,
+         *       "primary": true
+         *     } */
         ContactResponse: {
-            /** Format: uuid */
-            id: string;
+            id: components["schemas"]["UuidV4"];
             type: components["schemas"]["RegistrationChannel"];
             value: string;
             verified: boolean;
             primary: boolean;
         };
+        /** @example {
+         *       "type": "EMAIL",
+         *       "value": "alternate@example.test",
+         *       "locale": "en"
+         *     } */
         AddContactRequest: {
             type: components["schemas"]["RegistrationChannel"];
             value: string;
             locale: components["schemas"]["RegistrationLocale"];
         };
+        /** @example {
+         *       "code": "12345678"
+         *     } */
         VerifyContactRequest: {
             code: string;
         };
+        /** @example {
+         *       "id": "11111111-1111-4111-8111-111111111111"
+         *     } */
         CreatedContactResponse: {
-            /** Format: uuid */
-            id: string;
+            id: components["schemas"]["UuidV4"];
         };
+        /** @example {
+         *       "verified": true
+         *     } */
         VerifiedResponse: {
             verified: boolean;
         };
+        /** @example {
+         *       "accepted": true
+         *     } */
         AcceptedResponse: {
             accepted: boolean;
         };
+        /** @example {
+         *       "confirmed": true
+         *     } */
         ConfirmedResponse: {
             confirmed: boolean;
         };
+        /** @example {
+         *       "changed": true,
+         *       "csrfToken": "synthetic-csrf-token-not-a-secret"
+         *     } */
         PasswordChangedResponse: {
             changed: boolean;
             /** @description Rotated in-memory CSRF token. It is not a refresh credential and must not be persisted. */
             csrfToken: string;
         };
+        /** @example {
+         *       "csrfToken": "synthetic-csrf-token-not-a-secret",
+         *       "mode": "PREAUTH"
+         *     } */
+        SessionResponse: {
+            /**
+             * @description In-memory CSRF token; do not persist.
+             * @example synthetic-csrf-token-not-a-secret
+             */
+            csrfToken: string;
+            /**
+             * @example PREAUTH
+             * @enum {string}
+             */
+            mode: "PREAUTH" | "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
+        };
+        /** @example {
+         *       "mode": "TENANT_AUTHENTICATED",
+         *       "authenticated": true,
+         *       "tenantSelected": true
+         *     } */
+        SessionStateResponse: {
+            /**
+             * @example TENANT_AUTHENTICATED
+             * @enum {string}
+             */
+            mode: "PREAUTH" | "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
+            /** @example true */
+            authenticated: boolean;
+            /** @example true */
+            tenantSelected: boolean;
+        };
+        /** @example {
+         *       "tenantId": "11111111-1111-4111-8111-111111111111",
+         *       "membershipId": "22222222-2222-4222-8222-222222222222",
+         *       "name": "Sample Tenant",
+         *       "slug": "sample-tenant"
+         *     } */
+        TenantChoice: {
+            tenantId: components["schemas"]["UuidV4"];
+            membershipId: components["schemas"]["UuidV4"];
+            /** @example Sample Tenant */
+            name: string;
+            /** @example sample-tenant */
+            slug: string;
+        };
+        /** @example {
+         *       "tenants": [
+         *         {
+         *           "tenantId": "11111111-1111-4111-8111-111111111111",
+         *           "membershipId": "22222222-2222-4222-8222-222222222222",
+         *           "name": "Sample Tenant",
+         *           "slug": "sample-tenant"
+         *         }
+         *       ],
+         *       "suggestedMembershipId": "22222222-2222-4222-8222-222222222222"
+         *     } */
+        TenantListResponse: {
+            tenants: components["schemas"]["TenantChoice"][];
+            suggestedMembershipId?: components["schemas"]["UuidV4"] | null;
+        };
+        /** @example {
+         *       "tenantId": "11111111-1111-4111-8111-111111111111",
+         *       "membershipId": "22222222-2222-4222-8222-222222222222",
+         *       "lifecycle": "ACTIVE"
+         *     } */
+        TenantCreatedResponse: {
+            tenantId: components["schemas"]["UuidV4"];
+            membershipId: components["schemas"]["UuidV4"];
+            /** @example ACTIVE */
+            lifecycle: string;
+        };
+        /** @example {
+         *       "csrfToken": "synthetic-csrf-token-not-a-secret",
+         *       "tenantId": "11111111-1111-4111-8111-111111111111",
+         *       "membershipId": "22222222-2222-4222-8222-222222222222",
+         *       "mode": "TENANT_AUTHENTICATED"
+         *     } */
+        TenantSelectionResponse: {
+            /** @example synthetic-csrf-token-not-a-secret */
+            csrfToken: string;
+            tenantId: components["schemas"]["UuidV4"];
+            membershipId: components["schemas"]["UuidV4"];
+            /**
+             * @example TENANT_AUTHENTICATED
+             * @enum {string}
+             */
+            mode: "TENANT_AUTHENTICATED";
+        };
+        /** @example {
+         *       "invitationId": "11111111-1111-4111-8111-111111111111",
+         *       "expiresAt": "2030-01-01T00:00:00Z"
+         *     } */
+        InvitationCreatedResponse: {
+            invitationId: components["schemas"]["UuidV4"];
+            /**
+             * Format: date-time
+             * @example 2030-01-01T00:00:00Z
+             */
+            expiresAt: string;
+        };
+        /** @example {
+         *       "tenantId": "11111111-1111-4111-8111-111111111111",
+         *       "membershipId": "22222222-2222-4222-8222-222222222222"
+         *     } */
+        AcceptedInvitationResponse: {
+            tenantId: components["schemas"]["UuidV4"];
+            membershipId: components["schemas"]["UuidV4"];
+        };
+        /** @example {
+         *       "accepted": true,
+         *       "csrfToken": "synthetic-csrf-token-not-a-secret",
+         *       "mode": "AUTHENTICATED_ONBOARDING"
+         *     } */
+        RemovalResultResponse: {
+            /** @example true */
+            accepted: boolean;
+            /** @example synthetic-csrf-token-not-a-secret */
+            csrfToken?: string | null;
+            /**
+             * @example AUTHENTICATED_ONBOARDING
+             * @enum {string}
+             */
+            mode: "AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED";
+        };
+        /** @example {
+         *       "key": "document.read",
+         *       "scope": "TENANT",
+         *       "lifecycle": "ACTIVE"
+         *     } */
+        PermissionResponse: {
+            /** @example document.read */
+            key: string;
+            /** @example TENANT */
+            scope: string;
+            /** @example ACTIVE */
+            lifecycle: string;
+        };
+        /** @example {
+         *       "roleId": "11111111-1111-4111-8111-111111111111",
+         *       "name": "Sample role",
+         *       "description": "Synthetic role",
+         *       "kind": "CUSTOM",
+         *       "lifecycle": "ACTIVE",
+         *       "version": 1,
+         *       "permissions": [
+         *         "document.read"
+         *       ]
+         *     } */
+        RoleResponse: {
+            roleId: components["schemas"]["UuidV4"];
+            /** @example Sample role */
+            name: string;
+            /** @example Synthetic role */
+            description?: string | null;
+            /** @example CUSTOM */
+            kind: string;
+            /** @example ACTIVE */
+            lifecycle: string;
+            /**
+             * Format: int64
+             * @example 1
+             */
+            version: number;
+            /** @example [
+             *       "document.read"
+             *     ] */
+            permissions: string[];
+        };
+        /** @example {
+         *       "roles": [
+         *         {
+         *           "roleId": "11111111-1111-4111-8111-111111111111",
+         *           "name": "Sample role",
+         *           "kind": "CUSTOM",
+         *           "lifecycle": "ACTIVE",
+         *           "version": 1,
+         *           "permissions": [
+         *             "document.read"
+         *           ]
+         *         }
+         *       ],
+         *       "nextPageToken": "next-page"
+         *     } */
+        RolePageResponse: {
+            roles: components["schemas"]["RoleResponse"][];
+            /** @example next-page */
+            nextPageToken: string;
+        };
+        /** @example {
+         *       "permissionKey": "document.read",
+         *       "decision": "GRANT"
+         *     } */
+        OverrideResponse: {
+            /** @example document.read */
+            permissionKey: string;
+            /**
+             * @example GRANT
+             * @enum {string}
+             */
+            decision: "GRANT" | "DENY";
+        };
+        /** @example {
+         *       "membershipId": "11111111-1111-4111-8111-111111111111",
+         *       "roleIds": [
+         *         "22222222-2222-4222-8222-222222222222"
+         *       ],
+         *       "overrides": [
+         *         {
+         *           "permissionKey": "document.read",
+         *           "decision": "GRANT"
+         *         }
+         *       ]
+         *     } */
+        MembershipAuthorizationResponse: {
+            membershipId: components["schemas"]["UuidV4"];
+            roleIds: components["schemas"]["UuidV4"][];
+            overrides: components["schemas"]["OverrideResponse"][];
+        };
+        /** @example {
+         *       "type": "urn:hooshix:problem:invalid-request",
+         *       "title": "Invalid request",
+         *       "status": 400,
+         *       "code": "INVALID_REQUEST",
+         *       "instance": "/api/v1/example"
+         *     } */
         Problem: {
             /** Format: uri-reference */
             type: string;
@@ -381,7 +1079,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description Semantic registration quota was exceeded. */
+        /** @description The applicable semantic security quota was exceeded. */
         RateLimited: {
             headers: {
                 [name: string]: unknown;
@@ -390,7 +1088,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description An authoritative registration dependency is unavailable. */
+        /** @description The BFF runtime or an authoritative downstream dependency is unavailable. */
         DependencyUnavailable: {
             headers: {
                 [name: string]: unknown;
@@ -413,6 +1111,17 @@ export interface components {
         /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
         RequestId: string;
         ContactId: string;
+        /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+        CsrfToken: string;
+        /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+        OptionalCsrfToken: string;
+        MembershipId: components["schemas"]["UuidV4"];
+        RoleId: components["schemas"]["UuidV4"];
+        InvitationId: components["schemas"]["UuidV4"];
+        PermissionKey: string;
+        ExpectedVersion: number;
+        PageSize: number;
+        PageToken: string;
     };
     requestBodies: never;
     headers: never;
@@ -426,6 +1135,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -462,6 +1173,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -498,6 +1211,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -556,6 +1271,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -609,6 +1326,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -642,6 +1361,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path: {
                 id: components["parameters"]["ContactId"];
@@ -672,6 +1393,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path: {
                 id: components["parameters"]["ContactId"];
@@ -706,6 +1429,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path: {
                 id: components["parameters"]["ContactId"];
@@ -736,6 +1461,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path: {
                 id: components["parameters"]["ContactId"];
@@ -766,6 +1493,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -800,6 +1529,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -832,6 +1563,8 @@ export interface operations {
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
                 "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -856,6 +1589,696 @@ export interface operations {
             409: components["responses"]["PasswordRejected"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    bootstrapBrowserSession: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
+                "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pre-authentication session created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    loginWithLocalPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Authenticated session state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            429: components["responses"]["RateLimited"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    logoutBrowserSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    getBrowserSessionState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current session state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionStateResponse"];
+                };
+            };
+            401: components["responses"]["InvalidSession"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listIdentityTenants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenant choices. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantListResponse"];
+                };
+            };
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    createIdentityTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description Created tenant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantCreatedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    selectIdentityTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description Tenant selected and CSRF state rotated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantSelectionResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    inviteIdentityTenantMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteRequest"];
+            };
+        };
+        responses: {
+            /** @description Invitation created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationCreatedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    acceptIdentityTenantInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation accepted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedInvitationResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    removeIdentityTenantMembership: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removal result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovalResultResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listAuthorizationPermissions: {
+        parameters: {
+            query?: {
+                pageSize?: components["parameters"]["PageSize"];
+                pageToken?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorization-owned permissions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionResponse"][];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listAuthorizationRoles: {
+        parameters: {
+            query?: {
+                pageSize?: components["parameters"]["PageSize"];
+                pageToken?: components["parameters"]["PageToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorization-owned role page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolePageResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    createAuthorizationRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorization-owned role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    getAuthorizationRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorization-owned role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    updateAuthorizationRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorization-owned role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    archiveAuthorizationRole: {
+        parameters: {
+            query: {
+                expectedVersion: components["parameters"]["ExpectedVersion"];
+            };
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorization-owned role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    replaceAuthorizationRolePermissions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplacePermissionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Authorization-owned role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    getAuthorizationMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorization-owned membership state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipAuthorizationResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    assignAuthorizationRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                membershipId: components["parameters"]["MembershipId"];
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Role assigned. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    removeAuthorizationRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                membershipId: components["parameters"]["MembershipId"];
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Role removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    setAuthorizationMembershipOverride: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                membershipId: components["parameters"]["MembershipId"];
+                permissionKey: components["parameters"]["PermissionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description Override set. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    removeAuthorizationMembershipOverride: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                membershipId: components["parameters"]["MembershipId"];
+                permissionKey: components["parameters"]["PermissionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Override removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
             503: components["responses"]["DependencyUnavailable"];
         };
     };

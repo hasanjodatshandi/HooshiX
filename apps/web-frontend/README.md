@@ -19,9 +19,14 @@ Run the pinned frontend toolchain command:
 
 ```bash
 npm run generate:api
+npm run check:api
 npm run build
 npm run e2e
 ```
+
+`check:api` regenerates the complete public BFF transport types into a temporary directory and
+fails when the committed output differs. Application API request and response types are derived
+from that generated schema rather than duplicated by hand.
 
 ## Current state
 

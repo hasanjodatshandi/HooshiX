@@ -35,7 +35,7 @@ services/authorization-service
 services/web-bff
 ```
 
-The implemented foundation already includes substantial registration, local authentication/session/JWT, Tenant/Membership/Invitation, Authorization, Notification delivery/reconciliation/result-callback runtime, Compromised Password screening, the canonical BFF public registration OpenAPI slice, local integrated runtime, local production-fidelity staging, observability, and repository/release security controls.
+The implemented foundation already includes substantial registration, local authentication/session/JWT, Tenant/Membership/Invitation, Authorization, Notification delivery/reconciliation/result-callback runtime, Compromised Password screening, the canonical BFF public REST OpenAPI slice, local integrated runtime, local production-fidelity staging, observability, and repository/release security controls.
 
 The application is not yet a complete end-user product. Current material gaps are:
 
@@ -61,31 +61,44 @@ DEFERRED   intentionally excluded from the current application implementation se
 
 `COMPLETED` in this roadmap is repository/application milestone status. It is not a production-readiness claim.
 
-## 4. Ordered implementation milestones
+## 4. Completed foundation milestones
 
 | Order | Milestone | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 0 | Inter-service contract independence | `COMPLETED` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. When complete, mark this `COMPLETED` and move `NEXT` to milestone 1. |
+| 0 | Inter-service contract independence | `COMPLETED` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. |
 | 1 | Notification Delivery Runtime v1 | `COMPLETED` | Implement bounded dispatch claiming, durable pre-provider `DISPATCHING`, provider adapter execution, ambiguity-safe reconciliation, retry/observation rules, terminal result outbox, and Identity result callback with Day-One observability/tests. |
 | 2 | Public Registration Vertical Slice + OpenAPI | `COMPLETED` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
 | 3 | Frontend Foundation + Account Onboarding | `COMPLETED` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
 | 4 | Identity Profile & Contact Management | `COMPLETED` | Implement profile read/update plus Contact add/verify/resend/set-primary/remove semantics across Identity, BFF/OpenAPI, UI, persistence, security, and tests. |
 | 5 | Password Policy Decision + Password Lifecycle | `COMPLETED` | ADR-0053 defines the concrete password policy. Implement change/forgot/reset, compromised-password screening, recent-auth/MFA rules, and session revocation according to the approved contract. |
-| 6 | MFA/TOTP | `NEXT` | Implement TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, and security evidence. |
-| 7 | Google OIDC / ExternalIdentity | `PLANNED` | Implement BFF Authorization Code + PKCE/state/nonce flow, Identity issuer+subject binding/link semantics, collision protection, provider-token custody, MFA continuation, UI, and negative tests. |
-| 8 | Complete Tenant lifecycle | `PLANNED` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
-| 9 | Data Subject Erasure + Kafka | `PLANNED` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
-| 10 | Reference Data local capability | `GATED` | Implement the immutable Reference Data bundle in the owning deployable only when a real consumer journey requires it. `reference-data-service` remains prohibited until an ADR-0041 independent-deployable trigger is evidenced. |
-| 11 | Core AI Product Architecture | `PLANNED` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
-| 12 | Core AI Product implementation | `PLANNED` | Implement the accepted core-product architecture in vertical slices. Service/module boundaries come from milestone 11 evidence, not from speculative names. |
-| 13 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application milestone. Re-enter only when the owner explicitly reactivates it; use the production readiness authorities and executed environment evidence at that time. |
 
-## 5. Immediate next milestone contract
+## 5. Canonical remaining completion sequence
+
+The following is the one ordered application-completion sequence. Do not start a later numbered step while an earlier executable step is incomplete unless a reviewed architecture change changes the dependency order.
+
+| Order | Completion step | Current state | Completion boundary / next-step rule |
+| ---: | --- | --- | --- |
+| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.2.0 covers all 36 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
+| 2 | MFA/TOTP | `NEXT` | Implement TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, and security evidence. |
+| 3 | Google OIDC / ExternalIdentity | `PLANNED` | Implement BFF Authorization Code + PKCE/state/nonce flow, Identity issuer+subject binding/link semantics, collision protection, provider-token custody, MFA continuation, UI, and negative tests. |
+| 4 | Complete Tenant lifecycle | `PLANNED` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
+| 5 | Data Subject Erasure + Kafka | `PLANNED` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
+| 6 | Core AI Product Architecture | `PLANNED` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
+| 7 | Core AI Product vertical slices | `PLANNED` | Implement the accepted core-product architecture in vertical slices. Service/module boundaries come from step 6 evidence, not from speculative names. |
+| 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
+
+Reference Data is a separate conditional track, not part of the numbered completion sequence:
+
+| Conditional track | Current state | Completion boundary |
+| --- | --- | --- |
+| Reference Data local capability | `GATED` | Implement the immutable Reference Data bundle in the owning deployable only when a real consumer journey requires it. `reference-data-service` remains prohibited until an ADR-0041 independent-deployable trigger is evidenced. |
+
+## 6. Immediate next completion-step contract
 
 At the current state, the next coherent engineering task is:
 
 ```text
-Milestone 6 — MFA/TOTP
+Step 2 — MFA/TOTP
 ```
 
 The target invariant is:
@@ -102,21 +115,21 @@ security tests                      -> no downgrade, replay, or recovery bypass
 
 The browser must continue to consume only the BFF public contract. MFA authority and secret material remain in Identity; browser persistence must not become credential or factor authority.
 
-## 6. Rules for updating this roadmap
+## 7. Rules for updating this roadmap
 
-Update this file when a milestone changes state materially.
+Update this file when a foundation milestone or completion step changes state materially.
 
-A milestone implementation PR must:
+A completion-step implementation PR must:
 
-- reconcile actual code/tests/configuration with the milestone row;
-- change the completed milestone to `COMPLETED` only after required repository evidence passes;
-- set exactly one first executable application milestone to `NEXT`, except when the next item is explicitly `GATED` or `DEFERRED` and no executable milestone is available;
+- reconcile actual code/tests/configuration with the completion-step row;
+- change a completed step to `COMPLETED` only after required repository evidence passes;
+- set exactly one first executable application step to `NEXT`, except when the next item is explicitly `GATED` or `DEFERRED` and no executable step is available;
 - keep later prerequisites ordered unless a reviewed ADR/current architecture change modifies the sequence;
 - update `implementation-status.md` when repository-level implementation presence changes materially;
 - avoid production-readiness claims from repository implementation alone.
 
 Checkpoint records remain append-only historical evidence. They may help resume work but do not replace this current roadmap or current Git.
 
-## 7. Deferred production track
+## 8. Deferred production track
 
-Production Commissioning & Readiness remains intentionally separate from the application-build sequence. Existing production architecture, automation, release controls, and readiness documents remain valid current authorities, but missing real production environment evidence does not block continuing the application milestones above unless a specific application change itself requires that evidence.
+Production Commissioning & Readiness remains intentionally separate from the application-build sequence. Existing production architecture, automation, release controls, and readiness documents remain valid current authorities, but missing real production environment evidence does not block continuing the application completion steps above unless a specific application change itself requires that evidence.

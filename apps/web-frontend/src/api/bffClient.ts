@@ -1,5 +1,29 @@
-import type { AcceptedResponse, ConfirmRequest, ConfirmedResponse, RegisterRequest, ResendRequest } from './generated/registration';
+import type { components } from './generated/schema';
 import { BffProblemError } from '../errors/problem';
+
+type Schemas = components['schemas'];
+
+export type AcceptedResponse = Schemas['AcceptedResponse'];
+export type ConfirmRequest = Schemas['ConfirmRequest'];
+export type ConfirmedResponse = Schemas['ConfirmedResponse'];
+export type RegisterRequest = Schemas['RegisterRequest'];
+export type ResendRequest = Schemas['ResendRequest'];
+export type SessionResponse = Schemas['SessionResponse'];
+export type TenantChoice = Schemas['TenantChoice'];
+export type TenantList = Schemas['TenantListResponse'];
+export type TenantSelectionResponse = Schemas['TenantSelectionResponse'];
+export type Profile = Schemas['ProfileResponse'];
+export type Contact = Schemas['ContactResponse'];
+export type PasswordChangedResponse = Schemas['PasswordChangedResponse'];
+
+type LocalLoginRequest = Schemas['LocalLoginRequest'];
+type SelectTenantRequest = Schemas['SelectTenantRequest'];
+type UpdateProfileRequest = Schemas['UpdateProfileRequest'];
+type VerifyContactRequest = Schemas['VerifyContactRequest'];
+type AddContactRequest = Schemas['AddContactRequest'];
+type ChangePasswordRequest = Schemas['ChangePasswordRequest'];
+type PasswordRecoveryRequest = Schemas['PasswordRecoveryRequest'];
+type PasswordRecoveryConfirmRequest = Schemas['PasswordRecoveryConfirmRequest'];
 
 function requestId(): string {
   return crypto.randomUUID();
@@ -32,8 +56,24 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function postWithoutBody<T>(path: string): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+    },
+  });
+  if (!response.ok) {
+    if (response.status === 401) csrfToken = null;
+    const problem = await response.json().catch(() => null);
+    if (problem?.code) throw new BffProblemError(problem);
+    throw new Error('bff request failed');
+  }
+  return response.json() as Promise<T>;
+}
 
-export type SessionResponse = { csrfToken: string; mode: string };
 
 export async function bootstrapSession(): Promise<SessionResponse> {
   return fetch('/api/v1/auth/session/bootstrap', {
@@ -46,7 +86,9 @@ export async function bootstrapSession(): Promise<SessionResponse> {
   });
 }
 
-export async function login(body: { contact: string; password: string }): Promise<SessionResponse> {
+export async function login(
+  body: Pick<LocalLoginRequest, 'contact' | 'password'>,
+): Promise<SessionResponse> {
   if (!csrfToken) await bootstrapSession();
   return fetch('/api/v1/auth/local', {
     method: 'POST',
@@ -54,7 +96,6 @@ export async function login(body: { contact: string; password: string }): Promis
     headers: {
       'content-type': 'application/json',
       'x-request-id': requestId(),
-      'x-hooshix-client-ip': 'browser',
       ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
     },
     body: JSON.stringify({ channel: 'EMAIL', ...body }),
@@ -68,10 +109,6 @@ export async function login(body: { contact: string; password: string }): Promis
 }
 
 
-export type TenantChoice = { tenantId: string; membershipId: string; name: string; slug: string };
-export type TenantList = { tenants: TenantChoice[]; suggestedMembershipId: string | null };
-export type TenantSelectionResponse = { csrfToken: string; tenantId: string; membershipId: string; mode: string };
-
 export async function listTenants(): Promise<TenantList> {
   const r = await fetch('/api/v1/identity/tenants', { credentials: 'same-origin' });
   if (!r.ok) throw new Error('tenant list failed');
@@ -79,14 +116,12 @@ export async function listTenants(): Promise<TenantList> {
 }
 
 export async function selectTenant(membershipId: string): Promise<TenantSelectionResponse> {
-  const response = await post<TenantSelectionResponse>('/api/v1/identity/tenant-selection', { membershipId });
+  const body: SelectTenantRequest = { membershipId };
+  const response = await post<TenantSelectionResponse>('/api/v1/identity/tenant-selection', body);
   csrfToken = response.csrfToken;
   return response;
 }
 
-
-export type Profile = { id: string; firstName: string; lastName: string; fatherName?: string };
-export type Contact = { id: string; type: string; value: string; verified: boolean; primary: boolean };
 
 export async function getProfile(): Promise<Profile> {
   const r = await fetch('/api/v1/identity/profile', { credentials: 'same-origin' });
@@ -100,7 +135,7 @@ export async function getContacts(): Promise<Contact[]> {
   return r.json();
 }
 
-export async function updateProfile(body: {firstName: string; lastName: string; fatherName?: string}): Promise<{accepted:boolean}> {
+export async function updateProfile(body: UpdateProfileRequest): Promise<AcceptedResponse> {
   const response = await fetch('/api/v1/identity/profile', {
     method: 'PUT',
     credentials: 'same-origin',
@@ -115,19 +150,20 @@ export async function updateProfile(body: {firstName: string; lastName: string; 
   return response.json();
 }
 
-export async function verifyContact(id: string, code: string): Promise<{verified:boolean}> {
-  return post<{verified:boolean}>(`/api/v1/identity/contacts/${id}/verify`, { code });
+export async function verifyContact(id: string, code: string): Promise<Schemas['VerifiedResponse']> {
+  const body: VerifyContactRequest = { code };
+  return post<Schemas['VerifiedResponse']>(`/api/v1/identity/contacts/${id}/verify`, body);
 }
 
-export async function resendContactVerification(id: string): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>(`/api/v1/identity/contacts/${id}/resend`, {});
+export async function resendContactVerification(id: string): Promise<AcceptedResponse> {
+  return postWithoutBody<AcceptedResponse>(`/api/v1/identity/contacts/${id}/resend`);
 }
 
-export async function setPrimaryContact(id: string): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>(`/api/v1/identity/contacts/${id}/primary`, {});
+export async function setPrimaryContact(id: string): Promise<AcceptedResponse> {
+  return postWithoutBody<AcceptedResponse>(`/api/v1/identity/contacts/${id}/primary`);
 }
 
-export async function removeContact(id: string): Promise<{accepted:boolean}> {
+export async function removeContact(id: string): Promise<AcceptedResponse> {
   const r = await fetch(`/api/v1/identity/contacts/${id}`, {
     method: 'DELETE',
     credentials: 'same-origin',
@@ -140,22 +176,24 @@ export async function removeContact(id: string): Promise<{accepted:boolean}> {
   return r.json();
 }
 
-export async function addContact(body: {type: string; value: string; locale: string}): Promise<{id:string}> {
-  return post<{id:string}>('/api/v1/identity/contacts', body);
+export async function addContact(body: AddContactRequest): Promise<Schemas['CreatedContactResponse']> {
+  return post<Schemas['CreatedContactResponse']>('/api/v1/identity/contacts', body);
 }
 
-export type PasswordChangedResponse = { changed: boolean; csrfToken: string };
-
-export async function changePassword(body: {currentPassword:string; newPassword:string}): Promise<PasswordChangedResponse> {
+export async function changePassword(body: ChangePasswordRequest): Promise<PasswordChangedResponse> {
   const response = await post<PasswordChangedResponse>('/api/v1/password/change', body);
   csrfToken = response.csrfToken;
   return response;
 }
-export async function requestPasswordRecovery(contact:string): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>('/api/v1/password/recovery/request', {channel: 'EMAIL', contact});
+export async function requestPasswordRecovery(contact: string): Promise<AcceptedResponse> {
+  const body: PasswordRecoveryRequest = { channel: 'EMAIL', contact };
+  return post<AcceptedResponse>('/api/v1/password/recovery/request', body);
 }
-export async function confirmPasswordRecovery(body:{contact:string; code:string; newPassword:string}): Promise<{accepted:boolean}> {
-  return post<{accepted:boolean}>('/api/v1/password/recovery/confirm', {channel: 'EMAIL', ...body});
+export async function confirmPasswordRecovery(
+  input: Omit<PasswordRecoveryConfirmRequest, 'channel'>,
+): Promise<AcceptedResponse> {
+  const body: PasswordRecoveryConfirmRequest = { channel: 'EMAIL', ...input };
+  return post<AcceptedResponse>('/api/v1/password/recovery/confirm', body);
 }
 
 export const bffClient = {
