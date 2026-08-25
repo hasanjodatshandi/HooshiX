@@ -37,7 +37,7 @@ Do not disable a gate, broaden suppression, or set `ignoreFailures` merely to pa
 ## 3. Contract compatibility
 
 - Protobuf: Buf lint + breaking; field numbers never reused.
-- OpenAPI: compatibility, input/output bounds, security headers/errors.
+- OpenAPI: SemVer-compatible evolution, input/output bounds, security headers/errors, controller method/path parity, schema-validation and consumer-example coverage for every public BFF operation, and generated frontend transport-type drift.
 - Provider adapters: bounded request/response/ambiguity behavior.
 - Schema/contract changes: producer/consumer rollout compatibility.
 - Kafka remains async transport; internal request/reply is not silently switched to broker messaging.

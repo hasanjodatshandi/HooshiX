@@ -177,7 +177,7 @@ BFF evidence covers:
 - OIDC PKCE/state/nonce/pre-auth/replay/redirect;
 - server-side session/token custody/rotation/revocation;
 - CSRF/Origin/Fetch Metadata/CORS/CSP/cache/security headers;
-- canonical OpenAPI registration paths/schemas and stable RFC 9457 problem responses;
+- canonical OpenAPI coverage for every public controller method/path mapping, schema validation and consumer examples, controller/OpenAPI parity, generated frontend transport-type drift, and stable RFC 9457 problem responses;
 - anonymous same-origin register/resend behavior, trusted client-address forwarding, and session-bound CSRF when a cookie exists;
 - BFF -> Identity register/resend/confirm gRPC mapping and non-enumerating registration failures;
 - route->audience mapping and browser arbitrary-audience denial;
@@ -189,9 +189,11 @@ BFF evidence covers:
 
 The BFF is repository-complete for the implemented slice only when applicable source/contracts/tests/build/deploy/security/observability/CI artifacts exist and execute. Local fast-lane and production-fidelity kind/staging runtime evidence now exists as described below; production runtime evidence remains `NOT VERIFIED`.
 
-## 12. Public Registration facade
+## 12. Public REST contract
 
-The canonical public registration contract is BFF-owned OpenAPI 3.1 under `services/web-bff/contracts/openapi.yaml`. The reviewed routes are:
+The canonical browser-facing contract is BFF-owned OpenAPI 3.1, version 1.2.0, under `services/web-bff/contracts/openapi.yaml`. It covers all 36 implemented public controller method/path mappings. A compatible contract change follows SemVer, contains schema validation and a consumer example for every operation, preserves controller/OpenAPI parity, and regenerates frontend transport types; the generated-type drift gate rejects stale client output.
+
+The anonymous registration subset remains:
 
 ```text
 POST /api/v1/identity/registration
@@ -205,4 +207,4 @@ Web BFF performs transport validation and non-enumerating RFC 9457 error mapping
 
 ## Current repository implementation evidence
 
-The current repository contains the executable Web BFF slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement, local authentication/logout, Tenant lifecycle/selection routes, profile/contact routes, password change/recovery routes, Authorization-management routes, exact audience brokerage, and the canonical OpenAPI 3.1 browser facade. Password change obtains the refresh credential only from the encrypted server-side session, calls Identity once with a finite deadline, and atomically rotates the browser cookie/CSRF/server-held refresh state from the Identity result. Recovery initiation/confirmation are anonymous-capable same-origin writes and receive exact client address only from the trusted edge. Identity remains password policy/proof/challenge/quota authority; the BFF maps stable non-enumerating RFC 9457 outcomes and has no retry or fallback authority. Application ports retain ArchUnit enforcement; canonical WSL Java 25 `check` covers unit, OpenAPI contract, HTTP controller, browser-security, BFF -> Identity gRPC, Redis integration, architecture, SpotBugs, and formatting gates. Existing integrated runtime evidence predates this password revision; deployed password lifecycle and production edge/provider execution remain `NOT VERIFIED`.
+The current repository contains the executable Web BFF slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement, local authentication/logout, Tenant lifecycle/selection routes, profile/contact routes, password change/recovery routes, Authorization-management routes, exact audience brokerage, and the canonical OpenAPI 3.1 version-1.2.0 browser facade. The coherent change that introduces version 1.2.0 establishes full public controller coverage, consumer examples, schema validation, controller/OpenAPI parity, and generated frontend transport-type drift enforcement; its execution evidence remains change-specific PR/CI evidence and is not inferred by this document. Password change obtains the refresh credential only from the encrypted server-side session, calls Identity once with a finite deadline, and atomically rotates the browser cookie/CSRF/server-held refresh state from the Identity result. Recovery initiation/confirmation are anonymous-capable same-origin writes and receive exact client address only from the trusted edge. Identity remains password policy/proof/challenge/quota authority; the BFF maps stable non-enumerating RFC 9457 outcomes and has no retry or fallback authority. Application ports retain ArchUnit enforcement. Production BFF runtime, including deployed edge/provider evidence, remains `NOT VERIFIED`.

@@ -26,6 +26,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web-frontend/package-lock.json
       - run: npm ci
+      - run: npm run check:api
       - run: npx playwright install --with-deps
       - run: npm run build
       - run: npm run e2e
