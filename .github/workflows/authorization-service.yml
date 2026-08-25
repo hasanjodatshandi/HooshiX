@@ -257,9 +257,8 @@ jobs:
           set -euo pipefail
           /tmp/buf lint
           /tmp/buf build -o /tmp/authorization-contract.binpb
-          git update-ref refs/heads/buf-ci-main refs/remotes/origin/main
-          trap 'git update-ref -d refs/heads/buf-ci-main || true' EXIT
-          /tmp/buf breaking --against '../../.git#branch=buf-ci-main,subdir=contracts/protobuf-contracts/src/main/proto'
+          ../../scripts/contracts/verify_protobuf_compatibility.sh \
+            /tmp/buf /tmp/authorization-contract-baseline.binpb
 
       - name: Run pinned Semgrep policy
         run: |

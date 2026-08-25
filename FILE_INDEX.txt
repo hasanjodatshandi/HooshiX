@@ -294,6 +294,7 @@ scripts/context/context_engine.py
 scripts/context/post_merge_checkpoint.py
 scripts/context/tests/test_context_engine.py
 scripts/context/tests/test_post_merge_checkpoint.py
+scripts/contracts/verify_protobuf_compatibility.sh
 scripts/local/runtime.py
 scripts/local/tests/test_runtime.py
 scripts/platform/common.sh
