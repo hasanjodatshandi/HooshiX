@@ -282,6 +282,7 @@ class AuthenticateLocalUseCaseTest {
         UUID challengeId,
         UUID userId,
         GeneratedMfaChallenge challenge,
+        PrimaryAuthenticationMethod authenticationMethod,
         Instant now,
         Instant expiresAt) {
       this.userId = userId;

@@ -9,13 +9,14 @@ plugins {
 group="com.sajtech";version="0.1.0-SNAPSHOT"
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.5.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.6.0")
   implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
   implementation(platform("io.netty:netty-bom:4.2.16.Final"))
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.security:spring-security-oauth2-jose")
   implementation("io.lettuce:lettuce-core:7.5.2.RELEASE")
   implementation("io.grpc:grpc-netty-shaded:1.83.1")
   implementation("io.grpc:grpc-protobuf:1.83.1")

@@ -23,17 +23,33 @@ public final class SessionCrypto {
   }
 
   public IssuedOpaque issueSessionToken() {
+    return issueOpaque("session");
+  }
+
+  public IssuedOpaque issuePreauthToken() {
+    return issueOpaque("oidc-preauth");
+  }
+
+  private IssuedOpaque issueOpaque(String purpose) {
     byte[] raw = random(32);
     try {
       var key = locatorKeys.activeKey();
       String token = B64.encodeToString(raw);
-      return new IssuedOpaque(key.keyId() + "." + token, locator(key.keyId(), token));
+      return new IssuedOpaque(key.keyId() + "." + token, locator(key.keyId(), token, purpose));
     } finally {
       Arrays.fill(raw, (byte) 0);
     }
   }
 
   public String locatorFromCookie(String cookie) {
+    return locatorFromCookie(cookie, "session");
+  }
+
+  public String preauthLocatorFromCookie(String cookie) {
+    return locatorFromCookie(cookie, "oidc-preauth");
+  }
+
+  private String locatorFromCookie(String cookie, String purpose) {
     if (cookie == null || cookie.length() > 128)
       throw new IllegalArgumentException("Session cookie is invalid");
     int dot = cookie.indexOf('.');
@@ -42,7 +58,7 @@ public final class SessionCrypto {
     String keyId = cookie.substring(0, dot), token = cookie.substring(dot + 1);
     if (!keyId.matches("[A-Za-z0-9._-]{1,64}") || !token.matches("[A-Za-z0-9_-]{43}"))
       throw new IllegalArgumentException("Session cookie is invalid");
-    return locator(keyId, token);
+    return locator(keyId, token, purpose);
   }
 
   public java.util.Set<String> locatorKeyIds() {
@@ -80,6 +96,30 @@ public final class SessionCrypto {
     } finally {
       Arrays.fill(raw, (byte) 0);
     }
+  }
+
+  public IssuedState issueOidcState() {
+    byte[] raw = random(32);
+    try {
+      String clear = B64.encodeToString(raw);
+      var key = locatorKeys.activeKey();
+      return new IssuedState(
+          clear, key.keyId() + ":" + hex(hmac(key.key(), "hooshix:web-bff:oidc-state:v1", clear)));
+    } finally {
+      Arrays.fill(raw, (byte) 0);
+    }
+  }
+
+  public List<String> oidcStateLocators(String state) {
+    if (state == null || !state.matches("[A-Za-z0-9_-]{43}")) return List.of();
+    return locatorKeys.keyIds().stream()
+        .sorted()
+        .map(
+            keyId ->
+                keyId
+                    + ":"
+                    + hex(hmac(locatorKeys.key(keyId), "hooshix:web-bff:oidc-state:v1", state)))
+        .toList();
   }
 
   public boolean csrfMatches(String clear, String keyId, String expectedHex) {
@@ -164,6 +204,14 @@ public final class SessionCrypto {
     return challenge;
   }
 
+  public EncryptedValue encryptOidcPreauth(String locator, String payload) {
+    return encrypt(locator, payload, "oidc-preauth");
+  }
+
+  public String decryptOidcPreauth(String locator, EncryptedValue value) {
+    return decrypt(locator, value, "oidc-preauth");
+  }
+
   private EncryptedValue encrypt(String locator, String value, String purpose) {
     if (locator == null || value == null || value.isBlank() || value.length() > 1024) {
       throw new IllegalArgumentException("Encrypted session value is invalid");
@@ -214,11 +262,13 @@ public final class SessionCrypto {
     }
   }
 
-  private String locator(String keyId, String token) {
-    return "web-bff:session:v1:"
+  private String locator(String keyId, String token, String purpose) {
+    return "web-bff:"
+        + purpose
+        + ":v1:"
         + keyId
         + ":"
-        + hex(hmac(locatorKeys.key(keyId), "hooshix:web-bff:session-locator:v1", token));
+        + hex(hmac(locatorKeys.key(keyId), "hooshix:web-bff:" + purpose + "-locator:v1", token));
   }
 
   private static byte[] aad(String locator, String keyId) {
@@ -270,6 +320,8 @@ public final class SessionCrypto {
   public record IssuedOpaque(String cookieValue, String locator) {}
 
   public record IssuedCsrf(String clear, String keyId, String digestHex) {}
+
+  public record IssuedState(String clear, String locator) {}
 
   public record EncryptedValue(String keyId, String nonce, String ciphertext) {}
 }

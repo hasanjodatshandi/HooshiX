@@ -247,6 +247,36 @@ public final class JooqProfileContactStore implements ProfileContactStore {
   }
 
   @Override
+  public boolean activateExternalOnboardingIfComplete(UUID userId, Instant now) {
+    int changed =
+        dsl.execute(
+            """
+            UPDATE identity_user u
+            SET status='ACTIVE',updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE)
+            WHERE u.user_id=? AND u.status='PENDING'
+              AND EXISTS (
+                SELECT 1 FROM identity_profile p
+                WHERE p.user_id=u.user_id AND p.first_name<>'' AND p.last_name<>'')
+              AND EXISTS (
+                SELECT 1 FROM identity_contact c
+                WHERE c.user_id=u.user_id AND c.verified_at IS NOT NULL AND c.removed_at IS NULL)
+              AND EXISTS (
+                SELECT 1 FROM identity_external_identity e
+                WHERE e.user_id=u.user_id AND e.unlinked_at IS NULL)
+            """,
+            ts(now),
+            userId);
+    if (changed == 1) {
+      dsl.execute(
+          "INSERT INTO identity_security_audit(event_id,event_code,user_id,occurred_at) VALUES (?,'IDENTITY_EXTERNAL_ONBOARDING_COMPLETED',?,CAST(? AS TIMESTAMP WITH TIME ZONE))",
+          UUID.randomUUID(),
+          userId,
+          ts(now));
+    }
+    return changed == 1;
+  }
+
+  @Override
   public boolean setPrimary(UUID userId, UUID contactId, Instant now) {
     var target =
         dsl.fetchOptional(

@@ -1,7 +1,7 @@
 {
   "title": "HooshiX Identity Service",
   "schemaVersion": 41,
-  "version": 4,
+  "version": 5,
   "refresh": "30s",
   "tags": [
     "hooshix",
@@ -389,6 +389,47 @@
         "w": 12,
         "x": 12,
         "y": 72
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "External identity request rate by outcome",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, outcome) (rate(identity_external_identity_duration_seconds_count[5m]))",
+          "legendFormat": "{{operation}} {{outcome}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 80
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "External identity p95 and in flight",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(identity_external_identity_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{operation}} p95"
+        },
+        {
+          "refId": "B",
+          "expr": "identity_external_identity_in_flight",
+          "legendFormat": "in flight"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 80
       }
     }
   ]

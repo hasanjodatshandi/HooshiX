@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package hooshix.identity.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "hooshix/identity/v1/identity_authentication.proto";
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.v1";
+
+service IdentityExternalIdentityService {
+  rpc EstablishSession(EstablishSessionRequest) returns (EstablishSessionResponse);
+  rpc Link(LinkRequest) returns (LinkResponse);
+  rpc Unlink(UnlinkRequest) returns (UnlinkResponse);
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+}
+
+message ExternalIdentityEvidence {
+  option (buf.validate.message).cel = {
+    id: "external_identity_evidence.email_verification_shape"
+    message: "email_verified requires a bounded email value"
+    expression: "!this.email_verified || this.email != ''"
+  };
+
+  bytes evidence_id = 1 [(buf.validate.field).bytes = {len: 32}];
+  google.protobuf.Timestamp evidence_issued_at = 2 [(buf.validate.field).required = true];
+  string issuer = 3 [(buf.validate.field).string = {const: "https://accounts.google.com"}];
+  string subject = 4 [(buf.validate.field).string = {
+    pattern: "^[A-Za-z0-9_-]{1,255}$"
+    max_bytes: 255
+  }];
+  uint32 metadata_version = 5 [(buf.validate.field).uint32 = {const: 1}];
+  string email = 6 [(buf.validate.field).string = {
+    pattern: "^$|^[^\\s@]{1,64}@[^\\s@]{1,189}$"
+    max_len: 254
+  }];
+  bool email_verified = 7;
+  string given_name = 8 [(buf.validate.field).string = {
+    max_len: 120
+    max_bytes: 480
+  }];
+  string family_name = 9 [(buf.validate.field).string = {
+    max_len: 120
+    max_bytes: 480
+  }];
+}
+
+message EstablishSessionRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  ExternalIdentityEvidence evidence = 2 [(buf.validate.field).required = true];
+  AuthenticationTrustedClientAddress client_address = 3 [(buf.validate.field).required = true];
+}
+
+message EstablishSessionResponse {
+  AuthenticateLocalResponse authentication = 1 [(buf.validate.field).required = true];
+}
+
+message LinkRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  ExternalIdentityEvidence evidence = 3 [(buf.validate.field).required = true];
+  AuthenticationTrustedClientAddress client_address = 4 [(buf.validate.field).required = true];
+}
+
+message LinkResponse {
+  ExternalIdentitySession session = 1 [(buf.validate.field).required = true];
+}
+
+message UnlinkRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string issuer = 3 [(buf.validate.field).string = {const: "https://accounts.google.com"}];
+}
+
+message UnlinkResponse {
+  ExternalIdentitySession session = 1 [(buf.validate.field).required = true];
+}
+
+message GetStatusRequest {
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+}
+
+message GetStatusResponse {
+  bool google_linked = 1;
+}
+
+message ExternalIdentitySession {
+  option (buf.validate.message).cel = {
+    id: "external_identity_session.tenant_context_shape"
+    message: "tenant context must be absent for onboarding and complete for tenant-authenticated sessions"
+    expression: "(this.session_mode == 1 && this.selected_tenant_id == '' && this.selected_membership_id == '') || (this.session_mode == 2 && this.selected_tenant_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && this.selected_membership_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'))"
+  };
+
+  string identity_session_id = 1 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  string refresh_family_id = 2 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string refresh_credential = 3 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
+  google.protobuf.Timestamp refresh_idle_expires_at = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp refresh_absolute_expires_at = 5 [(buf.validate.field).required = true];
+  AuthenticationSessionMode session_mode = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string user_id = 7 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string selected_tenant_id = 8 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  string selected_membership_id = 9 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+}

@@ -21,7 +21,57 @@ public record WebBffProperties(
     Duration encryptionKeyMaximumStaleness,
     int identityMaximumConcurrentCalls,
     int authorizationMaximumConcurrentCalls,
-    Map<String, String> routeAudiences) {
+    Map<String, String> routeAudiences,
+    Path quotaKeyRingPath,
+    OidcQuota oidcQuota,
+    boolean googleOidcEnabled,
+    URI googleAuthorizationEndpoint,
+    URI googleTokenEndpoint,
+    URI googleJwkSetUri,
+    String googleClientId,
+    Path googleClientSecretPath,
+    int googleMaximumConcurrentCalls) {
+  public WebBffProperties(
+      boolean runtimeEnabled,
+      boolean requireFetchMetadata,
+      URI publicOrigin,
+      String identityTarget,
+      String authorizationTarget,
+      String redisUri,
+      Path locatorKeyRingPath,
+      Path csrfKeyRingPath,
+      Path refreshEncryptionKeyRingPath,
+      Duration hmacKeyMaximumStaleness,
+      Duration encryptionKeyMaximumStaleness,
+      int identityMaximumConcurrentCalls,
+      int authorizationMaximumConcurrentCalls,
+      Map<String, String> routeAudiences) {
+    this(
+        runtimeEnabled,
+        requireFetchMetadata,
+        publicOrigin,
+        identityTarget,
+        authorizationTarget,
+        redisUri,
+        locatorKeyRingPath,
+        csrfKeyRingPath,
+        refreshEncryptionKeyRingPath,
+        hmacKeyMaximumStaleness,
+        encryptionKeyMaximumStaleness,
+        identityMaximumConcurrentCalls,
+        authorizationMaximumConcurrentCalls,
+        routeAudiences,
+        locatorKeyRingPath,
+        new OidcQuota(10000, 1000, 30, locatorKeyRingPath),
+        false,
+        URI.create("https://accounts.google.com/o/oauth2/v2/auth"),
+        URI.create("https://oauth2.googleapis.com/token"),
+        URI.create("https://www.googleapis.com/oauth2/v3/certs"),
+        "disabled",
+        locatorKeyRingPath,
+        1);
+  }
+
   public WebBffProperties {
     if (publicOrigin == null
         || !"https".equalsIgnoreCase(publicOrigin.getScheme())
@@ -48,7 +98,9 @@ public record WebBffProperties(
         || hmacKeyMaximumStaleness.isZero()
         || encryptionKeyMaximumStaleness == null
         || encryptionKeyMaximumStaleness.isNegative()
-        || encryptionKeyMaximumStaleness.isZero())
+        || encryptionKeyMaximumStaleness.isZero()
+        || quotaKeyRingPath == null
+        || oidcQuota == null)
       throw new IllegalArgumentException("Web BFF security material configuration is invalid");
     if (publicOrigin.getPort() != -1
         && (publicOrigin.getPort() < 1 || publicOrigin.getPort() > 65535))
@@ -65,5 +117,36 @@ public record WebBffProperties(
                     || e.getValue().isBlank()
                     || e.getValue().contains("*")))
       throw new IllegalArgumentException("Web BFF route audience map is invalid");
+    if (!URI.create("https://accounts.google.com/o/oauth2/v2/auth")
+            .equals(googleAuthorizationEndpoint)
+        || !URI.create("https://oauth2.googleapis.com/token").equals(googleTokenEndpoint)
+        || !URI.create("https://www.googleapis.com/oauth2/v3/certs").equals(googleJwkSetUri)
+        || googleClientId == null
+        || googleClientId.isBlank()
+        || googleClientId.length() > 255
+        || googleClientSecretPath == null
+        || googleMaximumConcurrentCalls < 1) {
+      throw new IllegalArgumentException("Web BFF Google OIDC configuration is invalid");
+    }
+    if (googleOidcEnabled
+        && !googleClientId.matches("[0-9A-Za-z._-]{1,220}[.]apps[.]googleusercontent[.]com")) {
+      throw new IllegalArgumentException("Web BFF Google client ID is invalid");
+    }
+  }
+
+  public record OidcQuota(
+      int maxActiveBuckets,
+      int maxNewBucketsPerMinute,
+      int minimumMemoryHeadroomPercent,
+      Path hostTimeStatusPath) {
+    public OidcQuota {
+      if (maxActiveBuckets < 1
+          || maxNewBucketsPerMinute < 1
+          || minimumMemoryHeadroomPercent < 30
+          || minimumMemoryHeadroomPercent >= 100
+          || hostTimeStatusPath == null) {
+        throw new IllegalArgumentException("Web BFF OIDC quota configuration is invalid");
+      }
+    }
   }
 }

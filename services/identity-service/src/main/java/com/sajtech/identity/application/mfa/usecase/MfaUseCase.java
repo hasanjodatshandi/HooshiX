@@ -273,7 +273,8 @@ public final class MfaUseCase implements MfaManagement, CompleteMfaAuthenticatio
             selection.mode(),
             selection.tenantId(),
             selection.membershipId(),
-            now);
+            now,
+            observed.authenticationMethod());
     CompleteOutcome outcome =
         transactions.required(
             () -> {
@@ -283,9 +284,8 @@ public final class MfaUseCase implements MfaManagement, CompleteMfaAuthenticatio
               if (!"ACTIVE".equals(locked.state())) return CompleteOutcome.INVALID;
               if (!now.isBefore(locked.expiresAt())) return CompleteOutcome.EXPIRED;
               if (locked.failedAttempts() >= 5) return CompleteOutcome.EXHAUSTED;
-              LocalCredentialRecord user =
-                  authentication.lockLocalCredential(locked.userId()).orElse(null);
-              if (user == null || !"ACTIVE".equals(user.userStatus()))
+              String userStatus = authentication.lockUserStatus(locked.userId()).orElse(null);
+              if (!"ACTIVE".equals(userStatus) && !"PENDING".equals(userStatus))
                 return CompleteOutcome.INVALID;
               MfaStore.ActiveEnrollment active =
                   mfa.lockActiveEnrollment(locked.userId()).orElse(null);

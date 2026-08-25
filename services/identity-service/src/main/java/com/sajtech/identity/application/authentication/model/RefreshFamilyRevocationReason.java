@@ -8,5 +8,6 @@ public enum RefreshFamilyRevocationReason {
   EXPIRED,
   USER_INACTIVE,
   PASSWORD_CHANGED,
-  MFA_CHANGED
+  MFA_CHANGED,
+  EXTERNAL_IDENTITY_CHANGED
 }

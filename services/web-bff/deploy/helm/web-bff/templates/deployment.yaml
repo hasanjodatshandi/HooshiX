@@ -8,6 +8,13 @@
 {{- $locator := required "secrets.locatorSecretName is required" .Values.secrets.locatorSecretName -}}
 {{- $csrf := required "secrets.csrfSecretName is required" .Values.secrets.csrfSecretName -}}
 {{- $refresh := required "secrets.refreshEncryptionSecretName is required" .Values.secrets.refreshEncryptionSecretName -}}
+{{- $quota := required "secrets.quotaSecretName is required" .Values.secrets.quotaSecretName -}}
+{{- $hostTime := required "quota.hostTimeConfigMapName is required" .Values.quota.hostTimeConfigMapName -}}
+{{- if lt (int .Values.quota.minimumMemoryHeadroomPercent) 30 }}{{ fail "OIDC quota requires at least 30 percent memory headroom" }}{{ end -}}
+{{- if .Values.googleOidc.enabled -}}
+{{- if not (regexMatch "^[0-9A-Za-z._-]{1,220}[.]apps[.]googleusercontent[.]com$" (required "googleOidc.clientId is required when enabled" .Values.googleOidc.clientId)) }}{{ fail "googleOidc.clientId is invalid" }}{{ end -}}
+{{- $_ := required "googleOidc.clientSecretName is required when enabled" .Values.googleOidc.clientSecretName -}}
+{{- end -}}
 {{- if not .Values.runtime.requireFetchMetadata }}{{ fail "production browser surface must require Fetch Metadata" }}{{ end -}}
 {{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
 {{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
@@ -64,6 +71,17 @@ spec:
             - {name: WEB_BFF_LOCATOR_KEY_RING_PATH, value: /run/secrets/web-bff-locator/locator.properties}
             - {name: WEB_BFF_CSRF_KEY_RING_PATH, value: /run/secrets/web-bff-csrf/csrf.properties}
             - {name: WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH, value: /run/secrets/web-bff-refresh/refresh.properties}
+            - {name: WEB_BFF_QUOTA_KEY_RING_PATH, value: /run/secrets/web-bff-quota/quota.properties}
+            - {name: WEB_BFF_OIDC_QUOTA_HOST_TIME_STATUS_PATH, value: /run/status/web-bff/host-time-synchronized}
+            - {name: WEB_BFF_OIDC_QUOTA_MAX_ACTIVE_BUCKETS, value: {{ .Values.quota.maxActiveBuckets | quote }} }
+            - {name: WEB_BFF_OIDC_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE, value: {{ .Values.quota.maxNewBucketsPerMinute | quote }} }
+            - {name: WEB_BFF_OIDC_QUOTA_MINIMUM_MEMORY_HEADROOM_PERCENT, value: {{ .Values.quota.minimumMemoryHeadroomPercent | quote }} }
+            - {name: WEB_BFF_GOOGLE_OIDC_ENABLED, value: {{ .Values.googleOidc.enabled | quote }} }
+            - {name: WEB_BFF_GOOGLE_CLIENT_ID, value: {{ ternary .Values.googleOidc.clientId "disabled.apps.googleusercontent.com" .Values.googleOidc.enabled | quote }} }
+            - {name: WEB_BFF_GOOGLE_MAXIMUM_CONCURRENT_CALLS, value: {{ .Values.googleOidc.maximumConcurrentCalls | quote }} }
+            {{- if .Values.googleOidc.enabled }}
+            - {name: WEB_BFF_GOOGLE_CLIENT_SECRET_PATH, value: /run/secrets/web-bff-google/client-secret}
+            {{- end }}
             - {name: WEB_BFF_ROUTE_AUDIENCES_AUTHORIZATION_PREFIX, value: {{ .Values.routeAudiences.authorizationPrefix | quote }}}
             - {name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT, value: {{ $traceEndpoint | quote }}}
           resources:
@@ -76,6 +94,11 @@ spec:
             - {name: locator, mountPath: /run/secrets/web-bff-locator, readOnly: true}
             - {name: csrf, mountPath: /run/secrets/web-bff-csrf, readOnly: true}
             - {name: refresh, mountPath: /run/secrets/web-bff-refresh, readOnly: true}
+            - {name: quota, mountPath: /run/secrets/web-bff-quota, readOnly: true}
+            - {name: host-time, mountPath: /run/status/web-bff, readOnly: true}
+            {{- if .Values.googleOidc.enabled }}
+            - {name: google-client, mountPath: /run/secrets/web-bff-google, readOnly: true}
+            {{- end }}
             - {name: temporary, mountPath: /tmp}
       volumes:
         - name: redis
@@ -86,5 +109,13 @@ spec:
           secret: {secretName: {{ $csrf | quote }}, defaultMode: 0440, items: [{key: csrf.properties, path: csrf.properties}]}
         - name: refresh
           secret: {secretName: {{ $refresh | quote }}, defaultMode: 0440, items: [{key: refresh.properties, path: refresh.properties}]}
+        - name: quota
+          secret: {secretName: {{ $quota | quote }}, defaultMode: 0440, items: [{key: quota.properties, path: quota.properties}]}
+        - name: host-time
+          configMap: {name: {{ $hostTime | quote }}, defaultMode: 0440, items: [{key: host-time-synchronized, path: host-time-synchronized}]}
+        {{- if .Values.googleOidc.enabled }}
+        - name: google-client
+          secret: {secretName: {{ .Values.googleOidc.clientSecretName | quote }}, defaultMode: 0440, items: [{key: client-secret, path: client-secret}]}
+        {{- end }}
         - name: temporary
           emptyDir: {sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}}

@@ -1,0 +1,17 @@
+{
+  "requestId": "123e4567-e89b-42d3-a456-426614174000",
+  "evidence": {
+    "evidenceId": "ABEiM0RVZneImaq7zN3u_wARIjNEVWZ3iJmqu8zd7v8=",
+    "evidenceIssuedAt": "2026-08-26T12:00:00Z",
+    "issuer": "https://accounts.google.com",
+    "subject": "110169484474386276334",
+    "metadataVersion": 1,
+    "email": "consumer@example.com",
+    "emailVerified": true,
+    "givenName": "Consumer",
+    "familyName": "Example"
+  },
+  "clientAddress": {
+    "address": "fwAAAQ=="
+  }
+}

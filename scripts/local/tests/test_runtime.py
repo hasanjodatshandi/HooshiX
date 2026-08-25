@@ -71,7 +71,7 @@ class LocalRuntimeContractTest(unittest.TestCase):
             "authorization-intent", "authorization-quota", "identity-jwt-public",
             "identity-fingerprint", "identity-challenge", "identity-handoff", "identity-mfa", "identity-refresh",
             "identity-quota", "identity-jwt-private", "notification-fingerprint",
-            "notification-delivery", "web-bff-locator", "web-bff-csrf", "web-bff-refresh")}
+            "notification-delivery", "web-bff-locator", "web-bff-csrf", "web-bff-refresh", "web-bff-quota")}
         keys["web-bff-tls"] = ROOT / ".local-runtime" / "tls" / "web-bff.p12"
         dataset = {"database": "/tmp/local.sqlite", "manifest": "/tmp/local.json", "manifest_sha": "a" * 64}
         envs = runtime.runtime_envs(values, keys, dataset)

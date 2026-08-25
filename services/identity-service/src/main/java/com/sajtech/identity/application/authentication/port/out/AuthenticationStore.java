@@ -20,6 +20,10 @@ public interface AuthenticationStore {
   Optional<LocalCredentialRecord> lockVerifiedLocalCredential(
       UUID userId, CanonicalContact contact);
 
+  default Optional<String> lockUserStatus(UUID userId) {
+    return lockLocalCredential(userId).map(LocalCredentialRecord::userStatus);
+  }
+
   void expireDueFamilies(UUID userId, Instant now);
 
   int countActiveFamilies(UUID userId);

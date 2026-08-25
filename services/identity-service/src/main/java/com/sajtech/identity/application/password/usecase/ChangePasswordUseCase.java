@@ -212,6 +212,8 @@ public final class ChangePasswordUseCase implements ChangePassword {
         java.util.UUID challengeId,
         java.util.UUID userId,
         com.sajtech.identity.application.mfa.model.GeneratedMfaChallenge challenge,
+        com.sajtech.identity.application.authentication.model.PrimaryAuthenticationMethod
+            authenticationMethod,
         Instant now,
         Instant expiresAt) {
       throw new UnsupportedOperationException("MFA is disabled");

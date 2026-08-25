@@ -166,6 +166,7 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
                     UUID.randomUUID(),
                     found.userId(),
                     mfaChallenge,
+                    PrimaryAuthenticationMethod.LOCAL_PASSWORD,
                     now,
                     now.plus(Duration.ofMinutes(5)));
                 return true;
@@ -236,6 +237,7 @@ public final class AuthenticateLocalUseCase implements AuthenticateLocal {
         UUID challengeId,
         UUID userId,
         GeneratedMfaChallenge challenge,
+        PrimaryAuthenticationMethod authenticationMethod,
         Instant now,
         Instant expiresAt) {
       throw new UnsupportedOperationException("MFA is disabled");

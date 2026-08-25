@@ -4,6 +4,8 @@ import com.sajtech.hooshix.contract.validation.ContractValidationServerIntercept
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.*;
+import com.sajtech.identity.application.externalidentity.port.out.*;
+import com.sajtech.identity.application.externalidentity.usecase.ExternalIdentityUseCase;
 import com.sajtech.identity.application.mfa.port.in.*;
 import com.sajtech.identity.application.mfa.port.out.*;
 import com.sajtech.identity.application.mfa.usecase.MfaUseCase;
@@ -31,6 +33,7 @@ import com.sajtech.identity.infrastructure.security.challenge.HmacChallengeSecre
 import com.sajtech.identity.infrastructure.security.challenge.HmacContactVerificationSecret;
 import com.sajtech.identity.infrastructure.security.challenge.HmacPasswordRecoverySecret;
 import com.sajtech.identity.infrastructure.security.escrow.AesGcmNotificationEscrow;
+import com.sajtech.identity.infrastructure.security.externalidentity.*;
 import com.sajtech.identity.infrastructure.security.fingerprint.HmacIntentFingerprint;
 import com.sajtech.identity.infrastructure.security.jwt.FileBackedRsaSigningKeyRing;
 import com.sajtech.identity.infrastructure.security.jwt.RsaJwtAccessTokenSigner;
@@ -41,6 +44,7 @@ import com.sajtech.identity.infrastructure.security.session.HmacSessionCredentia
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
 import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.externalidentity.grpc.IdentityExternalIdentityGrpcService;
 import com.sajtech.identity.interfaces.mfa.grpc.IdentityMfaGrpcService;
 import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
@@ -153,6 +157,18 @@ public class RuntimeConfiguration {
     return new HmacIntentFingerprint(keys);
   }
 
+  @Bean
+  ExternalIdentityFingerprintPort externalIdentityFingerprint(
+      @Qualifier("fingerprintKeyRing") FileBackedKeyRing keys) {
+    return new HmacExternalIdentityFingerprint(keys);
+  }
+
+  @Bean
+  ExternalIdentityResultCryptoPort externalIdentityResultCrypto(
+      @Qualifier("mfaKeyRing") FileBackedKeyRing keys) {
+    return new AesGcmExternalIdentityResultCrypto(keys);
+  }
+
   @Bean("registrationChallengeSecrets")
   ChallengeSecretPort challengeSecrets(@Qualifier("challengeKeyRing") FileBackedKeyRing keys) {
     return new HmacChallengeSecret(keys);
@@ -193,6 +209,11 @@ public class RuntimeConfiguration {
   @Bean
   MfaStore mfaStore(DSLContext dsl) {
     return new JooqMfaStore(dsl);
+  }
+
+  @Bean
+  ExternalIdentityStore externalIdentityStore(DSLContext dsl) {
+    return new JooqExternalIdentityStore(dsl);
   }
 
   @Bean
@@ -623,6 +644,61 @@ public class RuntimeConfiguration {
       prefix = "identity",
       name = "authentication-runtime-enabled",
       havingValue = "true")
+  ExternalIdentityUseCase externalIdentityCore(
+      ExternalIdentityStore external,
+      ExternalIdentityFingerprintPort fingerprints,
+      ExternalIdentityResultCryptoPort resultCrypto,
+      AuthenticationStore authentication,
+      RefreshCredentialLookup refreshLookup,
+      SessionCredentialPort credentials,
+      AuthenticationTenantSelectionPort tenantSelection,
+      LoginQuotaPort quota,
+      MfaStore mfa,
+      MfaCryptographyPort mfaCryptography,
+      ContactCanonicalizer contacts,
+      TransactionRunner tx,
+      Clock clock) {
+    return new ExternalIdentityUseCase(
+        external,
+        fingerprints,
+        resultCrypto,
+        authentication,
+        refreshLookup,
+        credentials,
+        tenantSelection,
+        quota,
+        mfa,
+        mfaCryptography,
+        contacts,
+        tx,
+        clock);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ObservedExternalIdentity observedExternalIdentity(
+      ExternalIdentityUseCase core, ObservationRegistry observations, MeterRegistry meters) {
+    return new ObservedExternalIdentity(core, observations, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  IdentityExternalIdentityGrpcService externalIdentityGrpc(ObservedExternalIdentity observed) {
+    return new IdentityExternalIdentityGrpcService(observed);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
   RefreshSessionUseCase refreshSessionCore(
       RefreshCredentialLookup lookup,
       SessionCredentialPort credentials,
@@ -964,9 +1040,16 @@ public class RuntimeConfiguration {
       AuthenticationStore authenticationStore,
       com.sajtech.identity.application.profile.port.out.ProfileContactStore profileContactStore,
       MfaStore mfaStore,
+      ExternalIdentityStore externalIdentityStore,
       Clock clock) {
     return new IdentityRetentionWorker(
-        outboxStore, registrationStore, authenticationStore, profileContactStore, mfaStore, clock);
+        outboxStore,
+        registrationStore,
+        authenticationStore,
+        profileContactStore,
+        mfaStore,
+        externalIdentityStore,
+        clock);
   }
 
   @Bean

@@ -19,6 +19,9 @@ export type MfaProof = Schemas['MfaProofRequest'];
 export type MfaStatus = Schemas['MfaStatusResponse'];
 export type TotpEnrollment = Schemas['TotpEnrollmentResponse'];
 export type RecoveryCodes = Schemas['RecoveryCodesResponse'];
+export type OidcStartResponse = Schemas['OidcStartResponse'];
+export type ExternalIdentityStatus = Schemas['ExternalIdentityStatusResponse'];
+export type SessionState = Schemas['SessionStateResponse'];
 
 type LocalLoginRequest = Schemas['LocalLoginRequest'];
 type SelectTenantRequest = Schemas['SelectTenantRequest'];
@@ -30,6 +33,7 @@ type PasswordRecoveryRequest = Schemas['PasswordRecoveryRequest'];
 type PasswordRecoveryConfirmRequest = Schemas['PasswordRecoveryConfirmRequest'];
 type StartTotpEnrollmentRequest = Schemas['StartTotpEnrollmentRequest'];
 type ConfirmTotpEnrollmentRequest = Schemas['ConfirmTotpEnrollmentRequest'];
+type OidcStartRequest = Schemas['OidcStartRequest'];
 
 function requestId(): string {
   return crypto.randomUUID();
@@ -123,6 +127,47 @@ export async function login(
     if (!r.ok) return problem(r, 'login failed');
     return rememberCsrf(await r.json() as SessionResponse);
   });
+}
+
+export async function getSessionState(): Promise<SessionState> {
+  const response = await fetch('/api/v1/auth/session', { credentials: 'same-origin' });
+  if (!response.ok) return problem(response, 'session state failed');
+  return response.json() as Promise<SessionState>;
+}
+
+export async function startGoogleLogin(): Promise<OidcStartResponse> {
+  await ensureCsrf();
+  const body: OidcStartRequest = { returnTarget: '/oidc/complete' };
+  return post<OidcStartResponse>('/api/v1/auth/oidc/google/start', body);
+}
+
+export async function getExternalIdentityStatus(): Promise<ExternalIdentityStatus> {
+  const response = await fetch('/api/v1/identity/external-identities', {
+    credentials: 'same-origin',
+    headers: { 'x-request-id': requestId() },
+  });
+  if (!response.ok) return problem(response, 'external identity status failed');
+  return response.json() as Promise<ExternalIdentityStatus>;
+}
+
+export async function startGoogleLink(): Promise<OidcStartResponse> {
+  await ensureCsrf();
+  const body: OidcStartRequest = { returnTarget: '/security/external-identities' };
+  return post<OidcStartResponse>('/api/v1/identity/external-identities/google/start', body);
+}
+
+export async function unlinkGoogleIdentity(): Promise<void> {
+  await ensureCsrf();
+  const response = await fetch('/api/v1/identity/external-identities/google', {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers: {
+      'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+    },
+  });
+  if (!response.ok) return problem(response, 'external identity unlink failed');
+  csrfToken = null;
 }
 
 export async function completeMfaAuthentication(body: MfaProof): Promise<SessionResponse> {
@@ -294,4 +339,9 @@ export const bffClient = {
   confirmTotpEnrollment,
   disableTotp,
   rotateRecoveryCodes,
+  getSessionState,
+  startGoogleLogin,
+  getExternalIdentityStatus,
+  startGoogleLink,
+  unlinkGoogleIdentity,
 };

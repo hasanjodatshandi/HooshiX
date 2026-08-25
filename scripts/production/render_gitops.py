@@ -127,6 +127,12 @@ secrets:
   locatorSecretName: web-bff-locator
   csrfSecretName: web-bff-csrf
   refreshEncryptionSecretName: web-bff-refresh
+  quotaSecretName: web-bff-quota
+quota:
+  maxActiveBuckets: 200000
+  maxNewBucketsPerMinute: 2000
+  minimumMemoryHeadroomPercent: 30
+  hostTimeConfigMapName: web-bff-host-time
 edge:
   namespace: platform-edge
   podLabels: {{app.kubernetes.io/name: edge-waf}}

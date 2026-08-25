@@ -21,7 +21,7 @@ test('password login requiring MFA exposes no server challenge and completes wit
   await page.goto('/login');
   await page.getByLabel('Email').fill('person@example.com');
   await page.getByLabel('Password').fill('current password');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL(/\/login\/mfa$/);
   await page.reload();
   await page.getByLabel('Six-digit code').fill('123456');

@@ -9,4 +9,6 @@ export const routes = {
   passwordRecovery: '/password/recovery',
   passwordChange: '/password/change',
   mfa: '/security/mfa',
+  externalIdentities: '/security/external-identities',
+  oidcComplete: '/oidc/complete',
 } as const;
