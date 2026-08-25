@@ -1,0 +1,11 @@
+{
+  "requestId": "923e4567-e89b-42d3-a456-426614174000",
+  "channel": "NOTIFICATION_CHANNEL_EMAIL",
+  "recipient": "consumer@example.com",
+  "locale": "fa",
+  "messageNotAfter": "2026-08-25T08:10:00Z",
+  "registrationVerificationCode": {
+    "code": "12345678",
+    "expiresMinutes": 10
+  }
+}

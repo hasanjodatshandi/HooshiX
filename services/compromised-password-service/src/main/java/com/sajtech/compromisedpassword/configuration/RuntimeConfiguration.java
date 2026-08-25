@@ -12,6 +12,7 @@ import com.sajtech.compromisedpassword.infrastructure.observability.health.Datas
 import com.sajtech.compromisedpassword.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.compromisedpassword.interfaces.lookup.grpc.CompromisedPasswordGrpcService;
 import com.sajtech.compromisedpassword.interfaces.observability.grpc.SafeTracingServerInterceptor;
+import com.sajtech.hooshix.contract.validation.ContractValidationServerInterceptor;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -87,17 +88,25 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  ContractValidationServerInterceptor contractValidation(MeterRegistry meters) {
+    var rejections = meters.counter("hooshix.contract.validation.rejections");
+    return new ContractValidationServerInterceptor(ignored -> rejections.increment());
+  }
+
+  @Bean
   GrpcServerLifecycle grpcServerLifecycle(
       CompromisedPasswordProperties properties,
       CompromisedPasswordGrpcService service,
-      SafeTracingServerInterceptor interceptor,
+      SafeTracingServerInterceptor tracingInterceptor,
+      ContractValidationServerInterceptor validationInterceptor,
       @Value("${hooshix.compromised-password.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
         properties.grpcPort(),
         properties.maxConcurrentLookups(),
         service,
-        interceptor);
+        tracingInterceptor,
+        validationInterceptor);
   }
 
   @Bean(name = "compromisedPasswordDatasetHealthIndicator")

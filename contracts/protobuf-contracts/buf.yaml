@@ -1,6 +1,10 @@
 version: v2
 modules:
   - path: src/main/proto
+  - path: build/buf-dependencies
+    lint:
+      use:
+        - MINIMAL
 lint:
   use:
     - STANDARD

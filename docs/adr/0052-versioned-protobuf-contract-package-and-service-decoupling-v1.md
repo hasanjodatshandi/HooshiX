@@ -18,7 +18,10 @@ The module publishes a versioned Maven artifact:
 
     com.sajtech.hooshix:protobuf-contracts:<version>
 
-The artifact contains generated Protobuf and gRPC transport classes.
+The artifact contains generated Protobuf and gRPC transport classes, schema-level Protovalidate
+annotations, and the neutral gRPC request-validation interceptor needed to enforce those annotations
+before application code runs. Validation failures return a generic `INVALID_ARGUMENT` response and
+must not echo request field values.
 
 Services consume released contract versions. Services must not consume another service source tree, generated output, or domain implementation.
 
@@ -28,7 +31,9 @@ Services consume released contract versions. Services must not consume another s
 - Minor versions contain backward-compatible schema additions.
 - Major versions contain breaking wire changes.
 
-Buf lint and breaking checks are executed from the contract package authority.
+Buf lint and breaking checks are executed from the contract package authority. Every published
+service contract includes at least one protobuf-JSON consumer example. Executable contract tests
+parse and validate those examples so documentation cannot silently drift from the schema.
 
 ## Consequences
 
@@ -37,6 +42,7 @@ Positive:
 - Microservices become independently buildable.
 - External teams can consume a stable contract artifact.
 - Contract compatibility has one governance location.
+- Consumers receive executable request constraints and copyable, tested examples.
 
 Negative:
 
@@ -45,4 +51,7 @@ Negative:
 
 ## Enforcement
 
-Architecture fitness rules block service-local canonical Protobuf schemas and cross-service source references.
+Architecture fitness rules block service-local canonical Protobuf schemas and cross-service source
+references. Repository gates also enforce semantic artifact versions, versioned proto/Java packages,
+validation on every RPC request, exact consumer-version alignment, example presence, and runtime
+interceptor installation in every gRPC-serving service.

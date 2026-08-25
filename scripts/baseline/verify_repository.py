@@ -477,7 +477,114 @@ def validate_contract_package_boundary(root: Path) -> list[str]:
     if not contract_build.is_file():
         errors.append("missing contract package build definition")
 
+    build_text = read_text(contract_build) if contract_build.is_file() else ""
+    version_match = re.search(r'^version = "(\d+\.\d+\.\d+)"$', build_text, re.MULTILINE)
+    contract_version = version_match.group(1) if version_match else None
+    if contract_version is None:
+        errors.append("contract package version is missing or is not semantic versioning")
+    if not re.search(r'api\("build\.buf:protovalidate:\d+\.\d+\.\d+"\)', build_text):
+        errors.append("contract package is missing a pinned Protovalidate runtime")
+    if "prepareBufDependencies" not in build_text:
+        errors.append("contract package is missing reproducible local Buf validation schema preparation")
+
+    proto_files = sorted(contract_proto.rglob("*.proto"))
+    if not proto_files:
+        errors.append("canonical contract package contains no proto schemas")
+    for proto in proto_files:
+        relative = proto.relative_to(contract_proto)
+        text = read_text(proto)
+        if not any(re.fullmatch(r"v\d+", part) for part in relative.parts):
+            errors.append(f"contract proto path is not versioned: {relative}")
+        if not re.search(r"^package [A-Za-z0-9_.]+\.v\d+;$", text, re.MULTILINE):
+            errors.append(f"contract proto package is not versioned: {relative}")
+        if not re.search(
+            r'^option java_package = "[A-Za-z0-9_.]+\.v\d+";$', text, re.MULTILINE
+        ):
+            errors.append(f"contract Java package is not versioned: {relative}")
+        request_types = re.findall(r"\brpc\s+\w+\s*\(\s*(\w+)\s*\)", text)
+        if request_types and 'import "buf/validate/validate.proto";' not in text:
+            errors.append(f"contract service schema is missing validation import: {relative}")
+        for request_type in request_types:
+            block = proto_message_block(text, request_type)
+            if block is None or "buf.validate" not in block:
+                errors.append(
+                    f"RPC request has no schema validation: {relative}:{request_type}"
+                )
+
+        package_match = re.search(r"^package hooshix\.([a-z]+)\.(v\d+);$", text, re.MULTILINE)
+        if request_types and package_match:
+            example_dir = (
+                root
+                / "contracts/protobuf-contracts/examples"
+                / package_match.group(1)
+                / package_match.group(2)
+            )
+            for service_name in re.findall(r"\bservice\s+(\w+)\s*\{", text):
+                service_block = proto_named_block(text, "service", service_name)
+                rpc_names = (
+                    re.findall(r"\brpc\s+(\w+)\s*\(", service_block)
+                    if service_block is not None
+                    else []
+                )
+                if not any(
+                    (example_dir / f"{camel_to_kebab(rpc_name)}.valid.json").is_file()
+                    for rpc_name in rpc_names
+                ):
+                    errors.append(
+                        f"published service has no valid consumer example: "
+                        f"{relative}:{service_name}"
+                    )
+
+    if contract_version is not None:
+        for service_build in sorted((root / "services").glob("*/build.gradle.kts")):
+            text = read_text(service_build)
+            dependency = re.search(
+                r'com\.sajtech\.hooshix:protobuf-contracts:(\d+\.\d+\.\d+)', text
+            )
+            if dependency and dependency.group(1) != contract_version:
+                errors.append(
+                    f"contract consumer version mismatch: {service_build.relative_to(root)} "
+                    f"uses {dependency.group(1)} instead of {contract_version}"
+                )
+
+    for service_name in (
+        "authorization-service",
+        "compromised-password-service",
+        "identity-service",
+        "notification-service",
+    ):
+        java_root = root / "services" / service_name / "src/main/java"
+        if java_root.is_dir() and not any(
+            "ContractValidationServerInterceptor" in read_text(path)
+            for path in java_root.rglob("*.java")
+        ):
+            errors.append(f"gRPC server does not install contract validation: {service_name}")
+
     return errors
+
+
+def proto_message_block(text: str, message_name: str) -> str | None:
+    return proto_named_block(text, "message", message_name)
+
+
+def proto_named_block(text: str, keyword: str, name: str) -> str | None:
+    start_match = re.search(rf"\b{re.escape(keyword)}\s+{re.escape(name)}\s*\{{", text)
+    if start_match is None:
+        return None
+    start = start_match.start()
+    depth = 0
+    for index in range(start_match.end() - 1, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return None
+
+
+def camel_to_kebab(value: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", value).lower()
 
 def validate_guarded_structure(root: Path) -> list[str]:
     errors: list[str] = []

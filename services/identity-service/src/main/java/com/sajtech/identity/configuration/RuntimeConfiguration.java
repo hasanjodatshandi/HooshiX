@@ -1,5 +1,6 @@
 package com.sajtech.identity.configuration;
 
+import com.sajtech.hooshix.contract.validation.ContractValidationServerInterceptor;
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.*;
@@ -804,10 +805,17 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  ContractValidationServerInterceptor contractValidation(MeterRegistry meters) {
+    var rejections = meters.counter("hooshix.contract.validation.rejections");
+    return new ContractValidationServerInterceptor(ignored -> rejections.increment());
+  }
+
+  @Bean
   GrpcServerLifecycle grpcLifecycle(
       IdentityProperties p,
       List<BindableService> services,
       SafeTracingServerInterceptor tracing,
+      ContractValidationServerInterceptor validation,
       IdentityAdmissionInterceptor admission,
       @Value("${identity.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
@@ -819,6 +827,7 @@ public class RuntimeConfiguration {
             || p.tenantRuntimeEnabled(),
         services,
         tracing,
+        validation,
         admission);
   }
 
@@ -831,6 +840,7 @@ public class RuntimeConfiguration {
       IdentityProperties p,
       ReportNotificationResult report,
       SafeTracingServerInterceptor tracing,
+      ContractValidationServerInterceptor validation,
       IdentityAdmissionInterceptor admission,
       @Value("${identity.notification-result-grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
@@ -840,6 +850,7 @@ public class RuntimeConfiguration {
         true,
         List.of(new IdentityNotificationResultGrpcService(report)),
         tracing,
+        validation,
         admission);
   }
 

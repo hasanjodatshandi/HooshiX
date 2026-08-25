@@ -45,7 +45,8 @@ jobs:
         run: |
           set -euo pipefail
           cd contracts/protobuf-contracts
-          ../../services/identity-service/gradlew publishToMavenLocal --no-daemon --no-configuration-cache
+          ../../services/identity-service/gradlew publishToMavenLocal \
+            --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify Java and Gradle wrapper pins
         working-directory: ${{ env.SERVICE_DIR }}

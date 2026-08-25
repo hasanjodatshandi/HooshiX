@@ -1,0 +1,13 @@
+{
+  "requestId": "723e4567-e89b-42d3-a456-426614174000",
+  "channel": "REGISTRATION_CHANNEL_EMAIL",
+  "contact": "consumer@example.com",
+  "password": "correct horse battery staple",
+  "locale": "REGISTRATION_LOCALE_FA",
+  "firstName": "Sara",
+  "lastName": "Ahmadi",
+  "fatherName": "Reza",
+  "clientAddress": {
+    "address": "fwAAAQ=="
+  }
+}

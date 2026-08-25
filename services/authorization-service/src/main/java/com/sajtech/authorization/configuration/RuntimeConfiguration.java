@@ -15,6 +15,7 @@ import com.sajtech.authorization.infrastructure.security.*;
 import com.sajtech.authorization.infrastructure.security.keyring.FileBackedKeyRing;
 import com.sajtech.authorization.interfaces.grpc.*;
 import com.sajtech.authorization.interfaces.observability.grpc.AuthorizationObservabilityInterceptor;
+import com.sajtech.hooshix.contract.validation.ContractValidationServerInterceptor;
 import io.grpc.*;
 import java.time.Clock;
 import java.util.List;
@@ -186,12 +187,20 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  ContractValidationServerInterceptor contractValidation(
+      io.micrometer.core.instrument.MeterRegistry meters) {
+    var rejections = meters.counter("hooshix.contract.validation.rejections");
+    return new ContractValidationServerInterceptor(ignored -> rejections.increment());
+  }
+
+  @Bean
   GrpcServerLifecycle authorizationGrpcServer(
       AuthorizationProperties p,
       AuthorizationGrpcService service,
       AuthorizationObservabilityInterceptor telemetry,
       JwtActorServerInterceptor jwt,
       CheckPermissionOverloadInterceptor overload,
+      ContractValidationServerInterceptor validation,
       @Value("${authorization.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
@@ -199,7 +208,7 @@ public class RuntimeConfiguration {
         p.maxConcurrentCallsPerConnection(),
         p.runtimeEnabled(),
         List.<BindableService>of(service),
-        List.of(jwt, overload, telemetry));
+        List.of(jwt, overload, validation, telemetry));
   }
 
   @Bean

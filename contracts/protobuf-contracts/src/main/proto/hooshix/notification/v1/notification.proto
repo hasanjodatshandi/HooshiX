@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package hooshix.notification.v1;
 
+import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
 option java_multiple_files = true;
@@ -30,20 +31,35 @@ enum NotificationLifecycle {
 }
 
 message VerificationCodeContent {
-  string code = 1;
-  uint32 expires_minutes = 2;
+  string code = 1 [(buf.validate.field).string = {pattern: "^[0-9]{8}$"}];
+  uint32 expires_minutes = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 60
+  }];
 }
 
 message PasswordChangedNoticeContent {}
 
 message SubmitNotificationRequest {
-  string request_id = 1;
-  NotificationChannel channel = 2;
-  string recipient = 3;
-  string locale = 4;
+  string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
+  NotificationChannel channel = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string recipient = 3 [(buf.validate.field).string = {
+    min_len: 3
+    max_len: 254
+  }];
+  string locale = 4 [(buf.validate.field).string = {
+    in: [
+      "fa",
+      "en"
+    ]
+  }];
   google.protobuf.Timestamp message_not_after = 5;
 
   oneof semantic_content {
+    option (buf.validate.oneof).required = true;
     VerificationCodeContent registration_verification_code = 10;
     VerificationCodeContent password_recovery_code = 11;
     VerificationCodeContent mfa_verification_code = 12;

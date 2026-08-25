@@ -1,0 +1,9 @@
+{
+  "requestId": "323e4567-e89b-42d3-a456-426614174000",
+  "channel": "AUTHENTICATION_CHANNEL_EMAIL",
+  "contact": "consumer@example.com",
+  "password": "correct horse battery staple",
+  "clientAddress": {
+    "address": "fwAAAQ=="
+  }
+}

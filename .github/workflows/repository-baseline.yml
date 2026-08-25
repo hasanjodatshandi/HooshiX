@@ -13,6 +13,32 @@ permissions:
   contents: read
 
 jobs:
+  contract-quality:
+    name: Protobuf contract validation and examples
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Eclipse Temurin 25.0.4
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25.0.4'
+
+      - name: Verify generated contracts, validation, and consumer examples
+        working-directory: contracts/protobuf-contracts
+        run: |
+          set -euo pipefail
+          ../../services/identity-service/gradlew clean test \
+            --dependency-verification strict \
+            --no-daemon \
+            --no-configuration-cache
+
   repository-structure:
     name: Repository structure verify
     runs-on: ubuntu-24.04
@@ -85,6 +111,7 @@ jobs:
     name: Baseline verify
     if: ${{ always() }}
     needs:
+      - contract-quality
       - repository-structure
       - compromised-password-security
       - notification-security
@@ -96,6 +123,7 @@ jobs:
     steps:
       - name: Require repository and service verification
         env:
+          CONTRACT_RESULT: ${{ needs.contract-quality.result }}
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
           COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
           NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
@@ -104,6 +132,10 @@ jobs:
           WEB_BFF_RESULT: ${{ needs.web-bff-security.result }}
         run: |
           set -euo pipefail
+          if [ "${CONTRACT_RESULT}" != 'success' ]; then
+            echo "Protobuf contract quality result: ${CONTRACT_RESULT}" >&2
+            exit 1
+          fi
           if [ "${REPOSITORY_RESULT}" != 'success' ]; then
             echo "Repository structure verification result: ${REPOSITORY_RESULT}" >&2
             exit 1
