@@ -168,4 +168,16 @@
     <Class name="com.sajtech.identity.infrastructure.persistence.JooqMfaStore" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.identity.application.externalidentity.usecase.ExternalIdentityUseCase" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.JooqExternalIdentityStore" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.infrastructure.observability.ObservedExternalIdentity" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

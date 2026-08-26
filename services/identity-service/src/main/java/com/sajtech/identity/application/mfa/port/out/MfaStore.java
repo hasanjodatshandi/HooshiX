@@ -1,5 +1,6 @@
 package com.sajtech.identity.application.mfa.port.out;
 
+import com.sajtech.identity.application.authentication.model.PrimaryAuthenticationMethod;
 import com.sajtech.identity.application.mfa.model.*;
 import java.time.Instant;
 import java.util.List;
@@ -75,5 +76,23 @@ public interface MfaStore extends MfaAuthenticationGate {
       int failedAttempts,
       Instant primaryAuthenticatedAt,
       Instant expiresAt,
-      String state) {}
+      String state,
+      PrimaryAuthenticationMethod authenticationMethod) {
+    public LoginChallenge(
+        UUID challengeId,
+        UUID userId,
+        int failedAttempts,
+        Instant primaryAuthenticatedAt,
+        Instant expiresAt,
+        String state) {
+      this(
+          challengeId,
+          userId,
+          failedAttempts,
+          primaryAuthenticatedAt,
+          expiresAt,
+          state,
+          PrimaryAuthenticationMethod.LOCAL_PASSWORD);
+    }
+  }
 }

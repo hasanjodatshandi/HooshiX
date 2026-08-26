@@ -3,12 +3,15 @@ package com.sajtech.webbff.configuration;
 import com.sajtech.webbff.infrastructure.client.*;
 import com.sajtech.webbff.infrastructure.health.WebBffReadinessHealthIndicator;
 import com.sajtech.webbff.infrastructure.observability.*;
+import com.sajtech.webbff.infrastructure.quota.*;
 import com.sajtech.webbff.infrastructure.security.*;
 import com.sajtech.webbff.infrastructure.security.keyring.FileBackedKeyRing;
 import com.sajtech.webbff.infrastructure.session.RedisBffSessionRepository;
+import com.sajtech.webbff.infrastructure.session.RedisOidcPreauthRepository;
 import io.grpc.*;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.util.List;
@@ -43,6 +46,12 @@ public class RuntimeConfiguration {
         p.refreshEncryptionKeyRingPath(), "AES", 32, c, p.encryptionKeyMaximumStaleness());
   }
 
+  @Bean("webBffQuotaKeys")
+  FileBackedKeyRing quotaKeys(WebBffProperties p, Clock c) {
+    return new FileBackedKeyRing(
+        p.quotaKeyRingPath(), "HmacSHA256", 32, c, p.hmacKeyMaximumStaleness());
+  }
+
   @Bean
   SessionCrypto sessionCrypto(
       @Qualifier("webBffLocatorKeys") FileBackedKeyRing a,
@@ -55,8 +64,9 @@ public class RuntimeConfiguration {
   SecurityMaterialRefresher webBffSecurityMaterialRefresher(
       @Qualifier("webBffLocatorKeys") FileBackedKeyRing a,
       @Qualifier("webBffCsrfKeys") FileBackedKeyRing b,
-      @Qualifier("webBffRefreshKeys") FileBackedKeyRing c) {
-    return new SecurityMaterialRefresher(List.of(a, b, c));
+      @Qualifier("webBffRefreshKeys") FileBackedKeyRing c,
+      @Qualifier("webBffQuotaKeys") FileBackedKeyRing d) {
+    return new SecurityMaterialRefresher(List.of(a, b, c, d));
   }
 
   @Bean(destroyMethod = "close")
@@ -68,14 +78,64 @@ public class RuntimeConfiguration {
     return new RedisBffSessionRepository(p.redisUri(), crypto, c, meters);
   }
 
+  @Bean(destroyMethod = "close")
+  RedisOidcPreauthRepository oidcPreauth(
+      WebBffProperties properties, SessionCrypto crypto, Clock clock) {
+    return new RedisOidcPreauthRepository(properties.redisUri(), crypto, clock);
+  }
+
+  @Bean
+  GoogleOidcClient googleOidcProvider(
+      WebBffProperties properties,
+      ObservationRegistry observations,
+      MeterRegistry meters,
+      Clock clock) {
+    return new GoogleOidcClient(properties, observations, meters, clock);
+  }
+
+  @Bean
+  OidcClockSafetyGuard oidcClockSafetyGuard(Clock clock) {
+    return new OidcClockSafetyGuard(clock);
+  }
+
+  @Bean
+  OidcHostTimeHealth oidcHostTimeHealth(WebBffProperties properties) {
+    return new OidcHostTimeHealth(properties.oidcQuota().hostTimeStatusPath());
+  }
+
+  @Bean
+  OidcQuotaKeyEncoder oidcQuotaKeyEncoder(@Qualifier("webBffQuotaKeys") FileBackedKeyRing keys) {
+    return new OidcQuotaKeyEncoder(keys);
+  }
+
+  @Bean(destroyMethod = "close")
+  RedisOidcQuota oidcQuota(
+      WebBffProperties properties,
+      OidcQuotaKeyEncoder keys,
+      OidcClockSafetyGuard guard,
+      OidcHostTimeHealth hostTime,
+      MeterRegistry meters) {
+    return new RedisOidcQuota(
+        properties.redisUri(), keys, guard, hostTime, properties.oidcQuota(), meters);
+  }
+
+  @Bean
+  RedisOidcQuotaCleanupWorker oidcQuotaCleanup(
+      RedisOidcQuota quota, OidcClockSafetyGuard guard, OidcHostTimeHealth hostTime, Clock clock) {
+    return new RedisOidcQuotaCleanupWorker(quota, guard, hostTime, clock);
+  }
+
   @Bean
   WebBffReadinessHealthIndicator webBffReadiness(
       WebBffProperties p,
       @Qualifier("webBffLocatorKeys") FileBackedKeyRing a,
       @Qualifier("webBffCsrfKeys") FileBackedKeyRing b,
       @Qualifier("webBffRefreshKeys") FileBackedKeyRing c,
-      RedisBffSessionRepository sessions) {
-    return new WebBffReadinessHealthIndicator(p, List.of(a, b, c), sessions);
+      @Qualifier("webBffQuotaKeys") FileBackedKeyRing d,
+      RedisBffSessionRepository sessions,
+      RedisOidcQuota quota,
+      OidcHostTimeHealth hostTime) {
+    return new WebBffReadinessHealthIndicator(p, List.of(a, b, c, d), sessions, quota, hostTime);
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "webBffIdentityChannel")

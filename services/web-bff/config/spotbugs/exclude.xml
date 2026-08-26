@@ -54,4 +54,16 @@
     <Class name="com.sajtech.webbff.interfaces.http.MfaController" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.OidcController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.infrastructure.client.GoogleOidcClient" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.webbff.infrastructure.quota.RedisOidcQuota" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

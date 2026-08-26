@@ -16,7 +16,8 @@ public record PreparedSession(
     AuthenticationSessionMode mode,
     UUID selectedTenantId,
     UUID selectedMembershipId,
-    Instant mfaAuthenticatedAt) {
+    Instant mfaAuthenticatedAt,
+    PrimaryAuthenticationMethod authenticationMethod) {
   public PreparedSession(
       UUID refreshFamilyId,
       String sessionId,
@@ -43,7 +44,8 @@ public record PreparedSession(
         mode,
         selectedTenantId,
         selectedMembershipId,
-        null);
+        null,
+        PrimaryAuthenticationMethod.LOCAL_PASSWORD);
   }
 
   public PreparedSession(
@@ -69,6 +71,13 @@ public record PreparedSession(
         AuthenticationSessionMode.AUTHENTICATED_ONBOARDING,
         null,
         null,
-        null);
+        null,
+        PrimaryAuthenticationMethod.LOCAL_PASSWORD);
+  }
+
+  public PreparedSession {
+    if (authenticationMethod == null) {
+      throw new IllegalArgumentException("Primary authentication method is required");
+    }
   }
 }

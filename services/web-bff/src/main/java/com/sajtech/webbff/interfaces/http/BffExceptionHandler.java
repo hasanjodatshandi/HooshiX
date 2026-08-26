@@ -33,11 +33,22 @@ public final class BffExceptionHandler {
     }
     int status =
         switch (e.error()) {
-          case INVALID_SESSION, AUTHENTICATION_FAILED -> 401;
+          case INVALID_SESSION, AUTHENTICATION_FAILED, OIDC_INVALID_RESPONSE, OIDC_STATE_INVALID ->
+              401;
           case INVALID_ORIGIN, FETCH_METADATA_REQUIRED, CSRF_INVALID, AUTHORIZATION_DENIED -> 403;
           case RATE_LIMITED -> 429;
-          case DEPENDENCY_UNAVAILABLE, RUNTIME_DISABLED -> 503;
-          case TENANT_SELECTION_REQUIRED, REGISTRATION_REJECTED, PASSWORD_REJECTED -> 409;
+          case DEPENDENCY_UNAVAILABLE,
+              RUNTIME_DISABLED,
+              OIDC_UNAVAILABLE,
+              QUOTA_TIME_SOURCE_UNHEALTHY,
+              QUOTA_CAPACITY_UNHEALTHY ->
+              503;
+          case TENANT_SELECTION_REQUIRED,
+              REGISTRATION_REJECTED,
+              PASSWORD_REJECTED,
+              ACCOUNT_LINK_REQUIRED,
+              EXTERNAL_IDENTITY_REJECTED ->
+              409;
           case INVALID_REQUEST -> 400;
         };
     return problem(status, e.error().name(), request.getRequestURI());

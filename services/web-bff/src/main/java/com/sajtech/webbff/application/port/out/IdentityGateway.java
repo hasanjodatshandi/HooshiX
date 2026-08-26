@@ -102,6 +102,25 @@ public interface IdentityGateway {
   LoginResult completeMfaAuthentication(
       UUID requestId, String challenge, MfaProof proof, byte[] clientAddress);
 
+  LoginResult establishExternalIdentity(
+      UUID requestId,
+      byte[] evidenceId,
+      Instant evidenceIssuedAt,
+      com.sajtech.webbff.application.model.VerifiedGoogleIdentity identity,
+      byte[] clientAddress);
+
+  LoginResult linkExternalIdentity(
+      UUID requestId,
+      String refresh,
+      byte[] evidenceId,
+      Instant evidenceIssuedAt,
+      com.sajtech.webbff.application.model.VerifiedGoogleIdentity identity,
+      byte[] clientAddress);
+
+  LoginResult unlinkExternalIdentity(UUID requestId, String refresh);
+
+  boolean googleIdentityLinked(UUID requestId, String refresh);
+
   enum SessionMode {
     AUTHENTICATED_ONBOARDING,
     TENANT_AUTHENTICATED,

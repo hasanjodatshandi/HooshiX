@@ -47,7 +47,11 @@ public final class RefreshSessionUseCase implements RefreshSession {
               if (current == null || !"ACTIVE".equals(current.familyState())) {
                 return Decision.invalid();
               }
-              if (!"ACTIVE".equals(current.userStatus())) {
+              boolean externalOnboarding =
+                  "PENDING".equals(current.userStatus())
+                      && current.sessionMode()
+                          == AuthenticationSessionMode.AUTHENTICATED_ONBOARDING;
+              if (!"ACTIVE".equals(current.userStatus()) && !externalOnboarding) {
                 store.revokeAllFamilies(
                     current.userId(), RefreshFamilyRevocationReason.USER_INACTIVE, now);
                 return Decision.invalid();

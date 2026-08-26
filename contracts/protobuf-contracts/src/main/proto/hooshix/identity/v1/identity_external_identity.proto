@@ -10,10 +10,10 @@ option java_multiple_files = true;
 option java_package = "com.sajtech.identity.contract.v1";
 
 service IdentityExternalIdentityService {
-  rpc EstablishSession(EstablishExternalIdentitySessionRequest) returns (AuthenticateLocalResponse);
-  rpc Link(LinkExternalIdentityRequest) returns (ExternalIdentitySessionMutationResponse);
-  rpc Unlink(UnlinkExternalIdentityRequest) returns (ExternalIdentitySessionMutationResponse);
-  rpc GetStatus(GetExternalIdentityStatusRequest) returns (GetExternalIdentityStatusResponse);
+  rpc EstablishSession(EstablishSessionRequest) returns (EstablishSessionResponse);
+  rpc Link(LinkRequest) returns (LinkResponse);
+  rpc Unlink(UnlinkRequest) returns (UnlinkResponse);
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
 }
 
 message ExternalIdentityEvidence {
@@ -46,31 +46,53 @@ message ExternalIdentityEvidence {
   }];
 }
 
-message EstablishExternalIdentitySessionRequest {
+message EstablishSessionRequest {
   string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   ExternalIdentityEvidence evidence = 2 [(buf.validate.field).required = true];
   AuthenticationTrustedClientAddress client_address = 3 [(buf.validate.field).required = true];
 }
 
-message LinkExternalIdentityRequest {
+message EstablishSessionResponse {
+  AuthenticateLocalResponse authentication = 1 [(buf.validate.field).required = true];
+}
+
+message LinkRequest {
   string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
   ExternalIdentityEvidence evidence = 3 [(buf.validate.field).required = true];
   AuthenticationTrustedClientAddress client_address = 4 [(buf.validate.field).required = true];
 }
 
-message UnlinkExternalIdentityRequest {
+message LinkResponse {
+  ExternalIdentitySession session = 1 [(buf.validate.field).required = true];
+}
+
+message UnlinkRequest {
   string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
   string issuer = 3 [(buf.validate.field).string = {const: "https://accounts.google.com"}];
 }
 
-message GetExternalIdentityStatusRequest {
+message UnlinkResponse {
+  ExternalIdentitySession session = 1 [(buf.validate.field).required = true];
+}
+
+message GetStatusRequest {
   string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string refresh_credential = 2 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
 }
 
-message ExternalIdentitySessionMutationResponse {
+message GetStatusResponse {
+  bool google_linked = 1;
+}
+
+message ExternalIdentitySession {
+  option (buf.validate.message).cel = {
+    id: "external_identity_session.tenant_context_shape"
+    message: "tenant context must be absent for onboarding and complete for tenant-authenticated sessions"
+    expression: "(this.session_mode == 1 && this.selected_tenant_id == '' && this.selected_membership_id == '') || (this.session_mode == 2 && this.selected_tenant_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && this.selected_membership_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'))"
+  };
+
   string identity_session_id = 1 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
   string refresh_family_id = 2 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string refresh_credential = 3 [(buf.validate.field).string = {pattern: "^[A-Za-z0-9_-]{43}$"}];
@@ -83,8 +105,4 @@ message ExternalIdentitySessionMutationResponse {
   string user_id = 7 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string selected_tenant_id = 8 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string selected_membership_id = 9 [(buf.validate.field).string = {pattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
-}
-
-message GetExternalIdentityStatusResponse {
-  bool google_linked = 1;
 }

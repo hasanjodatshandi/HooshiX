@@ -62,7 +62,7 @@ def main():
         f"user webbff on >{data['redis_webbff']} ~* +@all",
     ])
     write('redis-acl/users.acl',acl)
-    for rel in ['authorization-fingerprint/fingerprint.properties','authorization-quota-key/quota.properties','identity-fingerprint/fingerprint.properties','identity-challenge/challenge.properties','identity-handoff/handoff.properties','identity-mfa/mfa.properties','identity-quota/quota.properties','identity-refresh/refresh.properties','notification-fingerprint/fingerprint.properties','notification-delivery/delivery.properties','web-bff-locator/locator.properties','web-bff-csrf/csrf.properties','web-bff-refresh/refresh.properties']:
+    for rel in ['authorization-fingerprint/fingerprint.properties','authorization-quota-key/quota.properties','identity-fingerprint/fingerprint.properties','identity-challenge/challenge.properties','identity-handoff/handoff.properties','identity-mfa/mfa.properties','identity-quota/quota.properties','identity-refresh/refresh.properties','notification-fingerprint/fingerprint.properties','notification-delivery/delivery.properties','web-bff-locator/locator.properties','web-bff-csrf/csrf.properties','web-bff-refresh/refresh.properties','web-bff-quota/quota.properties']:
         ring(rel)
     priv=FILES/'identity-jwt-private'/'signing.properties'; pub=FILES/'identity-jwt-public'/'verifier.properties'
     if priv.exists() != pub.exists(): raise SystemExit('incomplete staging JWT material; remove .platform-runtime/staging/files/identity-jwt-*')

@@ -23,3 +23,21 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: Web BFF downstream dependency admission is shedding requests
+      - alert: WebBffGoogleOidcProviderUnavailable
+        expr: increase(web_bff_oidc_provider_duration_seconds_count{job="web-bff",outcome="OIDC_UNAVAILABLE"}[5m]) > 5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Web BFF Google OIDC provider calls are repeatedly unavailable
+      - alert: WebBffOidcQuotaSecurityHealthFailure
+        expr: increase(web_bff_oidc_quota_total{job="web-bff",outcome=~"time_unhealthy|capacity_unhealthy|unavailable"}[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: Web BFF OIDC semantic quota failed closed on time, capacity, or transport health
+      - alert: WebBffOidcQuotaDenialSpike
+        expr: rate(web_bff_oidc_quota_total{job="web-bff",outcome="denied"}[5m]) > 5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Web BFF OIDC exact-client quota denial rate is elevated

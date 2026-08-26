@@ -34,6 +34,8 @@ public interface ProfileContactStore {
 
   void confirmContact(LockedContactChallenge challenge, Instant now);
 
+  boolean activateExternalOnboardingIfComplete(UUID userId, Instant now);
+
   boolean setPrimary(UUID userId, UUID contactId, Instant now);
 
   boolean remove(UUID userId, UUID contactId, Instant now);

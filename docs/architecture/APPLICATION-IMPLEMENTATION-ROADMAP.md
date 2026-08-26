@@ -41,7 +41,8 @@ The application is not yet a complete end-user product. Current material gaps ar
 
 - the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
-- Google OIDC/ExternalIdentity and erasure are incomplete;
+- Google OIDC/ExternalIdentity is implemented in the repository; deployed real-provider execution remains NOT VERIFIED;
+- data-subject erasure is incomplete;
 - remaining Tenant lifecycle operations are incomplete;
 - application Kafka runtime is not yet required by an implemented asynchronous use case;
 - Reference Data independent service remains intentionally gated by ADR-0041;
@@ -78,10 +79,10 @@ The following is the one ordered application-completion sequence. Do not start a
 
 | Order | Completion step | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.3.0 covers all 43 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
+| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.4.0 covers all 48 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
 | 2 | MFA/TOTP | `COMPLETED` | TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, CSRF reload recovery, and repository security evidence are implemented. Deployed production evidence remains a separate readiness concern. |
-| 3 | Google OIDC / ExternalIdentity | `NEXT` | Implement BFF Authorization Code + PKCE/state/nonce flow, Identity issuer+subject binding/link semantics, collision protection, provider-token custody, MFA continuation, UI, and negative tests. |
-| 4 | Complete Tenant lifecycle | `PLANNED` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
+| 3 | Google OIDC / ExternalIdentity | `COMPLETED` | BFF Authorization Code + PKCE/state/nonce, bounded encrypted pre-auth custody, Google issuer/audience/authorized-party/time validation, fail-closed semantic quota, Identity issuer+subject binding/link semantics, email collision protection, provider-token isolation, MFA continuation, OpenAPI/UI, observability, and negative/replay tests are implemented. Real deployed Google-provider execution remains a separate readiness concern. |
+| 4 | Complete Tenant lifecycle | `NEXT` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
 | 5 | Data Subject Erasure + Kafka | `PLANNED` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
 | 6 | Core AI Product Architecture | `PLANNED` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
 | 7 | Core AI Product vertical slices | `PLANNED` | Implement the accepted core-product architecture in vertical slices. Service/module boundaries come from step 6 evidence, not from speculative names. |
@@ -98,23 +99,24 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Step 3 — Google OIDC / ExternalIdentity
+Step 4 — Complete Tenant lifecycle
 ```
 
 The target invariant is:
 
 ```text
-authorization request               -> exact redirect, state, nonce, PKCE S256, bounded pre-auth
-provider token custody              -> BFF only; no provider token reaches browser or Identity
-Identity binding                    -> issuer + subject only; email never authorizes auto-link
-collision/linking                   -> explicit authenticated account flow and recent assurance
-active TOTP                         -> provider primary proof still enters the same MFA continuation
-session security state              -> server-side rotation and replay-safe callback completion
-BFF OpenAPI/UI                      -> stable errors, no token or verifier persistence
-security tests                      -> redirect/state/nonce/code replay and identity-collision negatives
+Tenant lifecycle authority          -> Identity owns canonical state; Authorization owns permission projection
+suspend/resume                      -> platform capability, audited, fail closed, no stale tenant authority
+delete                              -> tenant.delete owner authorization, DELETING first, pending invitations revoked
+cleanup acknowledgement             -> durable outbox; DELETED only after Authorization deny/cleanup ACK
+restore                             -> platform capability, before irreversible purge, PROVISIONING until reconciliation ACK
+Invitation lifecycle                -> decline/revoke/expire/reissue with target, TTL, and tenant-state invariants
+owner safety                        -> Authorization reservation protocol; no check-then-remove race
+BFF OpenAPI/UI                      -> stable lifecycle errors, current session/CSRF/assurance rules
+recovery and observability           -> idempotent replay, crash recovery, alerts, audit, migration and negative tests
 ```
 
-The browser must continue to consume only the BFF public contract. Provider tokens remain in BFF custody; Identity receives only reviewed provider evidence and remains issuer+subject binding and Session/MFA authority.
+The browser continues to consume only the BFF public contract. Identity remains canonical Tenant/Membership/Invitation lifecycle authority; Authorization remains authoritative for permissions, platform capabilities, owner safety, and lifecycle deny/cleanup projection. Remote calls never run inside Identity database transactions, and all durable commands retain stable idempotency identities.
 
 ## 7. Rules for updating this roadmap
 

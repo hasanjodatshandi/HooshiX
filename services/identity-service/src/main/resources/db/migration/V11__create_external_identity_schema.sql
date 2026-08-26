@@ -59,12 +59,21 @@ CREATE TABLE identity_oidc_evidence (
     fingerprint_version VARCHAR(32) NOT NULL CHECK (fingerprint_version = 'oidc-evidence-hmac-v1'),
     outcome VARCHAR(32) NOT NULL CHECK (outcome IN ('SESSION_ESTABLISHED', 'MFA_REQUIRED', 'LINKED', 'ACCOUNT_LINK_REQUIRED')),
     result_user_id UUID REFERENCES identity_user(user_id),
+    result_key_id VARCHAR(64),
+    result_nonce BYTEA CHECK (result_nonce IS NULL OR octet_length(result_nonce) = 12),
+    result_ciphertext BYTEA CHECK (result_ciphertext IS NULL OR octet_length(result_ciphertext) >= 16),
     evidence_issued_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
     consumed_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
     retain_until TIMESTAMP(6) WITH TIME ZONE NOT NULL,
     CONSTRAINT identity_oidc_evidence_lifetime CHECK (
-        evidence_issued_at <= consumed_at
+        evidence_issued_at <= consumed_at + INTERVAL '30 seconds'
         AND retain_until >= consumed_at + INTERVAL '10 minutes'
+    ),
+    CONSTRAINT identity_oidc_evidence_result_cipher_pair CHECK (
+        (result_key_id IS NULL) = (result_nonce IS NULL)
+        AND (result_nonce IS NULL) = (result_ciphertext IS NULL)
+        AND ((outcome = 'ACCOUNT_LINK_REQUIRED' AND result_ciphertext IS NULL)
+             OR (outcome <> 'ACCOUNT_LINK_REQUIRED' AND result_ciphertext IS NOT NULL))
     ),
     UNIQUE(request_id, operation)
 );

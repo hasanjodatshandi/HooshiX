@@ -11,6 +11,9 @@ secrets:
   locatorSecretName: web-bff-locator
   csrfSecretName: web-bff-csrf
   refreshEncryptionSecretName: web-bff-refresh
+  quotaSecretName: web-bff-quota
+quota:
+  hostTimeConfigMapName: web-bff-host-time
 edge:
   namespace: platform-edge
   podLabels:

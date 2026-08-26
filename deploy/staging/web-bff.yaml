@@ -9,6 +9,17 @@ secrets:
   locatorSecretName: web-bff-locator
   csrfSecretName: web-bff-csrf
   refreshEncryptionSecretName: web-bff-refresh
+  quotaSecretName: web-bff-quota
+quota:
+  maxActiveBuckets: 10000
+  maxNewBucketsPerMinute: 1000
+  minimumMemoryHeadroomPercent: 30
+  hostTimeConfigMapName: web-bff-host-time
+googleOidc:
+  enabled: false
+  clientId: ""
+  clientSecretName: ""
+  maximumConcurrentCalls: 16
 edge:
   namespace: platform-edge
   podLabels: {app.kubernetes.io/name: edge-waf}

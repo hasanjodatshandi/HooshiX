@@ -51,7 +51,7 @@ class IdentityMigrationProfileIntegrationTest {
           var result =
               statement.executeQuery("SELECT count(*) FROM flyway_schema_history WHERE success")) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(10);
+        assertThat(result.getInt(1)).isEqualTo(11);
       }
       try (var connection =
               DriverManager.getConnection(
@@ -65,6 +65,8 @@ class IdentityMigrationProfileIntegrationTest {
                     to_regclass('identity_totp_pending_enrollment') IS NOT NULL,
                     to_regclass('identity_mfa_recovery_code') IS NOT NULL,
                     to_regclass('identity_mfa_login_challenge') IS NOT NULL,
+                    to_regclass('identity_external_identity') IS NOT NULL,
+                    to_regclass('identity_oidc_evidence') IS NOT NULL,
                     EXISTS (
                       SELECT 1 FROM information_schema.columns
                       WHERE table_name = 'identity_refresh_family'
@@ -72,9 +74,30 @@ class IdentityMigrationProfileIntegrationTest {
                     )
                   """)) {
         assertThat(result.next()).isTrue();
-        for (int column = 1; column <= 5; column++) {
+        for (int column = 1; column <= 7; column++) {
           assertThat(result.getBoolean(column)).isTrue();
         }
+      }
+      try (var connection =
+              DriverManager.getConnection(
+                  POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+          var statement = connection.createStatement()) {
+        int inserted =
+            statement.executeUpdate(
+                """
+                WITH observed AS (SELECT CURRENT_TIMESTAMP AS now)
+                INSERT INTO identity_oidc_evidence(
+                  evidence_id,request_id,operation,workload_identity,issuer,subject,
+                  evidence_fingerprint,fingerprint_key_id,fingerprint_version,outcome,
+                  evidence_issued_at,consumed_at,retain_until)
+                SELECT decode(repeat('01',32),'hex'),
+                  '123e4567-e89b-42d3-a456-426614174000'::uuid,
+                  'ESTABLISH_SESSION','web-bff','https://accounts.google.com','google-subject',
+                  decode(repeat('02',32),'hex'),'f1','oidc-evidence-hmac-v1',
+                  'ACCOUNT_LINK_REQUIRED',now + INTERVAL '20 seconds',now,now + INTERVAL '10 minutes'
+                FROM observed
+                """);
+        assertThat(inserted).isEqualTo(1);
       }
     } finally {
       if (context.isActive()) {

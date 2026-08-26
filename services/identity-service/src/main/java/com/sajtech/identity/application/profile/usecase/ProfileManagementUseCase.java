@@ -96,6 +96,7 @@ public final class ProfileManagementUseCase implements ProfileManagement {
             claim(requestId, userId, "UPDATE_PROFILE", material, "UPDATED", null, now);
             store.updateProfile(
                 userId, profile.firstName(), profile.lastName(), profile.fatherName(), now);
+            store.activateExternalOnboardingIfComplete(userId, now);
             return null;
           });
     } finally {
@@ -233,6 +234,7 @@ public final class ProfileManagementUseCase implements ProfileManagement {
             }
             claim(requestId, userId, "VERIFY_CONTACT", material, "VERIFIED", null, now);
             store.confirmContact(challenge, now);
+            store.activateExternalOnboardingIfComplete(userId, now);
             return true;
           });
     } finally {
@@ -357,9 +359,15 @@ public final class ProfileManagementUseCase implements ProfileManagement {
 
   private static LockedRefreshCredential requireUsable(
       LockedRefreshCredential credential, Instant now, boolean recent) {
+    boolean activeUser = "ACTIVE".equals(credential.userStatus());
+    boolean externalOnboarding =
+        "PENDING".equals(credential.userStatus())
+            && credential.sessionMode()
+                == com.sajtech.identity.application.authentication.model.AuthenticationSessionMode
+                    .AUTHENTICATED_ONBOARDING;
     if (!"ACTIVE".equals(credential.credentialState())
         || !"ACTIVE".equals(credential.familyState())
-        || !"ACTIVE".equals(credential.userStatus())
+        || (!activeUser && !externalOnboarding)
         || !now.isBefore(credential.idleExpiresAt())
         || !now.isBefore(credential.absoluteExpiresAt())) {
       throw error(ProfileError.INVALID_SESSION);

@@ -46,6 +46,17 @@ secrets:
   locatorSecretName: ""
   csrfSecretName: ""
   refreshEncryptionSecretName: ""
+  quotaSecretName: ""
+quota:
+  maxActiveBuckets: 200000
+  maxNewBucketsPerMinute: 2000
+  minimumMemoryHeadroomPercent: 30
+  hostTimeConfigMapName: ""
+googleOidc:
+  enabled: false
+  clientId: ""
+  clientSecretName: ""
+  maximumConcurrentCalls: 16
 routeAudiences:
   authorizationPrefix: authorization-service
 edge:

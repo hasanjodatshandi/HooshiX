@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.sajtech.identity.contract.v1.*;
 import com.sajtech.webbff.application.*;
+import com.sajtech.webbff.application.model.VerifiedGoogleIdentity;
 import com.sajtech.webbff.application.port.out.IdentityGateway;
 import com.sajtech.webbff.application.port.out.IdentityGateway.*;
 import io.grpc.*;
@@ -506,6 +507,148 @@ public final class IdentityBffClient implements IdentityGateway {
     }
   }
 
+  @Override
+  public LoginResult establishExternalIdentity(
+      UUID requestId,
+      byte[] evidenceId,
+      Instant evidenceIssuedAt,
+      VerifiedGoogleIdentity identity,
+      byte[] clientAddress) {
+    try {
+      var response =
+          externalIdentityStub()
+              .establishSession(
+                  EstablishSessionRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setEvidence(evidence(evidenceId, evidenceIssuedAt, identity))
+                      .setClientAddress(authenticationClientAddress(clientAddress))
+                      .build());
+      return session(response.getAuthentication());
+    } catch (StatusRuntimeException exception) {
+      throw mapExternalIdentity(exception);
+    }
+  }
+
+  @Override
+  public LoginResult linkExternalIdentity(
+      UUID requestId,
+      String refresh,
+      byte[] evidenceId,
+      Instant evidenceIssuedAt,
+      VerifiedGoogleIdentity identity,
+      byte[] clientAddress) {
+    try {
+      var response =
+          externalIdentityStub()
+              .link(
+                  LinkRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setEvidence(evidence(evidenceId, evidenceIssuedAt, identity))
+                      .setClientAddress(authenticationClientAddress(clientAddress))
+                      .build());
+      return session(response.getSession());
+    } catch (StatusRuntimeException exception) {
+      throw mapExternalIdentity(exception);
+    }
+  }
+
+  @Override
+  public LoginResult unlinkExternalIdentity(UUID requestId, String refresh) {
+    try {
+      return session(
+          externalIdentityStub()
+              .unlink(
+                  UnlinkRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setIssuer("https://accounts.google.com")
+                      .build())
+              .getSession());
+    } catch (StatusRuntimeException exception) {
+      throw mapExternalIdentity(exception);
+    }
+  }
+
+  @Override
+  public boolean googleIdentityLinked(UUID requestId, String refresh) {
+    try {
+      return externalIdentityStub()
+          .getStatus(
+              GetStatusRequest.newBuilder()
+                  .setRequestId(requestId.toString())
+                  .setRefreshCredential(refresh)
+                  .build())
+          .getGoogleLinked();
+    } catch (StatusRuntimeException exception) {
+      throw mapExternalIdentity(exception);
+    }
+  }
+
+  private static ExternalIdentityEvidence evidence(
+      byte[] evidenceId, Instant issuedAt, VerifiedGoogleIdentity identity) {
+    ExternalIdentityEvidence.Builder builder =
+        ExternalIdentityEvidence.newBuilder()
+            .setEvidenceId(ByteString.copyFrom(evidenceId))
+            .setEvidenceIssuedAt(timestamp(issuedAt))
+            .setIssuer(identity.issuer())
+            .setSubject(identity.subject())
+            .setMetadataVersion(1)
+            .setEmailVerified(identity.emailVerified());
+    if (identity.email() != null) builder.setEmail(identity.email());
+    if (identity.givenName() != null) builder.setGivenName(identity.givenName());
+    if (identity.familyName() != null) builder.setFamilyName(identity.familyName());
+    return builder.build();
+  }
+
+  private IdentityExternalIdentityServiceGrpc.IdentityExternalIdentityServiceBlockingStub
+      externalIdentityStub() {
+    return IdentityExternalIdentityServiceGrpc.newBlockingStub(channel)
+        .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
+  }
+
+  private static LoginResult session(AuthenticateLocalResponse value) {
+    SessionMode sessionMode = mode(value.getSessionMode());
+    if (sessionMode == SessionMode.MFA_REQUIRED) {
+      return new LoginResult(
+          uuid(value.getUserId()),
+          null,
+          null,
+          null,
+          null,
+          null,
+          sessionMode,
+          null,
+          null,
+          value.getMfaChallenge());
+    }
+    return new LoginResult(
+        uuid(value.getUserId()),
+        value.getIdentitySessionId(),
+        uuid(value.getRefreshFamilyId()),
+        value.getRefreshCredential(),
+        instant(value.getRefreshIdleExpiresAt()),
+        instant(value.getRefreshAbsoluteExpiresAt()),
+        sessionMode,
+        optionalUuid(value.getSelectedTenantId()),
+        optionalUuid(value.getSelectedMembershipId()),
+        null);
+  }
+
+  private static LoginResult session(ExternalIdentitySession value) {
+    return new LoginResult(
+        uuid(value.getUserId()),
+        value.getIdentitySessionId(),
+        uuid(value.getRefreshFamilyId()),
+        value.getRefreshCredential(),
+        instant(value.getRefreshIdleExpiresAt()),
+        instant(value.getRefreshAbsoluteExpiresAt()),
+        mode(value.getSessionMode()),
+        optionalUuid(value.getSelectedTenantId()),
+        optionalUuid(value.getSelectedMembershipId()),
+        null);
+  }
+
   private IdentityMfaServiceGrpc.IdentityMfaServiceBlockingStub mfaStub() {
     return IdentityMfaServiceGrpc.newBlockingStub(channel)
         .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
@@ -755,6 +898,35 @@ public final class IdentityBffClient implements IdentityGateway {
     };
   }
 
+  private static BffException mapExternalIdentity(StatusRuntimeException exception) {
+    String description = exception.getStatus().getDescription();
+    return switch (exception.getStatus().getCode()) {
+      case UNAUTHENTICATED ->
+          new BffException(
+              BffError.OIDC_INVALID_RESPONSE, "External identity proof was rejected", exception);
+      case ALREADY_EXISTS ->
+          new BffException(
+              BffError.EXTERNAL_IDENTITY_REJECTED,
+              "External identity replay or conflict",
+              exception);
+      case FAILED_PRECONDITION ->
+          new BffException(
+              "ACCOUNT_LINK_REQUIRED".equals(description)
+                  ? BffError.ACCOUNT_LINK_REQUIRED
+                  : BffError.EXTERNAL_IDENTITY_REJECTED,
+              "External identity precondition failed",
+              exception);
+      case INVALID_ARGUMENT ->
+          new BffException(
+              BffError.INVALID_REQUEST, "External identity request is invalid", exception);
+      default ->
+          new BffException(
+              BffError.DEPENDENCY_UNAVAILABLE,
+              "External identity service is unavailable",
+              exception);
+    };
+  }
+
   private static BffException map(StatusRuntimeException e) {
     return switch (e.getStatus().getCode()) {
       case UNAUTHENTICATED ->
@@ -799,6 +971,13 @@ public final class IdentityBffClient implements IdentityGateway {
       throw new BffException(
           BffError.DEPENDENCY_UNAVAILABLE, "Identity returned invalid timestamp", e);
     }
+  }
+
+  private static Timestamp timestamp(Instant value) {
+    return Timestamp.newBuilder()
+        .setSeconds(value.getEpochSecond())
+        .setNanos(value.getNano())
+        .build();
   }
 
   private static SessionMode mode(AuthenticationSessionMode mode) {

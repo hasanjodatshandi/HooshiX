@@ -127,7 +127,7 @@ def generate_key_material(values: dict[str, str]) -> dict[str, Path]:
         "authorization-intent", "authorization-quota", "identity-fingerprint",
         "identity-challenge", "identity-handoff", "identity-mfa", "identity-refresh", "identity-quota",
         "notification-fingerprint", "notification-delivery", "web-bff-locator",
-        "web-bff-csrf", "web-bff-refresh")}
+        "web-bff-csrf", "web-bff-refresh", "web-bff-quota")}
     private_path = KEYS / "identity-jwt-private.properties"
     public_path = KEYS / "identity-jwt-public.properties"
     if private_path.exists() != public_path.exists():
@@ -474,6 +474,10 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "WEB_BFF_LOCATOR_KEY_RING_PATH": str(keys["web-bff-locator"]),
         "WEB_BFF_CSRF_KEY_RING_PATH": str(keys["web-bff-csrf"]),
         "WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH": str(keys["web-bff-refresh"]),
+        "WEB_BFF_QUOTA_KEY_RING_PATH": str(keys["web-bff-quota"]),
+        "WEB_BFF_OIDC_QUOTA_HOST_TIME_STATUS_PATH": str(HOST_TIME),
+        "WEB_BFF_OIDC_QUOTA_MAX_ACTIVE_BUCKETS": "10000",
+        "WEB_BFF_OIDC_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE": "1000",
     })
     return {
         "compromised-password-service": cp,

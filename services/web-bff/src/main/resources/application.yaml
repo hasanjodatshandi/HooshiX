@@ -51,6 +51,19 @@ web-bff:
   encryption-key-maximum-staleness: ${WEB_BFF_ENCRYPTION_KEY_MAXIMUM_STALENESS:PT1H}
   identity-maximum-concurrent-calls: ${WEB_BFF_IDENTITY_MAXIMUM_CONCURRENT_CALLS:128}
   authorization-maximum-concurrent-calls: ${WEB_BFF_AUTHORIZATION_MAXIMUM_CONCURRENT_CALLS:128}
+  google-oidc-enabled: ${WEB_BFF_GOOGLE_OIDC_ENABLED:false}
+  google-authorization-endpoint: https://accounts.google.com/o/oauth2/v2/auth
+  google-token-endpoint: https://oauth2.googleapis.com/token
+  google-jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  google-client-id: ${WEB_BFF_GOOGLE_CLIENT_ID:disabled.apps.googleusercontent.com}
+  google-client-secret-path: ${WEB_BFF_GOOGLE_CLIENT_SECRET_PATH:/var/run/secrets/hooshix/web-bff-google-client-secret}
+  google-maximum-concurrent-calls: ${WEB_BFF_GOOGLE_MAXIMUM_CONCURRENT_CALLS:16}
+  quota-key-ring-path: ${WEB_BFF_QUOTA_KEY_RING_PATH:/var/run/secrets/hooshix/web-bff-quota.properties}
+  oidc-quota:
+    max-active-buckets: ${WEB_BFF_OIDC_QUOTA_MAX_ACTIVE_BUCKETS:0}
+    max-new-buckets-per-minute: ${WEB_BFF_OIDC_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE:0}
+    minimum-memory-headroom-percent: ${WEB_BFF_OIDC_QUOTA_MINIMUM_MEMORY_HEADROOM_PERCENT:30}
+    host-time-status-path: ${WEB_BFF_OIDC_QUOTA_HOST_TIME_STATUS_PATH:/run/status/web-bff/host-time-synchronized}
   route-audiences:
     "[/api/v1/authorization]": authorization-service
 logging:

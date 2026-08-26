@@ -49,6 +49,13 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
   }
 
   @Override
+  public Optional<String> lockUserStatus(UUID userId) {
+    return dsl.fetchOptional(
+            "SELECT status FROM identity_user WHERE user_id = ? FOR UPDATE", userId)
+        .map(record -> record.get("status", String.class));
+  }
+
+  @Override
   public Optional<LocalCredentialRecord> findVerifiedLocalCredential(CanonicalContact contact) {
     return dsl.fetchOptional(
             """
@@ -159,7 +166,7 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
           refresh_family_id,session_id,user_id,state,session_mode,selected_tenant_id,selected_membership_id,authentication_method,
           authenticated_at,created_at,last_activity_at,idle_expires_at,absolute_expires_at,updated_at,
           mfa_authenticated_at)
-        VALUES (?,? ,?,'ACTIVE',?,?,?,'LOCAL_PASSWORD',
+        VALUES (?,? ,?,'ACTIVE',?,?,?,?,
           CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
           CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
           CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
@@ -171,6 +178,7 @@ public final class JooqAuthenticationStore implements AuthenticationStore {
         session.mode().name(),
         session.selectedTenantId(),
         session.selectedMembershipId(),
+        session.authenticationMethod().name(),
         ts(session.authenticatedAt()),
         ts(session.createdAt()),
         ts(session.createdAt()),

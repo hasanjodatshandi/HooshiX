@@ -36,6 +36,18 @@ export function LoginFlow() {
     }
   }
 
+  async function googleLogin() {
+    setBusy(true);
+    setError('');
+    try {
+      const authorization = await bffClient.startGoogleLogin();
+      window.location.assign(authorization.authorizationUrl);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+      setBusy(false);
+    }
+  }
+
   return <section aria-labelledby="login-title">
     <h2 id="login-title">Login</h2>
     <form onSubmit={submit}>
@@ -45,6 +57,8 @@ export function LoginFlow() {
       <input id="login-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required />
       <button type="submit" disabled={busy}>Continue</button>
     </form>
+    <p aria-hidden="true">or</p>
+    <button type="button" disabled={busy} onClick={() => void googleLogin()}>Continue with Google</button>
     <p role="alert">{error}</p>
   </section>;
 }

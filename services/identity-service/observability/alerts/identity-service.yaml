@@ -133,6 +133,26 @@ groups:
           service: identity-service
         annotations:
           summary: Identity MFA in-flight work is near the transport bound
+      - alert: IdentityExternalIdentityInternalErrorRateHigh
+        expr: |
+          sum(rate(identity_external_identity_duration_seconds_count{outcome=~"SESSION_STATE_INVALID|INTERNAL"}[5m]))
+          /
+          clamp_min(sum(rate(identity_external_identity_duration_seconds_count[5m])), 0.001)
+          > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity external-identity state or internal-error rate is above 1%
+      - alert: IdentityExternalIdentitySaturationHigh
+        expr: identity_external_identity_in_flight > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity external-identity in-flight work is near the transport bound
       - alert: IdentityGrpcAdmissionRejected
         expr: rate(identity_grpc_admission_rejected_total[5m]) > 0
         for: 5m

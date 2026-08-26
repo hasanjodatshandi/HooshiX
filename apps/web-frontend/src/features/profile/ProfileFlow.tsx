@@ -51,6 +51,10 @@ export function ProfileFlow() {
     }));
   }
 
+  const onboardingComplete =
+    Boolean(profile?.firstName.trim() && profile?.lastName.trim())
+    && contacts.some((contact) => contact.verified);
+
   return <section aria-labelledby="profile-title">
     <h1 id="profile-title">Profile</h1>
     <form onSubmit={(event) => void update(event)}>
@@ -79,6 +83,7 @@ export function ProfileFlow() {
       <input id="new-contact" type="email" autoComplete="email" maxLength={254} required value={value} onChange={(event) => setValue(event.target.value)} />
       <button type="submit">Add contact</button>
     </form>
+    {onboardingComplete && <p><a href="/tenant-select">Continue to tenant selection</a></p>}
     <p role="alert">{error}</p>
   </section>;
 }

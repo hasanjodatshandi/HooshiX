@@ -1,0 +1,15 @@
+{{- if .Values.googleOidc.enabled }}
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: {{ include "web-bff.name" . }}-google-oidc
+spec:
+  hosts:
+    - accounts.google.com
+    - oauth2.googleapis.com
+    - www.googleapis.com
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - {number: 443, name: tls, protocol: TLS}
+{{- end }}

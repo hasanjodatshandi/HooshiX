@@ -1,5 +1,6 @@
 package com.sajtech.identity.infrastructure.persistence;
 
+import com.sajtech.identity.application.authentication.model.PrimaryAuthenticationMethod;
 import com.sajtech.identity.application.mfa.MfaError;
 import com.sajtech.identity.application.mfa.MfaException;
 import com.sajtech.identity.application.mfa.model.*;
@@ -193,6 +194,7 @@ public final class JooqMfaStore implements MfaStore {
       UUID challengeId,
       UUID userId,
       GeneratedMfaChallenge challenge,
+      PrimaryAuthenticationMethod authenticationMethod,
       Instant now,
       Instant expiresAt) {
     dsl.execute(
@@ -210,7 +212,7 @@ public final class JooqMfaStore implements MfaStore {
               challenge_id,user_id,locator_digest,digest_key_id,digest_version,
               authentication_method,state,failed_attempts,primary_authenticated_at,
               expires_at,created_at,updated_at)
-            VALUES (?,?,?,?,?,'LOCAL_PASSWORD','ACTIVE',0,CAST(? AS TIMESTAMP WITH TIME ZONE),
+            VALUES (?,?,?,?,?,?,'ACTIVE',0,CAST(? AS TIMESTAMP WITH TIME ZONE),
                     CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE),
                     CAST(? AS TIMESTAMP WITH TIME ZONE))
             """,
@@ -219,6 +221,7 @@ public final class JooqMfaStore implements MfaStore {
             challenge.digest().digest(),
             challenge.digest().keyId(),
             challenge.digest().version(),
+            authenticationMethod.name(),
             ts(now),
             ts(expiresAt),
             ts(now),
@@ -245,7 +248,7 @@ public final class JooqMfaStore implements MfaStore {
       dsl.fetchOne("SELECT user_id FROM identity_user WHERE user_id = ? FOR UPDATE", userId);
       return dsl.fetchOptional(
               """
-              SELECT challenge_id,user_id,failed_attempts,primary_authenticated_at,expires_at,state
+              SELECT challenge_id,user_id,failed_attempts,primary_authenticated_at,expires_at,state,authentication_method
               FROM identity_mfa_login_challenge
               WHERE challenge_id = ? AND digest_key_id = ? AND digest_version = ?
                 AND locator_digest = ?
@@ -266,7 +269,7 @@ public final class JooqMfaStore implements MfaStore {
       Optional<LoginChallenge> found =
           dsl.fetchOptional(
                   """
-                  SELECT challenge_id,user_id,failed_attempts,primary_authenticated_at,expires_at,state
+                  SELECT challenge_id,user_id,failed_attempts,primary_authenticated_at,expires_at,state,authentication_method
                   FROM identity_mfa_login_challenge
                   WHERE digest_key_id = ? AND digest_version = ? AND locator_digest = ?
                   """,
@@ -531,7 +534,8 @@ public final class JooqMfaStore implements MfaStore {
         record.get("failed_attempts", Integer.class),
         record.get("primary_authenticated_at", OffsetDateTime.class).toInstant(),
         record.get("expires_at", OffsetDateTime.class).toInstant(),
-        record.get("state", String.class));
+        record.get("state", String.class),
+        PrimaryAuthenticationMethod.valueOf(record.get("authentication_method", String.class)));
   }
 
   private static EncryptedTotpSecret encrypted(Record record) {

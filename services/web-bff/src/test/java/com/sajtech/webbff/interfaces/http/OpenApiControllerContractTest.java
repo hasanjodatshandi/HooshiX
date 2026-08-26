@@ -28,8 +28,8 @@ class OpenApiControllerContractTest {
     Set<Route> controllerRoutes = controllerRoutes();
 
     assertThat(document.get("openapi")).isEqualTo("3.1.0");
-    assertThat(map(document.get("info")).get("version")).isEqualTo("1.3.0");
-    assertThat(openApiRoutes).hasSize(43).containsExactlyInAnyOrderElementsOf(controllerRoutes);
+    assertThat(map(document.get("info")).get("version")).isEqualTo("1.4.0");
+    assertThat(openApiRoutes).hasSize(48).containsExactlyInAnyOrderElementsOf(controllerRoutes);
   }
 
   @Test
@@ -67,7 +67,7 @@ class OpenApiControllerContractTest {
         Map<String, Object> responses = map(value.get("responses"));
         assertThat(responses).isNotEmpty();
         for (Map.Entry<String, Object> response : responses.entrySet()) {
-          if (!response.getKey().startsWith("2")) {
+          if (!response.getKey().startsWith("2") && !response.getKey().startsWith("3")) {
             assertThat(map(response.getValue()).get("$ref")).isInstanceOf(String.class);
             continue;
           }

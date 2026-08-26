@@ -70,6 +70,35 @@ final class HttpSupport {
             + "=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0");
   }
 
+  static void setOidcPreauthCookie(HttpServletResponse response, String value, long maxAge) {
+    response.addHeader(
+        "Set-Cookie",
+        BrowserSecurityContext.OIDC_PREAUTH_COOKIE_NAME
+            + "="
+            + value
+            + "; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age="
+            + maxAge);
+  }
+
+  static void clearOidcPreauthCookie(HttpServletResponse response) {
+    response.addHeader(
+        "Set-Cookie",
+        BrowserSecurityContext.OIDC_PREAUTH_COOKIE_NAME
+            + "=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0");
+  }
+
+  static String cookie(HttpServletRequest request, String name) {
+    Cookie[] cookies = request.getCookies();
+    if (cookies == null) return null;
+    String found = null;
+    for (Cookie cookie : cookies) {
+      if (!name.equals(cookie.getName())) continue;
+      if (found != null) throw new BffException(BffError.INVALID_REQUEST, "Duplicate cookie");
+      found = cookie.getValue();
+    }
+    return found;
+  }
+
   private static BffException invalid() {
     return new BffException(BffError.INVALID_REQUEST, "Request identifier is invalid");
   }

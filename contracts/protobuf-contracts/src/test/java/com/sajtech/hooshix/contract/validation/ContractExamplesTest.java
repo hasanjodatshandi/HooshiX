@@ -14,6 +14,7 @@ import com.sajtech.identity.contract.v1.AuthenticateLocalResponse;
 import com.sajtech.identity.contract.v1.AuthenticationSessionMode;
 import com.sajtech.identity.contract.v1.CreateTenantRequest;
 import com.sajtech.identity.contract.v1.CompleteMfaAuthenticationRequest;
+import com.sajtech.identity.contract.v1.EstablishSessionRequest;
 import com.sajtech.identity.contract.v1.MfaProof;
 import com.sajtech.identity.contract.v1.MfaProofType;
 import com.sajtech.identity.contract.v1.MfaSessionCredentials;
@@ -50,6 +51,9 @@ final class ContractExamplesTest {
             example("identity/v1/add-contact.valid.json", AddContactRequest.newBuilder()),
             example("identity/v1/register-local.valid.json", RegisterLocalRequest.newBuilder()),
             example("identity/v1/create-tenant.valid.json", CreateTenantRequest.newBuilder()),
+            example(
+                "identity/v1/establish-session.valid.json",
+                EstablishSessionRequest.newBuilder()),
             example("notification/v1/submit-notification.valid.json", SubmitNotificationRequest.newBuilder()))
         .map(
             example ->

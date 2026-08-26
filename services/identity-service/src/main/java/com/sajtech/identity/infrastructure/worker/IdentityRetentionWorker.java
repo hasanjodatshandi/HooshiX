@@ -1,6 +1,7 @@
 package com.sajtech.identity.infrastructure.worker;
 
 import com.sajtech.identity.application.authentication.port.out.AuthenticationStore;
+import com.sajtech.identity.application.externalidentity.port.out.ExternalIdentityStore;
 import com.sajtech.identity.application.mfa.port.out.MfaStore;
 import com.sajtech.identity.application.notification.port.out.NotificationOutboxStore;
 import com.sajtech.identity.application.profile.port.out.ProfileContactStore;
@@ -28,6 +29,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   private final AuthenticationStore authenticationStore;
   private final ProfileContactStore profileContactStore;
   private final MfaStore mfaStore;
+  private final ExternalIdentityStore externalIdentityStore;
   private final Clock clock;
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(
@@ -40,12 +42,14 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
       AuthenticationStore authenticationStore,
       ProfileContactStore profileContactStore,
       MfaStore mfaStore,
+      ExternalIdentityStore externalIdentityStore,
       Clock clock) {
     this.outboxStore = outboxStore;
     this.registrationStore = registrationStore;
     this.authenticationStore = authenticationStore;
     this.profileContactStore = profileContactStore;
     this.mfaStore = mfaStore;
+    this.externalIdentityStore = externalIdentityStore;
     this.clock = clock;
   }
 
@@ -81,6 +85,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
       authenticationStore.deleteFamiliesBefore(now.minus(SESSION_REUSE_EVIDENCE_RETENTION), BATCH);
       int pendingMfaErased = mfaStore.deletePendingEnrollmentsBefore(now, BATCH);
       mfaStore.deleteLoginChallengesBefore(now.minus(MFA_CHALLENGE_EVIDENCE_RETENTION), BATCH);
+      externalIdentityStore.deleteEvidenceBefore(now, BATCH);
       if (erased > 0) {
         LOGGER
             .atWarn()

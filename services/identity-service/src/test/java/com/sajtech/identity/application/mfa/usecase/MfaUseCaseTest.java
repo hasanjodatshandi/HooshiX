@@ -60,6 +60,7 @@ class MfaUseCaseTest {
     when(mfa.lockActiveEnrollment(USER_ID)).thenReturn(Optional.of(enrollment));
     when(authentication.lockLocalCredential(USER_ID))
         .thenReturn(Optional.of(new LocalCredentialRecord(USER_ID, "ACTIVE", "$argon2id$stored")));
+    when(authentication.lockUserStatus(USER_ID)).thenReturn(Optional.of("ACTIVE"));
     when(authentication.countActiveFamilies(USER_ID)).thenReturn(0);
     useCase =
         new MfaUseCase(

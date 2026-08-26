@@ -1,13 +1,15 @@
 {
   "title": "HooshiX Web BFF",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "panels": [
     {"type":"timeseries","title":"HTTP request rate","targets":[{"expr":"sum by (method,uri) (rate(http_server_requests_seconds_count{job=\"web-bff\"}[5m]))"}],"gridPos":{"h":8,"w":12,"x":0,"y":0}},
     {"type":"timeseries","title":"HTTP 5xx rate","targets":[{"expr":"sum by (uri) (rate(http_server_requests_seconds_count{job=\"web-bff\",status=~\"5..\"}[5m]))"}],"gridPos":{"h":8,"w":12,"x":12,"y":0}},
     {"type":"timeseries","title":"HTTP p95 latency","targets":[{"expr":"histogram_quantile(0.95, sum by (le,uri) (rate(http_server_requests_seconds_bucket{job=\"web-bff\"}[5m])))"}],"gridPos":{"h":8,"w":24,"x":0,"y":8}},
     {"type":"timeseries","title":"Internal dependency outcomes","targets":[{"expr":"sum by (dependency,operation,outcome) (rate(web_bff_dependency_duration_seconds_count{job=\"web-bff\"}[5m]))"}],"gridPos":{"h":8,"w":12,"x":0,"y":16}},
-    {"type":"timeseries","title":"Redis session p95 latency","targets":[{"expr":"histogram_quantile(0.95, sum by (le,operation) (rate(web_bff_redis_duration_seconds_bucket{job=\"web-bff\"}[5m])))"}],"gridPos":{"h":8,"w":12,"x":12,"y":16}}
+    {"type":"timeseries","title":"Redis session p95 latency","targets":[{"expr":"histogram_quantile(0.95, sum by (le,operation) (rate(web_bff_redis_duration_seconds_bucket{job=\"web-bff\"}[5m])))"}],"gridPos":{"h":8,"w":12,"x":12,"y":16}},
+    {"type":"timeseries","title":"Google OIDC provider outcomes","targets":[{"expr":"sum by (operation,outcome) (rate(web_bff_oidc_provider_duration_seconds_count{job=\"web-bff\"}[5m]))"}],"gridPos":{"h":8,"w":12,"x":0,"y":24}},
+    {"type":"timeseries","title":"OIDC quota outcomes","targets":[{"expr":"sum by (operation,outcome) (rate(web_bff_oidc_quota_total{job=\"web-bff\"}[5m]))"}],"gridPos":{"h":8,"w":12,"x":12,"y":24}}
   ]
 }
