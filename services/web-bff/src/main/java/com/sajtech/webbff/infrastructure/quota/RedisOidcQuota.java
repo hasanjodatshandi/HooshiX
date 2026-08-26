@@ -11,6 +11,7 @@ import java.util.*;
 
 public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
   private static final Duration BUDGET = Duration.ofMillis(75);
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
   private static final String SCRIPT =
       """
       local app_now=tonumber(ARGV[1]);local t=redis.call('TIME');
@@ -65,9 +66,10 @@ public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
       WebBffProperties.OidcQuota policy,
       MeterRegistry meters) {
     RedisURI uri = RedisURI.create(redisUri);
-    uri.setTimeout(BUDGET);
+    uri.setTimeout(CONNECT_TIMEOUT);
     this.client = RedisClient.create(uri);
     this.connection = client.connect();
+    this.connection.setTimeout(BUDGET);
     this.keys = keys;
     this.clockGuard = clockGuard;
     this.hostTime = hostTime;

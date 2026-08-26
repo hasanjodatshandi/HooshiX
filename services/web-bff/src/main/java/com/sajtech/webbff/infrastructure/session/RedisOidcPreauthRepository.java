@@ -15,6 +15,8 @@ import java.time.*;
 import java.util.*;
 
 public final class RedisOidcPreauthRepository implements OidcPreauthPort, AutoCloseable {
+  private static final Duration COMMAND_TIMEOUT = Duration.ofMillis(75);
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration TTL = Duration.ofMinutes(10);
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
@@ -53,9 +55,10 @@ public final class RedisOidcPreauthRepository implements OidcPreauthPort, AutoCl
 
   public RedisOidcPreauthRepository(String redisUri, SessionCrypto crypto, Clock clock) {
     RedisURI redis = RedisURI.create(redisUri);
-    redis.setTimeout(Duration.ofMillis(75));
+    redis.setTimeout(CONNECT_TIMEOUT);
     client = RedisClient.create(redis);
     connection = client.connect();
+    connection.setTimeout(COMMAND_TIMEOUT);
     this.crypto = crypto;
     this.clock = clock;
   }

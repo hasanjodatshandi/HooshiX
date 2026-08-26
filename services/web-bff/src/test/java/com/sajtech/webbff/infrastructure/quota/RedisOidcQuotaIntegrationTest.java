@@ -66,6 +66,7 @@ class RedisOidcQuotaIntegrationTest {
             new OidcHostTimeHealth(hostTime),
             new WebBffProperties.OidcQuota(10000, 1000, 30, hostTime),
             new SimpleMeterRegistry());
+    assertThat(quota.connection().getTimeout()).isEqualTo(Duration.ofMillis(75));
     quota.connection().sync().flushall();
   }
 

@@ -14,6 +14,8 @@ import java.util.*;
 import java.util.function.Supplier;
 
 public final class RedisBffSessionRepository implements BrowserSessionPort, AutoCloseable {
+  private static final Duration COMMAND_TIMEOUT = Duration.ofMillis(75);
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration PREAUTH = Duration.ofMinutes(10),
       MFA_PREAUTH = Duration.ofMinutes(5),
       IDLE = Duration.ofDays(7),
@@ -54,9 +56,10 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
   public RedisBffSessionRepository(
       String uri, SessionCrypto crypto, Clock clock, MeterRegistry meters) {
     RedisURI redis = RedisURI.create(uri);
-    redis.setTimeout(Duration.ofMillis(75));
+    redis.setTimeout(CONNECT_TIMEOUT);
     client = RedisClient.create(redis);
     connection = client.connect();
+    connection.setTimeout(COMMAND_TIMEOUT);
     this.crypto = Objects.requireNonNull(crypto);
     this.clock = Objects.requireNonNull(clock);
     this.meters = Objects.requireNonNull(meters);
