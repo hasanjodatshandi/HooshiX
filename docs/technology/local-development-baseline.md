@@ -84,7 +84,7 @@ The Web BFF local public origin is `https://localhost:18443`; PostgreSQL and Red
 | Gradle Wrapper | 9.6.1 + Kotlin DSL |
 | HTTP | Spring MVC + Virtual Threads |
 | Internal sync | gRPC + Protobuf |
-| Async | Kafka only when owning flow requires it |
+| Async | Kafka 4.2.1 + Spring Kafka 4.1.0 + security-fixed LZ4 Java 1.11.1, only when the owning flow requires it |
 | Mutable relational data | PostgreSQL + Flyway |
 | Security/session state | Redis where applicable |
 | Observability API | Micrometer Observation/Tracing + OpenTelemetry |

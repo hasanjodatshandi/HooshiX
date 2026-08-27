@@ -27,7 +27,7 @@ This matrix records production technology combinations that must remain compatib
 | PostgreSQL JDBC | 42.7.13 | fixed security line; locks must not regress below 42.7.12 |
 | Barman Cloud plugin | 0.13.0 | selected CNPG WAL/PITR integration |
 | cert-manager | 1.20.3 | compatible with Kubernetes 1.35 |
-| Kafka | 4.2.1 | Spring Kafka/client compatibility; single combined RF1 in single-server; RF3/minISR2 HA |
+| Kafka | 4.2.1 / Spring Kafka 4.1.0 / LZ4 Java 1.11.1 | Spring Kafka/client compatibility; LZ4 1.11.1 overrides the vulnerable Kafka transitive version; single combined RF1 in single-server; RF3/minISR2 HA |
 | Redis | 8.2.8 | single-server TLS/ACL/noeviction/AOF; HA Sentinel; ADR-0024 common-clock/cardinality/exact-IP semantics |
 | Gateway API | 1.5.1 | Traefik 3.7-supported Standard version |
 | Traefik | 3.7.10 / chart 41.2.0 | Gateway API 1.5.1; ADR-0043 trusted PROXY-v2/external-L4-only origin; chart-41 render migration |

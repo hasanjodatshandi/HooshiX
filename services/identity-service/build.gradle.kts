@@ -48,6 +48,9 @@ dependencies {
         implementation("tools.jackson.core:jackson-databind:3.1.5") {
             because("CVE-2026-59889 is fixed in jackson-databind 3.1.5")
         }
+        implementation("at.yawk.lz4:lz4-java:1.11.1") {
+            because("GHSA-xx22-p4ch-683r is fixed in lz4-java 1.11.1")
+        }
     }
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
