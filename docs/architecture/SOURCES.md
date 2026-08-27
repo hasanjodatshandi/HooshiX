@@ -28,6 +28,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Authorization | ADR-0013/0026/0032/0036 + service doc |
 | Identity/MFA/session | ADR-0012/0023 + service doc |
 | BFF/browser security | ADR-0016 + service doc |
+| Core AI product / Conversation / model execution | ADR-0054 + `services/conversation-service.md` |
 | Data/messaging | `data-and-messaging.md` |
 | Testing/evidence | `testing-and-quality-gates.md` + security/readiness/fitness matrices |
 | Build/CI | `../engineering/build-and-ci-quality-enforcement.md` |
@@ -120,6 +121,17 @@ ADR-0040 converts those facts into HooshiX-specific offline SHA-1 corpus/freshne
 - Spring Boot Metrics: `https://docs.spring.io/spring-boot/reference/actuator/metrics.html`
 
 Current Spring Boot baseline uses Micrometer Observation/Tracing, Prometheus-compatible metrics, and OpenTelemetry/OTLP trace export under ADR-0044.
+
+### OpenAI Responses API
+
+- Responses/background/cancellation: `https://developers.openai.com/api/docs/guides/background`
+- Function calling/tool execution: `https://developers.openai.com/api/docs/guides/function-calling`
+- Remote MCP approval semantics: `https://developers.openai.com/api/docs/guides/tools-remote-mcp`
+- API data controls/retention: `https://developers.openai.com/api/docs/guides/your-data`
+
+ADR-0054 uses these current provider facts to define the first adapter as stateless
+`store=false`, `background=false`, and tool-free. Provider features do not grant model output local
+authority or prove that the HooshiX adapter is implemented, enabled, privacy-approved, or ready.
 
 ### OpenTelemetry Collector
 

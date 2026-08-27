@@ -35,6 +35,7 @@ algorithm/query/model
 | P2 | HIBP-derived Compromised Password SQLite lookup | immutable indexed complete corpus, disk-backed fixed query, bounded concurrency | full-corpus latency/IO/cardinality compatibility fails -> tune schema/storage/capacity; no false-clean or runtime provider fallback |
 | P2 | Reference Data | local immutable bundle until independent-service trigger | only create service for independent consumers/lifecycle/security/scale/ownership evidence |
 | P2 | External providers | durable handoff/ambiguity/reconciliation | sustained provider impact -> reviewed second-provider decision |
+| P1 | Conversation ModelRun queue/provider/cost path | bounded DB claims; no locks across provider I/O; global/per-tenant bulkheads; 60s one-attempt ceiling; worst-case cost reservation | queue age/provider saturation/cost ambiguity threatens SLO or budget -> shed safely, reduce configured bounds, add measured capacity, or review provider/worker boundary; no blind retry/free ambiguous run |
 | P2 | OpenBao control plane | unchanged; request hot paths use local validated material; recovery evidence | refresh/recovery/RTO risk -> review OpenBao HA, not removal |
 | P2 | CI/platform validation time | fast inner loop + parallel checks + heavy staged/scheduled gates | feedback bottleneck -> profile/shard/cache without removing authority |
 | P2 | Premature microservice proliferation | independent deployable requires real boundary/trigger | no ownership/lifecycle/security/scale evidence -> keep module/capability local/gated |

@@ -174,3 +174,20 @@ Applicable evidence includes:
 - HIBP SHA-1 dataset source/freshness/full-corpus/SQLite/read-only/no-runtime-provider tests;
 - Reference Data trigger/bundle/service migration tests;
 - PII/secret-safe persistence/events/telemetry and trace-non-authority tests.
+
+## 11. Conversation/model-execution data
+
+ADR-0054 adds one accepted, not-yet-implemented mutable service boundary. Conversation will own a
+distinct PostgreSQL database/Flyway/role/RLS lifecycle for encrypted Conversation, Message,
+ModelRun, budget reservation, usage/cost, dedup, audit, tenant-lifecycle projection, and ADR-0028
+Inbox/Outbox evidence.
+
+The durable ModelRun queue is service-owned PostgreSQL state, not Kafka request/reply. Worker claims
+use bounded `SKIP LOCKED` transactions and release every DB lock before provider I/O. State plus
+accepted run/reservation/message is one local transaction; output plus usage reconciliation is a
+separate local transaction after provider completion. Kafka is limited to justified lifecycle and
+erasure integration under Outbox/Inbox/idempotency.
+
+Prompt/title/output/context plaintext, provider credentials, and raw provider payloads are not
+Kafka/telemetry/audit data. Provider-side Conversation/Thread/Vector Store state is prohibited in
+the first slice; HooshiX composes stateless context from its encrypted service-owned persistence.

@@ -193,6 +193,31 @@ Every executable service/critical path proves applicable:
 - required authoritative audit remains durable/off-host;
 - independent external black-box check detects total host loss when local monitoring is down.
 
+## 14.1 Conversation/model-execution tests
+
+The first ADR-0054 executable slice must add blocking evidence for:
+
+- versioned/validated/example-backed Protobuf plus BFF OpenAPI/controller/generated-client parity;
+- exact JWT audience, workload identity, four Authorization mappings, other-owner/cross-tenant deny,
+  forced RLS and pooled-connection context isolation;
+- UUIDv4 dedup replay/conflict, bounded validation/request sizes, deterministic context composition,
+  and no cross-Conversation message inclusion;
+- encrypted title/message/output tamper, nonce/purpose/key-version/rotation, and plaintext absence;
+- atomic user-message/run/cost reservation, bounded `SKIP LOCKED` claiming, no remote I/O/locks in a
+  DB transaction, cancel/claim/complete races, and one assistant message maximum;
+- fixed provider destination/model/options, `store=false`, `background=false`, empty tools,
+  provider-response normalization, one attempt/60s/cancellation/breaker/bulkhead behavior, and no
+  blind retry/fallback after ambiguity;
+- overflow-safe integer cost reservation/reconciliation, missing-usage conservative charge, tenant/
+  user/global concurrency and budget fail-close, and representative provider/load pressure;
+- prompt injection/tool/URL/provider-option rejection and sanitized Markdown/active-content negatives;
+- Identity tenant lifecycle ordering plus ADR-0028 Inbox/effect/receipt/legal-hold/restore evidence;
+- content/credential/identifier canaries absent from logs/traces/metrics/events/audit/errors, bounded
+  labels, telemetry outage non-authority, alerts/dashboard, hardened Helm/network/Istio render, and
+  browser-to-BFF-only E2E.
+
+Architecture documentation alone remains `NOT RUN`/`NOT VERIFIED` for this suite.
+
 ## 15. Developer-host Ops MCP tests
 
 ADR-0048/0051 independent Windows MCP runtime tests prove:
