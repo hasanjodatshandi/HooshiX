@@ -473,6 +473,273 @@ public final class JooqTenantStore
   }
 
   @Override
+  public TenantLifecycleMutation requestTenantLifecycle(
+      UUID requestId,
+      UUID actorUserId,
+      UUID tenantId,
+      String expectedLifecycle,
+      String targetLifecycle,
+      byte[] fingerprintMaterial,
+      Instant now) {
+    String operation =
+        switch (targetLifecycle) {
+          case "SUSPENDED" -> "SUSPEND_TENANT";
+          case "DELETING" -> "DELETE_TENANT";
+          case "ACTIVE" -> "RESUME_TENANT";
+          default -> throw error(TenantError.INVALID_ARGUMENT, "Unsupported lifecycle target");
+        };
+    Replay replay = replay(requestId, operation, fingerprintMaterial);
+    if (replay.present()) return lifecycleResult(requestId, replay.resultId(), targetLifecycle);
+    var tenant =
+        dsl.fetchOne(
+            "SELECT lifecycle FROM identity_tenant WHERE tenant_id=? FOR UPDATE", tenantId);
+    if (tenant == null) throw error(TenantError.TENANT_NOT_SELECTABLE, "Tenant is not found");
+    String current = tenant.get("lifecycle", String.class);
+    if (!expectedLifecycle.equals(current))
+      throw error(TenantError.TENANT_LIFECYCLE_INVALID, "Tenant lifecycle transition is invalid");
+    ensureNoPendingLifecycle(tenantId);
+    outbox(requestId, "APPLY_TENANT_LIFECYCLE", tenantId, null, actorUserId, targetLifecycle, now);
+    dedup(
+        requestId, operation, actorUserId, tenantId, fingerprints.digest(fingerprintMaterial), now);
+    audit("IDENTITY_TENANT_" + targetLifecycle + "_REQUESTED", actorUserId, now);
+    return new TenantLifecycleMutation(
+        tenantId, current, "DELETING".equals(targetLifecycle) ? "DELETED" : targetLifecycle, true);
+  }
+
+  @Override
+  public TenantLifecycleMutation restoreTenant(
+      UUID requestId, UUID actorUserId, UUID tenantId, byte[] fingerprintMaterial, Instant now) {
+    Replay replay = replay(requestId, "RESTORE_TENANT", fingerprintMaterial);
+    if (replay.present()) return lifecycleResult(requestId, replay.resultId(), "ACTIVE");
+    var tenant =
+        dsl.fetchOne(
+            "SELECT lifecycle,purge_started_at FROM identity_tenant WHERE tenant_id=? FOR UPDATE",
+            tenantId);
+    if (tenant == null) throw error(TenantError.TENANT_NOT_SELECTABLE, "Tenant is not found");
+    if (!"DELETED".equals(tenant.get("lifecycle", String.class)))
+      throw error(TenantError.TENANT_LIFECYCLE_INVALID, "Tenant is not deleted");
+    if (tenant.get("purge_started_at", OffsetDateTime.class) != null)
+      throw error(TenantError.TENANT_RESTORE_FORBIDDEN, "Tenant purge has started");
+    ensureNoPendingLifecycle(tenantId);
+    dsl.execute(
+        "UPDATE identity_tenant SET lifecycle='PROVISIONING',deleted_at=NULL,version=version+1,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
+        ts(now),
+        tenantId);
+    dsl.execute(
+        "UPDATE identity_user_membership_query SET tenant_lifecycle='PROVISIONING',updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
+        ts(now),
+        tenantId);
+    outbox(requestId, "APPLY_TENANT_LIFECYCLE", tenantId, null, actorUserId, "ACTIVE", now);
+    dedup(
+        requestId,
+        "RESTORE_TENANT",
+        actorUserId,
+        tenantId,
+        fingerprints.digest(fingerprintMaterial),
+        now);
+    audit("IDENTITY_TENANT_RESTORE_REQUESTED", actorUserId, now);
+    return new TenantLifecycleMutation(tenantId, "PROVISIONING", "ACTIVE", true);
+  }
+
+  @Override
+  public List<InvitationSummary> listReceivedInvitations(UUID userId, Instant now) {
+    expireInvitations(now, 200);
+    return invitationSummaries(
+        dsl.fetch(
+            """
+            SELECT q.invitation_id,q.tenant_id,t.name,t.slug,q.state,q.expires_at
+            FROM identity_invitation_query q
+            JOIN identity_tenant t ON t.tenant_id=q.tenant_id
+            WHERE q.target_user_id=?
+            ORDER BY q.updated_at DESC,q.invitation_id
+            LIMIT 201
+            """,
+            userId));
+  }
+
+  @Override
+  public List<InvitationSummary> listTenantInvitations(UUID tenantId, Instant now) {
+    expireInvitations(now, 200);
+    return invitationSummaries(
+        dsl.fetch(
+            """
+            SELECT q.invitation_id,q.tenant_id,t.name,t.slug,q.state,q.expires_at
+            FROM identity_invitation_query q
+            JOIN identity_tenant t ON t.tenant_id=q.tenant_id
+            WHERE q.tenant_id=?
+            ORDER BY q.updated_at DESC,q.invitation_id
+            LIMIT 201
+            """,
+            tenantId));
+  }
+
+  @Override
+  public InvitationMutation declineInvitation(
+      UUID requestId, UUID userId, UUID invitationId, byte[] fingerprintMaterial, Instant now) {
+    Replay replay = replay(requestId, "DECLINE_INVITATION", fingerprintMaterial);
+    if (replay.present()) return new InvitationMutation(replay.resultId(), "DECLINED");
+    var query =
+        dsl.fetchOne(
+            "SELECT tenant_id,target_user_id,state,expires_at FROM identity_invitation_query WHERE invitation_id=? FOR UPDATE",
+            invitationId);
+    if (query == null) throw error(TenantError.INVITATION_NOT_FOUND, "Invitation is not found");
+    if (!userId.equals(query.get("target_user_id", UUID.class)))
+      throw error(TenantError.INVITATION_TARGET_MISMATCH, "Invitation target mismatch");
+    UUID tenantId = query.get("tenant_id", UUID.class);
+    setTenant(tenantId);
+    String state = effectiveInvitationState(tenantId, invitationId, query, now);
+    if ("EXPIRED".equals(state))
+      throw error(TenantError.INVITATION_EXPIRED, "Invitation is expired");
+    if (!"PENDING".equals(state))
+      throw error(TenantError.INVITATION_NOT_PENDING, "Invitation is not pending");
+    updateInvitationState(tenantId, invitationId, "DECLINED", now);
+    dedup(
+        requestId,
+        "DECLINE_INVITATION",
+        userId,
+        invitationId,
+        fingerprints.digest(fingerprintMaterial),
+        now);
+    audit("IDENTITY_TENANT_INVITATION_DECLINED", userId, now);
+    return new InvitationMutation(invitationId, "DECLINED");
+  }
+
+  @Override
+  public InvitationMutation revokeInvitation(
+      UUID requestId,
+      UUID actorUserId,
+      UUID tenantId,
+      UUID invitationId,
+      byte[] fingerprintMaterial,
+      Instant now) {
+    Replay replay = replay(requestId, "REVOKE_INVITATION", fingerprintMaterial);
+    if (replay.present()) return new InvitationMutation(replay.resultId(), "REVOKED");
+    setTenant(tenantId);
+    var invitation =
+        dsl.fetchOne(
+            "SELECT i.state,i.expires_at,q.target_user_id FROM identity_tenant_invitation i JOIN identity_invitation_query q ON q.invitation_id=i.invitation_id WHERE i.tenant_id=? AND i.invitation_id=? FOR UPDATE OF i,q",
+            tenantId,
+            invitationId);
+    if (invitation == null)
+      throw error(TenantError.INVITATION_NOT_FOUND, "Invitation is not found");
+    String state = effectiveInvitationState(tenantId, invitationId, invitation, now);
+    if ("EXPIRED".equals(state))
+      throw error(TenantError.INVITATION_EXPIRED, "Invitation is expired");
+    if (!"PENDING".equals(state))
+      throw error(TenantError.INVITATION_NOT_PENDING, "Invitation is not pending");
+    updateInvitationState(tenantId, invitationId, "REVOKED", now);
+    dedup(
+        requestId,
+        "REVOKE_INVITATION",
+        actorUserId,
+        invitationId,
+        fingerprints.digest(fingerprintMaterial),
+        now);
+    audit("IDENTITY_TENANT_INVITATION_REVOKED", actorUserId, now);
+    return new InvitationMutation(invitationId, "REVOKED");
+  }
+
+  @Override
+  public InvitationResult reissueInvitation(
+      UUID requestId,
+      UUID actorUserId,
+      UUID tenantId,
+      UUID invitationId,
+      byte[] fingerprintMaterial,
+      Instant now,
+      Instant expiresAt) {
+    Replay replay = replay(requestId, "REISSUE_INVITATION", fingerprintMaterial);
+    if (replay.present()) {
+      Instant expiry =
+          instant(
+              "SELECT expires_at FROM identity_invitation_query WHERE invitation_id=?",
+              replay.resultId());
+      return new InvitationResult(replay.resultId(), expiry);
+    }
+    if (!"ACTIVE"
+        .equals(string("SELECT lifecycle FROM identity_tenant WHERE tenant_id=?", tenantId)))
+      throw error(TenantError.TENANT_NOT_SELECTABLE, "Tenant is not active");
+    setTenant(tenantId);
+    var old =
+        dsl.fetchOne(
+            "SELECT state,expires_at,target_user_id,target_contact_id FROM identity_tenant_invitation WHERE tenant_id=? AND invitation_id=? FOR UPDATE",
+            tenantId,
+            invitationId);
+    if (old == null) throw error(TenantError.INVITATION_NOT_FOUND, "Invitation is not found");
+    String state = effectiveInvitationState(tenantId, invitationId, old, now);
+    if (!Set.of("DECLINED", "EXPIRED", "REVOKED").contains(state))
+      throw error(TenantError.INVITATION_REISSUE_FORBIDDEN, "Invitation cannot be reissued");
+    UUID targetUser = old.get("target_user_id", UUID.class);
+    UUID targetContact = old.get("target_contact_id", UUID.class);
+    Boolean contactActive =
+        bool(
+            "SELECT EXISTS(SELECT 1 FROM identity_contact WHERE contact_id=? AND user_id=? AND verified_at IS NOT NULL AND removed_at IS NULL)",
+            targetContact,
+            targetUser);
+    if (!Boolean.TRUE.equals(contactActive))
+      throw error(TenantError.VERIFIED_CONTACT_REQUIRED, "Verified contact is required");
+    Boolean member =
+        bool(
+            "SELECT EXISTS(SELECT 1 FROM identity_tenant_membership WHERE tenant_id=? AND user_id=? AND lifecycle<>'REMOVED')",
+            tenantId,
+            targetUser);
+    if (Boolean.TRUE.equals(member))
+      throw error(TenantError.INVITATION_REISSUE_FORBIDDEN, "Target already has membership");
+    UUID reissued = UUID.randomUUID();
+    try {
+      dsl.execute(
+          "INSERT INTO identity_tenant_invitation(tenant_id,invitation_id,target_user_id,target_contact_id,invited_by_user_id,state,expires_at,reissued_from_invitation_id,created_at,updated_at) VALUES (?,?,?,?,?,'PENDING',CAST(? AS TIMESTAMP WITH TIME ZONE),?,CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))",
+          tenantId,
+          reissued,
+          targetUser,
+          targetContact,
+          actorUserId,
+          ts(expiresAt),
+          invitationId,
+          ts(now),
+          ts(now));
+    } catch (org.jooq.exception.DataAccessException e) {
+      if (isUnique(e))
+        throw error(TenantError.INVITATION_ALREADY_PENDING, "Pending invitation already exists");
+      throw e;
+    }
+    dsl.execute(
+        "INSERT INTO identity_invitation_query(invitation_id,tenant_id,target_user_id,state,expires_at,updated_at) VALUES (?,?,?,'PENDING',CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))",
+        reissued,
+        tenantId,
+        targetUser,
+        ts(expiresAt),
+        ts(now));
+    dedup(
+        requestId,
+        "REISSUE_INVITATION",
+        actorUserId,
+        reissued,
+        fingerprints.digest(fingerprintMaterial),
+        now);
+    audit("IDENTITY_TENANT_INVITATION_REISSUED", actorUserId, now);
+    return new InvitationResult(reissued, expiresAt);
+  }
+
+  @Override
+  public int expireInvitations(Instant now, int batch) {
+    if (batch < 1 || batch > 200) throw new IllegalArgumentException("Expiry batch is invalid");
+    var due =
+        dsl.fetch(
+            "SELECT invitation_id,tenant_id,target_user_id FROM identity_invitation_query WHERE state='PENDING' AND expires_at<=CAST(? AS TIMESTAMP WITH TIME ZONE) ORDER BY expires_at,invitation_id FOR UPDATE SKIP LOCKED LIMIT ?",
+            ts(now),
+            batch);
+    for (org.jooq.Record row : due) {
+      UUID tenantId = row.get("tenant_id", UUID.class);
+      UUID invitationId = row.get("invitation_id", UUID.class);
+      setTenant(tenantId);
+      updateInvitationState(tenantId, invitationId, "EXPIRED", now);
+      audit("IDENTITY_TENANT_INVITATION_EXPIRED", row.get("target_user_id", UUID.class), now);
+    }
+    return due.size();
+  }
+
+  @Override
   public List<AuthorizationOutboxItem> claimAuthorizationOutbox(
       Instant now, int batch, Instant leaseUntil) {
     if (batch < 1 || batch > 32)
@@ -529,9 +796,10 @@ public final class JooqTenantStore
   public void completeAuthorizationOutbox(UUID outboxId, Instant now) {
     var r =
         dsl.fetchOne(
-            "SELECT operation,tenant_id,membership_id,request_id FROM identity_authorization_outbox WHERE outbox_id=? FOR UPDATE",
+            "SELECT operation,tenant_id,membership_id,user_id,lifecycle,request_id,state FROM identity_authorization_outbox WHERE outbox_id=? FOR UPDATE",
             outboxId);
     if (r == null) return;
+    if ("COMPLETED".equals(r.get("state", String.class))) return;
     String op = r.get("operation", String.class);
     UUID tenant = r.get("tenant_id", UUID.class);
     if ("PROVISION_OWNER".equals(op)) {
@@ -545,6 +813,17 @@ public final class JooqTenantStore
             "UPDATE identity_user_membership_query SET tenant_lifecycle='ACTIVE',updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
             ts(now),
             tenant);
+    }
+    if ("APPLY_TENANT_LIFECYCLE".equals(op)) {
+      String target = r.get("lifecycle", String.class);
+      dsl.execute(
+          "UPDATE identity_authorization_outbox SET state='COMPLETED',lease_until=NULL,completed_at=CAST(? AS TIMESTAMP WITH TIME ZONE),updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
+          ts(now),
+          ts(now),
+          outboxId);
+      completeTenantLifecycle(
+          r.get("request_id", UUID.class), tenant, r.get("user_id", UUID.class), target, now);
+      return;
     }
     if ("FINALIZE_MEMBERSHIP_REMOVAL".equals(op))
       dsl.execute(
@@ -573,6 +852,115 @@ public final class JooqTenantStore
         ts(next),
         ts(now),
         outboxId);
+  }
+
+  private void completeTenantLifecycle(
+      UUID requestId, UUID tenantId, UUID actorUserId, String target, Instant now) {
+    var tenant =
+        dsl.fetchOne(
+            "SELECT lifecycle FROM identity_tenant WHERE tenant_id=? FOR UPDATE", tenantId);
+    if (tenant == null) throw error(TenantError.TENANT_NOT_SELECTABLE, "Tenant is not found");
+    String current = tenant.get("lifecycle", String.class);
+    boolean valid =
+        current.equals(target)
+            || ("ACTIVE".equals(current) && Set.of("SUSPENDED", "DELETING").contains(target))
+            || (Set.of("SUSPENDED", "PROVISIONING").contains(current) && "ACTIVE".equals(target))
+            || ("DELETING".equals(current) && "DELETED".equals(target));
+    if (!valid)
+      throw error(TenantError.TENANT_LIFECYCLE_INVALID, "Lifecycle acknowledgement is stale");
+    if (!current.equals(target)) {
+      dsl.execute(
+          "UPDATE identity_tenant SET lifecycle=?,deleted_at=CASE WHEN ?='DELETED' THEN CAST(? AS TIMESTAMP WITH TIME ZONE) ELSE deleted_at END,version=version+1,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
+          target,
+          target,
+          ts(now),
+          ts(now),
+          tenantId);
+      dsl.execute(
+          "UPDATE identity_user_membership_query SET tenant_lifecycle=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
+          target,
+          ts(now),
+          tenantId);
+    }
+    if ("DELETING".equals(target)) {
+      setTenant(tenantId);
+      dsl.execute(
+          "UPDATE identity_tenant_invitation SET state='REVOKED',updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=? AND state='PENDING'",
+          ts(now),
+          tenantId);
+      dsl.execute(
+          "UPDATE identity_invitation_query SET state='REVOKED',updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=? AND state='PENDING'",
+          ts(now),
+          tenantId);
+      UUID cleanupRequest = UUID.randomUUID();
+      outbox(cleanupRequest, "APPLY_TENANT_LIFECYCLE", tenantId, null, actorUserId, "DELETED", now);
+      audit("IDENTITY_TENANT_DELETE_CLEANUP_QUEUED", actorUserId, now);
+    } else {
+      audit("IDENTITY_TENANT_" + target + "_ACKNOWLEDGED", actorUserId, now);
+    }
+  }
+
+  private TenantLifecycleMutation lifecycleResult(
+      UUID requestId, UUID tenantId, String requestedTarget) {
+    String lifecycle = string("SELECT lifecycle FROM identity_tenant WHERE tenant_id=?", tenantId);
+    if (lifecycle == null) throw error(TenantError.TENANT_NOT_SELECTABLE, "Tenant is not found");
+    Boolean pending =
+        bool(
+            "SELECT EXISTS(SELECT 1 FROM identity_authorization_outbox WHERE tenant_id=? AND operation='APPLY_TENANT_LIFECYCLE' AND state IN ('PENDING','DISPATCHING'))",
+            tenantId);
+    String responseTarget = "DELETING".equals(requestedTarget) ? "DELETED" : requestedTarget;
+    return new TenantLifecycleMutation(
+        tenantId, lifecycle, responseTarget, Boolean.TRUE.equals(pending));
+  }
+
+  private void ensureNoPendingLifecycle(UUID tenantId) {
+    Boolean pending =
+        bool(
+            "SELECT EXISTS(SELECT 1 FROM identity_authorization_outbox WHERE tenant_id=? AND operation='APPLY_TENANT_LIFECYCLE' AND state IN ('PENDING','DISPATCHING'))",
+            tenantId);
+    if (Boolean.TRUE.equals(pending))
+      throw error(TenantError.TENANT_LIFECYCLE_PENDING, "Tenant lifecycle command is pending");
+  }
+
+  private List<InvitationSummary> invitationSummaries(Result<? extends org.jooq.Record> rows) {
+    if (rows.size() > 200)
+      throw error(TenantError.SESSION_STATE_INVALID, "Invitation result limit exceeded");
+    List<InvitationSummary> result = new ArrayList<>();
+    for (org.jooq.Record row : rows)
+      result.add(
+          new InvitationSummary(
+              row.get("invitation_id", UUID.class),
+              row.get("tenant_id", UUID.class),
+              row.get("name", String.class),
+              row.get("slug", String.class),
+              row.get("state", String.class),
+              row.get("expires_at", OffsetDateTime.class).toInstant()));
+    return List.copyOf(result);
+  }
+
+  private String effectiveInvitationState(
+      UUID tenantId, UUID invitationId, org.jooq.Record invitation, Instant now) {
+    String state = invitation.get("state", String.class);
+    OffsetDateTime expiresAt = invitation.get("expires_at", OffsetDateTime.class);
+    if ("PENDING".equals(state) && !now.isBefore(expiresAt.toInstant())) {
+      updateInvitationState(tenantId, invitationId, "EXPIRED", now);
+      return "EXPIRED";
+    }
+    return state;
+  }
+
+  private void updateInvitationState(UUID tenantId, UUID invitationId, String state, Instant now) {
+    dsl.execute(
+        "UPDATE identity_tenant_invitation SET state=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=? AND invitation_id=? AND state='PENDING'",
+        state,
+        ts(now),
+        tenantId,
+        invitationId);
+    dsl.execute(
+        "UPDATE identity_invitation_query SET state=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE invitation_id=? AND state='PENDING'",
+        state,
+        ts(now),
+        invitationId);
   }
 
   private Replay replay(UUID requestId, String operation, byte[] material) {

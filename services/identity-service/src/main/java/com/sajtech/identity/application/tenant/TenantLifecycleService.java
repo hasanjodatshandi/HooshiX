@@ -237,6 +237,244 @@ public final class TenantLifecycleService implements TenantLifecycle {
         targetMembershipId.toString());
   }
 
+  @Override
+  public TenantLifecycleMutation suspendTenant(
+      UUID requestId, String refreshCredential, UUID tenantId) {
+    return platformLifecycle(
+        requestId,
+        refreshCredential,
+        required(tenantId),
+        "platform.tenant.suspend",
+        "SUSPEND_TENANT",
+        "ACTIVE",
+        "SUSPENDED");
+  }
+
+  @Override
+  public TenantLifecycleMutation resumeTenant(
+      UUID requestId, String refreshCredential, UUID tenantId) {
+    return platformLifecycle(
+        requestId,
+        refreshCredential,
+        required(tenantId),
+        "platform.tenant.resume",
+        "RESUME_TENANT",
+        "SUSPENDED",
+        "ACTIVE");
+  }
+
+  @Override
+  public TenantLifecycleMutation deleteTenant(
+      UUID requestId, String refreshCredential, UUID tenantId) {
+    request(requestId);
+    required(tenantId);
+    SessionAuthority authority =
+        withSession(
+            refreshCredential,
+            true,
+            c -> new SessionAuthority(c.userId(), c.selectedTenantId(), c.selectedMembershipId()));
+    if (!tenantId.equals(authority.tenantId()))
+      throw error(TenantError.AUTHORIZATION_DENIED, "Selected tenant does not match");
+    authorization.checkPermission(tenantId, authority.membershipId(), "tenant.delete");
+    return withFingerprint(
+        "DELETE_TENANT",
+        material ->
+            withSession(
+                refreshCredential,
+                true,
+                c -> {
+                  if (!authority.userId().equals(c.userId())
+                      || !tenantId.equals(c.selectedTenantId())
+                      || !authority.membershipId().equals(c.selectedMembershipId()))
+                    throw error(TenantError.INVALID_SESSION, "Tenant context changed");
+                  return tenants.requestTenantLifecycle(
+                      requestId,
+                      c.userId(),
+                      tenantId,
+                      "ACTIVE",
+                      "DELETING",
+                      material,
+                      clock.instant());
+                }),
+        requestId.toString(),
+        tenantId.toString());
+  }
+
+  @Override
+  public TenantLifecycleMutation restoreTenant(
+      UUID requestId, String refreshCredential, UUID tenantId) {
+    request(requestId);
+    required(tenantId);
+    UUID actor = withSession(refreshCredential, false, LockedRefreshCredential::userId);
+    authorization.checkPlatformPermission(actor, "platform.tenant.restore");
+    return withFingerprint(
+        "RESTORE_TENANT",
+        material ->
+            withSession(
+                refreshCredential,
+                false,
+                c -> {
+                  if (!actor.equals(c.userId()))
+                    throw error(TenantError.INVALID_SESSION, "Session identity changed");
+                  return tenants.restoreTenant(
+                      requestId, actor, tenantId, material, clock.instant());
+                }),
+        requestId.toString(),
+        tenantId.toString());
+  }
+
+  @Override
+  public List<InvitationSummary> listReceivedInvitations(String refreshCredential) {
+    return withSession(
+        refreshCredential,
+        false,
+        c -> tenants.listReceivedInvitations(c.userId(), clock.instant()));
+  }
+
+  @Override
+  public List<InvitationSummary> listTenantInvitations(String refreshCredential) {
+    SessionAuthority authority =
+        withSession(
+            refreshCredential,
+            true,
+            c -> new SessionAuthority(c.userId(), c.selectedTenantId(), c.selectedMembershipId()));
+    authorization.checkPermission(
+        authority.tenantId(), authority.membershipId(), "membership.role.assign");
+    return withSession(
+        refreshCredential,
+        true,
+        c -> {
+          if (!authority.tenantId().equals(c.selectedTenantId())
+              || !authority.membershipId().equals(c.selectedMembershipId()))
+            throw error(TenantError.INVALID_SESSION, "Tenant context changed");
+          return tenants.listTenantInvitations(authority.tenantId(), clock.instant());
+        });
+  }
+
+  @Override
+  public InvitationMutation declineInvitation(
+      UUID requestId, String refreshCredential, UUID invitationId) {
+    request(requestId);
+    required(invitationId);
+    return withFingerprint(
+        "DECLINE_INVITATION",
+        material ->
+            withSession(
+                refreshCredential,
+                false,
+                c ->
+                    tenants.declineInvitation(
+                        requestId, c.userId(), invitationId, material, clock.instant())),
+        requestId.toString(),
+        invitationId.toString());
+  }
+
+  @Override
+  public InvitationMutation revokeInvitation(
+      UUID requestId, String refreshCredential, UUID invitationId) {
+    request(requestId);
+    required(invitationId);
+    SessionAuthority authority =
+        withSession(
+            refreshCredential,
+            true,
+            c -> new SessionAuthority(c.userId(), c.selectedTenantId(), c.selectedMembershipId()));
+    authorization.checkPermission(
+        authority.tenantId(), authority.membershipId(), "membership.role.assign");
+    return withFingerprint(
+        "REVOKE_INVITATION",
+        material ->
+            withSession(
+                refreshCredential,
+                true,
+                c -> {
+                  if (!authority.tenantId().equals(c.selectedTenantId())
+                      || !authority.membershipId().equals(c.selectedMembershipId()))
+                    throw error(TenantError.INVALID_SESSION, "Tenant context changed");
+                  return tenants.revokeInvitation(
+                      requestId,
+                      c.userId(),
+                      authority.tenantId(),
+                      invitationId,
+                      material,
+                      clock.instant());
+                }),
+        requestId.toString(),
+        authority.tenantId().toString(),
+        invitationId.toString());
+  }
+
+  @Override
+  public InvitationResult reissueInvitation(
+      UUID requestId, String refreshCredential, UUID invitationId) {
+    request(requestId);
+    required(invitationId);
+    SessionAuthority authority =
+        withSession(
+            refreshCredential,
+            true,
+            c -> new SessionAuthority(c.userId(), c.selectedTenantId(), c.selectedMembershipId()));
+    authorization.checkPermission(
+        authority.tenantId(), authority.membershipId(), "membership.role.assign");
+    return withFingerprint(
+        "REISSUE_INVITATION",
+        material ->
+            withSession(
+                refreshCredential,
+                true,
+                c -> {
+                  if (!authority.tenantId().equals(c.selectedTenantId())
+                      || !authority.membershipId().equals(c.selectedMembershipId()))
+                    throw error(TenantError.INVALID_SESSION, "Tenant context changed");
+                  Instant now = clock.instant();
+                  return tenants.reissueInvitation(
+                      requestId,
+                      c.userId(),
+                      authority.tenantId(),
+                      invitationId,
+                      material,
+                      now,
+                      now.plus(INVITATION_TTL));
+                }),
+        requestId.toString(),
+        authority.tenantId().toString(),
+        invitationId.toString());
+  }
+
+  private TenantLifecycleMutation platformLifecycle(
+      UUID requestId,
+      String refreshCredential,
+      UUID tenantId,
+      String permission,
+      String operation,
+      String expectedLifecycle,
+      String targetLifecycle) {
+    request(requestId);
+    UUID actor = withSession(refreshCredential, false, LockedRefreshCredential::userId);
+    authorization.checkPlatformPermission(actor, permission);
+    return withFingerprint(
+        operation,
+        material ->
+            withSession(
+                refreshCredential,
+                false,
+                c -> {
+                  if (!actor.equals(c.userId()))
+                    throw error(TenantError.INVALID_SESSION, "Session identity changed");
+                  return tenants.requestTenantLifecycle(
+                      requestId,
+                      actor,
+                      tenantId,
+                      expectedLifecycle,
+                      targetLifecycle,
+                      material,
+                      clock.instant());
+                }),
+        requestId.toString(),
+        tenantId.toString(),
+        targetLifecycle);
+  }
+
   private <T> T withSession(
       String encoded, boolean tenantRequired, Function<LockedRefreshCredential, T> work) {
     SessionResult<T> result =

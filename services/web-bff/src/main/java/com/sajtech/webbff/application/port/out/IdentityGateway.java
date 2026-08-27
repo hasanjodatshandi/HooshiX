@@ -35,6 +35,24 @@ public interface IdentityGateway {
 
   void removeMembership(UUID requestId, String refresh, UUID membershipId);
 
+  TenantLifecycleResult suspendTenant(UUID requestId, String refresh, UUID tenantId);
+
+  TenantLifecycleResult resumeTenant(UUID requestId, String refresh, UUID tenantId);
+
+  TenantLifecycleResult deleteTenant(UUID requestId, String refresh, UUID tenantId);
+
+  TenantLifecycleResult restoreTenant(UUID requestId, String refresh, UUID tenantId);
+
+  List<Invitation> receivedInvitations(String refresh);
+
+  List<Invitation> tenantInvitations(String refresh);
+
+  InvitationState declineInvitation(UUID requestId, String refresh, UUID invitationId);
+
+  InvitationState revokeInvitation(UUID requestId, String refresh, UUID invitationId);
+
+  InvitationCreated reissueInvitation(UUID requestId, String refresh, UUID invitationId);
+
   Profile profile(String refresh);
 
   boolean updateProfile(
@@ -186,6 +204,19 @@ public interface IdentityGateway {
   record InvitationCreated(UUID invitationId, Instant expiresAt) {}
 
   record AcceptedInvitation(UUID tenantId, UUID membershipId) {}
+
+  record TenantLifecycleResult(
+      UUID tenantId, String lifecycle, String targetLifecycle, boolean pending) {}
+
+  record Invitation(
+      UUID invitationId,
+      UUID tenantId,
+      String tenantName,
+      String tenantSlug,
+      String state,
+      Instant expiresAt) {}
+
+  record InvitationState(UUID invitationId, String state) {}
 
   record Profile(UUID id, String firstName, String lastName, String fatherName) {}
 

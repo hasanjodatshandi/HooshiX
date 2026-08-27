@@ -135,6 +135,143 @@ public final class IdentityTenantController {
     return new RemovalResult(true, null, old.mode().name());
   }
 
+  @PostMapping("/tenants/{tenantId}/suspend")
+  public LifecycleResult suspend(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String tenantId,
+      HttpServletRequest request) {
+    BrowserSession s = HttpSupport.authenticated(request);
+    return lifecycle(
+        identity.suspendTenant(
+            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(tenantId)));
+  }
+
+  @PostMapping("/tenants/{tenantId}/resume")
+  public LifecycleResult resume(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String tenantId,
+      HttpServletRequest request) {
+    BrowserSession s = HttpSupport.authenticated(request);
+    return lifecycle(
+        identity.resumeTenant(
+            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(tenantId)));
+  }
+
+  @DeleteMapping("/tenants/{tenantId}")
+  public LifecycleResult delete(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String tenantId,
+      HttpServletRequest request,
+      HttpServletResponse response) {
+    BrowserSession old = HttpSupport.tenant(request);
+    UUID target = HttpSupport.id(tenantId);
+    if (!target.equals(old.selectedTenantId()))
+      throw new BffException(BffError.AUTHORIZATION_DENIED, "Selected tenant does not match");
+    var result =
+        lifecycle(
+            identity.deleteTenant(
+                HttpSupport.requestId(requestId), old.refreshCredential(), target));
+    BrowserSessionGrant grant =
+        sessions.rotateAuthenticated(
+            old,
+            old.userId(),
+            old.identitySessionId(),
+            old.refreshFamilyId(),
+            old.refreshCredential(),
+            old.idleExpiresAt(),
+            old.absoluteExpiresAt());
+    HttpSupport.setCookie(
+        response,
+        grant.cookieValue(),
+        HttpSupport.maxAge(clock.instant(), grant.session().idleExpiresAt()));
+    return new LifecycleResult(
+        result.tenantId(),
+        result.lifecycle(),
+        result.targetLifecycle(),
+        result.pending(),
+        grant.csrfToken(),
+        grant.session().mode().name());
+  }
+
+  @PostMapping("/tenants/{tenantId}/restore")
+  public LifecycleResult restore(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String tenantId,
+      HttpServletRequest request) {
+    BrowserSession s = HttpSupport.authenticated(request);
+    return lifecycle(
+        identity.restoreTenant(
+            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(tenantId)));
+  }
+
+  @GetMapping("/invitations/received")
+  public InvitationList receivedInvitations(HttpServletRequest request) {
+    BrowserSession s = HttpSupport.authenticated(request);
+    return invitations(identity.receivedInvitations(s.refreshCredential()));
+  }
+
+  @GetMapping("/invitations")
+  public InvitationList tenantInvitations(HttpServletRequest request) {
+    BrowserSession s = HttpSupport.tenant(request);
+    return invitations(identity.tenantInvitations(s.refreshCredential()));
+  }
+
+  @PostMapping("/invitations/{invitationId}/decline")
+  public InvitationState decline(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String invitationId,
+      HttpServletRequest request) {
+    BrowserSession s = HttpSupport.authenticated(request);
+    var r =
+        identity.declineInvitation(
+            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+    return new InvitationState(r.invitationId(), r.state());
+  }
+
+  @PostMapping("/invitations/{invitationId}/revoke")
+  public InvitationState revoke(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String invitationId,
+      HttpServletRequest request) {
+    BrowserSession s = HttpSupport.tenant(request);
+    var r =
+        identity.revokeInvitation(
+            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+    return new InvitationState(r.invitationId(), r.state());
+  }
+
+  @PostMapping("/invitations/{invitationId}/reissue")
+  public InvitationCreated reissue(
+      @RequestHeader("X-Request-Id") String requestId,
+      @PathVariable String invitationId,
+      HttpServletRequest request) {
+    BrowserSession s = HttpSupport.tenant(request);
+    var r =
+        identity.reissueInvitation(
+            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+    return new InvitationCreated(r.invitationId(), r.expiresAt().toString());
+  }
+
+  private static LifecycleResult lifecycle(IdentityGateway.TenantLifecycleResult r) {
+    return new LifecycleResult(
+        r.tenantId(), r.lifecycle(), r.targetLifecycle(), r.pending(), null, null);
+  }
+
+  private static InvitationList invitations(List<IdentityGateway.Invitation> values) {
+    return new InvitationList(
+        values.stream()
+            .map(
+                x ->
+                    new InvitationSummary(
+                        x.invitationId(),
+                        x.tenantId(),
+                        x.tenantName(),
+                        x.tenantSlug(),
+                        x.state(),
+                        x.expiresAt().toString()))
+            .toList());
+  }
+
   public record CreateTenant(
       @NotBlank @Size(max = 120) String name, @NotBlank @Size(min = 3, max = 63) String slug) {}
 
@@ -160,4 +297,28 @@ public final class IdentityTenantController {
   public record AcceptedInvitation(UUID tenantId, UUID membershipId) {}
 
   public record RemovalResult(boolean accepted, String csrfToken, String mode) {}
+
+  public record LifecycleResult(
+      UUID tenantId,
+      String lifecycle,
+      String targetLifecycle,
+      boolean pending,
+      String csrfToken,
+      String mode) {}
+
+  public record InvitationSummary(
+      UUID invitationId,
+      UUID tenantId,
+      String tenantName,
+      String tenantSlug,
+      String state,
+      String expiresAt) {}
+
+  public record InvitationList(List<InvitationSummary> invitations) {
+    public InvitationList {
+      invitations = List.copyOf(invitations);
+    }
+  }
+
+  public record InvitationState(UUID invitationId, String state) {}
 }

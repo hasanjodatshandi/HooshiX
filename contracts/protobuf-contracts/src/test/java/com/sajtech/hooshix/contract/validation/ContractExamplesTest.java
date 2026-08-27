@@ -13,14 +13,23 @@ import com.sajtech.identity.contract.v1.AuthenticateLocalRequest;
 import com.sajtech.identity.contract.v1.AuthenticateLocalResponse;
 import com.sajtech.identity.contract.v1.AuthenticationSessionMode;
 import com.sajtech.identity.contract.v1.CreateTenantRequest;
+import com.sajtech.identity.contract.v1.DeclineInvitationRequest;
+import com.sajtech.identity.contract.v1.DeleteTenantRequest;
 import com.sajtech.identity.contract.v1.CompleteMfaAuthenticationRequest;
 import com.sajtech.identity.contract.v1.EstablishSessionRequest;
 import com.sajtech.identity.contract.v1.MfaProof;
 import com.sajtech.identity.contract.v1.MfaProofType;
 import com.sajtech.identity.contract.v1.MfaSessionCredentials;
+import com.sajtech.identity.contract.v1.ListReceivedInvitationsRequest;
+import com.sajtech.identity.contract.v1.ListTenantInvitationsRequest;
 import com.sajtech.identity.contract.v1.RegisterLocalRequest;
+import com.sajtech.identity.contract.v1.ReissueInvitationRequest;
+import com.sajtech.identity.contract.v1.RestoreTenantRequest;
+import com.sajtech.identity.contract.v1.ResumeTenantRequest;
+import com.sajtech.identity.contract.v1.RevokeInvitationRequest;
 import com.sajtech.identity.contract.v1.ReportNotificationResultRequest;
 import com.sajtech.identity.contract.v1.RequestPasswordRecoveryRequest;
+import com.sajtech.identity.contract.v1.SuspendTenantRequest;
 import com.sajtech.notification.contract.v1.SubmitNotificationRequest;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -51,6 +60,25 @@ final class ContractExamplesTest {
             example("identity/v1/add-contact.valid.json", AddContactRequest.newBuilder()),
             example("identity/v1/register-local.valid.json", RegisterLocalRequest.newBuilder()),
             example("identity/v1/create-tenant.valid.json", CreateTenantRequest.newBuilder()),
+            example("identity/v1/suspend-tenant.valid.json", SuspendTenantRequest.newBuilder()),
+            example("identity/v1/resume-tenant.valid.json", ResumeTenantRequest.newBuilder()),
+            example("identity/v1/delete-tenant.valid.json", DeleteTenantRequest.newBuilder()),
+            example("identity/v1/restore-tenant.valid.json", RestoreTenantRequest.newBuilder()),
+            example(
+                "identity/v1/list-received-invitations.valid.json",
+                ListReceivedInvitationsRequest.newBuilder()),
+            example(
+                "identity/v1/list-tenant-invitations.valid.json",
+                ListTenantInvitationsRequest.newBuilder()),
+            example(
+                "identity/v1/decline-invitation.valid.json",
+                DeclineInvitationRequest.newBuilder()),
+            example(
+                "identity/v1/revoke-invitation.valid.json",
+                RevokeInvitationRequest.newBuilder()),
+            example(
+                "identity/v1/reissue-invitation.valid.json",
+                ReissueInvitationRequest.newBuilder()),
             example(
                 "identity/v1/establish-session.valid.json",
                 EstablishSessionRequest.newBuilder()),

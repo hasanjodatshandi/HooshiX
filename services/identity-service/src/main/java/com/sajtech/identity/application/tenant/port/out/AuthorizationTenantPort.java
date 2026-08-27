@@ -5,6 +5,8 @@ import java.util.UUID;
 public interface AuthorizationTenantPort {
   void checkPermission(UUID tenantId, UUID membershipId, String permissionKey);
 
+  void checkPlatformPermission(UUID userId, String permissionKey);
+
   void provisionOwner(UUID requestId, UUID tenantId, UUID membershipId, UUID userId);
 
   void provisionMember(UUID requestId, UUID tenantId, UUID membershipId, UUID userId);

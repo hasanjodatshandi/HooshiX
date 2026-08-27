@@ -10,16 +10,15 @@ Maven coordinates:
 
 Example:
 
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.6.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.7.0")
 
 The JAR contains generated Protobuf and gRPC transport classes, Protovalidate rules, and the
 `ContractValidationServerInterceptor` used to enforce those rules at a server boundary.
 
-The current 1.6.0 release adds the backward-compatible Identity external-identity evidence,
-session-establishment, link, unlink, and status contracts. Evidence entropy, issuer, subject,
-metadata, refresh credentials, timestamps, and response shapes are executable Protovalidate rules,
-with a tested Google evidence consumer example. It retains all 1.5.0 operations and wire field
-numbers.
+The current 1.7.0 release adds backward-compatible Identity tenant lifecycle and invitation
+management contracts. Suspend, resume, delete, restore, invitation listing, decline, revoke, and
+reissue requests and responses have executable Protovalidate rules and tested consumer examples.
+It retains all 1.6.0 operations and wire field numbers.
 
 ## Validation
 

@@ -213,3 +213,11 @@ groups:
           service: identity-service
         annotations:
           summary: Identity Authorization outbox recorded a definitive command failure
+      - alert: IdentityInvitationExpiryWorkerFailures
+        expr: increase(identity_invitation_expiry_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity invitation expiry worker failed during the last five minutes

@@ -33,6 +33,7 @@ apps/web-frontend/e2e/oidc.spec.ts
 apps/web-frontend/e2e/onboarding.spec.ts
 apps/web-frontend/e2e/password-recovery.spec.ts
 apps/web-frontend/e2e/profile.spec.ts
+apps/web-frontend/e2e/tenant-lifecycle.spec.ts
 apps/web-frontend/index.html
 apps/web-frontend/package-lock.json
 apps/web-frontend/package.json
@@ -61,6 +62,7 @@ apps/web-frontend/src/navigation/usePath.ts
 apps/web-frontend/src/pages/ApplicationPage.tsx
 apps/web-frontend/src/pages/LoginPage.tsx
 apps/web-frontend/src/pages/OidcCompletionPage.tsx
+apps/web-frontend/src/pages/TenantManagementPage.tsx
 apps/web-frontend/src/pages/TenantSelectionPage.tsx
 apps/web-frontend/src/routes/App.tsx
 apps/web-frontend/src/routes/guards.tsx
@@ -104,10 +106,19 @@ contracts/protobuf-contracts/examples/identity/v1/add-contact.valid.json
 contracts/protobuf-contracts/examples/identity/v1/authenticate-local.valid.json
 contracts/protobuf-contracts/examples/identity/v1/complete-mfa-authentication.valid.json
 contracts/protobuf-contracts/examples/identity/v1/create-tenant.valid.json
+contracts/protobuf-contracts/examples/identity/v1/decline-invitation.valid.json
+contracts/protobuf-contracts/examples/identity/v1/delete-tenant.valid.json
 contracts/protobuf-contracts/examples/identity/v1/establish-session.valid.json
+contracts/protobuf-contracts/examples/identity/v1/list-received-invitations.valid.json
+contracts/protobuf-contracts/examples/identity/v1/list-tenant-invitations.valid.json
 contracts/protobuf-contracts/examples/identity/v1/register-local.valid.json
+contracts/protobuf-contracts/examples/identity/v1/reissue-invitation.valid.json
 contracts/protobuf-contracts/examples/identity/v1/report-notification-result.valid.json
 contracts/protobuf-contracts/examples/identity/v1/request-password-recovery.valid.json
+contracts/protobuf-contracts/examples/identity/v1/restore-tenant.valid.json
+contracts/protobuf-contracts/examples/identity/v1/resume-tenant.valid.json
+contracts/protobuf-contracts/examples/identity/v1/revoke-invitation.valid.json
+contracts/protobuf-contracts/examples/identity/v1/suspend-tenant.valid.json
 contracts/protobuf-contracts/examples/notification/v1/submit-notification.valid.json
 contracts/protobuf-contracts/gradle.lockfile
 contracts/protobuf-contracts/gradle/verification-metadata.xml
@@ -691,11 +702,14 @@ services/identity-service/src/main/java/com/sajtech/identity/application/tenant/
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/TenantLifecycleService.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/AcceptedInvitation.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/AuthorizationOutboxItem.java
+services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/InvitationMutation.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/InvitationResult.java
+services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/InvitationSummary.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/RemovalPreparation.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/SelectableTenant.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/SelectableTenantList.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/TenantCreation.java
+services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/TenantLifecycleMutation.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/model/TenantSelection.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/in/TenantLifecycle.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/out/AuthorizationTenantPort.java
@@ -766,6 +780,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/secu
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/security/session/HmacSessionCredential.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/worker/AuthorizationOutboxDispatcher.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/worker/IdentityRetentionWorker.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/worker/InvitationExpiryWorker.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/worker/NotificationOutboxDispatcher.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/authentication/grpc/IdentityAuthenticationGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/externalidentity/grpc/IdentityExternalIdentityGrpcService.java
@@ -781,6 +796,7 @@ services/identity-service/src/main/resources/application-migration.yaml
 services/identity-service/src/main/resources/application.yaml
 services/identity-service/src/main/resources/db/migration/V10__create_identity_mfa_schema.sql
 services/identity-service/src/main/resources/db/migration/V11__create_external_identity_schema.sql
+services/identity-service/src/main/resources/db/migration/V12__complete_tenant_lifecycle.sql
 services/identity-service/src/main/resources/db/migration/V1__create_identity_registration_schema.sql
 services/identity-service/src/main/resources/db/migration/V2__create_identity_authentication_session_schema.sql
 services/identity-service/src/main/resources/db/migration/V3__create_identity_tenant_membership_schema.sql
@@ -1078,6 +1094,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/session/RedisOi
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserAuthControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserResponseContractTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/IdentityTenantControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/MfaControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OidcControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/OpenApiControllerContractTest.java

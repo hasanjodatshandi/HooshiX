@@ -105,6 +105,10 @@
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
   <Match>
+    <Class name="com.sajtech.identity.infrastructure.worker.InvitationExpiryWorker" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
     <Class name="com.sajtech.identity.application.tenant.TenantLifecycleService" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>

@@ -36,6 +36,10 @@ export function tenantSelected(tenantId: string): AppEvent {
   return { type: 'TENANT_SELECTED', tenantId };
 }
 
+export function tenantCleared(): AppEvent {
+  return { type: 'TENANT_CLEARED' };
+}
+
 export function clearError(): AppEvent {
   return { type: 'ERROR_CLEARED' };
 }

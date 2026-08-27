@@ -37,6 +37,21 @@ public final class GrpcAuthorizationTenantClient implements AuthorizationTenantP
   }
 
   @Override
+  public void checkPlatformPermission(UUID user, String key) {
+    try {
+      AuthorizationServiceGrpc.newBlockingStub(channel)
+          .withDeadlineAfter(300, TimeUnit.MILLISECONDS)
+          .checkPlatformPermission(
+              CheckPlatformPermissionRequest.newBuilder()
+                  .setUserId(user.toString())
+                  .setPermissionKey(key)
+                  .build());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
   public void provisionOwner(UUID request, UUID tenant, UUID membership, UUID user) {
     call900(
         () ->

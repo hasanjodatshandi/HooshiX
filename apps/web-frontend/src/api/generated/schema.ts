@@ -469,10 +469,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List invitations for the selected tenant */
+        get: operations["listIdentityTenantInvitations"];
         put?: never;
         /** Invite an existing contact to the selected tenant */
         post: operations["inviteIdentityTenantMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations/received": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List invitations received by the authenticated user */
+        get: operations["listReceivedIdentityTenantInvitations"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -508,6 +526,128 @@ export interface paths {
         post?: never;
         /** Remove a membership from the selected tenant */
         delete: operations["removeIdentityTenantMembership"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/tenants/{tenantId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request platform-authorized tenant suspension */
+        post: operations["suspendIdentityTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/tenants/{tenantId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request platform-authorized tenant resumption */
+        post: operations["resumeIdentityTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/tenants/{tenantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Request owner-authorized tenant deletion
+         * @description The tenant enters durable cleanup; the browser session is rotated to onboarding mode and DELETED is reported only after Authorization acknowledges cleanup.
+         */
+        delete: operations["deleteIdentityTenant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/tenants/{tenantId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request platform-authorized restore before purge starts */
+        post: operations["restoreIdentityTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations/{invitationId}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline a received pending invitation */
+        post: operations["declineIdentityTenantInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations/{invitationId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke a pending invitation in the selected tenant */
+        post: operations["revokeIdentityTenantInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/invitations/{invitationId}/reissue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reissue a terminal invitation with a fresh seven-day expiry */
+        post: operations["reissueIdentityTenantInvitation"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1205,6 +1345,64 @@ export interface components {
         };
         /** @example {
          *       "tenantId": "11111111-1111-4111-8111-111111111111",
+         *       "lifecycle": "ACTIVE",
+         *       "targetLifecycle": "SUSPENDED",
+         *       "pending": true
+         *     } */
+        TenantLifecycleResultResponse: {
+            tenantId: components["schemas"]["UuidV4"];
+            /** @enum {string} */
+            lifecycle: "PROVISIONING" | "ACTIVE" | "SUSPENDED" | "DELETING" | "DELETED";
+            /** @enum {string} */
+            targetLifecycle: "PROVISIONING" | "ACTIVE" | "SUSPENDED" | "DELETING" | "DELETED";
+            pending: boolean;
+            csrfToken?: string | null;
+            mode?: ("AUTHENTICATED_ONBOARDING" | "TENANT_AUTHENTICATED") | null;
+        };
+        /** @example {
+         *       "invitationId": "11111111-1111-4111-8111-111111111111",
+         *       "tenantId": "22222222-2222-4222-8222-222222222222",
+         *       "tenantName": "Sample Tenant",
+         *       "tenantSlug": "sample-tenant",
+         *       "state": "PENDING",
+         *       "expiresAt": "2030-01-01T00:00:00Z"
+         *     } */
+        InvitationSummaryResponse: {
+            invitationId: components["schemas"]["UuidV4"];
+            tenantId: components["schemas"]["UuidV4"];
+            tenantName: string;
+            tenantSlug: string;
+            /** @enum {string} */
+            state: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "REVOKED";
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        /** @example {
+         *       "invitations": [
+         *         {
+         *           "invitationId": "11111111-1111-4111-8111-111111111111",
+         *           "tenantId": "22222222-2222-4222-8222-222222222222",
+         *           "tenantName": "Sample Tenant",
+         *           "tenantSlug": "sample-tenant",
+         *           "state": "PENDING",
+         *           "expiresAt": "2030-01-01T00:00:00Z"
+         *         }
+         *       ]
+         *     } */
+        InvitationListResponse: {
+            invitations: components["schemas"]["InvitationSummaryResponse"][];
+        };
+        /** @example {
+         *       "invitationId": "11111111-1111-4111-8111-111111111111",
+         *       "state": "DECLINED"
+         *     } */
+        InvitationStateResponse: {
+            invitationId: components["schemas"]["UuidV4"];
+            /** @enum {string} */
+            state: "DECLINED" | "REVOKED";
+        };
+        /** @example {
+         *       "tenantId": "11111111-1111-4111-8111-111111111111",
          *       "membershipId": "22222222-2222-4222-8222-222222222222"
          *     } */
         AcceptedInvitationResponse: {
@@ -1438,6 +1636,7 @@ export interface components {
         /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
         OptionalCsrfToken: string;
         MembershipId: components["schemas"]["UuidV4"];
+        TenantId: components["schemas"]["UuidV4"];
         RoleId: components["schemas"]["UuidV4"];
         InvitationId: components["schemas"]["UuidV4"];
         PermissionKey: string;
@@ -2339,6 +2538,29 @@ export interface operations {
             503: components["responses"]["DependencyUnavailable"];
         };
     };
+    listIdentityTenantInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenant invitations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationListResponse"];
+                };
+            };
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
     inviteIdentityTenantMember: {
         parameters: {
             query?: never;
@@ -2370,6 +2592,28 @@ export interface operations {
             401: components["responses"]["InvalidSession"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listReceivedIdentityTenantInvitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Received invitations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationListResponse"];
+                };
+            };
+            401: components["responses"]["InvalidSession"];
             503: components["responses"]["DependencyUnavailable"];
         };
     };
@@ -2428,6 +2672,230 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemovalResultResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    suspendIdentityTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Suspension accepted for durable reconciliation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantLifecycleResultResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    resumeIdentityTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resumption accepted for durable reconciliation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantLifecycleResultResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    deleteIdentityTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deletion accepted and browser security state rotated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantLifecycleResultResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    restoreIdentityTenant: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                tenantId: components["parameters"]["TenantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restore accepted for durable reconciliation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantLifecycleResultResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    declineIdentityTenantInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation declined. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationStateResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    revokeIdentityTenantInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationStateResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    reissueIdentityTenantInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                invitationId: components["parameters"]["InvitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation reissued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationCreatedResponse"];
                 };
             };
             400: components["responses"]["InvalidRequest"];
