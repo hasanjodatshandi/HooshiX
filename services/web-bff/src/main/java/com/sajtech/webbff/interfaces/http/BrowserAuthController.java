@@ -10,10 +10,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.Clock;
 import java.util.Map;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Profile("!migration")
 @RequestMapping("/api/v1/auth")
 public final class BrowserAuthController {
   private final BrowserSessionPort sessions;

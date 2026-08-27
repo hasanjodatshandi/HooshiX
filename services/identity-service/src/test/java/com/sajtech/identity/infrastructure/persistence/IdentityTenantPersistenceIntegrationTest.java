@@ -5,10 +5,13 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.sajtech.identity.application.authentication.model.*;
+import com.sajtech.identity.application.erasure.ErasureError;
+import com.sajtech.identity.application.erasure.ErasureException;
 import com.sajtech.identity.application.registration.model.FingerprintDigest;
 import com.sajtech.identity.application.registration.port.out.IntentFingerprintPort;
 import com.sajtech.identity.application.tenant.TenantError;
 import com.sajtech.identity.application.tenant.model.*;
+import com.sajtech.identity.contract.v1.ErasureCommandEvent;
 import com.sajtech.identity.infrastructure.observability.AuthorizationOutboxMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.*;
@@ -73,6 +76,123 @@ class IdentityTenantPersistenceIntegrationTest {
     targetUser = UUID.randomUUID();
     insertUser(ownerUser);
     insertUser(targetUser);
+  }
+
+  @Test
+  void dataSubjectErasureLocksRowsWithoutUnsupportedDistinctAndCompletesIdentityParticipant() {
+    UUID requestId = UUID.randomUUID();
+    UUID blockedEventId = UUID.randomUUID();
+    UUID revivalEventId = UUID.randomUUID();
+    JooqErasureStore erasureStore = new JooqErasureStore(dsl);
+    JooqIdentityErasureParticipant participant =
+        new JooqIdentityErasureParticipant(dsl, erasureStore);
+
+    tx.required(
+        () -> {
+          erasureStore.accept(requestId, targetUser, NOW);
+          return null;
+        });
+    UUID holdId = UUID.randomUUID();
+    var createdHold =
+        tx.required(
+            () ->
+                erasureStore.createHold(
+                    holdId, requestId, "LEGAL-CASE-2026-0001", ownerUser, NOW.plusMillis(250)));
+    assertThat(createdHold.state()).isEqualTo("ACTIVE");
+    assertThat(
+            dsl.fetchValue(
+                "SELECT state FROM identity_erasure_request WHERE erasure_request_id=?", requestId))
+        .isEqualTo("BLOCKED_BY_LEGAL_HOLD");
+    ErasureCommandEvent blockedEvent =
+        ErasureCommandEvent.newBuilder()
+            .setEventId(blockedEventId.toString())
+            .setErasureRequestId(requestId.toString())
+            .setParticipantPolicyVersion("1")
+            .build();
+    tx.required(
+        () -> {
+          participant.receive(blockedEvent, NOW.plusMillis(300));
+          return null;
+        });
+    JooqIdentityErasureParticipant.InboxItem blockedItem =
+        tx.required(() -> participant.claim(NOW.plusMillis(300), Duration.ofSeconds(30)))
+            .orElseThrow();
+    assertThatThrownBy(
+            () ->
+                tx.required(
+                    () -> {
+                      participant.erase(blockedItem, NOW.plusMillis(350));
+                      return null;
+                    }))
+        .isInstanceOfSatisfying(
+            ErasureException.class,
+            error -> assertThat(error.error()).isEqualTo(ErasureError.LEGAL_HOLD_ACTIVE));
+    var releasedHold =
+        tx.required(() -> erasureStore.releaseHold(holdId, ownerUser, NOW.plusMillis(500)));
+    assertThat(releasedHold.state()).isEqualTo("RELEASED");
+    assertThat(
+            dsl.fetchValue(
+                "SELECT state FROM identity_erasure_request WHERE erasure_request_id=?", requestId))
+        .isEqualTo("REQUESTED");
+    ErasureCommandEvent revivalEvent =
+        ErasureCommandEvent.newBuilder()
+            .setEventId(revivalEventId.toString())
+            .setErasureRequestId(requestId.toString())
+            .setParticipantPolicyVersion("1")
+            .build();
+    tx.required(
+        () -> {
+          participant.receive(revivalEvent, NOW.plusSeconds(1));
+          return null;
+        });
+    assertThat(
+            dsl.fetchValue(
+                "SELECT redrive_requested FROM identity_erasure_command_inbox WHERE event_id=?",
+                blockedEventId))
+        .isEqualTo(true);
+    tx.required(
+        () -> {
+          participant.exhaust(blockedEventId, 48, "LEGAL_HOLD_ACTIVE");
+          return null;
+        });
+    assertThat(
+            dsl.fetchValue(
+                "SELECT state FROM identity_erasure_command_inbox WHERE event_id=?",
+                blockedEventId))
+        .isEqualTo("PENDING");
+    JooqIdentityErasureParticipant.InboxItem item =
+        tx.required(() -> participant.claim(NOW.plusSeconds(2), Duration.ofSeconds(30)))
+            .orElseThrow();
+    assertThat(item.eventId()).isEqualTo(blockedEventId);
+    tx.required(
+        () -> {
+          participant.erase(item, NOW.plusSeconds(2));
+          return null;
+        });
+
+    assertThat(dsl.fetchValue("SELECT status FROM identity_user WHERE user_id=?", targetUser))
+        .isEqualTo("DELETED");
+    assertThat(
+            dsl.fetchValue(
+                "SELECT state FROM identity_erasure_command_inbox WHERE event_id=?",
+                blockedEventId))
+        .isEqualTo("COMPLETED");
+    assertThat(
+            dsl.fetchCount(
+                DSL.table("identity_erasure_command_inbox"),
+                DSL.field("erasure_request_id").eq(requestId)))
+        .isOne();
+    assertThat(
+            dsl.fetchValue(
+                "SELECT state FROM identity_erasure_participant WHERE erasure_request_id=? AND participant='IDENTITY_SERVICE'",
+                requestId))
+        .isEqualTo("IN_PROGRESS");
+    assertThat(
+            dsl.fetchCount(
+                DSL.table("identity_erasure_event_outbox"),
+                DSL.field("erasure_request_id").eq(requestId),
+                DSL.field("event_type").eq("RECEIPT")))
+        .isOne();
   }
 
   @Test

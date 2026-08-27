@@ -3,8 +3,15 @@ image:
   digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 runtime:
   enabled: true
+  erasureRuntimeEnabled: true
   requireFetchMetadata: true
   publicOrigin: https://app.example.com
+database:
+  jdbcUrl: jdbc:postgresql://web-bff-postgresql.platform-data.svc:5432/web_bff
+  runtimeSecretName: web-bff-db-runtime
+  migrationSecretName: web-bff-db-migration
+kafka:
+  connectionSecretName: web-bff-kafka
 redis:
   connectionSecretName: web-bff-redis
 secrets:

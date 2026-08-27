@@ -7,6 +7,7 @@ import com.sajtech.webbff.application.port.out.BrowserSessionPort;
 import jakarta.servlet.http.*;
 import java.net.URI;
 import java.util.Map;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
+@Profile("!migration")
 public final class BffExceptionHandler {
   private final BrowserSessionPort sessions;
 

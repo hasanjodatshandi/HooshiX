@@ -70,6 +70,24 @@ spec:
         - protocol: TCP
           port: 15008
     {{- end }}
+    {{- if .Values.runtime.erasureRuntimeEnabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.identity.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.identity.podLabels | nindent 14 }}
+      ports: [{protocol: TCP, port: 9090}, {protocol: TCP, port: 15008}]
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.kafka.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.kafka.podLabels | nindent 14 }}
+      ports: [{protocol: TCP, port: {{ .Values.kafka.port }}}, {protocol: TCP, port: 15008}]
+    {{- end }}
     {{- if .Values.observability.tracing.enabled }}
     - to:
         - namespaceSelector:

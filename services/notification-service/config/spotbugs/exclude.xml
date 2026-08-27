@@ -52,4 +52,13 @@
         <Class name="com.sajtech.notification.infrastructure.runtime.result.NotificationResultDispatcher"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+        <Or>
+            <Class name="com.sajtech.notification.infrastructure.erasure.JooqNotificationErasureRepository"/>
+            <Class name="com.sajtech.notification.infrastructure.erasure.NotificationErasureListener"/>
+            <Class name="com.sajtech.notification.infrastructure.erasure.NotificationErasureReceiptDispatcher"/>
+            <Class name="com.sajtech.notification.infrastructure.erasure.NotificationErasureWorker"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>

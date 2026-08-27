@@ -179,6 +179,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/erasure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Irreversibly erase the authenticated user's account data
+         * @description Requires recent authentication. When MFA is active, a current TOTP or recovery-code proof is mandatory. Acceptance immediately revokes every browser session while durable participants complete asynchronously.
+         */
+        post: operations["requestSelfErasure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/identity/mfa/totp/enrollment": {
         parameters: {
             query?: never;
@@ -1158,6 +1178,29 @@ export interface components {
             mfaProof?: components["schemas"]["MfaProofRequest"] | null;
         };
         /** @example {
+         *       "confirmation": "ERASE_MY_ACCOUNT",
+         *       "mfaProof": {
+         *         "type": "TOTP",
+         *         "code": "123456"
+         *       }
+         *     } */
+        SelfErasureRequest: {
+            /** @constant */
+            confirmation: "ERASE_MY_ACCOUNT";
+            mfaProof?: components["schemas"]["MfaProofRequest"] | null;
+        };
+        /** @example {
+         *       "erasureRequestId": "11111111-1111-4111-8111-111111111111",
+         *       "state": "REQUESTED",
+         *       "participantPolicyVersion": "1"
+         *     } */
+        SelfErasureAcceptedResponse: {
+            erasureRequestId: components["schemas"]["UuidV4"];
+            /** @enum {string} */
+            state: "REQUESTED" | "IN_PROGRESS" | "COMPLETED" | "BLOCKED_BY_LEGAL_HOLD" | "FAILED_RETRYABLE";
+            participantPolicyVersion: string;
+        };
+        /** @example {
          *       "id": "11111111-1111-4111-8111-111111111111",
          *       "firstName": "Sample",
          *       "lastName": "Person",
@@ -1574,6 +1617,15 @@ export interface components {
         };
         /** @description Password lifecycle precondition was not satisfied without exposing account existence or credential details. */
         PasswordRejected: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Account erasure was not accepted because a lifecycle, recent-authentication, or MFA precondition was not satisfied. */
+        ErasureRejected: {
             headers: {
                 [name: string]: unknown;
             };
@@ -2031,6 +2083,51 @@ export interface operations {
             };
             400: components["responses"]["InvalidRequest"];
             401: components["responses"]["InvalidSession"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    requestSelfErasure: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "X-Request-Id": components["parameters"]["RequestId"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /** @example {
+                 *       "confirmation": "ERASE_MY_ACCOUNT",
+                 *       "mfaProof": {
+                 *         "type": "TOTP",
+                 *         "code": "123456"
+                 *       }
+                 *     } */
+                "application/json": components["schemas"]["SelfErasureRequest"];
+            };
+        };
+        responses: {
+            /** @description Erasure was durably accepted and all browser sessions were revoked. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SelfErasureAcceptedResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ErasureRejected"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
             503: components["responses"]["DependencyUnavailable"];
         };
     };

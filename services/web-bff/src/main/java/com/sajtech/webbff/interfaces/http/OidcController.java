@@ -11,10 +11,12 @@ import java.net.URI;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.UUID;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Profile("!migration")
 public final class OidcController {
   private static final SecureRandom RANDOM = new SecureRandom();
   private static final String CALLBACK_PATH = "/api/v1/auth/oidc/google/callback";

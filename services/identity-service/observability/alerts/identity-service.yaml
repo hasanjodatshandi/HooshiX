@@ -221,3 +221,28 @@ groups:
           service: identity-service
         annotations:
           summary: Identity invitation expiry worker failed during the last five minutes
+      - alert: IdentityErasureWorkExhausted
+        expr: |
+          sum(increase({job="identity-service",__name__=~"identity_erasure_(outbox|participant|receipt)_exhausted_total"}[5m])) > 0
+        for: 0m
+        labels:
+          severity: page
+          service: identity-service
+        annotations:
+          summary: Identity erasure coordination or participant work exhausted finite retries
+      - alert: IdentityErasureReceiptPublicationFailing
+        expr: increase(identity_erasure_receipt_outbox_failures_total{job="identity-service"}[5m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: Identity erasure receipt publication is repeatedly failing
+      - alert: IdentityErasureRequestInFlightTooLong
+        expr: identity_erasure_in_flight{job="identity-service"} > 0
+        for: 1h
+        labels:
+          severity: warning
+          service: identity-service
+        annotations:
+          summary: At least one Identity erasure request has remained in flight for one hour

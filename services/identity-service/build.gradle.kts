@@ -19,12 +19,13 @@ java {
 
 
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.7.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation(platform("io.netty:netty-bom:4.2.16.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-jooq")
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -46,6 +47,9 @@ dependencies {
         }
         implementation("tools.jackson.core:jackson-databind:3.1.5") {
             because("CVE-2026-59889 is fixed in jackson-databind 3.1.5")
+        }
+        implementation("at.yawk.lz4:lz4-java:1.11.1") {
+            because("GHSA-xx22-p4ch-683r is fixed in lz4-java 1.11.1")
         }
     }
 

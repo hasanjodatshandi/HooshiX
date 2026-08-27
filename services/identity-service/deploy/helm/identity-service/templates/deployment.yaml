@@ -10,6 +10,10 @@
 {{- $runtimeDb := required "database.runtimeSecretName is required" .Values.database.runtimeSecretName -}}
 {{- $migrationDb := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
 {{- if eq $runtimeDb $migrationDb }}{{ fail "runtime and migration database credentials must be distinct" }}{{ end -}}
+{{- $kafkaSecret := "" -}}
+{{- if .Values.runtime.erasureRuntimeEnabled }}
+{{- $kafkaSecret = required "kafka.connectionSecretName is required when erasure runtime is enabled" .Values.kafka.connectionSecretName -}}
+{{- end -}}
 {{- $fingerprint := required "secrets.fingerprintSecretName is required" .Values.secrets.fingerprintSecretName -}}
 {{- $challenge := required "secrets.challengeSecretName is required" .Values.secrets.challengeSecretName -}}
 {{- $handoff := required "secrets.handoffSecretName is required" .Values.secrets.handoffSecretName -}}
@@ -96,6 +100,7 @@ spec:
             - {name: IDENTITY_NOTIFICATION_RESULT_GRPC_PORT, value: {{ .Values.service.notificationResultGrpcPort | quote }}}
             - {name: IDENTITY_AUTHENTICATION_RUNTIME_ENABLED, value: {{ .Values.runtime.authenticationRuntimeEnabled | quote }}}
             - {name: IDENTITY_TENANT_RUNTIME_ENABLED, value: {{ .Values.runtime.tenantRuntimeEnabled | quote }}}
+            - {name: IDENTITY_ERASURE_RUNTIME_ENABLED, value: {{ .Values.runtime.erasureRuntimeEnabled | quote }}}
             {{- if .Values.runtime.authenticationRuntimeEnabled }}
             - {name: IDENTITY_JWT_ISSUER, value: {{ .Values.jwt.issuer | quote }}}
             - {name: IDENTITY_JWT_ALLOWED_AUDIENCES, value: {{ join "," .Values.jwt.allowedAudiences | quote }}}
@@ -120,6 +125,9 @@ spec:
           livenessProbe: {httpGet: {path: /actuator/health/liveness, port: management}, periodSeconds: 20, timeoutSeconds: 2, failureThreshold: 3}
           volumeMounts:
             - {name: runtime-db, mountPath: /run/secrets/identity-db-runtime, readOnly: true}
+            {{- if .Values.runtime.erasureRuntimeEnabled }}
+            - {name: kafka, mountPath: /run/secrets/identity-kafka, readOnly: true}
+            {{- end }}
             - {name: fingerprint-key, mountPath: /run/secrets/identity-fingerprint, readOnly: true}
             - {name: challenge-key, mountPath: /run/secrets/identity-challenge, readOnly: true}
             - {name: handoff-key, mountPath: /run/secrets/identity-handoff, readOnly: true}
@@ -138,6 +146,10 @@ spec:
           secret: {secretName: {{ $runtimeDb | quote }}, defaultMode: 0440}
         - name: migration-db
           secret: {secretName: {{ $migrationDb | quote }}, defaultMode: 0440}
+        {{- if .Values.runtime.erasureRuntimeEnabled }}
+        - name: kafka
+          secret: {secretName: {{ $kafkaSecret | quote }}, defaultMode: 0440}
+        {{- end }}
         - name: fingerprint-key
           secret: {secretName: {{ $fingerprint | quote }}, defaultMode: 0440, items: [{key: fingerprint.properties, path: fingerprint.properties}]}
         - name: challenge-key

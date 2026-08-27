@@ -85,3 +85,15 @@ groups:
         labels: {severity: critical}
         annotations:
           summary: Authorization owner-removal reservation remains unresolved for one hour
+      - alert: AuthorizationErasureWorkExhausted
+        expr: increase(authorization_erasure_exhausted_total{job="authorization-service"}[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: Authorization erasure participant exhausted finite retries
+      - alert: AuthorizationErasureReceiptPublicationFailing
+        expr: increase(authorization_erasure_receipt_outbox_failures_total{job="authorization-service"}[5m]) > 3
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Authorization erasure receipt publication is repeatedly failing

@@ -13,6 +13,7 @@ service:
   managementPort: 9092
 
 runtime:
+  erasureRuntimeEnabled: false
   deliveryRuntimeEnabled: false
   maxConcurrentCallsPerConnection: 128
   temporaryStorageLimit: 256Mi
@@ -35,6 +36,12 @@ database:
   port: 5432
   runtimeSecretName: ""
   migrationSecretName: ""
+kafka:
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: kafka
+  port: 9093
+  connectionSecretName: ""
 
 secrets:
   fingerprintSecretName: ""
@@ -45,6 +52,7 @@ identity:
   namespace: platform-apps
   resultPort: 9091
   resultTarget: dns:///identity-service.platform-apps.svc.cluster.local:9091
+  erasureTarget: dns:///identity-service.platform-apps.svc.cluster.local:9090
   podLabels:
     app.kubernetes.io/name: identity-service
   principal: prod.sajtech.internal/ns/platform-apps/sa/identity-service

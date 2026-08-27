@@ -35,6 +35,17 @@ spec:
         - operation:
             ports: [{{ .Values.service.notificationResultGrpcPort | quote }}]
     {{- end }}
+    {{- if .Values.runtime.erasureRuntimeEnabled }}
+    - from:
+        - source:
+            principals:
+              - {{ required "authorization.principal is required" .Values.authorization.principal | quote }}
+              - {{ required "notification.principal is required" .Values.notification.principal | quote }}
+      to:
+        - operation:
+            ports: [{{ .Values.service.grpcPort | quote }}]
+            paths: [/hooshix.identity.v1.IdentityErasureService/BeginParticipantErasure]
+    {{- end }}
     {{- if .Values.observability.metrics.enabled }}
     - from:
         - source:

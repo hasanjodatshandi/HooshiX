@@ -7,7 +7,9 @@ spring:
     virtual:
       enabled: true
   config:
-    import: optional:configtree:/run/secrets/notification-db-runtime/
+    import:
+      - optional:configtree:/run/secrets/notification-db-runtime/
+      - optional:configtree:/run/secrets/notification-kafka/
   datasource:
     url: ${NOTIFICATION_DATABASE_URL:jdbc:postgresql://localhost:5432/notification}
     hikari:
@@ -20,12 +22,34 @@ spring:
     enabled: false
   jooq:
     sql-dialect: POSTGRES
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
 
 notification:
   grpc-port: 9090
   max-concurrent-calls-per-connection: 128
   caller-service: identity-service
   delivery-runtime-enabled: ${NOTIFICATION_DELIVERY_RUNTIME_ENABLED:false}
+  erasure-runtime-enabled: ${NOTIFICATION_ERASURE_RUNTIME_ENABLED:false}
+  erasure-command-topic: ${NOTIFICATION_ERASURE_COMMAND_TOPIC:hooshix.identity.erasure.command.v1}
+  erasure-consumer-group: ${NOTIFICATION_ERASURE_CONSUMER_GROUP:hooshix-notification-erasure-v1}
+  identity-erasure-target: ${NOTIFICATION_IDENTITY_ERASURE_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9090}
+  erasure-receipt-topic: ${NOTIFICATION_ERASURE_RECEIPT_TOPIC:hooshix.identity.erasure.receipt.v1}
   identity-result-target: ${NOTIFICATION_IDENTITY_RESULT_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9091}
   provider-configuration-path: ${NOTIFICATION_PROVIDER_CONFIGURATION_PATH:/run/secrets/notification-providers/providers.properties}
   fingerprint-key-ring-path: ${NOTIFICATION_FINGERPRINT_KEY_RING_PATH:/run/secrets/notification-fingerprint/fingerprint.properties}

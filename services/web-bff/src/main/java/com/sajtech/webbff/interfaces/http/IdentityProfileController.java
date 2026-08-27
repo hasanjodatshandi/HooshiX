@@ -7,9 +7,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.*;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Profile("!migration")
 @RequestMapping("/api/v1/identity")
 public final class IdentityProfileController {
   private final IdentityGateway identity;

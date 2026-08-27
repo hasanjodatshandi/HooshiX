@@ -14,6 +14,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +29,7 @@ DATASET = RUNTIME / "compromised-password"
 HOST_TIME = RUNTIME / "host-time-status"
 POSTGRES_PORT = 15432
 REDIS_PORT = 16379
+KAFKA_PORT = 19092
 LOCAL_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 SERVICE_PORTS = {
     "compromised-password-service": {"grpc": 19090, "management": 19091},
@@ -40,6 +42,7 @@ DATABASES = {
     "authorization": ("authorization_migration", "authorization_runtime", "authorization-service"),
     "identity": ("identity_migration", "identity_runtime", "identity-service"),
     "notification": ("notification_migration", "notification_runtime", "notification-service"),
+    "web_bff": ("web_bff_migration", "web_bff_runtime", "web-bff"),
 }
 BUILD_ORDER = ["authorization-service", "compromised-password-service", "identity-service", "notification-service", "web-bff"]
 START_ORDER = ["compromised-password-service", "notification-service", "authorization-service", "identity-service", "web-bff"]
@@ -90,6 +93,7 @@ def generate_runtime_secrets() -> dict[str, str]:
     ensure_dirs()
     names = ["postgres_admin", "authorization_migration", "authorization_runtime",
              "identity_migration", "identity_runtime", "notification_migration", "notification_runtime",
+             "web_bff_migration", "web_bff_runtime",
              "web_bff_tls"]
     if SECRETS_JSON.exists():
         try:
@@ -196,22 +200,107 @@ def service_jar(service: str) -> Path:
 
 
 def start_dependencies() -> None:
-    run(compose_args("up", "-d", "postgres", "redis"), timeout=90)
+    run(compose_args("up", "-d", "postgres", "redis", "kafka"), timeout=120)
     deadline = time.monotonic() + 45
     while time.monotonic() < deadline:
         pg = subprocess.run(compose_args("exec", "-T", "postgres", "pg_isready", "-U", "postgres", "-d", "postgres"),
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         redis = subprocess.run(compose_args("exec", "-T", "redis", "redis-cli", "ping"),
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if pg.returncode == 0 and redis.returncode == 0:
+        kafka = subprocess.run(
+            compose_args("exec", "-T", "kafka", "/opt/kafka/bin/kafka-broker-api-versions.sh",
+                         "--bootstrap-server", "localhost:9092"),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if pg.returncode == 0 and redis.returncode == 0 and kafka.returncode == 0:
             return
         time.sleep(1)
-    raise SystemExit("Local PostgreSQL/Redis did not become ready")
+    raise SystemExit("Local PostgreSQL/Redis/Kafka did not become ready")
+
+
+def provision_kafka_topics() -> None:
+    topic_configs = {
+        "hooshix.identity.erasure.command.v1": 35 * 24 * 60 * 60 * 1000,
+        "hooshix.identity.erasure.receipt.v1": 35 * 24 * 60 * 60 * 1000,
+        "hooshix.identity.erasure.command.v1.DLT": 14 * 24 * 60 * 60 * 1000,
+        "hooshix.identity.erasure.receipt.v1.DLT": 14 * 24 * 60 * 60 * 1000,
+    }
+    for topic, retention_ms in topic_configs.items():
+        run(
+            compose_args(
+                "exec", "-T", "kafka", "/opt/kafka/bin/kafka-topics.sh",
+                "--bootstrap-server", "localhost:9092", "--create", "--if-not-exists",
+                "--topic", topic, "--partitions", "1", "--replication-factor", "1",
+                "--config", f"retention.ms={retention_ms}", "--config", "cleanup.policy=delete"),
+            timeout=30)
 
 
 def psql(sql: str, *, database: str = "postgres") -> None:
     run(compose_args("exec", "-T", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", database),
         input_text=sql, timeout=30)
+
+
+def psql_query(sql: str, *, database: str = "postgres") -> str:
+    return run(
+        compose_args(
+            "exec", "-T", "postgres", "psql", "-At", "-v", "ON_ERROR_STOP=1",
+            "-U", "postgres", "-d", database),
+        input_text=sql, capture=True, timeout=30).stdout.strip()
+
+
+def erasure_smoke_seed_sql(user_id: uuid.UUID, request_id: uuid.UUID,
+                           event_id: uuid.UUID) -> str:
+    return f"""
+INSERT INTO identity_user(user_id,status,created_at,updated_at)
+VALUES ('{user_id}','DELETING',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO identity_erasure_request(
+  erasure_request_id,user_id,state,participant_policy_version,accepted_at,updated_at)
+VALUES ('{request_id}','{user_id}','IN_PROGRESS','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+INSERT INTO identity_erasure_participant(erasure_request_id,participant,state,updated_at)
+SELECT '{request_id}',participant,'PENDING',CURRENT_TIMESTAMP
+FROM unnest(ARRAY[
+  'IDENTITY_SERVICE','AUTHORIZATION_SERVICE','NOTIFICATION_SERVICE','WEB_BFF'
+]::text[]) AS participant;
+INSERT INTO identity_erasure_event_outbox(
+  event_id,erasure_request_id,event_type,participant_policy_version,state,attempt_count,
+  next_attempt_at,occurred_at,retain_until,updated_at)
+VALUES (
+  '{event_id}','{request_id}','COMMAND','1','PENDING',0,
+  CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + INTERVAL '35 days',CURRENT_TIMESTAMP);
+"""
+
+
+def smoke_erasure(timeout_seconds: int = 60) -> None:
+    status(require_ready=True)
+    user_id, request_id, event_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    psql(erasure_smoke_seed_sql(user_id, request_id, event_id), database="identity")
+    expected_participants = (
+        "AUTHORIZATION_SERVICE:COMPLETED,IDENTITY_SERVICE:COMPLETED,"
+        "NOTIFICATION_SERVICE:COMPLETED,WEB_BFF:COMPLETED")
+    query = f"""
+SELECT r.state || '|' || u.status || '|' ||
+       string_agg(p.participant || ':' || p.state, ',' ORDER BY p.participant)
+FROM identity_erasure_request r
+JOIN identity_user u ON u.user_id=r.user_id
+JOIN identity_erasure_participant p ON p.erasure_request_id=r.erasure_request_id
+WHERE r.erasure_request_id='{request_id}'
+GROUP BY r.state,u.status;
+"""
+    deadline = time.monotonic() + max(1, timeout_seconds)
+    last = "missing"
+    while time.monotonic() < deadline:
+        last = psql_query(query, database="identity") or "missing"
+        if last == f"COMPLETED|DELETED|{expected_participants}":
+            print(json.dumps({
+                "erasure_request_id": str(request_id),
+                "event_id": str(event_id),
+                "state": "COMPLETED",
+                "user_state": "DELETED",
+                "participants": 4,
+            }, indent=2))
+            return
+        time.sleep(1)
+    raise SystemExit(
+        f"Erasure Kafka smoke did not complete for request {request_id}; last state: {last}")
 
 
 def provision_databases(values: dict[str, str]) -> None:
@@ -257,6 +346,12 @@ def migration_env(service: str, database: str, role: str, password: str) -> dict
         env["IDENTITY_DATABASE_URL"] = env["SPRING_DATASOURCE_URL"]
     elif service == "notification-service":
         env["NOTIFICATION_DATABASE_URL"] = env["SPRING_DATASOURCE_URL"]
+    elif service == "web-bff":
+        env.update({
+            "WEB_BFF_DATABASE_URL": env["SPRING_DATASOURCE_URL"],
+            "WEB_BFF_DATABASE_USERNAME": role,
+            "WEB_BFF_DATABASE_PASSWORD": password,
+        })
     return env
 
 
@@ -401,6 +496,9 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "NOTIFICATION_GRPC_BIND_ADDRESS": "127.0.0.1",
         "NOTIFICATION_FINGERPRINT_KEY_RING_PATH": str(keys["notification-fingerprint"]),
         "NOTIFICATION_DELIVERY_KEY_RING_PATH": str(keys["notification-delivery"]),
+        "NOTIFICATION_ERASURE_RUNTIME_ENABLED": "true",
+        "NOTIFICATION_IDENTITY_ERASURE_TARGET": f"dns:///localhost:{SERVICE_PORTS['identity-service']['grpc']}",
+        "KAFKA_BOOTSTRAP_SERVERS": f"127.0.0.1:{KAFKA_PORT}",
         "MANAGEMENT_SERVER_PORT": str(SERVICE_PORTS["notification-service"]["management"]),
     })
 
@@ -418,6 +516,9 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "AUTHORIZATION_IDENTITY_JWT_VERIFIER_BUNDLE_PATH": str(keys["identity-jwt-public"]),
         "AUTHORIZATION_QUOTA_REDIS_URI": f"redis://127.0.0.1:{REDIS_PORT}",
         "AUTHORIZATION_HOST_TIME_STATUS_PATH": str(HOST_TIME),
+        "AUTHORIZATION_ERASURE_RUNTIME_ENABLED": "true",
+        "AUTHORIZATION_IDENTITY_ERASURE_TARGET": f"dns:///localhost:{SERVICE_PORTS['identity-service']['grpc']}",
+        "KAFKA_BOOTSTRAP_SERVERS": f"127.0.0.1:{KAFKA_PORT}",
         "MANAGEMENT_SERVER_PORT": str(SERVICE_PORTS["authorization-service"]["management"]),
     })
 
@@ -432,6 +533,7 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "IDENTITY_REGISTRATION_RUNTIME_ENABLED": "true",
         "IDENTITY_AUTHENTICATION_RUNTIME_ENABLED": "true",
         "IDENTITY_TENANT_RUNTIME_ENABLED": "true",
+        "IDENTITY_ERASURE_RUNTIME_ENABLED": "true",
         "IDENTITY_PHONE_REGISTRATION_ENABLED": "true",
         "IDENTITY_COMPROMISED_PASSWORD_TARGET": f"dns:///localhost:{SERVICE_PORTS['compromised-password-service']['grpc']}",
         "IDENTITY_NOTIFICATION_TARGET": f"dns:///localhost:{SERVICE_PORTS['notification-service']['grpc']}",
@@ -451,6 +553,7 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "IDENTITY_JWT_PRIVATE_KEY_RING_PATH": str(keys["identity-jwt-private"]),
         "IDENTITY_JWT_PUBLIC_VERIFIER_BUNDLE_PATH": str(keys["identity-jwt-public"]),
         "IDENTITY_JWT_ALLOWED_AUDIENCES": "authorization-service",
+        "KAFKA_BOOTSTRAP_SERVERS": f"127.0.0.1:{KAFKA_PORT}",
         "MANAGEMENT_SERVER_PORT": str(SERVICE_PORTS["identity-service"]["management"]),
     })
 
@@ -458,6 +561,10 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
     bff.update({
         "SPRING_PROFILES_ACTIVE": "local",
         "WEB_BFF_RUNTIME_ENABLED": "true",
+        "WEB_BFF_ERASURE_RUNTIME_ENABLED": "true",
+        "WEB_BFF_DATABASE_URL": f"jdbc:postgresql://127.0.0.1:{POSTGRES_PORT}/web_bff",
+        "WEB_BFF_DATABASE_USERNAME": "web_bff_runtime",
+        "WEB_BFF_DATABASE_PASSWORD": values["web_bff_runtime"],
         "WEB_BFF_HTTP_PORT": str(SERVICE_PORTS["web-bff"]["https"]),
         "WEB_BFF_MANAGEMENT_PORT": str(SERVICE_PORTS["web-bff"]["management"]),
         "WEB_BFF_PUBLIC_ORIGIN": f"https://localhost:{SERVICE_PORTS['web-bff']['https']}",
@@ -478,6 +585,7 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "WEB_BFF_OIDC_QUOTA_HOST_TIME_STATUS_PATH": str(HOST_TIME),
         "WEB_BFF_OIDC_QUOTA_MAX_ACTIVE_BUCKETS": "10000",
         "WEB_BFF_OIDC_QUOTA_MAX_NEW_BUCKETS_PER_MINUTE": "1000",
+        "KAFKA_BOOTSTRAP_SERVERS": f"127.0.0.1:{KAFKA_PORT}",
     })
     return {
         "compromised-password-service": cp,
@@ -587,7 +695,7 @@ def status(require_ready: bool = False) -> None:
                      "grpc": ("UP" if grpc else "DOWN") if has_grpc else "N/A"})
         if require_ready and (not alive or not ready or not grpc):
             failed = True
-    dependencies = {"postgres": "DOWN", "redis": "DOWN"}
+    dependencies = {"postgres": "DOWN", "redis": "DOWN", "kafka": "DOWN"}
     if COMPOSE_ENV.exists():
         for name in dependencies:
             completed = subprocess.run(compose_args("ps", "--status", "running", "--services", name),
@@ -611,6 +719,7 @@ def up(skip_build: bool = False) -> None:
         build_services()
     stop_processes()
     start_dependencies()
+    provision_kafka_topics()
     provision_databases(values)
     migrate_databases(values)
     keys = generate_key_material(values)
@@ -654,6 +763,8 @@ def main() -> None:
     logs_parser.add_argument("--lines", type=int, default=40)
     down_parser = sub.add_parser("down")
     down_parser.add_argument("--remove-data", action="store_true")
+    erasure_parser = sub.add_parser("smoke-erasure")
+    erasure_parser.add_argument("--timeout-seconds", type=int, default=60)
     args = parser.parse_args()
     if args.command == "up":
         up(args.skip_build)
@@ -663,6 +774,8 @@ def main() -> None:
         logs(max(1, min(args.lines, 500)))
     elif args.command == "down":
         down(args.remove_data)
+    elif args.command == "smoke-erasure":
+        smoke_erasure(max(1, min(args.timeout_seconds, 300)))
 
 
 if __name__ == "__main__":

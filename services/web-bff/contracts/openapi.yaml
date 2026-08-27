@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HooshiX Web BFF Public API
-  version: 1.5.0
+  version: 1.6.0
   description: Canonical browser-facing REST contract owned by Web BFF. All examples use synthetic .test identities and non-production placeholder credentials.
 servers:
   - url: /
@@ -288,6 +288,37 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidSession' }
         '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/identity/erasure:
+    post:
+      operationId: requestSelfErasure
+      summary: Irreversibly erase the authenticated user's account data
+      description: Requires recent authentication. When MFA is active, a current TOTP or recovery-code proof is mandatory. Acceptance immediately revokes every browser session while durable participants complete asynchronously.
+      security: [{ BrowserSession: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SelfErasureRequest' }
+            example: { confirmation: ERASE_MY_ACCOUNT, mfaProof: { type: TOTP, code: '123456' } }
+      x-hooshix-consumer-example: { method: POST, path: /api/v1/identity/erasure, body: { confirmation: ERASE_MY_ACCOUNT, mfaProof: { type: TOTP, code: '123456' } } }
+      responses:
+        '202':
+          description: Erasure was durably accepted and all browser sessions were revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SelfErasureAcceptedResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ErasureRejected' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /api/v1/identity/mfa/totp/enrollment:
     post:
       operationId: startIdentityTotpEnrollment
@@ -1324,6 +1355,34 @@ components:
           anyOf:
             - { $ref: '#/components/schemas/MfaProofRequest' }
             - { type: 'null' }
+    SelfErasureRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmation]
+      example: { confirmation: ERASE_MY_ACCOUNT, mfaProof: { type: TOTP, code: '123456' } }
+      properties:
+        confirmation:
+          type: string
+          const: ERASE_MY_ACCOUNT
+        mfaProof:
+          anyOf:
+            - { $ref: '#/components/schemas/MfaProofRequest' }
+            - { type: 'null' }
+    SelfErasureAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required: [erasureRequestId, state, participantPolicyVersion]
+      example: { erasureRequestId: 11111111-1111-4111-8111-111111111111, state: REQUESTED, participantPolicyVersion: '1' }
+      properties:
+        erasureRequestId: { $ref: '#/components/schemas/UuidV4' }
+        state:
+          type: string
+          enum: [REQUESTED, IN_PROGRESS, COMPLETED, BLOCKED_BY_LEGAL_HOLD, FAILED_RETRYABLE]
+        participantPolicyVersion:
+          type: string
+          pattern: '^[1-9][0-9]{0,8}$'
+          minLength: 1
+          maxLength: 64
     ProfileResponse:
       type: object
       additionalProperties: false
@@ -1640,6 +1699,11 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
     PasswordRejected:
       description: Password lifecycle precondition was not satisfied without exposing account existence or credential details.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ErasureRejected:
+      description: Account erasure was not accepted because a lifecycle, recent-authentication, or MFA precondition was not satisfied.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }

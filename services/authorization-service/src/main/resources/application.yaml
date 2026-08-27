@@ -10,6 +10,7 @@ spring:
     import:
       - optional:configtree:/run/secrets/authorization-db-runtime/
       - optional:configtree:/run/secrets/authorization-quota-redis/
+      - optional:configtree:/run/secrets/authorization-kafka/
   datasource:
     url: ${AUTHORIZATION_DATABASE_URL:jdbc:postgresql://localhost:5432/authorization}
     username: ${AUTHORIZATION_DATABASE_USERNAME:authorization_runtime}
@@ -23,11 +24,33 @@ spring:
     enabled: false
   jooq:
     sql-dialect: POSTGRES
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
 server:
   port: -1
 authorization:
   grpc-port: ${AUTHORIZATION_GRPC_PORT:9090}
   runtime-enabled: ${AUTHORIZATION_RUNTIME_ENABLED:false}
+  erasure-runtime-enabled: ${AUTHORIZATION_ERASURE_RUNTIME_ENABLED:false}
+  erasure-command-topic: ${AUTHORIZATION_ERASURE_COMMAND_TOPIC:hooshix.identity.erasure.command.v1}
+  erasure-consumer-group: ${AUTHORIZATION_ERASURE_CONSUMER_GROUP:hooshix-authorization-erasure-v1}
+  identity-erasure-target: ${AUTHORIZATION_IDENTITY_ERASURE_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9090}
+  erasure-receipt-topic: ${AUTHORIZATION_ERASURE_RECEIPT_TOPIC:hooshix.identity.erasure.receipt.v1}
   max-concurrent-calls-per-connection: ${AUTHORIZATION_MAX_CONCURRENT_CALLS_PER_CONNECTION:128}
   check-permission-overload:
     global-concurrency: ${AUTHORIZATION_CHECK_PERMISSION_GLOBAL_CONCURRENCY:8}

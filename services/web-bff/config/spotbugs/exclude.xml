@@ -66,4 +66,14 @@
     <Class name="com.sajtech.webbff.infrastructure.quota.RedisOidcQuota" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Or>
+      <Class name="com.sajtech.webbff.infrastructure.erasure.JooqWebBffErasureRepository" />
+      <Class name="com.sajtech.webbff.infrastructure.erasure.WebBffErasureListener" />
+      <Class name="com.sajtech.webbff.infrastructure.erasure.WebBffErasureReceiptDispatcher" />
+      <Class name="com.sajtech.webbff.infrastructure.erasure.WebBffErasureWorker" />
+      <Class name="com.sajtech.webbff.interfaces.http.ErasureController" />
+    </Or>
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

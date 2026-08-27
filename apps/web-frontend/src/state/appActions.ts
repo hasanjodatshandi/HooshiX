@@ -32,6 +32,10 @@ export function sessionExpired(): AppEvent {
   return { type: 'SESSION_EXPIRED' };
 }
 
+export function accountErased(): AppEvent {
+  return { type: 'ACCOUNT_ERASED' };
+}
+
 export function tenantSelected(tenantId: string): AppEvent {
   return { type: 'TENANT_SELECTED', tenantId };
 }

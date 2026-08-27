@@ -1,6 +1,7 @@
 package com.sajtech.authorization.configuration;
 
 import com.sajtech.authorization.application.port.out.*;
+import com.sajtech.authorization.infrastructure.erasure.*;
 import com.sajtech.authorization.infrastructure.health.AuthorizationReadinessHealthIndicator;
 import com.sajtech.authorization.infrastructure.observability.AuthorizationCheckPermissionMetrics;
 import com.sajtech.authorization.infrastructure.observability.AuthorizationReservationMonitor;
@@ -23,8 +24,11 @@ import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 @Profile("!migration")
@@ -81,6 +85,89 @@ public class RuntimeConfiguration {
   @Bean
   AuthorizationStore authorizationStore(DSLContext dsl, AuthorizationSecurityMetrics metrics) {
     return new JooqAuthorizationStore(dsl, metrics);
+  }
+
+  @Bean
+  TransactionTemplate authorizationTransactions(PlatformTransactionManager manager) {
+    return new TransactionTemplate(manager);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "authorization",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  JooqAuthorizationErasureRepository authorizationErasureRepository(DSLContext dsl) {
+    return new JooqAuthorizationErasureRepository(dsl);
+  }
+
+  @Bean(destroyMethod = "shutdownNow", name = "identityErasureChannel")
+  @ConditionalOnProperty(
+      prefix = "authorization",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  ManagedChannel identityErasureChannel(
+      @Value(
+              "${authorization.identity-erasure-target:dns:///identity-service.platform-apps.svc.cluster.local:9090}")
+          String target) {
+    return io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder.forTarget(target)
+        .usePlaintext()
+        .disableRetry()
+        .maxInboundMessageSize(64 * 1024)
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "authorization",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  IdentityErasureTargetClient identityErasureTargetClient(
+      @Qualifier("identityErasureChannel") ManagedChannel channel) {
+    return new IdentityErasureTargetClient(channel);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "authorization",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  AuthorizationErasureListener authorizationErasureListener(
+      JooqAuthorizationErasureRepository repository,
+      TransactionTemplate transactions,
+      Clock clock) {
+    return new AuthorizationErasureListener(repository, transactions, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "authorization",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  AuthorizationErasureWorker authorizationErasureWorker(
+      IdentityErasureTargetClient identity,
+      JooqAuthorizationErasureRepository repository,
+      TransactionTemplate transactions,
+      Clock clock,
+      io.micrometer.core.instrument.MeterRegistry meters) {
+    return new AuthorizationErasureWorker(identity, repository, transactions, clock, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "authorization",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  AuthorizationErasureReceiptDispatcher authorizationErasureReceiptDispatcher(
+      DSLContext dsl,
+      org.springframework.kafka.core.KafkaTemplate<String, byte[]> kafka,
+      TransactionTemplate transactions,
+      Clock clock,
+      @Value("${authorization.erasure-receipt-topic:hooshix.identity.erasure.receipt.v1}")
+          String topic,
+      io.micrometer.core.instrument.MeterRegistry meters) {
+    return new AuthorizationErasureReceiptDispatcher(
+        dsl, kafka, transactions, clock, topic, meters);
   }
 
   @Bean

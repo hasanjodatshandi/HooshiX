@@ -32,8 +32,11 @@ def main() -> int:
     require(text, r'secretName: "notification-db-migration"', "migration DB Secret is missing")
     require(text, r'secretName: "notification-fingerprint"', "fingerprint key-ring Secret is missing")
     require(text, r'secretName: "notification-delivery"', "delivery key-ring Secret is missing")
-    if text.count("defaultMode: 0440") != 4:
+    require(text, r'secretName: "notification-kafka"', "Kafka connection Secret is missing")
+    if text.count("defaultMode: 0440") != 5:
         raise AssertionError("all Notification Secret volumes must use defaultMode 0440")
+    require(text, r"NOTIFICATION_ERASURE_RUNTIME_ENABLED", "erasure runtime gate is missing")
+    require(text, r"notification-kafka", "Kafka egress selector is missing")
     require(text, r'serviceAccountName: "notification-service"', "dedicated ServiceAccount is missing")
     require(text, r"automountServiceAccountToken: false", "ServiceAccount token automount must be disabled")
     require(text, r"runAsNonRoot: true", "runAsNonRoot must be enabled")

@@ -10,6 +10,7 @@ spring:
     import:
       - optional:configtree:/run/secrets/identity-db-runtime/
       - optional:configtree:/run/secrets/identity-quota-redis/
+      - optional:configtree:/run/secrets/identity-kafka/
   datasource:
     url: ${IDENTITY_DATABASE_URL:jdbc:postgresql://localhost:5432/identity}
     hikari:
@@ -22,6 +23,23 @@ spring:
     enabled: false
   jooq:
     sql-dialect: POSTGRES
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
 
 identity:
   grpc-port: ${IDENTITY_GRPC_PORT:9090}
@@ -38,6 +56,11 @@ identity:
   notification-result-runtime-enabled: ${IDENTITY_NOTIFICATION_RESULT_RUNTIME_ENABLED:false}
   authorization-target: ${IDENTITY_AUTHORIZATION_TARGET:dns:///authorization-service.platform-apps.svc.cluster.local:9090}
   notification-dispatch-enabled: ${IDENTITY_NOTIFICATION_DISPATCH_ENABLED:true}
+  erasure-runtime-enabled: ${IDENTITY_ERASURE_RUNTIME_ENABLED:false}
+  erasure-command-topic: ${IDENTITY_ERASURE_COMMAND_TOPIC:hooshix.identity.erasure.command.v1}
+  erasure-consumer-group: ${IDENTITY_ERASURE_CONSUMER_GROUP:hooshix-identity-erasure-v1}
+  erasure-receipt-topic: ${IDENTITY_ERASURE_RECEIPT_TOPIC:hooshix.identity.erasure.receipt.v1}
+  erasure-receipt-consumer-group: ${IDENTITY_ERASURE_RECEIPT_CONSUMER_GROUP:hooshix-identity-erasure-receipt-v1}
   fingerprint-key-ring-path: ${IDENTITY_FINGERPRINT_KEY_RING_PATH:/run/secrets/identity-fingerprint/fingerprint.properties}
   challenge-key-ring-path: ${IDENTITY_CHALLENGE_KEY_RING_PATH:/run/secrets/identity-challenge/challenge.properties}
   handoff-key-ring-path: ${IDENTITY_HANDOFF_KEY_RING_PATH:/run/secrets/identity-handoff/handoff.properties}
@@ -85,6 +108,7 @@ management:
         identity.authentication.duration: true
         identity.mfa.duration: true
         identity.password_lifecycle.duration: true
+        identity.erasure.duration: true
         identity.tenant.duration: true
         identity.dependency.duration: true
         identity.password_verify.duration: true

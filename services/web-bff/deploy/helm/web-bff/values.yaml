@@ -10,6 +10,7 @@ service:
   managementPort: 9092
 runtime:
   enabled: false
+  erasureRuntimeEnabled: false
   requireFetchMetadata: true
   publicOrigin: ""
   temporaryStorageLimit: 128Mi
@@ -24,6 +25,20 @@ resources:
     cpu: "2"
     memory: 1Gi
     ephemeral-storage: 256Mi
+database:
+  jdbcUrl: ""
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: web-bff-postgresql
+  port: 5432
+  runtimeSecretName: ""
+  migrationSecretName: ""
+kafka:
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: kafka
+  port: 9093
+  connectionSecretName: ""
 identity:
   namespace: platform-apps
   podLabels:

@@ -113,6 +113,39 @@ Single-server RF1 has no broker redundancy.
 - rebuild desired broker/topic/ACL config from GitOps;
 - replay/reconstruct critical events from service-owned evidence;
 - verify lag/consumer state before reopening dependent async workflows;
+
+### 7.1 Erasure command/receipt recovery and reconciliation
+
+Erasure recovery is a traffic-opening gate, not an ordinary best-effort Kafka catch-up:
+
+1. keep affected authenticated traffic closed and preserve Identity, Authorization, Notification,
+   and Web BFF databases as the service-owned authorities;
+2. identify non-terminal `identity_erasure_request` rows and their snapshotted
+   `identity_erasure_participant` rows by non-PII `erasure_request_id`; never export User, Contact,
+   session, credential, or payload values to incident tooling;
+3. reconcile active `identity_legal_hold` rows first. An active hold keeps incompatible destructive
+   work blocked and never restores login, sessions, Membership authority, or Authorization grants;
+4. inspect the Identity command Outbox and each participant command Inbox/local effect/receipt
+   Outbox. A broker offset or acknowledgement is not completion evidence. Expired processing leases
+   may be reclaimed by the normal finite worker; an `EXHAUSTED` row requires incident review and a
+   reviewed recovery action after its cause is corrected;
+5. recreate the exact versioned command/receipt topics and retention, then restart the normal
+   dispatchers and consumers. Replay only from durable service-owned evidence, retaining the same
+   `event_id`, `erasure_request_id`, and participant policy version; do not create a second logical
+   request or bypass Inbox deduplication;
+6. for every required participant, verify the service-owned effect is complete, its Inbox is
+   terminal, and its non-PII receipt is durably published and applied by Identity. Identity may reach
+   `COMPLETED` only after all four snapshotted participants are `COMPLETED`;
+7. verify the erased User remains `DELETED`/non-authenticatable, BFF sessions are absent,
+   Authorization subject authority is absent, Notification subject payload state is erased as
+   required, and no legal hold was violated;
+8. inspect `ErasureWorkExhausted`, `ErasureReceiptPublicationFailures`, and
+   `ErasureRequestInFlightTooLong`; record non-PII reconciliation counts, IDs, policy versions,
+   timestamps, and operator/incident authorization before reopening traffic.
+
+In the developer-only integrated runtime, `python3 scripts/local/runtime.py smoke-erasure` provides
+an executable four-participant Kafka reconciliation smoke with synthetic UUID-only test state. It is
+not production recovery evidence.
 - record broker-local loss window.
 
 ## 8. Istio/Kyverno

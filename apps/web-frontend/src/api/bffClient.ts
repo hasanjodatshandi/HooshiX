@@ -28,6 +28,7 @@ export type InvitationSummary = Schemas['InvitationSummaryResponse'];
 export type InvitationState = Schemas['InvitationStateResponse'];
 export type InvitationCreated = Schemas['InvitationCreatedResponse'];
 export type AcceptedInvitation = Schemas['AcceptedInvitationResponse'];
+export type SelfErasureAccepted = Schemas['SelfErasureAcceptedResponse'];
 
 type LocalLoginRequest = Schemas['LocalLoginRequest'];
 type SelectTenantRequest = Schemas['SelectTenantRequest'];
@@ -40,6 +41,7 @@ type PasswordRecoveryConfirmRequest = Schemas['PasswordRecoveryConfirmRequest'];
 type StartTotpEnrollmentRequest = Schemas['StartTotpEnrollmentRequest'];
 type ConfirmTotpEnrollmentRequest = Schemas['ConfirmTotpEnrollmentRequest'];
 type OidcStartRequest = Schemas['OidcStartRequest'];
+type SelfErasureRequest = Schemas['SelfErasureRequest'];
 
 function requestId(): string {
   return crypto.randomUUID();
@@ -363,6 +365,15 @@ export async function confirmPasswordRecovery(
   return post<AcceptedResponse>('/api/v1/password/recovery/confirm', body);
 }
 
+export async function requestSelfErasure(
+  body: SelfErasureRequest,
+): Promise<SelfErasureAccepted> {
+  await ensureCsrf();
+  const response = await post<SelfErasureAccepted>('/api/v1/identity/erasure', body);
+  csrfToken = null;
+  return response;
+}
+
 export const bffClient = {
   login,
   completeMfaAuthentication,
@@ -382,6 +393,7 @@ export const bffClient = {
   changePassword,
   requestPasswordRecovery,
   confirmPasswordRecovery,
+  requestSelfErasure,
   getMfaStatus,
   startTotpEnrollment,
   confirmTotpEnrollment,

@@ -17,12 +17,17 @@ import com.sajtech.identity.contract.v1.DeclineInvitationRequest;
 import com.sajtech.identity.contract.v1.DeleteTenantRequest;
 import com.sajtech.identity.contract.v1.CompleteMfaAuthenticationRequest;
 import com.sajtech.identity.contract.v1.EstablishSessionRequest;
+import com.sajtech.identity.contract.v1.BeginParticipantErasureRequest;
+import com.sajtech.identity.contract.v1.CreateLegalHoldRequest;
+import com.sajtech.identity.contract.v1.ErasureCommandEvent;
+import com.sajtech.identity.contract.v1.ErasureReceiptEvent;
 import com.sajtech.identity.contract.v1.MfaProof;
 import com.sajtech.identity.contract.v1.MfaProofType;
 import com.sajtech.identity.contract.v1.MfaSessionCredentials;
 import com.sajtech.identity.contract.v1.ListReceivedInvitationsRequest;
 import com.sajtech.identity.contract.v1.ListTenantInvitationsRequest;
 import com.sajtech.identity.contract.v1.RegisterLocalRequest;
+import com.sajtech.identity.contract.v1.RequestSelfErasureRequest;
 import com.sajtech.identity.contract.v1.ReissueInvitationRequest;
 import com.sajtech.identity.contract.v1.RestoreTenantRequest;
 import com.sajtech.identity.contract.v1.ResumeTenantRequest;
@@ -59,6 +64,20 @@ final class ContractExamplesTest {
                 RequestPasswordRecoveryRequest.newBuilder()),
             example("identity/v1/add-contact.valid.json", AddContactRequest.newBuilder()),
             example("identity/v1/register-local.valid.json", RegisterLocalRequest.newBuilder()),
+            example(
+                "identity/v1/request-self-erasure.valid.json",
+                RequestSelfErasureRequest.newBuilder()),
+            example(
+                "identity/v1/create-legal-hold.valid.json", CreateLegalHoldRequest.newBuilder()),
+            example(
+                "identity/v1/begin-participant-erasure.valid.json",
+                BeginParticipantErasureRequest.newBuilder()),
+            example(
+                "identity/v1/erasure-command-event.valid.json",
+                ErasureCommandEvent.newBuilder()),
+            example(
+                "identity/v1/erasure-receipt-event.valid.json",
+                ErasureReceiptEvent.newBuilder()),
             example("identity/v1/create-tenant.valid.json", CreateTenantRequest.newBuilder()),
             example("identity/v1/suspend-tenant.valid.json", SuspendTenantRequest.newBuilder()),
             example("identity/v1/resume-tenant.valid.json", ResumeTenantRequest.newBuilder()),
