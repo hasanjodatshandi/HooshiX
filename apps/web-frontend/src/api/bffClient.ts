@@ -22,6 +22,12 @@ export type RecoveryCodes = Schemas['RecoveryCodesResponse'];
 export type OidcStartResponse = Schemas['OidcStartResponse'];
 export type ExternalIdentityStatus = Schemas['ExternalIdentityStatusResponse'];
 export type SessionState = Schemas['SessionStateResponse'];
+export type TenantLifecycleResult = Schemas['TenantLifecycleResultResponse'];
+export type InvitationList = Schemas['InvitationListResponse'];
+export type InvitationSummary = Schemas['InvitationSummaryResponse'];
+export type InvitationState = Schemas['InvitationStateResponse'];
+export type InvitationCreated = Schemas['InvitationCreatedResponse'];
+export type AcceptedInvitation = Schemas['AcceptedInvitationResponse'];
 
 type LocalLoginRequest = Schemas['LocalLoginRequest'];
 type SelectTenantRequest = Schemas['SelectTenantRequest'];
@@ -234,6 +240,48 @@ export async function selectTenant(membershipId: string): Promise<TenantSelectio
   return response;
 }
 
+async function tenantLifecycle(
+  tenantId: string,
+  operation: 'suspend' | 'resume' | 'restore',
+): Promise<TenantLifecycleResult> {
+  await ensureCsrf();
+  return postWithoutBody<TenantLifecycleResult>(
+    `/api/v1/identity/tenants/${tenantId}/${operation}`,
+  );
+}
+
+export async function deleteTenant(tenantId: string): Promise<TenantLifecycleResult> {
+  await ensureCsrf();
+  const response = await fetch(`/api/v1/identity/tenants/${tenantId}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers: {
+      'x-request-id': requestId(),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+    },
+  });
+  if (!response.ok) return problem(response, 'tenant deletion failed');
+  const result = await response.json() as TenantLifecycleResult;
+  if (result.csrfToken) csrfToken = result.csrfToken;
+  return result;
+}
+
+async function invitationList(path: string): Promise<InvitationList> {
+  const response = await fetch(path, { credentials: 'same-origin' });
+  if (!response.ok) return problem(response, 'invitation list failed');
+  return response.json() as Promise<InvitationList>;
+}
+
+export const listReceivedInvitations = () =>
+  invitationList('/api/v1/identity/invitations/received');
+
+export const listTenantInvitations = () => invitationList('/api/v1/identity/invitations');
+
+async function invitationMutation<T>(invitationId: string, operation: string): Promise<T> {
+  await ensureCsrf();
+  return postWithoutBody<T>(`/api/v1/identity/invitations/${invitationId}/${operation}`);
+}
+
 
 export async function getProfile(): Promise<Profile> {
   const r = await fetch('/api/v1/identity/profile', { credentials: 'same-origin' });
@@ -344,4 +392,14 @@ export const bffClient = {
   getExternalIdentityStatus,
   startGoogleLink,
   unlinkGoogleIdentity,
+  suspendTenant: (tenantId: string) => tenantLifecycle(tenantId, 'suspend'),
+  resumeTenant: (tenantId: string) => tenantLifecycle(tenantId, 'resume'),
+  restoreTenant: (tenantId: string) => tenantLifecycle(tenantId, 'restore'),
+  deleteTenant,
+  listReceivedInvitations,
+  listTenantInvitations,
+  acceptInvitation: (id: string) => invitationMutation<AcceptedInvitation>(id, 'accept'),
+  declineInvitation: (id: string) => invitationMutation<InvitationState>(id, 'decline'),
+  revokeInvitation: (id: string) => invitationMutation<InvitationState>(id, 'revoke'),
+  reissueInvitation: (id: string) => invitationMutation<InvitationCreated>(id, 'reissue'),
 };

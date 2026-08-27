@@ -15,6 +15,15 @@ service IdentityTenantService {
   rpc InviteExistingUser(InviteExistingUserRequest) returns (InviteExistingUserResponse);
   rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
   rpc RemoveMembership(RemoveMembershipRequest) returns (RemoveMembershipResponse);
+  rpc SuspendTenant(SuspendTenantRequest) returns (SuspendTenantResponse);
+  rpc ResumeTenant(ResumeTenantRequest) returns (ResumeTenantResponse);
+  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse);
+  rpc RestoreTenant(RestoreTenantRequest) returns (RestoreTenantResponse);
+  rpc ListReceivedInvitations(ListReceivedInvitationsRequest) returns (ListReceivedInvitationsResponse);
+  rpc ListTenantInvitations(ListTenantInvitationsRequest) returns (ListTenantInvitationsResponse);
+  rpc DeclineInvitation(DeclineInvitationRequest) returns (DeclineInvitationResponse);
+  rpc RevokeInvitation(RevokeInvitationRequest) returns (RevokeInvitationResponse);
+  rpc ReissueInvitation(ReissueInvitationRequest) returns (ReissueInvitationResponse);
 }
 
 message CreateTenantRequest {
@@ -101,4 +110,136 @@ message RemoveMembershipRequest {
 
 message RemoveMembershipResponse {
   bool accepted = 1;
+}
+
+message SuspendTenantRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string tenant_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message ResumeTenantRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string tenant_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message DeleteTenantRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string tenant_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message RestoreTenantRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string tenant_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message SuspendTenantResponse {
+  string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+  string lifecycle = 2 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  string target_lifecycle = 3 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  bool pending = 4;
+}
+
+message ResumeTenantResponse {
+  string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+  string lifecycle = 2 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  string target_lifecycle = 3 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  bool pending = 4;
+}
+
+message DeleteTenantResponse {
+  string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+  string lifecycle = 2 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  string target_lifecycle = 3 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  bool pending = 4;
+}
+
+message RestoreTenantResponse {
+  string tenant_id = 1 [(buf.validate.field).string.uuid = true];
+  string lifecycle = 2 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  string target_lifecycle = 3 [(buf.validate.field).string = {
+    in: ["PROVISIONING", "ACTIVE", "SUSPENDED", "DELETING", "DELETED"]
+  }];
+  bool pending = 4;
+}
+
+message ListReceivedInvitationsRequest {
+  string refresh_credential = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+}
+
+message ListTenantInvitationsRequest {
+  string refresh_credential = 1 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+}
+
+message InvitationSummary {
+  string invitation_id = 1 [(buf.validate.field).string.uuid = true];
+  string tenant_id = 2 [(buf.validate.field).string.uuid = true];
+  string tenant_name = 3 [(buf.validate.field).string = {min_len: 1 max_len: 120}];
+  string tenant_slug = 4 [(buf.validate.field).string.pattern = "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$"];
+  string state = 5 [(buf.validate.field).string = {
+    in: ["PENDING", "ACCEPTED", "DECLINED", "EXPIRED", "REVOKED"]
+  }];
+  google.protobuf.Timestamp expires_at = 6 [(buf.validate.field).required = true];
+}
+
+message ListReceivedInvitationsResponse {
+  repeated InvitationSummary invitations = 1 [(buf.validate.field).repeated.max_items = 200];
+}
+
+message ListTenantInvitationsResponse {
+  repeated InvitationSummary invitations = 1 [(buf.validate.field).repeated.max_items = 200];
+}
+
+message DeclineInvitationRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string invitation_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message RevokeInvitationRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string invitation_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message ReissueInvitationRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string invitation_id = 3 [(buf.validate.field).string.uuid = true];
+}
+
+message DeclineInvitationResponse {
+  string invitation_id = 1 [(buf.validate.field).string.uuid = true];
+  string state = 2 [(buf.validate.field).string = {
+    in: ["DECLINED", "REVOKED"]
+  }];
+}
+
+message RevokeInvitationResponse {
+  string invitation_id = 1 [(buf.validate.field).string.uuid = true];
+  string state = 2 [(buf.validate.field).string = {
+    in: ["DECLINED", "REVOKED"]
+  }];
+}
+
+message ReissueInvitationResponse {
+  string invitation_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp expires_at = 2 [(buf.validate.field).required = true];
 }

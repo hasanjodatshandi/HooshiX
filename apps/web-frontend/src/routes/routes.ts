@@ -4,6 +4,7 @@ export const routes = {
   login: '/login',
   loginMfa: '/login/mfa',
   tenantSelection: '/tenant-select',
+  tenantManagement: '/tenants/manage',
   application: '/application',
   profile: '/profile',
   passwordRecovery: '/password/recovery',

@@ -6,13 +6,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.sajtech.identity.application.tenant.TenantError;
 import com.sajtech.identity.application.tenant.TenantException;
 import com.sajtech.identity.application.tenant.model.AcceptedInvitation;
+import com.sajtech.identity.application.tenant.model.InvitationMutation;
 import com.sajtech.identity.application.tenant.model.InvitationResult;
+import com.sajtech.identity.application.tenant.model.InvitationSummary;
 import com.sajtech.identity.application.tenant.model.SelectableTenantList;
 import com.sajtech.identity.application.tenant.model.TenantCreation;
+import com.sajtech.identity.application.tenant.model.TenantLifecycleMutation;
 import com.sajtech.identity.application.tenant.model.TenantSelection;
 import com.sajtech.identity.application.tenant.port.in.TenantLifecycle;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -83,6 +87,58 @@ class ObservedTenantLifecycleTest {
     @Override
     public void removeMembership(
         UUID requestId, String refreshCredential, UUID targetMembershipId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public TenantLifecycleMutation suspendTenant(
+        UUID requestId, String refreshCredential, UUID tenantId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public TenantLifecycleMutation resumeTenant(
+        UUID requestId, String refreshCredential, UUID tenantId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public TenantLifecycleMutation deleteTenant(
+        UUID requestId, String refreshCredential, UUID tenantId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public TenantLifecycleMutation restoreTenant(
+        UUID requestId, String refreshCredential, UUID tenantId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<InvitationSummary> listReceivedInvitations(String refreshCredential) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<InvitationSummary> listTenantInvitations(String refreshCredential) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public InvitationMutation declineInvitation(
+        UUID requestId, String refreshCredential, UUID invitationId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public InvitationMutation revokeInvitation(
+        UUID requestId, String refreshCredential, UUID invitationId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public InvitationResult reissueInvitation(
+        UUID requestId, String refreshCredential, UUID invitationId) {
       throw new UnsupportedOperationException();
     }
   }

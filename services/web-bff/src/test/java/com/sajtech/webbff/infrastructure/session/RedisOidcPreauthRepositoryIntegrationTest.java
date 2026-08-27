@@ -46,7 +46,7 @@ class RedisOidcPreauthRepositoryIntegrationTest {
 
   @BeforeEach
   void setUp() throws Exception {
-    clock = Clock.fixed(Instant.parse("2026-08-26T08:00:00Z"), ZoneOffset.UTC);
+    clock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
     SessionCrypto crypto =
         new SessionCrypto(
             ring("locator", (byte) 1, "HmacSHA256", Duration.ofMinutes(5)),

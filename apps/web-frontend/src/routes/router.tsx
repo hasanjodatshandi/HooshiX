@@ -2,6 +2,7 @@ import { ApplicationShell } from '../app/ApplicationShell';
 import { ApplicationPage } from '../pages/ApplicationPage';
 import { LoginPage } from '../pages/LoginPage';
 import { TenantSelectionPage } from '../pages/TenantSelectionPage';
+import { TenantManagementPage } from '../pages/TenantManagementPage';
 import { VerificationFlow } from '../features/verification/VerificationFlow';
 import { ProfileFlow } from '../features/profile/ProfileFlow';
 import { ChangePasswordFlow } from '../features/password/ChangePasswordFlow';
@@ -36,6 +37,10 @@ export function Router() {
 
   if (path === routes.tenantSelection) {
     return <AuthenticatedGuard><TenantSelectionPage /></AuthenticatedGuard>;
+  }
+
+  if (path === routes.tenantManagement) {
+    return <AuthenticatedGuard><TenantManagementPage /></AuthenticatedGuard>;
   }
 
   if (path === routes.profile) {

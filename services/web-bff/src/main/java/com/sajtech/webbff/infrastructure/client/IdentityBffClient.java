@@ -261,6 +261,175 @@ public final class IdentityBffClient implements IdentityGateway {
     }
   }
 
+  @Override
+  public TenantLifecycleResult suspendTenant(UUID requestId, String refresh, UUID tenantId) {
+    try {
+      var r =
+          tenantStub()
+              .suspendTenant(
+                  SuspendTenantRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setTenantId(tenantId.toString())
+                      .build());
+      return tenantLifecycle(
+          r.getTenantId(), r.getLifecycle(), r.getTargetLifecycle(), r.getPending());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
+  public TenantLifecycleResult resumeTenant(UUID requestId, String refresh, UUID tenantId) {
+    try {
+      var r =
+          tenantStub()
+              .resumeTenant(
+                  ResumeTenantRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setTenantId(tenantId.toString())
+                      .build());
+      return tenantLifecycle(
+          r.getTenantId(), r.getLifecycle(), r.getTargetLifecycle(), r.getPending());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
+  public TenantLifecycleResult deleteTenant(UUID requestId, String refresh, UUID tenantId) {
+    try {
+      var r =
+          tenantStub()
+              .deleteTenant(
+                  DeleteTenantRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setTenantId(tenantId.toString())
+                      .build());
+      return tenantLifecycle(
+          r.getTenantId(), r.getLifecycle(), r.getTargetLifecycle(), r.getPending());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
+  public TenantLifecycleResult restoreTenant(UUID requestId, String refresh, UUID tenantId) {
+    try {
+      var r =
+          tenantStub()
+              .restoreTenant(
+                  RestoreTenantRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setTenantId(tenantId.toString())
+                      .build());
+      return tenantLifecycle(
+          r.getTenantId(), r.getLifecycle(), r.getTargetLifecycle(), r.getPending());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  private static TenantLifecycleResult tenantLifecycle(
+      String tenantId, String lifecycle, String targetLifecycle, boolean pending) {
+    return new TenantLifecycleResult(uuid(tenantId), lifecycle, targetLifecycle, pending);
+  }
+
+  @Override
+  public List<Invitation> receivedInvitations(String refresh) {
+    try {
+      return invitations(
+          tenantStub()
+              .listReceivedInvitations(
+                  ListReceivedInvitationsRequest.newBuilder().setRefreshCredential(refresh).build())
+              .getInvitationsList());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
+  public List<Invitation> tenantInvitations(String refresh) {
+    try {
+      return invitations(
+          tenantStub()
+              .listTenantInvitations(
+                  ListTenantInvitationsRequest.newBuilder().setRefreshCredential(refresh).build())
+              .getInvitationsList());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  private static List<Invitation> invitations(
+      List<com.sajtech.identity.contract.v1.InvitationSummary> response) {
+    List<Invitation> result = new ArrayList<>();
+    for (var r : response)
+      result.add(
+          new Invitation(
+              uuid(r.getInvitationId()),
+              uuid(r.getTenantId()),
+              r.getTenantName(),
+              r.getTenantSlug(),
+              r.getState(),
+              instant(r.getExpiresAt())));
+    return List.copyOf(result);
+  }
+
+  @Override
+  public InvitationState declineInvitation(UUID requestId, String refresh, UUID invitationId) {
+    try {
+      var r =
+          tenantStub()
+              .declineInvitation(
+                  DeclineInvitationRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setInvitationId(invitationId.toString())
+                      .build());
+      return new InvitationState(uuid(r.getInvitationId()), r.getState());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
+  public InvitationState revokeInvitation(UUID requestId, String refresh, UUID invitationId) {
+    try {
+      var r =
+          tenantStub()
+              .revokeInvitation(
+                  RevokeInvitationRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setInvitationId(invitationId.toString())
+                      .build());
+      return new InvitationState(uuid(r.getInvitationId()), r.getState());
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
+  @Override
+  public InvitationCreated reissueInvitation(UUID requestId, String refresh, UUID invitationId) {
+    try {
+      var r =
+          tenantStub()
+              .reissueInvitation(
+                  ReissueInvitationRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setRefreshCredential(refresh)
+                      .setInvitationId(invitationId.toString())
+                      .build());
+      return new InvitationCreated(uuid(r.getInvitationId()), instant(r.getExpiresAt()));
+    } catch (StatusRuntimeException e) {
+      throw map(e);
+    }
+  }
+
   public String issueAudienceToken(UUID requestId, String refresh, String audience) {
     try {
       return tokenStub()

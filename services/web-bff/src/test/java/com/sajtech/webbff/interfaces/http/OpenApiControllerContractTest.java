@@ -28,8 +28,8 @@ class OpenApiControllerContractTest {
     Set<Route> controllerRoutes = controllerRoutes();
 
     assertThat(document.get("openapi")).isEqualTo("3.1.0");
-    assertThat(map(document.get("info")).get("version")).isEqualTo("1.4.0");
-    assertThat(openApiRoutes).hasSize(48).containsExactlyInAnyOrderElementsOf(controllerRoutes);
+    assertThat(map(document.get("info")).get("version")).isEqualTo("1.5.0");
+    assertThat(openApiRoutes).hasSize(57).containsExactlyInAnyOrderElementsOf(controllerRoutes);
   }
 
   @Test

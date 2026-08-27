@@ -124,6 +124,160 @@ public final class IdentityTenantGrpcService
         });
   }
 
+  @Override
+  public void suspendTenant(SuspendTenantRequest r, StreamObserver<SuspendTenantResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.suspendTenant(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getTenantId()));
+          return SuspendTenantResponse.newBuilder()
+              .setTenantId(x.tenantId().toString())
+              .setLifecycle(x.lifecycle())
+              .setTargetLifecycle(x.targetLifecycle())
+              .setPending(x.pending())
+              .build();
+        });
+  }
+
+  @Override
+  public void resumeTenant(ResumeTenantRequest r, StreamObserver<ResumeTenantResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.resumeTenant(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getTenantId()));
+          return ResumeTenantResponse.newBuilder()
+              .setTenantId(x.tenantId().toString())
+              .setLifecycle(x.lifecycle())
+              .setTargetLifecycle(x.targetLifecycle())
+              .setPending(x.pending())
+              .build();
+        });
+  }
+
+  @Override
+  public void deleteTenant(DeleteTenantRequest r, StreamObserver<DeleteTenantResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.deleteTenant(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getTenantId()));
+          return DeleteTenantResponse.newBuilder()
+              .setTenantId(x.tenantId().toString())
+              .setLifecycle(x.lifecycle())
+              .setTargetLifecycle(x.targetLifecycle())
+              .setPending(x.pending())
+              .build();
+        });
+  }
+
+  @Override
+  public void restoreTenant(RestoreTenantRequest r, StreamObserver<RestoreTenantResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.restoreTenant(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getTenantId()));
+          return RestoreTenantResponse.newBuilder()
+              .setTenantId(x.tenantId().toString())
+              .setLifecycle(x.lifecycle())
+              .setTargetLifecycle(x.targetLifecycle())
+              .setPending(x.pending())
+              .build();
+        });
+  }
+
+  @Override
+  public void listReceivedInvitations(
+      ListReceivedInvitationsRequest r, StreamObserver<ListReceivedInvitationsResponse> o) {
+    run(
+        o,
+        () -> {
+          var b = ListReceivedInvitationsResponse.newBuilder();
+          for (var x : service.listReceivedInvitations(r.getRefreshCredential()))
+            b.addInvitations(invitation(x));
+          return b.build();
+        });
+  }
+
+  @Override
+  public void listTenantInvitations(
+      ListTenantInvitationsRequest r, StreamObserver<ListTenantInvitationsResponse> o) {
+    run(
+        o,
+        () -> {
+          var b = ListTenantInvitationsResponse.newBuilder();
+          for (var x : service.listTenantInvitations(r.getRefreshCredential()))
+            b.addInvitations(invitation(x));
+          return b.build();
+        });
+  }
+
+  @Override
+  public void declineInvitation(
+      DeclineInvitationRequest r, StreamObserver<DeclineInvitationResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.declineInvitation(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getInvitationId()));
+          return DeclineInvitationResponse.newBuilder()
+              .setInvitationId(x.invitationId().toString())
+              .setState(x.state())
+              .build();
+        });
+  }
+
+  @Override
+  public void revokeInvitation(
+      RevokeInvitationRequest r, StreamObserver<RevokeInvitationResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.revokeInvitation(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getInvitationId()));
+          return RevokeInvitationResponse.newBuilder()
+              .setInvitationId(x.invitationId().toString())
+              .setState(x.state())
+              .build();
+        });
+  }
+
+  @Override
+  public void reissueInvitation(
+      ReissueInvitationRequest r, StreamObserver<ReissueInvitationResponse> o) {
+    run(
+        o,
+        () -> {
+          var x =
+              service.reissueInvitation(
+                  request(r.getRequestId()), r.getRefreshCredential(), id(r.getInvitationId()));
+          return ReissueInvitationResponse.newBuilder()
+              .setInvitationId(x.invitationId().toString())
+              .setExpiresAt(ts(x.expiresAt()))
+              .build();
+        });
+  }
+
+  private static com.sajtech.identity.contract.v1.InvitationSummary invitation(
+      com.sajtech.identity.application.tenant.model.InvitationSummary x) {
+    return com.sajtech.identity.contract.v1.InvitationSummary.newBuilder()
+        .setInvitationId(x.invitationId().toString())
+        .setTenantId(x.tenantId().toString())
+        .setTenantName(x.tenantName())
+        .setTenantSlug(x.tenantSlug())
+        .setState(x.state())
+        .setExpiresAt(ts(x.expiresAt()))
+        .build();
+  }
+
   private static UUID id(String v) {
     try {
       UUID x = UUID.fromString(v);
@@ -157,7 +311,11 @@ public final class IdentityTenantGrpcService
           TENANT_NOT_SELECTABLE,
           INVITATION_NOT_PENDING,
           INVITATION_EXPIRED,
+          INVITATION_REISSUE_FORBIDDEN,
           INVITATION_TARGET_MISMATCH,
+          TENANT_LIFECYCLE_PENDING,
+          TENANT_LIFECYCLE_INVALID,
+          TENANT_RESTORE_FORBIDDEN,
           VERIFIED_CONTACT_REQUIRED,
           SESSION_STATE_INVALID ->
           Status.FAILED_PRECONDITION;

@@ -173,6 +173,74 @@ class TenantLifecycleServiceTest {
     verify(tenants).commitMembershipRemoval(requestId, NOW);
   }
 
+  @Test
+  void platformLifecyclePermissionIsCheckedOutsideTransactionBeforeDurableCommand() {
+    LockedRefreshCredential current = onboarding();
+    when(authentication.lockRefreshCredential(currentDigest)).thenReturn(Optional.of(current));
+    UUID requestId = UUID.randomUUID(), tenantId = UUID.randomUUID();
+    doAnswer(
+            invocation -> {
+              assertThat(transactions.inTransaction()).isFalse();
+              return null;
+            })
+        .when(authorization)
+        .checkPlatformPermission(current.userId(), "platform.tenant.suspend");
+    when(tenants.requestTenantLifecycle(
+            eq(requestId),
+            eq(current.userId()),
+            eq(tenantId),
+            eq("ACTIVE"),
+            eq("SUSPENDED"),
+            any(byte[].class),
+            eq(NOW)))
+        .thenAnswer(
+            invocation -> {
+              assertThat(transactions.inTransaction()).isTrue();
+              return new TenantLifecycleMutation(tenantId, "ACTIVE", "SUSPENDED", true);
+            });
+
+    TenantLifecycleMutation result = service.suspendTenant(requestId, "refresh", tenantId);
+
+    assertThat(result.pending()).isTrue();
+    verify(authorization).checkPlatformPermission(current.userId(), "platform.tenant.suspend");
+  }
+
+  @Test
+  void deleteChecksSelectedTenantOwnerPermissionOutsideTransaction() {
+    LockedRefreshCredential current = tenantAuthenticated();
+    when(authentication.lockRefreshCredential(currentDigest)).thenReturn(Optional.of(current));
+    when(tenants.isSelectable(
+            current.userId(), current.selectedTenantId(), current.selectedMembershipId()))
+        .thenReturn(true);
+    UUID requestId = UUID.randomUUID();
+    doAnswer(
+            invocation -> {
+              assertThat(transactions.inTransaction()).isFalse();
+              return null;
+            })
+        .when(authorization)
+        .checkPermission(
+            current.selectedTenantId(), current.selectedMembershipId(), "tenant.delete");
+    when(tenants.requestTenantLifecycle(
+            eq(requestId),
+            eq(current.userId()),
+            eq(current.selectedTenantId()),
+            eq("ACTIVE"),
+            eq("DELETING"),
+            any(byte[].class),
+            eq(NOW)))
+        .thenReturn(
+            new TenantLifecycleMutation(current.selectedTenantId(), "ACTIVE", "DELETED", true));
+
+    TenantLifecycleMutation result =
+        service.deleteTenant(requestId, "refresh", current.selectedTenantId());
+
+    assertThat(result.targetLifecycle()).isEqualTo("DELETED");
+    verify(authorization)
+        .checkPermission(
+            current.selectedTenantId(), current.selectedMembershipId(), "tenant.delete");
+  }
+
   private LockedRefreshCredential onboarding() {
     return new LockedRefreshCredential(
         UUID.randomUUID(),

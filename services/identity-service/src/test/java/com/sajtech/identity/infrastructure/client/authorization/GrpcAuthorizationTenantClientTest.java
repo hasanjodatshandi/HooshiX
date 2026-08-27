@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.sajtech.authorization.contract.v1.AuthorizationServiceGrpc;
 import com.sajtech.authorization.contract.v1.CheckPermissionRequest;
 import com.sajtech.authorization.contract.v1.CheckPermissionResponse;
+import com.sajtech.authorization.contract.v1.CheckPlatformPermissionRequest;
+import com.sajtech.authorization.contract.v1.CheckPlatformPermissionResponse;
 import io.grpc.ManagedChannel;
 import io.grpc.Metadata;
 import io.grpc.Server;
@@ -36,6 +38,14 @@ class GrpcAuthorizationTenantClientTest {
             observer.onNext(CheckPermissionResponse.getDefaultInstance());
             observer.onCompleted();
           }
+
+          @Override
+          public void checkPlatformPermission(
+              CheckPlatformPermissionRequest request,
+              StreamObserver<CheckPlatformPermissionResponse> observer) {
+            observer.onNext(CheckPlatformPermissionResponse.getDefaultInstance());
+            observer.onCompleted();
+          }
         };
     Server server =
         InProcessServerBuilder.forName(serverName)
@@ -57,8 +67,9 @@ class GrpcAuthorizationTenantClientTest {
             .start();
     ManagedChannel channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
     try {
-      new GrpcAuthorizationTenantClient(channel)
-          .checkPermission(UUID.randomUUID(), UUID.randomUUID(), "membership.role.assign");
+      GrpcAuthorizationTenantClient client = new GrpcAuthorizationTenantClient(channel);
+      client.checkPermission(UUID.randomUUID(), UUID.randomUUID(), "membership.role.assign");
+      client.checkPlatformPermission(UUID.randomUUID(), "platform.tenant.suspend");
       assertThat(caller.get()).isEqualTo("identity-service");
     } finally {
       channel.shutdownNow();

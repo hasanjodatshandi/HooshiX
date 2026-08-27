@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.sajtech.identity.application.authentication.model.*;
 import com.sajtech.identity.application.registration.model.FingerprintDigest;
 import com.sajtech.identity.application.registration.port.out.IntentFingerprintPort;
+import com.sajtech.identity.application.tenant.TenantError;
 import com.sajtech.identity.application.tenant.model.*;
 import com.sajtech.identity.infrastructure.observability.AuthorizationOutboxMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -287,6 +288,222 @@ class IdentityTenantPersistenceIntegrationTest {
                     """)
                 .getValues(0, String.class));
     assertThat(plan).contains("identity_authorization_outbox_oldest_unresolved_idx");
+  }
+
+  @Test
+  void deleteAndRestoreFinalizeOnlyAfterOrderedAuthorizationAcknowledgements() {
+    TenantCreation created = activeTenant("Lifecycle Tenant", "lifecycle-tenant", 10);
+    UUID contact = insertVerifiedEmail(targetUser, "lifecycle-target@example.com");
+    InvitationResult invitation =
+        tx.required(
+            () ->
+                tenantStore.createInvitation(
+                    UUID.randomUUID(),
+                    ownerUser,
+                    created.tenantId(),
+                    contact,
+                    material(11),
+                    NOW.plusSeconds(2),
+                    NOW.plus(Duration.ofDays(7))));
+
+    UUID deleteRequest = UUID.randomUUID();
+    TenantLifecycleMutation accepted =
+        tx.required(
+            () ->
+                tenantStore.requestTenantLifecycle(
+                    deleteRequest,
+                    ownerUser,
+                    created.tenantId(),
+                    "ACTIVE",
+                    "DELETING",
+                    material(12),
+                    NOW.plusSeconds(3)));
+    assertThat(accepted.lifecycle()).isEqualTo("ACTIVE");
+    assertThat(accepted.targetLifecycle()).isEqualTo("DELETED");
+    assertThat(accepted.pending()).isTrue();
+    assertThat(
+            tx.required(
+                () ->
+                    tenantStore.requestTenantLifecycle(
+                        deleteRequest,
+                        ownerUser,
+                        created.tenantId(),
+                        "ACTIVE",
+                        "DELETING",
+                        material(12),
+                        NOW.plusSeconds(3))))
+        .isEqualTo(accepted);
+    assertThatThrownBy(
+            () ->
+                tx.required(
+                    () ->
+                        tenantStore.requestTenantLifecycle(
+                            UUID.randomUUID(),
+                            ownerUser,
+                            created.tenantId(),
+                            "ACTIVE",
+                            "SUSPENDED",
+                            material(13),
+                            NOW.plusSeconds(3))))
+        .isInstanceOfSatisfying(
+            com.sajtech.identity.application.tenant.TenantException.class,
+            failure -> assertThat(failure.error()).isEqualTo(TenantError.TENANT_LIFECYCLE_PENDING));
+
+    AuthorizationOutboxItem deleting = claimOne(NOW.plusSeconds(3));
+    assertThat(deleting.lifecycle()).isEqualTo("DELETING");
+    complete(deleting, NOW.plusSeconds(4));
+    assertThat(
+            dsl.fetchValue(
+                "SELECT lifecycle FROM identity_tenant WHERE tenant_id=?", created.tenantId()))
+        .isEqualTo("DELETING");
+    assertThat(
+            dsl.fetchValue(
+                "SELECT state FROM identity_invitation_query WHERE invitation_id=?",
+                invitation.invitationId()))
+        .isEqualTo("REVOKED");
+
+    AuthorizationOutboxItem deleted = claimOne(NOW.plusSeconds(4));
+    assertThat(deleted.lifecycle()).isEqualTo("DELETED");
+    complete(deleted, NOW.plusSeconds(5));
+    assertThat(
+            dsl.fetchValue(
+                "SELECT lifecycle FROM identity_tenant WHERE tenant_id=?", created.tenantId()))
+        .isEqualTo("DELETED");
+
+    TenantLifecycleMutation restoring =
+        tx.required(
+            () ->
+                tenantStore.restoreTenant(
+                    UUID.randomUUID(),
+                    ownerUser,
+                    created.tenantId(),
+                    material(14),
+                    NOW.plusSeconds(6)));
+    assertThat(restoring.lifecycle()).isEqualTo("PROVISIONING");
+    assertThat(restoring.targetLifecycle()).isEqualTo("ACTIVE");
+    complete(claimOne(NOW.plusSeconds(6)), NOW.plusSeconds(7));
+    assertThat(
+            dsl.fetchValue(
+                "SELECT lifecycle FROM identity_tenant WHERE tenant_id=?", created.tenantId()))
+        .isEqualTo("ACTIVE");
+
+    dsl.execute(
+        "UPDATE identity_tenant SET lifecycle='DELETED',purge_started_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
+        OffsetDateTime.ofInstant(NOW.plusSeconds(8), ZoneOffset.UTC),
+        created.tenantId());
+    assertThatThrownBy(
+            () ->
+                tx.required(
+                    () ->
+                        tenantStore.restoreTenant(
+                            UUID.randomUUID(),
+                            ownerUser,
+                            created.tenantId(),
+                            material(15),
+                            NOW.plusSeconds(9))))
+        .isInstanceOfSatisfying(
+            com.sajtech.identity.application.tenant.TenantException.class,
+            failure -> assertThat(failure.error()).isEqualTo(TenantError.TENANT_RESTORE_FORBIDDEN));
+  }
+
+  @Test
+  void invitationsDeclineReissueExpireAndRevokeWithFreshTtl() {
+    TenantCreation created = activeTenant("Invitation Tenant", "invitation-tenant", 20);
+    UUID contact = insertVerifiedEmail(targetUser, "invitation-target@example.com");
+    InvitationResult original =
+        tx.required(
+            () ->
+                tenantStore.createInvitation(
+                    UUID.randomUUID(),
+                    ownerUser,
+                    created.tenantId(),
+                    contact,
+                    material(21),
+                    NOW.plusSeconds(2),
+                    NOW.plus(Duration.ofDays(7))));
+    InvitationMutation declined =
+        tx.required(
+            () ->
+                tenantStore.declineInvitation(
+                    UUID.randomUUID(),
+                    targetUser,
+                    original.invitationId(),
+                    material(22),
+                    NOW.plusSeconds(3)));
+    assertThat(declined.state()).isEqualTo("DECLINED");
+
+    Instant reissuedAt = NOW.plusSeconds(4);
+    InvitationResult reissued =
+        tx.required(
+            () ->
+                tenantStore.reissueInvitation(
+                    UUID.randomUUID(),
+                    ownerUser,
+                    created.tenantId(),
+                    original.invitationId(),
+                    material(23),
+                    reissuedAt,
+                    reissuedAt.plus(Duration.ofDays(7))));
+    assertThat(reissued.expiresAt()).isEqualTo(reissuedAt.plus(Duration.ofDays(7)));
+    assertThat(
+            dsl.fetchValue(
+                "SELECT reissued_from_invitation_id FROM identity_tenant_invitation WHERE invitation_id=?",
+                reissued.invitationId()))
+        .isEqualTo(original.invitationId());
+
+    Instant afterExpiry = reissuedAt.plus(Duration.ofDays(7));
+    assertThat(tx.required(() -> tenantStore.expireInvitations(afterExpiry, 200))).isEqualTo(1);
+    assertThat(tx.required(() -> tenantStore.listReceivedInvitations(targetUser, afterExpiry)))
+        .filteredOn(invitation -> invitation.invitationId().equals(reissued.invitationId()))
+        .singleElement()
+        .satisfies(invitation -> assertThat(invitation.state()).isEqualTo("EXPIRED"));
+
+    InvitationResult second =
+        tx.required(
+            () ->
+                tenantStore.reissueInvitation(
+                    UUID.randomUUID(),
+                    ownerUser,
+                    created.tenantId(),
+                    reissued.invitationId(),
+                    material(24),
+                    afterExpiry.plusSeconds(1),
+                    afterExpiry.plus(Duration.ofDays(7))));
+    InvitationMutation revoked =
+        tx.required(
+            () ->
+                tenantStore.revokeInvitation(
+                    UUID.randomUUID(),
+                    ownerUser,
+                    created.tenantId(),
+                    second.invitationId(),
+                    material(25),
+                    afterExpiry.plusSeconds(2)));
+    assertThat(revoked.state()).isEqualTo("REVOKED");
+  }
+
+  private TenantCreation activeTenant(String name, String slug, int marker) {
+    TenantCreation created =
+        tx.required(
+            () ->
+                tenantStore.createTenant(
+                    UUID.randomUUID(), ownerUser, name, slug, material(marker), NOW));
+    AuthorizationOutboxItem owner = claimOne(NOW);
+    complete(owner, NOW.plusSeconds(1));
+    return created;
+  }
+
+  private AuthorizationOutboxItem claimOne(Instant now) {
+    return tx.required(() -> tenantStore.claimAuthorizationOutbox(now, 32, now.plusSeconds(30)))
+        .getFirst();
+  }
+
+  private void complete(AuthorizationOutboxItem item, Instant now) {
+    tx.required(
+        () -> {
+          tenantStore.completeAuthorizationOutbox(item.outboxId(), now);
+          return null;
+        });
   }
 
   private void insertUser(UUID user) {

@@ -51,7 +51,7 @@ class IdentityMigrationProfileIntegrationTest {
           var result =
               statement.executeQuery("SELECT count(*) FROM flyway_schema_history WHERE success")) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(11);
+        assertThat(result.getInt(1)).isEqualTo(12);
       }
       try (var connection =
               DriverManager.getConnection(
@@ -71,10 +71,21 @@ class IdentityMigrationProfileIntegrationTest {
                       SELECT 1 FROM information_schema.columns
                       WHERE table_name = 'identity_refresh_family'
                         AND column_name = 'mfa_authenticated_at'
-                    )
+                    ),
+                    EXISTS (
+                      SELECT 1 FROM information_schema.columns
+                      WHERE table_name = 'identity_tenant'
+                        AND column_name = 'purge_started_at'
+                    ),
+                    EXISTS (
+                      SELECT 1 FROM information_schema.columns
+                      WHERE table_name = 'identity_tenant_invitation'
+                        AND column_name = 'reissued_from_invitation_id'
+                    ),
+                    to_regclass('identity_authorization_outbox_one_tenant_lifecycle_pending_idx') IS NOT NULL
                   """)) {
         assertThat(result.next()).isTrue();
-        for (int column = 1; column <= 7; column++) {
+        for (int column = 1; column <= 10; column++) {
           assertThat(result.getBoolean(column)).isTrue();
         }
       }

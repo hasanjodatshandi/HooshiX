@@ -958,6 +958,17 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  @ConditionalOnProperty(prefix = "identity", name = "tenant-runtime-enabled", havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.InvitationExpiryWorker invitationExpiryWorker(
+      com.sajtech.identity.infrastructure.persistence.JooqTenantStore store,
+      TransactionRunner tx,
+      Clock clock,
+      MeterRegistry meters) {
+    return new com.sajtech.identity.infrastructure.worker.InvitationExpiryWorker(
+        store, tx, clock, meters);
+  }
+
+  @Bean
   SafeTracingServerInterceptor tracing(OpenTelemetry otel) {
     return new SafeTracingServerInterceptor(otel);
   }

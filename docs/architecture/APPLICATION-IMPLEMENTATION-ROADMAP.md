@@ -42,9 +42,7 @@ The application is not yet a complete end-user product. Current material gaps ar
 - the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
 - Google OIDC/ExternalIdentity is implemented in the repository; deployed real-provider execution remains NOT VERIFIED;
-- data-subject erasure is incomplete;
-- remaining Tenant lifecycle operations are incomplete;
-- application Kafka runtime is not yet required by an implemented asynchronous use case;
+- data-subject erasure and its first justified application Kafka workflow are incomplete;
 - Reference Data independent service remains intentionally gated by ADR-0041;
 - Conversation/Workflow/Agent/LLM/tool-execution and other core AI-product bounded contexts are not yet defined and must not be created speculatively.
 
@@ -79,11 +77,11 @@ The following is the one ordered application-completion sequence. Do not start a
 
 | Order | Completion step | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.4.0 covers all 48 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
+| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.5.0 covers all 57 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
 | 2 | MFA/TOTP | `COMPLETED` | TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, CSRF reload recovery, and repository security evidence are implemented. Deployed production evidence remains a separate readiness concern. |
 | 3 | Google OIDC / ExternalIdentity | `COMPLETED` | BFF Authorization Code + PKCE/state/nonce, bounded encrypted pre-auth custody, Google issuer/audience/authorized-party/time validation, fail-closed semantic quota, Identity issuer+subject binding/link semantics, email collision protection, provider-token isolation, MFA continuation, OpenAPI/UI, observability, and negative/replay tests are implemented. Real deployed Google-provider execution remains a separate readiness concern. |
-| 4 | Complete Tenant lifecycle | `NEXT` | Complete suspend/resume/delete/restore and remaining Invitation lifecycle behavior with Identity/Authorization coordination, owner safety, audit, BFF/OpenAPI/UI, and recovery tests. |
-| 5 | Data Subject Erasure + Kafka | `PLANNED` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
+| 4 | Complete Tenant lifecycle | `COMPLETED` | Suspend/resume/delete/restore and Invitation decline/revoke/expire/reissue are implemented with Identity/Authorization coordination, owner safety, durable replay, BFF OpenAPI/UI, migration, observability, and negative/recovery tests. |
+| 5 | Data Subject Erasure + Kafka | `NEXT` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
 | 6 | Core AI Product Architecture | `PLANNED` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
 | 7 | Core AI Product vertical slices | `PLANNED` | Implement the accepted core-product architecture in vertical slices. Service/module boundaries come from step 6 evidence, not from speculative names. |
 | 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
@@ -99,24 +97,25 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Step 4 — Complete Tenant lifecycle
+Step 5 — Data Subject Erasure + Kafka
 ```
 
 The target invariant is:
 
 ```text
-Tenant lifecycle authority          -> Identity owns canonical state; Authorization owns permission projection
-suspend/resume                      -> platform capability, audited, fail closed, no stale tenant authority
-delete                              -> tenant.delete owner authorization, DELETING first, pending invitations revoked
-cleanup acknowledgement             -> durable outbox; DELETED only after Authorization deny/cleanup ACK
-restore                             -> platform capability, before irreversible purge, PROVISIONING until reconciliation ACK
-Invitation lifecycle                -> decline/revoke/expire/reissue with target, TTL, and tenant-state invariants
-owner safety                        -> Authorization reservation protocol; no check-then-remove race
-BFF OpenAPI/UI                      -> stable lifecycle errors, current session/CSRF/assurance rules
-recovery and observability           -> idempotent replay, crash recovery, alerts, audit, migration and negative tests
+coordination authority              -> Identity owns the server-defined participant policy and global request state
+self-erasure acceptance             -> recent auth/MFA, Membership precondition, DELETING, session and invitation revocation atomically
+transport                           -> versioned Protobuf events over Kafka after a local Transactional Outbox commit
+participant effects                 -> service-owned erase/anonymize/retention actions with atomic Inbox/idempotency
+legal hold                          -> platform/legal-authorized durable ledger; blocks purge but never restores authentication
+receipts                            -> durable non-PII participant progress through participant Outbox events
+completion                          -> impossible until every snapshotted required participant has a current successful receipt
+retry and recovery                  -> finite observable retry/DLQ plus 35-day publication and dedup evidence
+restore reconciliation              -> replay erasure/legal-hold evidence before restored traffic can open
+security and observability          -> no PII/secrets in events, DLQs, receipts, logs, traces, or metric labels
 ```
 
-The browser continues to consume only the BFF public contract. Identity remains canonical Tenant/Membership/Invitation lifecycle authority; Authorization remains authoritative for permissions, platform capabilities, owner safety, and lifecycle deny/cleanup projection. Remote calls never run inside Identity database transactions, and all durable commands retain stable idempotency identities.
+The browser continues to consume only the BFF public contract. Identity remains global erasure coordinator while each bounded context exclusively owns its local erasure effect. Kafka is recoverable transport rather than business authority; no broker acknowledgement replaces a local database commit or participant receipt. Remote calls and Kafka publication never run inside a business transaction, and stable event/request identities preserve at-least-once replay safety.
 
 ## 7. Rules for updating this roadmap
 
