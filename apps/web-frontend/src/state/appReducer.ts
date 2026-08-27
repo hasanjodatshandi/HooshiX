@@ -11,6 +11,7 @@ export type AppEvent =
   | { type: 'VERIFICATION_FAILED'; error: string }
   | { type: 'ERROR_CLEARED' }
   | { type: 'SESSION_EXPIRED' }
+  | { type: 'ACCOUNT_ERASED' }
   | { type: 'TENANT_SELECTED'; tenantId: string }
   | { type: 'TENANT_CLEARED' }
   | { type: 'LOGIN_SUCCEEDED' };
@@ -47,6 +48,7 @@ export function appReducer(state: AppModel, event: AppEvent): AppModel {
     case 'VERIFICATION_FAILED': return { ...state, verificationStatus: 'failed', lastError: event.error };
     case 'ERROR_CLEARED': return { ...state, lastError: null };
     case 'SESSION_EXPIRED': return { ...state, authenticated: false, status: 'expired' };
+    case 'ACCOUNT_ERASED': return { ...initialAppModel };
     case 'TENANT_SELECTED': return { ...state, selectedTenantId: event.tenantId };
     case 'TENANT_CLEARED': return { ...state, selectedTenantId: null };
     case 'LOGIN_SUCCEEDED': return { ...state, authenticated: true, status: 'ready' };

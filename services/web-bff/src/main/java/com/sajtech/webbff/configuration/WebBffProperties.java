@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties(prefix = "web-bff")
 public record WebBffProperties(
@@ -72,6 +73,7 @@ public record WebBffProperties(
         1);
   }
 
+  @ConstructorBinding
   public WebBffProperties {
     if (publicOrigin == null
         || !"https".equalsIgnoreCase(publicOrigin.getScheme())

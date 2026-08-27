@@ -10,6 +10,7 @@ import { PasswordRecoveryFlow } from '../features/password/PasswordRecoveryFlow'
 import { MfaLoginFlow } from '../features/mfa/MfaLoginFlow';
 import { MfaSettingsFlow } from '../features/mfa/MfaSettingsFlow';
 import { ExternalIdentitySettingsFlow } from '../features/externalIdentity/ExternalIdentitySettingsFlow';
+import { AccountErasureFlow } from '../features/erasure/AccountErasureFlow';
 import { OidcCompletionPage } from '../pages/OidcCompletionPage';
 import { VerificationGuard, AuthenticatedGuard } from './guards';
 import { routes } from './routes';
@@ -63,6 +64,10 @@ export function Router() {
 
   if (path === routes.externalIdentities) {
     return <AuthenticatedGuard><ExternalIdentitySettingsFlow /></AuthenticatedGuard>;
+  }
+
+  if (path === routes.accountErasure) {
+    return <AuthenticatedGuard><AccountErasureFlow /></AuthenticatedGuard>;
   }
 
   if (path === routes.application) {

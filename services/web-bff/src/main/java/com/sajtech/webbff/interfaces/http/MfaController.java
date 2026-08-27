@@ -14,9 +14,11 @@ import jakarta.validation.constraints.Pattern;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Profile("!migration")
 @RequestMapping("/api/v1/identity/mfa")
 public final class MfaController {
   private final IdentityGateway identity;

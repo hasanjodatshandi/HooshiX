@@ -55,6 +55,20 @@ data:
             for: 2m
             labels: {severity: warning}
             annotations: {summary: "OpenTelemetry Collector exporter queue is above 80 percent"}
+          - alert: ErasureWorkExhausted
+            expr: sum(increase({__name__=~"identity_erasure_(outbox|participant|receipt)_exhausted_total|authorization_erasure_exhausted_total|notification_erasure_exhausted_total|web_bff_erasure_exhausted_total"}[5m])) > 0
+            labels: {severity: critical}
+            annotations: {summary: "A data-subject erasure command, participant, or receipt exhausted finite retries"}
+          - alert: ErasureReceiptPublicationFailures
+            expr: sum(increase({__name__=~"identity_erasure_receipt_outbox_failures_total|authorization_erasure_receipt_outbox_failures_total|notification_erasure_receipt_outbox_failures_total|web_bff_erasure_receipt_outbox_failures_total"}[5m])) > 3
+            for: 2m
+            labels: {severity: warning}
+            annotations: {summary: "Erasure receipt publication is repeatedly failing"}
+          - alert: ErasureRequestInFlightTooLong
+            expr: identity_erasure_in_flight > 0
+            for: 1h
+            labels: {severity: warning}
+            annotations: {summary: "At least one data-subject erasure request has remained in flight for one hour"}
 ---
 apiVersion: apps/v1
 kind: Deployment

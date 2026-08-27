@@ -27,4 +27,13 @@
     <Class name="com.sajtech.authorization.infrastructure.observability.ObservedAdminQuota" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Or>
+      <Class name="com.sajtech.authorization.infrastructure.erasure.AuthorizationErasureListener" />
+      <Class name="com.sajtech.authorization.infrastructure.erasure.AuthorizationErasureReceiptDispatcher" />
+      <Class name="com.sajtech.authorization.infrastructure.erasure.AuthorizationErasureWorker" />
+      <Class name="com.sajtech.authorization.infrastructure.erasure.JooqAuthorizationErasureRepository" />
+    </Or>
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

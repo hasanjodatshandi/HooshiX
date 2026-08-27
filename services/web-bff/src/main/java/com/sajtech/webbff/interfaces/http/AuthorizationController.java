@@ -8,10 +8,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.*;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Profile("!migration")
 @RequestMapping("/api/v1/authorization")
 public final class AuthorizationController {
   private final IdentityGateway identity;

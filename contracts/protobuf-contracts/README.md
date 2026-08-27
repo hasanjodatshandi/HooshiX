@@ -10,15 +10,16 @@ Maven coordinates:
 
 Example:
 
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.7.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
 
 The JAR contains generated Protobuf and gRPC transport classes, Protovalidate rules, and the
 `ContractValidationServerInterceptor` used to enforce those rules at a server boundary.
 
-The current 1.7.0 release adds backward-compatible Identity tenant lifecycle and invitation
-management contracts. Suspend, resume, delete, restore, invitation listing, decline, revoke, and
-reissue requests and responses have executable Protovalidate rules and tested consumer examples.
-It retains all 1.6.0 operations and wire field numbers.
+The current 1.8.0 release adds backward-compatible Identity data-subject erasure contracts. The
+self-erasure, legal-hold, participant-target resolution, Kafka command, and non-PII receipt
+messages have executable Protovalidate rules and tested consumer examples. Coordination events
+contain only non-PII workflow identifiers and policy metadata. It retains all 1.7.0 operations and
+wire field numbers.
 
 ## Validation
 

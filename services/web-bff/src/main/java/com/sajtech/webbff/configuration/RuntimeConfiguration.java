@@ -1,6 +1,7 @@
 package com.sajtech.webbff.configuration;
 
 import com.sajtech.webbff.infrastructure.client.*;
+import com.sajtech.webbff.infrastructure.erasure.*;
 import com.sajtech.webbff.infrastructure.health.WebBffReadinessHealthIndicator;
 import com.sajtech.webbff.infrastructure.observability.*;
 import com.sajtech.webbff.infrastructure.quota.*;
@@ -15,17 +16,72 @@ import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.util.List;
+import org.jooq.DSLContext;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.*;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
+@Profile("!migration")
 @EnableConfigurationProperties(WebBffProperties.class)
 public class RuntimeConfiguration {
   @Bean
   Clock webBffClock() {
     return Clock.systemUTC();
+  }
+
+  @Bean
+  TransactionTemplate webBffTransactions(PlatformTransactionManager manager) {
+    return new TransactionTemplate(manager);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "web-bff", name = "erasure-runtime-enabled", havingValue = "true")
+  JooqWebBffErasureRepository webBffErasureRepository(DSLContext dsl) {
+    return new JooqWebBffErasureRepository(dsl);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "web-bff", name = "erasure-runtime-enabled", havingValue = "true")
+  IdentityErasureTargetClient identityErasureTargetClient(
+      @Qualifier("webBffIdentityChannel") ManagedChannel channel) {
+    return new IdentityErasureTargetClient(channel);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "web-bff", name = "erasure-runtime-enabled", havingValue = "true")
+  WebBffErasureListener webBffErasureListener(
+      JooqWebBffErasureRepository repository, TransactionTemplate transactions, Clock clock) {
+    return new WebBffErasureListener(repository, transactions, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "web-bff", name = "erasure-runtime-enabled", havingValue = "true")
+  WebBffErasureWorker webBffErasureWorker(
+      IdentityErasureTargetClient identity,
+      JooqWebBffErasureRepository repository,
+      RedisBffSessionRepository sessions,
+      TransactionTemplate transactions,
+      Clock clock,
+      MeterRegistry meters) {
+    return new WebBffErasureWorker(identity, repository, sessions, transactions, clock, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "web-bff", name = "erasure-runtime-enabled", havingValue = "true")
+  WebBffErasureReceiptDispatcher webBffErasureReceiptDispatcher(
+      DSLContext dsl,
+      org.springframework.kafka.core.KafkaTemplate<String, byte[]> kafka,
+      TransactionTemplate transactions,
+      Clock clock,
+      @Value("${web-bff.erasure-receipt-topic:hooshix.identity.erasure.receipt.v1}") String topic,
+      MeterRegistry meters) {
+    return new WebBffErasureReceiptDispatcher(dsl, kafka, transactions, clock, topic, meters);
   }
 
   @Bean("webBffLocatorKeys")

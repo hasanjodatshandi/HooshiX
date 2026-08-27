@@ -193,6 +193,32 @@ edges:
       - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
       - docs/architecture/services/notification-service.md
 
+  - operation_id: identity.erasure-command-publication
+    caller_owner: Identity
+    dependency_id: kafka.hooshix-identity-erasure-command-v1
+    class: DURABLE_COMMAND
+    failure_action: "command outbox remains pending or explicitly exhausted; erasure request never completes from broker acknowledgement alone"
+    retry_owner: Identity durable erasure command dispatcher
+    fallback: "none; PostgreSQL coordination state/outbox remains authority"
+    owner: Identity
+    policy_refs:
+      - docs/adr/0015-define-kafka-production-durability-and-rebuildable-dr-v1.md
+      - docs/adr/0028-define-data-subject-erasure-execution-and-evidence-v1.md
+      - docs/architecture/services/identity-service.md
+
+  - operation_id: erasure.participant-receipt-publication
+    caller_owner: required erasure participant
+    dependency_id: kafka.hooshix-identity-erasure-receipt-v1
+    class: DURABLE_COMMAND
+    failure_action: "participant receipt outbox remains pending or explicitly exhausted; Identity keeps the request incomplete"
+    retry_owner: participant durable receipt dispatcher
+    fallback: "none; participant database effect and receipt outbox remain authority"
+    owner: participating bounded context
+    policy_refs:
+      - docs/adr/0015-define-kafka-production-durability-and-rebuildable-dr-v1.md
+      - docs/adr/0028-define-data-subject-erasure-execution-and-evidence-v1.md
+      - docs/architecture/data-and-messaging.md
+
   - operation_id: notification.provider-dispatch
     caller_owner: Notification
     dependency_id: email-or-sms-provider

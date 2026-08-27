@@ -171,11 +171,17 @@ Broker data is not business truth.
 
 Before restored business data receives traffic:
 
-- reconcile current erasure requests/evidence;
-- reconcile legal hold;
-- ensure erased Users do not regain authentication/session/Authorization authority;
-- ensure participant replay is idempotent;
-- record non-PII reconciliation evidence.
+- follow `docs/operations/incident-response-runbook.md` §7.1 against the isolated restored
+  Identity, Authorization, Notification, and Web BFF databases;
+- reconcile every non-terminal request and every active legal hold before replaying any incompatible
+  destructive effect;
+- recreate the versioned command/receipt topics, then replay from durable Outbox evidence with the
+  original event/request identities and normal Inbox idempotency;
+- require four current successful participant receipts before coordinator completion;
+- ensure erased Users do not regain authentication/session/Authorization authority and retained
+  Notification/audit state obeys the recorded hold/retention decision;
+- record non-PII request/event identifiers, policy versions, participant terminal states, replay
+  counts, and review authorization as recovery evidence.
 
 Historical backup is not current authority before this gate.
 

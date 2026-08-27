@@ -9,13 +9,18 @@ plugins {
 group="com.sajtech";version="0.1.0-SNAPSHOT"
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.7.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
   implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
   implementation(platform("io.netty:netty-bom:4.2.16.Final"))
   implementation("org.springframework.boot:spring-boot-starter-actuator")
+  implementation("org.springframework.boot:spring-boot-starter-jdbc")
+  implementation("org.springframework.boot:spring-boot-starter-jooq")
+  implementation("org.springframework.boot:spring-boot-starter-flyway")
   implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.boot:spring-boot-starter-kafka")
+  implementation("org.flywaydb:flyway-database-postgresql")
   implementation("org.springframework.security:spring-security-oauth2-jose")
   implementation("io.lettuce:lettuce-core:7.5.2.RELEASE")
   implementation("io.grpc:grpc-netty-shaded:1.83.1")
@@ -23,6 +28,7 @@ dependencies {
   implementation("io.grpc:grpc-stub:1.83.1")
   compileOnly("javax.annotation:javax.annotation-api:1.3.2")
   runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+  runtimeOnly("org.postgresql:postgresql:42.7.13")
   constraints {
     implementation("org.apache.logging.log4j:log4j-api:2.25.5") { because("CVE-2026-49844 is fixed in Log4j API 2.25.5") }
     implementation("tools.jackson.core:jackson-databind:3.1.5") { because("CVE-2026-59889 is fixed in jackson-databind 3.1.5") }
@@ -32,6 +38,7 @@ dependencies {
   testImplementation("org.yaml:snakeyaml:2.6")
   testImplementation("io.grpc:grpc-inprocess:1.83.1")
   testImplementation("org.testcontainers:testcontainers")
+  testImplementation("org.testcontainers:testcontainers-postgresql")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

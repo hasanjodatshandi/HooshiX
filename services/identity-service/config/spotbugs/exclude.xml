@@ -184,4 +184,20 @@
     <Class name="com.sajtech.identity.infrastructure.observability.ObservedExternalIdentity" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
+  <Match>
+    <Or>
+      <Class name="com.sajtech.identity.application.erasure.usecase.ErasureUseCase" />
+      <Class name="com.sajtech.identity.application.erasure.usecase.LegalHoldUseCase" />
+      <Class name="com.sajtech.identity.infrastructure.observability.ObservedErasure" />
+      <Class name="com.sajtech.identity.infrastructure.persistence.JooqErasureCommandOutbox" />
+      <Class name="com.sajtech.identity.infrastructure.persistence.JooqErasureReceiptCoordinator" />
+      <Class name="com.sajtech.identity.infrastructure.persistence.JooqErasureStore" />
+      <Class name="com.sajtech.identity.infrastructure.persistence.JooqIdentityErasureParticipant" />
+      <Class name="com.sajtech.identity.infrastructure.worker.ErasureCommandOutboxDispatcher" />
+      <Class name="com.sajtech.identity.infrastructure.worker.IdentityErasureListener" />
+      <Class name="com.sajtech.identity.infrastructure.worker.IdentityErasureReceiptDispatcher" />
+      <Class name="com.sajtech.identity.infrastructure.worker.IdentityErasureWorker" />
+    </Or>
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
 </FindBugsFilter>

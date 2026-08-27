@@ -14,6 +14,7 @@ runtime:
   notificationResultRuntimeEnabled: false
   authenticationRuntimeEnabled: false
   tenantRuntimeEnabled: false
+  erasureRuntimeEnabled: false
   maxConcurrentCallsPerConnection: 128
   maxGlobalConcurrentCalls: 128
   argon2MaxConcurrentHashes: 0
@@ -38,6 +39,12 @@ database:
   port: 5432
   runtimeSecretName: ""
   migrationSecretName: ""
+kafka:
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: kafka
+  port: 9093
+  connectionSecretName: ""
 quota:
   redis:
     namespace: platform-data
@@ -80,6 +87,7 @@ authorization:
     app.kubernetes.io/name: authorization-service
   port: 9090
   target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
+  principal: prod.sajtech.internal/ns/platform-apps/sa/authorization-service
 notification:
   namespace: platform-apps
   principal: prod.sajtech.internal/ns/platform-apps/sa/notification-service

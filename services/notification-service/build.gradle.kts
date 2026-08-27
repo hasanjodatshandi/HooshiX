@@ -18,11 +18,12 @@ java {
 }
 
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.7.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-jooq")
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.springframework.boot:spring-boot-starter-validation")

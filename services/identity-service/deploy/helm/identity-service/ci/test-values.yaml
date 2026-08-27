@@ -17,7 +17,10 @@ runtime:
   registrationRuntimeEnabled: true
   authenticationRuntimeEnabled: true
   tenantRuntimeEnabled: true
+  erasureRuntimeEnabled: true
   argon2MaxConcurrentHashes: 2
+kafka:
+  connectionSecretName: identity-kafka
 secrets:
   fingerprintSecretName: identity-fingerprint
   challengeSecretName: identity-challenge

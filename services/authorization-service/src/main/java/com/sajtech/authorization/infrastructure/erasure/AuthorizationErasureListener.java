@@ -1,0 +1,47 @@
+package com.sajtech.authorization.infrastructure.erasure;
+
+import build.buf.protovalidate.ValidatorFactory;
+import build.buf.protovalidate.exceptions.ValidationException;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.sajtech.identity.contract.v1.ErasureCommandEvent;
+import java.time.Clock;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.transaction.support.TransactionTemplate;
+
+public final class AuthorizationErasureListener {
+  private final JooqAuthorizationErasureRepository repository;
+  private final TransactionTemplate transactions;
+  private final Clock clock;
+
+  public AuthorizationErasureListener(
+      JooqAuthorizationErasureRepository repository,
+      TransactionTemplate transactions,
+      Clock clock) {
+    this.repository = repository;
+    this.transactions = transactions;
+    this.clock = clock;
+  }
+
+  @KafkaListener(
+      topics = "${authorization.erasure-command-topic:hooshix.identity.erasure.command.v1}",
+      groupId = "${authorization.erasure-consumer-group:hooshix-authorization-erasure-v1}",
+      containerFactory = "erasureKafkaListenerContainerFactory")
+  public void receive(byte[] payload, Acknowledgment acknowledgment) {
+    ErasureCommandEvent event = parse(payload);
+    transactions.executeWithoutResult(ignored -> repository.receive(event, clock.instant()));
+    acknowledgment.acknowledge();
+  }
+
+  private static ErasureCommandEvent parse(byte[] payload) {
+    try {
+      ErasureCommandEvent event = ErasureCommandEvent.parseFrom(payload);
+      if (!ValidatorFactory.newBuilder().build().validate(event).isSuccess()) {
+        throw new IllegalArgumentException("Erasure event contract is invalid");
+      }
+      return event;
+    } catch (InvalidProtocolBufferException | ValidationException exception) {
+      throw new IllegalArgumentException("Erasure event contract is invalid", exception);
+    }
+  }
+}

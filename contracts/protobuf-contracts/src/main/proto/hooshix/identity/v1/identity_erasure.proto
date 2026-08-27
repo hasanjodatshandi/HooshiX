@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+package hooshix.identity.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "hooshix/identity/v1/identity_mfa.proto";
+
+option java_multiple_files = true;
+option java_package = "com.sajtech.identity.contract.v1";
+
+// Identity owns the global erasure request. Participant effects remain service-owned.
+service IdentityErasureService {
+  rpc RequestSelfErasure(RequestSelfErasureRequest) returns (RequestSelfErasureResponse);
+  rpc CreateLegalHold(CreateLegalHoldRequest) returns (CreateLegalHoldResponse);
+  rpc ReleaseLegalHold(ReleaseLegalHoldRequest) returns (ReleaseLegalHoldResponse);
+  rpc BeginParticipantErasure(BeginParticipantErasureRequest) returns (BeginParticipantErasureResponse);
+}
+
+enum ErasureRequestState {
+  ERASURE_REQUEST_STATE_UNSPECIFIED = 0;
+  ERASURE_REQUEST_STATE_REQUESTED = 1;
+  ERASURE_REQUEST_STATE_IN_PROGRESS = 2;
+  ERASURE_REQUEST_STATE_COMPLETED = 3;
+  ERASURE_REQUEST_STATE_BLOCKED_BY_LEGAL_HOLD = 4;
+  ERASURE_REQUEST_STATE_FAILED_RETRYABLE = 5;
+}
+
+enum ErasureParticipant {
+  ERASURE_PARTICIPANT_UNSPECIFIED = 0;
+  ERASURE_PARTICIPANT_IDENTITY_SERVICE = 1;
+  ERASURE_PARTICIPANT_AUTHORIZATION_SERVICE = 2;
+  ERASURE_PARTICIPANT_NOTIFICATION_SERVICE = 3;
+  ERASURE_PARTICIPANT_WEB_BFF = 4;
+}
+
+enum ErasureParticipantOutcome {
+  ERASURE_PARTICIPANT_OUTCOME_UNSPECIFIED = 0;
+  ERASURE_PARTICIPANT_OUTCOME_COMPLETED = 1;
+  ERASURE_PARTICIPANT_OUTCOME_BLOCKED_BY_LEGAL_HOLD = 2;
+  ERASURE_PARTICIPANT_OUTCOME_FAILED_RETRYABLE = 3;
+}
+
+enum LegalHoldState {
+  LEGAL_HOLD_STATE_UNSPECIFIED = 0;
+  LEGAL_HOLD_STATE_ACTIVE = 1;
+  LEGAL_HOLD_STATE_RELEASED = 2;
+}
+
+message RequestSelfErasureRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  MfaProof mfa_proof = 3;
+  string confirmation = 4 [(buf.validate.field).string.const = "ERASE_MY_ACCOUNT"];
+}
+
+message RequestSelfErasureResponse {
+  string erasure_request_id = 1 [(buf.validate.field).string.uuid = true];
+  ErasureRequestState state = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string participant_policy_version = 3 [(buf.validate.field).string.pattern = "^[1-9][0-9]{0,8}$"];
+  google.protobuf.Timestamp accepted_at = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp completed_at = 5;
+}
+
+message CreateLegalHoldRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string erasure_request_id = 3 [(buf.validate.field).string.uuid = true];
+  string authority_reference = 4 [(buf.validate.field).string = {
+    pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$"
+    max_bytes: 128
+  }];
+  MfaProof mfa_proof = 5 [(buf.validate.field).required = true];
+}
+
+message ReleaseLegalHoldRequest {
+  string request_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];
+  string hold_id = 3 [(buf.validate.field).string.uuid = true];
+  MfaProof mfa_proof = 4 [(buf.validate.field).required = true];
+}
+
+message CreateLegalHoldResponse {
+  string hold_id = 1 [(buf.validate.field).string.uuid = true];
+  string erasure_request_id = 2 [(buf.validate.field).string.uuid = true];
+  LegalHoldState state = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string policy_version = 4 [(buf.validate.field).string.pattern = "^[1-9][0-9]{0,8}$"];
+  google.protobuf.Timestamp created_at = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp released_at = 6;
+}
+
+message ReleaseLegalHoldResponse {
+  string hold_id = 1 [(buf.validate.field).string.uuid = true];
+  string erasure_request_id = 2 [(buf.validate.field).string.uuid = true];
+  LegalHoldState state = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string policy_version = 4 [(buf.validate.field).string.pattern = "^[1-9][0-9]{0,8}$"];
+  google.protobuf.Timestamp created_at = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp released_at = 6;
+}
+
+// Workload-only request. Caller identity is authenticated outside the message.
+message BeginParticipantErasureRequest {
+  string event_id = 1 [(buf.validate.field).string.uuid = true];
+  string erasure_request_id = 2 [(buf.validate.field).string.uuid = true];
+  ErasureParticipant participant = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string participant_policy_version = 4 [(buf.validate.field).string.pattern = "^[1-9][0-9]{0,8}$"];
+  string page_token = 5 [(buf.validate.field).string = {
+    pattern: "^$|^[A-Za-z0-9_-]{1,128}$"
+    max_bytes: 128
+  }];
+}
+
+message BeginParticipantErasureResponse {
+  option (buf.validate.message).cel = {
+    id: "begin_participant_erasure_response.target_shape"
+    message: "authorization and web participants receive a user target; notification receives notification targets; identity receives neither"
+    expression: "(this.participant == 1 && this.user_id == '' && size(this.notification_ids) == 0) || ((this.participant == 2 || this.participant == 4) && this.user_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && size(this.notification_ids) == 0) || (this.participant == 3 && this.user_id == '')"
+  };
+
+  ErasureParticipant participant = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string user_id = 2 [(buf.validate.field).string.pattern = "^$|^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  repeated string notification_ids = 3 [(buf.validate.field).repeated = {
+    max_items: 200
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  string next_page_token = 4 [(buf.validate.field).string = {
+    pattern: "^$|^[A-Za-z0-9_-]{1,128}$"
+    max_bytes: 128
+  }];
+  bool complete_page = 5;
+}
+
+// Kafka value. It intentionally contains no user/contact/provider identifier.
+message ErasureCommandEvent {
+  string event_id = 1 [(buf.validate.field).string.uuid = true];
+  string erasure_request_id = 2 [(buf.validate.field).string.uuid = true];
+  string participant_policy_version = 3 [(buf.validate.field).string.pattern = "^[1-9][0-9]{0,8}$"];
+  google.protobuf.Timestamp occurred_at = 4 [(buf.validate.field).required = true];
+}
+
+// Kafka value and durable receipt evidence. It intentionally contains no erased PII.
+message ErasureReceiptEvent {
+  string event_id = 1 [(buf.validate.field).string.uuid = true];
+  string erasure_request_id = 2 [(buf.validate.field).string.uuid = true];
+  ErasureParticipant participant = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string participant_policy_version = 4 [(buf.validate.field).string.pattern = "^[1-9][0-9]{0,8}$"];
+  ErasureParticipantOutcome outcome = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  repeated string action_categories = 6 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 16
+    unique: true
+    items: {
+      string: {pattern: "^[a-z][a-z0-9_]{1,63}$"}
+    }
+  }];
+  google.protobuf.Timestamp occurred_at = 7 [(buf.validate.field).required = true];
+}

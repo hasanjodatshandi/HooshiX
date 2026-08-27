@@ -34,6 +34,28 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
       ServerInterceptor tracingInterceptor,
       ServerInterceptor validationInterceptor,
       ServerInterceptor admissionInterceptor) {
+    this(
+        bindAddress,
+        port,
+        maxConcurrentCallsPerConnection,
+        enabled,
+        services,
+        tracingInterceptor,
+        validationInterceptor,
+        admissionInterceptor,
+        List.of());
+  }
+
+  public GrpcServerLifecycle(
+      String bindAddress,
+      int port,
+      int maxConcurrentCallsPerConnection,
+      boolean enabled,
+      List<BindableService> services,
+      ServerInterceptor tracingInterceptor,
+      ServerInterceptor validationInterceptor,
+      ServerInterceptor admissionInterceptor,
+      List<ServerInterceptor> additionalInterceptors) {
     if (bindAddress == null
         || bindAddress.isBlank()
         || port <= 0
@@ -45,6 +67,7 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
     Objects.requireNonNull(tracingInterceptor);
     Objects.requireNonNull(validationInterceptor);
     Objects.requireNonNull(admissionInterceptor);
+    Objects.requireNonNull(additionalInterceptors);
     if (!enabled) {
       server = null;
       executor = null;
@@ -67,7 +90,12 @@ public final class GrpcServerLifecycle implements SmartLifecycle {
           ServerInterceptors.intercept(tracedService, validationInterceptor);
       ServerServiceDefinition admittedService =
           ServerInterceptors.intercept(validatedService, admissionInterceptor);
-      builder.addService(admittedService);
+      ServerServiceDefinition finalService = admittedService;
+      for (ServerInterceptor interceptor : additionalInterceptors) {
+        finalService =
+            ServerInterceptors.intercept(finalService, Objects.requireNonNull(interceptor));
+      }
+      builder.addService(finalService);
     }
     server = builder.build();
   }

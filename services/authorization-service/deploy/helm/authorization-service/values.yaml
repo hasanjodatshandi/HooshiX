@@ -10,6 +10,7 @@ service:
   managementPort: 9092
 runtime:
   enabled: false
+  erasureRuntimeEnabled: false
   maxConcurrentCallsPerConnection: 128
   checkPermission:
     globalConcurrency: 0
@@ -36,6 +37,12 @@ database:
   port: 5432
   runtimeSecretName: ""
   migrationSecretName: ""
+kafka:
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: kafka
+  port: 9093
+  connectionSecretName: ""
 quota:
   redis:
     namespace: platform-data
@@ -58,6 +65,7 @@ identity:
   principal: prod.sajtech.internal/ns/platform-apps/sa/identity-service
   jwtVerifierConfigMapName: ""
   jwtIssuer: https://identity.sajtech.internal
+  erasureTarget: dns:///identity-service.platform-apps.svc.cluster.local:9090
 webBff:
   namespace: platform-apps
   podLabels:

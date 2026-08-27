@@ -1,6 +1,7 @@
 import importlib.util
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -26,16 +27,22 @@ class LocalRuntimeContractTest(unittest.TestCase):
             self.assertNotIn(migration, seen)
             self.assertNotIn(runtime_role, seen)
             seen.update((migration, runtime_role))
-            self.assertTrue(service.endswith("-service"))
-            self.assertIn(database, {"authorization", "identity", "notification"})
+            self.assertTrue(service.endswith("-service") or service == "web-bff")
+            self.assertIn(database, {"authorization", "identity", "notification", "web_bff"})
 
     def test_compose_pins_loopback_dependencies_and_noeviction(self):
         compose = runtime.COMPOSE.read_text(encoding="utf-8")
         self.assertIn("postgres:18.4-bookworm@sha256:1961f96e", compose)
         self.assertIn("redis:8.2.8-bookworm@sha256:2f7462b9", compose)
+        self.assertIn("apache/kafka:4.2.1@sha256:9916d60e", compose)
         self.assertIn('127.0.0.1:15432:5432', compose)
         self.assertIn('127.0.0.1:16379:6379', compose)
+        self.assertIn('127.0.0.1:19092:19092', compose)
+        self.assertIn('HOST://localhost:19092', compose)
+        self.assertIn('INTERNAL://kafka:9092', compose)
         self.assertIn('noeviction', compose)
+        self.assertIn('KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"', compose)
+        self.assertIn('KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"', compose)
 
     def test_local_secret_validation_rejects_sql_or_env_metacharacters(self):
         self.assertEqual("A" * 32, runtime.validate_local_secret("sample", "A" * 32))
@@ -50,6 +57,20 @@ class LocalRuntimeContractTest(unittest.TestCase):
         self.assertFalse(runtime.service_command_matches(service, ["java", "-jar", "/tmp/unrelated.jar"]))
         self.assertFalse(runtime.service_command_matches(service, ["python3", "-jar", str(jar)]))
         self.assertFalse(runtime.service_command_matches(service, ["java", "-jar", str(jar.parent / "authorization-service.jar")]))
+
+    def test_erasure_smoke_seed_is_non_pii_and_covers_all_required_participants(self):
+        sql = runtime.erasure_smoke_seed_sql(
+            uuid.UUID("10000000-0000-4000-8000-000000000001"),
+            uuid.UUID("20000000-0000-4000-8000-000000000002"),
+            uuid.UUID("30000000-0000-4000-8000-000000000003"))
+        self.assertIn("'COMMAND','1','PENDING'", sql)
+        self.assertIn("INTERVAL '35 days'", sql)
+        for participant in (
+                "IDENTITY_SERVICE", "AUTHORIZATION_SERVICE",
+                "NOTIFICATION_SERVICE", "WEB_BFF"):
+            self.assertIn(participant, sql)
+        for prohibited in ("email", "phone", "first_name", "last_name", "contact"):
+            self.assertNotIn(prohibited, sql.lower())
 
     def test_symmetric_key_ring_is_reused_across_startups(self):
         original_keys = runtime.KEYS
@@ -66,7 +87,8 @@ class LocalRuntimeContractTest(unittest.TestCase):
 
     def test_full_application_runtime_is_enabled_only_in_local_environment(self):
         values = {name: "test" for name in (
-            "authorization_runtime", "identity_runtime", "notification_runtime", "web_bff_tls")}
+            "authorization_runtime", "identity_runtime", "notification_runtime",
+            "web_bff_runtime", "web_bff_tls")}
         keys = {name: ROOT / ".local-runtime" / "keys" / f"{name}.properties" for name in (
             "authorization-intent", "authorization-quota", "identity-jwt-public",
             "identity-fingerprint", "identity-challenge", "identity-handoff", "identity-mfa", "identity-refresh",
@@ -77,6 +99,15 @@ class LocalRuntimeContractTest(unittest.TestCase):
         envs = runtime.runtime_envs(values, keys, dataset)
         self.assertTrue(all(env["SPRING_PROFILES_ACTIVE"] == "local" for env in envs.values()))
         self.assertEqual(envs["authorization-service"]["AUTHORIZATION_RUNTIME_ENABLED"], "true")
+        erasure_participants = (
+            ("authorization-service", "AUTHORIZATION_ERASURE_RUNTIME_ENABLED"),
+            ("identity-service", "IDENTITY_ERASURE_RUNTIME_ENABLED"),
+            ("notification-service", "NOTIFICATION_ERASURE_RUNTIME_ENABLED"),
+            ("web-bff", "WEB_BFF_ERASURE_RUNTIME_ENABLED"),
+        )
+        for service, flag in erasure_participants:
+            self.assertEqual(envs[service][flag], "true")
+            self.assertEqual(envs[service]["KAFKA_BOOTSTRAP_SERVERS"], "127.0.0.1:19092")
         self.assertTrue(all(env["MANAGEMENT_SERVER_ADDRESS"] == "127.0.0.1" for env in envs.values()))
         self.assertEqual(envs["compromised-password-service"]["HOOSHIX_COMPROMISED_PASSWORD_GRPC_BIND_ADDRESS"], "127.0.0.1")
         self.assertEqual(envs["notification-service"]["NOTIFICATION_GRPC_BIND_ADDRESS"], "127.0.0.1")
@@ -88,6 +119,7 @@ class LocalRuntimeContractTest(unittest.TestCase):
         self.assertEqual(identity["IDENTITY_GRPC_BIND_ADDRESS"], "127.0.0.1")
         bff = envs["web-bff"]
         self.assertEqual(bff["WEB_BFF_RUNTIME_ENABLED"], "true")
+        self.assertEqual(bff["WEB_BFF_DATABASE_USERNAME"], "web_bff_runtime")
         self.assertTrue(bff["WEB_BFF_PUBLIC_ORIGIN"].startswith("https://localhost:"))
         self.assertEqual(bff["SERVER_SSL_ENABLED"], "true")
         self.assertEqual(bff["SERVER_ADDRESS"], "127.0.0.1")

@@ -29,3 +29,19 @@ groups:
           service: notification-service
         annotations:
           summary: Notification submission in-flight work is near the transport concurrency bound
+      - alert: NotificationErasureWorkExhausted
+        expr: increase(notification_erasure_exhausted_total{job="notification-service"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          service: notification-service
+        annotations:
+          summary: Notification erasure participant exhausted finite retries
+      - alert: NotificationErasureReceiptPublicationFailing
+        expr: increase(notification_erasure_receipt_outbox_failures_total{job="notification-service"}[5m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+          service: notification-service
+        annotations:
+          summary: Notification erasure receipt publication is repeatedly failing

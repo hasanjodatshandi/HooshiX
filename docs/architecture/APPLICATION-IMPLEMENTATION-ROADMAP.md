@@ -1,7 +1,7 @@
 # Application Implementation Roadmap — Current Execution Authority
 
 - **Status:** Active implementation-sequencing authority
-- **Last full application review:** 2026-08-26
+- **Last full application review:** 2026-08-28
 - **Scope:** HooshiX application implementation order and continuation across chats/agents
 - **Production Commissioning & Readiness:** DEFERRED until explicitly reactivated by the owner
 
@@ -42,7 +42,8 @@ The application is not yet a complete end-user product. Current material gaps ar
 - the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
 - Google OIDC/ExternalIdentity is implemented in the repository; deployed real-provider execution remains NOT VERIFIED;
-- data-subject erasure and its first justified application Kafka workflow are incomplete;
+- data-subject erasure and its first justified application Kafka workflow are repository-complete
+  and verified in the developer-only integrated runtime; production deployment remains unverified;
 - Reference Data independent service remains intentionally gated by ADR-0041;
 - Conversation/Workflow/Agent/LLM/tool-execution and other core AI-product bounded contexts are not yet defined and must not be created speculatively.
 
@@ -77,12 +78,12 @@ The following is the one ordered application-completion sequence. Do not start a
 
 | Order | Completion step | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.5.0 covers all 57 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
+| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.6.0 covers all 58 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
 | 2 | MFA/TOTP | `COMPLETED` | TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, CSRF reload recovery, and repository security evidence are implemented. Deployed production evidence remains a separate readiness concern. |
 | 3 | Google OIDC / ExternalIdentity | `COMPLETED` | BFF Authorization Code + PKCE/state/nonce, bounded encrypted pre-auth custody, Google issuer/audience/authorized-party/time validation, fail-closed semantic quota, Identity issuer+subject binding/link semantics, email collision protection, provider-token isolation, MFA continuation, OpenAPI/UI, observability, and negative/replay tests are implemented. Real deployed Google-provider execution remains a separate readiness concern. |
 | 4 | Complete Tenant lifecycle | `COMPLETED` | Suspend/resume/delete/restore and Invitation decline/revoke/expire/reissue are implemented with Identity/Authorization coordination, owner safety, durable replay, BFF OpenAPI/UI, migration, observability, and negative/recovery tests. |
-| 5 | Data Subject Erasure + Kafka | `NEXT` | Use the first justified application Kafka path for ADR-0028: Identity coordination, Transactional Outbox, Kafka Protobuf events, participant Inbox/idempotency, legal-hold rules, non-PII receipts, replay and restore reconciliation. Kafka is not introduced earlier only to match the platform baseline. |
-| 6 | Core AI Product Architecture | `PLANNED` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
+| 5 | Data Subject Erasure + Kafka | `COMPLETED` | Identity coordination, atomic self-erasure acceptance, Transactional Outbox, versioned/validated/exampled Kafka Protobuf events, participant Inbox/idempotency, service-owned effects, legal-hold rules, non-PII receipts, finite observable retry/DLT, 35-day evidence, restore/replay procedure, Helm/network policy, frontend flow, and a real four-participant local Kafka smoke are implemented and verified. Production deployment/readiness remains separate and unverified. |
+| 6 | Core AI Product Architecture | `NEXT` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
 | 7 | Core AI Product vertical slices | `PLANNED` | Implement the accepted core-product architecture in vertical slices. Service/module boundaries come from step 6 evidence, not from speculative names. |
 | 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
 
@@ -97,25 +98,29 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Step 5 — Data Subject Erasure + Kafka
+Step 6 — Core AI Product Architecture
 ```
 
 The target invariant is:
 
 ```text
-coordination authority              -> Identity owns the server-defined participant policy and global request state
-self-erasure acceptance             -> recent auth/MFA, Membership precondition, DELETING, session and invitation revocation atomically
-transport                           -> versioned Protobuf events over Kafka after a local Transactional Outbox commit
-participant effects                 -> service-owned erase/anonymize/retention actions with atomic Inbox/idempotency
-legal hold                          -> platform/legal-authorized durable ledger; blocks purge but never restores authentication
-receipts                            -> durable non-PII participant progress through participant Outbox events
-completion                          -> impossible until every snapshotted required participant has a current successful receipt
-retry and recovery                  -> finite observable retry/DLQ plus 35-day publication and dedup evidence
-restore reconciliation              -> replay erasure/legal-hold evidence before restored traffic can open
-security and observability          -> no PII/secrets in events, DLQs, receipts, logs, traces, or metric labels
+product journeys                    -> define the smallest end-to-end AI journeys and explicit non-goals before service boundaries
+domain ownership                    -> identify aggregates, invariants, tenant/global ownership, and authoritative state
+model/provider/tool authority       -> define who may select models/tools, approve side effects, and hold provider credentials
+authorization                       -> map platform, tenant, resource, tool, and human-approval decisions without local bypass
+persistence and messaging           -> choose synchronous/async boundaries, idempotency, Outbox/Inbox, retention, and recovery
+quota and cost                      -> define tenant/user/provider budgets, fail-closed safety, accounting authority, and abuse limits
+privacy and security                -> classify prompt/output/tool data, secrets, audit, retention, legal hold, and erasure participation
+reliability and observability       -> set SLOs, dependency budgets, bounded concurrency, failure modes, and Day-One telemetry
+deployment boundaries               -> justify each independently deployable bounded context from ownership and scaling evidence
+acceptance authority                -> record effective ADRs/current service documents before executable vertical slices begin
 ```
 
-The browser continues to consume only the BFF public contract. Identity remains global erasure coordinator while each bounded context exclusively owns its local erasure effect. Kafka is recoverable transport rather than business authority; no broker acknowledgement replaces a local database commit or participant receipt. Remote calls and Kafka publication never run inside a business transaction, and stable event/request identities preserve at-least-once replay safety.
+Step 6 is an architecture milestone, not permission to create speculative deployables. The browser
+continues to consume only BFF-owned public contracts. Service/module boundaries must follow accepted
+business capabilities, ownership, security, consistency, failure, and deployment evidence. Step 7
+cannot begin until the current architecture sources and effective ADRs make those boundaries and the
+first vertical-slice acceptance contract explicit.
 
 ## 7. Rules for updating this roadmap
 

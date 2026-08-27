@@ -11,5 +11,6 @@ export const routes = {
   passwordChange: '/password/change',
   mfa: '/security/mfa',
   externalIdentities: '/security/external-identities',
+  accountErasure: '/security/account-erasure',
   oidcComplete: '/oidc/complete',
 } as const;

@@ -41,3 +41,15 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: Web BFF OIDC exact-client quota denial rate is elevated
+      - alert: WebBffErasureWorkExhausted
+        expr: increase(web_bff_erasure_exhausted_total{job="web-bff"}[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: Web BFF erasure participant exhausted finite retries
+      - alert: WebBffErasureReceiptPublicationFailing
+        expr: increase(web_bff_erasure_receipt_outbox_failures_total{job="web-bff"}[5m]) > 3
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Web BFF erasure receipt publication is repeatedly failing

@@ -7,10 +7,12 @@ import jakarta.servlet.http.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.Clock;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@Profile("!migration")
 @RequestMapping("/api/v1/password")
 public final class PasswordController {
   private final IdentityGateway identity;

@@ -15,7 +15,40 @@ spring:
     virtual:
       enabled: true
   config:
-    import: optional:configtree:/run/secrets/web-bff-redis/
+    import:
+      - optional:configtree:/run/secrets/web-bff-redis/
+      - optional:configtree:/run/secrets/web-bff-db-runtime/
+      - optional:configtree:/run/secrets/web-bff-kafka/
+  datasource:
+    url: ${WEB_BFF_DATABASE_URL:jdbc:postgresql://localhost:5432/web_bff}
+    username: ${WEB_BFF_DATABASE_USERNAME:web_bff_runtime}
+    password: ${WEB_BFF_DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 250
+      validation-timeout: 250
+  flyway:
+    enabled: false
+  jooq:
+    sql-dialect: POSTGRES
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
 server:
   port: ${WEB_BFF_HTTP_PORT:-1}
   max-http-request-header-size: 16KB
@@ -39,6 +72,10 @@ management:
           include: readinessState,webBffReadiness
 web-bff:
   runtime-enabled: ${WEB_BFF_RUNTIME_ENABLED:false}
+  erasure-runtime-enabled: ${WEB_BFF_ERASURE_RUNTIME_ENABLED:false}
+  erasure-command-topic: ${WEB_BFF_ERASURE_COMMAND_TOPIC:hooshix.identity.erasure.command.v1}
+  erasure-consumer-group: ${WEB_BFF_ERASURE_CONSUMER_GROUP:hooshix-web-bff-erasure-v1}
+  erasure-receipt-topic: ${WEB_BFF_ERASURE_RECEIPT_TOPIC:hooshix.identity.erasure.receipt.v1}
   require-fetch-metadata: ${WEB_BFF_REQUIRE_FETCH_METADATA:true}
   public-origin: ${WEB_BFF_PUBLIC_ORIGIN:https://localhost}
   identity-target: ${WEB_BFF_IDENTITY_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9090}

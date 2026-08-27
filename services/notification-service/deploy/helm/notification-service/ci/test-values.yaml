@@ -11,6 +11,12 @@ secrets:
   fingerprintSecretName: notification-fingerprint
   deliverySecretName: notification-delivery
 
+runtime:
+  erasureRuntimeEnabled: true
+
+kafka:
+  connectionSecretName: notification-kafka
+
 observability:
   tracing:
     otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces

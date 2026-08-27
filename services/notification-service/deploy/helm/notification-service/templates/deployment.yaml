@@ -14,6 +14,10 @@
 {{- if eq $runtimeDbSecret $migrationDbSecret -}}
 {{- fail "runtime and migration database credentials must use distinct Secrets" -}}
 {{- end -}}
+{{- $kafkaSecret := "" -}}
+{{- if .Values.runtime.erasureRuntimeEnabled -}}
+{{- $kafkaSecret = required "kafka.connectionSecretName is required when erasure runtime is enabled" .Values.kafka.connectionSecretName -}}
+{{- end -}}
 {{- if not .Values.observability.tracing.enabled -}}
 {{- fail "Day-One tracing must remain enabled" -}}
 {{- end -}}
@@ -102,6 +106,10 @@ spec:
               value: {{ .Values.runtime.maxConcurrentCallsPerConnection | quote }}
             - name: NOTIFICATION_DELIVERY_RUNTIME_ENABLED
               value: {{ .Values.runtime.deliveryRuntimeEnabled | quote }}
+            - name: NOTIFICATION_ERASURE_RUNTIME_ENABLED
+              value: {{ .Values.runtime.erasureRuntimeEnabled | quote }}
+            - name: NOTIFICATION_IDENTITY_ERASURE_TARGET
+              value: {{ .Values.identity.erasureTarget | quote }}
             - name: NOTIFICATION_IDENTITY_RESULT_TARGET
               value: {{ .Values.identity.resultTarget | quote }}
             - name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
@@ -132,6 +140,11 @@ spec:
             - name: runtime-db-credentials
               mountPath: /run/secrets/notification-db-runtime
               readOnly: true
+            {{- if .Values.runtime.erasureRuntimeEnabled }}
+            - name: kafka
+              mountPath: /run/secrets/notification-kafka
+              readOnly: true
+            {{- end }}
             - name: fingerprint-key-ring
               mountPath: /run/secrets/notification-fingerprint
               readOnly: true
@@ -154,6 +167,12 @@ spec:
           secret:
             secretName: {{ $migrationDbSecret | quote }}
             defaultMode: 0440
+        {{- if .Values.runtime.erasureRuntimeEnabled }}
+        - name: kafka
+          secret:
+            secretName: {{ $kafkaSecret | quote }}
+            defaultMode: 0440
+        {{- end }}
         - name: fingerprint-key-ring
           secret:
             secretName: {{ $fingerprintSecret | quote }}

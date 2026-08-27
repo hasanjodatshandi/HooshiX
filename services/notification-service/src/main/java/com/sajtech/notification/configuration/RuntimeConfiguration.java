@@ -22,6 +22,7 @@ import com.sajtech.notification.application.template.service.BoundedTemplateRend
 import com.sajtech.notification.application.template.service.TemplateContentDigest;
 import com.sajtech.notification.domain.notification.service.ProviderRetryPolicy;
 import com.sajtech.notification.infrastructure.client.identity.GrpcIdentityNotificationResultClient;
+import com.sajtech.notification.infrastructure.erasure.*;
 import com.sajtech.notification.infrastructure.observability.NotificationDeliveryMetrics;
 import com.sajtech.notification.infrastructure.observability.NotificationKeyRingRefresher;
 import com.sajtech.notification.infrastructure.observability.NotificationReadinessHealthIndicator;
@@ -65,6 +66,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 @Profile("!migration")
@@ -132,6 +134,86 @@ public class RuntimeConfiguration {
   @Bean
   TransactionRunner transactionRunner(PlatformTransactionManager transactionManager) {
     return new SpringTransactionRunner(transactionManager);
+  }
+
+  @Bean
+  TransactionTemplate notificationTransactions(PlatformTransactionManager transactionManager) {
+    return new TransactionTemplate(transactionManager);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "notification",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  JooqNotificationErasureRepository notificationErasureRepository(DSLContext dsl) {
+    return new JooqNotificationErasureRepository(dsl);
+  }
+
+  @Bean(destroyMethod = "shutdownNow", name = "identityErasureChannel")
+  @ConditionalOnProperty(
+      prefix = "notification",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  ManagedChannel identityErasureChannel(
+      @Value(
+              "${notification.identity-erasure-target:dns:///identity-service.platform-apps.svc.cluster.local:9090}")
+          String target) {
+    return NettyChannelBuilder.forTarget(target)
+        .usePlaintext()
+        .disableRetry()
+        .maxInboundMessageSize(64 * 1024)
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "notification",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  IdentityErasureTargetClient identityErasureTargetClient(
+      @Qualifier("identityErasureChannel") ManagedChannel channel) {
+    return new IdentityErasureTargetClient(channel);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "notification",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  NotificationErasureListener notificationErasureListener(
+      JooqNotificationErasureRepository repository, TransactionTemplate transactions, Clock clock) {
+    return new NotificationErasureListener(repository, transactions, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "notification",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  NotificationErasureWorker notificationErasureWorker(
+      IdentityErasureTargetClient identity,
+      JooqNotificationErasureRepository repository,
+      TransactionTemplate transactions,
+      Clock clock,
+      MeterRegistry meters) {
+    return new NotificationErasureWorker(identity, repository, transactions, clock, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "notification",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  NotificationErasureReceiptDispatcher notificationErasureReceiptDispatcher(
+      DSLContext dsl,
+      org.springframework.kafka.core.KafkaTemplate<String, byte[]> kafka,
+      TransactionTemplate transactions,
+      Clock clock,
+      @Value("${notification.erasure-receipt-topic:hooshix.identity.erasure.receipt.v1}")
+          String topic,
+      MeterRegistry meters) {
+    return new NotificationErasureReceiptDispatcher(dsl, kafka, transactions, clock, topic, meters);
   }
 
   @Bean

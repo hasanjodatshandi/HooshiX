@@ -4,6 +4,10 @@ import com.sajtech.hooshix.contract.validation.ContractValidationServerIntercept
 import com.sajtech.identity.application.authentication.port.out.*;
 import com.sajtech.identity.application.authentication.service.RefreshCredentialLookup;
 import com.sajtech.identity.application.authentication.usecase.*;
+import com.sajtech.identity.application.erasure.port.out.ErasureStore;
+import com.sajtech.identity.application.erasure.usecase.ErasureUseCase;
+import com.sajtech.identity.application.erasure.usecase.LegalHoldUseCase;
+import com.sajtech.identity.application.erasure.usecase.ParticipantErasureUseCase;
 import com.sajtech.identity.application.externalidentity.port.out.*;
 import com.sajtech.identity.application.externalidentity.usecase.ExternalIdentityUseCase;
 import com.sajtech.identity.application.mfa.port.in.*;
@@ -44,6 +48,8 @@ import com.sajtech.identity.infrastructure.security.session.HmacSessionCredentia
 import com.sajtech.identity.infrastructure.worker.IdentityRetentionWorker;
 import com.sajtech.identity.infrastructure.worker.NotificationOutboxDispatcher;
 import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.erasure.grpc.ErasureWorkloadIdentityInterceptor;
+import com.sajtech.identity.interfaces.erasure.grpc.IdentityErasureGrpcService;
 import com.sajtech.identity.interfaces.externalidentity.grpc.IdentityExternalIdentityGrpcService;
 import com.sajtech.identity.interfaces.mfa.grpc.IdentityMfaGrpcService;
 import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
@@ -204,6 +210,126 @@ public class RuntimeConfiguration {
   @Bean
   AuthenticationStore authenticationStore(DSLContext dsl) {
     return new JooqAuthenticationStore(dsl);
+  }
+
+  @Bean
+  ErasureStore erasureStore(DSLContext dsl) {
+    return new JooqErasureStore(dsl);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.application.erasure.port.out.ErasureCommandOutbox erasureCommandOutbox(
+      DSLContext dsl) {
+    return new JooqErasureCommandOutbox(dsl);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.ErasureCommandOutboxDispatcher
+      erasureCommandOutboxDispatcher(
+          com.sajtech.identity.application.erasure.port.out.ErasureCommandOutbox outbox,
+          org.springframework.kafka.core.KafkaTemplate<String, byte[]> kafka,
+          TransactionRunner transactions,
+          Clock clock,
+          @Value("${identity.erasure-command-topic:hooshix.identity.erasure.command.v1}")
+              String topic,
+          MeterRegistry meters) {
+    return new com.sajtech.identity.infrastructure.worker.ErasureCommandOutboxDispatcher(
+        outbox, kafka, transactions, clock, topic, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  JooqIdentityErasureParticipant identityErasureParticipant(
+      DSLContext dsl, ErasureStore erasureStore) {
+    return new JooqIdentityErasureParticipant(dsl, erasureStore);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.IdentityErasureListener identityErasureListener(
+      JooqIdentityErasureParticipant repository, TransactionRunner transactions, Clock clock) {
+    return new com.sajtech.identity.infrastructure.worker.IdentityErasureListener(
+        repository, transactions, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.IdentityErasureWorker identityErasureWorker(
+      JooqIdentityErasureParticipant repository,
+      TransactionRunner transactions,
+      Clock clock,
+      MeterRegistry meters) {
+    return new com.sajtech.identity.infrastructure.worker.IdentityErasureWorker(
+        repository, transactions, clock, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  JooqErasureReceiptCoordinator erasureReceiptCoordinator(DSLContext dsl) {
+    return new JooqErasureReceiptCoordinator(dsl);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.ErasureReceiptListener erasureReceiptListener(
+      JooqErasureReceiptCoordinator coordinator, TransactionRunner transactions, Clock clock) {
+    return new com.sajtech.identity.infrastructure.worker.ErasureReceiptListener(
+        coordinator, transactions, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.ErasureReceiptWorker erasureReceiptWorker(
+      JooqErasureReceiptCoordinator coordinator,
+      TransactionRunner transactions,
+      Clock clock,
+      MeterRegistry meters) {
+    return new com.sajtech.identity.infrastructure.worker.ErasureReceiptWorker(
+        coordinator, transactions, clock, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.IdentityErasureReceiptDispatcher
+      identityErasureReceiptDispatcher(
+          DSLContext dsl,
+          org.springframework.kafka.core.KafkaTemplate<String, byte[]> kafka,
+          TransactionRunner transactions,
+          Clock clock,
+          @Value("${identity.erasure-receipt-topic:hooshix.identity.erasure.receipt.v1}")
+              String topic,
+          MeterRegistry meters) {
+    return new com.sajtech.identity.infrastructure.worker.IdentityErasureReceiptDispatcher(
+        dsl, kafka, transactions, clock, topic, meters);
   }
 
   @Bean
@@ -873,6 +999,87 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ErasureUseCase erasureCoordination(
+      ErasureStore erasureStore,
+      AuthenticationStore authenticationStore,
+      SessionCredentialPort sessionCredentials,
+      MfaStore mfaStore,
+      MfaCryptographyPort mfaCryptography,
+      TransactionRunner transactions,
+      Clock clock) {
+    return new ErasureUseCase(
+        erasureStore,
+        authenticationStore,
+        sessionCredentials,
+        mfaStore,
+        mfaCryptography,
+        transactions,
+        clock);
+  }
+
+  @Bean
+  @Primary
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ObservedErasure observedErasure(
+      ErasureUseCase delegate, ObservationRegistry observations, MeterRegistry meters) {
+    return new ObservedErasure(delegate, observations, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "authentication-runtime-enabled",
+      havingValue = "true")
+  ParticipantErasureUseCase participantErasureCoordination(
+      ErasureStore erasureStore, TransactionRunner transactions, Clock clock) {
+    return new ParticipantErasureUseCase(erasureStore, transactions, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = {"authentication-runtime-enabled", "tenant-runtime-enabled"},
+      havingValue = "true")
+  LegalHoldUseCase legalHoldManagement(
+      ErasureStore erasureStore,
+      AuthenticationStore authenticationStore,
+      SessionCredentialPort sessionCredentials,
+      MfaStore mfaStore,
+      MfaCryptographyPort mfaCryptography,
+      com.sajtech.identity.application.tenant.port.out.AuthorizationTenantPort authorization,
+      TransactionRunner transactions,
+      Clock clock) {
+    return new LegalHoldUseCase(
+        erasureStore,
+        authenticationStore,
+        sessionCredentials,
+        mfaStore,
+        mfaCryptography,
+        authorization,
+        transactions,
+        clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = {"authentication-runtime-enabled", "tenant-runtime-enabled"},
+      havingValue = "true")
+  IdentityErasureGrpcService erasureGrpc(
+      ObservedErasure erasure,
+      ParticipantErasureUseCase participants,
+      LegalHoldUseCase legalHolds) {
+    return new IdentityErasureGrpcService(erasure, participants, legalHolds);
+  }
+
+  @Bean
   com.sajtech.identity.infrastructure.persistence.JooqTenantStore tenantStore(
       DSLContext dsl, IntentFingerprintPort fingerprints) {
     return new com.sajtech.identity.infrastructure.persistence.JooqTenantStore(dsl, fingerprints);
@@ -980,6 +1187,11 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  ErasureWorkloadIdentityInterceptor erasureWorkloadIdentityInterceptor() {
+    return new ErasureWorkloadIdentityInterceptor();
+  }
+
+  @Bean
   ContractValidationServerInterceptor contractValidation(MeterRegistry meters) {
     var rejections = meters.counter("hooshix.contract.validation.rejections");
     return new ContractValidationServerInterceptor(ignored -> rejections.increment());
@@ -992,6 +1204,7 @@ public class RuntimeConfiguration {
       SafeTracingServerInterceptor tracing,
       ContractValidationServerInterceptor validation,
       IdentityAdmissionInterceptor admission,
+      ErasureWorkloadIdentityInterceptor erasureWorkload,
       @Value("${identity.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
@@ -1003,7 +1216,8 @@ public class RuntimeConfiguration {
         services,
         tracing,
         validation,
-        admission);
+        admission,
+        List.of(erasureWorkload));
   }
 
   @Bean(name = "notificationResultGrpcLifecycle")

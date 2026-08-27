@@ -3,6 +3,7 @@ image:
   digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 runtime:
   enabled: true
+  erasureRuntimeEnabled: true
   checkPermission:
     globalConcurrency: 8
     perCallerConcurrency: 4
@@ -27,6 +28,8 @@ secrets:
   quotaKeySecretName: authorization-quota-key
 identity:
   jwtVerifierConfigMapName: identity-jwt-verifier
+kafka:
+  connectionSecretName: authorization-kafka
 webBff:
   principal: prod.sajtech.internal/ns/platform-apps/sa/web-bff
 resourceCallers:

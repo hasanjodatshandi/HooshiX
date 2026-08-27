@@ -139,6 +139,9 @@ public interface IdentityGateway {
 
   boolean googleIdentityLinked(UUID requestId, String refresh);
 
+  ErasureRequest requestSelfErasure(
+      UUID requestId, String refresh, String confirmation, MfaProof mfaProof);
+
   enum SessionMode {
     AUTHENTICATED_ONBOARDING,
     TENANT_AUTHENTICATED,
@@ -237,4 +240,6 @@ public interface IdentityGateway {
       recoveryCodes = List.copyOf(recoveryCodes);
     }
   }
+
+  record ErasureRequest(UUID erasureRequestId, String state, String participantPolicyVersion) {}
 }

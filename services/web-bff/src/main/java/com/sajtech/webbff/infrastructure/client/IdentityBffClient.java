@@ -754,6 +754,26 @@ public final class IdentityBffClient implements IdentityGateway {
     }
   }
 
+  @Override
+  public ErasureRequest requestSelfErasure(
+      UUID requestId, String refresh, String confirmation, MfaProof proof) {
+    try {
+      var request =
+          RequestSelfErasureRequest.newBuilder()
+              .setRequestId(requestId.toString())
+              .setRefreshCredential(refresh)
+              .setConfirmation(confirmation);
+      if (proof != null) request.setMfaProof(mfaProof(proof));
+      var response = erasureStub().requestSelfErasure(request.build());
+      return new ErasureRequest(
+          uuid(response.getErasureRequestId()),
+          response.getState().name().replace("ERASURE_REQUEST_STATE_", ""),
+          response.getParticipantPolicyVersion());
+    } catch (StatusRuntimeException exception) {
+      throw map(exception);
+    }
+  }
+
   private static ExternalIdentityEvidence evidence(
       byte[] evidenceId, Instant issuedAt, VerifiedGoogleIdentity identity) {
     ExternalIdentityEvidence.Builder builder =
@@ -1016,6 +1036,11 @@ public final class IdentityBffClient implements IdentityGateway {
   private IdentityTenantServiceGrpc.IdentityTenantServiceBlockingStub tenantStub() {
     return IdentityTenantServiceGrpc.newBlockingStub(channel)
         .withDeadlineAfter(1500, TimeUnit.MILLISECONDS);
+  }
+
+  private IdentityErasureServiceGrpc.IdentityErasureServiceBlockingStub erasureStub() {
+    return IdentityErasureServiceGrpc.newBlockingStub(channel)
+        .withDeadlineAfter(2000, TimeUnit.MILLISECONDS);
   }
 
   private static BffException mapRegistration(StatusRuntimeException e) {
