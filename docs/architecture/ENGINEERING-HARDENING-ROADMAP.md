@@ -156,8 +156,8 @@ Remediation must not weaken these verified current properties:
 
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
-| 1 | Current-truth documentation reconciliation | `IN PROGRESS` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Pending |
-| 2 | Database deadlines and durable-worker lease safety | `PLANNED` | Define operation-specific transaction/statement/lock budgets; implement cancellation/error mapping; add lock contention/pool-exhaustion tests; measure and enforce worker batch/deadline/lease invariants without layered retries or remote I/O in transactions. | Pending |
+| 1 | Current-truth documentation reconciliation | `COMPLETED` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Passed on PR #119 reviewed head `e33fff3`: local context/baseline gates, protected repository run `33162134425`, and frontend run `33162134277` |
+| 2 | Database deadlines and durable-worker lease safety | `NEXT` | Define operation-specific transaction/statement/lock budgets; implement cancellation/error mapping; add lock contention/pool-exhaustion tests; measure and enforce worker batch/deadline/lease invariants without layered retries or remote I/O in transactions. | Pending |
 | 3 | Frontend resilience and privacy | `PLANNED` | Add one bounded abortable BFF request boundary, consistent safe problem mapping, busy/double-submit/cancellation/error states, error boundary, safe storage failure behavior, minimal persisted state, and prompt PII clearing. | Pending |
 | 4 | Frontend testing, localization, and accessibility | `PLANNED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Pending |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `PLANNED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Pending |
@@ -170,6 +170,12 @@ Remediation must not weaken these verified current properties:
 Stage 2 is the first code-changing stage. It precedes Conversation implementation so
 new model-execution load is not added before database, pool, worker lease, and
 cancellation behavior is bounded and testable.
+
+### Stage completion receipts
+
+| Stage | Base commit | Final reviewed implementation commit | Review and verification result |
+| ---: | --- | --- | --- |
+| 1 | `68cf66cf24c07dd6fca010ddae2789f42608aa31` | `e33fff3f707d40a250044a38e05649977acedbc5` | `Passed`: complete PR #119 documentation/governance diff reviewed against unchanged `origin/main`; no remaining Stage 1 finding; `make context-verify`, generated Task Review Matrix parity, `make context-bootstrap`, and `make baseline-verify` passed locally; protected Repository baseline `33162134425` and Web frontend E2E `33162134277` passed on the reviewed head. No runtime code, contract, migration, deployment, provider, or Production state changed. |
 
 ## 7. Stage review checklist
 
