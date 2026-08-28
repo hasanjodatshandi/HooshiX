@@ -99,6 +99,36 @@ evidence gap is not reported as a confirmed runtime defect.
 | HR-018 | BLOCKER when Production track is active | Production platform | Production K3s/Calico/Istio/Kyverno/OpenBao, CNPG/Barman, Kafka, Redis security/recovery, Argo CD, WireGuard/JIT access, external host-down monitoring, off-host audit, signing/admission execution, backup/PITR/DR, and complete-stack capacity evidence are not commissioned. | 10 |
 | HR-019 | MEDIUM | Documentation truth | Roadmap frontend wording, Identity completion wording, reporting-standard section references, and current protected-CI evidence had drifted from current Git. | 1 |
 
+### Key source anchors
+
+These anchors make the finding register reproducible; the owning stage must inspect
+the full affected flow rather than patching only the named line.
+
+| Finding | Initial evidence anchors |
+| --- | --- |
+| HR-001 | `services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/SpringTransactionRunner.java`; Identity lock-taking repository queries; Identity datasource/transaction configuration |
+| HR-002 | `services/notification-service/src/main/java/com/sajtech/notification/infrastructure/runtime/delivery/NotificationDeliveryWorker.java`; `services/notification-service/src/main/java/com/sajtech/notification/application/delivery/usecase/RunDeliveryBatchService.java`; Identity/Notification Outbox dispatchers and their lease/deadline configuration |
+| HR-003/004 | `apps/web-frontend/src/api/bffClient.ts`; `apps/web-frontend/src/pages/TenantSelectionPage.tsx`; `apps/web-frontend/src/state/storage.ts`; `apps/web-frontend/src/state/appReducer.ts`; all submit/selection/destructive-action pages |
+| HR-005/006 | `apps/web-frontend/package.json`; `apps/web-frontend/e2e/`; `apps/web-frontend/src/i18n/resources.ts`; frontend accessibility audit and roadmap/status claims |
+| HR-007/008 | `.github/workflows/web-frontend-e2e.yml`; `apps/web-frontend/package.json`; `apps/web-frontend/package-lock.json`; Production release/deployed-digest workflows |
+| HR-009 | `contracts/protobuf-contracts/build.gradle.kts`; all five `services/*/build.gradle.kts` files that configure service-local Protobuf generation |
+| HR-010 | `services/authorization-service/src/main/java/com/sajtech/authorization/infrastructure/persistence/JooqAuthorizationStore.java`; `services/identity-service/src/main/java/com/sajtech/identity/configuration/RuntimeConfiguration.java`; `services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/IdentityBffClient.java`; `services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqTenantStore.java` |
+| HR-011 | `.github/workflows/`; `scripts/`; `docs/engineering/build-and-ci-quality-enforcement.md` |
+| HR-012/013/014 | `docs/architecture/performance-and-bottlenecks.md`; `docs/architecture/testing-and-quality-gates.md`; `docs/operations/chaos-engineering-program.md`; `docs/runbooks/production-cold-dr.md`; current test/source inventory |
+| HR-015/016/017 | `docs/adr/0054-define-core-conversation-and-model-execution-v1.md`; `docs/architecture/services/conversation-service.md`; absence of `services/conversation-service/` |
+| HR-018 | `docs/architecture/PRODUCTION-READINESS-CHECKLIST.md`; `docs/architecture/implementation-status.md`; Production release, platform, and recovery authorities |
+
+### Test and contract snapshot
+
+At the audit baseline, backend services had 111 tracked files under their service test
+source trees, the neutral contract package published twelve Protobuf files with
+validation-backed request messages and example-backed consumer checks, and the BFF
+OpenAPI covered all 58 public controller method/path mappings. The frontend had seven
+project-owned Playwright spec files containing eleven current journeys, but no
+project-owned unit/component test file and no coverage threshold. Counts are baseline
+inventory only; stage completion depends on risk coverage and executed behavior, not a
+target file count or 100% line-coverage goal.
+
 ## 5. Confirmed strengths to preserve
 
 Remediation must not weaken these verified current properties:
