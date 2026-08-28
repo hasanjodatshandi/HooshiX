@@ -19,6 +19,7 @@ Covers:
 - Day-One logging/metrics/tracing;
 - privileged access;
 - backup/restore/erasure/DR;
+- private Conversation/model execution, provider egress, prompt/output confidentiality, and cost;
 - single-server host concentration.
 
 ## 2. Security objectives
@@ -62,6 +63,9 @@ Covers:
 | Backups/WAL/snapshots | confidentiality + integrity + recoverability |
 | Erasure/legal-hold state | integrity + ordering correctness |
 | Human production identities/JIT grants | integrity + attribution |
+| Conversation titles/prompts/outputs/composed context | confidentiality + tenant isolation + erasure |
+| ModelRun budget reservation/usage/cost ledger | integrity + bounded availability |
+| LLM provider credential/model/prompt/price policy | confidentiality + integrity + provenance |
 
 ## 4. Trust boundaries
 
@@ -143,6 +147,14 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - ADR-0051 protected local policy fixes the WSL distribution, canonical repository root, and project Context Engine path; tunnel/service-manager CWD and caller input cannot select another repository; Linux Git inside WSL is authority;
 - caller query/revision values are data passed through bounded validation and fixed Git argument arrays, never shell command text.
 
+### TB-13 Conversation -> model provider
+
+Conversation content crosses an approved external processor boundary only through the reviewed
+service adapter. Browser/model input cannot select destination, credential, model, storage mode,
+system prompt, or tool. The first slice uses fixed HTTPS egress, `store=false`, no background or
+provider-side conversation state, and no tools. Provider/model output is untrusted data rather than
+identity, permission, audit, quota, or side-effect authority.
+
 ## 5. Threat actors
 
 - Internet attacker: arbitrary requests, spoofed forwarding/trace headers, credential stuffing, high-cardinality abuse, DDoS participation.
@@ -161,6 +173,10 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 - Compromised host/root: broad single-server process/storage visibility.
 - Compromised provider/source/scanner feed: malformed/replayed/delayed/false data within protocol scope.
 - Storage/backup attacker: tamper/delete/exfiltrate recovery artifacts.
+- Malicious prompt/content author: attempts prompt injection, cross-conversation data extraction,
+  tool/URL/provider option injection, cost amplification, or unsafe rendered output.
+- Compromised/model provider: returns malformed/adversarial output, loses usage/cancellation
+  evidence, retains content contrary to policy, or creates ambiguous charged work.
 
 ## 6. Representative STRIDE mapping
 
@@ -207,6 +223,9 @@ ADR-0046 Context Engine output is derived developer context, not a new authority
 | Elevation | tenant admin grants stronger authority | Authorization privilege-escalation/owner safety | admin concurrency negatives |
 | Elevation | network access becomes root | WireGuard != FIDO2 != JIT | separation tests |
 | Elevation | read-only AI context channel is treated as repository/production mutation authority | no write MCP tools/no HooshiX network listener + normal Git/PR/production access controls remain separate | MCP tool-list/unknown-write negatives |
+| Information disclosure | prompt/output/context crosses tenant, telemetry, event, error, browser, or provider-retention boundary | private ownership + forced RLS + application encryption + telemetry/event exclusions + `store=false` stateless adapter | cross-tenant/RLS/encryption/PII-canary/provider-request negatives |
+| Elevation / Tampering | model output or prompt injection invokes a tool, URL, permission, or side effect | first slice exposes no tools and treats output as sanitized untrusted data; fixed egress/options | tool/provider-option/URL/render negatives |
+| DoS / Financial | attacker amplifies provider concurrency/tokens/cost or exploits ambiguous retry | server-owned caps + atomic worst-case reservation + global/tenant bulkheads + one attempt + conservative unknown charging | concurrency/budget/overflow/ambiguity/load tests |
 | Elevation | tunnel runtime credential is replaced with broad/admin authority | restricted Tunnels `Read` + `Use`; admin key prohibited for daemon | operator key-permission evidence |
 
 ## 7. Critical abuse cases
@@ -383,6 +402,27 @@ Required:
 
 Residual: output produced by an explicitly authorized broad local command can itself contain sensitive developer-host data. Persistent output therefore remains protected local operational state and is not a secret-storage or audit channel.
 
+### TM-23 Conversation prompt injection/content leakage/cost ambiguity
+
+A tenant member submits adversarial content intended to reveal another conversation, change the
+provider/model/system prompt, cause tool/network execution, inject active browser content, create
+unbounded provider work, or obtain an unpaid duplicate after an ambiguous result.
+
+Required:
+
+- exact Tenant/Membership/private-resource authorization plus forced RLS and encrypted content;
+- context composition restricted to recorded messages from the same Conversation;
+- no first-slice tool/remote-MCP/hosted-tool/provider-side state and fixed provider egress/options;
+- escaped/sanitized untrusted model rendering;
+- server-owned context/output/concurrency limits and atomic worst-case cost reservation;
+- one provider attempt, no blind retry/fallback, explicit `OUTCOME_UNKNOWN`, conservative
+  reconciliation, and cancellation that never fabricates stopped work/refund;
+- `store=false`, content-free telemetry/events/audit/errors, ADR-0028 erasure, and lifecycle replay.
+
+Residual: the approved external provider necessarily receives the composed prompt for generation and
+may charge a request that HooshiX cannot conclusively reconcile after transport ambiguity. Provider
+contract/data-control approval and conservative charging bound rather than eliminate that risk.
+
 ## 8. Single-server residual risks
 
 - one host failure can stop complete platform and local observability;
@@ -416,4 +456,4 @@ A documented mitigation without executed evidence remains `NOT VERIFIED`.
 
 ## 10. Change triggers
 
-Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/Context MCP, developer-host Ops MCP/policy/execution, developer-host Desktop MCP/screen/input/session/credential-binding policy, or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.
+Review this threat model when public proxy/L4/WAF/client-address, quota identity/time/capacity, authentication/MFA/session/token, service boundary, Authorization, tenant persistence, Conversation/model/provider/tool/prompt/cost behavior, datastore/provider/Internet egress, observability/Collector/storage, OpenBao/secrets, Git-history secret scanning, AI-agent context/bootstrap/routing/checkpoint/retrieval/Context MCP, developer-host Ops MCP/policy/execution, developer-host Desktop MCP/screen/input/session/credential-binding policy, or secure-tunnel behavior, Semgrep/Syft/Grype/Cosign/Kyverno toolchain authority, CI/admission, privileged access, production topology, backup/erasure, or a real incident changes.

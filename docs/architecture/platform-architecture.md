@@ -51,6 +51,7 @@ Browser
   -> Web BFF
        -> Identity
        -> Authorization
+       -> Conversation when the ADR-0054 first slice is implemented
        -> Notification-related internal flows as registered
        -> resource services as implemented
        -> Reference Data local immutable adapter initially, or remote service only after ADR-0041 trigger
@@ -140,10 +141,21 @@ Current independent service targets:
 - Notification;
 - Web BFF;
 - Compromised Password.
+- Conversation (accepted under ADR-0054; implementation `NOT PRESENT`).
 
 Reference Data capability is current, but the independent `reference-data-service` remains **PLANNED / GATED** until ADR-0041 trigger evidence exists.
 
-Future Workflow or other services require independent bounded-context evidence; no speculative service creation.
+ADR-0054 accepts only one private Conversation/model-execution service boundary. Workflow, Agent,
+Tool, Prompt, Model-catalog, Billing, or separate worker services remain prohibited without new
+independent bounded-context evidence.
+
+### Conversation
+
+Conversation owns encrypted private Conversation/Message state, asynchronous ModelRun lifecycle,
+provider adaptation, and tenant/user run-budget/cost authority. The first adapter is stateless
+OpenAI Responses with `store=false`, no background/provider-side conversation state, and no tools.
+The browser reaches it only through BFF-owned contracts. Architecture is accepted; implementation
+and runtime evidence remain `NOT PRESENT`/`NOT VERIFIED`.
 
 ### Compromised Password
 

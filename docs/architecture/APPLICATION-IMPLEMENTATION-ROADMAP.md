@@ -45,7 +45,8 @@ The application is not yet a complete end-user product. Current material gaps ar
 - data-subject erasure and its first justified application Kafka workflow are repository-complete
   and verified in the developer-only integrated runtime; production deployment remains unverified;
 - Reference Data independent service remains intentionally gated by ADR-0041;
-- Conversation/Workflow/Agent/LLM/tool-execution and other core AI-product bounded contexts are not yet defined and must not be created speculatively.
+- ADR-0054 now defines the first private Conversation/model-execution bounded context and explicitly
+  excludes speculative Workflow/Agent/tool deployables; executable implementation is the next step.
 
 ## 3. Milestone status vocabulary
 
@@ -83,8 +84,8 @@ The following is the one ordered application-completion sequence. Do not start a
 | 3 | Google OIDC / ExternalIdentity | `COMPLETED` | BFF Authorization Code + PKCE/state/nonce, bounded encrypted pre-auth custody, Google issuer/audience/authorized-party/time validation, fail-closed semantic quota, Identity issuer+subject binding/link semantics, email collision protection, provider-token isolation, MFA continuation, OpenAPI/UI, observability, and negative/replay tests are implemented. Real deployed Google-provider execution remains a separate readiness concern. |
 | 4 | Complete Tenant lifecycle | `COMPLETED` | Suspend/resume/delete/restore and Invitation decline/revoke/expire/reissue are implemented with Identity/Authorization coordination, owner safety, durable replay, BFF OpenAPI/UI, migration, observability, and negative/recovery tests. |
 | 5 | Data Subject Erasure + Kafka | `COMPLETED` | Identity coordination, atomic self-erasure acceptance, Transactional Outbox, versioned/validated/exampled Kafka Protobuf events, participant Inbox/idempotency, service-owned effects, legal-hold rules, non-PII receipts, finite observable retry/DLT, 35-day evidence, restore/replay procedure, Helm/network policy, frontend flow, and a real four-participant local Kafka smoke are implemented and verified. Production deployment/readiness remains separate and unverified. |
-| 6 | Core AI Product Architecture | `NEXT` | Before creating Conversation/Workflow/Agent/model/tool services, define user journeys, aggregates, tenant ownership, LLM/provider/tool authority, credentials, authorization, persistence, async boundaries, quotas/costs, retention/erasure, audit, observability, and deployment-boundary evidence. |
-| 7 | Core AI Product vertical slices | `PLANNED` | Implement the accepted core-product architecture in vertical slices. Service/module boundaries come from step 6 evidence, not from speculative names. |
+| 6 | Core AI Product Architecture | `COMPLETED` | ADR-0054 and `services/conversation-service.md` define the private text Conversation journey, aggregates, ownership, OpenAI `store=false` no-tool adapter boundary, authorization, encrypted persistence, durable worker, quotas/cost, retention/erasure, audit, reliability, observability, deployment evidence, and explicit non-goals. |
+| 7 | Core AI Product vertical slices | `NEXT` | Implement the accepted first private Conversation + asynchronous ModelRun slice exactly within ADR-0054 acceptance; Workflow/Agent/tool/RAG/streaming/BYOK/shared-conversation boundaries remain excluded. |
 | 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
 
 Reference Data is a separate conditional track, not part of the numbered completion sequence:
@@ -98,29 +99,25 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Step 6 — Core AI Product Architecture
+Step 7 — Core AI Product vertical slice 1: private Conversation + ModelRun
 ```
 
 The target invariant is:
 
 ```text
-product journeys                    -> define the smallest end-to-end AI journeys and explicit non-goals before service boundaries
-domain ownership                    -> identify aggregates, invariants, tenant/global ownership, and authoritative state
-model/provider/tool authority       -> define who may select models/tools, approve side effects, and hold provider credentials
-authorization                       -> map platform, tenant, resource, tool, and human-approval decisions without local bypass
-persistence and messaging           -> choose synchronous/async boundaries, idempotency, Outbox/Inbox, retention, and recovery
-quota and cost                      -> define tenant/user/provider budgets, fail-closed safety, accounting authority, and abuse limits
-privacy and security                -> classify prompt/output/tool data, secrets, audit, retention, legal hold, and erasure participation
-reliability and observability       -> set SLOs, dependency budgets, bounded concurrency, failure modes, and Day-One telemetry
-deployment boundaries               -> justify each independently deployable bounded context from ownership and scaling evidence
-acceptance authority                -> record effective ADRs/current service documents before executable vertical slices begin
+service foundation                  -> one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, key ring, and Day-One telemetry
+contracts                           -> versioned validated example-backed gRPC plus BFF OpenAPI/generated frontend types
+authority                           -> exact JWT audience, four permission keys, one online CheckPermission, final private-resource ownership
+conversation/run state              -> encrypted Conversation/Message, idempotent run acceptance, bounded durable worker, deterministic cancellation
+provider                            -> provider-neutral port plus fixed-egress OpenAI Responses adapter with store=false/background=false/tools=[]
+quota and cost                      -> atomic worst-case reservation, integer-micro-unit price snapshot, usage reconciliation, fail-closed ambiguity
+lifecycle                           -> tenant lifecycle gating plus ADR-0028 Inbox/effect/receipt before content is enabled
+evidence                            -> migration/RLS, provider/failure/race/security/privacy/load, browser, Helm and repository gates
 ```
 
-Step 6 is an architecture milestone, not permission to create speculative deployables. The browser
-continues to consume only BFF-owned public contracts. Service/module boundaries must follow accepted
-business capabilities, ownership, security, consistency, failure, and deployment evidence. Step 7
-cannot begin until the current architecture sources and effective ADRs make those boundaries and the
-first vertical-slice acceptance contract explicit.
+ADR-0054 §9 and `services/conversation-service.md` §12 are the acceptance authority. The browser
+continues to consume only BFF-owned public contracts. Step 7 does not authorize Workflow, Agent,
+Tool, RAG, streaming, provider-side state, BYOK, or shared-conversation implementation.
 
 ## 7. Rules for updating this roadmap
 

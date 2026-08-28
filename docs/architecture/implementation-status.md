@@ -22,6 +22,12 @@ services/authorization-service/
 services/web-bff/
 ```
 
+ADR-0054 and `services/conversation-service.md` now define the first core AI-product boundary:
+private text Conversation plus asynchronous ModelRun through a platform-approved, stateless
+`store=false` OpenAI adapter with no tools. `services/conversation-service/` is not present at this
+revision; no provider credential, model execution, Conversation database, public route, or runtime
+evidence is claimed.
+
 Implemented repository-governance artifacts are:
 
 ```text
@@ -82,6 +88,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Notification Service | DESIGNED | IMPLEMENTED delivery runtime plus ADR-0028 participant | Java 25 strict full check, PostgreSQL integration, six Flyway migrations through V6 erasure, bounded delivery/reconciliation, encrypted escrow, subject-target paging/deletion, atomic Inbox/receipt Outbox, provider fixtures, Buf, Helm/Prometheus and complete local Kafka smoke pass; real provider and production erasure execution remain NOT VERIFIED | NOT VERIFIED | `services/notification-service` |
 | Web BFF | DESIGNED | IMPLEMENTED public facade plus ADR-0028 session-state participant | OpenAPI 3.1 version 1.6.0 covers all 58 public operations including self-erasure; schema/examples/parity/generated-type drift, PostgreSQL V1 participant state, Redis indexed-session erasure, atomic Inbox/receipt Outbox, strict full check, Helm/Prometheus and local Kafka smoke pass; protected/deployed production evidence remains NOT VERIFIED | NOT VERIFIED | `services/web-bff` |
 | Web Frontend | DESIGNED | IMPLEMENTED foundation/onboarding/profile/password/MFA/Tenant-lifecycle/erasure repository slices | React/TypeScript typecheck/build, generated OpenAPI schema, browser-to-BFF-only boundary, explicit erasure confirmation/MFA and immediate local-state clearing, plus all eleven Playwright journeys pass locally; secrets/challenges/recovery codes remain absent from browser persistence; broader accessibility/localization and deployed journey evidence remain incomplete | NOT VERIFIED | `apps/web-frontend` |
+| Conversation Service | DESIGNED under ADR-0054 | NOT PRESENT | NOT RUN; architecture and first-slice acceptance exist, but no service source/build/contracts/database/provider adapter/deployment/runtime exists | NOT VERIFIED | `services/conversation-service` |
 | Compromised Password Service | DESIGNED | IMPLEMENTED | canonical WSL Java 25 strict Gradle/integration/bootJar, Buf, Semgrep, OSV, Gitleaks tree/history, Helm/render, and observability-artifact gates pass locally for the current revision; the latest local integrated execution verified the repository-built `GENERATED_TEST_FIXTURE` dataset runtime Ready simultaneously with the other four services; repository CI evidence remains commit-specific; the local production-fidelity kind staging deployment is Ready with an exact-digest-bound `GENERATED_TEST_FIXTURE`; production HIBP corpus/runtime evidence NOT VERIFIED | NOT VERIFIED | `services/compromised-password-service` |
 | Reference Data capability | DESIGNED | local immutable adapter permitted when needed | NOT VERIFIED | NOT VERIFIED | owning deployable bundle/module |
 | Reference Data independent service | DESIGNED / GATED | PLANNED / GATED | NOT VERIFIED | NOT VERIFIED | `services/reference-data-service` only after ADR-0041 trigger |
@@ -175,6 +182,9 @@ Current architecture still requires evidence that this repository slice does not
 - production K3s/Calico/Istio/Kyverno/OpenBao/edge/observability deployment and complete-stack capacity evidence; the repository local kind/Calico/Istio/Kyverno/edge/observability integration lane has PASSED;
 - deployed Identity ADR-0024 Redis quota evidence, measured production capacity/allocation thresholds, real host-time synchronization integration, NAT/IPv6/collateral tests, and complete-stack cardinality/load/failure evidence;
 - Reference Data deployable trigger evidence before any independent Reference Data service creation.
+- executable ADR-0054 Conversation vertical-slice evidence: service/database/contracts/BFF/frontend,
+  fixed-egress provider adapter and credential/data-control approval, cost/quota reconciliation,
+  tenant lifecycle/erasure, privacy/failure/load evidence, and deployed runtime.
 
 These are implementation/release gates, not evidence that production is ready.
 

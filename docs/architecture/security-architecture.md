@@ -227,6 +227,30 @@ Single-server accepts outages but never weaker decisions:
 - telemetry unavailable -> no security/audit/control bypass;
 - host loss -> external monitor alerts while local observability is unavailable.
 
+## 13.1 Core AI Conversation/model boundary
+
+ADR-0054 classifies Conversation title/prompt/output/composed context as restricted customer
+content and makes `conversation-service` the only first-slice model-execution authority.
+
+- browser/BFF input cannot select provider endpoint/credential/system prompt/tool/internal audience;
+- provider credentials are Conversation-only OpenBao material and never tenant/BFF/browser state;
+- all content is application-layer encrypted in the Conversation database and excluded from
+  ordinary logs/metrics/traces/events/audit/errors;
+- every protected operation uses Authorization then local private-resource ownership and forced RLS;
+- model output/tool requests are untrusted data and cannot grant authority or cause a side effect;
+- first-slice provider calls require `store=false`, `background=false`, no provider-side conversation
+  state, and no hosted/custom/MCP tools;
+- fixed provider egress rejects caller/model-selected URLs and raw provider responses never reach the
+  browser;
+- cost reservation fails closed before provider work and ambiguous outcomes never become free
+  success or blind retry;
+- Conversation participates in ADR-0028 erasure and Identity tenant lifecycle before user content is
+  enabled.
+
+Prompt-injection, cross-tenant content exposure, cost amplification, provider retention, model-output
+script injection, and cancellation/billing ambiguity require executable negative tests in the first
+vertical slice.
+
 ## 14. Developer-host AI Ops boundary
 
 ADR-0051 separates MCP runtime source from the HooshiX application repository and makes `/home/coder/workspace/Hooshix` the canonical Linux Git/application authority. ADR-0048 adds a developer-host-only Ops MCP separate from the ADR-0046 Context MCP. The Context MCP remains exact read-only repository/context authority and receives no write/execute tool.

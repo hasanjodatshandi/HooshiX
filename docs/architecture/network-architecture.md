@@ -144,6 +144,19 @@ New external destination requires owner/use case, exact destination/protocol, au
 
 Compromised Password runtime has no HIBP/provider Internet egress; HIBP corpus acquisition is offline release/build work.
 
+ADR-0054 permits one future Conversation provider edge only after its first-slice gates pass:
+
+```text
+conversation-service -> DNS/TLS -> api.openai.com:443
+```
+
+The destination, SNI/hostname verification, provider/model/options, and credential are service-owned
+configuration. Browser, BFF, tenant data, prompt, and model output cannot select or redirect egress.
+The first adapter uses `store=false`, `background=false`, and no tools/provider-side conversation
+state. NetworkPolicy/mesh/DNS strategy, fixed-destination negatives, credential delivery, provider
+data-control approval, and outage/capacity evidence are required before provider execution is
+enabled. No other service receives this egress capability.
+
 ## 8. Single-server management plane
 
 ```text

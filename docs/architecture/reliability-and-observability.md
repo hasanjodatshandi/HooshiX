@@ -176,3 +176,21 @@ Review profile/capacity when any of these becomes material:
 - broker/session/security dependency availability need exceeds single-server profile.
 
 Do not mask triggers by weakening correctness/security.
+
+## 14. Conversation/model-run reliability
+
+ADR-0054 separates interactive run acceptance from long provider execution. Acceptance is a short
+authorized/cost-reserved PostgreSQL transaction returning a stable run identity. A bounded worker
+claims durable state, releases locks, and performs one provider attempt with a 60-second safety
+deadline, cancellation propagation, global/per-tenant bulkheads, zero/unbounded-queue prohibition,
+and breaker-open suppression. There is no automatic retry or alternate-provider/model fallback.
+
+Required signals are low-cardinality API/run/provider/budget outcomes, queue depth/oldest age/start
+delay, worker/bulkhead/breaker saturation, cancellation, `OUTCOME_UNKNOWN`, reservation age,
+token/cost totals by safe model alias/price version, RLS/database pool state, erasure lag, and audit
+health. Content and subject/resource/request/provider identifiers are prohibited telemetry.
+
+Provider, Authorization, budget, key, lifecycle, database, or required audit uncertainty fails with
+the owning stable availability/state result. Telemetry outage does not alter durable run/cost state.
+Complete-stack evidence must include provider latency/connection pressure and worst-case accepted-run
+queue/cost behavior before production enablement.

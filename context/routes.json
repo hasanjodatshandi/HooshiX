@@ -182,6 +182,31 @@
       "summary": "Full architecture read is mandatory before changing an independently deployable boundary."
     },
     {
+      "id": "core-ai-conversation",
+      "title": "Core AI Conversation/model execution",
+      "review_mode": "full-read",
+      "match_terms": ["conversation service", "model run", "llm", "openai responses", "ai product", "prompt", "tool calling", "agent workflow", "سرویس گفتگو", "اجرای مدل", "محصول هوش مصنوعی"],
+      "minimum_sources": [
+        "docs/adr/0054-define-core-conversation-and-model-execution-v1.md",
+        "docs/architecture/services/conversation-service.md",
+        "docs/architecture/services/web-bff.md",
+        "docs/architecture/services/authorization-service.md",
+        "docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md",
+        "docs/adr/0025-define-synchronous-dependency-failure-containment-v1.md",
+        "docs/adr/0028-define-data-subject-erasure-execution-and-evidence-v1.md",
+        "docs/architecture/data-and-messaging.md",
+        "docs/architecture/dependency-criticality.yaml",
+        "docs/architecture/security-architecture.md",
+        "docs/architecture/threat-model.md",
+        "docs/architecture/reliability-and-observability.md",
+        "docs/architecture/performance-and-bottlenecks.md",
+        "docs/architecture/testing-and-quality-gates.md",
+        "docs/technology/technology-baseline.md",
+        "docs/architecture/PRODUCTION-READINESS-CHECKLIST.md"
+      ],
+      "summary": "ADR-0054 permits only the private text Conversation/ModelRun slice; keep model output untrusted, provider state stateless/store=false, tools absent, cost reserved, and erasure/lifecycle fail closed."
+    },
+    {
       "id": "application-observability",
       "title": "Day-One application observability",
       "review_mode": "targeted",
