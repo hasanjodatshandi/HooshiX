@@ -208,6 +208,7 @@ docs/adr/0053-define-identity-password-policy-v1.md
 docs/adr/0054-define-core-conversation-and-model-execution-v1.md
 docs/adr/decision-register.md
 docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md
+docs/architecture/ENGINEERING-HARDENING-ROADMAP.md
 docs/architecture/PRODUCTION-ARCHITECTURE-REVIEW.md
 docs/architecture/PRODUCTION-DECISION-SUMMARY.md
 docs/architecture/PRODUCTION-READINESS-CHECKLIST.md

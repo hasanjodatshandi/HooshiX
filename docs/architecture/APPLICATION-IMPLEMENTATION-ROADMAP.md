@@ -1,7 +1,7 @@
 # Application Implementation Roadmap — Current Execution Authority
 
 - **Status:** Active implementation-sequencing authority
-- **Last full application review:** 2026-08-28
+- **Last full application review:** 2026-08-29
 - **Scope:** HooshiX application implementation order and continuation across chats/agents
 - **Production Commissioning & Readiness:** DEFERRED until explicitly reactivated by the owner
 
@@ -40,6 +40,8 @@ The implemented foundation already includes substantial registration, local auth
 The application is not yet a complete end-user product. Current material gaps are:
 
 - the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
+- the mandatory repository-wide audit remediation track in `ENGINEERING-HARDENING-ROADMAP.md`
+  is active and must complete its ordered stages before the Conversation implementation;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
 - Google OIDC/ExternalIdentity is implemented in the repository; deployed real-provider execution remains NOT VERIFIED;
 - data-subject erasure and its first justified application Kafka workflow are repository-complete
@@ -54,6 +56,7 @@ Use only these roadmap states:
 
 ```text
 COMPLETED  repository implementation and required milestone evidence are complete
+IN PROGRESS implementation has started but its completion boundary is not verified
 NEXT       first coherent implementation milestone to execute
 PLANNED    ordered future milestone whose prerequisites are not yet complete
 GATED      implementation is prohibited until its explicit architecture/evidence trigger is satisfied
@@ -69,7 +72,7 @@ DEFERRED   intentionally excluded from the current application implementation se
 | 0 | Inter-service contract independence | `COMPLETED` | Move canonical inter-service Protobuf schemas outside every service source tree; remove all service-to-service source/build coupling; keep semantic ownership with the provider bounded context; make Buf/build/CI consume the neutral contract registry; enforce the boundary. |
 | 1 | Notification Delivery Runtime v1 | `COMPLETED` | Implement bounded dispatch claiming, durable pre-provider `DISPATCHING`, provider adapter execution, ambiguity-safe reconciliation, retry/observation rules, terminal result outbox, and Identity result callback with Day-One observability/tests. |
 | 2 | Public Registration Vertical Slice + OpenAPI | `COMPLETED` | Establish canonical BFF OpenAPI authority and implement public register/resend/confirm routes through BFF -> Identity -> Notification with RFC 9457 errors, browser/security/quota controls, contract tests, and an integrated journey. |
-| 3 | Frontend Foundation + Account Onboarding | `COMPLETED` | Add the reviewed TypeScript/React frontend baseline, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, `fa`/`en`, RTL/LTR, accessibility, and critical Playwright journey. |
+| 3 | Frontend Foundation + Account Onboarding | `COMPLETED` | Add the reviewed TypeScript/React foundation, generated/validated BFF client boundary, registration/verification/login/session/Tenant-selection UI, browser-to-BFF-only boundary, baseline semantic markup, and critical Playwright journey. Complete localization, RTL/LTR, component testing, and broader accessibility remain in the hardening track. |
 | 4 | Identity Profile & Contact Management | `COMPLETED` | Implement profile read/update plus Contact add/verify/resend/set-primary/remove semantics across Identity, BFF/OpenAPI, UI, persistence, security, and tests. |
 | 5 | Password Policy Decision + Password Lifecycle | `COMPLETED` | ADR-0053 defines the concrete password policy. Implement change/forgot/reset, compromised-password screening, recent-auth/MFA rules, and session revocation according to the approved contract. |
 
@@ -85,7 +88,8 @@ The following is the one ordered application-completion sequence. Do not start a
 | 4 | Complete Tenant lifecycle | `COMPLETED` | Suspend/resume/delete/restore and Invitation decline/revoke/expire/reissue are implemented with Identity/Authorization coordination, owner safety, durable replay, BFF OpenAPI/UI, migration, observability, and negative/recovery tests. |
 | 5 | Data Subject Erasure + Kafka | `COMPLETED` | Identity coordination, atomic self-erasure acceptance, Transactional Outbox, versioned/validated/exampled Kafka Protobuf events, participant Inbox/idempotency, service-owned effects, legal-hold rules, non-PII receipts, finite observable retry/DLT, 35-day evidence, restore/replay procedure, Helm/network policy, frontend flow, and a real four-participant local Kafka smoke are implemented and verified. Production deployment/readiness remains separate and unverified. |
 | 6 | Core AI Product Architecture | `COMPLETED` | ADR-0054 and `services/conversation-service.md` define the private text Conversation journey, aggregates, ownership, OpenAI `store=false` no-tool adapter boundary, authorization, encrypted persistence, durable worker, quotas/cost, retention/erasure, audit, reliability, observability, deployment evidence, and explicit non-goals. |
-| 7 | Core AI Product vertical slices | `NEXT` | Implement the accepted first private Conversation + asynchronous ModelRun slice exactly within ADR-0054 acceptance; Workflow/Agent/tool/RAG/streaming/BYOK/shared-conversation boundaries remain excluded. |
+| 6A | Engineering hardening audit remediation | `IN PROGRESS` | Complete stages 1-8 in `ENGINEERING-HARDENING-ROADMAP.md` in order. Each stage remains incomplete until its full diff and applicable repository gates are reviewed and recorded. |
+| 7 | Core AI Product vertical slices | `PLANNED` | After hardening stages 1-8 complete, implement the accepted first private Conversation + asynchronous ModelRun slice exactly within ADR-0054 acceptance; Workflow/Agent/tool/RAG/streaming/BYOK/shared-conversation boundaries remain excluded. |
 | 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
 
 Reference Data is a separate conditional track, not part of the numbered completion sequence:
@@ -99,10 +103,12 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Step 7 — Core AI Product vertical slice 1: private Conversation + ModelRun
+Engineering Hardening Stage 1 — Current-truth documentation reconciliation
 ```
 
-The target invariant is:
+Its completion boundary and interruption-safe status are owned by
+`ENGINEERING-HARDENING-ROADMAP.md`. Conversation implementation remains ordered after
+hardening stages 1-8. Its future target invariant remains:
 
 ```text
 service foundation                  -> one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, key ring, and Day-One telemetry

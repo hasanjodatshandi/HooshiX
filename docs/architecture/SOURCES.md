@@ -12,7 +12,8 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Topic | Primary current source |
 | --- | --- |
 | Current ADRs/stable IDs | `../adr/decision-register.md` |
-| Application implementation sequence / next step | `APPLICATION-IMPLEMENTATION-ROADMAP.md` + `implementation-status.md` + current Git/source evidence |
+| Application implementation sequence / next step | `APPLICATION-IMPLEMENTATION-ROADMAP.md` + `ENGINEERING-HARDENING-ROADMAP.md` while its mandatory track is active + `implementation-status.md` + current Git/source evidence |
+| Engineering audit findings/remediation state | `ENGINEERING-HARDENING-ROADMAP.md` + applicable owning ADR/current architecture + current Git/executable evidence |
 | Agent Context Engine/bootstrap/task routing/checkpoints/MCP | ADR-0046 + ADR-0051 + `../engineering/agent-context-engine.md` + `../../context/routes.json` |
 | ChatGPT Web Context Engine tunnel bridge | ADR-0047 + ADR-0051 + `../runbooks/chatgpt-web-secure-mcp-tunnel.md` + `../technology/local-development-baseline.md` |
 | ChatGPT Web developer-host Ops MCP | ADR-0048 + ADR-0051 + `../runbooks/chatgpt-web-ops-mcp.md` + `../technology/local-development-baseline.md` |

@@ -12,9 +12,10 @@ Start with:
 4. `SOURCES.md`;
 5. `../adr/decision-register.md`;
 6. `APPLICATION-IMPLEMENTATION-ROADMAP.md` for current application continuation/next-step sequencing;
-7. `PRODUCTION-DECISION-SUMMARY.md`;
-8. applicable service/platform/security/data/reliability documents;
-9. `PRODUCTION-READINESS-CHECKLIST.md` for executable evidence.
+7. `ENGINEERING-HARDENING-ROADMAP.md` while the ordered audit-remediation track is active;
+8. `PRODUCTION-DECISION-SUMMARY.md`;
+9. applicable service/platform/security/data/reliability documents;
+10. `PRODUCTION-READINESS-CHECKLIST.md` for executable evidence.
 
 ADR-0046 may compile this reading scope through the verified Git-native Context Engine. A verified targeted route does not change document authority or bypass a real `full-read` trigger. `context/routes.json` is canonical for machine-readable task routing; `TASK-REVIEW-MATRIX.md` is its generated human view.
 
@@ -61,6 +62,7 @@ These are target decisions. `implementation-status.md` remains authoritative for
 - `PRODUCTION-READINESS-CHECKLIST.md` — production traffic gate.
 - `implementation-status.md` — actual repository implementation/evidence presence.
 - `APPLICATION-IMPLEMENTATION-ROADMAP.md` — current application milestone order and cross-chat continuation authority after Git reconciliation.
+- `ENGINEERING-HARDENING-ROADMAP.md` — repository-wide audit finding register, ordered remediation stages, completion gates, and interruption-safe continuation state.
 - `../engineering/agent-context-engine.md` — developer/agent operating interface for ADR-0046.
 - `../runbooks/chatgpt-web-ops-mcp.md` — operator setup for the separate ADR-0048 developer-host Ops MCP.
 - `services/` — implementation-facing service contracts.
