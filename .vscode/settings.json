@@ -1,0 +1,5 @@
+{
+    "protobuf.externalLinter.enabled": true,
+    "protobuf.externalLinter.linter": "buf",
+    "protobuf.externalLinter.bufPath": "/home/coder/.vscode-server/data/User/globalStorage/drblury.protobuf-vsc/bin/buf"
+}
