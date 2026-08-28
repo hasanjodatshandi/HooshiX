@@ -1,5 +1,7 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import static com.sajtech.identity.application.transaction.model.TransactionProfile.WORK_CLAIM;
+
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import com.sajtech.identity.infrastructure.persistence.JooqErasureReceiptCoordinator;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,7 +36,7 @@ public final class ErasureReceiptWorker {
   @Scheduled(fixedDelayString = "${identity.erasure-receipt-worker-delay:PT1S}")
   public void run() {
     Instant now = clock.instant();
-    var item = transactions.required(() -> coordinator.claim(now, LEASE));
+    var item = transactions.required(WORK_CLAIM, () -> coordinator.claim(now, LEASE));
     if (item.isEmpty()) return;
     try {
       transactions.required(

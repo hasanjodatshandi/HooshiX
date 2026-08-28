@@ -751,6 +751,9 @@ services/identity-service/src/main/java/com/sajtech/identity/application/tenant/
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/out/AuthorizationTenantPort.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/port/out/TenantStore.java
 services/identity-service/src/main/java/com/sajtech/identity/application/tenant/service/TenantIntentEncoder.java
+services/identity-service/src/main/java/com/sajtech/identity/application/transaction/model/TransactionFailure.java
+services/identity-service/src/main/java/com/sajtech/identity/application/transaction/model/TransactionProfile.java
+services/identity-service/src/main/java/com/sajtech/identity/application/transaction/model/TransactionUnavailableException.java
 services/identity-service/src/main/java/com/sajtech/identity/application/transaction/port/out/TransactionRunner.java
 services/identity-service/src/main/java/com/sajtech/identity/configuration/ErasureKafkaConfiguration.java
 services/identity-service/src/main/java/com/sajtech/identity/configuration/IdentityApplication.java
@@ -838,6 +841,7 @@ services/identity-service/src/main/java/com/sajtech/identity/interfaces/mfa/grpc
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/notification/grpc/IdentityNotificationResultGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/IdentityAdmissionInterceptor.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/SafeTracingServerInterceptor.java
+services/identity-service/src/main/java/com/sajtech/identity/interfaces/observability/grpc/TransactionFailureServerInterceptor.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/password/grpc/IdentityPasswordGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/profile/grpc/IdentityProfileGrpcService.java
 services/identity-service/src/main/java/com/sajtech/identity/interfaces/registration/grpc/IdentityRegistrationGrpcService.java
@@ -884,6 +888,7 @@ services/identity-service/src/test/java/com/sajtech/identity/infrastructure/pers
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantContextIntegrityIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantRlsIntegrationTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/SpringTransactionRunnerIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/ClockSafetyGuardTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/RedisSemanticQuotaIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/challenge/HmacChallengeSecretTest.java
@@ -892,11 +897,14 @@ services/identity-service/src/test/java/com/sajtech/identity/infrastructure/secu
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/mfa/JcaMfaCryptographyTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/password/Argon2idPasswordHasherTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/session/HmacSessionCredentialTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/worker/DurableWorkerLeaseSafetyTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/authentication/grpc/IdentityAuthenticationContractTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/externalidentity/grpc/IdentityExternalIdentityContractTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/mfa/grpc/IdentityMfaContractTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/observability/grpc/IdentityAdmissionInterceptorTest.java
+services/identity-service/src/test/java/com/sajtech/identity/interfaces/observability/grpc/TransactionFailureServerInterceptorTest.java
 services/identity-service/src/test/java/com/sajtech/identity/interfaces/registration/grpc/IdentityRegistrationContractTest.java
+services/identity-service/src/test/java/com/sajtech/identity/interfaces/tenant/grpc/IdentityTenantGrpcServiceTransactionFailureTest.java
 services/identity-service/src/test/resources/features/identity_authentication.feature
 services/notification-service/.dockerignore
 services/notification-service/Dockerfile
@@ -1052,6 +1060,7 @@ services/notification-service/src/test/java/com/sajtech/notification/infrastruct
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/provider/ippanel/IpPanelSmsProviderAdapterTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/provider/liara/LiaraSmtpProviderAdapterTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/provider/local/LoggingProviderAdapterTest.java
+services/notification-service/src/test/java/com/sajtech/notification/infrastructure/runtime/result/NotificationResultDispatcherTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/AesGcmDeliveryEscrowReaderTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/FileBackedHmacIntentFingerprintTest.java
 services/notification-service/src/test/java/com/sajtech/notification/infrastructure/security/FileBackedKeyRingTest.java

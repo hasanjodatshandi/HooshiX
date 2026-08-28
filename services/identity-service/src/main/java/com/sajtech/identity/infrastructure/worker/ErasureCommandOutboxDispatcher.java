@@ -1,5 +1,7 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import static com.sajtech.identity.application.transaction.model.TransactionProfile.WORK_CLAIM;
+
 import com.google.protobuf.Timestamp;
 import com.sajtech.identity.application.erasure.model.ErasureCommandOutboxItem;
 import com.sajtech.identity.application.erasure.port.out.ErasureCommandOutbox;
@@ -48,9 +50,15 @@ public final class ErasureCommandOutboxDispatcher {
 
   @Scheduled(fixedDelayString = "${identity.erasure-dispatch-delay:PT1S}")
   public void dispatch() {
-    Instant now = clock.instant();
-    var due = transactions.required(() -> outbox.claimDue(BATCH, now, LEASE));
-    for (ErasureCommandOutboxItem item : due) publish(item);
+    for (int index = 0; index < BATCH; index++) {
+      Instant now = clock.instant();
+      var due = transactions.required(WORK_CLAIM, () -> outbox.claimDue(1, now, LEASE));
+      if (due.isEmpty()) break;
+      if (due.size() != 1) {
+        throw new IllegalStateException("Erasure outbox exceeded the single-claim lease");
+      }
+      publish(due.getFirst());
+    }
   }
 
   private void publish(ErasureCommandOutboxItem item) {

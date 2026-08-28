@@ -36,13 +36,21 @@ public final class RunReconciliationBatchService implements RunReconciliationBat
       throw new IllegalArgumentException("Reconciliation batch size must be between 1 and 25");
     }
     int recovered = repository.recoverStaleDispatches(batchSize);
-    List<DeliveryReconciliationClaim> claims = repository.claimDue(batchSize, CLAIM_LEASE);
+    int claimed = 0;
     int processed = 0;
-    for (DeliveryReconciliationClaim claim : claims) {
+    for (int index = 0; index < batchSize; index++) {
+      List<DeliveryReconciliationClaim> claims = repository.claimDue(1, CLAIM_LEASE);
+      if (claims.isEmpty()) break;
+      if (claims.size() != 1) {
+        throw new IllegalStateException(
+            "Reconciliation repository exceeded the single-claim lease");
+      }
+      DeliveryReconciliationClaim claim = claims.getFirst();
+      claimed++;
       process(claim);
       processed++;
     }
-    return new ReconciliationBatchResult(recovered, claims.size(), processed);
+    return new ReconciliationBatchResult(recovered, claimed, processed);
   }
 
   private void process(DeliveryReconciliationClaim claim) {

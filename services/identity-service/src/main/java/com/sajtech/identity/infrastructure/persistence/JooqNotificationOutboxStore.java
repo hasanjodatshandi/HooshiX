@@ -6,6 +6,7 @@ import com.sajtech.identity.domain.registration.valueobject.RegistrationChannel;
 import com.sajtech.identity.domain.registration.valueobject.RegistrationLocale;
 import java.time.*;
 import java.util.*;
+import java.util.function.Function;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 
@@ -19,9 +20,9 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
   @Override
   public List<NotificationOutboxRecord> claimDue(Instant now, int batch, Duration lease) {
     if (batch <= 0 || batch > 32) throw new IllegalArgumentException("Outbox batch is invalid");
-    return dsl.transactionResult(
-        configuration -> {
-          DSLContext tx = org.jooq.impl.DSL.using(configuration);
+    return transaction(
+        500,
+        tx -> {
           var rows =
               tx.fetch(
                   """
@@ -50,32 +51,41 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
 
   @Override
   public void markSubmitted(UUID id, UUID notificationId, Instant now) {
-    dsl.execute(
-        "UPDATE identity_notification_outbox SET state='SUBMITTED',notification_id=?,submitted_at=CAST(? AS TIMESTAMP WITH TIME ZONE),claimed_until=NULL,payload_nonce=NULL,payload_ciphertext=NULL,last_error_class=NULL,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
-        notificationId,
-        ts(now),
-        ts(now),
-        id);
+    transaction(
+        500,
+        tx ->
+            tx.execute(
+                "UPDATE identity_notification_outbox SET state='SUBMITTED',notification_id=?,submitted_at=CAST(? AS TIMESTAMP WITH TIME ZONE),claimed_until=NULL,payload_nonce=NULL,payload_ciphertext=NULL,last_error_class=NULL,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
+                notificationId,
+                ts(now),
+                ts(now),
+                id));
   }
 
   @Override
   public void reschedule(UUID id, int attempts, Instant next, Instant now, String error) {
-    dsl.execute(
-        "UPDATE identity_notification_outbox SET state='PENDING',attempt_count=?,next_attempt_at=CAST(? AS TIMESTAMP WITH TIME ZONE),claimed_until=NULL,last_error_class=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
-        attempts,
-        ts(next),
-        error,
-        ts(now),
-        id);
+    transaction(
+        500,
+        tx ->
+            tx.execute(
+                "UPDATE identity_notification_outbox SET state='PENDING',attempt_count=?,next_attempt_at=CAST(? AS TIMESTAMP WITH TIME ZONE),claimed_until=NULL,last_error_class=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
+                attempts,
+                ts(next),
+                error,
+                ts(now),
+                id));
   }
 
   @Override
   public void markPermanentFailure(UUID id, Instant now, String error) {
-    dsl.execute(
-        "UPDATE identity_notification_outbox SET state='FAILED_PERMANENT',claimed_until=NULL,payload_nonce=NULL,payload_ciphertext=NULL,last_error_class=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
-        error,
-        ts(now),
-        id);
+    transaction(
+        500,
+        tx ->
+            tx.execute(
+                "UPDATE identity_notification_outbox SET state='FAILED_PERMANENT',claimed_until=NULL,payload_nonce=NULL,payload_ciphertext=NULL,last_error_class=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE outbox_id=?",
+                error,
+                ts(now),
+                id));
   }
 
   @Override
@@ -83,8 +93,11 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
     if (batch <= 0 || batch > 256) {
       throw new IllegalArgumentException("Sensitive-retention batch is invalid");
     }
-    return dsl.execute(
-        """
+    return transaction(
+        2000,
+        tx ->
+            tx.execute(
+                """
         WITH due AS (
           SELECT outbox_id
           FROM identity_notification_outbox
@@ -104,9 +117,20 @@ public final class JooqNotificationOutboxStore implements NotificationOutboxStor
         FROM due
         WHERE o.outbox_id = due.outbox_id
         """,
-        ts(now),
-        batch,
-        ts(now));
+                ts(now),
+                batch,
+                ts(now)));
+  }
+
+  private <T> T transaction(int statementTimeoutMillis, Function<DSLContext, T> work) {
+    return dsl.transactionResult(
+        configuration -> {
+          DSLContext tx = org.jooq.impl.DSL.using(configuration);
+          tx.fetchValue("SELECT set_config('lock_timeout', '100ms', true)");
+          tx.fetchValue(
+              "SELECT set_config('statement_timeout', ?, true)", statementTimeoutMillis + "ms");
+          return work.apply(tx);
+        });
   }
 
   private static NotificationOutboxRecord map(Record r) {

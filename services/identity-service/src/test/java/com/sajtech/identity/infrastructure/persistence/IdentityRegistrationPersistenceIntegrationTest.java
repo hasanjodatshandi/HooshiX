@@ -3,6 +3,7 @@ package com.sajtech.identity.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.*;
 
 import com.sajtech.identity.application.notification.model.*;
+import com.sajtech.identity.application.notification.usecase.ReportNotificationResultUseCase;
 import com.sajtech.identity.application.profile.ProfileException;
 import com.sajtech.identity.application.profile.model.*;
 import com.sajtech.identity.application.registration.model.*;
@@ -65,7 +66,7 @@ class IdentityRegistrationPersistenceIntegrationTest {
     dsl = DSL.using(new TransactionAwareDataSourceProxy(source), SQLDialect.POSTGRES);
     store = new JooqRegistrationStore(dsl);
     outboxStore = new JooqNotificationOutboxStore(dsl);
-    tx = new SpringTransactionRunner(new DataSourceTransactionManager(source));
+    tx = new SpringTransactionRunner(new DataSourceTransactionManager(source), dsl);
   }
 
   @Test
@@ -98,27 +99,28 @@ class IdentityRegistrationPersistenceIntegrationTest {
           store.insertRegistration(prepared);
           return null;
         });
-    dsl.execute(
-        "UPDATE identity_notification_outbox SET state='SUBMITTED',notification_id=?,submitted_at=CAST(? AS TIMESTAMP WITH TIME ZONE),payload_nonce=NULL,payload_ciphertext=NULL WHERE outbox_id=?",
-        notificationId,
-        OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
-        outboxId);
+    assertThat(outboxStore.claimDue(now, 1, Duration.ofSeconds(30)))
+        .singleElement()
+        .extracting(NotificationOutboxRecord::outboxId)
+        .isEqualTo(outboxId);
+    outboxStore.markSubmitted(outboxId, notificationId, now);
     JooqNotificationResultStore results = new JooqNotificationResultStore(dsl);
+    ReportNotificationResultUseCase report = new ReportNotificationResultUseCase(results, tx);
     NotificationTerminalResult delivered =
         new NotificationTerminalResult(
             notificationId, NotificationTerminalLifecycle.DELIVERED, now.plusSeconds(30));
 
-    assertThat(results.apply(delivered)).isEqualTo(NotificationResultApplyOutcome.APPLIED);
-    assertThat(results.apply(delivered)).isEqualTo(NotificationResultApplyOutcome.REPLAY);
+    assertThat(report.report(delivered)).isEqualTo(NotificationResultApplyOutcome.APPLIED);
+    assertThat(report.report(delivered)).isEqualTo(NotificationResultApplyOutcome.REPLAY);
     assertThat(
-            results.apply(
+            report.report(
                 new NotificationTerminalResult(
                     notificationId,
                     NotificationTerminalLifecycle.FAILED_PERMANENT,
                     now.plusSeconds(31))))
         .isEqualTo(NotificationResultApplyOutcome.CONFLICT);
     assertThat(
-            results.apply(
+            report.report(
                 new NotificationTerminalResult(
                     UUID.randomUUID(), NotificationTerminalLifecycle.DELIVERED, now)))
         .isEqualTo(NotificationResultApplyOutcome.NOT_FOUND);

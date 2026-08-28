@@ -66,9 +66,7 @@ public final class NotificationResultDispatcher implements SmartLifecycle {
     if (!running) return;
     boolean busy = false;
     try {
-      List<NotificationResultOutboxRecord> records = outbox.claimDue(BATCH, LEASE);
-      busy = !records.isEmpty();
-      for (NotificationResultOutboxRecord record : records) process(record);
+      busy = dispatchDue();
     } catch (RuntimeException ignored) {
       meters.counter("notification.result.dispatch.cycle.failures").increment();
       LOGGER
@@ -78,6 +76,20 @@ public final class NotificationResultDispatcher implements SmartLifecycle {
     } finally {
       schedule(busy ? BUSY : IDLE);
     }
+  }
+
+  boolean dispatchDue() {
+    boolean claimed = false;
+    for (int index = 0; index < BATCH; index++) {
+      List<NotificationResultOutboxRecord> records = outbox.claimDue(1, LEASE);
+      if (records.isEmpty()) break;
+      if (records.size() != 1) {
+        throw new IllegalStateException("Result outbox exceeded the single-claim lease");
+      }
+      claimed = true;
+      process(records.getFirst());
+    }
+    return claimed;
   }
 
   private void process(NotificationResultOutboxRecord record) {

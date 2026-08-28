@@ -1,5 +1,7 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import static com.sajtech.identity.application.transaction.model.TransactionProfile.MAINTENANCE;
+
 import com.sajtech.identity.application.tenant.port.out.TenantStore;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import io.micrometer.core.instrument.*;
@@ -54,7 +56,8 @@ public final class InvitationExpiryWorker implements SmartLifecycle {
   private void cycle() {
     boolean busy = false;
     try {
-      int expired = transactions.required(() -> store.expireInvitations(clock.instant(), 200));
+      int expired =
+          transactions.required(MAINTENANCE, () -> store.expireInvitations(clock.instant(), 200));
       busy = expired == 200;
       increment(this.expired, expired);
     } catch (RuntimeException failure) {

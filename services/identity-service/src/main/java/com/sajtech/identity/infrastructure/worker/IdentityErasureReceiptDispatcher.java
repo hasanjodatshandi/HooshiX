@@ -1,5 +1,7 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import static com.sajtech.identity.application.transaction.model.TransactionProfile.WORK_CLAIM;
+
 import com.google.protobuf.Timestamp;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import com.sajtech.identity.contract.v1.ErasureParticipant;
@@ -50,7 +52,7 @@ public final class IdentityErasureReceiptDispatcher {
   @Scheduled(fixedDelayString = "${identity.erasure-receipt-dispatch-delay:PT1S}")
   public void dispatch() {
     Instant now = clock.instant();
-    Optional<Item> claimed = transactions.required(() -> claim(now));
+    Optional<Item> claimed = transactions.required(WORK_CLAIM, () -> claim(now));
     if (claimed.isEmpty()) return;
     Item item = claimed.get();
     try {

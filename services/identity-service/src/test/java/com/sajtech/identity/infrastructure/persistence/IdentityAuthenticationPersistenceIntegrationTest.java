@@ -71,7 +71,7 @@ class IdentityAuthenticationPersistenceIntegrationTest {
     flyway.migrate();
     dsl = DSL.using(new TransactionAwareDataSourceProxy(source), SQLDialect.POSTGRES);
     store = new JooqAuthenticationStore(dsl);
-    tx = new SpringTransactionRunner(new DataSourceTransactionManager(source));
+    tx = new SpringTransactionRunner(new DataSourceTransactionManager(source), dsl);
     userId = UUID.randomUUID();
     insertActiveUser(userId);
   }

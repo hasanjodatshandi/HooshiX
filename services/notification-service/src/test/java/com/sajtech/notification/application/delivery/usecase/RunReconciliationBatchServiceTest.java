@@ -19,6 +19,7 @@ class RunReconciliationBatchServiceTest {
     RecordingReconciliation delivered = new RecordingReconciliation(claim(NOW.minusSeconds(30)));
     service(delivered, ProviderReconciliationStatus.DELIVERED, NOW).run(25);
     assertThat(delivered.action).isEqualTo("DELIVERED");
+    assertThat(delivered.claimSizes).containsOnly(1);
 
     RecordingReconciliation pending = new RecordingReconciliation(claim(NOW.minusSeconds(30)));
     service(pending, ProviderReconciliationStatus.PENDING, NOW).run(25);
@@ -66,6 +67,30 @@ class RunReconciliationBatchServiceTest {
     assertThat(repository.action).isEqualTo("RESCHEDULE");
   }
 
+  @Test
+  void claimsNextReconciliationOnlyAfterPriorProviderCallAndDurableCompletion() {
+    List<DeliveryReconciliationClaim> claims =
+        List.of(claim(NOW.minusSeconds(30)), claim(NOW.minusSeconds(30)));
+    List<String> events = new ArrayList<>();
+    SequencedReconciliation repository = new SequencedReconciliation(claims, events);
+    SequencedProvider provider = new SequencedProvider(claims, events);
+    var service =
+        new RunReconciliationBatchService(
+            repository,
+            () -> NOW,
+            new ProviderAttemptPlanner(new ProviderRetryPolicy()),
+            new ProviderObservationPolicy(),
+            List.of(
+                provider,
+                new CountingProvider(
+                    NotificationChannel.SMS, ProviderReconciliationStatus.PENDING)));
+
+    assertThat(service.run(25)).isEqualTo(new ReconciliationBatchResult(0, 2, 2));
+    assertThat(events)
+        .containsExactly(
+            "claim-0", "remote-0", "complete-0", "claim-1", "remote-1", "complete-1", "claim-2");
+  }
+
   private static RunReconciliationBatchService service(
       RecordingReconciliation repository, ProviderReconciliationStatus status, Instant now) {
     return new RunReconciliationBatchService(
@@ -91,6 +116,8 @@ class RunReconciliationBatchServiceTest {
 
   private static final class RecordingReconciliation implements DeliveryReconciliationRepository {
     private final DeliveryReconciliationClaim claim;
+    private final List<Integer> claimSizes = new ArrayList<>();
+    private boolean claimed;
     private String action;
 
     RecordingReconciliation(DeliveryReconciliationClaim claim) {
@@ -102,6 +129,9 @@ class RunReconciliationBatchServiceTest {
     }
 
     public List<DeliveryReconciliationClaim> claimDue(int batch, Duration lease) {
+      claimSizes.add(batch);
+      if (claimed) return List.of();
+      claimed = true;
       return List.of(claim);
     }
 
@@ -122,6 +152,74 @@ class RunReconciliationBatchServiceTest {
     public void recordStatusUnknown(
         DeliveryReconciliationClaim c, ProviderReconciliationOutcome o) {
       action = "UNKNOWN";
+    }
+  }
+
+  private static final class SequencedReconciliation implements DeliveryReconciliationRepository {
+    private final List<DeliveryReconciliationClaim> claims;
+    private final List<String> events;
+    private int next;
+
+    SequencedReconciliation(List<DeliveryReconciliationClaim> claims, List<String> events) {
+      this.claims = claims;
+      this.events = events;
+    }
+
+    public int recoverStaleDispatches(int batch) {
+      return 0;
+    }
+
+    public List<DeliveryReconciliationClaim> claimDue(int batch, Duration lease) {
+      assertThat(batch).isEqualTo(1);
+      events.add("claim-" + next);
+      return next < claims.size() ? List.of(claims.get(next++)) : List.of();
+    }
+
+    public void recordDelivered(
+        DeliveryReconciliationClaim claim, ProviderReconciliationOutcome outcome) {
+      events.add("complete-" + claims.indexOf(claim));
+    }
+
+    public void recordPermanentFailure(
+        DeliveryReconciliationClaim claim, ProviderReconciliationOutcome outcome) {}
+
+    public void reschedule(
+        DeliveryReconciliationClaim claim, ProviderReconciliationOutcome outcome, Duration delay) {}
+
+    public void recordStatusUnknown(
+        DeliveryReconciliationClaim claim, ProviderReconciliationOutcome outcome) {}
+  }
+
+  private static final class SequencedProvider implements NotificationProviderGateway {
+    private final List<DeliveryReconciliationClaim> claims;
+    private final List<String> events;
+
+    SequencedProvider(List<DeliveryReconciliationClaim> claims, List<String> events) {
+      this.claims = claims;
+      this.events = events;
+    }
+
+    public NotificationChannel channel() {
+      return NotificationChannel.EMAIL;
+    }
+
+    public boolean liveDelivery() {
+      return true;
+    }
+
+    public ProviderDispatchOutcome dispatch(ProviderDispatchMessage message) {
+      throw new UnsupportedOperationException();
+    }
+
+    public ProviderReconciliationOutcome reconcile(ProviderReconciliationRequest request) {
+      int index =
+          claims.stream()
+              .map(DeliveryReconciliationClaim::notificationId)
+              .toList()
+              .indexOf(request.notificationId());
+      events.add("remote-" + index);
+      return ProviderReconciliationOutcome.live(
+          ProviderReconciliationStatus.DELIVERED, null, request.providerCorrelationId());
     }
   }
 
