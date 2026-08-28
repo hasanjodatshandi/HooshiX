@@ -1,9 +1,9 @@
 # Production Decision Summary — Current State
 
-- **Reviewed:** 2026-08-22
+- **Reviewed:** 2026-08-29
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, Identity registration/authentication/Session/RefreshFamily/JWT/Tenant slices, Authorization, and Web BFF slices; service-specific Semgrep/OSV gates are present and all five implemented Java services have implemented Gitleaks current-tree/Git-history gates. Protected merged-main repository/security CI passed for the prior Compromised Password, Notification, and Identity suites on `main@a3766bd`; the expanded five-service protected PR baseline passed on implementation head `7de8b17` in run `32261626399`; the repository-owned local production-fidelity kind/staging lane has passed its composite runtime verification, while production deployed-runtime/staging/release evidence remains `NOT VERIFIED`; Syft/Grype/Cosign/Kyverno final-artifact/release-admission evidence also remains `NOT VERIFIED`; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, the current Identity registration/authentication/session/JWT/Tenant/Profile/Contact/MFA/ExternalIdentity/erasure surface, Authorization, and Web BFF slices; service-specific Semgrep/OSV/Gitleaks gates are present for all five implemented Java services. Protected repository baseline run `33105936814` passed every service security suite and the final aggregator on `main@68cf66c`; protected frontend run `33105936555` also passed at that commit. The repository-owned local production-fidelity kind/staging lane has passed its composite runtime verification, while production deployed-runtime/staging/release evidence remains `NOT VERIFIED`; real Production Syft/Grype/Cosign/Kyverno final-artifact/release-admission execution also remains `NOT VERIFIED`; see `implementation-status.md`
 
 ## 1. Selected single-server topology
 

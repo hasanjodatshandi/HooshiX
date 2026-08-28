@@ -8,7 +8,8 @@
     "docs/architecture/SOURCES.md",
     "docs/adr/decision-register.md",
     "docs/architecture/implementation-status.md",
-    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md"
+    "docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md",
+    "docs/architecture/ENGINEERING-HARDENING-ROADMAP.md"
   ],
   "full_read_triggers": [
     {

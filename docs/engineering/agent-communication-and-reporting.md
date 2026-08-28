@@ -15,7 +15,7 @@ This document is mandatory companion reading for `AGENTS.md`, applicable archite
 9. Do not silently expand scope or perform unrelated refactoring.
 10. Preserve the user's language unless another language is requested; code/commands/identifiers/errors stay exact.
 11. Do not expose private chain-of-thought/internal reasoning; report evidence and concise rationale.
-12. Implementation work follows the 20-item preflight in `AGENTS.md` §15 and `coding-standards.md` §16.
+12. Implementation work follows the applicable concern review in `AGENTS.md` §14 and the mandatory code-generation preflight in `coding-standards.md` §16.
 
 ## 2. Progress updates
 
@@ -126,7 +126,7 @@ Do not execute without explicit confirmation when confirmation is required.
 
 ## 9. Failure/blocker reporting
 
-An intermediate failure does not justify an incomplete final status while a safe, authorized recovery action remains available in the current response. For a terminal-condition task, follow `AGENTS.md` §14.1: diagnose recoverable failures, use materially distinct bounded recovery attempts, re-verify, and continue. A progress checkpoint or conversation-turn boundary is not a final task boundary.
+An intermediate failure does not justify an incomplete final status while a safe, authorized recovery action remains available in the current response. For a terminal-condition task, follow `AGENTS.md` §15: diagnose recoverable failures, use materially distinct bounded recovery attempts, re-verify, and continue. A progress checkpoint or conversation-turn boundary is not a final task boundary.
 
 Before reporting `partial` or `blocked`, record the exact unsatisfied terminal condition, blocker evidence, recovery actions attempted, why available tools cannot safely advance the task, and any exact external or user action required. If no new external input is required and the next safe action is available, execute it instead of ending.
 
@@ -261,7 +261,7 @@ Architecture report:
 
 Report `completed` only when requested behavior/artifact is implemented, affected files/contracts/configuration inspected, current Git/PR diff reviewed, applicable checks passed, current architecture/Definition of Done checked, limitations disclosed, and no known blocker remains within scope.
 
-If a material required check could not run, first apply the recovery discipline in `AGENTS.md` §14.1. Report `partial` only when the check remains unavailable after applicable safe recovery and the missing evidence is material. Use `Not applicable` only when it is genuinely irrelevant.
+If a material required check could not run, first apply the recovery discipline in `AGENTS.md` §15. Report `partial` only when the check remains unavailable after applicable safe recovery and the missing evidence is material. Use `Not applicable` only when it is genuinely irrelevant.
 
 ## 14. Prohibited reporting
 
