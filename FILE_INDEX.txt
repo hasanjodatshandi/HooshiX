@@ -96,6 +96,7 @@ context/checkpoints/20260822T180614Z-post-merge-pr-98-finalize-the-application-i
 context/checkpoints/20260822T231253Z-finalize-public-registration-vertical-slice-openapi-delivery-lif.json
 context/checkpoints/20260822T234134Z-post-merge-pr-102-record-final-post-merge-evidence-for-public-re.json
 context/checkpoints/20260828T221510Z-document-the-repository-wide-engineering-audit-and-complete-hard.json
+context/checkpoints/20260829T030836Z-post-merge-pr-119-record-final-post-merge-evidence-for-engineeri.json
 context/checkpoints/README.md
 context/routes.json
 context/routes.schema.json
