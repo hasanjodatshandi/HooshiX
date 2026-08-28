@@ -1,6 +1,6 @@
 # Production Architecture Review — Current State
 
-- **Reviewed:** 2026-08-22
+- **Reviewed:** 2026-08-29
 - **Status:** architecture target accepted; implementation/runtime evidence not implied
 - **Selected profile:** `production-single-server`
 - **Availability posture:** explicit non-HA

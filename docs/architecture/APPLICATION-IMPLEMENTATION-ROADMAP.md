@@ -133,7 +133,7 @@ A completion-step implementation PR must:
 
 - reconcile actual code/tests/configuration with the completion-step row;
 - change a completed step to `COMPLETED` only after required repository evidence passes;
-- set exactly one first executable application step to `NEXT`, except when the next item is explicitly `GATED` or `DEFERRED` and no executable step is available;
+- set at most one active application step to `IN PROGRESS`; when none is active, set exactly one first executable step to `NEXT`, except when all remaining items are explicitly `GATED` or `DEFERRED`;
 - keep later prerequisites ordered unless a reviewed ADR/current architecture change modifies the sequence;
 - update `implementation-status.md` when repository-level implementation presence changes materially;
 - avoid production-readiness claims from repository implementation alone.
