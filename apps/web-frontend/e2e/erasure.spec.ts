@@ -3,22 +3,12 @@ import { test, expect } from '@playwright/test';
 const csrf = 'synthetic-csrf-token-with-at-least-thirty-two-characters';
 
 test('account erasure requires explicit confirmation and MFA then clears browser state', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'hooshix.frontend.state',
-      JSON.stringify({
-        version: 1,
-        data: {
-          contact: 'person@example.test',
-          authenticated: true,
-          selectedTenantId: null,
-          status: 'ready',
-          registrationStatus: 'idle',
-          verificationStatus: 'idle',
-          lastError: null,
-        },
-      }),
-    );
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"mode":"AUTHENTICATED_ONBOARDING","authenticated":true,"tenantSelected":false}',
+    });
   });
   await page.route('**/api/v1/identity/mfa', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '{"totpEnabled":true,"recoveryCodesRemaining":8}' });
@@ -52,7 +42,9 @@ test('account erasure requires explicit confirmation and MFA then clears browser
     confirmation: 'ERASE_MY_ACCOUNT',
     mfaProof: { type: 'TOTP', code: '123456' },
   });
-  const persisted = await page.evaluate(() => window.localStorage.getItem('hooshix.frontend.state'));
-  expect(persisted).not.toContain('person@example.test');
-  expect(persisted).not.toContain('authenticated":true');
+  const persisted = await page.evaluate(() => ({
+    local: window.localStorage.getItem('hooshix.frontend.state'),
+    session: window.sessionStorage.getItem('hooshix.frontend.registration'),
+  }));
+  expect(persisted).toEqual({ local: null, session: null });
 });

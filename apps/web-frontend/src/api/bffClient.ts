@@ -1,5 +1,10 @@
 import type { components } from './generated/schema';
-import { BffProblemError } from '../errors/problem';
+import {
+  BffProblemError,
+  BffRequestError,
+  isUnauthorizedFailure,
+  parseProblem,
+} from '../errors/problem';
 
 type Schemas = components['schemas'];
 
@@ -43,6 +48,12 @@ type ConfirmTotpEnrollmentRequest = Schemas['ConfirmTotpEnrollmentRequest'];
 type OidcStartRequest = Schemas['OidcStartRequest'];
 type SelfErasureRequest = Schemas['SelfErasureRequest'];
 
+export type BffRequestOptions = {
+  signal?: AbortSignal;
+};
+
+const REQUEST_TIMEOUT_MS = 3_000;
+
 function requestId(): string {
   return crypto.randomUUID();
 }
@@ -56,91 +67,132 @@ function rememberCsrf(response: SessionResponse): SessionResponse {
 
 async function ensureCsrf(): Promise<void> {
   if (csrfToken) return;
-  const recover = () => fetch('/api/v1/auth/session/csrf', {
+  const recover = () => request<SessionResponse>('/api/v1/auth/session/csrf', {
       method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'x-request-id': requestId() },
     });
-  let response = await recover();
-  if (response.status === 401) response = await recover();
-  if (!response.ok) return problem(response, 'CSRF recovery failed');
-  rememberCsrf(await response.json() as SessionResponse);
+  try {
+    rememberCsrf(await recover());
+  } catch (error) {
+    if (!isUnauthorizedFailure(error)) throw error;
+    rememberCsrf(await recover());
+  }
 }
 
-async function problem(response: Response, fallback: string): Promise<never> {
+async function problem(response: Response): Promise<never> {
   if (response.status === 401) csrfToken = null;
-  const value = await response.json().catch(() => null);
-  if (value?.code) throw new BffProblemError(value);
-  throw new Error(fallback);
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    value = null;
+  }
+  const parsed = parseProblem(value);
+  if (parsed && parsed.status === response.status) throw new BffProblemError(parsed);
+  throw new BffRequestError('BFF_UNEXPECTED_RESPONSE', response.status);
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  options: BffRequestOptions = {},
+  expectJson = true,
+): Promise<T> {
+  if (options.signal?.aborted) throw new BffRequestError('BFF_REQUEST_CANCELLED');
+  const controller = new AbortController();
+  let timedOut = false;
+  const cancel = () => controller.abort();
+  options.signal?.addEventListener('abort', cancel, { once: true });
+  const timeout = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(path, {
+      ...init,
+      signal: controller.signal,
+      credentials: 'same-origin',
+      headers: {
+        'x-request-id': requestId(),
+        ...init.headers,
+      },
+    });
+    if (!response.ok) return await problem(response);
+    if (!expectJson || response.status === 204) return undefined as T;
+    try {
+      return await response.json() as T;
+    } catch (error) {
+      if (timedOut || controller.signal.aborted) throw error;
+      throw new BffRequestError('BFF_INVALID_RESPONSE', response.status);
+    }
+  } catch (error) {
+    if (timedOut) throw new BffRequestError('BFF_REQUEST_TIMEOUT');
+    if (controller.signal.aborted) throw new BffRequestError('BFF_REQUEST_CANCELLED');
+    if (error instanceof BffProblemError || error instanceof BffRequestError) throw error;
+    throw new BffRequestError('BFF_NETWORK_ERROR');
+  } finally {
+    window.clearTimeout(timeout);
+    options.signal?.removeEventListener('abort', cancel);
+  }
+}
+
+function requestWithoutResponse(path: string, init: RequestInit): Promise<void> {
+  return request<void>(path, init, {}, false);
+}
+
+function csrfHeaders(): Record<string, string> {
+  return csrfToken ? { 'x-csrf-token': csrfToken } : {};
+}
+
+async function post<T>(
+  path: string,
+  body: unknown,
+  options: BffRequestOptions = {},
+): Promise<T> {
+  return request<T>(path, {
     method: 'POST',
     credentials: 'same-origin',
     headers: {
       'content-type': 'application/json',
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      ...csrfHeaders(),
     },
     body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    return problem(response, 'bff request failed');
-  }
-  return response.json() as Promise<T>;
+  }, options);
 }
 
-async function postWithoutBody<T>(path: string): Promise<T> {
-  const response = await fetch(path, {
+async function postWithoutBody<T>(
+  path: string,
+  options: BffRequestOptions = {},
+): Promise<T> {
+  return request<T>(path, {
     method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
-  });
-  if (!response.ok) {
-    return problem(response, 'bff request failed');
-  }
-  return response.json() as Promise<T>;
+    headers: csrfHeaders(),
+  }, options);
 }
 
 
-export async function bootstrapSession(): Promise<SessionResponse> {
-  return fetch('/api/v1/auth/session/bootstrap', {
+export async function bootstrapSession(
+  options: BffRequestOptions = {},
+): Promise<SessionResponse> {
+  return rememberCsrf(await request<SessionResponse>('/api/v1/auth/session/bootstrap', {
     method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'x-request-id': requestId() },
-  }).then(async (r) => {
-    if (!r.ok) throw new Error('session bootstrap failed');
-    return rememberCsrf(await r.json() as SessionResponse);
-  });
+  }, options));
 }
 
 export async function login(
   body: Pick<LocalLoginRequest, 'contact' | 'password'>,
 ): Promise<SessionResponse> {
   await ensureCsrf();
-  return fetch('/api/v1/auth/local', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'content-type': 'application/json',
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ channel: 'EMAIL', ...body }),
-  }).then(async (r) => {
-    if (!r.ok) return problem(r, 'login failed');
-    return rememberCsrf(await r.json() as SessionResponse);
-  });
+  return rememberCsrf(await post<SessionResponse>(
+    '/api/v1/auth/local',
+    { channel: 'EMAIL', ...body },
+  ));
 }
 
-export async function getSessionState(): Promise<SessionState> {
-  const response = await fetch('/api/v1/auth/session', { credentials: 'same-origin' });
-  if (!response.ok) return problem(response, 'session state failed');
-  return response.json() as Promise<SessionState>;
+export async function getSessionState(
+  options: BffRequestOptions = {},
+): Promise<SessionState> {
+  return request<SessionState>('/api/v1/auth/session', {}, options);
 }
 
 export async function startGoogleLogin(): Promise<OidcStartResponse> {
@@ -149,13 +201,10 @@ export async function startGoogleLogin(): Promise<OidcStartResponse> {
   return post<OidcStartResponse>('/api/v1/auth/oidc/google/start', body);
 }
 
-export async function getExternalIdentityStatus(): Promise<ExternalIdentityStatus> {
-  const response = await fetch('/api/v1/identity/external-identities', {
-    credentials: 'same-origin',
-    headers: { 'x-request-id': requestId() },
-  });
-  if (!response.ok) return problem(response, 'external identity status failed');
-  return response.json() as Promise<ExternalIdentityStatus>;
+export async function getExternalIdentityStatus(
+  options: BffRequestOptions = {},
+): Promise<ExternalIdentityStatus> {
+  return request<ExternalIdentityStatus>('/api/v1/identity/external-identities', {}, options);
 }
 
 export async function startGoogleLink(): Promise<OidcStartResponse> {
@@ -166,15 +215,10 @@ export async function startGoogleLink(): Promise<OidcStartResponse> {
 
 export async function unlinkGoogleIdentity(): Promise<void> {
   await ensureCsrf();
-  const response = await fetch('/api/v1/identity/external-identities/google', {
+  await requestWithoutResponse('/api/v1/identity/external-identities/google', {
     method: 'DELETE',
-    credentials: 'same-origin',
-    headers: {
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
+    headers: csrfHeaders(),
   });
-  if (!response.ok) return problem(response, 'external identity unlink failed');
   csrfToken = null;
 }
 
@@ -183,13 +227,10 @@ export async function completeMfaAuthentication(body: MfaProof): Promise<Session
   return rememberCsrf(await post<SessionResponse>('/api/v1/auth/mfa/complete', body));
 }
 
-export async function getMfaStatus(): Promise<MfaStatus> {
-  const response = await fetch('/api/v1/identity/mfa', {
-    credentials: 'same-origin',
-    headers: { 'x-request-id': requestId() },
-  });
-  if (!response.ok) return problem(response, 'MFA status failed');
-  return response.json() as Promise<MfaStatus>;
+export async function getMfaStatus(
+  options: BffRequestOptions = {},
+): Promise<MfaStatus> {
+  return request<MfaStatus>('/api/v1/identity/mfa', {}, options);
 }
 
 export async function startTotpEnrollment(
@@ -209,17 +250,14 @@ export async function confirmTotpEnrollment(
 
 export async function disableTotp(body: MfaProof): Promise<void> {
   await ensureCsrf();
-  const response = await fetch('/api/v1/identity/mfa/totp', {
+  await requestWithoutResponse('/api/v1/identity/mfa/totp', {
     method: 'DELETE',
-    credentials: 'same-origin',
     headers: {
       'content-type': 'application/json',
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      ...csrfHeaders(),
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) return problem(response, 'disable MFA failed');
 }
 
 export async function rotateRecoveryCodes(body: MfaProof): Promise<RecoveryCodes> {
@@ -228,10 +266,10 @@ export async function rotateRecoveryCodes(body: MfaProof): Promise<RecoveryCodes
 }
 
 
-export async function listTenants(): Promise<TenantList> {
-  const r = await fetch('/api/v1/identity/tenants', { credentials: 'same-origin' });
-  if (!r.ok) throw new Error('tenant list failed');
-  return r.json();
+export async function listTenants(
+  options: BffRequestOptions = {},
+): Promise<TenantList> {
+  return request<TenantList>('/api/v1/identity/tenants', {}, options);
 }
 
 export async function selectTenant(membershipId: string): Promise<TenantSelectionResponse> {
@@ -254,30 +292,26 @@ async function tenantLifecycle(
 
 export async function deleteTenant(tenantId: string): Promise<TenantLifecycleResult> {
   await ensureCsrf();
-  const response = await fetch(`/api/v1/identity/tenants/${tenantId}`, {
+  const result = await request<TenantLifecycleResult>(`/api/v1/identity/tenants/${tenantId}`, {
     method: 'DELETE',
-    credentials: 'same-origin',
-    headers: {
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
+    headers: csrfHeaders(),
   });
-  if (!response.ok) return problem(response, 'tenant deletion failed');
-  const result = await response.json() as TenantLifecycleResult;
   if (result.csrfToken) csrfToken = result.csrfToken;
   return result;
 }
 
-async function invitationList(path: string): Promise<InvitationList> {
-  const response = await fetch(path, { credentials: 'same-origin' });
-  if (!response.ok) return problem(response, 'invitation list failed');
-  return response.json() as Promise<InvitationList>;
+async function invitationList(
+  path: string,
+  options: BffRequestOptions = {},
+): Promise<InvitationList> {
+  return request<InvitationList>(path, {}, options);
 }
 
-export const listReceivedInvitations = () =>
-  invitationList('/api/v1/identity/invitations/received');
+export const listReceivedInvitations = (options: BffRequestOptions = {}) =>
+  invitationList('/api/v1/identity/invitations/received', options);
 
-export const listTenantInvitations = () => invitationList('/api/v1/identity/invitations');
+export const listTenantInvitations = (options: BffRequestOptions = {}) =>
+  invitationList('/api/v1/identity/invitations', options);
 
 async function invitationMutation<T>(invitationId: string, operation: string): Promise<T> {
   await ensureCsrf();
@@ -285,32 +319,24 @@ async function invitationMutation<T>(invitationId: string, operation: string): P
 }
 
 
-export async function getProfile(): Promise<Profile> {
-  const r = await fetch('/api/v1/identity/profile', { credentials: 'same-origin' });
-  if (!r.ok) throw new Error('profile failed');
-  return r.json();
+export async function getProfile(options: BffRequestOptions = {}): Promise<Profile> {
+  return request<Profile>('/api/v1/identity/profile', {}, options);
 }
 
-export async function getContacts(): Promise<Contact[]> {
-  const r = await fetch('/api/v1/identity/contacts', { credentials: 'same-origin' });
-  if (!r.ok) throw new Error('contacts failed');
-  return r.json();
+export async function getContacts(options: BffRequestOptions = {}): Promise<Contact[]> {
+  return request<Contact[]>('/api/v1/identity/contacts', {}, options);
 }
 
 export async function updateProfile(body: UpdateProfileRequest): Promise<AcceptedResponse> {
   await ensureCsrf();
-  const response = await fetch('/api/v1/identity/profile', {
+  return request<AcceptedResponse>('/api/v1/identity/profile', {
     method: 'PUT',
-    credentials: 'same-origin',
     headers: {
       'content-type': 'application/json',
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      ...csrfHeaders(),
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error('profile update failed');
-  return response.json();
 }
 
 export async function verifyContact(id: string, code: string): Promise<Schemas['VerifiedResponse']> {
@@ -331,16 +357,10 @@ export async function setPrimaryContact(id: string): Promise<AcceptedResponse> {
 
 export async function removeContact(id: string): Promise<AcceptedResponse> {
   await ensureCsrf();
-  const r = await fetch(`/api/v1/identity/contacts/${id}`, {
+  return request<AcceptedResponse>(`/api/v1/identity/contacts/${id}`, {
     method: 'DELETE',
-    credentials: 'same-origin',
-    headers: {
-      'x-request-id': requestId(),
-      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-    },
+    headers: csrfHeaders(),
   });
-  if (!r.ok) throw new Error('remove contact failed');
-  return r.json();
 }
 
 export async function addContact(body: AddContactRequest): Promise<Schemas['CreatedContactResponse']> {

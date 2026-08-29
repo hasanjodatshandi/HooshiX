@@ -11,15 +11,19 @@ export function OidcCompletionPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void bffClient.getSessionState().then((session) => {
+    const controller = new AbortController();
+    void bffClient.getSessionState({ signal: controller.signal }).then((session) => {
       if (session.mode === 'MFA_PREAUTH') {
         navigate(routes.loginMfa);
         return;
       }
       if (!session.authenticated) throw new Error('OIDC session was not established');
-      dispatch(actions.loginSucceeded());
+      dispatch(actions.loginSucceeded(session.tenantSelected));
       navigate(session.tenantSelected ? routes.application : routes.profile);
-    }).catch((cause) => setError(getErrorMessage(cause)));
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setError(getErrorMessage(cause));
+    });
+    return () => controller.abort();
   }, [dispatch]);
 
   return <main aria-busy={!error}><h1>Completing sign in</h1><p role="status">Verifying your secure session…</p><p role="alert">{error}</p></main>;

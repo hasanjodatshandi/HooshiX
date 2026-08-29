@@ -16,17 +16,19 @@ export function MfaLoginFlow() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
       const canonicalCode = type === 'TOTP' ? totpCode(code) : recoveryCode(code);
       const session = await bffClient.completeMfaAuthentication({ type, code: canonicalCode });
       setCode('');
-      dispatch(actions.loginSucceeded());
+      dispatch(actions.loginSucceeded(session.mode === 'TENANT_AUTHENTICATED'));
       navigate(session.mode === 'TENANT_AUTHENTICATED' ? routes.application : routes.tenantSelection);
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
+      setCode('');
       setBusy(false);
     }
   }

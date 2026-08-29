@@ -18,13 +18,20 @@ export function MfaSettingsFlow() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void bffClient.getMfaStatus().then(setStatus).catch((cause) => setError(getErrorMessage(cause)));
+    const controller = new AbortController();
+    void bffClient.getMfaStatus({ signal: controller.signal })
+      .then(setStatus)
+      .catch((cause) => {
+        if (!controller.signal.aborted) setError(getErrorMessage(cause));
+      });
+    return () => controller.abort();
   }, []);
 
   async function run(operation: () => Promise<void>) {
+    if (busy) return;
     setBusy(true);
     setError('');
-    try { await operation(); } catch (cause) { setError(getErrorMessage(cause)); } finally { setBusy(false); }
+    try { await operation(); } catch (cause) { setError(getErrorMessage(cause)); } finally { setProofCode(''); setBusy(false); }
   }
 
   function proof(): MfaProof | undefined {

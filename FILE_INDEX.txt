@@ -34,6 +34,7 @@ apps/web-frontend/e2e/oidc.spec.ts
 apps/web-frontend/e2e/onboarding.spec.ts
 apps/web-frontend/e2e/password-recovery.spec.ts
 apps/web-frontend/e2e/profile.spec.ts
+apps/web-frontend/e2e/resilience-privacy.spec.ts
 apps/web-frontend/e2e/tenant-lifecycle.spec.ts
 apps/web-frontend/index.html
 apps/web-frontend/package-lock.json
@@ -44,6 +45,7 @@ apps/web-frontend/scripts/generate-openapi-client.sh
 apps/web-frontend/src/api/bffClient.ts
 apps/web-frontend/src/api/generated/schema.ts
 apps/web-frontend/src/app/ApplicationShell.tsx
+apps/web-frontend/src/errors/ApplicationErrorBoundary.tsx
 apps/web-frontend/src/errors/getErrorMessage.ts
 apps/web-frontend/src/errors/problem.ts
 apps/web-frontend/src/features/erasure/AccountErasureFlow.tsx
@@ -59,6 +61,7 @@ apps/web-frontend/src/features/verification/VerificationFlow.tsx
 apps/web-frontend/src/i18n/direction.ts
 apps/web-frontend/src/i18n/resources.ts
 apps/web-frontend/src/main.tsx
+apps/web-frontend/src/navigation/InternalLink.tsx
 apps/web-frontend/src/navigation/navigate.ts
 apps/web-frontend/src/navigation/usePath.ts
 apps/web-frontend/src/pages/ApplicationPage.tsx
@@ -75,7 +78,6 @@ apps/web-frontend/src/state/appReducer.ts
 apps/web-frontend/src/state/appState.tsx
 apps/web-frontend/src/state/flow.ts
 apps/web-frontend/src/state/storage.ts
-apps/web-frontend/src/state/validation.ts
 apps/web-frontend/src/validation/userInput.ts
 apps/web-frontend/tsconfig.json
 apps/web-frontend/vite.config.ts

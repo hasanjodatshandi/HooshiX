@@ -15,6 +15,7 @@ export function PasswordRecoveryFlow() {
 
   async function request(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -29,6 +30,7 @@ export function PasswordRecoveryFlow() {
 
   async function confirm(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -41,10 +43,14 @@ export function PasswordRecoveryFlow() {
       setCode('');
       setPassword('');
       setMfaCode('');
+      setContact('');
       setStage('complete');
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
+      setCode('');
+      setPassword('');
+      setMfaCode('');
       setBusy(false);
     }
   }

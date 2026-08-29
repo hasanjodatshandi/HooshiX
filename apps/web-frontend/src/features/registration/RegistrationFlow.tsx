@@ -18,6 +18,7 @@ export function RegistrationFlow() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (status === 'loading') return;
     dispatch(actions.clearError());
     dispatch(actions.registrationRequestStarted());
     try {
@@ -37,6 +38,8 @@ export function RegistrationFlow() {
       navigate('/verify');
     } catch (cause) {
       dispatch(actions.registrationFailed(getErrorMessage(cause)));
+    } finally {
+      setPassword('');
     }
   }
 
@@ -53,7 +56,7 @@ export function RegistrationFlow() {
       <input id="registration-father-name" maxLength={240} value={fatherName} onChange={(event) => setFatherName(event.target.value)} />
       <label htmlFor="registration-password">Password</label>
       <input id="registration-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required value={password} onChange={(event) => setPassword(event.target.value)} />
-      <button type="submit">Continue</button>
+      <button type="submit" disabled={status === 'loading'}>Continue</button>
     </form>
     <p role="status">{status}</p>
     <p role="alert">{error}</p>

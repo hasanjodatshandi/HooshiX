@@ -5,23 +5,23 @@ const invitationId = '22222222-2222-4222-8222-222222222222';
 const csrf = 'synthetic-csrf-token-with-at-least-thirty-two-characters';
 
 test('tenant management handles received invitations and clears deleted tenant state', async ({ page }) => {
-  await page.addInitScript(({ selectedTenantId }) => {
-    window.localStorage.setItem(
-      'hooshix.frontend.state',
-      JSON.stringify({
-        version: 1,
-        data: {
-          contact: 'person@example.test',
-          authenticated: true,
-          selectedTenantId,
-          status: 'ready',
-          registrationStatus: 'idle',
-          verificationStatus: 'idle',
-          lastError: null,
-        },
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"mode":"AUTHENTICATED_ONBOARDING","authenticated":true,"tenantSelected":false}',
+    });
+  });
+  await page.route('**/api/v1/identity/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        tenants: [{ tenantId, membershipId: invitationId, name: 'Sample Tenant', slug: 'sample-tenant' }],
+        suggestedMembershipId: invitationId,
       }),
-    );
-  }, { selectedTenantId: tenantId });
+    });
+  });
   await page.route('**/api/v1/auth/session/csrf', async (route) => {
     await route.fulfill({
       status: 200,
@@ -51,7 +51,7 @@ test('tenant management handles received invitations and clears deleted tenant s
   let declined = false;
   await page.route(`**/api/v1/identity/invitations/${invitationId}/decline`, async (route) => {
     declined = true;
-    expect(route.request().headers()['x-csrf-token']).toBe(csrf);
+    expect(route.request().headers()['x-csrf-token']).toBe(`${csrf}-selected`);
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -74,14 +74,27 @@ test('tenant management handles received invitations and clears deleted tenant s
     });
   });
 
-  await page.goto('/tenants/manage');
+  await page.route('**/api/v1/identity/tenant-selection', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ csrfToken: `${csrf}-selected`, tenantId, membershipId: invitationId, mode: 'TENANT_AUTHENTICATED' }),
+    });
+  });
+
+  await page.goto('/tenant-select');
+  await page.getByRole('button', { name: 'Sample Tenant' }).click();
+  await expect(page).toHaveURL(/\/application$/);
+  await page.getByRole('link', { name: 'Tenant management' }).click();
   await expect(page.getByText('Sample Tenant — PENDING')).toBeVisible();
   await page.getByRole('button', { name: 'decline' }).click();
   await expect.poll(() => declined).toBe(true);
   await page.getByRole('button', { name: 'Delete selected tenant' }).click();
   await expect(page.getByRole('status')).toContainText('ACTIVE → DELETED (pending)');
 
-  const persisted = await page.evaluate(() => window.localStorage.getItem('hooshix.frontend.state'));
-  expect(persisted).toContain('"selectedTenantId":null');
-  expect(persisted).not.toContain('refresh');
+  const persisted = await page.evaluate(() => JSON.stringify({
+    local: { ...window.localStorage },
+    session: { ...window.sessionStorage },
+  }));
+  expect(persisted).not.toMatch(/selectedTenantId|authenticated|refresh|person@example/i);
 });

@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { bffClient, type Contact, type Profile } from '../../api/bffClient';
 import { getErrorMessage } from '../../errors/getErrorMessage';
+import { InternalLink } from '../../navigation/InternalLink';
+import { routes } from '../../routes/routes';
 import { canonicalEmail, canonicalName, verificationCode } from '../../validation/userInput';
 
 export function ProfileFlow() {
@@ -11,10 +13,15 @@ export function ProfileFlow() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [fatherName, setFatherName] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  async function reload() {
-    const [nextProfile, nextContacts] = await Promise.all([bffClient.getProfile(), bffClient.getContacts()]);
+  async function reload(signal?: AbortSignal) {
+    const options = signal ? { signal } : {};
+    const [nextProfile, nextContacts] = await Promise.all([
+      bffClient.getProfile(options),
+      bffClient.getContacts(options),
+    ]);
     setProfile(nextProfile);
     setFirstName(nextProfile.firstName);
     setLastName(nextProfile.lastName);
@@ -22,15 +29,26 @@ export function ProfileFlow() {
     setContacts(nextContacts);
   }
 
-  useEffect(() => { void reload().catch((cause) => setError(getErrorMessage(cause))); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void reload(controller.signal).catch((cause) => {
+      if (!controller.signal.aborted) setError(getErrorMessage(cause));
+    });
+    return () => controller.abort();
+  }, []);
 
   async function run(action: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
     setError('');
     try {
       await action();
       await reload();
     } catch (cause) {
       setError(getErrorMessage(cause));
+    } finally {
+      setCodes({});
+      setBusy(false);
     }
   }
 
@@ -64,7 +82,7 @@ export function ProfileFlow() {
       <input id="profile-last-name" maxLength={240} required value={lastName} onChange={(event) => setLastName(event.target.value)} />
       <label htmlFor="profile-father-name">Father name</label>
       <input id="profile-father-name" maxLength={240} value={fatherName} onChange={(event) => setFatherName(event.target.value)} />
-      <button type="submit" disabled={!profile}>Save profile</button>
+      <button type="submit" disabled={busy || !profile}>Save profile</button>
     </form>
     <h2>Contacts</h2>
     <ul>{contacts.map((contact) => <li key={contact.id}>
@@ -72,18 +90,18 @@ export function ProfileFlow() {
       {!contact.verified && <>
         <label htmlFor={`code-${contact.id}`}>Verification code</label>
         <input id={`code-${contact.id}`} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} value={codes[contact.id] ?? ''} onChange={(event) => setCodes((old) => ({ ...old, [contact.id]: event.target.value }))} />
-        <button type="button" onClick={() => void run(() => bffClient.verifyContact(contact.id, verificationCode(codes[contact.id] ?? '')))}>Verify</button>
-        <button type="button" onClick={() => void run(() => bffClient.resendContactVerification(contact.id))}>Resend</button>
+        <button type="button" disabled={busy} onClick={() => void run(() => bffClient.verifyContact(contact.id, verificationCode(codes[contact.id] ?? '')))}>Verify</button>
+        <button type="button" disabled={busy} onClick={() => void run(() => bffClient.resendContactVerification(contact.id))}>Resend</button>
       </>}
-      {contact.verified && !contact.primary && <button type="button" onClick={() => void run(() => bffClient.setPrimaryContact(contact.id))}>Primary</button>}
-      {!contact.primary && <button type="button" onClick={() => void run(() => bffClient.removeContact(contact.id))}>Remove</button>}
+      {contact.verified && !contact.primary && <button type="button" disabled={busy} onClick={() => void run(() => bffClient.setPrimaryContact(contact.id))}>Primary</button>}
+      {!contact.primary && <button type="button" disabled={busy} onClick={() => void run(() => bffClient.removeContact(contact.id))}>Remove</button>}
     </li>)}</ul>
     <form onSubmit={(event) => void add(event)}>
       <label htmlFor="new-contact">Email</label>
       <input id="new-contact" type="email" autoComplete="email" maxLength={254} required value={value} onChange={(event) => setValue(event.target.value)} />
-      <button type="submit">Add contact</button>
+      <button type="submit" disabled={busy}>Add contact</button>
     </form>
-    {onboardingComplete && <p><a href="/tenant-select">Continue to tenant selection</a></p>}
+    {onboardingComplete && <p><InternalLink to={routes.tenantSelection}>Continue to tenant selection</InternalLink></p>}
     <p role="alert">{error}</p>
   </section>;
 }
