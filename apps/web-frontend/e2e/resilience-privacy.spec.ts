@@ -39,6 +39,40 @@ test('BFF failures expose only a stable safe code and clear submitted credential
   expect(persisted).not.toMatch(/current password|provider-token|authenticated|tenantSelected/i);
 });
 
+test('late session restoration cannot overwrite a completed login', async ({ page }) => {
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/problem+json',
+      body: JSON.stringify({
+        type: 'about:blank',
+        title: 'Invalid session',
+        status: 401,
+        code: 'INVALID_SESSION',
+      }),
+    });
+  });
+  await page.route('**/api/v1/auth/session/csrf', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ csrfToken: csrf, mode: 'PREAUTH' }) });
+  });
+  await page.route('**/api/v1/auth/local', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ csrfToken: `${csrf}-login`, mode: 'TENANT_AUTHENTICATED' }) });
+  });
+
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('person@example.com');
+  await page.getByLabel('Password').fill('current password');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.waitForTimeout(700);
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/application');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  await expect(page.getByRole('heading', { name: 'Application' })).toBeVisible();
+});
+
 test('BFF request timeout is finite and duplicate submit is suppressed', async ({ page }) => {
   let loginRequests = 0;
   await page.route('**/api/v1/auth/session/csrf', async (route) => {

@@ -45,7 +45,7 @@ export const initialAppModel: AppModel = {
 
 export function appReducer(state: AppModel, event: AppEvent): AppModel {
   switch (event.type) {
-    case 'SESSION_RESTORED': return {
+    case 'SESSION_RESTORED': return state.sessionStatus === 'ready' ? state : {
       ...state,
       contact: event.authenticated ? '' : state.contact,
       authenticated: event.authenticated,
@@ -54,7 +54,7 @@ export function appReducer(state: AppModel, event: AppEvent): AppModel {
       sessionStatus: 'ready',
       status: event.authenticated ? 'ready' : state.status,
     };
-    case 'SESSION_RESTORE_FAILED': return {
+    case 'SESSION_RESTORE_FAILED': return state.sessionStatus === 'ready' ? state : {
       ...state,
       authenticated: false,
       tenantSelected: false,
@@ -74,13 +74,13 @@ export function appReducer(state: AppModel, event: AppEvent): AppModel {
     case 'REGISTRATION_SUCCEEDED': return { ...state, registrationStatus: 'success' };
     case 'REGISTRATION_FAILED': return { ...state, registrationStatus: 'failed', lastError: event.error };
     case 'VERIFICATION_REQUEST_STARTED': return { ...state, verificationStatus: 'loading', lastError: null };
-    case 'VERIFICATION_COMPLETED': return { ...state, contact: '', verificationStatus: 'success', authenticated: true };
+    case 'VERIFICATION_COMPLETED': return { ...state, contact: '', verificationStatus: 'success', authenticated: true, sessionStatus: 'ready' };
     case 'VERIFICATION_FAILED': return { ...state, verificationStatus: 'failed', lastError: event.error };
     case 'ERROR_CLEARED': return { ...state, lastError: null };
     case 'SESSION_EXPIRED': return { ...state, authenticated: false, tenantSelected: false, selectedTenantId: null, status: 'expired' };
     case 'ACCOUNT_ERASED': return { ...initialAppModel, sessionStatus: 'ready' };
     case 'TENANT_SELECTED': return { ...state, tenantSelected: true, selectedTenantId: event.tenantId };
     case 'TENANT_CLEARED': return { ...state, tenantSelected: false, selectedTenantId: null };
-    case 'LOGIN_SUCCEEDED': return { ...state, authenticated: true, tenantSelected: event.tenantSelected, status: 'ready' };
+    case 'LOGIN_SUCCEEDED': return { ...state, authenticated: true, tenantSelected: event.tenantSelected, sessionStatus: 'ready', status: 'ready' };
   }
 }
