@@ -103,7 +103,7 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 2 — Database deadlines and durable-worker lease safety
+Engineering Hardening Stage 1 — Current-truth documentation reconciliation
 ```
 
 Its completion boundary and interruption-safe status are owned by
