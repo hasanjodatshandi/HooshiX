@@ -52,6 +52,7 @@ export type BffRequestOptions = {
   signal?: AbortSignal;
 };
 
+// The BFF owns a 2,600 ms outer budget; the browser allows bounded response propagation margin.
 const REQUEST_TIMEOUT_MS = 3_000;
 
 function requestId(): string {

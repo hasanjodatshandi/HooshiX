@@ -64,6 +64,45 @@ test('BFF request timeout is finite and duplicate submit is suppressed', async (
   expect(loginRequests).toBe(1);
 });
 
+test('BFF timeout also bounds stalled response-body parsing', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith('/api/v1/auth/local')) {
+        return {
+          ok: true,
+          status: 200,
+          json: () => new Promise<never>((_resolve, reject) => {
+            const signal = init?.signal;
+            if (!signal) return;
+            if (signal.aborted) {
+              reject(new DOMException('Aborted', 'AbortError'));
+              return;
+            }
+            signal.addEventListener(
+              'abort',
+              () => reject(new DOMException('Aborted', 'AbortError')),
+              { once: true },
+            );
+          }),
+        } as Response;
+      }
+      return originalFetch(input, init);
+    };
+  });
+  await page.route('**/api/v1/auth/session/csrf', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ csrfToken: csrf, mode: 'PREAUTH' }) });
+  });
+
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('person@example.com');
+  await page.getByLabel('Password').fill('current password');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+
+  await expect(page.getByRole('alert')).toHaveText('BFF_REQUEST_TIMEOUT', { timeout: 4_500 });
+});
+
 test('disabled browser storage does not crash registration', async ({ page }) => {
   await page.addInitScript(() => {
     for (const name of ['localStorage', 'sessionStorage'] as const) {
@@ -136,4 +175,34 @@ test('unmount aborts an in-flight loader without a late error', async ({ page })
   await expect(page.getByRole('heading', { name: 'Application' })).toBeVisible();
   await page.waitForTimeout(1_200);
   await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('application error boundary hides caught render details', async ({ page }) => {
+  await page.addInitScript(() => {
+    Date.prototype.toLocaleString = () => { throw new Error('person@example.com secret-render-detail'); };
+  });
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"mode":"AUTHENTICATED_ONBOARDING","authenticated":true,"tenantSelected":false}' });
+  });
+  await page.route('**/api/v1/identity/invitations/received', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        invitations: [{
+          invitationId: '11111111-1111-4111-8111-111111111111',
+          tenantId: '22222222-2222-4222-8222-222222222222',
+          tenantName: 'Sample Tenant',
+          tenantSlug: 'sample-tenant',
+          state: 'PENDING',
+          expiresAt: '2030-01-01T00:00:00Z',
+        }],
+      }),
+    });
+  });
+
+  await page.goto('/tenants/manage');
+
+  await expect(page.getByRole('heading', { name: 'The application could not continue' })).toBeVisible();
+  await expect(page.getByText(/person@example|secret-render-detail/)).toHaveCount(0);
 });
