@@ -156,8 +156,8 @@ Remediation must not weaken these verified current properties:
 
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
-| 1 | Current-truth documentation reconciliation | `IN PROGRESS` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Reopened: final service-document review found two stale protected-CI claims; fixes require final verification |
-| 2 | Database deadlines and durable-worker lease safety | `PLANNED` | Define operation-specific transaction/statement/lock budgets; implement cancellation/error mapping; add lock contention/pool-exhaustion tests; measure and enforce worker batch/deadline/lease invariants without layered retries or remote I/O in transactions. | Pending |
+| 1 | Current-truth documentation reconciliation | `COMPLETED` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Final corrected implementation head `a4dca87963854083be505091283ed645bda59fe1`; protected repository baseline run `33181670174` attempt 2 and frontend E2E run `33181670044` passed |
+| 2 | Database deadlines and durable-worker lease safety | `NEXT` | Define operation-specific transaction/statement/lock budgets; implement cancellation/error mapping; add lock contention/pool-exhaustion tests; measure and enforce worker batch/deadline/lease invariants without layered retries or remote I/O in transactions. | Pending |
 | 3 | Frontend resilience and privacy | `PLANNED` | Add one bounded abortable BFF request boundary, consistent safe problem mapping, busy/double-submit/cancellation/error states, error boundary, safe storage failure behavior, minimal persisted state, and prompt PII clearing. | Pending |
 | 4 | Frontend testing, localization, and accessibility | `PLANNED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Pending |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `PLANNED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Pending |
@@ -175,7 +175,7 @@ cancellation behavior is bounded and testable.
 
 | Stage | Base commit | Final reviewed implementation commit | Review and verification result |
 | ---: | --- | --- | --- |
-| 1 | `68cf66cf24c07dd6fca010ddae2789f42608aa31` | Pending final re-review | Reopened after the first completion review found stale protected-CI claims in the Identity and Authorization service documents. The earlier successful checks remain historical evidence, but Stage 1 is not complete until the corrected full diff and new final head pass. |
+| 1 | `68cf66cf24c07dd6fca010ddae2789f42608aa31` | `a4dca87963854083be505091283ed645bda59fe1` | `COMPLETED`: complete corrected diff reviewed with no remaining Stage 1 finding; `make context-verify`, generated matrix parity, `make context-bootstrap`, and `make baseline-verify` passed locally; protected repository baseline run `33181670174` attempt 2 passed structure, contracts, all five service security suites, and the final aggregator; frontend E2E run `33181670044` passed. Production-only evidence remains outside this stage. |
 
 ## 7. Stage review checklist
 
