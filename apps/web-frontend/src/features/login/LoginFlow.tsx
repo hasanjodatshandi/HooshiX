@@ -6,8 +6,10 @@ import * as actions from '../../state/appActions';
 import { canonicalEmail, normalizedCurrentPassword } from '../../validation/userInput';
 import { navigate } from '../../navigation/navigate';
 import { routes } from '../../routes/routes';
+import { useI18n } from '../../i18n/I18nProvider';
 
 export function LoginFlow() {
+  const { t } = useI18n();
   const { dispatch } = useAppState();
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
@@ -52,16 +54,16 @@ export function LoginFlow() {
   }
 
   return <section aria-labelledby="login-title">
-    <h2 id="login-title">Login</h2>
+    <h2 id="login-title">{t('login')}</h2>
     <form onSubmit={submit}>
-      <label htmlFor="login-email">Email</label>
+      <label htmlFor="login-email">{t('email')}</label>
       <input id="login-email" value={contact} onChange={(event) => setContact(event.target.value)} type="email" autoComplete="email" maxLength={254} required />
-      <label htmlFor="login-password">Password</label>
+      <label htmlFor="login-password">{t('password')}</label>
       <input id="login-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required />
-      <button type="submit" disabled={busy}>Continue</button>
+      <button type="submit" disabled={busy}>{t('continue')}</button>
     </form>
-    <p aria-hidden="true">or</p>
-    <button type="button" disabled={busy} onClick={() => void googleLogin()}>Continue with Google</button>
+    <p aria-hidden="true">{t('or')}</p>
+    <button type="button" disabled={busy} onClick={() => void googleLogin()}>{t('continueWithGoogle')}</button>
     <p role="alert">{error}</p>
   </section>;
 }

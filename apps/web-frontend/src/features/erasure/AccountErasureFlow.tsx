@@ -5,10 +5,12 @@ import { navigate } from '../../navigation/navigate';
 import { accountErased } from '../../state/appActions';
 import { useAppState } from '../../state/appState';
 import { recoveryCode, totpCode } from '../../validation/userInput';
+import { useI18n } from '../../i18n/I18nProvider';
 
 const CONFIRMATION = 'ERASE_MY_ACCOUNT';
 
 export function AccountErasureFlow() {
+  const { t } = useI18n();
   const { dispatch } = useAppState();
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [confirmation, setConfirmation] = useState('');
@@ -51,22 +53,22 @@ export function AccountErasureFlow() {
   }
 
   return <main><section aria-labelledby="account-erasure-title">
-    <h1 id="account-erasure-title">Permanently erase account</h1>
-    <p>This action has no self-service undo. Leave or transfer every active tenant membership first.</p>
-    <p>You must have authenticated within the last five minutes. Acceptance immediately signs out every browser session while each service completes its own irreversible erasure.</p>
+    <h1 id="account-erasure-title">{t('permanentlyEraseAccount')}</h1>
+    <p>{t('erasureNoUndo')}</p>
+    <p>{t('erasureRecentAuthentication')}</p>
     <form onSubmit={(event) => void erase(event)}>
-      <label htmlFor="account-erasure-confirmation">Type {CONFIRMATION} to confirm</label>
+      <label htmlFor="account-erasure-confirmation">{t('typeToConfirm', { confirmation: CONFIRMATION })}</label>
       <input id="account-erasure-confirmation" autoComplete="off" required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
       {status?.totpEnabled && <>
-        <label htmlFor="account-erasure-proof-type">Current MFA proof type</label>
+        <label htmlFor="account-erasure-proof-type">{t('currentMfaProofType')}</label>
         <select id="account-erasure-proof-type" value={proofType} onChange={(event) => { setProofType(event.target.value as MfaProof['type']); setProofCode(''); }}>
-          <option value="TOTP">Authenticator code</option>
-          <option value="RECOVERY_CODE">Recovery code</option>
+          <option value="TOTP">{t('authenticatorCode')}</option>
+          <option value="RECOVERY_CODE">{t('recoveryCode')}</option>
         </select>
-        <label htmlFor="account-erasure-proof">Current MFA proof</label>
+        <label htmlFor="account-erasure-proof">{t('currentMfaProof')}</label>
         <input id="account-erasure-proof" autoComplete="one-time-code" required value={proofCode} onChange={(event) => setProofCode(event.target.value)} />
       </>}
-      <button type="submit" disabled={busy || !status || confirmation !== CONFIRMATION || Boolean(status.totpEnabled && !proofCode)}>Permanently erase my account</button>
+      <button type="submit" disabled={busy || !status || confirmation !== CONFIRMATION || Boolean(status.totpEnabled && !proofCode)}>{t('permanentlyEraseMyAccount')}</button>
     </form>
     <p role="alert">{error}</p>
   </section></main>;

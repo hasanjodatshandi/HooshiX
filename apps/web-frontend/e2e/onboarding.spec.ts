@@ -28,7 +28,7 @@ test('registration validates locally and canonicalizes the contact before submis
     channel: 'EMAIL',
     contact: 'Person@xn--bcher-kva.example',
     password: 'a-secure-password',
-    locale: 'fa',
+    locale: 'en',
     firstName: 'First',
     lastName: 'Last',
   });

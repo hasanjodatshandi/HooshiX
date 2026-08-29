@@ -5,8 +5,10 @@ import { getErrorMessage } from '../../errors/getErrorMessage';
 import { navigate } from '../../navigation/navigate';
 import * as actions from '../../state/appActions';
 import { canonicalEmail, verificationCode } from '../../validation/userInput';
+import { useI18n } from '../../i18n/I18nProvider';
 
 export function VerificationFlow() {
+  const { t } = useI18n();
   const [code, setCode] = useState('');
 
   const { state: appState, dispatch } = useAppState();
@@ -35,13 +37,13 @@ export function VerificationFlow() {
   }
 
   return <section aria-labelledby="verification-title">
-    <h2 id="verification-title">Verification</h2>
+    <h2 id="verification-title">{t('verification')}</h2>
     <form onSubmit={(event) => void confirm(event)}>
-      <label htmlFor="verification-code">Code</label>
-      <input id="verification-code" aria-label="Verification code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} required value={code} onChange={(event) => setCode(event.target.value)} />
-      <button type="submit" disabled={status === 'loading'}>Confirm</button>
+      <label htmlFor="verification-code">{t('code')}</label>
+      <input id="verification-code" aria-label={t('verificationCode')} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{8}" maxLength={8} required value={code} onChange={(event) => setCode(event.target.value)} />
+      <button type="submit" disabled={status === 'loading'}>{t('confirm')}</button>
     </form>
-    <p role="status">{status}</p>
+    <p role="status">{status === 'loading' ? t('submitting') : status === 'success' ? t('completed') : ''}</p>
     <p role="alert">{error}</p>
   </section>;
 }

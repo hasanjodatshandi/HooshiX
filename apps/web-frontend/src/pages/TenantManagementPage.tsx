@@ -7,8 +7,11 @@ import {
 import { getErrorMessage } from '../errors/getErrorMessage';
 import { useAppState } from '../state/appState';
 import * as actions from '../state/appActions';
+import { useI18n } from '../i18n/I18nProvider';
+import type { MessageKey } from '../i18n/resources';
 
 export function TenantManagementPage() {
+  const { t } = useI18n();
   const { state, dispatch } = useAppState();
   const [tenantId, setTenantId] = useState(state.selectedTenantId ?? '');
   const [received, setReceived] = useState<InvitationSummary[]>([]);
@@ -70,40 +73,42 @@ export function TenantManagementPage() {
   }
 
   return <main aria-labelledby="tenant-management-title">
-    <h1 id="tenant-management-title">Tenant management</h1>
+    <h1 id="tenant-management-title">{t('tenantManagement')}</h1>
     <section aria-labelledby="tenant-lifecycle-title">
-      <h2 id="tenant-lifecycle-title">Lifecycle</h2>
-      <label>Tenant ID<input value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label>
-      <button disabled={busy || !tenantId} onClick={() => void lifecycle('suspend')}>Suspend</button>
-      <button disabled={busy || !tenantId} onClick={() => void lifecycle('resume')}>Resume</button>
-      <button disabled={busy || !tenantId} onClick={() => void lifecycle('restore')}>Restore</button>
-      <button disabled={busy || !state.selectedTenantId || tenantId !== state.selectedTenantId} onClick={() => void lifecycle('delete')}>Delete selected tenant</button>
-      {result && <p role="status">{result.lifecycle} → {result.targetLifecycle}{result.pending ? ' (pending)' : ''}</p>}
+      <h2 id="tenant-lifecycle-title">{t('lifecycle')}</h2>
+      <label>{t('tenantId')}<input value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label>
+      <button disabled={busy || !tenantId} onClick={() => void lifecycle('suspend')}>{t('suspend')}</button>
+      <button disabled={busy || !tenantId} onClick={() => void lifecycle('resume')}>{t('resume')}</button>
+      <button disabled={busy || !tenantId} onClick={() => void lifecycle('restore')}>{t('restore')}</button>
+      <button disabled={busy || !state.selectedTenantId || tenantId !== state.selectedTenantId} onClick={() => void lifecycle('delete')}>{t('deleteSelectedTenant')}</button>
+      {result && <p role="status">{result.lifecycle} → {result.targetLifecycle}{result.pending ? ` (${t('pending')})` : ''}</p>}
     </section>
-    <InvitationSection title="Received invitations" values={received} actions={['accept', 'decline']} busy={busy} mutate={mutate} />
-    {state.selectedTenantId && <InvitationSection title="Selected tenant invitations" values={managed} actions={['revoke', 'reissue']} busy={busy} mutate={mutate} />}
+    <InvitationSection titleKey="receivedInvitations" values={received} actions={['accept', 'decline']} busy={busy} mutate={mutate} />
+    {state.selectedTenantId && <InvitationSection titleKey="selectedTenantInvitations" values={managed} actions={['revoke', 'reissue']} busy={busy} mutate={mutate} />}
     {message && <p role="alert">{message}</p>}
   </main>;
 }
 
 function InvitationSection({
-  title,
+  titleKey,
   values,
   actions,
   busy,
   mutate,
 }: {
-  title: string;
+  titleKey: MessageKey;
   values: InvitationSummary[];
   actions: Array<'accept' | 'decline' | 'revoke' | 'reissue'>;
   busy: boolean;
   mutate: (id: string, operation: 'accept' | 'decline' | 'revoke' | 'reissue') => Promise<void>;
 }) {
+  const { locale, t } = useI18n();
+  const title = t(titleKey);
   return <section aria-label={title}>
     <h2>{title}</h2>
-    {values.length === 0 ? <p>No invitations</p> : <ul>{values.map((invitation) => <li key={invitation.invitationId}>
-      <span>{invitation.tenantName} — {invitation.state} — {new Date(invitation.expiresAt).toLocaleString()}</span>
-      {actions.map((operation) => <button key={operation} disabled={busy || (operation !== 'reissue' && invitation.state !== 'PENDING')} onClick={() => void mutate(invitation.invitationId, operation)}>{operation}</button>)}
+    {values.length === 0 ? <p>{t('noInvitations')}</p> : <ul>{values.map((invitation) => <li key={invitation.invitationId}>
+      <span>{invitation.tenantName} — {invitation.state} — {new Date(invitation.expiresAt).toLocaleString(locale)}</span>
+      {actions.map((operation) => <button key={operation} disabled={busy || (operation !== 'reissue' && invitation.state !== 'PENDING')} onClick={() => void mutate(invitation.invitationId, operation)}>{t(operation)}</button>)}
     </li>)}</ul>}
   </section>;
 }

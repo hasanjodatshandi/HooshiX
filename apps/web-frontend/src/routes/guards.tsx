@@ -2,6 +2,7 @@ import { type ReactNode, useEffect } from 'react';
 import { useAppState } from '../state/appState';
 import { navigate } from '../navigation/navigate';
 import { canEnterStage } from '../state/flow';
+import { useI18n } from '../i18n/I18nProvider';
 
 export function VerificationGuard({ children }: { children: ReactNode }) {
   const { state } = useAppState();
@@ -14,10 +15,11 @@ export function VerificationGuard({ children }: { children: ReactNode }) {
 }
 
 export function AuthenticatedGuard({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const { state } = useAppState();
 
   if (state.sessionStatus === 'checking') {
-    return <main aria-busy="true"><p role="status">Checking session…</p></main>;
+    return <main aria-busy="true"><p role="status">{t('checkingSession')}</p></main>;
   }
 
   if (!canEnterStage('authenticated', { contact: '', authenticated: state.authenticated, tenantId: null })) {

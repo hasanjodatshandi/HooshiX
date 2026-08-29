@@ -23,7 +23,9 @@ Run the pinned frontend toolchain command:
 ```bash
 npm run generate:api
 npm run check:api
+npm run test:components
 npm run build
+npm run test:a11y
 npm run e2e
 ```
 
@@ -46,9 +48,16 @@ Implemented:
 - server-session restoration without persisted browser authentication authority
 - duplicate-submit/busy handling, prompt credential/proof clearing, and storage-failure recovery
 - application error boundary that exposes no caught error detail
-- critical Playwright coverage
+- typed English/Persian catalogs consumed by every current journey, with browser-preference
+  initialization and explicit RTL/LTR switching without persistent client state
+- route-heading focus management and native keyboard semantics
+- Vitest/React Testing Library component coverage for localization, focus, and safe error recovery
+- an executable Chromium/axe WCAG A/AA accessibility gate
+- twenty-seven Playwright journeys across accessibility, localization, keyboard/focus,
+  privacy/resilience, onboarding, and authenticated account/Tenant behavior
 
 Remaining broader work:
 
-- accessibility and localization completion
+- risk-based coverage thresholds and specialized security mutation evidence in the later
+  performance/reliability hardening stage
 - deployed staging/production browser journey evidence
