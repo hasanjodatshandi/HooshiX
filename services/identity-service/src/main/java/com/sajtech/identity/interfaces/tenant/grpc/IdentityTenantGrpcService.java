@@ -4,6 +4,7 @@ import com.google.protobuf.Timestamp;
 import com.sajtech.identity.application.tenant.*;
 import com.sajtech.identity.application.tenant.model.*;
 import com.sajtech.identity.application.tenant.port.in.TenantLifecycle;
+import com.sajtech.identity.application.transaction.model.TransactionUnavailableException;
 import com.sajtech.identity.contract.v1.*;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -330,6 +331,8 @@ public final class IdentityTenantGrpcService
       o.onCompleted();
     } catch (TenantException e) {
       o.onError(status(e).withDescription(e.error().name()).asRuntimeException());
+    } catch (TransactionUnavailableException e) {
+      throw e;
     } catch (RuntimeException e) {
       o.onError(Status.INTERNAL.withDescription("TENANT_OPERATION_FAILED").asRuntimeException());
     }

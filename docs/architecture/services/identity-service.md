@@ -172,9 +172,34 @@ These global exceptions do not grant tenant or permission authority. Application
 
 The current V5 migration also enforces persisted tenant-context identity at the database boundary: selected Session/RefreshFamily context and accepted Invitation context reference the exact `(tenant_id, membership_id, user_id)` Membership tuple. Direct SQL cannot bind another user's Membership even when the Tenant identifier matches.
 
+Identity transaction execution uses immutable operation profiles. Interactive and
+durable-work claim transactions have a one-second Spring transaction timeout, 500 ms
+PostgreSQL `statement_timeout`, and 100 ms `lock_timeout`. Bounded maintenance work has
+a three-second transaction timeout, 2,000 ms statement timeout, and 100 ms lock
+timeout. PostgreSQL limits are transaction-local and therefore cannot leak through a
+pooled connection. Direct jOOQ statements retain a three-second outer query timeout;
+the Notification handoff/result stores additionally apply the applicable transaction-
+local worker budgets.
+
+Expected deadline/capacity failures are mapped without database detail disclosure:
+transaction or statement expiry is `DEADLINE_EXCEEDED / IDENTITY_DATABASE_DEADLINE`,
+lock-budget exhaustion is `UNAVAILABLE / IDENTITY_DATABASE_LOCK_UNAVAILABLE`, and
+connection-pool acquisition exhaustion is
+`RESOURCE_EXHAUSTED / IDENTITY_DATABASE_POOL_UNAVAILABLE`. Unknown database failures
+remain unexpected failures rather than being misclassified. Low-cardinality metrics
+use only the finite failure category.
+
 ## 8. Events and side effects
 
 A local state change that must publish integration intent uses Transactional Outbox. Consumers/callbacks use stable request/event identities and idempotency according to owning contracts.
+
+Every Identity durable dispatcher claims at most one record immediately before its
+bounded remote operation, completes or reschedules that record, and only then claims
+the next record. A cycle may process at most 32 Notification/Authorization records or
+25 erasure-command records, but no later record spends an earlier remote call's time
+inside its 30-second lease. Current maximum single remote budgets are 900 ms for
+Notification/Authorization gRPC and 12 seconds for the Kafka send wait. Remote I/O
+remains outside every Identity database transaction.
 
 Notification durable acceptance is not delivery. Identity state that depends on verification/delivery follows current challenge/result semantics and does not infer provider delivery from submit success.
 
@@ -235,6 +260,8 @@ Identity implementation evidence covers, as applicable:
 - Tenant/Membership/invitation/owner-safety lifecycle;
 - Authorization/Notification dependency failure/idempotency/Outbox semantics;
 - forced RLS/cross-tenant/pool-reuse/cross-service privilege negatives;
+- transaction/statement/lock deadline mapping, pool exhaustion, transaction-local
+  reset, and durable-worker single-claim ordering;
 - erasure/legal-hold/recovery behavior;
 - strict mTLS/NetworkPolicy/wrong-workload negatives;
 - Day-One logs/metrics/traces, PII canaries, correlation, and telemetry-backend outage;

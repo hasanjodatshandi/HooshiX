@@ -1,5 +1,7 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import static com.sajtech.identity.application.transaction.model.TransactionProfile.WORK_CLAIM;
+
 import com.sajtech.identity.application.tenant.*;
 import com.sajtech.identity.application.tenant.model.AuthorizationOutboxItem;
 import com.sajtech.identity.application.tenant.port.out.*;
@@ -14,6 +16,8 @@ import org.springframework.context.SmartLifecycle;
 
 public final class AuthorizationOutboxDispatcher implements SmartLifecycle {
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationOutboxDispatcher.class);
+  private static final int BATCH = 32;
+  private static final Duration LEASE = Duration.ofSeconds(30);
   private final TenantStore store;
   private final AuthorizationOutboxTelemetryQuery telemetryQuery;
   private final AuthorizationTenantPort authorization;
@@ -65,11 +69,7 @@ public final class AuthorizationOutboxDispatcher implements SmartLifecycle {
   private void cycle() {
     boolean busy = false;
     try {
-      Instant now = clock.instant();
-      List<AuthorizationOutboxItem> items =
-          tx.required(() -> store.claimAuthorizationOutbox(now, 32, now.plusSeconds(30)));
-      busy = !items.isEmpty();
-      for (var item : items) dispatch(item);
+      busy = dispatchDue();
     } catch (RuntimeException e) {
       LOG.atWarn()
           .addKeyValue("eventCode", "IDENTITY_AUTHORIZATION_OUTBOX_CYCLE_FAILED")
@@ -78,6 +78,22 @@ public final class AuthorizationOutboxDispatcher implements SmartLifecycle {
       sampleMetrics();
       schedule(busy ? 250 : 1000);
     }
+  }
+
+  boolean dispatchDue() {
+    boolean claimed = false;
+    for (int index = 0; index < BATCH; index++) {
+      Instant now = clock.instant();
+      List<AuthorizationOutboxItem> items =
+          tx.required(WORK_CLAIM, () -> store.claimAuthorizationOutbox(now, 1, now.plus(LEASE)));
+      if (items.isEmpty()) break;
+      if (items.size() != 1) {
+        throw new IllegalStateException("Authorization outbox exceeded the single-claim lease");
+      }
+      claimed = true;
+      dispatch(items.getFirst());
+    }
+    return claimed;
   }
 
   private void sampleMetrics() {

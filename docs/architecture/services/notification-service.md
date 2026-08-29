@@ -146,13 +146,22 @@ Flyway is the only schema-change mechanism. Executed migrations are immutable. R
 Provider worker baseline:
 
 - claim lease 30s;
-- claim batch 25;
+- maximum work per cycle 25, claimed one record at a time immediately before its
+  provider/callback operation;
 - busy poll 250ms;
 - idle poll 1s;
 - isolation `READ COMMITTED`;
 - `lock_timeout` 100ms;
 - general worker `statement_timeout` 500ms;
 - claims use `FOR UPDATE SKIP LOCKED`.
+
+The one-record claim invariant applies to delivery, reconciliation, and terminal-result
+callback workers. Each record is durably completed/rescheduled before the next claim,
+so later work never consumes the elapsed time of an earlier remote call within its
+lease. Current maximum single dependency budgets remain below the 30-second lease:
+IPPanel has a 1,500 ms total timeout, SMTP has bounded 500 ms connection and 1,500 ms
+read/write timeouts, and the Identity result callback has a 750 ms deadline. These
+limits do not authorize an in-transaction remote call or a transport retry.
 
 A stale `DISPATCHING` attempt reconciles; it is not reclaimed as a new send.
 
@@ -232,6 +241,7 @@ Notification changes require applicable tests for:
 - request fingerprint equality/conflict behavior;
 - PostgreSQL-authoritative timestamp boundaries;
 - concurrent `SKIP LOCKED` claims and dispatch locking;
+- multi-record claim/provider/durable-completion ordering and lease freshness;
 - crash immediately before/after `DISPATCHING` commit;
 - profile-specific PostgreSQL behavior: single-server process/host/storage loss plus isolated shared-cluster recovery/no blind redispatch, or HA primary failover with acknowledged-state durability;
 - distinct Notification database/runtime/migration role/Flyway ownership and cross-service privilege denial in both profiles;

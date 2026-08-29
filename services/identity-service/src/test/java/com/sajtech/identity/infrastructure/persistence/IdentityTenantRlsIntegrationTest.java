@@ -82,7 +82,8 @@ class IdentityTenantRlsIntegrationTest {
     runtimeSource = new HikariDataSource(config);
     TransactionAwareDataSourceProxy proxy = new TransactionAwareDataSourceProxy(runtimeSource);
     runtime = DSL.using(proxy, SQLDialect.POSTGRES);
-    transactions = new SpringTransactionRunner(new DataSourceTransactionManager(runtimeSource));
+    transactions =
+        new SpringTransactionRunner(new DataSourceTransactionManager(runtimeSource), runtime);
   }
 
   @AfterEach

@@ -66,7 +66,7 @@ class IdentityTenantPersistenceIntegrationTest {
     flyway.clean();
     flyway.migrate();
     dsl = DSL.using(new TransactionAwareDataSourceProxy(source), SQLDialect.POSTGRES);
-    tx = new SpringTransactionRunner(new DataSourceTransactionManager(source));
+    tx = new SpringTransactionRunner(new DataSourceTransactionManager(source), dsl);
     IntentFingerprintPort fingerprints = mock(IntentFingerprintPort.class);
     when(fingerprints.digest(any(byte[].class))).thenAnswer(i -> fingerprint(i.getArgument(0)));
     when(fingerprints.matches(any(byte[].class), any())).thenReturn(true);

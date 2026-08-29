@@ -20,6 +20,8 @@ public final class JooqNotificationResultStore implements NotificationResultStor
     return dsl.transactionResult(
         c -> {
           DSLContext tx = DSL.using(c);
+          tx.fetchValue("SELECT set_config('lock_timeout', '100ms', true)");
+          tx.fetchValue("SELECT set_config('statement_timeout', '500ms', true)");
           Record row =
               tx.fetchOne(
                   "SELECT notification_terminal_lifecycle FROM identity_notification_outbox WHERE notification_id=? FOR UPDATE",

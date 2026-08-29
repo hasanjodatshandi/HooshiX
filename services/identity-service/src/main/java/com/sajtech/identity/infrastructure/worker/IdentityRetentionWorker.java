@@ -1,11 +1,14 @@
 package com.sajtech.identity.infrastructure.worker;
 
+import static com.sajtech.identity.application.transaction.model.TransactionProfile.MAINTENANCE;
+
 import com.sajtech.identity.application.authentication.port.out.AuthenticationStore;
 import com.sajtech.identity.application.externalidentity.port.out.ExternalIdentityStore;
 import com.sajtech.identity.application.mfa.port.out.MfaStore;
 import com.sajtech.identity.application.notification.port.out.NotificationOutboxStore;
 import com.sajtech.identity.application.profile.port.out.ProfileContactStore;
 import com.sajtech.identity.application.registration.port.out.RegistrationStore;
+import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,6 +33,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   private final ProfileContactStore profileContactStore;
   private final MfaStore mfaStore;
   private final ExternalIdentityStore externalIdentityStore;
+  private final TransactionRunner transactions;
   private final Clock clock;
   private final ScheduledExecutorService executor =
       Executors.newSingleThreadScheduledExecutor(
@@ -43,6 +47,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
       ProfileContactStore profileContactStore,
       MfaStore mfaStore,
       ExternalIdentityStore externalIdentityStore,
+      TransactionRunner transactions,
       Clock clock) {
     this.outboxStore = outboxStore;
     this.registrationStore = registrationStore;
@@ -50,6 +55,7 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
     this.profileContactStore = profileContactStore;
     this.mfaStore = mfaStore;
     this.externalIdentityStore = externalIdentityStore;
+    this.transactions = transactions;
     this.clock = clock;
   }
 
@@ -79,13 +85,29 @@ public final class IdentityRetentionWorker implements SmartLifecycle {
   private void cycle() {
     try {
       Instant now = clock.instant();
-      int erased = outboxStore.eraseExpiredSensitive(now, BATCH);
-      registrationStore.deleteDedupBefore(now.minus(DEDUP_RETENTION), BATCH);
-      profileContactStore.deleteCommandsBefore(now.minus(DEDUP_RETENTION), BATCH);
-      authenticationStore.deleteFamiliesBefore(now.minus(SESSION_REUSE_EVIDENCE_RETENTION), BATCH);
-      int pendingMfaErased = mfaStore.deletePendingEnrollmentsBefore(now, BATCH);
-      mfaStore.deleteLoginChallengesBefore(now.minus(MFA_CHALLENGE_EVIDENCE_RETENTION), BATCH);
-      externalIdentityStore.deleteEvidenceBefore(now, BATCH);
+      int erased =
+          transactions.required(MAINTENANCE, () -> outboxStore.eraseExpiredSensitive(now, BATCH));
+      transactions.required(
+          MAINTENANCE,
+          () -> registrationStore.deleteDedupBefore(now.minus(DEDUP_RETENTION), BATCH));
+      transactions.required(
+          MAINTENANCE,
+          () -> profileContactStore.deleteCommandsBefore(now.minus(DEDUP_RETENTION), BATCH));
+      transactions.required(
+          MAINTENANCE,
+          () ->
+              authenticationStore.deleteFamiliesBefore(
+                  now.minus(SESSION_REUSE_EVIDENCE_RETENTION), BATCH));
+      int pendingMfaErased =
+          transactions.required(
+              MAINTENANCE, () -> mfaStore.deletePendingEnrollmentsBefore(now, BATCH));
+      transactions.required(
+          MAINTENANCE,
+          () ->
+              mfaStore.deleteLoginChallengesBefore(
+                  now.minus(MFA_CHALLENGE_EVIDENCE_RETENTION), BATCH));
+      transactions.required(
+          MAINTENANCE, () -> externalIdentityStore.deleteEvidenceBefore(now, BATCH));
       if (erased > 0) {
         LOGGER
             .atWarn()

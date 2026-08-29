@@ -125,6 +125,14 @@
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
   <Match>
+    <Class name="com.sajtech.identity.infrastructure.persistence.SpringTransactionRunner" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
+    <Class name="com.sajtech.identity.interfaces.observability.grpc.TransactionFailureServerInterceptor" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
     <Class name="com.sajtech.identity.application.profile.usecase.ProfileManagementUseCase" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>

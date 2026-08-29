@@ -55,6 +55,7 @@ import com.sajtech.identity.interfaces.mfa.grpc.IdentityMfaGrpcService;
 import com.sajtech.identity.interfaces.notification.grpc.IdentityNotificationResultGrpcService;
 import com.sajtech.identity.interfaces.observability.grpc.IdentityAdmissionInterceptor;
 import com.sajtech.identity.interfaces.observability.grpc.SafeTracingServerInterceptor;
+import com.sajtech.identity.interfaces.observability.grpc.TransactionFailureServerInterceptor;
 import com.sajtech.identity.interfaces.password.grpc.IdentityPasswordGrpcService;
 import com.sajtech.identity.interfaces.profile.grpc.IdentityProfileGrpcService;
 import com.sajtech.identity.interfaces.registration.grpc.IdentityRegistrationGrpcService;
@@ -72,6 +73,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.jooq.autoconfigure.DefaultConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -198,8 +200,13 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  TransactionRunner transactions(PlatformTransactionManager tm) {
-    return new SpringTransactionRunner(tm);
+  TransactionRunner transactions(PlatformTransactionManager tm, DSLContext dsl) {
+    return new SpringTransactionRunner(tm, dsl);
+  }
+
+  @Bean
+  DefaultConfigurationCustomizer identityJooqTimeout() {
+    return configuration -> configuration.settings().setQueryTimeout(3);
   }
 
   @Bean
@@ -365,8 +372,9 @@ public class RuntimeConfiguration {
   }
 
   @Bean
-  ReportNotificationResult reportNotificationResult(NotificationResultStore store) {
-    return new ReportNotificationResultUseCase(store);
+  ReportNotificationResult reportNotificationResult(
+      NotificationResultStore store, TransactionRunner transactions) {
+    return new ReportNotificationResultUseCase(store, transactions);
   }
 
   @Bean
@@ -1187,6 +1195,11 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  TransactionFailureServerInterceptor transactionFailureInterceptor(MeterRegistry meters) {
+    return new TransactionFailureServerInterceptor(meters);
+  }
+
+  @Bean
   ErasureWorkloadIdentityInterceptor erasureWorkloadIdentityInterceptor() {
     return new ErasureWorkloadIdentityInterceptor();
   }
@@ -1204,6 +1217,7 @@ public class RuntimeConfiguration {
       SafeTracingServerInterceptor tracing,
       ContractValidationServerInterceptor validation,
       IdentityAdmissionInterceptor admission,
+      TransactionFailureServerInterceptor transactionFailures,
       ErasureWorkloadIdentityInterceptor erasureWorkload,
       @Value("${identity.grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
@@ -1217,7 +1231,7 @@ public class RuntimeConfiguration {
         tracing,
         validation,
         admission,
-        List.of(erasureWorkload));
+        List.of(transactionFailures, erasureWorkload));
   }
 
   @Bean(name = "notificationResultGrpcLifecycle")
@@ -1231,6 +1245,7 @@ public class RuntimeConfiguration {
       SafeTracingServerInterceptor tracing,
       ContractValidationServerInterceptor validation,
       IdentityAdmissionInterceptor admission,
+      TransactionFailureServerInterceptor transactionFailures,
       @Value("${identity.notification-result-grpc-bind-address:0.0.0.0}") String bindAddress) {
     return new GrpcServerLifecycle(
         bindAddress,
@@ -1240,7 +1255,8 @@ public class RuntimeConfiguration {
         List.of(new IdentityNotificationResultGrpcService(report)),
         tracing,
         validation,
-        admission);
+        admission,
+        List.of(transactionFailures));
   }
 
   @Bean(destroyMethod = "shutdownNow", name = "notificationChannel")
@@ -1266,6 +1282,7 @@ public class RuntimeConfiguration {
       com.sajtech.identity.application.profile.port.out.ProfileContactStore profileContactStore,
       MfaStore mfaStore,
       ExternalIdentityStore externalIdentityStore,
+      TransactionRunner transactions,
       Clock clock) {
     return new IdentityRetentionWorker(
         outboxStore,
@@ -1274,6 +1291,7 @@ public class RuntimeConfiguration {
         profileContactStore,
         mfaStore,
         externalIdentityStore,
+        transactions,
         clock);
   }
 

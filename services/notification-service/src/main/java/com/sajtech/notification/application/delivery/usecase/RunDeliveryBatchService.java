@@ -43,13 +43,20 @@ public final class RunDeliveryBatchService implements RunDeliveryBatch {
     if (batchSize <= 0 || batchSize > MAX_BATCH) {
       throw new IllegalArgumentException("Delivery batch size must be between 1 and 25");
     }
-    List<DeliveryAttemptClaim> claims = repository.claimDue(batchSize, CLAIM_LEASE);
+    int claimed = 0;
     int completed = 0;
-    for (DeliveryAttemptClaim claim : claims) {
+    for (int index = 0; index < batchSize; index++) {
+      List<DeliveryAttemptClaim> claims = repository.claimDue(1, CLAIM_LEASE);
+      if (claims.isEmpty()) break;
+      if (claims.size() != 1) {
+        throw new IllegalStateException("Delivery repository exceeded the single-claim lease");
+      }
+      DeliveryAttemptClaim claim = claims.getFirst();
+      claimed++;
       process(claim);
       completed++;
     }
-    return new DeliveryBatchResult(claims.size(), completed);
+    return new DeliveryBatchResult(claimed, completed);
   }
 
   private void process(DeliveryAttemptClaim claim) {
