@@ -54,18 +54,18 @@ test('@a11y authenticated account and tenant routes are accessible', async ({ pa
     await route.fulfill({ status: 200, contentType: 'application/json', body: '{"googleLinked":false}' });
   });
 
-  for (const path of [
-    '/application',
-    '/profile',
-    '/password/change',
-    '/security/mfa',
-    '/security/external-identities',
-    '/security/account-erasure',
-    '/tenant-select',
-    '/tenants/manage',
+  for (const [path, heading] of [
+    ['/application', 'Application'],
+    ['/profile', 'Profile'],
+    ['/password/change', 'Change password'],
+    ['/security/mfa', 'Two-factor authentication settings'],
+    ['/security/external-identities', 'External identities'],
+    ['/security/account-erasure', 'Permanently erase account'],
+    ['/tenant-select', 'Tenant Selection'],
+    ['/tenants/manage', 'Tenant management'],
   ]) {
     await page.goto(path);
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
     await expectNoAccessibilityViolations(page);
   }
 });
