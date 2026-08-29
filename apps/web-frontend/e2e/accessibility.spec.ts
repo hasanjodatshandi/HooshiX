@@ -18,9 +18,16 @@ test('@a11y registration is accessible in English and Persian', async ({ page })
   await expectNoAccessibilityViolations(page);
 });
 
-test('@a11y login is accessible', async ({ page }) => {
-  await page.goto('/login');
-  await expectNoAccessibilityViolations(page);
+test('@a11y public authentication routes are accessible', async ({ page }) => {
+  for (const [path, heading] of [
+    ['/login', 'Login'],
+    ['/login/mfa', 'Two-factor authentication'],
+    ['/password/recovery', 'Password recovery'],
+  ]) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+  }
 });
 
 test('@a11y authenticated account and tenant routes are accessible', async ({ page }) => {

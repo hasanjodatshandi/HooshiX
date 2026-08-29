@@ -5,7 +5,7 @@ Accessibility is an executable frontend gate, not a manual milestone note.
 `npm run test:a11y` runs `@axe-core/playwright` in Chromium against:
 
 - registration in English/LTR and Persian/RTL;
-- login;
+- login, MFA login and password recovery;
 - all current authenticated account and Tenant route shells (application, profile,
   password change, MFA, external identity, erasure, Tenant selection and management).
 
