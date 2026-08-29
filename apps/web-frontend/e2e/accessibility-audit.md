@@ -6,7 +6,8 @@ Accessibility is an executable frontend gate, not a manual milestone note.
 
 - registration in English/LTR and Persian/RTL;
 - login;
-- authenticated application navigation.
+- all current authenticated account and Tenant route shells (application, profile,
+  password change, MFA, external identity, erasure, Tenant selection and management).
 
 The scan enforces WCAG 2.0 A/AA and WCAG 2.1 A/AA rule tags. It complements,
 but does not replace, semantic RTL component tests and Playwright keyboard/focus

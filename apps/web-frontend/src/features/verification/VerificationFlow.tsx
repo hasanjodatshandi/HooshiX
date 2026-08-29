@@ -36,7 +36,7 @@ export function VerificationFlow() {
     }
   }
 
-  return <section aria-labelledby="verification-title">
+  return <main><section aria-labelledby="verification-title">
     <h2 id="verification-title">{t('verification')}</h2>
     <form onSubmit={(event) => void confirm(event)}>
       <label htmlFor="verification-code">{t('code')}</label>
@@ -45,5 +45,5 @@ export function VerificationFlow() {
     </form>
     <p role="status">{status === 'loading' ? t('submitting') : status === 'success' ? t('completed') : ''}</p>
     <p role="alert">{error}</p>
-  </section>;
+  </section></main>;
 }

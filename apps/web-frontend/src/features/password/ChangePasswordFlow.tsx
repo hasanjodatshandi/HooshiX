@@ -33,7 +33,7 @@ export function ChangePasswordFlow() {
     }
   }
 
-  return <section aria-labelledby="password-change-title">
+  return <main><section aria-labelledby="password-change-title">
     <h1 id="password-change-title">{t('changePassword')}</h1>
     <form onSubmit={submit}>
       <label htmlFor="current-password">{t('currentPassword')}</label>
@@ -44,5 +44,5 @@ export function ChangePasswordFlow() {
     </form>
     <p role="status">{status === 'changed' ? t('passwordChanged') : ''}</p>
     <p role="alert">{error}</p>
-  </section>;
+  </section></main>;
 }

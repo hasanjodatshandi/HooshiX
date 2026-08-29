@@ -75,7 +75,7 @@ export function ProfileFlow() {
     Boolean(profile?.firstName.trim() && profile?.lastName.trim())
     && contacts.some((contact) => contact.verified);
 
-  return <section aria-labelledby="profile-title">
+  return <main><section aria-labelledby="profile-title">
     <h1 id="profile-title">{t('profile')}</h1>
     <form onSubmit={(event) => void update(event)}>
       <label htmlFor="profile-first-name">{t('firstName')}</label>
@@ -105,5 +105,5 @@ export function ProfileFlow() {
     </form>
     {onboardingComplete && <p><InternalLink to={routes.tenantSelection}>{t('continueToTenantSelection')}</InternalLink></p>}
     <p role="alert">{error}</p>
-  </section>;
+  </section></main>;
 }

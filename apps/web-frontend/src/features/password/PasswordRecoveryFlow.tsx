@@ -57,7 +57,7 @@ export function PasswordRecoveryFlow() {
     }
   }
 
-  return <section aria-labelledby="password-recovery-title">
+  return <main><section aria-labelledby="password-recovery-title">
     <h1 id="password-recovery-title">{t('passwordRecovery')}</h1>
     {stage === 'request' && <form onSubmit={request}>
       <label htmlFor="recovery-contact">{t('email')}</label>
@@ -83,5 +83,5 @@ export function PasswordRecoveryFlow() {
     </form>}
     <p role="status">{stage === 'complete' ? t('passwordResetComplete') : ''}</p>
     <p role="alert">{error}</p>
-  </section>;
+  </section></main>;
 }
