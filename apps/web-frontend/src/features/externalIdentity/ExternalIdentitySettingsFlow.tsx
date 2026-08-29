@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { bffClient, type ExternalIdentityStatus } from '../../api/bffClient';
 import { getErrorMessage } from '../../errors/getErrorMessage';
+import { useI18n } from '../../i18n/I18nProvider';
 
 export function ExternalIdentitySettingsFlow() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<ExternalIdentityStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -45,12 +47,12 @@ export function ExternalIdentitySettingsFlow() {
   }
 
   return <main><section aria-labelledby="external-identities-title">
-    <h1 id="external-identities-title">External identities</h1>
-    {status && <p role="status">Google is {status.googleLinked ? 'linked' : 'not linked'}.</p>}
+    <h1 id="external-identities-title">{t('externalIdentities')}</h1>
+    {status && <p role="status">{t('googleLinkStatus', { state: t(status.googleLinked ? 'linked' : 'notLinked') })}</p>}
     {status?.googleLinked
-      ? <button type="button" disabled={busy} onClick={() => void unlink()}>Unlink Google</button>
-      : <button type="button" disabled={busy || !status} onClick={() => void link()}>Link Google</button>}
-    <p>Linking or unlinking requires a recent sign-in. Email equality never links accounts automatically.</p>
+      ? <button type="button" disabled={busy} onClick={() => void unlink()}>{t('unlinkGoogle')}</button>
+      : <button type="button" disabled={busy || !status} onClick={() => void link()}>{t('linkGoogle')}</button>}
+    <p>{t('externalIdentityWarning')}</p>
     <p role="alert">{error}</p>
   </section></main>;
 }

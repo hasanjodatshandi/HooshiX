@@ -5,8 +5,10 @@ import { navigate } from '../navigation/navigate';
 import { routes } from '../routes/routes';
 import { useAppState } from '../state/appState';
 import * as actions from '../state/appActions';
+import { useI18n } from '../i18n/I18nProvider';
 
 export function OidcCompletionPage() {
+  const { t } = useI18n();
   const { dispatch } = useAppState();
   const [error, setError] = useState('');
 
@@ -26,5 +28,5 @@ export function OidcCompletionPage() {
     return () => controller.abort();
   }, [dispatch]);
 
-  return <main aria-busy={!error}><h1>Completing sign in</h1><p role="status">Verifying your secure session…</p><p role="alert">{error}</p></main>;
+  return <main aria-busy={!error}><h1>{t('completingSignIn')}</h1><p role="status">{t('verifyingSecureSession')}</p><p role="alert">{error}</p></main>;
 }
