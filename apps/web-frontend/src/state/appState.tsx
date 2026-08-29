@@ -12,8 +12,11 @@ const Context = createContext<{
 } | null>(null);
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
-  const initial = loadState();
-  const [state, dispatch] = useReducer(appReducer, { ...initialAppModel, ...initial });
+  const [state, dispatch] = useReducer(
+    appReducer,
+    initialAppModel,
+    (base) => ({ ...base, ...loadState() }),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
