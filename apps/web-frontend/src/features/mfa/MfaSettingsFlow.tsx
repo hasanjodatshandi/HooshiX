@@ -31,7 +31,15 @@ export function MfaSettingsFlow() {
     if (busy) return;
     setBusy(true);
     setError('');
-    try { await operation(); } catch (cause) { setError(getErrorMessage(cause)); } finally { setProofCode(''); setBusy(false); }
+    try {
+      await operation();
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      setProofCode('');
+      setConfirmationCode('');
+      setBusy(false);
+    }
   }
 
   function proof(): MfaProof | undefined {

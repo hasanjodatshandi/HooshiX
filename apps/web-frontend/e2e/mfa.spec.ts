@@ -63,13 +63,32 @@ test('TOTP enrollment displays its secret and ten recovery codes only in transie
     });
   });
   const recoveryCodes = [...'ABCDEFGHJK'].map((suffix) => `AAAA-BBBB-CCCC-DDD${suffix}`);
+  let confirmationAttempts = 0;
   await page.route('**/api/v1/identity/mfa/totp/enrollment/confirm', async (route) => {
+    confirmationAttempts++;
+    if (confirmationAttempts === 1) {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({
+          type: 'about:blank',
+          title: 'Confirmation unavailable',
+          status: 503,
+          code: 'MFA_CONFIRMATION_UNAVAILABLE',
+        }),
+      });
+      return;
+    }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ recoveryCodes }) });
   });
 
   await page.goto('/security/mfa');
   await page.getByRole('button', { name: 'Set up authenticator' }).click();
   await expect(page.getByLabel('Authenticator secret')).toHaveText('A'.repeat(52));
+  await page.getByLabel('Six-digit code').fill('123456');
+  await page.getByRole('button', { name: 'Confirm authenticator' }).click();
+  await expect(page.getByRole('alert')).toHaveText('MFA_CONFIRMATION_UNAVAILABLE');
+  await expect(page.getByLabel('Six-digit code')).toHaveValue('');
   await page.getByLabel('Six-digit code').fill('123456');
   await page.getByRole('button', { name: 'Confirm authenticator' }).click();
 
