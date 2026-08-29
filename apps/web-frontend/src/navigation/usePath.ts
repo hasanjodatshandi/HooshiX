@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export function usePath() {
-  const [path, setPath] = useState(window.location.pathname);
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
 
-  useEffect(() => {
-    const handler = () => setPath(window.location.pathname);
-    window.addEventListener('popstate', handler);
-    return () => window.removeEventListener('popstate', handler);
-  }, []);
+function subscribe(onPathChange: () => void) {
+  window.addEventListener('popstate', onPathChange);
+  return () => window.removeEventListener('popstate', onPathChange);
+}
 
-  return path;
+function getSnapshot() {
+  return window.location.pathname;
 }

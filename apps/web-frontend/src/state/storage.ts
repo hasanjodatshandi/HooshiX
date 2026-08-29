@@ -1,4 +1,5 @@
 import type { AppModel } from './appReducer';
+import { canonicalEmail } from '../validation/userInput';
 
 const LEGACY_KEY = 'hooshix.frontend.state';
 const KEY = 'hooshix.frontend.registration';
@@ -18,19 +19,31 @@ export function loadState(): Partial<AppModel> {
   try {
     const raw = window.sessionStorage.getItem(KEY);
     if (!raw) return {};
-    const parsed = JSON.parse(raw) as StoredState;
+    const parsed = JSON.parse(raw) as unknown;
+    const candidate = parsed && typeof parsed === 'object'
+      ? parsed as Partial<StoredState>
+      : null;
+    const contact = canonicalStoredContact(candidate?.contact);
     if (
-      parsed.version !== VERSION
-      || typeof parsed.contact !== 'string'
-      || parsed.contact.length === 0
-      || parsed.contact.length > 254
+      candidate?.version !== VERSION
+      || contact === null
     ) {
       window.sessionStorage.removeItem(KEY);
       return {};
     }
-    return { contact: parsed.contact };
+    return { contact };
   } catch {
     return {};
+  }
+}
+
+function canonicalStoredContact(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const canonical = canonicalEmail(value);
+    return canonical === value ? canonical : null;
+  } catch {
+    return null;
   }
 }
 
@@ -41,11 +54,12 @@ export function saveState(state: AppModel): void {
     // Browser storage is optional UX state and never authority.
   }
   try {
-    if (!state.contact || state.authenticated) {
+    const contact = canonicalStoredContact(state.contact);
+    if (contact === null || state.authenticated) {
       window.sessionStorage.removeItem(KEY);
       return;
     }
-    const payload: StoredState = { version: VERSION, contact: state.contact };
+    const payload: StoredState = { version: VERSION, contact };
     window.sessionStorage.setItem(KEY, JSON.stringify(payload));
   } catch {
     // Quota, privacy mode, and disabled storage must not crash the application.

@@ -183,6 +183,32 @@ test('registration contact is tab-scoped and cleared when the flow is abandoned'
   await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('hooshix.frontend.registration'))).toBeNull();
 });
 
+test('non-canonical registration storage is rejected before verification', async ({ page }) => {
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/problem+json',
+      body: JSON.stringify({
+        type: 'about:blank',
+        title: 'Invalid session',
+        status: 401,
+        code: 'INVALID_SESSION',
+      }),
+    });
+  });
+
+  await page.goto('/');
+  await page.evaluate(() => window.sessionStorage.setItem(
+    'hooshix.frontend.registration',
+    JSON.stringify({ version: 2, contact: ' Person@EXAMPLE.com ' }),
+  ));
+  await page.goto('/verify');
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Registration' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('hooshix.frontend.registration'))).toBeNull();
+});
+
 test('unmount aborts an in-flight loader without a late error', async ({ page }) => {
   await page.route('**/api/v1/auth/session', async (route) => {
     await route.fulfill({
