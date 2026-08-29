@@ -11,6 +11,7 @@ export function ChangePasswordFlow() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (status === 'saving') return;
     setStatus('saving');
     setError('');
     try {
@@ -24,6 +25,9 @@ export function ChangePasswordFlow() {
     } catch (cause) {
       setError(getErrorMessage(cause));
       setStatus('failed');
+    } finally {
+      setCurrentPassword('');
+      setNewPassword('');
     }
   }
 

@@ -4,6 +4,10 @@ export function registrationStarted(contact: string): AppEvent {
   return { type: 'REGISTRATION_STARTED', contact };
 }
 
+export function registrationCleared(): AppEvent {
+  return { type: 'REGISTRATION_CLEARED' };
+}
+
 export function registrationRequestStarted(): AppEvent {
   return { type: 'REGISTRATION_REQUEST_STARTED' };
 }
@@ -32,6 +36,14 @@ export function sessionExpired(): AppEvent {
   return { type: 'SESSION_EXPIRED' };
 }
 
+export function sessionRestored(authenticated: boolean, tenantSelected: boolean): AppEvent {
+  return { type: 'SESSION_RESTORED', authenticated, tenantSelected };
+}
+
+export function sessionRestoreFailed(error: string): AppEvent {
+  return { type: 'SESSION_RESTORE_FAILED', error };
+}
+
 export function accountErased(): AppEvent {
   return { type: 'ACCOUNT_ERASED' };
 }
@@ -48,4 +60,6 @@ export function clearError(): AppEvent {
   return { type: 'ERROR_CLEARED' };
 }
 
-export function loginSucceeded() { return { type: 'LOGIN_SUCCEEDED' as const }; }
+export function loginSucceeded(tenantSelected = false): AppEvent {
+  return { type: 'LOGIN_SUCCEEDED', tenantSelected };
+}

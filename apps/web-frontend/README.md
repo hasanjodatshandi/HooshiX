@@ -10,6 +10,9 @@ This frontend contains the completed roadmap foundation plus onboarding, profile
 - Browser code does not call Identity, Authorization, Notification, or other internal services.
 - API models follow the generated Web BFF OpenAPI schema.
 - Session authority remains server-side.
+- Every BFF request uses the single finite abortable client boundary; loaders abort on unmount.
+- Browser persistence never stores authentication or Tenant-selection state. Only the canonical
+  registration contact may live temporarily in tab-scoped `sessionStorage` until verification.
 
 ## API generation
 
@@ -39,6 +42,10 @@ Implemented:
 - login/session and Tenant-selection flows
 - profile/contact flows
 - password recovery/change flows with server-only refresh credential custody
+- bounded BFF timeout/cancellation and validated safe RFC Problem mapping
+- server-session restoration without persisted browser authentication authority
+- duplicate-submit/busy handling, prompt credential/proof clearing, and storage-failure recovery
+- application error boundary that exposes no caught error detail
 - critical Playwright coverage
 
 Remaining broader work:

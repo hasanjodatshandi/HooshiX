@@ -16,6 +16,7 @@ export function LoginFlow() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -28,15 +29,17 @@ export function LoginFlow() {
         navigate(routes.loginMfa);
         return;
       }
-      dispatch(actions.loginSucceeded());
+      dispatch(actions.loginSucceeded(session.mode === 'TENANT_AUTHENTICATED'));
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
+      setPassword('');
       setBusy(false);
     }
   }
 
   async function googleLogin() {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {

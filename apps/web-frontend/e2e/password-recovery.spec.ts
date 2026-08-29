@@ -27,22 +27,12 @@ test('recovery requests and confirms an eight-digit purpose-bound challenge', as
 });
 
 test('authenticated change never exposes a refresh credential to browser code', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem(
-      'hooshix.frontend.state',
-      JSON.stringify({
-        version: 1,
-        data: {
-          contact: 'person@example.com',
-          authenticated: true,
-          selectedTenantId: null,
-          status: 'ready',
-          registrationStatus: 'idle',
-          verificationStatus: 'idle',
-          lastError: null,
-        },
-      }),
-    );
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"mode":"AUTHENTICATED_ONBOARDING","authenticated":true,"tenantSelected":false}',
+    });
   });
   let body: Record<string, unknown> | undefined;
   await page.route('**/api/v1/auth/session/csrf', async (route) => {

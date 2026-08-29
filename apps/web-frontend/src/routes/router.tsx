@@ -16,9 +16,19 @@ import { VerificationGuard, AuthenticatedGuard } from './guards';
 import { routes } from './routes';
 
 import { usePath } from '../navigation/usePath';
+import { useEffect } from 'react';
+import { registrationCleared } from '../state/appActions';
+import { useAppState } from '../state/appState';
 
 export function Router() {
   const path = usePath();
+  const { dispatch } = useAppState();
+
+  useEffect(() => {
+    if (path !== routes.register && path !== routes.verify) {
+      dispatch(registrationCleared());
+    }
+  }, [dispatch, path]);
 
   if (path === routes.verify) {
     return <VerificationGuard><VerificationFlow /></VerificationGuard>;

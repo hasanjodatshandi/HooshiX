@@ -8,10 +8,17 @@ export function ExternalIdentitySettingsFlow() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void bffClient.getExternalIdentityStatus().then(setStatus).catch((cause) => setError(getErrorMessage(cause)));
+    const controller = new AbortController();
+    void bffClient.getExternalIdentityStatus({ signal: controller.signal })
+      .then(setStatus)
+      .catch((cause) => {
+        if (!controller.signal.aborted) setError(getErrorMessage(cause));
+      });
+    return () => controller.abort();
   }, []);
 
   async function link() {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -24,6 +31,7 @@ export function ExternalIdentitySettingsFlow() {
   }
 
   async function unlink() {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {

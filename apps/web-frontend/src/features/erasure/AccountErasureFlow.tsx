@@ -18,12 +18,18 @@ export function AccountErasureFlow() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void bffClient.getMfaStatus().then(setStatus).catch((cause) => setError(getErrorMessage(cause)));
+    const controller = new AbortController();
+    void bffClient.getMfaStatus({ signal: controller.signal })
+      .then(setStatus)
+      .catch((cause) => {
+        if (!controller.signal.aborted) setError(getErrorMessage(cause));
+      });
+    return () => controller.abort();
   }, []);
 
   async function erase(event: FormEvent) {
     event.preventDefault();
-    if (confirmation !== CONFIRMATION) return;
+    if (busy || confirmation !== CONFIRMATION) return;
     setBusy(true);
     setError('');
     try {
@@ -39,6 +45,8 @@ export function AccountErasureFlow() {
     } catch (cause) {
       setError(getErrorMessage(cause));
       setBusy(false);
+    } finally {
+      setProofCode('');
     }
   }
 

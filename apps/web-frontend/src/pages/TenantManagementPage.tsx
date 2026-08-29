@@ -14,13 +14,15 @@ export function TenantManagementPage() {
   const [received, setReceived] = useState<InvitationSummary[]>([]);
   const [managed, setManaged] = useState<InvitationSummary[]>([]);
   const [result, setResult] = useState<TenantLifecycleResult | null>(null);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
-  const reload = useCallback(async () => {
-    const inbox = await bffClient.listReceivedInvitations();
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    const options = signal ? { signal } : {};
+    const inbox = await bffClient.listReceivedInvitations(options);
     setReceived(inbox.invitations);
     if (state.selectedTenantId) {
-      const tenant = await bffClient.listTenantInvitations();
+      const tenant = await bffClient.listTenantInvitations(options);
       setManaged(tenant.invitations);
     } else {
       setManaged([]);
@@ -28,10 +30,16 @@ export function TenantManagementPage() {
   }, [state.selectedTenantId]);
 
   useEffect(() => {
-    reload().catch((error: unknown) => setMessage(getErrorMessage(error)));
+    const controller = new AbortController();
+    void reload(controller.signal).catch((error: unknown) => {
+      if (!controller.signal.aborted) setMessage(getErrorMessage(error));
+    });
+    return () => controller.abort();
   }, [reload]);
 
   async function lifecycle(operation: 'suspend' | 'resume' | 'restore' | 'delete') {
+    if (busy) return;
+    setBusy(true);
     setMessage('');
     try {
       const value = await bffClient[`${operation}Tenant`](tenantId);
@@ -39,6 +47,8 @@ export function TenantManagementPage() {
       if (operation === 'delete') dispatch(actions.tenantCleared());
     } catch (error: unknown) {
       setMessage(getErrorMessage(error));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -46,12 +56,16 @@ export function TenantManagementPage() {
     invitationId: string,
     operation: 'accept' | 'decline' | 'revoke' | 'reissue',
   ) {
+    if (busy) return;
+    setBusy(true);
     setMessage('');
     try {
       await bffClient[`${operation}Invitation`](invitationId);
       await reload();
     } catch (error: unknown) {
       setMessage(getErrorMessage(error));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -60,14 +74,14 @@ export function TenantManagementPage() {
     <section aria-labelledby="tenant-lifecycle-title">
       <h2 id="tenant-lifecycle-title">Lifecycle</h2>
       <label>Tenant ID<input value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label>
-      <button disabled={!tenantId} onClick={() => lifecycle('suspend')}>Suspend</button>
-      <button disabled={!tenantId} onClick={() => lifecycle('resume')}>Resume</button>
-      <button disabled={!tenantId} onClick={() => lifecycle('restore')}>Restore</button>
-      <button disabled={!state.selectedTenantId || tenantId !== state.selectedTenantId} onClick={() => lifecycle('delete')}>Delete selected tenant</button>
+      <button disabled={busy || !tenantId} onClick={() => void lifecycle('suspend')}>Suspend</button>
+      <button disabled={busy || !tenantId} onClick={() => void lifecycle('resume')}>Resume</button>
+      <button disabled={busy || !tenantId} onClick={() => void lifecycle('restore')}>Restore</button>
+      <button disabled={busy || !state.selectedTenantId || tenantId !== state.selectedTenantId} onClick={() => void lifecycle('delete')}>Delete selected tenant</button>
       {result && <p role="status">{result.lifecycle} → {result.targetLifecycle}{result.pending ? ' (pending)' : ''}</p>}
     </section>
-    <InvitationSection title="Received invitations" values={received} actions={['accept', 'decline']} mutate={mutate} />
-    {state.selectedTenantId && <InvitationSection title="Selected tenant invitations" values={managed} actions={['revoke', 'reissue']} mutate={mutate} />}
+    <InvitationSection title="Received invitations" values={received} actions={['accept', 'decline']} busy={busy} mutate={mutate} />
+    {state.selectedTenantId && <InvitationSection title="Selected tenant invitations" values={managed} actions={['revoke', 'reissue']} busy={busy} mutate={mutate} />}
     {message && <p role="alert">{message}</p>}
   </main>;
 }
@@ -76,18 +90,20 @@ function InvitationSection({
   title,
   values,
   actions,
+  busy,
   mutate,
 }: {
   title: string;
   values: InvitationSummary[];
   actions: Array<'accept' | 'decline' | 'revoke' | 'reissue'>;
+  busy: boolean;
   mutate: (id: string, operation: 'accept' | 'decline' | 'revoke' | 'reissue') => Promise<void>;
 }) {
   return <section aria-label={title}>
     <h2>{title}</h2>
     {values.length === 0 ? <p>No invitations</p> : <ul>{values.map((invitation) => <li key={invitation.invitationId}>
       <span>{invitation.tenantName} — {invitation.state} — {new Date(invitation.expiresAt).toLocaleString()}</span>
-      {actions.map((operation) => <button key={operation} disabled={operation !== 'reissue' && invitation.state !== 'PENDING'} onClick={() => mutate(invitation.invitationId, operation)}>{operation}</button>)}
+      {actions.map((operation) => <button key={operation} disabled={busy || (operation !== 'reissue' && invitation.state !== 'PENDING')} onClick={() => void mutate(invitation.invitationId, operation)}>{operation}</button>)}
     </li>)}</ul>}
   </section>;
 }

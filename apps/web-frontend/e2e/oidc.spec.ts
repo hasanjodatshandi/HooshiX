@@ -39,7 +39,29 @@ test('OIDC completion reconstructs only browser session state before navigation'
   await page.goto('/oidc/complete');
 
   await expect(page).toHaveURL(/\/profile$/);
-  const persisted = await page.evaluate(() => window.localStorage.getItem('hooshix.frontend.state'));
-  expect(persisted).toContain('"authenticated":true');
-  expect(persisted).not.toMatch(/token|verifier|nonce|authorizationUrl/i);
+  const persisted = await page.evaluate(() => JSON.stringify({
+    local: { ...window.localStorage },
+    session: { ...window.sessionStorage },
+  }));
+  expect(persisted).not.toMatch(/authenticated|tenantSelected|token|verifier|nonce|authorizationUrl/i);
+});
+
+test('Google unlink accepts a no-content response and keeps provider data transient', async ({ page }) => {
+  await page.route('**/api/v1/auth/session', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"mode":"AUTHENTICATED_ONBOARDING","authenticated":true,"tenantSelected":false}' });
+  });
+  await page.route('**/api/v1/identity/external-identities', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"googleLinked":true}' });
+  });
+  await page.route('**/api/v1/auth/session/csrf', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ csrfToken: csrf, mode: 'AUTHENTICATED_ONBOARDING' }) });
+  });
+  await page.route('**/api/v1/identity/external-identities/google', async (route) => {
+    await route.fulfill({ status: 204, body: '' });
+  });
+
+  await page.goto('/security/external-identities');
+  await page.getByRole('button', { name: 'Unlink Google' }).click();
+
+  await expect(page.getByRole('status')).toHaveText('Google is not linked.');
 });
