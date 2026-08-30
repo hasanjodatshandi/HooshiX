@@ -26,7 +26,7 @@ OBS=f"""observability:
         app.kubernetes.io/name: prometheus
       principal: {PROM}
 """
-SERVICE_ACCOUNTS={"authorization-service":"authorization-service","compromised-password-service":"compromised-password-service","identity-service":"identity-service","notification-service":"notification-service","web-bff":"web-bff"}
+SERVICE_ACCOUNTS={"authorization-service":"authorization-service","compromised-password-service":"compromised-password-service","identity-service":"identity-service","notification-service":"notification-service","web-bff":"web-bff","web-frontend":"web-frontend"}
 def split_image(image:str)->tuple[str,str]: return tuple(image.rsplit("@",1))
 def build_values(service:str,m:dict)->str:
     a=m["service_capacity"]["authorization"]; i=m["service_capacity"]["identity"]; d=m["compromised_password_dataset"]
@@ -154,8 +154,9 @@ def render_service(helm:str,service:str,m:dict,values:Path)->str:
     return rendered
 def admission_policy(m:dict)->str:
     identity=m["cosign"]["certificate_identity"]; issuer=m["cosign"]["certificate_oidc_issuer"]; revision=m["git_revision"]
-    image_lines="\n".join(f"    - glob: '{m['images'][s]}'" for s in verify_release.SERVICES)
-    mapping=", ".join(f"'{SERVICE_ACCOUNTS[s]}':'{m['images'][s]}'" for s in verify_release.SERVICES)
+    image_lines="\n".join(f"    - glob: '{m['images'][component]}'" for component in verify_release.RELEASE_COMPONENTS)
+    mapping=", ".join(f"'{SERVICE_ACCOUNTS[component]}':'{m['images'][component]}'" for component in verify_release.RELEASE_COMPONENTS)
+    application_service_accounts=",".join(f"'{SERVICE_ACCOUNTS[component]}'" for component in verify_release.RELEASE_COMPONENTS)
     return f"""apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -173,7 +174,7 @@ spec:
   validations:
     - message: application ServiceAccounts must use the exact reviewed production release digest
       expression: >-
-        !(['authorization-service','compromised-password-service','identity-service','notification-service','web-bff'].exists(sa, sa == object.spec.serviceAccountName))
+        !([{application_service_accounts}].exists(sa, sa == object.spec.serviceAccountName))
         || (object.spec.containers.size() == 1 && object.spec.containers[0].image == {{{mapping}}}[object.spec.serviceAccountName])
 ---
 apiVersion: policies.kyverno.io/v1

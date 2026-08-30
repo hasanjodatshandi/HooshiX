@@ -1,0 +1,20 @@
+{
+  auto_https off
+  admin off
+  log default {
+    output stdout
+    format json
+    level INFO
+  }
+}
+
+:8080 {
+  root * /srv
+  try_files {path} /index.html
+  file_server
+}
+
+:9090 {
+  respond /healthz "ok" 200
+  respond 404
+}

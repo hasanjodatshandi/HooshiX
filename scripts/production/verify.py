@@ -143,6 +143,10 @@ def validate_static_contracts(profile: dict) -> list[str]:
     add(errors, release.get("grype_severities_blocking") == ["Critical","High"] and release.get("signed_sbom_attestation_required") is True, "production final-artifact release policy is invalid")
     required_schema = set(schema.get("required",[]))
     add(errors, {"git_revision","images","cosign","external_l4_source_cidrs","capacity_evidence","service_capacity","compromised_password_dataset","external_evidence","secret_refs"} <= required_schema, "production release manifest schema is missing mandatory evidence fields")
+    image_schema = schema.get("properties",{}).get("images",{})
+    expected_release_components = {"authorization-service","compromised-password-service","identity-service","notification-service","web-bff","web-frontend"}
+    add(errors, set(image_schema.get("required",[])) == expected_release_components and set(image_schema.get("properties",{})) == expected_release_components,
+        "production release manifest must cover exactly all six application release components")
     k3s = (PRODUCTION/"k3s/config.yaml").read_text(encoding="utf-8")
     for line in ("secrets-encryption: true","flannel-backend: none","disable-network-policy: true","  - servicelb","  - traefik"): add(errors, line in k3s, f"K3s config missing required setting: {line.strip()}")
     add(errors, "protect-kernel-defaults: true" in k3s, "K3s must protect kernel defaults")

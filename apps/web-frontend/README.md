@@ -55,9 +55,18 @@ Implemented:
 - an executable Chromium/axe WCAG A/AA accessibility gate
 - twenty-seven Playwright journeys across accessibility, localization, keyboard/focus,
   privacy/resilience, onboarding, and authenticated account/Tenant behavior
+- exact reviewed npm versions with React/ReactDOM 19.2.7 runtime alignment
+- pinned OSV-Scanner lockfile advisory and immutable-image Semgrep JS/TS policy gates
+- a digest-pinned Caddy runtime image that runs as UID/GID 10001 with a read-only filesystem,
+  no Linux capabilities, a separate health port, and SPA-route fallback
+- inclusion in the six-component Production Syft/Grype/Cosign/Kyverno release-evidence contract
 
 Remaining broader work:
 
 - risk-based coverage thresholds and specialized security mutation evidence in the later
   performance/reliability hardening stage
 - deployed staging/production browser journey evidence
+
+Repository image and release-path verification is not deployment evidence. Production frontend
+routing, workload manifests, environment configuration, and executed signing/admission remain
+outside this slice and are `NOT VERIFIED`.

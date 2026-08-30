@@ -75,7 +75,11 @@ They answer whether the build resolved the expected dependency bytes/metadata. T
 
 OSV-Scanner is the selected early advisory scanner for supported declared/locked dependency evidence.
 
-Current repository implementation pins OSV-Scanner 2.4.0 in the implemented Compromised Password, Notification, Identity, Authorization, and Web BFF service security suites, scans their Gradle lockfiles during blocking service security verification, and re-runs those security suites from the scheduled repository workflow. Exact downloaded-binary checksum ownership remains in each implemented workflow.
+Current repository implementation pins OSV-Scanner 2.4.0 in the implemented Compromised Password,
+Notification, Identity, Authorization, and Web BFF service security suites and in the frontend
+workflow. It scans the five Gradle lockfiles and the frontend npm lockfile during blocking
+verification; the service suites also re-run from the scheduled repository workflow. Exact
+downloaded-binary checksum ownership remains in each implemented workflow.
 
 This is useful fast feedback, but it is not the final-artifact vulnerability authority:
 
@@ -166,13 +170,13 @@ Architecture selection is not implementation evidence.
 
 At the current repository state:
 
-- repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, and Web BFF;
-- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, and Web BFF and is wired into PR/push/scheduled repository security workflows; every protected service scan passed on `main@68cf66c` in repository baseline run `33105936814`; frontend lockfile advisory enforcement remains tracked by `ENGINEERING-HARDENING-ROADMAP.md`;
+- repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, Web BFF, and frontend; protected service run `33301549810` and frontend run `33301549573` passed on implementation commit `209684a`, including the frontend positive and negative fixtures;
+- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, Web BFF, and the frontend npm lockfile; protected service run `33301549810` and frontend run `33301549573` passed on implementation commit `209684a`;
 - Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in all five implemented Java service security workflows with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; every protected service job passed its configured Gitleaks steps on `main@68cf66c` in repository baseline run `33105936814`;
-- final-image Syft SBOM generation is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** in the protected production release workflow and is retained as digest-bound CycloneDX evidence;
+- final-image Syft SBOM generation is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** for all six application release components, including `web-frontend`, in the protected production release workflow and is retained as digest-bound CycloneDX evidence;
 - final-image/SBOM Grype vulnerability gating is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** with retained scan/database metadata plus a scheduled two-hour tracked-production-digest rescan path;
 - Cosign signing/provenance/SBOM attestation release automation is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** and is restricted to the protected main production-release workflow identity with GitHub OIDC;
-- Kyverno production admission generation is **IMPLEMENTED / PRODUCTION CLUSTER EXECUTION NOT VERIFIED** using stable policies.kyverno.io/v1 fail-closed release allow-list and image-validation policy output;
+- Kyverno production admission generation is **IMPLEMENTED / PRODUCTION CLUSTER EXECUTION NOT VERIFIED** using stable policies.kyverno.io/v1 fail-closed release allow-list and image-validation policy output for all six release digests;
 - Trivy and OWASP Dependency-Check are **NOT SELECTED**, not missing required implementation.
 
 `implementation-status.md` is the repository-level status authority and must stay aligned with actual files/checks.

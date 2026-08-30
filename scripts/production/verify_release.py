@@ -20,6 +20,7 @@ SERVICES = (
     "notification-service",
     "web-bff",
 )
+RELEASE_COMPONENTS = SERVICES + ("web-frontend",)
 TOP_LEVEL = {
     "schema_version",
     "profile",
@@ -114,15 +115,16 @@ def validate_manifest(data: object, now: dt.datetime | None = None) -> list[str]
     if not isinstance(images, dict):
         errors.append("images must be an object")
     else:
-        _need(errors, set(images) == set(SERVICES), "images must contain exactly the five services")
-        for service in SERVICES:
-            image = images.get(service)
+        _need(errors, set(images) == set(RELEASE_COMPONENTS),
+              "images must contain exactly the six application release components")
+        for component in RELEASE_COMPONENTS:
+            image = images.get(component)
             valid = isinstance(image, str) and bool(IMAGE.fullmatch(image))
             if valid:
                 repository = image.rsplit("@sha256:", 1)[0]
                 final_segment = repository.rsplit("/", 1)[-1]
                 valid = "/" in repository and "*" not in repository and ":" not in final_segment
-            _need(errors, valid, f"images.{service} must be an untagged immutable repository@sha256 digest")
+            _need(errors, valid, f"images.{component} must be an untagged immutable repository@sha256 digest")
 
     cosign = data.get("cosign")
     if not isinstance(cosign, dict):

@@ -163,6 +163,10 @@
           "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
           "type": "string"
         },
+        "web-frontend": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
         "web-bff": {
           "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
           "type": "string"
@@ -173,6 +177,7 @@
         "compromised-password-service",
         "identity-service",
         "notification-service",
+        "web-frontend",
         "web-bff"
       ],
       "type": "object"

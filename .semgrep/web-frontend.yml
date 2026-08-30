@@ -1,0 +1,60 @@
+rules:
+  - id: web-frontend-no-dangerous-html
+    languages: [typescript]
+    severity: ERROR
+    message: Rendering untrusted HTML bypasses React escaping and is prohibited.
+    pattern: '<$TAG ... dangerouslySetInnerHTML={{__html: $VALUE}} ... />'
+
+  - id: web-frontend-no-dom-inner-html
+    languages: [typescript]
+    severity: ERROR
+    message: Assigning DOM innerHTML bypasses React escaping and is prohibited.
+    pattern: $ELEMENT.innerHTML = $VALUE
+
+  - id: web-frontend-no-dynamic-code-execution
+    languages: [typescript]
+    severity: ERROR
+    message: Dynamic code execution is prohibited in browser code.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: web-frontend-no-script-managed-cookies
+    languages: [typescript]
+    severity: ERROR
+    message: Browser session cookies must remain HttpOnly and server-managed.
+    pattern: document.cookie = $VALUE
+
+  - id: web-frontend-no-persistent-browser-storage
+    languages: [typescript]
+    severity: ERROR
+    message: Authentication, identity, and journey state must not enter persistent browser storage.
+    pattern-either:
+      - pattern: localStorage.setItem(...)
+      - pattern: window.localStorage.setItem(...)
+
+  - id: web-frontend-centralize-session-storage
+    languages: [typescript]
+    severity: ERROR
+    message: Ephemeral browser state must use the bounded storage adapter.
+    paths:
+      exclude:
+        - /apps/web-frontend/src/state/storage.ts
+    pattern-either:
+      - pattern: sessionStorage.setItem(...)
+      - pattern: window.sessionStorage.setItem(...)
+
+  - id: web-frontend-centralize-network-calls
+    languages: [typescript]
+    severity: ERROR
+    message: Network calls must use the same-origin BFF client and its validation/error handling.
+    paths:
+      exclude:
+        - /apps/web-frontend/src/api/bffClient.ts
+    pattern: fetch(...)
+
+  - id: web-frontend-no-console-output
+    languages: [typescript]
+    severity: ERROR
+    message: Browser runtime output must not expose request, identity, or journey data.
+    pattern: console.$METHOD(...)

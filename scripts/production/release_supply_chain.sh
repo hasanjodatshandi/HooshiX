@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${SERVICE_NAME:?SERVICE_NAME is required}"
+: "${COMPONENT_NAME:?COMPONENT_NAME is required}"
 : "${IMAGE_REF:?IMAGE_REF is required}"
 : "${GIT_REVISION:?GIT_REVISION is required}"
 : "${COSIGN_IDENTITY:?COSIGN_IDENTITY is required}"
@@ -9,9 +9,9 @@ set -euo pipefail
 : "${PROVENANCE_FILE:?PROVENANCE_FILE is required}"
 : "${EVIDENCE_DIR:?EVIDENCE_DIR is required}"
 
-case "$SERVICE_NAME" in
-  authorization-service|compromised-password-service|identity-service|notification-service|web-bff) ;;
-  *) echo 'unsupported production service' >&2; exit 2 ;;
+case "$COMPONENT_NAME" in
+  authorization-service|compromised-password-service|identity-service|notification-service|web-bff|web-frontend) ;;
+  *) echo 'unsupported production application component' >&2; exit 2 ;;
 esac
 [[ "$IMAGE_REF" =~ ^[a-z0-9][a-z0-9._:-]*(/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$ ]] || { echo 'invalid immutable image reference' >&2; exit 2; }
 [[ "$GIT_REVISION" =~ ^[0-9a-f]{40}$ ]] || { echo 'invalid Git revision' >&2; exit 2; }
@@ -47,8 +47,8 @@ cosign verify --certificate-identity "$COSIGN_IDENTITY" --certificate-oidc-issue
 cosign verify-attestation --type slsaprovenance1 --certificate-identity "$COSIGN_IDENTITY" --certificate-oidc-issuer "$COSIGN_ISSUER" "$IMAGE_REF" >/dev/null
 cosign verify-attestation --type cyclonedx --certificate-identity "$COSIGN_IDENTITY" --certificate-oidc-issuer "$COSIGN_ISSUER" "$IMAGE_REF" >/dev/null
 {
-  printf 'service=%s\n' "$SERVICE_NAME"
-  printf 'owner=service:%s\n' "$SERVICE_NAME"
+  printf 'component=%s\n' "$COMPONENT_NAME"
+  printf 'owner=application-component:%s\n' "$COMPONENT_NAME"
   printf 'environment=production\n'
   printf 'image=%s\n' "$IMAGE_REF"
   printf 'git_revision=%s\n' "$GIT_REVISION"
