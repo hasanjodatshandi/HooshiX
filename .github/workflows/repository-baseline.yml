@@ -53,6 +53,9 @@ jobs:
       - name: Show Python runtime
         run: python3 --version
 
+      - name: Verify shell, Python, and workflow sources
+        run: make script-static-verify
+
       - name: Inspect baseline verifier inputs
         run: |
           set -euo pipefail

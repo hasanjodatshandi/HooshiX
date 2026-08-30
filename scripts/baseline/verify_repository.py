@@ -61,6 +61,8 @@ REQUIRED_BASELINE_PATHS = (
     "docs/architecture/implementation-status.md",
     "docs/engineering/build-and-ci-quality-enforcement.md",
     "docs/engineering/coding-standards.md",
+    "scripts/ci/quality/verify_repository_sources.sh",
+    "scripts/ci/security/service_security.sh",
     "scripts/context/context_engine.py",
     "scripts/context/post_merge_checkpoint.py",
     "scripts/context/tests/test_context_engine.py",
@@ -69,7 +71,7 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/baseline/verify_repository.py",
 )
 
-IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", "node_modules", "dist", "test-results"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "dist", "test-results"}
 IGNORED_SUFFIXES = {".pyc", ".pyo", ".tsbuildinfo"}
 
 EXTERNALIZED_MCP_PATHS = (
@@ -93,6 +95,31 @@ REPORTING_PROTOCOL_VALUE_MARKERS = (
 REPORTING_PROTOCOL_PATHS = (
     "AGENTS.md",
     "docs/engineering/agent-communication-and-reporting.md",
+)
+
+SERVICE_SECURITY_WORKFLOWS = (
+    ".github/workflows/authorization-service.yml",
+    ".github/workflows/compromised-password-service.yml",
+    ".github/workflows/identity-service.yml",
+    ".github/workflows/notification-service.yml",
+    ".github/workflows/web-bff.yml",
+)
+SERVICE_SECURITY_MODES = (
+    "gitleaks-fixtures",
+    "gitleaks-scan",
+    "osv-install",
+    "osv-scan",
+)
+SOURCE_QUALITY_MARKERS = (
+    "readonly actionlint_version='1.7.12'",
+    "readonly actionlint_sha256='8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'",
+    "readonly shellcheck_version='0.11.0'",
+    "readonly shellcheck_sha256='8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198'",
+    "readonly ruff_version='0.16.5'",
+    "readonly ruff_sha256='65b8bae7e43f12a91b71036a52176012b3aefb725d5ae263e2771474110a0983'",
+    "--select E9,F63,F7,F82",
+    "--exclude=SC1090,SC2034,SC2154",
+    '"${actionlint}" -shellcheck="${shellcheck}"',
 )
 
 
@@ -457,6 +484,52 @@ def validate_agent_reporting_contract(root: Path) -> list[str]:
     return errors
 
 
+def validate_ci_source_quality(root: Path) -> list[str]:
+    errors: list[str] = []
+    security_script = root / "scripts/ci/security/service_security.sh"
+    quality_script = root / "scripts/ci/quality/verify_repository_sources.sh"
+    baseline_workflow = root / ".github/workflows/repository-baseline.yml"
+
+    for path in (security_script, quality_script):
+        if not path.is_file():
+            errors.append(f"missing CI source-quality script: {path.relative_to(root)}")
+        elif not os.access(path, os.X_OK):
+            errors.append(f"CI source-quality script is not executable: {path.relative_to(root)}")
+
+    if quality_script.is_file():
+        quality_text = read_text(quality_script)
+        for marker in SOURCE_QUALITY_MARKERS:
+            if marker not in quality_text:
+                errors.append(f"repository source-quality gate is missing: {marker}")
+
+    if security_script.is_file():
+        security_text = read_text(security_script)
+        for mode in SERVICE_SECURITY_MODES:
+            if f"{mode})" not in security_text:
+                errors.append(f"shared service security script is missing mode: {mode}")
+
+    invocation_prefix = "scripts/ci/security/service_security.sh "
+    for relative in SERVICE_SECURITY_WORKFLOWS:
+        workflow = root / relative
+        if not workflow.is_file():
+            errors.append(f"missing service security workflow: {relative}")
+            continue
+        workflow_text = read_text(workflow)
+        for mode in SERVICE_SECURITY_MODES:
+            invocation = invocation_prefix + mode
+            if workflow_text.count(invocation) != 1:
+                errors.append(
+                    f"service security workflow must invoke {mode} exactly once: {relative}"
+                )
+
+    if not baseline_workflow.is_file():
+        errors.append("missing repository baseline workflow")
+    elif "run: make script-static-verify" not in read_text(baseline_workflow):
+        errors.append("repository baseline workflow does not enforce script-static-verify")
+
+    return errors
+
+
 
 def validate_contract_package_boundary(root: Path) -> list[str]:
     errors: list[str] = []
@@ -623,6 +696,7 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         ("dependency_registry", lambda: validate_dependency_registry(root)),
         ("source_references", lambda: validate_source_references(root)),
         ("agent_reporting", lambda: validate_agent_reporting_contract(root)),
+        ("ci_source_quality", lambda: validate_ci_source_quality(root)),
         ("contract_package_boundary", lambda: validate_contract_package_boundary(root)),
         ("guarded_structure", lambda: validate_guarded_structure(root)),
     )

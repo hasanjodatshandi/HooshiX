@@ -47,6 +47,31 @@ CI enforces at least:
 
 ## 3. Secret, dependency, supply-chain, and artifact gates
 
+### Repository scripts and workflows
+
+Repository baseline CI runs checksum-pinned ShellCheck 0.11.0, actionlint 1.7.12,
+and Ruff 0.16.5 from official release artifacts before repository governance tests.
+The selected boundary is intentionally high-signal and blocking:
+
+- ShellCheck reports warning/error findings across tracked `scripts/**/*.sh`; `SC1090`
+  is excluded for workspace-controlled dynamic source paths, `SC2034` for variables
+  intentionally exported by sourced pin/config files, and `SC2154` for variables
+  supplied by those sourced files or the owning CI environment;
+- actionlint validates all GitHub Actions workflow syntax, expressions, job/step
+  structure, local reusable-workflow references, and embedded shell through the same
+  ShellCheck warning/error policy;
+- Ruff enforces `E9,F63,F7,F82` across repository Python scripts so syntax,
+  invalid comparison/control-flow, and undefined-name defects block CI without
+  introducing a broad style-only rewrite.
+
+The five Java service workflows retain their separate Gitleaks fixture, Gitleaks
+tree/history scan, OSV installation, and OSV lockfile scan steps, but their identical
+implementations are owned by `scripts/ci/security/service_security.sh`. Baseline
+verification requires every workflow to invoke every mode exactly once. Changing the
+shared script therefore requires reviewing all five security jobs and preserving
+redaction, positive/negative fixtures, immutable tool identity, and scan failure
+semantics.
+
 ### Secret scanning
 
 - Gitleaks CLI version comes from Technology Baseline and the exact downloaded native artifact/checksum or immutable image digest is pinned in CI metadata;
