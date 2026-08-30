@@ -39,7 +39,7 @@ The implemented foundation already includes substantial registration, local auth
 
 The application is not yet a complete end-user product. Current material gaps are:
 
-- the browser frontend foundation, onboarding, profile/contact, and password lifecycle slices exist, but broader accessibility/localization and deployed journey evidence remain incomplete;
+- the browser frontend foundation, onboarding, profile/contact, password lifecycle, localization, and repository accessibility slices exist, while dependency/release alignment and deployed journey evidence remain incomplete;
 - the mandatory repository-wide audit remediation track in `ENGINEERING-HARDENING-ROADMAP.md`
   is active and must complete its ordered stages before the Conversation implementation;
 - real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
@@ -103,7 +103,7 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 2 — Database deadlines and durable-worker lease safety
+Engineering Hardening Stage 5 — Dependency, DevSecOps, and frontend release alignment
 ```
 
 Its completion boundary and interruption-safe status are owned by
