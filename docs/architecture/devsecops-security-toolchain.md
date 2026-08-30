@@ -170,8 +170,8 @@ Architecture selection is not implementation evidence.
 
 At the current repository state:
 
-- repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, Web BFF, and frontend; the frontend policy has executable positive and negative fixtures;
-- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, Web BFF, and the frontend npm lockfile; every protected Java service scan passed on `main@68cf66c` in repository baseline run `33105936814`, while current frontend protected evidence remains commit-specific;
+- repository Semgrep rules exist for the implemented Compromised Password, Notification, Identity registration/authentication/session/JWT/tenant slices, Authorization, Web BFF, and frontend; protected service run `33301549810` and frontend run `33301549573` passed on implementation commit `209684a`, including the frontend positive and negative fixtures;
+- OSV-Scanner 2.4.0 locked-dependency scanning is **IMPLEMENTED** for Compromised Password, Notification, Identity, Authorization, Web BFF, and the frontend npm lockfile; protected service run `33301549810` and frontend run `33301549573` passed on implementation commit `209684a`;
 - Gitleaks 8.30.0 current-tree/Git-history scanning is **IMPLEMENTED** in all five implemented Java service security workflows with redacted negative/current-tree-positive/commit-then-delete history fixtures and reviewed narrow false-positive policy; every protected service job passed its configured Gitleaks steps on `main@68cf66c` in repository baseline run `33105936814`;
 - final-image Syft SBOM generation is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** for all six application release components, including `web-frontend`, in the protected production release workflow and is retained as digest-bound CycloneDX evidence;
 - final-image/SBOM Grype vulnerability gating is **IMPLEMENTED / PRODUCTION EXECUTION NOT VERIFIED** with retained scan/database metadata plus a scheduled two-hour tracked-production-digest rescan path;

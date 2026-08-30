@@ -103,7 +103,7 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 5 — Dependency, DevSecOps, and frontend release alignment
+Engineering Hardening Stage 6 — Characterization-first maintainability refactor
 ```
 
 Its completion boundary and interruption-safe status are owned by
