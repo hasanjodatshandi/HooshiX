@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+env:
+  OSV_SCANNER_VERSION: '2.4.0'
+  OSV_SCANNER_SHA256: 15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0
+  SEMGREP_IMAGE: semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
+
 jobs:
   e2e:
     runs-on: ubuntu-24.04
@@ -26,9 +31,77 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web-frontend/package-lock.json
       - run: npm ci
+      - name: Install and verify OSV-Scanner
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          printf '%s  %s\n' "${OSV_SCANNER_SHA256}" /tmp/osv-scanner | sha256sum --check --strict -
+          chmod 0755 /tmp/osv-scanner
+          /tmp/osv-scanner --version | grep -F "${OSV_SCANNER_VERSION}"
+      - name: Scan locked frontend dependencies for known vulnerabilities
+        run: /tmp/osv-scanner scan source --lockfile=package-lock.json --format=vertical
+      - name: Run pinned frontend Semgrep policy and fixtures
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          common=(
+            --rm
+            --network none
+            --read-only
+            --tmpfs /tmp:rw,noexec,nosuid,size=128m
+            --cap-drop ALL
+            --security-opt no-new-privileges
+            --volume "${GITHUB_WORKSPACE}:/src:ro"
+            --workdir /src
+            --env HOME=/tmp
+            --env SEMGREP_SEND_METRICS=off
+          )
+          scan=(
+            semgrep scan
+            --disable-version-check
+            --metrics=off
+            --error
+            --config .semgrep/web-frontend.yml
+          )
+          docker run "${common[@]}" "${SEMGREP_IMAGE}" "${scan[@]}" apps/web-frontend/src
+          if docker run "${common[@]}" "${SEMGREP_IMAGE}" "${scan[@]}" .semgrep/fixtures/web-frontend-positive.tsx; then
+            echo "Frontend Semgrep positive fixture was not rejected" >&2
+            exit 1
+          fi
+          docker run "${common[@]}" "${SEMGREP_IMAGE}" "${scan[@]}" .semgrep/fixtures/web-frontend-negative.tsx
       - run: npm run check:api
       - run: npm run test:components
       - run: npx playwright install --with-deps
       - run: npm run build
+      - name: Build and smoke-test hardened frontend image
+        run: |
+          set -euo pipefail
+          docker build --pull=false --tag hooshix-web-frontend:ci .
+          [[ "$(docker image inspect hooshix-web-frontend:ci --format '{{.Config.User}}')" == '10001:10001' ]]
+          docker run --detach \
+            --name hooshix-web-frontend-ci \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=32m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --publish 127.0.0.1:18080:8080 \
+            --publish 127.0.0.1:19090:9090 \
+            hooshix-web-frontend:ci
+          cleanup() { docker rm --force hooshix-web-frontend-ci >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:19090/healthz | grep -Fxq ok; then
+              break
+            fi
+            if (( attempt == 30 )); then
+              docker logs hooshix-web-frontend-ci >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error http://127.0.0.1:18080/ | grep -Fq '<div id="root"></div>'
+          curl --fail --silent --show-error http://127.0.0.1:18080/register | grep -Fq '<div id="root"></div>'
       - run: npm run test:a11y
       - run: npm run e2e

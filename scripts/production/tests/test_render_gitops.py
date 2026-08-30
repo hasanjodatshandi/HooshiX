@@ -62,6 +62,23 @@ class ProductionGitOpsRenderTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             render_gitops.build_values("unknown", self.manifest)
 
+    def test_admission_policy_binds_frontend_digest_and_service_account(self) -> None:
+        digest = "b" * 64
+        manifest = {
+            "git_revision": "c" * 40,
+            "images": {
+                component: f"registry.example.test/hooshix/{component}@sha256:{digest}"
+                for component in render_gitops.verify_release.RELEASE_COMPONENTS
+            },
+            "cosign": {
+                "certificate_identity": render_gitops.verify_release.EXPECTED_CERTIFICATE_IDENTITY,
+                "certificate_oidc_issuer": render_gitops.verify_release.EXPECTED_OIDC_ISSUER,
+            },
+        }
+        policy = render_gitops.admission_policy(manifest)
+        self.assertIn("'web-frontend'", policy)
+        self.assertIn(manifest["images"]["web-frontend"], policy)
+
 
 if __name__ == "__main__":
     unittest.main()

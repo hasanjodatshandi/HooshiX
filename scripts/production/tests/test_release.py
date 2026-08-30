@@ -21,7 +21,7 @@ class ProductionReleaseManifestTest(unittest.TestCase):
             "public_hostname": "app.example.test",
             "images": {
                 service: f"registry.example.test/hooshix/{service}@sha256:{digest}"
-                for service in verify_release.SERVICES
+                for service in verify_release.RELEASE_COMPONENTS
             },
             "cosign": {
                 "certificate_identity": "https://github.com/hasanjodatshandi/HooshiX/.github/workflows/production-release.yml@refs/heads/main",
@@ -89,6 +89,11 @@ class ProductionReleaseManifestTest(unittest.TestCase):
         data = copy.deepcopy(self.manifest)
         data["images"]["identity-service"] = "registry.example.test/hooshix/identity-service:latest"
         self.assertTrue(any("images.identity-service" in e for e in self.errors(data)))
+
+    def test_requires_frontend_release_image(self) -> None:
+        data = copy.deepcopy(self.manifest)
+        del data["images"]["web-frontend"]
+        self.assertTrue(any("six application release components" in e for e in self.errors(data)))
 
     def test_rejects_wildcard_signer(self) -> None:
         data = copy.deepcopy(self.manifest)

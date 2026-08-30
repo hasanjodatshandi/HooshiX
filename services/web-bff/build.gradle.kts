@@ -44,7 +44,7 @@ dependencies {
 }
 
 
-protobuf { protoc { artifact="com.google.protobuf:protoc:3.25.8" }; plugins { maybeCreate("grpc").artifact="io.grpc:protoc-gen-grpc-java:1.83.1" }; generateProtoTasks { all().forEach { it.plugins.maybeCreate("grpc") } } }
+protobuf { protoc { artifact="com.google.protobuf:protoc:4.34.2" }; plugins { maybeCreate("grpc").artifact="io.grpc:protoc-gen-grpc-java:1.83.1" }; generateProtoTasks { all().forEach { it.plugins.maybeCreate("grpc") } } }
 spotless { java { target("src/**/*.java"); googleJavaFormat("1.36.1"); removeUnusedImports(); trimTrailingWhitespace(); endWithNewline() }; format("misc") { target("*.gradle.kts","*.properties","src/**/*.yaml","contracts/**/*.yaml","Dockerfile"); trimTrailingWhitespace(); endWithNewline() } }
 configure<SpotBugsExtension> { toolVersion.set("4.10.3"); ignoreFailures.set(false); excludeFilter.set(file("config/spotbugs/exclude.xml")) }
 dependencyLocking { lockAllConfigurations() }

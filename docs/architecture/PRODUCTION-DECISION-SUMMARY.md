@@ -134,7 +134,11 @@ Current exact selected versions include:
 
 Semgrep remains first-party source SAST/repository policy. Gradle dependency verification/locks remain dependency-integrity controls, not CVE authority.
 
-OSV-Scanner 2.4.0 locked-dependency scanning is implemented for the current Compromised Password, Notification, Identity, Authorization, and Web BFF service slices and is wired into their PR/push security verification plus the scheduled repository security workflow. Exact tool/checksum ownership remains in the implemented workflows. This is early dependency-advisory evidence only.
+OSV-Scanner 2.4.0 locked-dependency scanning is implemented for the current Compromised Password,
+Notification, Identity, Authorization, and Web BFF service slices and for the frontend npm lockfile.
+The service scans are wired into PR/push verification plus the scheduled repository security
+workflow; frontend scanning is wired into its PR/push workflow. Exact tool/checksum ownership
+remains in the implemented workflows. This is early dependency-advisory evidence only.
 
 Syft+Grype remain mandatory for exact final-image release/deployed-artifact vulnerability evidence because OS packages, the JDK/runtime, native libraries, and packaged transitive content may not be represented by the lockfile.
 
@@ -142,7 +146,12 @@ Trivy and OWASP Dependency-Check are not selected current default tools because 
 
 A real committed secret requires revoke/rotate handling when exposure is plausible; deleting the latest line is not sufficient. Scanner output must stay redacted.
 
-The selected ADR-0045 repository controls are now implemented for the current service/release boundary: all five implemented Java services have Gitleaks current-tree/Git-history gates, and the repository contains exact-digest Syft/Grype/Cosign release automation, scheduled deployed-digest rescanning, and stable Kyverno production release-admission generation. Real production final-artifact scanning/signing/attestation/rescanning and production-cluster admission enforcement remain `NOT VERIFIED`.
+The selected ADR-0045 repository controls are now implemented for the current code/release boundary:
+all five implemented Java services have Gitleaks current-tree/Git-history gates; the frontend has
+dedicated Semgrep and OSV gates; and exact-digest Syft/Grype/Cosign release automation, scheduled
+deployed-digest rescanning, and stable Kyverno production release-admission generation cover all
+six application release components. Real production final-artifact scanning/signing/attestation/
+rescanning and production-cluster admission enforcement remain `NOT VERIFIED`.
 
 ## 8. Kyverno
 
