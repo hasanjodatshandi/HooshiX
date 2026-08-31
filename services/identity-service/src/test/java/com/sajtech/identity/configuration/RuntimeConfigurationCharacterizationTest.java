@@ -27,15 +27,13 @@ class RuntimeConfigurationCharacterizationTest {
 
     assertThat(beanMethods).hasSizeGreaterThanOrEqualTo(100);
     assertBean(beanMethods, "fingerprintKeyRing", "fingerprintKeyRing", "(inferred)");
-    assertBean(beanMethods, "compromisedPasswordChannel", "compromisedPasswordChannel", "shutdownNow");
+    assertBean(
+        beanMethods, "compromisedPasswordChannel", "compromisedPasswordChannel", "shutdownNow");
     assertBean(beanMethods, "authorizationChannel", "authorizationChannel", "shutdownNow");
     assertBean(beanMethods, "notificationChannel", "notificationChannel", "shutdownNow");
     assertBean(beanMethods, "readiness", "identityReadiness", "(inferred)");
     assertBean(
-        beanMethods,
-        "authenticationReadiness",
-        "identityAuthenticationReadiness",
-        "(inferred)");
+        beanMethods, "authenticationReadiness", "identityAuthenticationReadiness", "(inferred)");
 
     Method refreshKeyRing = method(beanMethods, "refreshKeyRing");
     ConditionalOnProperty condition = refreshKeyRing.getAnnotation(ConditionalOnProperty.class);

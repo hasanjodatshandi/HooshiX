@@ -54,6 +54,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Source policy/SAST | repository Semgrep CLI/rules | ADR-0039/0045; exact Semgrep image/tool and rules pinned in CI; separate Semgrep products are not implied |
 | Secret scanning | Gitleaks CLI 8.30.0 | ADR-0045; reviewed fallback from defective 8.30.1; current-tree + Git-history scan; immutable official GHCR image digest pinned in CI; positive detection control required; no raw secret output |
 | Dependency advisory scan | OSV-Scanner 2.4.0 | ADR-0045; early declared/locked dependency advisory feedback; exact Linux/x64 artifact SHA-256 pinned in implemented service CI; not final-image authority |
+| Repository source lint | ShellCheck 0.11.0 + actionlint 1.7.12 + Ruff 0.16.5 | checksum-pinned official Linux/x64 artifacts; selected high-signal shell, GitHub Actions, and Python source checks in repository baseline CI |
 | CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
 | BDD | Cucumber-JVM + Gherkin | critical behavior only |
 | Frontend unit/component | Vitest + React Testing Library | frontend lockfile |
@@ -181,7 +182,7 @@ Both profiles preserve:
 ## 6. Version governance
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
-- Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
+- Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
 - services own Wrapper/dependency locks/verification metadata;
 - Spring Boot dependency management is default; overrides require rationale/alignment tests;
 - no agent guesses an unlisted patch;

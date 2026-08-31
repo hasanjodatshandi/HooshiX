@@ -77,6 +77,8 @@ secrets/
 .local-runtime/
 # Python generated state
 __pycache__/
+.pytest_cache/
+.ruff_cache/
 *.py[cod]
 
 # HooshiX production-fidelity local runtime state

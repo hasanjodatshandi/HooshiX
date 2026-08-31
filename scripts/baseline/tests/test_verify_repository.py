@@ -148,6 +148,52 @@ None | <exact action>
             errors = verifier.validate_agent_reporting_contract(root)
             self.assertTrue(any("Human action required:" in error for error in errors))
 
+    def test_current_ci_source_quality_boundary_is_valid(self) -> None:
+        repository_root = Path(__file__).resolve().parents[3]
+
+        self.assertEqual([], verifier.validate_ci_source_quality(repository_root))
+
+    def test_ci_source_quality_rejects_a_missing_service_security_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            quality = root / "scripts/ci/quality/verify_repository_sources.sh"
+            security = root / "scripts/ci/security/service_security.sh"
+            baseline = root / ".github/workflows/repository-baseline.yml"
+            quality.parent.mkdir(parents=True)
+            security.parent.mkdir(parents=True)
+            baseline.parent.mkdir(parents=True)
+            quality.write_text("\n".join(verifier.SOURCE_QUALITY_MARKERS), encoding="utf-8")
+            quality.chmod(0o755)
+            security.write_text(
+                "\n".join(f"{mode})" for mode in verifier.SERVICE_SECURITY_MODES),
+                encoding="utf-8",
+            )
+            security.chmod(0o755)
+            baseline.write_text("run: make script-static-verify\n", encoding="utf-8")
+            for relative in verifier.SERVICE_SECURITY_WORKFLOWS:
+                workflow = root / relative
+                workflow.parent.mkdir(parents=True, exist_ok=True)
+                workflow.write_text(
+                    "\n".join(
+                        "scripts/ci/security/service_security.sh " + mode
+                        for mode in verifier.SERVICE_SECURITY_MODES
+                        if not (
+                            relative.endswith("identity-service.yml")
+                            and mode == "osv-scan"
+                        )
+                    ),
+                    encoding="utf-8",
+                )
+
+            errors = verifier.validate_ci_source_quality(root)
+
+            self.assertTrue(
+                any(
+                    "identity-service.yml" in error and "osv-scan" in error
+                    for error in errors
+                )
+            )
+
     def test_guard_rejects_premature_reference_data_service(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
