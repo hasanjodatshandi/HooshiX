@@ -2,7 +2,9 @@ import com.github.spotbugs.snom.SpotBugsExtension
 
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.1.0"
+    id("info.solidsoft.pitest") version "1.19.0"
     id("com.google.protobuf") version "0.10.0"
     id("com.diffplug.spotless") version "8.9.0"
     id("com.github.spotbugs") version "6.5.9"
@@ -15,6 +17,35 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
     }
+}
+
+jacoco { toolVersion = "0.8.15" }
+
+pitest {
+    pitestVersion.set("1.22.1")
+    junit5PluginVersion.set("1.2.3")
+    targetClasses.set(
+        setOf(
+            "com.sajtech.identity.infrastructure.security.challenge.HmacPasswordRecoverySecret",
+            "com.sajtech.identity.infrastructure.security.externalidentity.AesGcmExternalIdentityResultCrypto",
+            "com.sajtech.identity.application.erasure.usecase.ParticipantErasureUseCase",
+        )
+    )
+    targetTests.set(
+        setOf(
+            "com.sajtech.identity.infrastructure.security.challenge.HmacPasswordRecoverySecretTest",
+            "com.sajtech.identity.infrastructure.security.externalidentity.AesGcmExternalIdentityResultCryptoTest",
+            "com.sajtech.identity.application.erasure.usecase.ParticipantErasureUseCaseTest",
+        )
+    )
+    mutators.set(setOf("DEFAULTS"))
+    threads.set(2)
+    outputFormats.set(setOf("XML", "HTML"))
+    timestampedReports.set(false)
+    failWhenNoMutations.set(true)
+    coverageThreshold.set(95)
+    mutationThreshold.set(95)
+    testStrengthThreshold.set(95)
 }
 
 
@@ -152,6 +183,70 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     shouldRunAfter(tasks.test)
 }
 
+val jacocoRiskReport = tasks.register<JacocoReport>("jacocoRiskReport") {
+    description = "Generates combined unit and integration coverage evidence."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(tasks.test, integrationTest)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/integrationTest.exec"),
+    )
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(sourceSets.main.get().output)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+val jacocoRiskCoverage = tasks.register<JacocoCoverageVerification>("jacocoRiskCoverage") {
+    description = "Enforces the measured service baseline and critical identity coverage."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(jacocoRiskReport)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/integrationTest.exec"),
+    )
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(sourceSets.main.get().output)
+    violationRules {
+        rule {
+            limit { counter = "LINE"; minimum = "0.48".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.35".toBigDecimal() }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf(
+                "com.sajtech.identity.infrastructure.security.session.HmacSessionCredential",
+                "com.sajtech.identity.infrastructure.security.mfa.JcaMfaCryptography",
+                "com.sajtech.identity.infrastructure.security.jwt.RsaJwtAccessTokenSigner",
+                "com.sajtech.identity.infrastructure.security.externalidentity.AesGcmExternalIdentityResultCrypto",
+                "com.sajtech.identity.infrastructure.quota.ClockSafetyGuard",
+                "com.sajtech.identity.infrastructure.security.challenge.HmacChallengeSecret",
+                "com.sajtech.identity.infrastructure.security.challenge.HmacPasswordRecoverySecret",
+            )
+            limit { counter = "LINE"; minimum = "0.82".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.50".toBigDecimal() }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf(
+                "com.sajtech.identity.application.erasure.usecase.ErasureUseCase",
+                "com.sajtech.identity.application.erasure.usecase.ParticipantErasureUseCase",
+            )
+            limit { counter = "LINE"; minimum = "0.80".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.52".toBigDecimal() }
+        }
+    }
+}
+
 tasks.check {
-    dependsOn(integrationTest, architectureTest, tasks.named("spotbugsMain"), tasks.named("spotlessCheck"))
+    dependsOn(
+        integrationTest,
+        architectureTest,
+        jacocoRiskCoverage,
+        tasks.named("spotbugsMain"),
+        tasks.named("spotlessCheck"),
+    )
 }

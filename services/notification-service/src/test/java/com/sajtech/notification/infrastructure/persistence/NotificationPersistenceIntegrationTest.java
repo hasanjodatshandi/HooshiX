@@ -150,6 +150,97 @@ class NotificationPersistenceIntegrationTest {
   }
 
   @Test
+  void representativeReconciliationClaimPlanUsesDueIndex() throws Exception {
+    SubmitNotificationUseCase useCase = createUseCase();
+    Instant messageNotAfter = new PostgresDatabaseTime(dsl).now().plus(Duration.ofMinutes(10));
+    var accepted = useCase.submit(command(UUID.randomUUID(), "12345678", messageNotAfter));
+    dsl.execute(
+        """
+        INSERT INTO notification(
+          notification_id,caller_service,request_id,intent_fingerprint,fingerprint_version,
+          fingerprint_key_id,channel,semantic_type,locale,template_version_id,template_sha256,
+          message_not_after,effective_delivery_deadline,lifecycle,escrow_format_version,
+          escrow_key_id,recipient_nonce,recipient_ciphertext,subject_nonce,subject_ciphertext,
+          text_nonce,text_ciphertext,html_nonce,html_ciphertext,accepted_at,sensitive_expires_at,
+          updated_at)
+        SELECT gen_random_uuid(),source.caller_service,gen_random_uuid(),source.intent_fingerprint,
+          source.fingerprint_version,source.fingerprint_key_id,source.channel,source.semantic_type,
+          source.locale,source.template_version_id,source.template_sha256,source.message_not_after,
+          source.effective_delivery_deadline,'DISPATCHING',source.escrow_format_version,
+          source.escrow_key_id,source.recipient_nonce,source.recipient_ciphertext,
+          source.subject_nonce,source.subject_ciphertext,source.text_nonce,source.text_ciphertext,
+          source.html_nonce,source.html_ciphertext,source.accepted_at,source.sensitive_expires_at,
+          source.updated_at
+        FROM notification source CROSS JOIN generate_series(1,5000)
+        WHERE source.notification_id=CAST(? AS uuid)
+        """,
+        accepted.notificationId());
+    dsl.execute(
+        """
+        INSERT INTO notification_attempt(
+          attempt_id,notification_id,attempt_number,execution_id,state,classification,
+          next_action_at,claimed_until,created_at,updated_at,dispatched_at,observation_started_at)
+        SELECT gen_random_uuid(),notification_id,1,gen_random_uuid(),'RECONCILING','AMBIGUOUS',
+          CASE WHEN row_number() OVER (ORDER BY notification_id)<=50
+            THEN clock_timestamp()-interval '1 minute'
+            ELSE clock_timestamp()+interval '1 day' END,
+          NULL,clock_timestamp(),clock_timestamp(),
+          clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '2 minutes'
+        FROM notification WHERE notification_id<>CAST(? AS uuid)
+        """,
+        accepted.notificationId());
+    dsl.execute(
+        "UPDATE notification SET lifecycle='DISPATCHING' WHERE notification_id=?",
+        accepted.notificationId());
+    dsl.execute(
+        """
+        UPDATE notification_attempt SET execution_id=gen_random_uuid(),state='RECONCILING',
+          classification='AMBIGUOUS',next_action_at=clock_timestamp()-interval '1 minute',
+          claimed_until=NULL,dispatched_at=clock_timestamp()-interval '2 minutes',
+          observation_started_at=clock_timestamp()-interval '2 minutes'
+        WHERE notification_id=CAST(? AS uuid)
+        """,
+        accepted.notificationId());
+    dsl.execute(
+        """
+        INSERT INTO provider_receipt_evidence(
+          receipt_id,notification_id,attempt_id,provider_code,provider_correlation_id,
+          observed_at,expires_at)
+        SELECT gen_random_uuid(),notification_id,attempt_id,'ACCEPTED',
+          'provider-' || attempt_id::text,clock_timestamp()-interval '1 minute',
+          clock_timestamp()+interval '1 day'
+        FROM notification_attempt
+        """);
+    dsl.execute("ANALYZE notification");
+    dsl.execute("ANALYZE notification_attempt");
+    dsl.execute("ANALYZE provider_receipt_evidence");
+
+    String plan =
+        String.valueOf(
+            dsl.fetchValue(
+                """
+                EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+                SELECT a.attempt_id,a.notification_id,a.execution_id,n.channel,n.lifecycle,
+                       COALESCE(a.observation_started_at,a.dispatched_at) AS observation_started_at,
+                       e.provider_correlation_id
+                FROM notification_attempt a JOIN notification n ON n.notification_id=a.notification_id
+                LEFT JOIN LATERAL (
+                  SELECT provider_correlation_id FROM provider_receipt_evidence p
+                  WHERE p.attempt_id=a.attempt_id ORDER BY observed_at DESC,receipt_id DESC LIMIT 1
+                ) e ON true
+                WHERE a.state='RECONCILING' AND a.next_action_at<=clock_timestamp()
+                  AND (a.claimed_until IS NULL OR a.claimed_until<=clock_timestamp())
+                  AND n.lifecycle IN ('DISPATCHING','PROVIDER_ACCEPTED')
+                ORDER BY a.next_action_at,a.attempt_id LIMIT 25 FOR UPDATE OF a SKIP LOCKED
+                """));
+
+    assertThat(plan)
+        .contains("notification_attempt_reconciliation_idx")
+        .contains("provider_receipt_attempt_latest_idx")
+        .doesNotContain("Seq Scan on notification_attempt");
+  }
+
+  @Test
   void migrationRejectsCrossDefinitionActivationAndInvalidChannelSemanticState() throws Exception {
     assertThatThrownBy(
             () ->

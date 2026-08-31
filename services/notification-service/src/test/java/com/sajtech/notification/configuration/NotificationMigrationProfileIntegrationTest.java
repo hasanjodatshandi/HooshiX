@@ -51,7 +51,7 @@ class NotificationMigrationProfileIntegrationTest {
           var result =
               statement.executeQuery("SELECT count(*) FROM flyway_schema_history WHERE success")) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(6);
+        assertThat(result.getInt(1)).isEqualTo(7);
       }
     } finally {
       if (context.isActive()) {

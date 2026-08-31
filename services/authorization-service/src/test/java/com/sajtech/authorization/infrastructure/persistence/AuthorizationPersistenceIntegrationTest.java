@@ -107,6 +107,68 @@ class AuthorizationPersistenceIntegrationTest {
   }
 
   @Test
+  void representativeCheckPermissionPlanUsesTenantMembershipIndexes() {
+    UUID tenant = UUID.randomUUID();
+    UUID member = UUID.randomUUID();
+    store.provisionOwner(
+        UUID.randomUUID(), digest(1), tenant, UUID.randomUUID(), UUID.randomUUID(), NOW);
+    store.provisionMember(UUID.randomUUID(), digest(2), tenant, member, UUID.randomUUID(), NOW);
+    admin.execute(
+        """
+        INSERT INTO authorization_membership_projection(
+          tenant_id,membership_id,user_id,lifecycle,updated_at)
+        SELECT CAST(? AS uuid),gen_random_uuid(),gen_random_uuid(),'ACTIVE',CAST(? AS timestamptz)
+        FROM generate_series(1,5000)
+        """,
+        tenant,
+        NOW);
+    UUID memberRole =
+        Objects.requireNonNull(
+            admin.fetchOne(
+                "SELECT role_id FROM authorization_membership_role WHERE tenant_id=? AND membership_id=? LIMIT 1",
+                tenant,
+                member))
+            .get("role_id", UUID.class);
+    admin.execute(
+        """
+        INSERT INTO authorization_membership_role(tenant_id,membership_id,role_id,created_at)
+        SELECT tenant_id,membership_id,CAST(? AS uuid),CAST(? AS timestamptz)
+        FROM authorization_membership_projection
+        WHERE tenant_id=CAST(? AS uuid) AND membership_id<>CAST(? AS uuid)
+        """,
+        memberRole,
+        NOW,
+        tenant,
+        member);
+    admin.execute("ANALYZE authorization_membership_projection");
+    admin.execute("ANALYZE authorization_membership_role");
+    admin.execute("ANALYZE authorization_membership_permission_override");
+
+    String plan =
+        runtime.transactionResult(
+            configuration -> {
+              DSLContext tx = DSL.using(configuration);
+              AuthorizationPersistenceSupport.configureCheckPermissionTransaction(tx, tenant);
+              return String.valueOf(
+                  tx.fetchValue(
+                      "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) "
+                          + AuthorizationPersistenceSupport.CHECK_PERMISSION_SQL,
+                      tenant,
+                      member,
+                      "tenant.read",
+                      tenant,
+                      member,
+                      "tenant.read"));
+            });
+
+    assertThat(plan)
+        .contains("authorization_membership_projection_pkey")
+        .contains("authorization_membership_role_pkey")
+        .doesNotContain("Seq Scan on authorization_membership_projection")
+        .doesNotContain("Seq Scan on authorization_membership_role");
+  }
+
+  @Test
   void forcedRlsHidesOtherTenantRowsFromRuntimeRole() {
     UUID t1 = UUID.randomUUID(), t2 = UUID.randomUUID();
     store.provisionOwner(

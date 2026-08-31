@@ -3,6 +3,7 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.1.0"
     id("com.google.protobuf") version "0.10.0"
     id("com.diffplug.spotless") version "8.9.0"
@@ -13,6 +14,8 @@ group = "com.sajtech"
 version = "0.1.0-SNAPSHOT"
 
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+
+jacoco { toolVersion = "0.8.15" }
 
 dependencies {
     implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
@@ -96,4 +99,55 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     useJUnitPlatform { includeTags("architecture") }
     shouldRunAfter(tasks.test)
 }
-tasks.check { dependsOn(integrationTest, architectureTest, tasks.named("spotbugsMain"), tasks.named("spotlessCheck")) }
+val jacocoRiskReport = tasks.register<JacocoReport>("jacocoRiskReport") {
+    description = "Generates combined unit and integration coverage evidence."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(tasks.test, integrationTest)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/integrationTest.exec"),
+    )
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(sourceSets.main.get().output)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+val jacocoRiskCoverage = tasks.register<JacocoCoverageVerification>("jacocoRiskCoverage") {
+    description = "Enforces the measured service baseline and critical authorization coverage."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(jacocoRiskReport)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/integrationTest.exec"),
+    )
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(sourceSets.main.get().output)
+    violationRules {
+        rule {
+            limit { counter = "LINE"; minimum = "0.40".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.36".toBigDecimal() }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf(
+                "com.sajtech.authorization.infrastructure.security.IdentityJwtVerifier",
+                "com.sajtech.authorization.infrastructure.runtime.grpc.CheckPermissionAdmissionController",
+                "com.sajtech.authorization.infrastructure.quota.ClockSafetyGuard",
+            )
+            limit { counter = "LINE"; minimum = "0.64".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.42".toBigDecimal() }
+        }
+    }
+}
+tasks.check {
+    dependsOn(
+        integrationTest,
+        architectureTest,
+        jacocoRiskCoverage,
+        tasks.named("spotbugsMain"),
+        tasks.named("spotlessCheck"),
+    )
+}
