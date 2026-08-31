@@ -103,12 +103,13 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 6 — Characterization-first maintainability refactor
+Engineering Hardening Stage 7 — Performance, reliability, and test evidence
 ```
 
 Its completion boundary and interruption-safe status are owned by
-`ENGINEERING-HARDENING-ROADMAP.md`. Conversation implementation remains ordered after
-hardening stages 1-8. Its future target invariant remains:
+`ENGINEERING-HARDENING-ROADMAP.md`. Stage 6 is complete; Stage 7 has not started.
+Conversation implementation remains ordered after hardening stages 1-8. Its future
+target invariant remains:
 
 ```text
 service foundation                  -> one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, key ring, and Day-One telemetry
