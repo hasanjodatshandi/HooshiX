@@ -18,6 +18,7 @@ spec:
               - prod.sajtech.internal/ns/platform-apps/sa/authorization-service
               - prod.sajtech.internal/ns/platform-apps/sa/identity-service
               - prod.sajtech.internal/ns/platform-apps/sa/notification-service
+              - prod.sajtech.internal/ns/platform-apps/sa/web-bff
               - prod.sajtech.internal/ns/platform-data/sa/postgres-bootstrap
       to: [{operation: {ports: ["5432"]}}]
 ---

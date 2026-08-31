@@ -2,6 +2,11 @@ runtime:
   enabled: true
   requireFetchMetadata: true
   publicOrigin: https://hooshix.local:8443
+database:
+  jdbcUrl: jdbc:postgresql://postgresql.platform-data.svc.cluster.local:5432/web_bff
+  podLabels: {app.kubernetes.io/name: postgresql}
+  runtimeSecretName: web-bff-db-runtime
+  migrationSecretName: web-bff-db-migration
 redis:
   podLabels: {app.kubernetes.io/name: security-redis}
   connectionSecretName: web-bff-redis

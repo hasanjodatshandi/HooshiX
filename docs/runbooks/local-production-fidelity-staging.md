@@ -59,7 +59,7 @@ The staging image state also records exact Git `HEAD`, clean/dirty source state,
 - An unauthorized workload cannot reach the protected WAF/BFF path.
 - Kyverno uses stable CEL policy APIs and blocks mutable image references and unsafe workload shapes. Its five local `linux/amd64` controller/init images are host-cached, mirrored into the loopback kind registry with digest-preservation checks, and referenced by those reviewed platform-specific manifest digests when the byte-identical vendored installer is rendered.
 - The node Collector exception is restricted to the exact `otel-collector` identity/image/security context and read-only `/var/log/pods`; other host paths are denied.
-- Local PostgreSQL uses distinct migration/runtime roles and databases for Authorization, Identity, and Notification. Runtime roles are non-superuser/non-owner and cross-service `CONNECT` is denied.
+- Local PostgreSQL uses distinct migration/runtime roles and databases for Authorization, Identity, Notification, and the Web BFF erasure participant. Runtime roles are non-superuser/non-owner and cross-service `CONNECT` is denied.
 - Staging datastore NetworkPolicy and Istio authorization are applied before datastore workloads. The PostgreSQL bootstrap job denies ingress and permits egress only for DNS and PostgreSQL/HBONE. WAF NetworkPolicy, strict mTLS, and AuthorizationPolicy resources are created before the WAF pod and public route.
 - Local Redis uses `noeviction`, AOF, and `appendfsync everysec`.
 - Staging credentials, TLS/key material, generated image state, and verification logs remain under Git-ignored `.platform-runtime/` or Kubernetes Secrets created from local generated state. They are not production secrets.

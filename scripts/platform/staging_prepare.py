@@ -31,7 +31,7 @@ def ring(rel: str):
 def main():
     os.umask(0o077)
     FILES.mkdir(parents=True,exist_ok=True)
-    names=['postgres_admin','authorization_migration','authorization_runtime','identity_migration','identity_runtime','notification_migration','notification_runtime','redis_health','redis_verify','grafana_admin','redis_authorization','redis_identity','redis_webbff']
+    names=['postgres_admin','authorization_migration','authorization_runtime','identity_migration','identity_runtime','notification_migration','notification_runtime','web_bff_migration','web_bff_runtime','redis_health','redis_verify','grafana_admin','redis_authorization','redis_identity','redis_webbff']
     if META.exists():
         try: data=json.loads(META.read_text(encoding='utf-8'))
         except (OSError,json.JSONDecodeError) as exc: raise SystemExit('staging metadata is unreadable or invalid JSON') from exc
@@ -41,11 +41,11 @@ def main():
     data=validate_metadata(data,names)
     META.write_text(json.dumps(data,sort_keys=True)+'\n',encoding='utf-8'); META.chmod(0o600)
     write('postgres-admin/password',data['postgres_admin'],False)
-    for service in ('authorization','identity','notification'):
+    for service,key in (('authorization','authorization'),('identity','identity'),('notification','notification'),('web-bff','web_bff')):
         for role in ('migration','runtime'):
             d=f'{service}-db-{role}'
-            write(f'{d}/spring.datasource.username',f'{service}_{role}',False)
-            write(f'{d}/spring.datasource.password',data[f'{service}_{role}'],False)
+            write(f'{d}/spring.datasource.username',f'{key}_{role}',False)
+            write(f'{d}/spring.datasource.password',data[f'{key}_{role}'],False)
     redis_host='security-redis.platform-data.svc.cluster.local:6379'
     write('authorization-quota-redis/AUTHORIZATION_QUOTA_REDIS_URI',f"redis://authorization:{data['redis_authorization']}@{redis_host}",False)
     write('identity-quota-redis/quota_redis_uri',f"redis://identity:{data['redis_identity']}@{redis_host}",False)
