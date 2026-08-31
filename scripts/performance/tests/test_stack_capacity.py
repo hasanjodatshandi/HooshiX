@@ -28,12 +28,14 @@ class StackCapacityEvidenceTest(unittest.TestCase):
                 "min_success_percent": 99,
                 "min_cpu_headroom_percent": 30,
                 "min_memory_headroom_percent": 30,
+                "max_consecutive_swap_active_samples": 5,
             },
             "results": {
                 "operations": 1000,
                 "successes": 1000,
                 "unexpected_failures": 0,
                 "success_percent": 100.0,
+                "expected_outcomes_by_code": {"RATE_LIMITED": 900, "AUTHENTICATION_FAILED": 100},
                 "errors_by_code": {},
                 "latency_ms": {"p50": 30, "p95": 80, "p99": 120, "max": 200},
                 "system": {
@@ -45,6 +47,8 @@ class StackCapacityEvidenceTest(unittest.TestCase):
                     "max_swap_used_bytes": 0,
                     "swap_in_pages": 0,
                     "swap_out_pages": 0,
+                    "swap_active_sample_count": 0,
+                    "max_consecutive_swap_active_samples": 0,
                     "min_root_disk_free_bytes": 10_000_000_000,
                 },
             },
@@ -72,14 +76,52 @@ class StackCapacityEvidenceTest(unittest.TestCase):
         data["passed"] = False
         self.assertEqual([], stack_capacity.validate_evidence(data))
 
-    def test_swap_occupancy_is_recorded_but_only_interval_activity_fails(self) -> None:
+    def test_swap_occupancy_and_bursts_are_recorded_but_only_sustained_activity_fails(self) -> None:
         data = copy.deepcopy(self.evidence)
         data["results"]["system"]["max_swap_used_bytes"] = 1_000_000
         self.assertEqual([], stack_capacity.validate_evidence(data))
         data["results"]["system"]["swap_out_pages"] = 1
-        data["failure_reasons"] = ["SWAP_ACTIVITY"]
+        data["results"]["system"]["swap_active_sample_count"] = 1
+        data["results"]["system"]["max_consecutive_swap_active_samples"] = 1
+        self.assertEqual([], stack_capacity.validate_evidence(data))
+        data["results"]["system"]["swap_out_pages"] = 5
+        data["results"]["system"]["swap_active_sample_count"] = 5
+        data["results"]["system"]["max_consecutive_swap_active_samples"] = 5
+        data["failure_reasons"] = ["SUSTAINED_SWAP_ACTIVITY"]
         data["passed"] = False
         self.assertEqual([], stack_capacity.validate_evidence(data))
+
+    def test_outcome_counters_must_match_successes(self) -> None:
+        data = copy.deepcopy(self.evidence)
+        data["results"]["expected_outcomes_by_code"]["RATE_LIMITED"] = 899
+        errors = stack_capacity.validate_evidence(data)
+        self.assertTrue(any("expected_outcomes_by_code" in error for error in errors))
+
+    def test_outcomes_must_prove_the_selected_scenario(self) -> None:
+        data = copy.deepcopy(self.evidence)
+        data["results"]["expected_outcomes_by_code"] = {"RATE_LIMITED": 1000}
+        errors = stack_capacity.validate_evidence(data)
+        self.assertTrue(any("selected scenario" in error for error in errors))
+
+        data = copy.deepcopy(self.evidence)
+        data["scenario"] = "session-bootstrap"
+        data["results"]["expected_outcomes_by_code"] = {"SESSION_BOOTSTRAP_CREATED": 1000}
+        self.assertEqual([], stack_capacity.validate_evidence(data))
+
+    def test_http_failures_only_include_bounded_stable_problem_codes(self) -> None:
+        self.assertEqual(
+            "LOGIN_HTTP_400_INVALID_REQUEST",
+            stack_capacity._http_failure("LOGIN", 400, "INVALID_REQUEST"),
+        )
+        self.assertEqual(
+            "LOGIN_HTTP_502_INVALID_PROBLEM",
+            stack_capacity._http_failure("LOGIN", 502, None),
+        )
+
+    def test_only_stable_authentication_and_rate_limit_denials_are_expected(self) -> None:
+        self.assertIn((401, "AUTHENTICATION_FAILED"), stack_capacity.EXPECTED_LOGIN_DENIALS)
+        self.assertIn((429, "RATE_LIMITED"), stack_capacity.EXPECTED_LOGIN_DENIALS)
+        self.assertNotIn((429, "AUTHENTICATION_FAILED"), stack_capacity.EXPECTED_LOGIN_DENIALS)
 
     def test_rejects_placeholder_revision_unknown_keys_and_error_cardinality(self) -> None:
         data = copy.deepcopy(self.evidence)

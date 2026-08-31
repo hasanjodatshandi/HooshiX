@@ -34,6 +34,10 @@ MIN_DURATION = {"load": 60, "soak": 1800}
 MAX_DURATION = 86_400
 MAX_CONCURRENCY = 256
 MAX_BODY = 16_384
+EXPECTED_LOGIN_DENIALS = {
+    (401, "AUTHENTICATION_FAILED"),
+    (429, "RATE_LIMITED"),
+}
 
 
 def _number(value: object) -> bool:
@@ -86,6 +90,7 @@ def validate_evidence(data: object) -> list[str]:
         "min_success_percent",
         "min_cpu_headroom_percent",
         "min_memory_headroom_percent",
+        "max_consecutive_swap_active_samples",
     }
     if not isinstance(config, dict) or set(config) != config_keys:
         errors.append("configuration is invalid")
@@ -100,6 +105,11 @@ def validate_evidence(data: object) -> list[str]:
         1 <= concurrency <= MAX_CONCURRENCY
     ):
         errors.append("concurrency is outside the admissible bound")
+    swap_samples = config.get("max_consecutive_swap_active_samples")
+    if not isinstance(swap_samples, int) or isinstance(swap_samples, bool) or not (
+        2 <= swap_samples <= 60
+    ):
+        errors.append("max_consecutive_swap_active_samples is outside the admissible bound")
     for field, minimum, maximum in (
         ("p99_limit_ms", 1, 60_000),
         ("min_success_percent", 90, 100),
@@ -116,6 +126,7 @@ def validate_evidence(data: object) -> list[str]:
         "successes",
         "unexpected_failures",
         "success_percent",
+        "expected_outcomes_by_code",
         "errors_by_code",
         "latency_ms",
         "system",
@@ -138,15 +149,36 @@ def validate_evidence(data: object) -> list[str]:
         if abs(success_percent - expected_percent) > 0.001:
             errors.append("success_percent does not match operation counters")
     error_codes = results.get("errors_by_code")
-    if not isinstance(error_codes, dict) or len(error_codes) > 32 or any(
-        not isinstance(key, str)
-        or not re.fullmatch(r"[A-Z0-9_]{1,64}", key)
-        or not isinstance(value, int)
-        or isinstance(value, bool)
-        or value <= 0
-        for key, value in (error_codes.items() if isinstance(error_codes, dict) else [])
+    outcome_codes = results.get("expected_outcomes_by_code")
+    for field, counter, expected_total in (
+        ("expected_outcomes_by_code", outcome_codes, successes),
+        ("errors_by_code", error_codes, failures),
     ):
-        errors.append("errors_by_code is invalid")
+        if (
+            not isinstance(counter, dict)
+            or len(counter) > 32
+            or any(
+                not isinstance(key, str)
+                or not re.fullmatch(r"[A-Z0-9_]{1,64}", key)
+                or not isinstance(value, int)
+                or isinstance(value, bool)
+                or value <= 0
+                for key, value in (counter.items() if isinstance(counter, dict) else [])
+            )
+            or (isinstance(expected_total, int) and sum(counter.values()) != expected_total)
+        ):
+            errors.append(f"{field} is invalid")
+    expected_scenario_outcomes = {
+        "session-bootstrap": {"SESSION_BOOTSTRAP_CREATED"},
+        "invalid-login": {"AUTHENTICATION_FAILED", "RATE_LIMITED"},
+    }
+    scenario_outcomes = expected_scenario_outcomes.get(data.get("scenario"))
+    if (
+        isinstance(outcome_codes, dict)
+        and scenario_outcomes is not None
+        and set(outcome_codes) != scenario_outcomes
+    ):
+        errors.append("expected_outcomes_by_code does not prove the selected scenario")
     latency = results.get("latency_ms")
     if not isinstance(latency, dict) or set(latency) != {"p50", "p95", "p99", "max"}:
         errors.append("latency_ms is invalid")
@@ -167,6 +199,8 @@ def validate_evidence(data: object) -> list[str]:
         "max_swap_used_bytes",
         "swap_in_pages",
         "swap_out_pages",
+        "swap_active_sample_count",
+        "max_consecutive_swap_active_samples",
         "min_root_disk_free_bytes",
     }
     if not isinstance(system, dict) or set(system) != system_keys:
@@ -186,10 +220,22 @@ def validate_evidence(data: object) -> list[str]:
         "max_swap_used_bytes",
         "swap_in_pages",
         "swap_out_pages",
+        "swap_active_sample_count",
+        "max_consecutive_swap_active_samples",
         "min_root_disk_free_bytes",
     ):
         if not isinstance(system.get(field), int) or isinstance(system.get(field), bool) or system[field] < 0:
             errors.append(f"system.{field} is invalid")
+    sample_count = system.get("sample_count")
+    active_samples = system.get("swap_active_sample_count")
+    consecutive_samples = system.get("max_consecutive_swap_active_samples")
+    if (
+        isinstance(sample_count, int)
+        and isinstance(active_samples, int)
+        and isinstance(consecutive_samples, int)
+        and not (0 <= consecutive_samples <= active_samples <= sample_count)
+    ):
+        errors.append("system swap sample counters are inconsistent")
 
     reasons = data.get("failure_reasons")
     if not isinstance(reasons, list) or len(reasons) > 16 or any(
@@ -208,11 +254,12 @@ def validate_evidence(data: object) -> list[str]:
     if _number(system.get("min_memory_headroom_percent")) and _number(config.get("min_memory_headroom_percent")) and system["min_memory_headroom_percent"] < config["min_memory_headroom_percent"]:
         calculated.append("MEMORY_HEADROOM_BELOW_LIMIT")
     if (
-        isinstance(system.get("swap_in_pages"), int)
-        and isinstance(system.get("swap_out_pages"), int)
-        and system["swap_in_pages"] + system["swap_out_pages"] > 0
+        isinstance(system.get("max_consecutive_swap_active_samples"), int)
+        and isinstance(config.get("max_consecutive_swap_active_samples"), int)
+        and system["max_consecutive_swap_active_samples"]
+        >= config["max_consecutive_swap_active_samples"]
     ):
-        calculated.append("SWAP_ACTIVITY")
+        calculated.append("SUSTAINED_SWAP_ACTIVITY")
     if sorted(reasons) != sorted(calculated):
         errors.append("failure_reasons do not match measured thresholds")
     if data.get("passed") is not (not calculated):
@@ -249,7 +296,7 @@ def _swap_io() -> tuple[int, int]:
 class SystemSampler:
     def __init__(self) -> None:
         self.stop = threading.Event()
-        self.samples: list[tuple[float, float, int, int]] = []
+        self.samples: list[tuple[float, float, int, int, int, int]] = []
         self.swap_in_start, self.swap_out_start = _swap_io()
         self.thread = threading.Thread(target=self._run, name="capacity-system-sampler", daemon=True)
 
@@ -270,7 +317,8 @@ class SystemSampler:
             memory_total, memory_available, swap_used = _memory()
             memory_used = 100.0 * (memory_total - memory_available) / memory_total
             disk_free = shutil.disk_usage("/").free
-            self.samples.append((used, memory_used, swap_used, disk_free))
+            swap_in, swap_out = _swap_io()
+            self.samples.append((used, memory_used, swap_used, disk_free, swap_in, swap_out))
             previous_total, previous_idle = total, idle
 
     def result(self) -> dict[str, int | float]:
@@ -278,9 +326,23 @@ class SystemSampler:
             memory_total, memory_available, swap_used = _memory()
             memory_used = 100.0 * (memory_total - memory_available) / memory_total
             disk_free = shutil.disk_usage("/").free
-            self.samples.append((0.0, memory_used, swap_used, disk_free))
+            swap_in, swap_out = _swap_io()
+            self.samples.append((0.0, memory_used, swap_used, disk_free, swap_in, swap_out))
         cpu = [sample[0] for sample in self.samples]
         memory = [sample[1] for sample in self.samples]
+        final_swap_in, final_swap_out = _swap_io()
+        final_sample = self.samples[-1]
+        self.samples[-1] = (*final_sample[:4], final_swap_in, final_swap_out)
+        previous_in, previous_out = self.swap_in_start, self.swap_out_start
+        active_samples = 0
+        consecutive_samples = 0
+        max_consecutive_samples = 0
+        for sample in self.samples:
+            active = sample[4] > previous_in or sample[5] > previous_out
+            active_samples += int(active)
+            consecutive_samples = consecutive_samples + 1 if active else 0
+            max_consecutive_samples = max(max_consecutive_samples, consecutive_samples)
+            previous_in, previous_out = sample[4], sample[5]
         return {
             "sample_count": len(self.samples),
             "max_cpu_used_percent": round(max(cpu), 3),
@@ -288,8 +350,10 @@ class SystemSampler:
             "max_memory_used_percent": round(max(memory), 3),
             "min_memory_headroom_percent": round(100 - max(memory), 3),
             "max_swap_used_bytes": max(sample[2] for sample in self.samples),
-            "swap_in_pages": max(0, _swap_io()[0] - self.swap_in_start),
-            "swap_out_pages": max(0, _swap_io()[1] - self.swap_out_start),
+            "swap_in_pages": max(0, final_swap_in - self.swap_in_start),
+            "swap_out_pages": max(0, final_swap_out - self.swap_out_start),
+            "swap_active_sample_count": active_samples,
+            "max_consecutive_swap_active_samples": max_consecutive_samples,
             "min_root_disk_free_bytes": min(sample[3] for sample in self.samples),
         }
 
@@ -354,13 +418,26 @@ def _read_json(response: Any) -> dict[str, Any]:
     return value
 
 
+def _problem_code(response: Any) -> str | None:
+    try:
+        code = _read_json(response).get("code")
+    except (ValueError, json.JSONDecodeError):
+        return None
+    return code if isinstance(code, str) and re.fullmatch(r"[A-Z0-9_]{1,48}", code) else None
+
+
+def _http_failure(prefix: str, status: int, problem_code: str | None) -> str:
+    suffix = problem_code if problem_code is not None else "INVALID_PROBLEM"
+    return f"{prefix}_HTTP_{status}_{suffix}"
+
+
 def _request(
     base_url: str,
     scenario: str,
     ca_file: str | None,
     insecure_local: bool,
     connect_host: str | None,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     parsed = urllib.parse.urlparse(base_url)
     opener = _opener(ca_file, insecure_local, parsed.hostname or "", connect_host)
     common = {
@@ -372,14 +449,17 @@ def _request(
     bootstrap = urllib.request.Request(
         base_url + "/api/v1/auth/session/bootstrap", data=b"", headers=common, method="POST"
     )
-    with opener.open(bootstrap, timeout=10) as response:
-        if response.status != 201:
-            return f"HTTP_{response.status}"
-        document = _read_json(response)
+    try:
+        with opener.open(bootstrap, timeout=10) as response:
+            if response.status != 201:
+                return None, f"BOOTSTRAP_HTTP_{response.status}"
+            document = _read_json(response)
+    except urllib.error.HTTPError as error:
+        return None, _http_failure("BOOTSTRAP", error.code, _problem_code(error))
     if document.get("mode") != "PREAUTH" or not isinstance(document.get("csrfToken"), str):
-        return "INVALID_BOOTSTRAP"
+        return None, "INVALID_BOOTSTRAP"
     if scenario == "session-bootstrap":
-        return None
+        return "SESSION_BOOTSTRAP_CREATED", None
     payload = json.dumps(
         {
             "channel": "EMAIL",
@@ -398,11 +478,15 @@ def _request(
     )
     login = urllib.request.Request(base_url + "/api/v1/auth/local", data=payload, headers=headers, method="POST")
     try:
-        opener.open(login, timeout=10)
-        return "UNEXPECTED_LOGIN_SUCCESS"
+        with opener.open(login, timeout=10):
+            pass
+        return None, "UNEXPECTED_LOGIN_SUCCESS"
     except urllib.error.HTTPError as error:
-        document = _read_json(error)
-        return None if error.code == 401 and document.get("code") == "AUTHENTICATION_FAILED" else f"HTTP_{error.code}"
+        problem_code = _problem_code(error)
+        denial = (error.code, problem_code)
+        if denial in EXPECTED_LOGIN_DENIALS:
+            return str(problem_code), None
+        return None, _http_failure("LOGIN", error.code, problem_code)
 
 
 def _percentile(values: list[float], percent: float) -> float:
@@ -422,13 +506,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     deadline = time.monotonic() + args.duration_seconds
     latencies: list[float] = []
     errors: Counter[str] = Counter()
+    expected_outcomes: Counter[str] = Counter()
     lock = threading.Lock()
 
     def worker() -> None:
         while time.monotonic() < deadline:
             before = time.monotonic()
             try:
-                error = _request(
+                outcome, error = _request(
                     base_url,
                     args.scenario,
                     args.ca_file,
@@ -436,10 +521,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                     args.connect_host,
                 )
             except (OSError, ValueError, json.JSONDecodeError) as exception:
+                outcome = None
                 error = type(exception).__name__.upper()
             elapsed = (time.monotonic() - before) * 1000
             with lock:
                 latencies.append(elapsed)
+                if outcome:
+                    expected_outcomes[outcome] += 1
                 if error:
                     errors[re.sub(r"[^A-Z0-9_]", "_", error.upper())[:64]] += 1
 
@@ -465,8 +553,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         reasons.append("CPU_HEADROOM_BELOW_LIMIT")
     if system["min_memory_headroom_percent"] < args.min_memory_headroom_percent:
         reasons.append("MEMORY_HEADROOM_BELOW_LIMIT")
-    if system["swap_in_pages"] + system["swap_out_pages"] > 0:
-        reasons.append("SWAP_ACTIVITY")
+    if (
+        system["max_consecutive_swap_active_samples"]
+        >= args.max_consecutive_swap_active_samples
+    ):
+        reasons.append("SUSTAINED_SWAP_ACTIVITY")
     evidence = {
         "schema": SCHEMA,
         "profile": args.profile,
@@ -482,12 +573,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "min_success_percent": args.min_success_percent,
             "min_cpu_headroom_percent": args.min_cpu_headroom_percent,
             "min_memory_headroom_percent": args.min_memory_headroom_percent,
+            "max_consecutive_swap_active_samples": args.max_consecutive_swap_active_samples,
         },
         "results": {
             "operations": operations,
             "successes": successes,
             "unexpected_failures": failures,
             "success_percent": success_percent,
+            "expected_outcomes_by_code": dict(sorted(expected_outcomes.items())),
             "errors_by_code": dict(sorted(errors.items())),
             "latency_ms": {
                 "p50": _percentile(latency, 0.50),
@@ -535,6 +628,7 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--min-success-percent", type=float, default=99.0)
     execute.add_argument("--min-cpu-headroom-percent", type=float, default=30.0)
     execute.add_argument("--min-memory-headroom-percent", type=float, default=30.0)
+    execute.add_argument("--max-consecutive-swap-active-samples", type=int, default=5)
     execute.add_argument("--ca-file")
     execute.add_argument("--connect-host")
     execute.add_argument("--insecure-local-staging", action="store_true")
