@@ -318,6 +318,7 @@ class _LoopbackHTTPSHandler(urllib.request.HTTPSHandler):
                 host, connect_host=self.connect_host, **kwargs
             ),
             request,
+            context=self._context,
         )
 
 

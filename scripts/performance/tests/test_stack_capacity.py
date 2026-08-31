@@ -96,6 +96,10 @@ class StackCapacityEvidenceTest(unittest.TestCase):
             stack_capacity._opener(None, False, "hooshix.local", "192.0.2.10")
         opener = stack_capacity._opener(None, True, "hooshix.local", "127.0.0.1")
         self.assertIsNotNone(opener)
+        handler = next(
+            item for item in opener.handlers if isinstance(item, stack_capacity._LoopbackHTTPSHandler)
+        )
+        self.assertEqual(stack_capacity.ssl.CERT_NONE, handler._context.verify_mode)
 
 
 if __name__ == "__main__":
