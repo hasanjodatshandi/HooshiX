@@ -7,12 +7,15 @@ import argparse
 import concurrent.futures
 import contextlib
 import datetime as dt
+import http.client
 import http.cookiejar
+import ipaddress
 import json
 import math
 import os
 import re
 import shutil
+import socket
 import ssl
 import subprocess
 import tempfile
@@ -268,16 +271,52 @@ class SystemSampler:
         }
 
 
-def _opener(ca_file: str | None, insecure_local: bool, host: str) -> urllib.request.OpenerDirector:
+class _LoopbackHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, host: str, *, connect_host: str, **kwargs: Any) -> None:
+        super().__init__(host, **kwargs)
+        self.connect_host = connect_host
+
+    def connect(self) -> None:
+        raw = socket.create_connection((self.connect_host, self.port), self.timeout, self.source_address)
+        if self._tunnel_host:
+            self.sock = raw
+            self._tunnel()
+        self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+
+
+class _LoopbackHTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, context: ssl.SSLContext, connect_host: str) -> None:
+        super().__init__(context=context)
+        self.connect_host = connect_host
+
+    def https_open(self, request: urllib.request.Request) -> Any:
+        return self.do_open(
+            lambda host, **kwargs: _LoopbackHTTPSConnection(
+                host, connect_host=self.connect_host, **kwargs
+            ),
+            request,
+        )
+
+
+def _opener(
+    ca_file: str | None, insecure_local: bool, host: str, connect_host: str | None
+) -> urllib.request.OpenerDirector:
     if insecure_local:
         if host not in {"hooshix.local", "localhost", "127.0.0.1"}:
             raise ValueError("insecure TLS is restricted to the local staging host")
         context = ssl._create_unverified_context()
     else:
         context = ssl.create_default_context(cafile=ca_file)
+    handler: urllib.request.BaseHandler
+    if connect_host:
+        if not ipaddress.ip_address(connect_host).is_loopback:
+            raise ValueError("connect host override must be a loopback IP address")
+        handler = _LoopbackHTTPSHandler(context, connect_host)
+    else:
+        handler = urllib.request.HTTPSHandler(context=context)
     return urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
-        urllib.request.HTTPSHandler(context=context),
+        handler,
     )
 
 
@@ -291,9 +330,15 @@ def _read_json(response: Any) -> dict[str, Any]:
     return value
 
 
-def _request(base_url: str, scenario: str, ca_file: str | None, insecure_local: bool) -> str | None:
+def _request(
+    base_url: str,
+    scenario: str,
+    ca_file: str | None,
+    insecure_local: bool,
+    connect_host: str | None,
+) -> str | None:
     parsed = urllib.parse.urlparse(base_url)
-    opener = _opener(ca_file, insecure_local, parsed.hostname or "")
+    opener = _opener(ca_file, insecure_local, parsed.hostname or "", connect_host)
     common = {
         "Origin": base_url,
         "Sec-Fetch-Site": "same-origin",
@@ -359,7 +404,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         while time.monotonic() < deadline:
             before = time.monotonic()
             try:
-                error = _request(base_url, args.scenario, args.ca_file, args.insecure_local_staging)
+                error = _request(
+                    base_url,
+                    args.scenario,
+                    args.ca_file,
+                    args.insecure_local_staging,
+                    args.connect_host,
+                )
             except (OSError, ValueError, json.JSONDecodeError) as exception:
                 error = type(exception).__name__.upper()
             elapsed = (time.monotonic() - before) * 1000
@@ -461,6 +512,7 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--min-cpu-headroom-percent", type=float, default=30.0)
     execute.add_argument("--min-memory-headroom-percent", type=float, default=30.0)
     execute.add_argument("--ca-file")
+    execute.add_argument("--connect-host")
     execute.add_argument("--insecure-local-staging", action="store_true")
     execute.add_argument("--output", type=Path, required=True)
     return root

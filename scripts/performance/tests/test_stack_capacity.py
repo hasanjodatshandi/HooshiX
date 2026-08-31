@@ -80,6 +80,12 @@ class StackCapacityEvidenceTest(unittest.TestCase):
         self.assertTrue(any("git_revision" in error for error in errors))
         self.assertTrue(any("errors_by_code" in error for error in errors))
 
+    def test_connect_override_is_restricted_to_loopback(self) -> None:
+        with self.assertRaisesRegex(ValueError, "loopback"):
+            stack_capacity._opener(None, False, "hooshix.local", "192.0.2.10")
+        opener = stack_capacity._opener(None, True, "hooshix.local", "127.0.0.1")
+        self.assertIsNotNone(opener)
+
 
 if __name__ == "__main__":
     unittest.main()

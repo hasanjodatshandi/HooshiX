@@ -7,6 +7,7 @@ This matrix records production technology combinations that must remain compatib
 | Java | 25 LTS | Spring Boot/application libraries support Java 25 |
 | Spring Boot | 4.1.0 | Java 25; Gradle 9.x; Spring MVC/Virtual Threads; Micrometer Observation/Tracing |
 | Gradle | 9.6.1 | selected Spring Boot build plugin/toolchain |
+| JaCoCo / PIT | 0.8.15 / 1.22.1 | Java 25/Gradle 9.6.1; Gradle PIT plugin 1.19.0 and PIT JUnit 5 plugin 1.2.3; combined unit/integration coverage and selective mutation thresholds remain blocking |
 | gRPC Java | 1.83.1 | Java 25; Protobuf/runtime/stubs/codegen/testing aligned; Netty transport stream-limit enforcement retained and bounded server concurrency configured where applicable |
 | Protobuf / Protovalidate Java | 4.34.2 / 1.2.2 | gRPC 1.83.1 and Java 25; generated v1 schemas, CEL rules, consumer examples, and server interceptor tests aligned |
 | Gitleaks CLI | 8.30.0 | ADR-0045 current-tree + Git-history secret scan; reviewed fallback from defective 8.30.1; redacted output; immutable official image digest and positive detection control pinned in CI |

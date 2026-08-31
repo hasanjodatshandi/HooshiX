@@ -34,6 +34,22 @@ Semgrep, Gitleaks, Gradle verification, and OSV-Scanner protect different failur
 
 Do not disable a gate, broaden suppression, or set `ignoreFailures` merely to pass CI.
 
+Every Java service executes `jacocoRiskCoverage` in its protected workflow. The task
+combines unit and integration execution data, applies a measured global baseline,
+and applies higher line/branch thresholds to service-owned risk classes. Identity
+also executes selective PIT mutation against password-recovery HMAC,
+ExternalIdentity AES-GCM, and erasure authorization/state handling. Web BFF executes
+selective PIT mutation against browser security filtering, session cryptography,
+trusted client-address handling, and OIDC clock safety. These mutation scopes are
+deliberately narrow; a broad low-signal mutation score is not substituted for the
+selected security-state evidence.
+
+The frontend protected workflow executes `npm run test:coverage`. Vitest/V8 applies
+the measured repository baseline and higher thresholds to problem normalization,
+the application reducer, browser storage failure handling, and user-input
+validation. Raising the baseline follows new tested behavior; lowering any threshold
+requires a reviewed regression rationale and replacement evidence.
+
 ## 3. Contract compatibility
 
 - Protobuf: Buf lint + breaking; field numbers never reused.
@@ -284,6 +300,21 @@ Record:
 - reboot/recovery and external-monitor behavior.
 
 Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memory headroom, applicable >=2x critical/security load, safe concurrent WAL+AOF+Kafka+telemetry IO, and no security/admission/backup/observability bypass.
+
+Repository execution uses `scripts/performance/stack_capacity.py`. `load` evidence
+requires at least 60 seconds and `soak` evidence at least 1,800 seconds; concurrency,
+response size, TLS behavior, latency, success rate, CPU/memory reserve, swap, disk,
+Git revision, and evidence shape are bounded and validated. The local staging suite
+is `scripts/performance/staging_capacity_suite.sh`; it targets only credential-free
+session bootstrap and a fixed invalid-login identity and writes Git-ignored aggregate
+evidence. A passing local run is staging evidence, not Production sizing evidence.
+
+`scripts/performance/external_runtime_evidence.py` rejects fixture-corpus claims,
+stale or incomplete HIBP measurements, unexecuted Google/Liara/IPPanel paths,
+missing ambiguity/failure checks, partial four-participant erasure, or evidence that
+contains unknown fields such as credentials. Passing its unit tests proves only the
+claim validator. The external evidence itself remains `Not verified` until real
+approved inputs and staging execution produce and validate a record.
 
 ## 18. CI/CD ordering
 

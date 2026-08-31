@@ -48,6 +48,8 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Trace export protocol | OTLP | services -> approved internal Collector |
 | Logging | structured JSON stdout + ADR-0031 controls | allow-list/redaction/canary/runtime detection |
 | Backend test | JUnit 5 + Testcontainers | service locks |
+| Java coverage | JaCoCo 0.8.15 | combined unit/integration risk thresholds in every Java service |
+| Selective mutation | Gradle PIT plugin 1.19.0 / PIT 1.22.1 / PIT JUnit 5 plugin 1.2.3 | Identity cryptography/erasure and BFF browser-edge security only; measured baselines are blocking |
 | Architecture test | ArchUnit | mandatory Java architecture rules |
 | Formatting | Spotless + one approved pinned formatter | exact plugin/formatter in build metadata |
 | Java bug analysis | SpotBugs | blocking production-code gate |
@@ -57,7 +59,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Repository source lint | ShellCheck 0.11.0 + actionlint 1.7.12 + Ruff 0.16.5 | checksum-pinned official Linux/x64 artifacts; selected high-signal shell, GitHub Actions, and Python source checks in repository baseline CI |
 | CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
 | BDD | Cucumber-JVM + Gherkin | critical behavior only |
-| Frontend unit/component | Vitest + React Testing Library | frontend lockfile |
+| Frontend unit/component | Vitest 4.1.11 + `@vitest/coverage-v8` 4.1.11 + React Testing Library | exact frontend lockfile; global baseline plus higher risk-module thresholds |
 | Browser E2E | Playwright Test + TypeScript | frontend lockfile |
 
 ## 2. Platform baseline
