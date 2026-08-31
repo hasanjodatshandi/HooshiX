@@ -144,8 +144,12 @@ Erasure recovery is a traffic-opening gate, not an ordinary best-effort Kafka ca
    timestamps, and operator/incident authorization before reopening traffic.
 
 In the developer-only integrated runtime, `python3 scripts/local/runtime.py smoke-erasure` provides
-an executable four-participant Kafka reconciliation smoke with synthetic UUID-only test state. It is
-not production recovery evidence.
+an executable four-participant Kafka reconciliation smoke with synthetic UUID-only test state.
+`python3 scripts/local/runtime.py smoke-erasure-recovery` additionally stops local traffic, captures
+the four local service databases before completion, verifies completion across a full service
+restart, restores that pre-completion state, and requires the original durable Outbox/Kafka/Inbox
+workflow to reconcile to completion again without identity reappearance. Both commands are local
+evidence only, not staging or Production recovery evidence.
 - record broker-local loss window.
 
 ## 8. Istio/Kyverno

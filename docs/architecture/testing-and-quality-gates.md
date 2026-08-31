@@ -315,6 +315,12 @@ is `scripts/performance/staging_capacity_suite.sh`; it targets only credential-f
 session bootstrap and a fixed invalid-login identity and writes Git-ignored aggregate
 evidence. A passing local run is staging evidence, not Production sizing evidence.
 
+The developer-only integrated runtime separately exposes
+`make local-runtime-smoke-erasure-recovery`. It verifies four-participant terminal evidence across
+service redeploy and an isolated restore of the generated local databases followed by normal
+Outbox/Kafka/Inbox replay. It never satisfies the `staging` erasure fields in the external-runtime
+aggregate and is not Production restore evidence.
+
 `scripts/performance/external_runtime_evidence.py` rejects fixture-corpus claims,
 stale or incomplete HIBP measurements, unexecuted Google/Liara/IPPanel paths,
 missing ambiguity/failure checks, partial four-participant erasure, or evidence that

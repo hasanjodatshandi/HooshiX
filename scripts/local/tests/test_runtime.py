@@ -72,6 +72,15 @@ class LocalRuntimeContractTest(unittest.TestCase):
         for prohibited in ("email", "phone", "first_name", "last_name", "contact"):
             self.assertNotIn(prohibited, sql.lower())
 
+    def test_erasure_recovery_dump_is_clean_and_restricted_to_owned_databases(self):
+        args = runtime.pg_dump_args("identity")
+        self.assertIn("pg_dump", args)
+        self.assertIn("--format=plain", args)
+        self.assertIn("--clean", args)
+        self.assertIn("--if-exists", args)
+        with self.assertRaisesRegex(ValueError, "outside"):
+            runtime.pg_dump_args("postgres")
+
     def test_symmetric_key_ring_is_reused_across_startups(self):
         original_keys = runtime.KEYS
         try:
