@@ -79,6 +79,29 @@ no security/admission/backup/audit/network-trust/observability bypass
 
 If it fails, tune safe cardinality/retention/concurrency, add CPU/RAM/SSD/network, externalize ordinary observability, or move HA. Do not remove OpenBao/Kyverno/Ambient/PITR/MFA/WAF/fail-closed controls or required audit.
 
+### Executable staging evidence
+
+Run the repository-owned bounded suite only after the production-fidelity lane is
+healthy:
+
+```bash
+make production-fidelity-verify
+scripts/performance/staging_capacity_suite.sh
+```
+
+It records a 60-second invalid-login load and a 30-minute session-bootstrap soak,
+with >=30% CPU and memory headroom, no sustained swap activity (five consecutive
+one-second swap-active samples), finite latency limits, exact expected security-outcome
+counts, and exact Git
+revision. Evidence is written below `.platform-runtime/stage7/capacity/` and is
+validated again after execution. The loopback connection override preserves the
+`hooshix.local` TLS/Host identity and refuses non-loopback destinations.
+
+This suite is a safe, repeatable staging lower bound. It does not measure the
+Production K3s host, Production HIBP corpus, real providers, backups, external host
+monitor, or the full WAL/AOF/Kafka/telemetry concurrent-IO envelope. Those claims
+remain `NOT VERIFIED` until their owning environment executes the complete register.
+
 ## 2. Semantic quota attack capacity
 
 Normal user load is insufficient capacity evidence because attacker-selected unique inputs can grow Redis security state.

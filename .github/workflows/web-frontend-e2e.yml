@@ -72,7 +72,8 @@ jobs:
           fi
           docker run "${common[@]}" "${SEMGREP_IMAGE}" "${scan[@]}" .semgrep/fixtures/web-frontend-negative.tsx
       - run: npm run check:api
-      - run: npm run test:components
+      - name: Verify component tests and risk-based coverage thresholds
+        run: npm run test:coverage
       - run: npx playwright install --with-deps
       - run: npm run build
       - name: Build and smoke-test hardened frontend image

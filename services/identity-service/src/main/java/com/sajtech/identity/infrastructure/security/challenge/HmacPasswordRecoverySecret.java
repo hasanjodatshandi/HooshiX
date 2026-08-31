@@ -35,10 +35,8 @@ public final class HmacPasswordRecoverySecret implements PasswordRecoverySecretP
 
   @Override
   public boolean matches(UUID challengeId, String code, byte[] storedVerifier, String keyId) {
-    if (code == null
-        || !CODE.matcher(code).matches()
-        || storedVerifier == null
-        || storedVerifier.length != 32) return false;
+    if (code == null || storedVerifier == null || storedVerifier.length != 32) return false;
+    if (!CODE.matcher(code).matches()) return false;
     byte[] computed = mac(keys.key(keyId), challengeId, code);
     try {
       return MessageDigest.isEqual(computed, storedVerifier);

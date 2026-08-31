@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: baseline-test baseline-verify script-static-verify platform-test production-test production-verify context-test context-verify context-bootstrap context-matrix-check context-post-merge-verify local-runtime-test local-runtime-up local-runtime-status local-runtime-smoke-erasure local-runtime-logs local-runtime-down local-runtime-reset kind-inotify-configure kind-inotify-verify local-cluster-up local-cluster-verify local-cluster-delete local-istio-ambient-install verify-local-istio-ambient local-istio-ambient-delete local-kyverno-install verify-local-kyverno local-traefik-edge-install verify-local-traefik-edge local-traefik-edge-delete local-observability-install verify-local-observability staging-data-install staging-build staging-deploy staging-verify production-fidelity-up production-fidelity-verify production-fidelity-down
+.PHONY: baseline-test baseline-verify script-static-verify platform-test performance-test production-test production-verify context-test context-verify context-bootstrap context-matrix-check context-post-merge-verify local-runtime-test local-runtime-up local-runtime-status local-runtime-smoke-erasure local-runtime-smoke-erasure-recovery local-runtime-logs local-runtime-down local-runtime-reset kind-inotify-configure kind-inotify-verify local-cluster-up local-cluster-verify local-cluster-delete local-istio-ambient-install verify-local-istio-ambient local-istio-ambient-delete local-kyverno-install verify-local-kyverno local-traefik-edge-install verify-local-traefik-edge local-traefik-edge-delete local-observability-install verify-local-observability staging-data-install staging-build staging-deploy staging-verify production-fidelity-up production-fidelity-verify production-fidelity-down
 
 baseline-test:
 	$(PYTHON) -m unittest discover -s scripts/baseline/tests -p 'test_*.py'
@@ -10,6 +10,9 @@ script-static-verify:
 
 platform-test:
 	$(PYTHON) -m unittest discover -s scripts/platform/tests -p 'test_*.py'
+
+performance-test:
+	$(PYTHON) -m unittest discover -s scripts/performance/tests -p 'test_*.py'
 
 production-test:
 	$(PYTHON) -m unittest discover -s scripts/production/tests -p 'test_*.py'
@@ -40,7 +43,7 @@ context-matrix-check:
 	}; \
 	rm -f $$tmp_file
 
-baseline-verify: baseline-test platform-test production-verify context-test context-verify context-matrix-check local-runtime-test
+baseline-verify: baseline-test platform-test performance-test production-verify context-test context-verify context-matrix-check local-runtime-test
 	$(PYTHON) scripts/baseline/verify_repository.py
 
 local-runtime-test:
@@ -54,6 +57,9 @@ local-runtime-status:
 
 local-runtime-smoke-erasure:
 	$(PYTHON) scripts/local/runtime.py smoke-erasure
+
+local-runtime-smoke-erasure-recovery:
+	$(PYTHON) scripts/local/runtime.py smoke-erasure-recovery
 
 local-runtime-logs:
 	$(PYTHON) scripts/local/runtime.py logs

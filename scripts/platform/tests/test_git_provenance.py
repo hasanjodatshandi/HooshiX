@@ -36,4 +36,14 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   install=(REPO_ROOT/"scripts/platform/staging_data_install.sh").read_text()
   self.assertLess(install.index("networkpolicy.yaml"),install.index("data.yaml")); self.assertLess(install.index("authorizationpolicy.yaml"),install.index("data.yaml"))
   policy=(REPO_ROOT/"infrastructure/staging/networkpolicy.yaml").read_text(); self.assertIn("name: postgres-bootstrap",policy); self.assertIn("policyTypes: [Ingress, Egress]",policy)
+ def test_identity_staging_binds_every_required_key_ring(self):
+  values=(REPO_ROOT/"deploy/staging/identity-service.yaml").read_text()
+  for secret in ("identity-fingerprint","identity-challenge","identity-handoff","identity-mfa","identity-quota","identity-refresh","identity-jwt-private"):
+   self.assertIn(secret,values)
+ def test_web_bff_staging_owns_distinct_database_credentials(self):
+  values=(REPO_ROOT/"deploy/staging/web-bff.yaml").read_text()
+  for value in ("/web_bff","web-bff-db-migration","web-bff-db-runtime"):
+   self.assertIn(value,values)
+  secrets=(REPO_ROOT/"scripts/platform/staging_secrets_apply.sh").read_text()
+  self.assertEqual(2,secrets.count("web-bff-db-migration")); self.assertEqual(2,secrets.count("web-bff-db-runtime"))
 if __name__=="__main__": unittest.main()

@@ -107,7 +107,8 @@ Engineering Hardening Stage 7 — Performance, reliability, and test evidence
 ```
 
 Its completion boundary and interruption-safe status are owned by
-`ENGINEERING-HARDENING-ROADMAP.md`. Stage 6 is complete; Stage 7 has not started.
+`ENGINEERING-HARDENING-ROADMAP.md`. Stage 6 is complete; Stage 7 is in progress and
+remains incomplete until its repository evidence boundary is fully verified.
 Conversation implementation remains ordered after hardening stages 1-8. Its future
 target invariant remains:
 

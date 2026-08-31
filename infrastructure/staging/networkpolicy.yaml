@@ -12,6 +12,8 @@ spec:
           podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: notification-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-data}}
           podSelector: {matchLabels: {app.kubernetes.io/name: postgres-bootstrap}}
       ports: [{protocol: TCP, port: 5432}, {protocol: TCP, port: 15008}]

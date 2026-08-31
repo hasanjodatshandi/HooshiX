@@ -2,6 +2,7 @@ import com.github.spotbugs.snom.SpotBugsExtension
 
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.1.0"
     id("com.google.protobuf") version "0.10.0"
     id("com.diffplug.spotless") version "8.9.0"
@@ -16,6 +17,8 @@ java {
         languageVersion = JavaLanguageVersion.of(25)
     }
 }
+
+jacoco { toolVersion = "0.8.15" }
 
 dependencies {
     implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
@@ -139,6 +142,58 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     shouldRunAfter(tasks.test)
 }
 
+val jacocoRiskReport = tasks.register<JacocoReport>("jacocoRiskReport") {
+    description = "Generates combined unit and integration coverage evidence."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(tasks.test, integrationTest)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/integrationTest.exec"),
+    )
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(sourceSets.main.get().output)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+val jacocoRiskCoverage = tasks.register<JacocoCoverageVerification>("jacocoRiskCoverage") {
+    description = "Enforces the measured service baseline and critical delivery coverage."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    dependsOn(jacocoRiskReport)
+    executionData(
+        layout.buildDirectory.file("jacoco/test.exec"),
+        layout.buildDirectory.file("jacoco/integrationTest.exec"),
+    )
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(sourceSets.main.get().output)
+    violationRules {
+        rule {
+            limit { counter = "LINE"; minimum = "0.51".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.44".toBigDecimal() }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf(
+                "com.sajtech.notification.domain.notification.service.NotificationStateMachine",
+                "com.sajtech.notification.domain.notification.service.ProviderRetryPolicy",
+                "com.sajtech.notification.application.delivery.service.ProviderAttemptPlanner",
+                "com.sajtech.notification.application.delivery.usecase.RunReconciliationBatchService",
+            )
+            limit { counter = "LINE"; minimum = "0.76".toBigDecimal() }
+            limit { counter = "BRANCH"; minimum = "0.58".toBigDecimal() }
+        }
+    }
+}
+
 tasks.check {
-    dependsOn(integrationTest, architectureTest, tasks.named("spotbugsMain"), tasks.named("spotlessCheck"))
+    dependsOn(
+        integrationTest,
+        architectureTest,
+        jacocoRiskCoverage,
+        tasks.named("spotbugsMain"),
+        tasks.named("spotlessCheck"),
+    )
 }
