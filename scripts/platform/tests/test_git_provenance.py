@@ -44,4 +44,6 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   values=(REPO_ROOT/"deploy/staging/web-bff.yaml").read_text()
   for value in ("/web_bff","web-bff-db-migration","web-bff-db-runtime"):
    self.assertIn(value,values)
+  secrets=(REPO_ROOT/"scripts/platform/staging_secrets_apply.sh").read_text()
+  self.assertEqual(2,secrets.count("web-bff-db-migration")); self.assertEqual(2,secrets.count("web-bff-db-runtime"))
 if __name__=="__main__": unittest.main()
