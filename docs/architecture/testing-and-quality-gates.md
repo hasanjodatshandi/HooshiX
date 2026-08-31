@@ -320,6 +320,9 @@ The developer-only integrated runtime separately exposes
 service redeploy and an isolated restore of the generated local databases followed by normal
 Outbox/Kafka/Inbox replay. It never satisfies the `staging` erasure fields in the external-runtime
 aggregate and is not Production restore evidence.
+Its successful aggregate receipt is stored outside Git at
+`.local-runtime/erasure-recovery-evidence.json`; the closed receipt contains no User,
+request, event, provider, or contact identifier and is bound to the full Git revision.
 
 `scripts/performance/external_runtime_evidence.py` rejects fixture-corpus claims,
 stale or incomplete HIBP measurements, unexecuted Google/Liara/IPPanel paths,

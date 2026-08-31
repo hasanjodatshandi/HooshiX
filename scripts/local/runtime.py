@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime as dt
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ LOGS = RUNTIME / "logs"
 PIDS = RUNTIME / "pids"
 DATASET = RUNTIME / "compromised-password"
 HOST_TIME = RUNTIME / "host-time-status"
+ERASURE_RECOVERY_EVIDENCE = RUNTIME / "erasure-recovery-evidence.json"
 POSTGRES_PORT = 15432
 REDIS_PORT = 16379
 KAFKA_PORT = 19092
@@ -382,6 +384,37 @@ def restore_erasure_databases(snapshots: dict[str, Path]) -> None:
             )
 
 
+def erasure_recovery_evidence(revision: str) -> dict[str, object]:
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise ValueError("recovery evidence requires a full Git revision")
+    return {
+        "schema": "hooshix-local-erasure-recovery-v1",
+        "git_revision": revision,
+        "environment": "developer-local",
+        "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "redeploy_completed": True,
+        "restore_reconciliation_completed": True,
+        "participant_count": 4,
+        "identity_deleted": True,
+        "no_reappearance": True,
+        "passed": True,
+    }
+
+
+def write_private_json(path: Path, value: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        temporary.chmod(0o600)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def smoke_erasure_recovery(timeout_seconds: int = 120) -> None:
     status(require_ready=True)
     user_id, request_id, event_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
@@ -404,18 +437,9 @@ def smoke_erasure_recovery(timeout_seconds: int = 120) -> None:
         wait_for_erasure(user_id, request_id, timeout_seconds)
         verify_erasure_participant_evidence(request_id)
 
-    revision = output(["git", "rev-parse", "HEAD"])
-    print(json.dumps({
-        "schema": "hooshix-local-erasure-recovery-v1",
-        "git_revision": revision,
-        "environment": "developer-local",
-        "redeploy_completed": True,
-        "restore_reconciliation_completed": True,
-        "participant_count": 4,
-        "identity_deleted": True,
-        "no_reappearance": True,
-        "passed": True,
-    }, indent=2))
+    evidence = erasure_recovery_evidence(output(["git", "rev-parse", "HEAD"]))
+    write_private_json(ERASURE_RECOVERY_EVIDENCE, evidence)
+    print(json.dumps(evidence, indent=2))
 
 
 def provision_databases(values: dict[str, str]) -> None:

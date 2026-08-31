@@ -50,3 +50,5 @@ the pre-completion snapshots while traffic is stopped, and requires normal Outbo
 Inbox reconciliation to complete the original request again. Snapshot files are mode
 `0600`, temporary, and removed after the run. It never targets databases outside the
 generated `.local-runtime` lane and is not staging or Production restore evidence.
+On success it atomically writes a mode-`0600`, identifier-free aggregate receipt to
+`.local-runtime/erasure-recovery-evidence.json`, bound to the exact Git revision.

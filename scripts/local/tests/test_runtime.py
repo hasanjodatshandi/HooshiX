@@ -81,6 +81,16 @@ class LocalRuntimeContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside"):
             runtime.pg_dump_args("postgres")
 
+    def test_erasure_recovery_evidence_is_aggregate_and_commit_bound(self):
+        evidence = runtime.erasure_recovery_evidence("a" * 40)
+        self.assertEqual("developer-local", evidence["environment"])
+        self.assertEqual(4, evidence["participant_count"])
+        self.assertTrue(evidence["passed"])
+        self.assertNotIn("user_id", evidence)
+        self.assertNotIn("erasure_request_id", evidence)
+        with self.assertRaisesRegex(ValueError, "full Git revision"):
+            runtime.erasure_recovery_evidence("main")
+
     def test_symmetric_key_ring_is_reused_across_startups(self):
         original_keys = runtime.KEYS
         try:
