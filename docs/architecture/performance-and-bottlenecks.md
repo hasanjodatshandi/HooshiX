@@ -90,7 +90,7 @@ scripts/performance/staging_capacity_suite.sh
 ```
 
 It records a 60-second invalid-login load and a 30-minute session-bootstrap soak,
-with >=30% CPU and memory headroom, no swap, finite latency limits, and exact Git
+with >=30% CPU and memory headroom, no measured swap activity, finite latency limits, and exact Git
 revision. Evidence is written below `.platform-runtime/stage7/capacity/` and is
 validated again after execution. The loopback connection override preserves the
 `hooshix.local` TLS/Host identity and refuses non-loopback destinations.

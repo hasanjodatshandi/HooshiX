@@ -43,6 +43,8 @@ class StackCapacityEvidenceTest(unittest.TestCase):
                     "max_memory_used_percent": 57,
                     "min_memory_headroom_percent": 43,
                     "max_swap_used_bytes": 0,
+                    "swap_in_pages": 0,
+                    "swap_out_pages": 0,
                     "min_root_disk_free_bytes": 10_000_000_000,
                 },
             },
@@ -67,6 +69,15 @@ class StackCapacityEvidenceTest(unittest.TestCase):
         data["results"]["system"]["max_memory_used_percent"] = 71
         self.assertTrue(any("failure_reasons" in error for error in stack_capacity.validate_evidence(data)))
         data["failure_reasons"] = ["MEMORY_HEADROOM_BELOW_LIMIT"]
+        data["passed"] = False
+        self.assertEqual([], stack_capacity.validate_evidence(data))
+
+    def test_swap_occupancy_is_recorded_but_only_interval_activity_fails(self) -> None:
+        data = copy.deepcopy(self.evidence)
+        data["results"]["system"]["max_swap_used_bytes"] = 1_000_000
+        self.assertEqual([], stack_capacity.validate_evidence(data))
+        data["results"]["system"]["swap_out_pages"] = 1
+        data["failure_reasons"] = ["SWAP_ACTIVITY"]
         data["passed"] = False
         self.assertEqual([], stack_capacity.validate_evidence(data))
 

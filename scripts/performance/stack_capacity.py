@@ -165,6 +165,8 @@ def validate_evidence(data: object) -> list[str]:
         "max_memory_used_percent",
         "min_memory_headroom_percent",
         "max_swap_used_bytes",
+        "swap_in_pages",
+        "swap_out_pages",
         "min_root_disk_free_bytes",
     }
     if not isinstance(system, dict) or set(system) != system_keys:
@@ -180,7 +182,12 @@ def validate_evidence(data: object) -> list[str]:
     ):
         if not _number(system.get(field)) or not 0 <= system[field] <= 100:
             errors.append(f"system.{field} is invalid")
-    for field in ("max_swap_used_bytes", "min_root_disk_free_bytes"):
+    for field in (
+        "max_swap_used_bytes",
+        "swap_in_pages",
+        "swap_out_pages",
+        "min_root_disk_free_bytes",
+    ):
         if not isinstance(system.get(field), int) or isinstance(system.get(field), bool) or system[field] < 0:
             errors.append(f"system.{field} is invalid")
 
@@ -200,8 +207,12 @@ def validate_evidence(data: object) -> list[str]:
         calculated.append("CPU_HEADROOM_BELOW_LIMIT")
     if _number(system.get("min_memory_headroom_percent")) and _number(config.get("min_memory_headroom_percent")) and system["min_memory_headroom_percent"] < config["min_memory_headroom_percent"]:
         calculated.append("MEMORY_HEADROOM_BELOW_LIMIT")
-    if isinstance(system.get("max_swap_used_bytes"), int) and system["max_swap_used_bytes"] > 0:
-        calculated.append("SWAP_USED")
+    if (
+        isinstance(system.get("swap_in_pages"), int)
+        and isinstance(system.get("swap_out_pages"), int)
+        and system["swap_in_pages"] + system["swap_out_pages"] > 0
+    ):
+        calculated.append("SWAP_ACTIVITY")
     if sorted(reasons) != sorted(calculated):
         errors.append("failure_reasons do not match measured thresholds")
     if data.get("passed") is not (not calculated):
@@ -226,10 +237,20 @@ def _memory() -> tuple[int, int, int]:
     return total, available, swap_used
 
 
+def _swap_io() -> tuple[int, int]:
+    values: dict[str, int] = {}
+    for line in Path("/proc/vmstat").read_text(encoding="ascii").splitlines():
+        key, raw = line.split()
+        if key in {"pswpin", "pswpout"}:
+            values[key] = int(raw)
+    return values.get("pswpin", 0), values.get("pswpout", 0)
+
+
 class SystemSampler:
     def __init__(self) -> None:
         self.stop = threading.Event()
         self.samples: list[tuple[float, float, int, int]] = []
+        self.swap_in_start, self.swap_out_start = _swap_io()
         self.thread = threading.Thread(target=self._run, name="capacity-system-sampler", daemon=True)
 
     def __enter__(self) -> "SystemSampler":
@@ -267,6 +288,8 @@ class SystemSampler:
             "max_memory_used_percent": round(max(memory), 3),
             "min_memory_headroom_percent": round(100 - max(memory), 3),
             "max_swap_used_bytes": max(sample[2] for sample in self.samples),
+            "swap_in_pages": max(0, _swap_io()[0] - self.swap_in_start),
+            "swap_out_pages": max(0, _swap_io()[1] - self.swap_out_start),
             "min_root_disk_free_bytes": min(sample[3] for sample in self.samples),
         }
 
@@ -441,8 +464,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         reasons.append("CPU_HEADROOM_BELOW_LIMIT")
     if system["min_memory_headroom_percent"] < args.min_memory_headroom_percent:
         reasons.append("MEMORY_HEADROOM_BELOW_LIMIT")
-    if system["max_swap_used_bytes"] > 0:
-        reasons.append("SWAP_USED")
+    if system["swap_in_pages"] + system["swap_out_pages"] > 0:
+        reasons.append("SWAP_ACTIVITY")
     evidence = {
         "schema": SCHEMA,
         "profile": args.profile,

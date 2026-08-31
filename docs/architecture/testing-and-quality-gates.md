@@ -304,7 +304,9 @@ Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memo
 Repository execution uses `scripts/performance/stack_capacity.py`. `load` evidence
 requires at least 60 seconds and `soak` evidence at least 1,800 seconds; concurrency,
 response size, TLS behavior, latency, success rate, CPU/memory reserve, swap, disk,
-Git revision, and evidence shape are bounded and validated. The local staging suite
+Git revision, and evidence shape are bounded and validated. Pre-existing host swap
+occupancy is recorded; any swap-in or swap-out activity during the measured interval
+fails the run. The local staging suite
 is `scripts/performance/staging_capacity_suite.sh`; it targets only credential-free
 session bootstrap and a fixed invalid-login identity and writes Git-ignored aggregate
 evidence. A passing local run is staging evidence, not Production sizing evidence.
