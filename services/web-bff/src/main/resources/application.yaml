@@ -57,6 +57,10 @@ server:
 management:
   server:
     port: ${WEB_BFF_MANAGEMENT_PORT:9092}
+  otlp:
+    metrics:
+      export:
+        enabled: false
   endpoints:
     web:
       exposure:

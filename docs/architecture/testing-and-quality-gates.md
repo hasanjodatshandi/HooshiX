@@ -304,7 +304,11 @@ Pass requires no OOM, no sustained swap/MemoryPressure, >=30% validated CPU+memo
 Repository execution uses `scripts/performance/stack_capacity.py`. `load` evidence
 requires at least 60 seconds and `soak` evidence at least 1,800 seconds; concurrency,
 response size, TLS behavior, latency, success rate, CPU/memory reserve, swap, disk,
-Git revision, and evidence shape are bounded and validated. Pre-existing host swap
+Git revision, and evidence shape are bounded and validated. The runner refuses a dirty
+Git worktree so evidence cannot be attributed to code outside its recorded revision,
+and snapshots the selected Kubernetes application pods before and after each profile;
+any container restart, OOM termination, or pod-set replacement during the measured interval fails
+the evidence instead of being hidden by aggregate host headroom. Pre-existing host swap
 occupancy, interval page movement, active samples, and consecutive active samples are
 recorded. An isolated swap burst remains visible evidence; five consecutive one-second
 swap-active samples are the repository definition of sustained swap and fail the run.

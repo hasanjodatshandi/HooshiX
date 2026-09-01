@@ -28,7 +28,7 @@ class OpenApiControllerContractTest {
     Set<Route> controllerRoutes = controllerRoutes();
 
     assertThat(document.get("openapi")).isEqualTo("3.1.0");
-    assertThat(map(document.get("info")).get("version")).isEqualTo("1.6.0");
+    assertThat(map(document.get("info")).get("version")).isEqualTo("2.0.0");
     assertThat(openApiRoutes).hasSize(58).containsExactlyInAnyOrderElementsOf(controllerRoutes);
   }
 
@@ -151,7 +151,10 @@ class OpenApiControllerContractTest {
     Map<String, Object> schemas = map(components.get("schemas"));
     Map<String, Object> parameters = map(components.get("parameters"));
 
-    assertThat(map(map(parameters.get("RequestId")).get("schema")).get("pattern"))
+    assertThat(map(parameters.get("IdempotencyKey")))
+        .containsEntry("name", "Idempotency-Key")
+        .containsEntry("required", true);
+    assertThat(map(map(parameters.get("IdempotencyKey")).get("schema")).get("pattern"))
         .isEqualTo("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");
     assertThat(map(schemas.get("UuidV4")).get("pattern"))
         .isEqualTo("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$");

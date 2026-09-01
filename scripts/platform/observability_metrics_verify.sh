@@ -14,6 +14,12 @@ r=json.load(open('/tmp/hooshix-prom-query.json')).get('data',{}).get('result',[]
 if not r or not all(float(x['value'][1]) == 1 for x in r): raise SystemExit('Prometheus target not up: '+os.environ['JOB'])
 PY
 done
+for deployment in authorization-service compromised-password-service identity-service notification-service web-bff; do
+  if k logs -n platform-apps "deployment/${deployment}" --since=10m 2>/dev/null \
+    | grep -Eq 'OtlpMeterRegistry|Failed to publish metrics to OTLP receiver'; then
+    fail "${deployment} attempted duplicate OTLP metrics export"
+  fi
+done
 q=$(python3 -c 'import urllib.parse; print(urllib.parse.quote("up{job=\"otel-collector\"}"))')
 curl -fsS "http://127.0.0.1:19090/api/v1/query?query=$q" >/tmp/hooshix-prom-query.json
 python3 - <<'PY'

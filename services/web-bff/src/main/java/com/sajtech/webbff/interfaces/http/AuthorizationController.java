@@ -57,13 +57,13 @@ public final class AuthorizationController {
 
   @PostMapping("/roles")
   public RoleDto create(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @Valid @RequestBody CreateRole body,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     return authorization.createRole(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         body.name(),
         body.description(),
         body.permissionKeys());
@@ -71,14 +71,14 @@ public final class AuthorizationController {
 
   @PutMapping("/roles/{roleId}")
   public RoleDto update(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String roleId,
       @Valid @RequestBody UpdateRole body,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     return authorization.updateRole(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         HttpSupport.id(roleId),
         body.expectedVersion(),
         body.name(),
@@ -87,25 +87,25 @@ public final class AuthorizationController {
 
   @DeleteMapping("/roles/{roleId}")
   public RoleDto archive(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String roleId,
       @RequestParam long expectedVersion,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     return authorization.archiveRole(
-        token(s), HttpSupport.requestId(requestId), HttpSupport.id(roleId), expectedVersion);
+        token(s), HttpSupport.idempotencyKey(requestId), HttpSupport.id(roleId), expectedVersion);
   }
 
   @PutMapping("/roles/{roleId}/permissions")
   public RoleDto replacePermissions(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String roleId,
       @Valid @RequestBody ReplacePermissions body,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     return authorization.replacePermissions(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         HttpSupport.id(roleId),
         body.expectedVersion(),
         body.permissionKeys(),
@@ -114,7 +114,7 @@ public final class AuthorizationController {
 
   @PostMapping("/memberships/{membershipId}/roles/{roleId}")
   public ResponseEntity<Void> assignRole(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String membershipId,
       @PathVariable String roleId,
       @Valid @RequestBody Reason body,
@@ -122,7 +122,7 @@ public final class AuthorizationController {
     BrowserSession s = HttpSupport.tenant(request);
     authorization.assignRole(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         HttpSupport.id(membershipId),
         HttpSupport.id(roleId),
         body.reason());
@@ -131,7 +131,7 @@ public final class AuthorizationController {
 
   @DeleteMapping("/memberships/{membershipId}/roles/{roleId}")
   public ResponseEntity<Void> removeRole(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String membershipId,
       @PathVariable String roleId,
       @Valid @RequestBody Reason body,
@@ -139,7 +139,7 @@ public final class AuthorizationController {
     BrowserSession s = HttpSupport.tenant(request);
     authorization.removeRole(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         HttpSupport.id(membershipId),
         HttpSupport.id(roleId),
         body.reason());
@@ -148,7 +148,7 @@ public final class AuthorizationController {
 
   @PutMapping("/memberships/{membershipId}/overrides/{permissionKey}")
   public ResponseEntity<Void> setOverride(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String membershipId,
       @PathVariable String permissionKey,
       @Valid @RequestBody Override body,
@@ -156,7 +156,7 @@ public final class AuthorizationController {
     BrowserSession s = HttpSupport.tenant(request);
     authorization.setOverride(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         HttpSupport.id(membershipId),
         permissionKey,
         body.decision(),
@@ -166,7 +166,7 @@ public final class AuthorizationController {
 
   @DeleteMapping("/memberships/{membershipId}/overrides/{permissionKey}")
   public ResponseEntity<Void> removeOverride(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String membershipId,
       @PathVariable String permissionKey,
       @Valid @RequestBody Reason body,
@@ -174,7 +174,7 @@ public final class AuthorizationController {
     BrowserSession s = HttpSupport.tenant(request);
     authorization.removeOverride(
         token(s),
-        HttpSupport.requestId(requestId),
+        HttpSupport.idempotencyKey(requestId),
         HttpSupport.id(membershipId),
         permissionKey,
         body.reason());

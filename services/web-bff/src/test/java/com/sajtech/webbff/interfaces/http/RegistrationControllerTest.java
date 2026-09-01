@@ -44,7 +44,7 @@ class RegistrationControllerTest {
     String requestId = UUID.randomUUID().toString();
     mvc.perform(
             post("/api/v1/identity/registration")
-                .header("X-Request-Id", requestId)
+                .header("Idempotency-Key", requestId)
                 .header("X-HooshiX-Client-IP", "192.0.2.44")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -55,7 +55,7 @@ class RegistrationControllerTest {
 
     mvc.perform(
             post("/api/v1/identity/registration/resend")
-                .header("X-Request-Id", UUID.randomUUID().toString())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
                 .header("X-HooshiX-Client-IP", "192.0.2.44")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"channel\":\"EMAIL\",\"contact\":\"person@example.com\"}"))
@@ -64,7 +64,7 @@ class RegistrationControllerTest {
 
     mvc.perform(
             post("/api/v1/identity/registration/confirm")
-                .header("X-Request-Id", UUID.randomUUID().toString())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
                 .header("X-HooshiX-Client-IP", "192.0.2.44")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -85,7 +85,7 @@ class RegistrationControllerTest {
 
     mvc.perform(
             post("/api/v1/identity/registration/confirm")
-                .header("X-Request-Id", UUID.randomUUID().toString())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
                 .header("X-HooshiX-Client-IP", "192.0.2.44")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -97,5 +97,27 @@ class RegistrationControllerTest {
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
         .andExpect(jsonPath("$.instance").value("/api/v1/identity/registration/confirm"));
     verifyNoInteractions(identity);
+  }
+
+  @Test
+  void telemetryRequestIdCannotSubstituteForTheBusinessIdempotencyKey() throws Exception {
+    IdentityGateway identity = mock(IdentityGateway.class);
+    TrustedClientAddressPort addresses = mock(TrustedClientAddressPort.class);
+    BrowserSessionPort sessions = mock(BrowserSessionPort.class);
+    MockMvc mvc =
+        MockMvcBuilders.standaloneSetup(new RegistrationController(identity, addresses))
+            .setControllerAdvice(new BffExceptionHandler(sessions))
+            .build();
+
+    mvc.perform(
+            post("/api/v1/identity/registration")
+                .header("X-Request-Id", UUID.randomUUID().toString())
+                .header("X-HooshiX-Client-IP", "192.0.2.44")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"channel\":\"EMAIL\",\"contact\":\"person@example.com\",\"password\":\"Strong password\",\"locale\":\"en\",\"firstName\":\"First\",\"lastName\":\"Last\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    verifyNoInteractions(identity, addresses);
   }
 }

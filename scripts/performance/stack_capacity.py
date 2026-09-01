@@ -28,8 +28,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-SCHEMA = "hooshix-stack-capacity-v1"
+SCHEMA = "hooshix-stack-capacity-v2"
 REVISION = re.compile(r"^[0-9a-f]{40}$")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MIN_DURATION = {"load": 60, "soak": 1800}
 MAX_DURATION = 86_400
 MAX_CONCURRENCY = 256
@@ -91,6 +92,8 @@ def validate_evidence(data: object) -> list[str]:
         "min_cpu_headroom_percent",
         "min_memory_headroom_percent",
         "max_consecutive_swap_active_samples",
+        "kubernetes_namespace",
+        "kubernetes_deployments",
     }
     if not isinstance(config, dict) or set(config) != config_keys:
         errors.append("configuration is invalid")
@@ -110,6 +113,23 @@ def validate_evidence(data: object) -> list[str]:
         2 <= swap_samples <= 60
     ):
         errors.append("max_consecutive_swap_active_samples is outside the admissible bound")
+    namespace = config.get("kubernetes_namespace")
+    if not isinstance(namespace, str) or not re.fullmatch(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?", namespace):
+        errors.append("kubernetes_namespace is invalid")
+    deployments = config.get("kubernetes_deployments")
+    deployment_names = deployments if isinstance(deployments, list) else []
+    if (
+        not isinstance(deployments, list)
+        or not 1 <= len(deployments) <= 32
+        or any(
+            not isinstance(deployment, str)
+            or not re.fullmatch(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?", deployment)
+            for deployment in deployment_names
+        )
+        or deployments != sorted(deployment_names)
+        or len(set(deployment_names)) != len(deployment_names)
+    ):
+        errors.append("kubernetes_deployments is invalid")
     for field, minimum, maximum in (
         ("p99_limit_ms", 1, 60_000),
         ("min_success_percent", 90, 100),
@@ -130,6 +150,7 @@ def validate_evidence(data: object) -> list[str]:
         "errors_by_code",
         "latency_ms",
         "system",
+        "workloads",
     }
     if not isinstance(results, dict) or set(results) != result_keys:
         errors.append("results are invalid")
@@ -237,6 +258,33 @@ def validate_evidence(data: object) -> list[str]:
     ):
         errors.append("system swap sample counters are inconsistent")
 
+    workloads = results.get("workloads")
+    workload_keys = {
+        "pod_count_start",
+        "pod_count_end",
+        "restart_count_start",
+        "restart_count_end",
+        "restart_count_increase",
+        "oom_killed_count_start",
+        "oom_killed_count_end",
+        "oom_killed_count_increase",
+        "pod_uid_change_count",
+    }
+    if not isinstance(workloads, dict) or set(workloads) != workload_keys:
+        errors.append("workload evidence is invalid")
+        workloads = {}
+    for field in workload_keys:
+        if (
+            not isinstance(workloads.get(field), int)
+            or isinstance(workloads.get(field), bool)
+            or workloads[field] < 0
+        ):
+            errors.append(f"workloads.{field} is invalid")
+    if workloads.get("pod_count_start", 0) < len(deployment_names):
+        errors.append("workload start snapshot is incomplete")
+    if workloads.get("pod_count_end", 0) < len(deployment_names):
+        errors.append("workload end snapshot is incomplete")
+
     reasons = data.get("failure_reasons")
     if not isinstance(reasons, list) or len(reasons) > 16 or any(
         not isinstance(reason, str) or not re.fullmatch(r"[A-Z0-9_]{1,64}", reason)
@@ -260,6 +308,12 @@ def validate_evidence(data: object) -> list[str]:
         >= config["max_consecutive_swap_active_samples"]
     ):
         calculated.append("SUSTAINED_SWAP_ACTIVITY")
+    if isinstance(workloads.get("restart_count_increase"), int) and workloads["restart_count_increase"] > 0:
+        calculated.append("WORKLOAD_RESTART_DETECTED")
+    if isinstance(workloads.get("oom_killed_count_increase"), int) and workloads["oom_killed_count_increase"] > 0:
+        calculated.append("WORKLOAD_OOM_DETECTED")
+    if isinstance(workloads.get("pod_uid_change_count"), int) and workloads["pod_uid_change_count"] > 0:
+        calculated.append("WORKLOAD_POD_SET_CHANGED")
     if sorted(reasons) != sorted(calculated):
         errors.append("failure_reasons do not match measured thresholds")
     if data.get("passed") is not (not calculated):
@@ -291,6 +345,35 @@ def _swap_io() -> tuple[int, int]:
         if key in {"pswpin", "pswpout"}:
             values[key] = int(raw)
     return values.get("pswpin", 0), values.get("pswpout", 0)
+
+
+def _clean_git_revision() -> str:
+    revision = subprocess.run(
+        ["git", "-C", str(REPOSITORY_ROOT), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout.strip()
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(REPOSITORY_ROOT),
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout
+    if status:
+        raise ValueError("capacity evidence requires a clean Git worktree")
+    if not REVISION.fullmatch(revision):
+        raise ValueError("capacity evidence requires a full lowercase Git revision")
+    return revision
 
 
 class SystemSampler:
@@ -356,6 +439,94 @@ class SystemSampler:
             "max_consecutive_swap_active_samples": max_consecutive_samples,
             "min_root_disk_free_bytes": min(sample[3] for sample in self.samples),
         }
+
+
+def _kubernetes_snapshot(
+    namespace: str, deployments: list[str]
+) -> dict[str, dict[str, tuple[int, int]]]:
+    completed = subprocess.run(
+        ["kubectl", "get", "pods", "-n", namespace, "-o", "json"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    document = json.loads(completed.stdout)
+    items = document.get("items")
+    if not isinstance(items, list):
+        raise ValueError("Kubernetes pod response is invalid")
+    snapshot: dict[str, dict[str, tuple[int, int]]] = {
+        deployment: {} for deployment in deployments
+    }
+    for pod in items:
+        if not isinstance(pod, dict):
+            continue
+        metadata = pod.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        labels = metadata.get("labels")
+        uid = metadata.get("uid")
+        if not isinstance(labels, dict) or not isinstance(uid, str):
+            continue
+        deployment = labels.get("app.kubernetes.io/name")
+        if deployment not in snapshot:
+            continue
+        statuses = pod.get("status", {}).get("containerStatuses", [])
+        if not isinstance(statuses, list):
+            statuses = []
+        restarts = 0
+        oom_killed = 0
+        for status in statuses:
+            if not isinstance(status, dict):
+                continue
+            restart_count = status.get("restartCount", 0)
+            if isinstance(restart_count, int) and not isinstance(restart_count, bool):
+                restarts += max(0, restart_count)
+            for state_key in ("state", "lastState"):
+                state = status.get(state_key, {})
+                terminated = state.get("terminated", {}) if isinstance(state, dict) else {}
+                if isinstance(terminated, dict) and terminated.get("reason") == "OOMKilled":
+                    oom_killed += 1
+        snapshot[deployment][uid] = (restarts, oom_killed)
+    missing = [deployment for deployment, pods in snapshot.items() if not pods]
+    if missing:
+        raise ValueError("Kubernetes workloads are missing: " + ", ".join(missing))
+    return snapshot
+
+
+def _workload_evidence(
+    start: dict[str, dict[str, tuple[int, int]]],
+    end: dict[str, dict[str, tuple[int, int]]],
+) -> dict[str, int]:
+    start_pods = {uid: counts for pods in start.values() for uid, counts in pods.items()}
+    end_pods = {uid: counts for pods in end.values() for uid, counts in pods.items()}
+    common_uids = start_pods.keys() & end_pods.keys()
+    new_uids = end_pods.keys() - start_pods.keys()
+    restart_increase = sum(
+        max(0, end_pods[uid][0] - start_pods[uid][0]) for uid in common_uids
+    ) + sum(end_pods[uid][0] for uid in new_uids)
+    oom_increase = sum(
+        max(
+            0,
+            end_pods[uid][1] - start_pods[uid][1],
+            int(
+                end_pods[uid][1] > 0
+                and end_pods[uid][0] > start_pods[uid][0]
+            ),
+        )
+        for uid in common_uids
+    ) + sum(end_pods[uid][1] for uid in new_uids)
+    return {
+        "pod_count_start": len(start_pods),
+        "pod_count_end": len(end_pods),
+        "restart_count_start": sum(counts[0] for counts in start_pods.values()),
+        "restart_count_end": sum(counts[0] for counts in end_pods.values()),
+        "restart_count_increase": restart_increase,
+        "oom_killed_count_start": sum(counts[1] for counts in start_pods.values()),
+        "oom_killed_count_end": sum(counts[1] for counts in end_pods.values()),
+        "oom_killed_count_increase": oom_increase,
+        "pod_uid_change_count": len(start_pods.keys() ^ end_pods.keys()),
+    }
 
 
 class _LoopbackHTTPSConnection(http.client.HTTPSConnection):
@@ -472,7 +643,7 @@ def _request(
     headers.update(
         {
             "X-CSRF-Token": document["csrfToken"],
-            "X-Request-Id": __import__("uuid").uuid4().urn.removeprefix("urn:uuid:"),
+            "Idempotency-Key": __import__("uuid").uuid4().urn.removeprefix("urn:uuid:"),
             "Content-Type": "application/json",
         }
     )
@@ -499,9 +670,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     parsed = urllib.parse.urlparse(base_url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError("base URL must be credential-free HTTPS")
-    revision = subprocess.run(
-        ["git", "rev-parse", "HEAD"], check=True, text=True, stdout=subprocess.PIPE
-    ).stdout.strip()
+    revision = _clean_git_revision()
+    deployments = sorted(set(args.kubernetes_deployment))
+    workload_start = _kubernetes_snapshot(args.kubernetes_namespace, deployments)
     started = dt.datetime.now(dt.timezone.utc)
     deadline = time.monotonic() + args.duration_seconds
     latencies: list[float] = []
@@ -543,6 +714,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     successes = operations - failures
     latency = latencies or [0.0]
     system = sampler.result()
+    workload_end = _kubernetes_snapshot(args.kubernetes_namespace, deployments)
+    workloads = _workload_evidence(workload_start, workload_end)
     success_percent = round(successes * 100 / operations, 3) if operations else 0.0
     reasons: list[str] = []
     if success_percent < args.min_success_percent:
@@ -558,6 +731,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         >= args.max_consecutive_swap_active_samples
     ):
         reasons.append("SUSTAINED_SWAP_ACTIVITY")
+    if workloads["restart_count_increase"] > 0:
+        reasons.append("WORKLOAD_RESTART_DETECTED")
+    if workloads["oom_killed_count_increase"] > 0:
+        reasons.append("WORKLOAD_OOM_DETECTED")
+    if workloads["pod_uid_change_count"] > 0:
+        reasons.append("WORKLOAD_POD_SET_CHANGED")
     evidence = {
         "schema": SCHEMA,
         "profile": args.profile,
@@ -574,6 +753,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "min_cpu_headroom_percent": args.min_cpu_headroom_percent,
             "min_memory_headroom_percent": args.min_memory_headroom_percent,
             "max_consecutive_swap_active_samples": args.max_consecutive_swap_active_samples,
+            "kubernetes_namespace": args.kubernetes_namespace,
+            "kubernetes_deployments": deployments,
         },
         "results": {
             "operations": operations,
@@ -589,6 +770,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "max": round(max(latency), 3),
             },
             "system": system,
+            "workloads": workloads,
         },
         "passed": not reasons,
         "failure_reasons": reasons,
@@ -629,6 +811,8 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--min-cpu-headroom-percent", type=float, default=30.0)
     execute.add_argument("--min-memory-headroom-percent", type=float, default=30.0)
     execute.add_argument("--max-consecutive-swap-active-samples", type=int, default=5)
+    execute.add_argument("--kubernetes-namespace", required=True)
+    execute.add_argument("--kubernetes-deployment", action="append", required=True)
     execute.add_argument("--ca-file")
     execute.add_argument("--connect-host")
     execute.add_argument("--insecure-local-staging", action="store_true")
@@ -651,7 +835,11 @@ def main() -> int:
             return 1
         print("Capacity evidence PASSED")
         return 0
-    evidence = run(args)
+    try:
+        evidence = run(args)
+    except (OSError, subprocess.CalledProcessError, ValueError) as exception:
+        print(f"capacity run failed: {exception}", file=__import__("sys").stderr)
+        return 2
     _write_atomic(args.output, evidence)
     print(f"Capacity evidence {'PASSED' if evidence['passed'] else 'FAILED'}: {args.output}")
     return 0 if evidence["passed"] else 1

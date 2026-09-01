@@ -33,14 +33,14 @@ public final class PasswordController {
 
   @PostMapping("/change")
   public ResponseEntity<PasswordChanged> change(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @Valid @RequestBody Change body,
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession old = HttpSupport.authenticated(request);
     var changed =
         identity.changePassword(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             old.refreshCredential(),
             body.currentPassword(),
             body.newPassword());
@@ -56,12 +56,12 @@ public final class PasswordController {
 
   @PostMapping("/recovery/request")
   public Accepted request(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody RecoveryRequest body) {
     return new Accepted(
         identity.requestPasswordRecovery(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             body.channel(),
             body.contact(),
             addresses.parse(clientIp)));
@@ -69,12 +69,12 @@ public final class PasswordController {
 
   @PostMapping("/recovery/confirm")
   public Accepted confirm(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody RecoveryConfirm body) {
     return new Accepted(
         identity.confirmPasswordRecovery(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             body.channel(),
             body.contact(),
             body.code(),

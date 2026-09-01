@@ -124,10 +124,10 @@ class AuthorizationPersistenceIntegrationTest {
         NOW);
     UUID memberRole =
         Objects.requireNonNull(
-            admin.fetchOne(
-                "SELECT role_id FROM authorization_membership_role WHERE tenant_id=? AND membership_id=? LIMIT 1",
-                tenant,
-                member))
+                admin.fetchOne(
+                    "SELECT role_id FROM authorization_membership_role WHERE tenant_id=? AND membership_id=? LIMIT 1",
+                    tenant,
+                    member))
             .get("role_id", UUID.class);
     admin.execute(
         """

@@ -50,12 +50,14 @@ apps/web-frontend/package.json
 apps/web-frontend/playwright.config.ts
 apps/web-frontend/scripts/check-openapi-client.sh
 apps/web-frontend/scripts/generate-openapi-client.sh
+apps/web-frontend/src/api/bffClient.test.ts
 apps/web-frontend/src/api/bffClient.ts
 apps/web-frontend/src/api/generated/schema.ts
 apps/web-frontend/src/app/ApplicationShell.tsx
 apps/web-frontend/src/errors/ApplicationErrorBoundary.test.tsx
 apps/web-frontend/src/errors/ApplicationErrorBoundary.tsx
 apps/web-frontend/src/errors/getErrorMessage.ts
+apps/web-frontend/src/errors/problem.test.ts
 apps/web-frontend/src/errors/problem.ts
 apps/web-frontend/src/features/erasure/AccountErasureFlow.tsx
 apps/web-frontend/src/features/externalIdentity/ExternalIdentitySettingsFlow.tsx
@@ -88,11 +90,15 @@ apps/web-frontend/src/routes/guards.tsx
 apps/web-frontend/src/routes/router.tsx
 apps/web-frontend/src/routes/routes.ts
 apps/web-frontend/src/state/appActions.ts
+apps/web-frontend/src/state/appReducer.test.ts
 apps/web-frontend/src/state/appReducer.ts
 apps/web-frontend/src/state/appState.tsx
+apps/web-frontend/src/state/flow.test.ts
 apps/web-frontend/src/state/flow.ts
+apps/web-frontend/src/state/storage.test.ts
 apps/web-frontend/src/state/storage.ts
 apps/web-frontend/src/test/setup.ts
+apps/web-frontend/src/validation/userInput.test.ts
 apps/web-frontend/src/validation/userInput.ts
 apps/web-frontend/tsconfig.json
 apps/web-frontend/vite.config.ts
@@ -350,6 +356,11 @@ scripts/context/tests/test_post_merge_checkpoint.py
 scripts/contracts/verify_protobuf_compatibility.sh
 scripts/local/runtime.py
 scripts/local/tests/test_runtime.py
+scripts/performance/external_runtime_evidence.py
+scripts/performance/stack_capacity.py
+scripts/performance/staging_capacity_suite.sh
+scripts/performance/tests/test_external_runtime_evidence.py
+scripts/performance/tests/test_stack_capacity.py
 scripts/platform/common.sh
 scripts/platform/edge_delete.sh
 scripts/platform/edge_foundation_verify.sh
@@ -493,6 +504,7 @@ services/authorization-service/src/main/resources/db/migration/V3__enforce_tenan
 services/authorization-service/src/main/resources/db/migration/V4__create_erasure_participant_schema.sql
 services/authorization-service/src/test/java/com/sajtech/authorization/application/AuthorizationServiceTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/architecture/ArchitectureRulesTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/configuration/AuthorizationApplicationPropertiesTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/configuration/AuthorizationMigrationProfileIntegrationTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/observability/AuthorizationReservationMonitorTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/persistence/AuthorizationPersistenceIntegrationTest.java
@@ -900,6 +912,7 @@ services/identity-service/src/test/java/com/sajtech/identity/application/authent
 services/identity-service/src/test/java/com/sajtech/identity/application/authentication/usecase/RefreshSessionUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/erasure/usecase/ErasureUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/erasure/usecase/LegalHoldUseCaseTest.java
+services/identity-service/src/test/java/com/sajtech/identity/application/erasure/usecase/ParticipantErasureUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/externalidentity/usecase/ExternalIdentityUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/mfa/usecase/MfaUseCaseTest.java
 services/identity-service/src/test/java/com/sajtech/identity/application/password/usecase/PasswordLifecycleUseCaseTest.java
@@ -927,6 +940,8 @@ services/identity-service/src/test/java/com/sajtech/identity/infrastructure/pers
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/ClockSafetyGuardTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/quota/RedisSemanticQuotaIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/challenge/HmacChallengeSecretTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/challenge/HmacPasswordRecoverySecretTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/externalidentity/AesGcmExternalIdentityResultCryptoTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/jwt/RsaJwtAccessTokenSignerTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/keyring/FileBackedKeyRingTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/security/mfa/JcaMfaCryptographyTest.java
@@ -1080,6 +1095,7 @@ services/notification-service/src/main/resources/db/migration/V3__enforce_notifi
 services/notification-service/src/main/resources/db/migration/V4__complete_delivery_runtime.sql
 services/notification-service/src/main/resources/db/migration/V5__add_contact_verification_templates.sql
 services/notification-service/src/main/resources/db/migration/V6__create_erasure_participant_schema.sql
+services/notification-service/src/main/resources/db/migration/V7__index_reconciliation_receipt_lookup.sql
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/service/ProviderAttemptPlannerTest.java
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/usecase/RunDeliveryBatchServiceTest.java
 services/notification-service/src/test/java/com/sajtech/notification/application/delivery/usecase/RunReconciliationBatchServiceTest.java

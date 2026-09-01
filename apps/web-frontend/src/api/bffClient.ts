@@ -114,7 +114,7 @@ async function request<T>(
       signal: controller.signal,
       credentials: 'same-origin',
       headers: {
-        'x-request-id': requestId(),
+        'idempotency-key': requestId(),
         ...init.headers,
       },
     });

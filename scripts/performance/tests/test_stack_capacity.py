@@ -5,6 +5,7 @@ import datetime as dt
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import stack_capacity
@@ -29,6 +30,14 @@ class StackCapacityEvidenceTest(unittest.TestCase):
                 "min_cpu_headroom_percent": 30,
                 "min_memory_headroom_percent": 30,
                 "max_consecutive_swap_active_samples": 5,
+                "kubernetes_namespace": "platform-apps",
+                "kubernetes_deployments": [
+                    "authorization-service",
+                    "compromised-password-service",
+                    "identity-service",
+                    "notification-service",
+                    "web-bff",
+                ],
             },
             "results": {
                 "operations": 1000,
@@ -50,6 +59,17 @@ class StackCapacityEvidenceTest(unittest.TestCase):
                     "swap_active_sample_count": 0,
                     "max_consecutive_swap_active_samples": 0,
                     "min_root_disk_free_bytes": 10_000_000_000,
+                },
+                "workloads": {
+                    "pod_count_start": 5,
+                    "pod_count_end": 5,
+                    "restart_count_start": 0,
+                    "restart_count_end": 0,
+                    "restart_count_increase": 0,
+                    "oom_killed_count_start": 0,
+                    "oom_killed_count_end": 0,
+                    "oom_killed_count_increase": 0,
+                    "pod_uid_change_count": 0,
                 },
             },
             "passed": True,
@@ -90,6 +110,57 @@ class StackCapacityEvidenceTest(unittest.TestCase):
         data["failure_reasons"] = ["SUSTAINED_SWAP_ACTIVITY"]
         data["passed"] = False
         self.assertEqual([], stack_capacity.validate_evidence(data))
+
+    def test_workload_restart_oom_and_replacement_fail_the_run(self) -> None:
+        data = copy.deepcopy(self.evidence)
+        data["results"]["workloads"].update(
+            {
+                "restart_count_end": 1,
+                "restart_count_increase": 1,
+                "oom_killed_count_end": 1,
+                "oom_killed_count_increase": 1,
+                "pod_uid_change_count": 2,
+            }
+        )
+        data["failure_reasons"] = [
+            "WORKLOAD_RESTART_DETECTED",
+            "WORKLOAD_OOM_DETECTED",
+            "WORKLOAD_POD_SET_CHANGED",
+        ]
+        data["passed"] = False
+        self.assertEqual([], stack_capacity.validate_evidence(data))
+
+    def test_workload_snapshot_diff_detects_restart_oom_and_pod_change(self) -> None:
+        start = {
+            "identity-service": {"identity-old": (0, 0)},
+            "web-bff": {"bff-stable": (1, 0)},
+        }
+        end = {
+            "identity-service": {"identity-new": (1, 1)},
+            "web-bff": {"bff-stable": (2, 0)},
+        }
+        self.assertEqual(
+            {
+                "pod_count_start": 2,
+                "pod_count_end": 2,
+                "restart_count_start": 1,
+                "restart_count_end": 3,
+                "restart_count_increase": 2,
+                "oom_killed_count_start": 0,
+                "oom_killed_count_end": 1,
+                "oom_killed_count_increase": 1,
+                "pod_uid_change_count": 2,
+            },
+            stack_capacity._workload_evidence(start, end),
+        )
+
+    def test_repeated_oom_is_detected_when_last_termination_reason_is_unchanged(self) -> None:
+        start = {"identity-service": {"identity": (1, 1)}}
+        end = {"identity-service": {"identity": (2, 1)}}
+        self.assertEqual(
+            1,
+            stack_capacity._workload_evidence(start, end)["oom_killed_count_increase"],
+        )
 
     def test_outcome_counters_must_match_successes(self) -> None:
         data = copy.deepcopy(self.evidence)
@@ -142,6 +213,38 @@ class StackCapacityEvidenceTest(unittest.TestCase):
             item for item in opener.handlers if isinstance(item, stack_capacity._LoopbackHTTPSHandler)
         )
         self.assertEqual(stack_capacity.ssl.CERT_NONE, handler._context.verify_mode)
+
+    def test_capacity_run_provenance_requires_a_clean_worktree(self) -> None:
+        with mock.patch.object(
+            stack_capacity.subprocess,
+            "run",
+            side_effect=[
+                stack_capacity.subprocess.CompletedProcess(
+                    args=["git", "rev-parse"], returncode=0, stdout="a" * 40 + "\n"
+                ),
+                stack_capacity.subprocess.CompletedProcess(
+                    args=["git", "status"], returncode=0, stdout=" M tracked-file\n"
+                ),
+            ],
+        ):
+            with self.assertRaisesRegex(ValueError, "clean Git worktree"):
+                stack_capacity._clean_git_revision()
+
+    def test_capacity_run_provenance_returns_the_exact_clean_revision(self) -> None:
+        revision = "b" * 40
+        with mock.patch.object(
+            stack_capacity.subprocess,
+            "run",
+            side_effect=[
+                stack_capacity.subprocess.CompletedProcess(
+                    args=["git", "rev-parse"], returncode=0, stdout=revision + "\n"
+                ),
+                stack_capacity.subprocess.CompletedProcess(
+                    args=["git", "status"], returncode=0, stdout=""
+                ),
+            ],
+        ):
+            self.assertEqual(revision, stack_capacity._clean_git_revision())
 
 
 if __name__ == "__main__":

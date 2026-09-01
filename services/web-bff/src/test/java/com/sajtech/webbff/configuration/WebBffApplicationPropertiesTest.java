@@ -12,6 +12,16 @@ import org.springframework.core.io.ClassPathResource;
 
 class WebBffApplicationPropertiesTest {
   @Test
+  void applicationYamlDisablesDuplicateOtlpMetricsExport() throws Exception {
+    var loader = new YamlPropertySourceLoader();
+    var loaded = loader.load("application", new ClassPathResource("application.yaml"));
+
+    assertThat(loaded)
+        .extracting(source -> source.getProperty("management.otlp.metrics.export.enabled"))
+        .contains(false);
+  }
+
+  @Test
   void applicationYamlPreservesSlashBearingRouteAudienceKey() throws Exception {
     var loader = new YamlPropertySourceLoader();
     var loaded = loader.load("application", new ClassPathResource("application.yaml"));

@@ -162,7 +162,7 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Pending |
+| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Partial evidence is recorded in the Stage 7 continuation receipt below; the measured capacity gates and required external-runtime evidence have not passed, so this stage is not complete. |
 | 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
@@ -181,6 +181,76 @@ cancellation behavior is bounded and testable.
 | 4 | `ae68a2f9f7351826fbee952bb5e97ffe8285a070` | `4f29bdccc60581b2a2144ef296d6e31647b86e42` | `COMPLETED`: complete Stage 4 diff reviewed with no remaining HR-005/HR-006 finding. Context7 was invoked for Vitest, React Testing Library, and axe documentation but its transport was unavailable; current official project documentation and exact installed-version behavior were used as the fallback. Typed `fa`/`en` catalogs now drive every current journey, request locale, and document RTL/LTR without persistent browser state; route headings receive client-navigation focus and every direct route has a main landmark. Three Vitest/RTL component tests, three Chromium/axe test journeys covering two directions and eleven stable route shells, twenty-four other Playwright journeys, generated OpenAPI drift, TypeScript/build, npm advisory, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected frontend run `33247612549` passed and repository baseline run `33247612662` passed structure, contracts, all five service security suites, and its final aggregator. Coverage thresholds remain Stage 7; frontend SAST/advisory/release alignment remains Stage 5; deployed-browser/Production evidence remains Stage 10 and `NOT VERIFIED`. |
 | 5 | `c6a972d2d770ddb8a50b48dc57630856d2920597` | `209684a5a465477e87ff9c257c0511ace5af3a0f` | `COMPLETED`: the complete Stage 5 diff was reviewed against unchanged `origin/main` with no remaining HR-007/HR-008/HR-009 finding. Context7-confirmed React 19.2.7 alignment, OSV npm-lock scanning, and explicit protoc 4.34.2 configuration were applied. Frontend manifest and lockfile pins, OSV scan, eight-rule Semgrep source policy with positive/negative fixtures, non-root/read-only/no-capability Caddy image health/SPA smoke, Production six-component release validation/rescan/Syft/Grype/Cosign/Kyverno wiring, all five strict Gradle checks, production tests, component/API/build/accessibility/twenty-four other browser journeys, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected frontend run `33301549573` passed every new frontend gate and protected repository baseline run `33301549810` passed contracts, structure, all five service security suites, and its final aggregator. Actual frontend staging/Production workload/routing, real release signing/scanning/admission execution, deployed browser journeys, and Production readiness remain Stage 10 and `NOT VERIFIED`. |
 | 6 | `703333fabcdd97808863a33604a19d161c9a8d2b` | `56bb71c29b96ddb4cce7f0b276f25c53417a32fc` | `COMPLETED`: the complete Stage 6 diff was reviewed against unchanged `origin/main` with no remaining HR-010/HR-011 finding. Characterization tests fixed the public facade constructors/interfaces and critical Spring bean names, conditions, profiles, and destroy methods before refactoring. Authorization persistence, Identity tenant persistence, Identity runtime configuration, and the BFF Identity client are now capability-focused facades/components; transaction-call counts, BFF deadline counts, and Identity bean counts match the pre-refactor surfaces, and no contract, migration, deployment, or dependency file changed. The five service workflows now share one executable Gitleaks/OSV implementation while retaining four explicit blocking security steps each. Checksum-pinned ShellCheck 0.11.0, actionlint 1.7.12, and Ruff 0.16.5 enforce selected high-signal repository source checks. Context7-confirmed Spring configuration composition/profile behavior, jOOQ transaction-scoped context use, and actionlint/ShellCheck integration informed the review. Authorization, Identity, and Web BFF formatting, unit, integration, architecture, SpotBugs, and runtime-JAR gates, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected repository baseline run `33322638261` passed source lint, contracts, all five complete service security suites, and its final aggregator; frontend E2E run `33322638140` passed. Stage 7 retains all coverage, mutation, performance, load, soak, fault, provider, and capacity evidence work. |
+
+### Stage 7 continuation receipt
+
+This is interruption-safe progress evidence, not a completion receipt. The current
+implementation head is `a8d100edcbd61d37ec314d9ac138a95266a3e24c`; the Stage 7
+branch remained clean while the following runtime evidence was measured against that
+exact revision:
+
+- **Passed:** all five Java services have enforced global and risk-focused JaCoCo
+  thresholds over combined unit/integration execution; the Identity security slice
+  killed 33 of 34 PIT mutants (97%), and the Web BFF boundary killed 108 of 245 PIT
+  mutants (44%) under their reviewed risk-specific thresholds.
+- **Passed:** frontend Vitest/V8 coverage has global and risk-module thresholds, with
+  47 current tests; representative Authorization and Notification PostgreSQL plans use
+  the intended indexes on realistic local cardinalities without sequential scans.
+- **Passed:** `make local-runtime-smoke-erasure-recovery` completed a developer-local
+  four-participant erasure, full service redeploy, pre-completion PostgreSQL 18 snapshot
+  restore, and normal Outbox/Kafka/Inbox reconciliation without reappearance. Its
+  identifier-free mode-0600 receipt is bound to the exact revision above. This is not
+  staging or Production restore evidence.
+- **Passed:** the complete local production-fidelity staging lane, including five
+  services, persistence, strict Ambient mTLS/workload-identity negatives, edge/WAF,
+  metrics, traces, privacy-filtered logs, Grafana, and telemetry-backend outage
+  non-authority behavior, passed at the exact revision above. The first observability
+  rollout attempt encountered a Docker Hub TLS handshake timeout; the repository-owned
+  idempotent observability target succeeded on retry before the complete verifier ran.
+- **Failed:** the 60-second invalid-login load at concurrency 16 completed 6,475
+  operations with 97.869% exact safe outcomes, p99 439.315 ms, minimum CPU headroom
+  52.697%, and minimum memory headroom 70.646%. It failed the 99% success gate because
+  52 `INVALID_REQUEST` and 86 `DEPENDENCY_UNAVAILABLE` outcomes were unexpected; swap
+  activity was not sustained.
+- **Failed:** the 1,800-second session-bootstrap soak at concurrency 8 completed
+  281,988 operations with 99.995% success, p99 61.181 ms, and minimum memory headroom
+  68.489%. It failed the 30% CPU-headroom gate because observed minimum CPU headroom
+  was 2.811%; 14 `INTERNAL_ERROR` outcomes were recorded, and swap activity was not
+  sustained.
+- **Not verified:** complete official HIBP corpus provenance/bounds, real Google,
+  Liara, and IPPanel executions, and a real staging four-participant erasure
+  restore/redeploy/provider-ambiguity/failure exercise. No real provider call is made
+  without the required credentials, recipient, cost/side-effect authority, and
+  environment.
+
+Resume Stage 7 by diagnosing and correcting the measured invalid-login failure rate,
+session-bootstrap internal errors, and complete-stack CPU saturation without weakening
+security, correctness, observability, workload, or headroom gates. Re-run both exact
+capacity profiles after a coherent correction. Then obtain and validate the remaining
+external-runtime evidence. Keep Stage 7 `IN PROGRESS` until every completion-boundary
+item and the complete Stage 7 diff pass review; do not advance to Stage 8 before then.
+
+Current corrective work after that measured receipt remains `IN PROGRESS`:
+
+- The Identity soak failure was traced to one `OOMKilled` restart: a 75% JVM heap
+  envelope inside the 1 GiB container left insufficient native/runtime reserve. The
+  candidate image uses 50% without changing Argon2 security or workload limits.
+- Authorization and Web BFF explicitly disable duplicate OTLP metrics export while
+  retaining Prometheus metrics and OTLP tracing; the full production-fidelity verifier
+  passed this candidate configuration, including absence of OTLP metrics-push errors.
+- The intermittent login `INVALID_REQUEST` was reproduced with one canonical UUIDv4.
+  Direct BFF access accepted it, while WAF-to-waypoint access rejected it. Effective
+  Envoy configuration uses `UuidRequestIdConfig`, and official Envoy documentation
+  confirms that `x-request-id` is generated/mutated telemetry. OpenAPI 2.0.0 therefore
+  moves business replay identity to UUIDv4 `Idempotency-Key`; frontend/controller and
+  edge regression coverage move atomically with it.
+- Capacity evidence schema v2 snapshots the five application workloads before and
+  after each run; any restart, OOM observation, or pod-set replacement now fails the
+  result rather than being hidden by aggregate host headroom. The runner also refuses
+  dirty worktrees so formal evidence cannot be misattributed to the preceding commit.
+
+The corrected exact load and 30-minute soak profiles have not yet been rerun. The
+candidate diff is not a completion receipt and Stage 7 remains `IN PROGRESS`.
 
 ## 7. Stage review checklist
 

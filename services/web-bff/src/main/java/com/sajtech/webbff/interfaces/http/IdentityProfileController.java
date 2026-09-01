@@ -43,7 +43,7 @@ public final class IdentityProfileController {
     BrowserSession session = HttpSupport.authenticated(request);
     return new Accepted(
         identity.updateProfile(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             session.refreshCredential(),
             body.firstName(),
             body.lastName(),
@@ -58,7 +58,7 @@ public final class IdentityProfileController {
     BrowserSession s = HttpSupport.authenticated(request);
     return new Created(
         identity.addContact(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             s.refreshCredential(),
             body.type(),
             body.value(),
@@ -73,7 +73,9 @@ public final class IdentityProfileController {
     BrowserSession session = HttpSupport.authenticated(request);
     return new Accepted(
         identity.resendContactVerification(
-            HttpSupport.requestId(requestId), session.refreshCredential(), HttpSupport.id(id)));
+            HttpSupport.idempotencyKey(requestId),
+            session.refreshCredential(),
+            HttpSupport.id(id)));
   }
 
   @PostMapping("/contacts/{id}/verify")
@@ -85,7 +87,7 @@ public final class IdentityProfileController {
     BrowserSession session = HttpSupport.authenticated(request);
     return new Verified(
         identity.verifyContact(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             session.refreshCredential(),
             HttpSupport.id(id),
             body.code()));
@@ -99,7 +101,9 @@ public final class IdentityProfileController {
     BrowserSession session = HttpSupport.authenticated(request);
     return new Accepted(
         identity.setPrimaryContact(
-            HttpSupport.requestId(requestId), session.refreshCredential(), HttpSupport.id(id)));
+            HttpSupport.idempotencyKey(requestId),
+            session.refreshCredential(),
+            HttpSupport.id(id)));
   }
 
   @DeleteMapping("/contacts/{id}")
@@ -110,7 +114,9 @@ public final class IdentityProfileController {
     BrowserSession session = HttpSupport.authenticated(request);
     return new Accepted(
         identity.removeContact(
-            HttpSupport.requestId(requestId), session.refreshCredential(), HttpSupport.id(id)));
+            HttpSupport.idempotencyKey(requestId),
+            session.refreshCredential(),
+            HttpSupport.id(id)));
   }
 
   public record Profile(UUID id, String firstName, String lastName, String fatherName) {}
