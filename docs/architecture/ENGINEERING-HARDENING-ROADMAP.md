@@ -306,9 +306,52 @@ Stage 7 CI remediation on 2026-09-07:
   PR head/check runs before resuming; previous failed runs are retained as provenance,
   never treated as passing evidence.
 
+CI recheck of implementation `330ced32e03ac57a10ec83762688d93de319a2ea`:
+
+- **Passed:** frontend run `34150784062`, and all five clean staging image builds
+  with Git-bound metadata. Each packaged JAR contains the three aligned fixed Tomcat
+  modules. These images have not been deployed into the inaccessible cluster.
+- **Failed:** baseline run `34150784378` reached BFF mutation testing after its
+  OSV/unit/integration/coverage/architecture gates passed, then strict dependency
+  verification rejected the unrecorded `groovy-bom-4.0.11.module` metadata artifact.
+  The corresponding POM was already recorded. The exact module bytes and published
+  SHA-256 were independently matched against Maven Central; only that missing artifact
+  checksum is added, without disabling metadata verification or changing dependencies.
+- **Passed:** local BFF PIT at the Tomcat-patched revision still kills 110/248 mutants
+  (44%), with 67% line coverage of selected classes and 59% test strength. Local
+  cache success did not prove a fresh CI dependency-resolution path; the corrected
+  metadata must pass the new protected CI run before this subtask is closed.
+
 Then obtain and validate the remaining external-runtime evidence. Keep Stage 7
 `IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
 review; do not advance to Stage 8 before then.
+
+#### CI remediation review report
+
+This report covers the bounded CI follow-up, not completion of the entire Stage 7 PR.
+
+| Required field | Review evidence |
+| --- | --- |
+| Architecture review mode | `full-read`, continued from the Stage 7 review; minimum-safe engineering `critical` |
+| Architecture document version/commit | Current authorities reconciled at `bbbfb448297c777ca810c078aca55b588a38194f`; `origin/main` remained `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` |
+| Architecture sections reviewed | Mandatory source order; BFF browser/session ownership; version governance/compatibility; build/CI, testing, performance and interruption-safe evidence |
+| Search terms used | `Tomcat`, `constraints`, `verification`, `lock`, `storage`, `Stage 7`, `IN PROGRESS` |
+| ADRs reviewed or changed | Existing Stage 7 ADR review retained, including ADR-0016/0039/0045 for this follow-up; no ADR changed |
+| Changed bounded context/module | Build dependencies of all five Java services; frontend storage unit-test fixtures; baseline/compatibility and roadmap evidence |
+| Contracts changed | None in this CI follow-up; earlier PR OpenAPI change remains under Stage 7 review |
+| Database migration | Not applicable to the CI follow-up |
+| Transaction boundary | Unchanged |
+| Timeout/deadline behavior | Unchanged; no budget increase |
+| Retry/cancellation/concurrency behavior | Unchanged; no runtime retry added |
+| Kafka/event and idempotency behavior | Unchanged |
+| Security impact | Patch known vulnerable servlet-container dependency; preserve all source, secret, integrity, advisory and test gates |
+| Istio identity and authorization impact | Unchanged; no bypass of the failed cluster RBAC boundary |
+| Logging and PII impact | No runtime change; only synthetic in-memory frontend test data |
+| Observability added or changed | None in this CI follow-up; earlier session metrics remain subject to renewed staging evidence |
+| Build/CI/architecture enforcement changed | Aligned Tomcat constraints/locks and verified checksum metadata; no scanner suppression, threshold reduction, new plugin or workflow relaxation |
+| Tests executed | Exact local and protected-run outcomes recorded above; failed/unverified runtime gates remain explicit |
+| Architecture deviations | None identified within this bounded follow-up |
+| Rollback considerations | Do not promote/revert to known vulnerable Tomcat artifacts; fail forward with a reviewed fixed compatible patch. Cluster recovery/backup is not established, so no destructive rebuild without explicit owner approval |
 
 ## 7. Stage review checklist
 
