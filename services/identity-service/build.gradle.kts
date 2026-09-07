@@ -73,6 +73,15 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     constraints {
+        implementation("org.apache.tomcat.embed:tomcat-embed-core:11.0.25") {
+            because("Tomcat 11.0.25 fixes the August 2026 authentication and access-control advisories")
+        }
+        implementation("org.apache.tomcat.embed:tomcat-embed-el:11.0.25") {
+            because("Align embedded Tomcat modules with the security-fixed core")
+        }
+        implementation("org.apache.tomcat.embed:tomcat-embed-websocket:11.0.25") {
+            because("Align embedded Tomcat modules with the security-fixed core")
+        }
         implementation("org.apache.logging.log4j:log4j-api:2.25.5") {
             because("CVE-2026-49844 is fixed in Log4j API 2.25.5")
         }

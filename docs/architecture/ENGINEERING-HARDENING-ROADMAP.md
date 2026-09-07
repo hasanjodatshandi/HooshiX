@@ -262,9 +262,49 @@ Current session-failure follow-up remains `IN PROGRESS`:
   (unit/integration/architecture/SpotBugs/format/coverage); BFF PIT 110/248 mutants
   killed (44%) under the existing threshold; official checksum-pinned
   repository actionlint/ShellCheck/Ruff and baseline gates.
-- **Not verified:** refreshed production-fidelity/load/soak
-  evidence for this follow-up. Record the new clean implementation revision after
-  execution, inspect any classified failures, and update this receipt before stopping.
+- **Passed:** all five staging images were built from clean session-failure revision
+  `bbbfb448297c777ca810c078aca55b588a38194f`.
+- **Failed:** deployment of that revision stopped at the first Kubernetes apply with
+  `Forbidden`. The configured `kubernetes-admin` cannot list namespaces in
+  `kind-platform-local`; the failure was reconfirmed before the CI remediation below.
+  Read-only container diagnostics show the control plane restarted at
+  `2026-09-07T10:40:06Z`, after the earlier capacity run, with only its core static
+  pods running. Earlier API startup diagnostics reported missing system namespaces.
+  The cause of the missing cluster state is **Inconclusive**. No RBAC bypass,
+  cluster deletion, or reconstruction has been performed.
+- **Not run:** refreshed production-fidelity/load/soak evidence for the session
+  follow-up or subsequent Tomcat patch. Restoring the configured cluster access/state,
+  or explicit owner approval to delete and rebuild only the `platform-local` test
+  cluster, is required first. Deletion would remove its three test nodes and any
+  remaining cluster-local data, not repository/Git data; recovery is not established.
+
+Stage 7 CI remediation on 2026-09-07:
+
+- Protected baseline run `34125212492` at `bbbfb448297c777ca810c078aca55b588a38194f`
+  failed all five service jobs at the OSV dependency gate. Three Critical-rated OSV
+  advisories in embedded Tomcat require the official fixed patch; this is a
+  pre-existing dependency finding exposed by refreshed advisory data, not a
+  demonstrated exploit of the application's configured authentication paths.
+- Frontend run `34125212165` failed five Semgrep findings in the new Stage 7
+  `storage.test.ts` fixtures. This was introduced by this PR's test setup, not a
+  production storage change. The fixtures now seed isolated in-memory Storage
+  doubles; the real adapter remains under test, including disabled access and failed
+  reads/writes/removals. No scanner rule, exclusion, or coverage threshold changed.
+- All five service builds now constrain the three embedded Tomcat modules to the
+  security-fixed baseline in `../technology/technology-baseline.md`. Selective Gradle
+  lock regeneration changed only these three modules; all six new JAR/POM checksums
+  in each service match the published Maven Central SHA-256 values. Spring Boot,
+  Gradle, and Vitest documentation was retrieved through Context7.
+- **Passed:** checksum-pinned OSV rescans of all five updated service lockfiles;
+  all five strict Gradle `check bootJar` executions (unit, integration, architecture,
+  SpotBugs, formatting, dependency integrity, and existing risk-coverage thresholds);
+  frontend 51 Vitest tests with existing coverage thresholds, OpenAPI generated-client
+  parity, TypeScript/build, 3 accessibility journeys, 24 other Playwright journeys,
+  and unchanged eight-rule Semgrep with positive/negative controls; repository baseline,
+  actionlint/ShellCheck/Ruff, context verification/bootstrap, and whitespace checks.
+- **Not verified:** refreshed protected CI for this remediation. Reconcile the exact
+  PR head/check runs before resuming; previous failed runs are retained as provenance,
+  never treated as passing evidence.
 
 Then obtain and validate the remaining external-runtime evidence. Keep Stage 7
 `IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass

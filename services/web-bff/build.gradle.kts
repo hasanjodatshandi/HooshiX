@@ -58,6 +58,15 @@ dependencies {
   runtimeOnly("io.micrometer:micrometer-registry-prometheus")
   runtimeOnly("org.postgresql:postgresql:42.7.13")
   constraints {
+    implementation("org.apache.tomcat.embed:tomcat-embed-core:11.0.25") {
+      because("Tomcat 11.0.25 fixes the August 2026 authentication and access-control advisories")
+    }
+    implementation("org.apache.tomcat.embed:tomcat-embed-el:11.0.25") {
+      because("Align embedded Tomcat modules with the security-fixed core")
+    }
+    implementation("org.apache.tomcat.embed:tomcat-embed-websocket:11.0.25") {
+      because("Align embedded Tomcat modules with the security-fixed core")
+    }
     implementation("org.apache.logging.log4j:log4j-api:2.25.5") { because("CVE-2026-49844 is fixed in Log4j API 2.25.5") }
     implementation("tools.jackson.core:jackson-databind:3.1.5") { because("CVE-2026-59889 is fixed in jackson-databind 3.1.5") }
     implementation("at.yawk.lz4:lz4-java:1.11.1") { because("GHSA-xx22-p4ch-683r is fixed in lz4-java 1.11.1") }

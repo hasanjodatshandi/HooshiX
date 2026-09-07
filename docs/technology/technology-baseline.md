@@ -17,6 +17,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | --- | --- | --- |
 | JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | official runtime archive SHA-256 and runtime base-image digest pinned by owning service; CI verifies exact runtime build |
 | Framework | Spring Boot 4.1.0 | current stable project baseline |
+| Embedded servlet container | Apache Tomcat 11.0.25 (`core`, `el`, `websocket` aligned) | reviewed security override of the Boot-managed version; resolves GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6, and GHSA-h3x4-894j-xpx5; all five service locks/checksums must align |
 | HTTP model | Spring MVC | WebFlux/Reactor prohibited without revised decision |
 | Request/I/O concurrency | Virtual Threads | `spring.threads.virtual.enabled=true` |
 | Build | Gradle Wrapper 9.6.1 + Kotlin DSL | wrapper per independently deployable service |
@@ -182,6 +183,12 @@ Both profiles preserve:
 - zero-standing-privilege human access.
 
 ## 6. Version governance
+
+The Tomcat patch override follows the [official Tomcat 11 security notices](https://tomcat.apache.org/security-11.html).
+Each service uses native Gradle constraints over the Spring Boot BOM; no new dependency-management
+plugin or authentication mode is introduced. The affected CI advisory findings require the patch
+regardless of whether a vulnerable container authentication configuration is active. Strict service
+checks, advisory rescans, and refreshed staging/runtime evidence are required before promotion.
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
 - Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
