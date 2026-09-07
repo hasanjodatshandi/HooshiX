@@ -302,9 +302,8 @@ Stage 7 CI remediation on 2026-09-07:
   parity, TypeScript/build, 3 accessibility journeys, 24 other Playwright journeys,
   and unchanged eight-rule Semgrep with positive/negative controls; repository baseline,
   actionlint/ShellCheck/Ruff, context verification/bootstrap, and whitespace checks.
-- **Not verified:** refreshed protected CI for this remediation. Reconcile the exact
-  PR head/check runs before resuming; previous failed runs are retained as provenance,
-  never treated as passing evidence.
+- Protected recheck outcomes are recorded below by exact implementation revision.
+  Previous failed runs remain provenance, never passing evidence for a later commit.
 
 CI recheck of implementation `330ced32e03ac57a10ec83762688d93de319a2ea`:
 
@@ -319,8 +318,29 @@ CI recheck of implementation `330ced32e03ac57a10ec83762688d93de319a2ea`:
   checksum is added, without disabling metadata verification or changing dependencies.
 - **Passed:** local BFF PIT at the Tomcat-patched revision still kills 110/248 mutants
   (44%), with 67% line coverage of selected classes and 59% test strength. Local
-  cache success did not prove a fresh CI dependency-resolution path; the corrected
-  metadata must pass the new protected CI run before this subtask is closed.
+  cache success did not prove a fresh CI dependency-resolution path; that path was
+  subsequently verified by the corrected-metadata protected run below.
+
+CI remediation completion receipt, not Stage 7 completion:
+
+- Reviewed corrected implementation: `ca6d4803ebf9d398dba0590a601076743497d467`.
+- **Passed:** protected repository baseline run `34151203292`, including structure,
+  contract validation/examples, every complete service security suite, both selective
+  mutation gates, and the final baseline aggregator. Frontend run `34151203110` also
+  passed all advisory, SAST, coverage, image, accessibility, and browser gates.
+- **Passed:** forced local BFF mutation rerun with strict verification: all ten tasks
+  executed, 110/248 mutants killed (44%), 67% selected-class line coverage and 59%
+  test strength. No CI bypass, checksum wildcard, suppression, or reduced gate was used.
+- The two original CI failures and the fresh-CI metadata failure are resolved.
+  Current blockers are the inaccessible test cluster and the required external-runtime
+  evidence, not unfinished CI remediation. PR #126 remains Draft and Stage 7 remains
+  `IN PROGRESS`; `main` was not changed.
+- **Continuation action:** obtain owner restoration of `kind-platform-local` access
+  and state, or explicit approval for the scoped destructive test-cluster rebuild;
+  then build/deploy the current clean revision and rerun production-fidelity/capacity.
+  Obtain the complete official HIBP corpus path/provenance and authorized staging
+  provider configuration/test-recipient paths before the required external exercises.
+  Never request secret values in chat or substitute synthetic claims for these runs.
 
 Then obtain and validate the remaining external-runtime evidence. Keep Stage 7
 `IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
@@ -332,7 +352,7 @@ This report covers the bounded CI follow-up, not completion of the entire Stage 
 
 | Required field | Review evidence |
 | --- | --- |
-| Architecture review mode | `full-read`, continued from the Stage 7 review; minimum-safe engineering `critical` |
+| Architecture review mode | `full-read`, continued from the Stage 7 review; `minimal-safe-engineering` in `critical` mode |
 | Architecture document version/commit | Current authorities reconciled at `bbbfb448297c777ca810c078aca55b588a38194f`; `origin/main` remained `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` |
 | Architecture sections reviewed | Mandatory source order; BFF browser/session ownership; version governance/compatibility; build/CI, testing, performance and interruption-safe evidence |
 | Search terms used | `Tomcat`, `constraints`, `verification`, `lock`, `storage`, `Stage 7`, `IN PROGRESS` |
