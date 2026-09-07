@@ -40,14 +40,24 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
       if math.abs(redis_now-app_now)>2000 then return {'TIME_UNHEALTHY'} end
       local max_active=tonumber(ARGV[2])
       local max_alloc=tonumber(ARGV[3])
-      if max_active<=0 or max_alloc<=0 then return {'CAPACITY_UNHEALTHY'} end
+      local min_headroom=tonumber(ARGV[4])
+      if max_active<=0 or max_alloc<=0 or min_headroom<30 or min_headroom>=100 then return {'CAPACITY_UNHEALTHY'} end
       local active_key=KEYS[1]
       local alloc_key=KEYS[2]
       local index_key=KEYS[3]
-      local dim_count=tonumber(ARGV[4])
+      local dim_count=tonumber(ARGV[5])
       local new_count=0
       for i=1,dim_count do
         if redis.call('EXISTS',KEYS[3+i])==0 then new_count=new_count+1 end
+      end
+      if new_count>0 then
+        local info=redis.call('INFO','memory')
+        local used=tonumber(string.match(info,'used_memory:(%d+)') or '')
+        local maximum=tonumber(string.match(info,'maxmemory:(%d+)') or '')
+        local eviction=string.match(info,'maxmemory_policy:([%a]+)')
+        if not used or not maximum or maximum<=0 or eviction~='noeviction' or used*100>maximum*(100-min_headroom) then
+          return {'CAPACITY_UNHEALTHY'}
+        end
       end
       local active=tonumber(redis.call('GET',active_key) or '0')
       if active+new_count>max_active then return {'CAPACITY_UNHEALTHY'} end
@@ -57,7 +67,7 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
       if window_count+new_count>max_alloc then return {'CAPACITY_UNHEALTHY'} end
       local proposed={}
       local any_denied=false
-      local arg=5
+      local arg=6
       for i=1,dim_count do
         local key=KEYS[3+i]
         local hard=tonumber(ARGV[arg]); local cap=tonumber(ARGV[arg+1]); local interval=tonumber(ARGV[arg+2]); local horizon=tonumber(ARGV[arg+3]); local cost=tonumber(ARGV[arg+4]); arg=arg+5
@@ -126,6 +136,7 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
     uri.setTimeout(BUDGET);
     client = RedisClient.create(uri);
     connection = client.connect();
+    connection.setTimeout(BUDGET);
     this.keys = keys;
     this.clockGuard = clockGuard;
     this.hostTime = hostTime;
@@ -136,9 +147,6 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
 
   @Override
   public void checkSource(byte[] clientAddress) {
-    long started = System.nanoTime();
-    long appNow = healthyTime();
-    requireMemoryHeadroom(started);
     QuotaKeyEncoder.LoginSourceKeys encoded;
     try {
       encoded = keys.encodeLoginSource(clientAddress);
@@ -146,8 +154,6 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
       throw unavailable("Trusted client address is unavailable", exception);
     }
     consume(
-        started,
-        appNow,
         List.of(
             new Dimension(encoded.exactIpKey(), true, LOGIN_EXACT),
             new Dimension(encoded.aggregateNetworkKey(), false, LOGIN_AGGREGATE)));
@@ -155,25 +161,21 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
 
   @Override
   public void recordFailure(CanonicalContact contact) {
-    long started = System.nanoTime();
-    long appNow = healthyTime();
-    requireMemoryHeadroom(started);
     String subject;
     try {
       subject = keys.encodeLoginSubject(contact);
     } catch (IllegalArgumentException exception) {
       throw unavailable("Login quota subject is unavailable", exception);
     }
-    consume(started, appNow, List.of(new Dimension(subject, true, LOGIN_FAILURE)));
+    consume(List.of(new Dimension(subject, true, LOGIN_FAILURE)));
   }
 
   @Override
   public void recordSuccess(CanonicalContact contact) {
-    long started = System.nanoTime();
-    long appNow = healthyTime();
     String subject;
     try {
       subject = keys.encodeLoginSubject(contact);
+      long appNow = healthyTime();
       Object result =
           connection
               .sync()
@@ -182,7 +184,6 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
                   ScriptOutputType.MULTI,
                   new String[] {ACTIVE_KEY, ALLOCATION_KEY, INDEX_KEY, subject},
                   Long.toString(appNow));
-      if (elapsedMs(started) > BUDGET.toMillis()) throw unavailable(null, null);
       requireResult(result);
     } catch (AuthenticationException exception) {
       throw exception;
@@ -196,14 +197,9 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
   @Override
   public void consume(MfaQuotaOperation operation, java.util.UUID userId, byte[] clientAddress) {
     try {
-      long started = System.nanoTime();
-      long appNow = healthyTime();
-      requireMemoryHeadroom(started);
       QuotaKeyEncoder.MfaKeys encoded =
           keys.encodeMfa("MFA_" + operation.name(), userId, clientAddress);
       consume(
-          started,
-          appNow,
           List.of(
               new Dimension(encoded.userKey(), true, MFA_USER),
               new Dimension(encoded.exactIpKey(), true, MFA_EXACT),
@@ -216,13 +212,8 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
   @Override
   public void consumeRecoverySource(byte[] clientAddress) {
     try {
-      long started = System.nanoTime();
-      long appNow = healthyTime();
-      requireMemoryHeadroom(started);
       QuotaKeyEncoder.LoginSourceKeys encoded = keys.encodeMfaRecoverySource(clientAddress);
       consume(
-          started,
-          appNow,
           List.of(
               new Dimension(encoded.exactIpKey(), true, MFA_EXACT, 2),
               new Dimension(encoded.aggregateNetworkKey(), false, MFA_AGGREGATE, 2)));
@@ -234,12 +225,7 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
   @Override
   public void recordRecoveryFailure(java.util.UUID userId) {
     try {
-      long started = System.nanoTime();
-      long appNow = healthyTime();
-      requireMemoryHeadroom(started);
       consume(
-          started,
-          appNow,
           List.of(
               new Dimension(keys.encodeMfaRecoverySubject(userId), true, MFA_RECOVERY_SUBJECT, 2)));
     } catch (AuthenticationException exception) {
@@ -247,15 +233,17 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
     }
   }
 
-  private void consume(long started, long appNow, List<Dimension> dimensions) {
+  private void consume(List<Dimension> dimensions) {
     List<String> redisKeys = new ArrayList<>();
     redisKeys.add(ACTIVE_KEY);
     redisKeys.add(ALLOCATION_KEY);
     redisKeys.add(INDEX_KEY);
+    long appNow = healthyTime();
     List<String> argv = new ArrayList<>();
     argv.add(Long.toString(appNow));
     argv.add(Integer.toString(maxActiveBuckets));
     argv.add(Integer.toString(maxNewBucketsPerMinute));
+    argv.add(Integer.toString(minimumMemoryHeadroomPercent));
     argv.add(Integer.toString(dimensions.size()));
     for (Dimension dimension : dimensions) {
       redisKeys.add(dimension.key());
@@ -274,7 +262,6 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
                   ScriptOutputType.MULTI,
                   redisKeys.toArray(String[]::new),
                   argv.toArray(String[]::new));
-      if (elapsedMs(started) > BUDGET.toMillis()) throw unavailable(null, null);
       requireResult(result);
     } catch (AuthenticationException exception) {
       throw exception;
@@ -318,40 +305,6 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
     }
   }
 
-  private void requireMemoryHeadroom(long started) {
-    try {
-      String info = connection.sync().info("memory");
-      if (elapsedMs(started) > BUDGET.toMillis()) throw unavailable(null, null);
-      long used = value(info, "used_memory");
-      long max = value(info, "maxmemory");
-      if (max <= 0 || used < 0 || used * 100L > max * (100L - minimumMemoryHeadroomPercent)) {
-        throw new AuthenticationException(
-            AuthenticationError.QUOTA_CAPACITY_UNHEALTHY, "Quota capacity is unavailable");
-      }
-    } catch (AuthenticationException exception) {
-      throw exception;
-    } catch (RuntimeException exception) {
-      throw unavailable(null, exception);
-    }
-  }
-
-  private static long value(String info, String name) {
-    for (String line : info.split("\\r?\\n")) {
-      if (line.startsWith(name + ":")) {
-        try {
-          return Long.parseLong(line.substring(name.length() + 1).trim());
-        } catch (NumberFormatException exception) {
-          return -1;
-        }
-      }
-    }
-    return -1;
-  }
-
-  private static long elapsedMs(long started) {
-    return (System.nanoTime() - started) / 1_000_000L;
-  }
-
   private static AuthenticationException unavailable(String message, Throwable cause) {
     String safe = message == null ? "Semantic quota dependency is unavailable" : message;
     return cause == null
@@ -376,6 +329,10 @@ public final class RedisLoginQuota implements LoginQuotaPort, MfaQuotaPort, Auto
     } catch (RuntimeException exception) {
       return false;
     }
+  }
+
+  StatefulRedisConnection<String, String> connection() {
+    return connection;
   }
 
   @Override

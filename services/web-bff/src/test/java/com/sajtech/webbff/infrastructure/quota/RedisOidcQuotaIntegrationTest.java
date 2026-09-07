@@ -124,6 +124,24 @@ class RedisOidcQuotaIntegrationTest {
     assertCapacityFailure();
   }
 
+  @Test
+  void memoryHeadroomGuardDoesNotRecheckExistingBuckets() throws Exception {
+    byte[] existing = new byte[] {(byte) 198, 51, 100, 40};
+    quota.consume(OidcQuotaPort.Operation.OIDC_START, existing);
+    quota.close();
+    quota = quota(Clock.systemUTC(), new WebBffProperties.OidcQuota(10000, 1000, 99, hostTime));
+
+    quota.consume(OidcQuotaPort.Operation.OIDC_START, existing);
+    assertThatThrownBy(
+            () ->
+                quota.consume(
+                    OidcQuotaPort.Operation.OIDC_START, new byte[] {(byte) 198, 51, 100, 41}))
+        .isInstanceOfSatisfying(
+            BffException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(BffError.QUOTA_CAPACITY_UNHEALTHY));
+  }
+
   private void assertCapacityFailure() {
     assertThatThrownBy(
             () ->

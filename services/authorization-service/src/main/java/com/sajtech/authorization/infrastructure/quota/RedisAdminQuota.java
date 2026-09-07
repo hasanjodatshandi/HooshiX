@@ -25,7 +25,8 @@ public final class RedisAdminQuota implements AdminQuota, AutoCloseable {
 local app=tonumber(ARGV[1]); local maxa=tonumber(ARGV[2]); local maxn=tonumber(ARGV[3]); local cost=tonumber(ARGV[4])
 local ac=tonumber(ARGV[5]); local acap=tonumber(ARGV[6]); local ai=tonumber(ARGV[7]); local ah=tonumber(ARGV[8])
 local sc=tonumber(ARGV[9]); local scap=tonumber(ARGV[10]); local si=tonumber(ARGV[11]); local sh=tonumber(ARGV[12])
-if cost<1 or cost>100 or ac<1 or sc<1 or maxa<1 or maxn<1 then return {'CAPACITY_UNHEALTHY'} end
+local minhead=tonumber(ARGV[13])
+if cost<1 or cost>100 or ac<1 or sc<1 or maxa<1 or maxn<1 or minhead<30 or minhead>=100 then return {'CAPACITY_UNHEALTHY'} end
 local t=redis.call('TIME'); local now=tonumber(t[1])*1000+math.floor(tonumber(t[2])/1000)
 if math.abs(now-app)>2000 then return {'TIME_UNHEALTHY'} end
 local function inspect(start,count,cap,interval)
@@ -59,6 +60,13 @@ if a.tokens<cost*1000000 or s.tokens<cost*1000000 then
  return {'QUOTA_EXCEEDED'}
 end
 local logical=0; if a.existing==0 then logical=logical+1 end; if s.existing==0 then logical=logical+1 end
+if logical>0 then
+ local info=redis.call('INFO','memory')
+ local used=tonumber(string.match(info,'used_memory:(%d+)') or '')
+ local maximum=tonumber(string.match(info,'maxmemory:(%d+)') or '')
+ local eviction=string.match(info,'maxmemory_policy:([%a]+)')
+ if not used or not maximum or maximum<=0 or eviction~='noeviction' or used*100>maximum*(100-minhead) then return {'CAPACITY_UNHEALTHY'} end
+end
 local after=active+(1-a.existing)+(1-s.existing); if after<0 or after>maxa then return {'CAPACITY_UNHEALTHY'} end
 local ws=tonumber(redis.call('HGET',KEYS[2],'window_start') or tostring(now)); local wc=tonumber(redis.call('HGET',KEYS[2],'count') or '0')
 if now-ws>=60000 then ws=now; wc=0 end; if wc+logical>maxn then return {'CAPACITY_UNHEALTHY'} end
@@ -87,6 +95,7 @@ return {'ALLOWED',tostring(after),tostring(logical)}
     redis.setTimeout(BUDGET);
     client = RedisClient.create(redis);
     connection = client.connect();
+    connection.setTimeout(BUDGET);
     this.keys = Objects.requireNonNull(keys);
     this.guard = Objects.requireNonNull(guard);
     this.host = Objects.requireNonNull(host);
@@ -104,8 +113,6 @@ return {'ALLOWED',tostring(after),tostring(logical)}
         || cost > 100)
       throw new AuthorizationException(
           AuthorizationError.LIMIT_EXCEEDED, "Authorization mutation cost is invalid");
-    long started = System.nanoTime(), now = guard.requireHealthy(host.synchronizedHealthy());
-    memory(started);
     List<String> actorKeys =
         bucketKeys("actor", actor.userId().toString(), actor.tenantId().toString());
     List<String> scopeKeys = bucketKeys("tenant", actor.tenantId().toString());
@@ -115,6 +122,7 @@ return {'ALLOWED',tostring(after),tostring(logical)}
     redisKeys.add(INDEX);
     redisKeys.addAll(actorKeys);
     redisKeys.addAll(scopeKeys);
+    long now = guard.requireHealthy(host.synchronizedHealthy());
     String[] argv = {
       Long.toString(now),
       Integer.toString(maxActive),
@@ -127,14 +135,14 @@ return {'ALLOWED',tostring(after),tostring(logical)}
       Integer.toString(scopeKeys.size()),
       Integer.toString(SCOPE_CAPACITY),
       Long.toString(SCOPE_INTERVAL),
-      Long.toString(HORIZON)
+      Long.toString(HORIZON),
+      Integer.toString(headroom)
     };
     try {
       Object result =
           connection
               .sync()
               .eval(SCRIPT, ScriptOutputType.MULTI, redisKeys.toArray(String[]::new), argv);
-      if (elapsed(started) > BUDGET.toMillis()) throw unavailable(null);
       String code = ((List<?>) result).getFirst().toString();
       switch (code) {
         case "ALLOWED" -> {
@@ -187,34 +195,6 @@ return {'ALLOWED',tostring(after),tostring(logical)}
     byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
     mac.update(ByteBuffer.allocate(4).putInt(bytes.length).array());
     mac.update(bytes);
-  }
-
-  private void memory(long started) {
-    try {
-      String info = connection.sync().info("memory");
-      if (elapsed(started) > BUDGET.toMillis()) throw unavailable(null);
-      long used = value(info, "used_memory"), max = value(info, "maxmemory");
-      if (max <= 0 || used < 0 || used * 100L > max * (100L - headroom)) throw unavailable(null);
-    } catch (AuthorizationException e) {
-      throw e;
-    } catch (RuntimeException e) {
-      throw unavailable(e);
-    }
-  }
-
-  private static long value(String info, String name) {
-    for (String line : info.split("\\r?\\n"))
-      if (line.startsWith(name + ":"))
-        try {
-          return Long.parseLong(line.substring(name.length() + 1).trim());
-        } catch (NumberFormatException e) {
-          return -1;
-        }
-    return -1;
-  }
-
-  private static long elapsed(long started) {
-    return (System.nanoTime() - started) / 1_000_000L;
   }
 
   private static AuthorizationException unavailable(Throwable cause) {

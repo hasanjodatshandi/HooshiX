@@ -18,16 +18,26 @@ public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
       local redis_now=tonumber(t[1])*1000+math.floor(tonumber(t[2])/1000)
       if math.abs(redis_now-app_now)>2000 then return {'TIME_UNHEALTHY'} end
       local max_active=tonumber(ARGV[2]);local max_alloc=tonumber(ARGV[3])
-      if max_active<=0 or max_alloc<=0 then return {'CAPACITY_UNHEALTHY'} end
+      local min_headroom=tonumber(ARGV[4])
+      if max_active<=0 or max_alloc<=0 or min_headroom<30 or min_headroom>=100 then return {'CAPACITY_UNHEALTHY'} end
       local new_count=0
       for i=4,5 do if redis.call('EXISTS',KEYS[i])==0 then new_count=new_count+1 end end
+      if new_count>0 then
+        local info=redis.call('INFO','memory')
+        local used=tonumber(string.match(info,'used_memory:(%d+)') or '')
+        local maximum=tonumber(string.match(info,'maxmemory:(%d+)') or '')
+        local eviction=string.match(info,'maxmemory_policy:([%a]+)')
+        if not used or not maximum or maximum<=0 or eviction~='noeviction' or used*100>maximum*(100-min_headroom) then
+          return {'CAPACITY_UNHEALTHY'}
+        end
+      end
       local active=tonumber(redis.call('GET',KEYS[1]) or '0')
       if active+new_count>max_active then return {'CAPACITY_UNHEALTHY'} end
       local window_start=tonumber(redis.call('HGET',KEYS[2],'window_start') or tostring(redis_now))
       local window_count=tonumber(redis.call('HGET',KEYS[2],'count') or '0')
       if redis_now-window_start>=60000 then window_start=redis_now;window_count=0 end
       if window_count+new_count>max_alloc then return {'CAPACITY_UNHEALTHY'} end
-      local cap=tonumber(ARGV[4]);local interval=tonumber(ARGV[5]);local horizon=tonumber(ARGV[6])
+      local cap=tonumber(ARGV[5]);local interval=tonumber(ARGV[6]);local horizon=tonumber(ARGV[7])
       local proposed={}
       for i=4,5 do
         local tokens=tonumber(redis.call('HGET',KEYS[i],'tokens') or tostring(cap*1000000))
@@ -79,12 +89,10 @@ public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
 
   @Override
   public void consume(Operation operation, byte[] clientAddress) {
-    long started = System.nanoTime();
     try {
-      long appNow = clockGuard.requireHealthy(hostTime.synchronizedHealthy());
-      requireCapacity(started);
       OidcQuotaKeyEncoder.EncodedKeys encoded = keys.encode(operation, clientAddress);
       Bucket bucket = Bucket.forOperation(operation);
+      long appNow = clockGuard.requireHealthy(hostTime.synchronizedHealthy());
       Object raw =
           connection
               .sync()
@@ -101,10 +109,10 @@ public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
                   Long.toString(appNow),
                   Integer.toString(policy.maxActiveBuckets()),
                   Integer.toString(policy.maxNewBucketsPerMinute()),
+                  Integer.toString(policy.minimumMemoryHeadroomPercent()),
                   Integer.toString(bucket.capacity()),
                   Long.toString(bucket.refillIntervalMs()),
                   Long.toString(bucket.cleanupHorizonMs()));
-      if (elapsedMillis(started) > BUDGET.toMillis()) throw unavailable(null);
       String result = ((List<?>) raw).getFirst().toString();
       switch (result) {
         case "ALLOWED" -> record(operation, "allowed");
@@ -144,39 +152,6 @@ public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
     };
   }
 
-  private void requireCapacity(long started) {
-    try {
-      String info = connection.sync().info("memory");
-      Map<String, String> eviction = connection.sync().configGet("maxmemory-policy");
-      if (elapsedMillis(started) > BUDGET.toMillis()) throw unavailable(null);
-      long used = infoValue(info, "used_memory");
-      long maximum = infoValue(info, "maxmemory");
-      if (!"noeviction".equals(eviction.get("maxmemory-policy"))
-          || maximum <= 0
-          || used < 0
-          || used * 100L > maximum * (100L - policy.minimumMemoryHeadroomPercent())) {
-        throw capacityUnhealthy();
-      }
-    } catch (BffException exception) {
-      throw exception;
-    } catch (RuntimeException exception) {
-      throw unavailable(exception);
-    }
-  }
-
-  private static long infoValue(String info, String name) {
-    for (String line : info.split("\r?\n")) {
-      if (line.startsWith(name + ":")) {
-        try {
-          return Long.parseLong(line.substring(name.length() + 1).strip());
-        } catch (NumberFormatException exception) {
-          return -1;
-        }
-      }
-    }
-    return -1;
-  }
-
   StatefulRedisConnection<String, String> connection() {
     return connection;
   }
@@ -187,10 +162,6 @@ public final class RedisOidcQuota implements OidcQuotaPort, AutoCloseable {
     } catch (RuntimeException exception) {
       return false;
     }
-  }
-
-  private static long elapsedMillis(long started) {
-    return (System.nanoTime() - started) / 1_000_000L;
   }
 
   private static BffException timeUnhealthy() {
