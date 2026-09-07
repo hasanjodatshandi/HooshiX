@@ -1,5 +1,7 @@
 package com.sajtech.webbff.infrastructure.security;
 
+import com.sajtech.webbff.application.BffError;
+import com.sajtech.webbff.application.BffException;
 import com.sajtech.webbff.application.model.BrowserSecurityContext;
 import com.sajtech.webbff.application.model.BrowserSession;
 import com.sajtech.webbff.configuration.WebBffProperties;
@@ -65,22 +67,29 @@ public final class BrowserSecurityFilter extends OncePerRequestFilter {
     String cookie = sessionCookie(request);
     BrowserSession session = null;
     if (cookie != null) {
-      session = sessions.load(cookie).orElse(null);
-      if (session == null) {
-        clearCookie(response);
-        problem(response, request, 401, "INVALID_SESSION");
-        return;
-      }
-      effective.setAttribute(SESSION_ATTRIBUTE, session);
-      if (unsafe
-          && !"/api/v1/auth/session/csrf".equals(request.getRequestURI())
-          && !sessions.csrfMatches(session, request.getHeader("X-CSRF-Token"))) {
-        problem(response, request, 403, "CSRF_INVALID");
-        return;
-      }
-      if (!sessions.touch(session)) {
-        clearCookie(response);
-        problem(response, request, 401, "INVALID_SESSION");
+      try {
+        session = sessions.load(cookie).orElse(null);
+        if (session == null) {
+          clearCookie(response);
+          problem(response, request, 401, "INVALID_SESSION");
+          return;
+        }
+        effective.setAttribute(SESSION_ATTRIBUTE, session);
+        if (unsafe
+            && !"/api/v1/auth/session/csrf".equals(request.getRequestURI())
+            && !sessions.csrfMatches(session, request.getHeader("X-CSRF-Token"))) {
+          problem(response, request, 403, "CSRF_INVALID");
+          return;
+        }
+        if (!sessions.touch(session)) {
+          clearCookie(response);
+          problem(response, request, 401, "INVALID_SESSION");
+          return;
+        }
+      } catch (BffException exception) {
+        if (exception.error() != BffError.DEPENDENCY_UNAVAILABLE) throw exception;
+        effective.removeAttribute(SESSION_ATTRIBUTE);
+        problem(response, request, 503, "DEPENDENCY_UNAVAILABLE");
         return;
       }
     } else if (unsafe && !ANONYMOUS_UNSAFE.contains(request.getRequestURI())) {

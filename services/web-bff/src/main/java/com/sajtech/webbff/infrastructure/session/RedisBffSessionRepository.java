@@ -1,5 +1,7 @@
 package com.sajtech.webbff.infrastructure.session;
 
+import com.sajtech.webbff.application.BffError;
+import com.sajtech.webbff.application.BffException;
 import com.sajtech.webbff.application.model.*;
 import com.sajtech.webbff.application.port.out.BrowserSessionPort;
 import com.sajtech.webbff.infrastructure.security.SessionCrypto;
@@ -96,7 +98,7 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
     } catch (RuntimeException e) {
       return Optional.empty();
     }
-    Map<String, String> f = connection.sync().hgetall(locator);
+    Map<String, String> f = timed("load", () -> connection.sync().hgetall(locator));
     if (f.isEmpty()) return Optional.empty();
     Instant now = clock.instant(),
         idle = time(f, "idle_expires_at"),
@@ -176,13 +178,16 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
     fields.put("mfa_nonce", encrypted.nonce());
     fields.put("mfa_ciphertext", encrypted.ciphertext());
     Long result =
-        connection
-            .sync()
-            .eval(
-                ROTATE,
-                ScriptOutputType.INTEGER,
-                new String[] {old.locator(), opaque.locator()},
-                args(fields, absolute));
+        timed(
+            "rotate_mfa",
+            () ->
+                connection
+                    .sync()
+                    .eval(
+                        ROTATE,
+                        ScriptOutputType.INTEGER,
+                        new String[] {old.locator(), opaque.locator()},
+                        args(fields, absolute)));
     if (result == null || result != 1L) {
       throw new IllegalStateException("BFF MFA session rotation failed");
     }
@@ -197,13 +202,16 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
 
   public boolean touch(BrowserSession s) {
     Long result =
-        connection
-            .sync()
-            .eval(
-                TOUCH_SCRIPT,
-                ScriptOutputType.INTEGER,
-                new String[] {s.locator()},
-                Long.toString(clock.millis()));
+        timed(
+            "touch",
+            () ->
+                connection
+                    .sync()
+                    .eval(
+                        TOUCH_SCRIPT,
+                        ScriptOutputType.INTEGER,
+                        new String[] {s.locator()},
+                        Long.toString(clock.millis())));
     return result != null && result == 1L;
   }
 
@@ -339,12 +347,19 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
       String index = crypto.userSessionIndex(keyId, userId);
       io.lettuce.core.ScanCursor cursor = io.lettuce.core.ScanCursor.INITIAL;
       do {
+        var current = cursor;
         var page =
-            connection.sync().sscan(index, cursor, io.lettuce.core.ScanArgs.Builder.limit(64));
-        for (String locator : page.getValues()) connection.sync().del(locator);
+            timed(
+                "erase_scan",
+                () ->
+                    connection
+                        .sync()
+                        .sscan(index, current, io.lettuce.core.ScanArgs.Builder.limit(64)));
+        for (String locator : page.getValues())
+          timed("erase_session", () -> connection.sync().del(locator));
         cursor = page;
       } while (!cursor.isFinished());
-      connection.sync().del(index);
+      timed("erase_index", () -> connection.sync().del(index));
     }
   }
 
@@ -384,13 +399,16 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
             userIndex);
     String[] argv = args(fields, idle);
     Long result =
-        connection
-            .sync()
-            .eval(
-                ROTATE,
-                ScriptOutputType.INTEGER,
-                new String[] {old.locator(), opaque.locator()},
-                argv);
+        timed(
+            "rotate",
+            () ->
+                connection
+                    .sync()
+                    .eval(
+                        ROTATE,
+                        ScriptOutputType.INTEGER,
+                        new String[] {old.locator(), opaque.locator()},
+                        argv));
     if (result == null || result != 1L)
       throw new IllegalStateException("BFF session rotation failed");
     return new BrowserSessionGrant(
@@ -401,9 +419,16 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
 
   private void create(String locator, Map<String, String> fields, Instant expiry) {
     Long result =
-        connection
-            .sync()
-            .eval(CREATE, ScriptOutputType.INTEGER, new String[] {locator}, args(fields, expiry));
+        timed(
+            "create",
+            () ->
+                connection
+                    .sync()
+                    .eval(
+                        CREATE,
+                        ScriptOutputType.INTEGER,
+                        new String[] {locator},
+                        args(fields, expiry)));
     if (result == null || result != 1L)
       throw new IllegalStateException("BFF session creation failed");
   }
@@ -477,8 +502,9 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
 
   private void destroyLocator(String locator, Map<String, String> f) {
     String idx = f == null ? null : f.get("user_index_key");
-    if (idx != null && !idx.isBlank()) connection.sync().srem(idx, locator);
-    connection.sync().del(locator);
+    if (idx != null && !idx.isBlank())
+      timed("destroy_index", () -> connection.sync().srem(idx, locator));
+    timed("destroy", () -> connection.sync().del(locator));
   }
 
   private static String req(Map<String, String> f, String k) {
@@ -517,6 +543,10 @@ redis.call('HSET',KEYS[1],'last_seen_at',now,'idle_expires_at',idle);redis.call(
     String outcome = "ok";
     try {
       return work.get();
+    } catch (RedisException e) {
+      outcome = e instanceof RedisCommandTimeoutException ? "timeout" : "unavailable";
+      throw new BffException(
+          BffError.DEPENDENCY_UNAVAILABLE, "Browser session store is unavailable", e);
     } catch (RuntimeException e) {
       outcome = "error";
       throw e;

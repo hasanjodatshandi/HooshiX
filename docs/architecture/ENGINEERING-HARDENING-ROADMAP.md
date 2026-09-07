@@ -162,7 +162,7 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Partial evidence is recorded in the Stage 7 continuation receipt below; the measured capacity gates and required external-runtime evidence have not passed, so this stage is not complete. |
+| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Local load/soak capacity gates passed at the revision in the continuation receipt; session-failure follow-up verification and required external-runtime evidence remain open. |
 | 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
@@ -184,10 +184,12 @@ cancellation behavior is bounded and testable.
 
 ### Stage 7 continuation receipt
 
-This is interruption-safe progress evidence, not a completion receipt. The current
-implementation head is `a8d100edcbd61d37ec314d9ac138a95266a3e24c`; the Stage 7
-branch remained clean while the following runtime evidence was measured against that
-exact revision:
+This is interruption-safe progress evidence, not a completion receipt. The latest
+completed local production-fidelity and capacity run used the clean implementation
+revision `a29486549bec3b258376c6c66b51714f94e94947` on 2026-09-07. Earlier coverage,
+mutation, plan, and developer-local erasure receipts were recorded at
+`a8d100edcbd61d37ec314d9ac138a95266a3e24c`; they are commit-bound historical evidence,
+not proof for later changes.
 
 - **Passed:** all five Java services have enforced global and risk-focused JaCoCo
   thresholds over combined unit/integration execution; the Identity security slice
@@ -199,45 +201,39 @@ exact revision:
 - **Passed:** `make local-runtime-smoke-erasure-recovery` completed a developer-local
   four-participant erasure, full service redeploy, pre-completion PostgreSQL 18 snapshot
   restore, and normal Outbox/Kafka/Inbox reconciliation without reappearance. Its
-  identifier-free mode-0600 receipt is bound to the exact revision above. This is not
+  identifier-free mode-0600 receipt is bound to `a8d100edcbd61d37ec314d9ac138a95266a3e24c`. This is not
   staging or Production restore evidence.
 - **Passed:** the complete local production-fidelity staging lane, including five
   services, persistence, strict Ambient mTLS/workload-identity negatives, edge/WAF,
   metrics, traces, privacy-filtered logs, Grafana, and telemetry-backend outage
-  non-authority behavior, passed at the exact revision above. The first observability
-  rollout attempt encountered a Docker Hub TLS handshake timeout; the repository-owned
-  idempotent observability target succeeded on retry before the complete verifier ran.
-- **Failed:** the 60-second invalid-login load at concurrency 16 completed 6,475
-  operations with 97.869% exact safe outcomes, p99 439.315 ms, minimum CPU headroom
-  52.697%, and minimum memory headroom 70.646%. It failed the 99% success gate because
-  52 `INVALID_REQUEST` and 86 `DEPENDENCY_UNAVAILABLE` outcomes were unexpected; swap
-  activity was not sustained.
-- **Failed:** the 1,800-second session-bootstrap soak at concurrency 8 completed
-  281,988 operations with 99.995% success, p99 61.181 ms, and minimum memory headroom
-  68.489%. It failed the 30% CPU-headroom gate because observed minimum CPU headroom
-  was 2.811%; 14 `INTERNAL_ERROR` outcomes were recorded, and swap activity was not
-  sustained.
+  non-authority behavior, passed at `a29486549bec3b258376c6c66b51714f94e94947`.
+- **Passed:** the 60-second invalid-login load at concurrency 16 completed 5,940
+  operations with 100% exact safe outcomes, no unexpected failures, p99 510.596 ms,
+  minimum CPU headroom 42.056%, and minimum memory headroom 67.778%.
+- **Passed:** the 1,800-second session-bootstrap soak at concurrency 8 completed
+  273,524 operations with 273,520 successes (99.999%), p99 62.509 ms, minimum CPU
+  headroom 67.4%, and minimum memory headroom 66.891%. Both profiles recorded zero
+  swap movement, restarts, OOM kills, or application pod-UID changes. Results are in
+  `.platform-runtime/stage7/capacity/` with the exact revision and UTC timestamps.
+- **Inconclusive:** the soak recorded four `BOOTSTRAP_HTTP_500_INTERNAL_ERROR`
+  outcomes. Prometheus confirmed all four on the bootstrap route, but logs and
+  sampled traces did not retain a classified cause; these are not claimed as diagnosed
+  Redis timeouts or as zero-error evidence. This prompted the session-failure follow-up
+  below despite the capacity suite passing its unchanged thresholds.
 - **Not verified:** complete official HIBP corpus provenance/bounds, real Google,
   Liara, and IPPanel executions, and a real staging four-participant erasure
   restore/redeploy/provider-ambiguity/failure exercise. No real provider call is made
   without the required credentials, recipient, cost/side-effect authority, and
   environment.
 
-Resume Stage 7 by diagnosing and correcting the measured invalid-login failure rate,
-session-bootstrap internal errors, and complete-stack CPU saturation without weakening
-security, correctness, observability, workload, or headroom gates. Re-run both exact
-capacity profiles after a coherent correction. Then obtain and validate the remaining
-external-runtime evidence. Keep Stage 7 `IN PROGRESS` until every completion-boundary
-item and the complete Stage 7 diff pass review; do not advance to Stage 8 before then.
-
-Current corrective work after that measured receipt remains `IN PROGRESS`:
+Corrective work already included in the measured revision:
 
 - The Identity soak failure was traced to one `OOMKilled` restart: a 75% JVM heap
   envelope inside the 1 GiB container left insufficient native/runtime reserve. The
-  candidate image uses 50% without changing Argon2 security or workload limits.
+  image uses 50% without changing Argon2 security or workload limits.
 - Authorization and Web BFF explicitly disable duplicate OTLP metrics export while
   retaining Prometheus metrics and OTLP tracing; the full production-fidelity verifier
-  passed this candidate configuration, including absence of OTLP metrics-push errors.
+  passed this configuration, including absence of OTLP metrics-push errors.
 - The intermittent login `INVALID_REQUEST` was reproduced with one canonical UUIDv4.
   Direct BFF access accepted it, while WAF-to-waypoint access rejected it. Effective
   Envoy configuration uses `UuidRequestIdConfig`, and official Envoy documentation
@@ -248,9 +244,31 @@ Current corrective work after that measured receipt remains `IN PROGRESS`:
   after each run; any restart, OOM observation, or pod-set replacement now fails the
   result rather than being hidden by aggregate host headroom. The runner also refuses
   dirty worktrees so formal evidence cannot be misattributed to the preceding commit.
+- Quota capacity/noeviction checks execute inside the same atomic EVAL only for new
+  bucket allocation. Four adapters use the existing 75ms Lettuce command timeout;
+  the duplicate elapsed-time rejection after a successful Redis decision is removed.
+  Context7 Redis/Lettuce documentation, Redis 8.2.8 integration tests, and the Identity,
+  Authorization, and BFF full Gradle checks support the change. No security budget,
+  retry, fail-closed result, or memory reserve was relaxed.
 
-The corrected exact load and 30-minute soak profiles have not yet been rerun. The
-candidate diff is not a completion receipt and Stage 7 remains `IN PROGRESS`.
+Current session-failure follow-up remains `IN PROGRESS`:
+
+- Session Redis commands now share the existing timing/error boundary, classify only
+  fixed `timeout`/`unavailable` outcomes, and translate dependency failure into stable
+  `503/DEPENDENCY_UNAVAILABLE`. Browser-filter lookup/touch stops dispatch without
+  clearing a valid cookie. No application retry or session grant follows ambiguity.
+- **Passed:** focused real-Redis delayed-write/closed-connection tests and HTTP/filter
+  rejection, no-grant, no-retry, and safe-label/error tests; full BFF Gradle check
+  (unit/integration/architecture/SpotBugs/format/coverage); BFF PIT 110/248 mutants
+  killed (44%) under the existing threshold; official checksum-pinned
+  repository actionlint/ShellCheck/Ruff and baseline gates.
+- **Not verified:** refreshed production-fidelity/load/soak
+  evidence for this follow-up. Record the new clean implementation revision after
+  execution, inspect any classified failures, and update this receipt before stopping.
+
+Then obtain and validate the remaining external-runtime evidence. Keep Stage 7
+`IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
+review; do not advance to Stage 8 before then.
 
 ## 7. Stage review checklist
 

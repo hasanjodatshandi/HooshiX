@@ -69,6 +69,14 @@ Session/pre-auth state remains server-side Redis authority under current ADRs. B
 
 Session creation/rotation/revocation/idle/absolute lifetime, user-session index, retained refresh encryption/key-ring behavior, and OIDC pre-auth limits remain under current ADR-0016/Identity contracts.
 
+Browser-session Redis commands have a 75ms command deadline and no application retry.
+Transport/server failures and timeouts map to `503/DEPENDENCY_UNAVAILABLE`, including
+session lookup/touch in the browser filter. Dependency failure is not an invalid-session
+result: it neither clears a valid browser cookie nor permits dispatch. A timed-out
+write may already have executed; the caller receives no grant/success, and any anonymous
+state left by an ambiguous bootstrap expires under its existing ten-minute TTL.
+Atomic rotation and revocation semantics are unchanged.
+
 For active TOTP, the BFF converts Identity's primary-proof result into a five-minute `MFA_PREAUTH` browser session. The Identity challenge is AES-GCM encrypted in Redis with locator/purpose binding and is never returned to browser JavaScript. TOTP or recovery proof completion uses that server-held challenge once, has a 1500ms child deadline, no automatic retry, no fallback, and atomically rotates into the completed authenticated browser session. MFA enrollment/disable/replacement/recovery-code mutations likewise use only the server-held Identity refresh credential and rotate cookie, CSRF, and encrypted refresh state from Identity's result.
 
 CSRF tokens remain JavaScript-memory-only. `/api/v1/auth/session/csrf` is the narrow reload-recovery path: it is exempt only from the lost CSRF proof itself, still requires exact same-origin Origin and Fetch Metadata, uses SameSite cookie binding, rotates the server-side browser locator/CSRF state, and preserves any encrypted Identity refresh credential or MFA challenge only server-side. Cross-origin, missing Fetch Metadata, invalid/expired session, and ordinary unsafe-route CSRF negatives remain fail closed.
