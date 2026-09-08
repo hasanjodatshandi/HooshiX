@@ -10,6 +10,11 @@ global:
 deployment:
   replicas: 1
   additionalContainers: []
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
 ingressClass:
   enabled: false
 providers:
@@ -56,16 +61,27 @@ api:
   dashboard: false
   insecure: false
 log:
-  general:
-    format: json
-    level: INFO
+  format: json
+  level: INFO
 accessLog:
   enabled: true
   format: json
   fields:
-    general:
-      defaultMode: keep
+    defaultMode: drop
+    names:
+      DownstreamStatus: keep
+      Duration: keep
+      OriginStatus: keep
+      OriginDuration: keep
+      Overhead: keep
+      RetryAttempts: keep
+      StartUTC: keep
+      RouterName: keep
+      ServiceName: keep
+      entryPointName: keep
     headers:
+      defaultMode: drop
+    queryParameters:
       defaultMode: drop
 resources:
   requests:

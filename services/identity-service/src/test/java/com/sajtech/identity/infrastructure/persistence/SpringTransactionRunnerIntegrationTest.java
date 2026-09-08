@@ -3,14 +3,47 @@ package com.sajtech.identity.infrastructure.persistence;
 import static com.sajtech.identity.application.transaction.model.TransactionProfile.MAINTENANCE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.google.protobuf.ByteString;
+import com.sajtech.identity.application.authentication.port.in.IssueAudienceAccessToken;
+import com.sajtech.identity.application.authentication.port.in.LogoutAll;
+import com.sajtech.identity.application.authentication.port.in.LogoutCurrent;
+import com.sajtech.identity.application.authentication.port.in.RefreshSession;
+import com.sajtech.identity.application.authentication.port.out.LoginQuotaPort;
+import com.sajtech.identity.application.authentication.port.out.PasswordVerificationPort;
+import com.sajtech.identity.application.authentication.port.out.SessionCredentialPort;
+import com.sajtech.identity.application.authentication.usecase.AuthenticateLocalUseCase;
+import com.sajtech.identity.application.registration.service.ContactCanonicalizer;
+import com.sajtech.identity.application.registration.service.PasswordNormalizer;
 import com.sajtech.identity.application.transaction.model.TransactionFailure;
 import com.sajtech.identity.application.transaction.model.TransactionUnavailableException;
+import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
+import com.sajtech.identity.contract.v1.AuthenticateLocalRequest;
+import com.sajtech.identity.contract.v1.AuthenticationChannel;
+import com.sajtech.identity.contract.v1.AuthenticationTrustedClientAddress;
+import com.sajtech.identity.contract.v1.IdentityAuthenticationServiceGrpc;
+import com.sajtech.identity.interfaces.authentication.grpc.IdentityAuthenticationGrpcService;
+import com.sajtech.identity.interfaces.observability.grpc.TransactionFailureServerInterceptor;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.grpc.ManagedChannel;
+import io.grpc.Server;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.inprocess.InProcessChannelBuilder;
+import io.grpc.inprocess.InProcessServerBuilder;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.Clock;
 import java.time.Duration;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -19,6 +52,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.jooq.autoconfigure.ExceptionTranslatorExecuteListener;
+import org.springframework.boot.jooq.autoconfigure.JooqAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
@@ -144,6 +181,111 @@ class SpringTransactionRunnerIntegrationTest {
                       .isEqualTo(TransactionFailure.LOCK_TIMEOUT));
       assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(1));
       blocker.rollback();
+    }
+  }
+
+  @Test
+  void directCredentialReadPoolExhaustionMapsThroughUnaryTransportAndRecovers() {
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(POSTGRES.getJdbcUrl());
+    config.setUsername(POSTGRES.getUsername());
+    config.setPassword(POSTGRES.getPassword());
+    config.setMaximumPoolSize(1);
+    config.setMinimumIdle(0);
+    config.setConnectionTimeout(250);
+    config.setPoolName("identity-direct-query-budget-test");
+    try (HikariDataSource pool = new HikariDataSource(config)) {
+      new ApplicationContextRunner()
+          .withConfiguration(AutoConfigurations.of(JooqAutoConfiguration.class))
+          .withPropertyValues("spring.jooq.sql-dialect=POSTGRES")
+          .withBean(DataSource.class, () -> pool)
+          .withBean(ExceptionTranslatorExecuteListener.class, DatabaseFailureTranslation::new)
+          .run(
+              context -> {
+                assertThat(context).hasNotFailed();
+                assertThat(context).hasSingleBean(ExceptionTranslatorExecuteListener.class);
+                DSLContext pooledDsl = context.getBean(DSLContext.class);
+                JooqAuthenticationStore store = new JooqAuthenticationStore(pooledDsl);
+                LoginQuotaPort quota = mock(LoginQuotaPort.class);
+                PasswordVerificationPort verifier = mock(PasswordVerificationPort.class);
+                SessionCredentialPort credentials = mock(SessionCredentialPort.class);
+                TransactionRunner authenticationTransactions = mock(TransactionRunner.class);
+                AuthenticateLocalUseCase authentication =
+                    new AuthenticateLocalUseCase(
+                        new ContactCanonicalizer(),
+                        new PasswordNormalizer(),
+                        quota,
+                        verifier,
+                        credentials,
+                        authenticationTransactions,
+                        store,
+                        Clock.systemUTC());
+                SimpleMeterRegistry meters = new SimpleMeterRegistry();
+                String name = InProcessServerBuilder.generateName();
+                Server server =
+                    InProcessServerBuilder.forName(name)
+                        .directExecutor()
+                        .intercept(new TransactionFailureServerInterceptor(meters))
+                        .addService(
+                            new IdentityAuthenticationGrpcService(
+                                authentication,
+                                mock(RefreshSession.class),
+                                mock(LogoutCurrent.class),
+                                mock(LogoutAll.class),
+                                mock(IssueAudienceAccessToken.class)))
+                        .build()
+                        .start();
+                ManagedChannel channel =
+                    InProcessChannelBuilder.forName(name).directExecutor().build();
+                try {
+                  try (Connection held = pool.getConnection()) {
+                    byte[] address = {(byte) 192, 0, 2, 9};
+                    AuthenticateLocalRequest request =
+                        AuthenticateLocalRequest.newBuilder()
+                            .setRequestId(UUID.randomUUID().toString())
+                            .setChannel(AuthenticationChannel.AUTHENTICATION_CHANNEL_EMAIL)
+                            .setContact("pool-probe@example.com")
+                            .setPassword("synthetic-pool-probe-password")
+                            .setClientAddress(
+                                AuthenticationTrustedClientAddress.newBuilder()
+                                    .setAddress(ByteString.copyFrom(address)))
+                            .build();
+                    long started = System.nanoTime();
+                    assertThatThrownBy(
+                            () ->
+                                IdentityAuthenticationServiceGrpc.newBlockingStub(channel)
+                                    .withDeadlineAfter(2, TimeUnit.SECONDS)
+                                    .authenticateLocal(request))
+                        .isInstanceOfSatisfying(
+                            StatusRuntimeException.class,
+                            failure -> {
+                              assertThat(failure.getStatus().getCode())
+                                  .isEqualTo(Status.Code.RESOURCE_EXHAUSTED);
+                              assertThat(failure.getStatus().getDescription())
+                                  .isEqualTo("IDENTITY_DATABASE_POOL_UNAVAILABLE");
+                              assertThat(failure.getStatus().getCause()).isNull();
+                            });
+                    assertThat(Duration.ofNanos(System.nanoTime() - started))
+                        .isLessThan(Duration.ofSeconds(2));
+                    assertThat(held.isClosed()).isFalse();
+                    verify(quota).checkSource(address);
+                    verifyNoMoreInteractions(quota);
+                    verifyNoInteractions(verifier, credentials, authenticationTransactions);
+                    assertThat(
+                            meters
+                                .get("identity.database.transaction.failures")
+                                .tag("failure", "POOL_UNAVAILABLE")
+                                .counter()
+                                .count())
+                        .isEqualTo(1.0);
+                  }
+                  assertThat(pooledDsl.fetchValue("SELECT 1", Integer.class)).isEqualTo(1);
+                } finally {
+                  channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+                  server.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+                  meters.close();
+                }
+              });
     }
   }
 

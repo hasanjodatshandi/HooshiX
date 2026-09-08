@@ -343,6 +343,9 @@ infrastructure/traefik/values-local.yaml
 infrastructure/waf/Caddyfile
 infrastructure/waf/Dockerfile
 infrastructure/waf/kubernetes.yaml
+infrastructure/waf/opaque-cookie-exclusions.conf
+infrastructure/waf/patches/hooshix_logging_test.go
+infrastructure/waf/patches/safe-rule-logging.patch
 infrastructure/waf/pins.env
 infrastructure/waf/vendor/4.25.1/coreruleset-4.25.1.tar.gz
 scripts/baseline/tests/test_verify_repository.py
@@ -365,6 +368,7 @@ scripts/platform/common.sh
 scripts/platform/edge_delete.sh
 scripts/platform/edge_foundation_verify.sh
 scripts/platform/edge_install.sh
+scripts/platform/edge_restart_verify.sh
 scripts/platform/edge_verify.sh
 scripts/platform/git_provenance.py
 scripts/platform/istio_delete.sh
@@ -407,6 +411,7 @@ scripts/platform/tests/test_deterministic_bootstrap.py
 scripts/platform/tests/test_git_provenance.py
 scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
+scripts/platform/waf_image_smoke.py
 scripts/production/build_provenance.py
 scripts/production/install_release_tools.sh
 scripts/production/readiness.py
@@ -826,6 +831,7 @@ services/identity-service/src/main/java/com/sajtech/identity/infrastructure/obse
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedSemanticQuota.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/observability/ObservedTenantLifecycle.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/AuthorizationOutboxTelemetryQuery.java
+services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/DatabaseFailureTranslation.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqAuthenticationStore.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqErasureCommandOutbox.java
 services/identity-service/src/main/java/com/sajtech/identity/infrastructure/persistence/JooqErasureReceiptCoordinator.java
@@ -930,6 +936,7 @@ services/identity-service/src/test/java/com/sajtech/identity/infrastructure/clie
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/observability/ObservedMfaTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/observability/ObservedPasswordLifecycleTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/observability/ObservedTenantLifecycleTest.java
+services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/DatabaseFailureTranslationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityAuthenticationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityRegistrationPersistenceIntegrationTest.java
 services/identity-service/src/test/java/com/sajtech/identity/infrastructure/persistence/IdentityTenantContextIntegrityIntegrationTest.java
@@ -1219,6 +1226,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/configuration/WebBffMigrationP
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/GoogleOidcClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityBffRegistrationClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGatewaySurfaceCharacterizationTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGrpcClientSupportTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptorTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/OidcClockSafetyGuardTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/RedisOidcQuotaIntegrationTest.java

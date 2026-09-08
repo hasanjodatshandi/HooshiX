@@ -98,6 +98,13 @@ Every BFF internal edge is registered with exact workload identity, criticality/
 
 Authoritative security dependencies do not use automatic retry/stale allow.
 
+Identity `RESOURCE_EXHAUSTED` is not automatically a user quota response. Only the
+reviewed `QUOTA_EXCEEDED` semantic (plus the existing profile contact-count business
+limit `CONTACT_LIMIT_REACHED`) maps to HTTP 429. Database-pool exhaustion,
+authentication admission pressure and other capacity/unknown exhaustion map to the
+stable dependency-unavailable HTTP 503 response. The BFF does not retry or infer an
+authentication/session result after this ambiguous dependency failure.
+
 Reference Data:
 
 - before ADR-0041 independent-service trigger, BFF may serve the approved immutable reference bundle through an in-process adapter;

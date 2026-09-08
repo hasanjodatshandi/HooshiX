@@ -162,7 +162,7 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Local load/soak capacity gates passed at the revision in the continuation receipt; session-failure follow-up verification and required external-runtime evidence remain open. |
+| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Rebuilt local staging and load/soak gates passed at `25b747e`; both resulting WAF/privacy and Identity pool-failure findings are corrected and locally verified. Formal post-fix staging/capacity, protected CI, and external-runtime evidence remain open. |
 | 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
@@ -186,7 +186,9 @@ cancellation behavior is bounded and testable.
 
 This is interruption-safe progress evidence, not a completion receipt. The latest
 completed local production-fidelity and capacity run used the clean implementation
-revision `a29486549bec3b258376c6c66b51714f94e94947` on 2026-09-07. Earlier coverage,
+revision `25b747e4a7070d6cfc0602eb0506d6b5bebb5866` on 2026-09-08, as recorded in the
+rebuild receipt below. The following 2026-09-07 measurements belong to
+`a29486549bec3b258376c6c66b51714f94e94947`. Earlier coverage,
 mutation, plan, and developer-local erasure receipts were recorded at
 `a8d100edcbd61d37ec314d9ac138a95266a3e24c`; they are commit-bound historical evidence,
 not proof for later changes.
@@ -251,7 +253,7 @@ Corrective work already included in the measured revision:
   Authorization, and BFF full Gradle checks support the change. No security budget,
   retry, fail-closed result, or memory reserve was relaxed.
 
-Current session-failure follow-up remains `IN PROGRESS`:
+Session-failure implementation and historical deployment interruption:
 
 - Session Redis commands now share the existing timing/error boundary, classify only
   fixed `timeout`/`unavailable` outcomes, and translate dependency failure into stable
@@ -270,13 +272,99 @@ Current session-failure follow-up remains `IN PROGRESS`:
   Read-only container diagnostics show the control plane restarted at
   `2026-09-07T10:40:06Z`, after the earlier capacity run, with only its core static
   pods running. Earlier API startup diagnostics reported missing system namespaces.
-  The cause of the missing cluster state is **Inconclusive**. No RBAC bypass,
-  cluster deletion, or reconstruction has been performed.
-- **Not run:** refreshed production-fidelity/load/soak evidence for the session
-  follow-up or subsequent Tomcat patch. Restoring the configured cluster access/state,
-  or explicit owner approval to delete and rebuild only the `platform-local` test
-  cluster, is required first. Deletion would remove its three test nodes and any
-  remaining cluster-local data, not repository/Git data; recovery is not established.
+  Its exact historical cause remains **Inconclusive**. The configured etcd storage
+  is the explicitly ephemeral `/dev/shm/hooshix-kind/etcd`; loss on WSL restart is
+  consistent with the documented topology, not evidence of a persistent-volume
+  recovery guarantee. The subsequent owner-approved rebuild is recorded below.
+
+Owner-approved local rebuild and refreshed capacity receipt, 2026-09-08:
+
+- The owner explicitly approved deleting/rebuilding only `platform-local`. Its three
+  old kind nodes and cluster-local state were removed; repository/Git data and the
+  existing local registry were preserved. Recovery of removed cluster data is not
+  established. Do not repeat `production-fidelity-up` merely to resume: it deletes
+  and recreates this ephemeral cluster. Use the component deploy/verify commands.
+- **Passed:** `production-fidelity-up` at clean
+  `25b747e4a7070d6cfc0602eb0506d6b5bebb5866`: restored configured operator access,
+  all three Ready nodes, five exact-source service images, persistence, strict Ambient
+  identity/bypass negatives, Kyverno, edge/WAF, and full observability including
+  backend-outage non-authority tests. Log: `.platform-runtime/stage7/approved-rebuild.log`.
+- **Passed:** unchanged 60-second/concurrency-16 invalid-login capacity thresholds,
+  UTC `03:26:32`–`03:27:32`: 6,514 operations, 6,510 expected outcomes (99.939%),
+  p99 441.052 ms, minimum CPU/memory headroom 52.116%/72.210%.
+  Four unexpected responses remain material follow-up, not zero-error evidence:
+  three `LOGIN_HTTP_403_INVALID_PROBLEM` and one
+  `LOGIN_HTTP_503_DEPENDENCY_UNAVAILABLE`.
+- **Passed:** unchanged 1,800-second/concurrency-8 bootstrap soak, UTC
+  `03:27:32`–`03:57:33`: 283,189/283,189 successes (100%), no unexpected failure,
+  p99 59.126 ms, minimum CPU/memory headroom 70.737%/71.138%.
+  Both runs recorded zero application restarts, OOM kills or pod-UID changes.
+  Swap movement was nonzero but isolated (maximum consecutive active samples: one
+  in each run), below the unchanged five-consecutive-sample failure threshold.
+  Exact mode-0600 JSON receipts: `.platform-runtime/stage7/capacity-25b747e-20260908/`.
+- **Passed:** BFF session Redis metric aggregates contained only fixed `ok` outcomes
+  through these runs. The previous four bootstrap 500s did not recur; this does not
+  retroactively establish their original cause.
+- **Passed locally:** all three load 403s were traced to CRS rule 930120 inspecting
+  a valid opaque session locator. The exact one-cookie locator shape is now excluded
+  only from that rule; malformed/duplicate/other cookies, arguments, bodies and other
+  rules remain inspected. The pinned coraza-caddy source is checksum-verified, patched
+  before compilation to emit only fixed events plus numeric rule metadata, and covered
+  by embedded CRS/privacy tests. Audit/debug expansion is off, Caddy request metadata
+  is dropped, and the immutable local image is
+  `sha256:22ba62be1b1bdc55c4f5a5ce7236e006c93f58ff02ca5caca133494b5171efab`.
+  Its no-network packaged-image smoke and configuration validation passed.
+- **Passed locally:** Traefik chart-41 access logging now uses a response/timing-only
+  allowlist. Its single-node host-port update does not surge. An exact current
+  Kubernetes API EndpointSlice `/32` and TCP port is installed before the chart so a
+  replacement pod can restore Gateway watches without broad egress. The complete edge
+  verifier passed foundation, strict Ambient identity positives/negatives, synthetic
+  privacy canaries, a real Traefik pod replacement and post-restart WAF routing.
+- **Passed locally:** the Identity SQL connection-acquisition exception was confirmed
+  to escape a direct pre-transaction credential read. Direct and transactional jOOQ
+  paths now share type/SQLSTATE-based finite failure translation; the unary boundary
+  returns `RESOURCE_EXHAUSTED / IDENTITY_DATABASE_POOL_UNAVAILABLE` without a cause,
+  grant, retry or second quota charge and recovers after the held connection releases.
+  BFF maps only reviewed quota/business-limit descriptions to 429 and maps capacity or
+  unknown exhaustion to stable 503. Fresh full Identity and BFF `check bootJar` runs,
+  including integration, architecture, SpotBugs, formatting and coverage gates, passed.
+  One Identity unit test first exceeded its existing 100 ms client deadline while both
+  service suites were deliberately rerun concurrently; the isolated unchanged suite
+  then passed all 23 executed tasks. No production deadline was relaxed.
+- **Not run:** formal post-fix clean-commit image build/deploy, renewed complete-stack
+  fidelity/capacity/soak evidence and protected CI. Local focused evidence is not a
+  substitute for those commit-bound gates.
+- **Not verified:** official complete HIBP corpus, authorized real Google/Liara/IPPanel
+  exercises and real staging four-participant erasure restore/redeploy evidence.
+  Generated local fixtures cannot satisfy those gates; secrets must not be sent in chat.
+
+#### Load-finding remediation review report
+
+This report covers only the bounded WAF/Traefik and Identity/BFF corrections caused by
+the measured load findings. It is not a Stage 7 completion receipt.
+
+| Required field | Review evidence |
+| --- | --- |
+| Architecture review mode | `full-read`; security/PII/persistence/platform work reviewed under `minimal-safe-engineering` critical priorities |
+| Architecture document version/commit | Worktree based on `25b747e4a7070d6cfc0602eb0506d6b5bebb5866`; `origin/main` reviewed at `a52dfd82856a1da9419e7d9cd4c20b96acf783fe`; final correction commit and base reconciliation remain pre-merge gates |
+| Architecture sections reviewed | Mandatory source order; edge/network/client trust, BFF/Identity service boundaries, synchronous failure containment, PII-safe observability, performance/capacity, test/CI and local edge runbook |
+| Search terms used | `930120`, `MATCHED_VAR`, `ErrorLog`, `accessLog.fields`, `EndpointSlice`, `NetworkPolicy`, `RESOURCE_EXHAUSTED`, `SQLTransientConnectionException`, `TransactionUnavailableException`, `QUOTA_EXCEEDED` |
+| ADRs reviewed or changed | ADR-0001/0016/0024/0025/0031/0039/0042/0043/0044/0045; no ADR changed |
+| Changed bounded context/module | Local Traefik/WAF edge; Identity persistence failure adapter/transport evidence; Web BFF Identity failure mapping; protected baseline wiring |
+| Contracts changed | No schema or public route changed. Existing stable gRPC descriptions and HTTP problem codes are classified more narrowly; compatibility tests cover the mappings |
+| Database migration | Not applicable; no schema, query or migration changed |
+| Transaction boundary | Unchanged. The same classifier now also covers direct jOOQ execution before a transaction begins |
+| Timeout/deadline behavior | Unchanged: query, pool-acquisition, gRPC and BFF deadlines were not increased |
+| Retry/cancellation/concurrency behavior | No retry added and no pool/concurrency limit increased. Local one-replica Traefik uses `maxSurge: 0`/`maxUnavailable: 1` because its host ports are exclusive |
+| Kafka/event and idempotency behavior | Unchanged; no event, Outbox/Inbox or idempotency contract changed |
+| Security impact | Removes valid opaque-locator false positives without disabling a rule globally; preserves WAF enforcement; capacity ambiguity fails closed as 503 rather than a false user quota result; API egress is one resolved `/32` and port |
+| Istio identity and authorization impact | Existing strict Ambient identity and WAF-only public route remain unchanged and passed positive/negative runtime verification |
+| Logging and PII impact | Expanded Coraza match/request text and Traefik request metadata are removed; fixed low-cardinality numeric WAF events remain. Synthetic canaries and all severity levels are tested |
+| Observability added or changed | Edge log fields narrowed; Identity retains the existing low-cardinality `failure` metric. Telemetry remains non-authoritative |
+| Build/CI/architecture enforcement changed | Protected baseline now requires checksum-pinned WAF source build, embedded rule/privacy tests, packaged configuration validation and no-network image smoke; repository/platform static tests cover the wiring |
+| Tests executed | WAF build/embedded tests and image smoke, Caddy validation, full local edge/identity/restart verification, 17 platform tests, all repository baseline suites, and fresh full Identity/BFF Gradle suites passed; one concurrent Identity timing failure and its isolated passing rerun are recorded above |
+| Architecture deviations | None identified within this correction. Local single-node restart briefly interrupts ingress and is not an HA claim |
+| Rollback considerations | Do not restore raw WAF/request logging, remove exact API watch egress, globally disable CRS 930120, route around WAF, or map unknown capacity to 429. Replace the source patch only with an upstream version that passes the same privacy/boundary gates |
 
 Stage 7 CI remediation on 2026-09-07:
 
@@ -332,12 +420,13 @@ CI remediation completion receipt, not Stage 7 completion:
   executed, 110/248 mutants killed (44%), 67% selected-class line coverage and 59%
   test strength. No CI bypass, checksum wildcard, suppression, or reduced gate was used.
 - The two original CI failures and the fresh-CI metadata failure are resolved.
-  Current blockers are the inaccessible test cluster and the required external-runtime
-  evidence, not unfinished CI remediation. PR #126 remains Draft and Stage 7 remains
+  The cluster blocker was subsequently removed by the approved rebuild above.
+  Commit-bound load-finding verification and required external-runtime evidence remain open,
+  not unfinished CI remediation. PR #126 remains Draft and Stage 7 remains
   `IN PROGRESS`; `main` was not changed.
-- **Continuation action:** obtain owner restoration of `kind-platform-local` access
-  and state, or explicit approval for the scoped destructive test-cluster rebuild;
-  then build/deploy the current clean revision and rerun production-fidelity/capacity.
+- **Continuation action:** commit and protect-check the locally verified WAF/Identity
+  correction, build/deploy that exact clean revision without another cluster rebuild,
+  and rerun production-fidelity/capacity.
   Obtain the complete official HIBP corpus path/provenance and authorized staging
   provider configuration/test-recipient paths before the required external exercises.
   Never request secret values in chat or substitute synthetic claims for these runs.

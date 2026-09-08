@@ -72,6 +72,23 @@ localhost:8443 -> node port 443 -> Traefik `websecure`
 The exact mapping belongs in `infrastructure/kind/cluster.yaml` and must be
 reviewed with the local baseline.
 
+This single ingress-ready node cannot run two replicas holding the same host ports.
+Local upgrades therefore use `maxSurge: 0`, `maxUnavailable: 1`: the old instance
+releases the ports before its replacement starts. A brief local ingress outage is
+expected; this is not a zero-downtime or HA update guarantee. Do not bypass the WAF
+or remove placement/security constraints to make a second host-port pod schedulable.
+
+Traefik's Kubernetes Gateway provider needs long-lived list/watch connectivity to
+the cluster API. Service destination rewriting occurs before the local Calico egress
+decision, so a Service-ClusterIP rule does not authorize this path. Before creating
+or updating Traefik, the installer resolves the one ready `kubernetes` EndpointSlice
+address and HTTPS target port, validates a single IPv4 endpoint, and creates a
+separate exact `/32` + TCP-port NetworkPolicy. DNS and WAF rules remain separate.
+Without this exact rule, existing watch connections may mask the defect until a
+restart, after which every application route degrades to Traefik 404. The verifier
+compares current EndpointSlice and policy exactly; do not replace this with a node,
+pod or Internet CIDR.
+
 ## Pod Security exception
 
 The local Traefik deployment uses `hostPort` for ports 80 and 443 so host traffic
@@ -179,6 +196,41 @@ The WAF must:
 
 Local WAF tests do **not** prove upstream L3/L4 DDoS mitigation.
 
+### Opaque-cookie and logging profile
+
+Traefik chart 41 uses flat `accessLog.fields.defaultMode/names`, not the older
+`fields.general` shape. Access logs keep only response status, timing, retry count,
+timestamp and configured router/service/entrypoint names. Request paths, queries,
+client addresses, user names, host values and headers are not logged. Explicit
+query-parameter dropping remains enabled as an additional guard.
+
+`infrastructure/waf/opaque-cookie-exclusions.conf` is owned by the BFF/edge
+boundary. It excludes only the value of one well-formed `__Host-sajtech-session`
+or `__Host-sajtech-preauth` cookie from CRS rule 930120. The accepted shape is one
+1–64 character alphanumeric/underscore/hyphen key ID, one dot, and exactly 43
+base64url characters, matching the BFF opaque locator format. Duplicate cookies,
+malformed values, other cookies, cookie names, arguments, and all other CRS rules
+remain inspected. This is a format-bound permanent exception, not a route bypass;
+review it with any cookie-format or CRS update. The BFF remains the only session
+authority and validates the key, Redis state, expiry, Origin and CSRF independently.
+
+The pinned coraza-caddy module receives the small repository-owned
+`patches/safe-rule-logging.patch` before compilation. Upstream module bytes are
+verified against the public Go checksum database and the exact recorded module hash;
+the module cache is never patched. The patch replaces expanded rule/request text
+with fixed events and numeric rule/severity/status fields. Raw transaction audit
+logging and debug logging are off; safe rule/block events remain enabled. These are
+ordinary WAF diagnostics, not the separately required durable business/security
+audit. Caddy's native filter cannot redact its reserved message field, so merely
+filtering structured cookie fields does not solve the upstream rule-text exposure.
+
+The image build executes synthetic logging tests at every severity and tests the
+exact pinned CRS/exclusion boundary. Protected baseline CI requires that build and
+packaged configuration validation. Local edge verification additionally checks
+blocked-request canaries and numeric rule evidence. Remove the patch only when an
+upstream replacement passes the same privacy tests; never roll back to raw request
+logging or disable required WAF rules to obtain a passing capacity run.
+
 ## Prerequisites
 
 ```bash
@@ -239,6 +291,8 @@ The verifier must check at least:
 - the public Route backend points to `edge-waf`, not `web-bff`;
 - HTTP/HTTPS behavior matches local policy;
 - WAF receives the request before BFF;
+- after replacing the single Traefik pod, the exact API egress restores the
+  Gateway/HTTPRoute watch and controlled WAF route without manual resource edits;
 - a controlled WAF detection/blocking test produces the expected rule result;
 - Traefik -> WAF is allowed by identity;
 - WAF -> BFF is allowed by identity;

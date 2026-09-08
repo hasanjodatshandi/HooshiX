@@ -47,6 +47,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.jooq.autoconfigure.DefaultConfigurationCustomizer;
+import org.springframework.boot.jooq.autoconfigure.ExceptionTranslatorExecuteListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -179,6 +180,11 @@ class IdentityCoreRuntimeConfiguration {
   @Bean
   DefaultConfigurationCustomizer identityJooqTimeout() {
     return configuration -> configuration.settings().setQueryTimeout(3);
+  }
+
+  @Bean
+  ExceptionTranslatorExecuteListener identityDatabaseExceptionTranslator() {
+    return new DatabaseFailureTranslation();
   }
 
   @Bean

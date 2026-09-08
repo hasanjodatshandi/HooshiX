@@ -48,7 +48,7 @@ This matrix records production technology combinations that must remain compatib
 | `production-single-server` human access | host OpenSSH + FIDO2 + JIT + audit | exact package pin; WireGuard separate; no root/password/shared key |
 | `production-ha` human access | Teleport 18.10.0 | JIT/SSO/WebAuthn/session-audit evidence |
 | OpenBao | 2.6.1 | exact secret authority; unchanged by current single-server/network/observability/DevSecOps decisions |
-| Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0; combined image/rules tests |
+| Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0 with repository safe-rule-logging patch; combined image/rules, opaque-cookie and log-privacy tests |
 | Argo CD | 3.4.2 | security-patched line; reconciliation/rollback validation |
 
 Trivy and OWASP Dependency-Check are not current baseline components. Under ADR-0045 they are reconsidered only if a distinct coverage gap is evidenced and the compatibility/ownership/exception model is reviewed.

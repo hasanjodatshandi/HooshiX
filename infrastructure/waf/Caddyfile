@@ -4,7 +4,12 @@
   admin off
   log default {
     output stdout
-    format json
+    format filter {
+      wrap json
+      fields {
+        request delete
+      }
+    }
     level INFO
   }
 }
@@ -14,7 +19,10 @@
     load_owasp_crs
     directives `
       Include @coraza.conf-recommended
+      SecAuditEngine Off
+      SecDebugLogLevel 0
       Include /etc/coraza/crs/crs-setup.conf.example
+      Include /etc/coraza/opaque-cookie-exclusions.conf
       Include /etc/coraza/crs/rules/*.conf
       SecRuleEngine On
       SecResponseBodyAccess Off

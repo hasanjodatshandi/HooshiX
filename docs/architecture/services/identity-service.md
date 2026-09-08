@@ -181,6 +181,13 @@ pooled connection. Direct jOOQ statements retain a three-second outer query time
 the Notification handoff/result stores additionally apply the applicable transaction-
 local worker budgets.
 
+The same finite database-failure classifier is installed as Spring Boot's jOOQ
+exception translator, so direct pre-transaction reads do not bypass the transport
+contract. Only recognized deadline, lock and connection/pool categories are
+translated; unknown and constraint failures retain the framework's normal specific
+translation. Classification uses exception types and reviewed SQLSTATE categories,
+never SQL text, bind values or vendor messages.
+
 Expected deadline/capacity failures are mapped without database detail disclosure:
 transaction or statement expiry is `DEADLINE_EXCEEDED / IDENTITY_DATABASE_DEADLINE`,
 lock-budget exhaustion is `UNAVAILABLE / IDENTITY_DATABASE_LOCK_UNAVAILABLE`, and

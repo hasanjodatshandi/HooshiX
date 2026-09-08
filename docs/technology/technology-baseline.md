@@ -77,7 +77,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Edge gateway | Traefik 3.7.10 | Helm chart 41.2.0; bundled K3s Traefik disabled |
 | Kubernetes routing API | Gateway API 1.5.1 | Traefik 3.7-supported Standard version |
 | WAF server | Caddy 2.11.4 | immutable digest |
-| WAF connector | coraza-caddy 2.5.0 | version/digest pinned |
+| WAF connector | coraza-caddy 2.5.0 | version/digest pinned; repository safe-rule-logging patch, verified upstream module bytes; see local edge runbook |
 | WAF engine | Coraza 3.7.0 | current choice |
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
