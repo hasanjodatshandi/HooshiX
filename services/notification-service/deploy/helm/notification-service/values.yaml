@@ -79,3 +79,5 @@ observability:
       namespace: ""
       podLabels: {}
       principal: ""
+ambient:
+  waypointName: platform-apps-waypoint

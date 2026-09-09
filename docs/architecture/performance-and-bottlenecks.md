@@ -95,7 +95,7 @@ one-second swap-active samples), finite latency limits, exact expected security-
 counts, and exact Git
 revision. Evidence is written below `.platform-runtime/stage7/capacity/` and is
 validated again after execution. The loopback connection override preserves the
-`hooshix.local` TLS/Host identity and refuses non-loopback destinations.
+`localhost` TLS/Host identity and refuses non-loopback destinations.
 
 This suite is a safe, repeatable staging lower bound. It does not measure the
 Production K3s host, Production HIBP corpus, real providers, backups, external host

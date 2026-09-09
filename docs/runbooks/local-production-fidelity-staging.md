@@ -46,7 +46,7 @@ Grafana 13.1.3
 Alertmanager 0.33.1
 ```
 
-Application images are built from the current source with Eclipse Temurin 25.0.4 and pushed to the loopback local registry. Deployments use the exact recorded image digest.
+Application images are built from the current source with Eclipse Temurin 25.0.4 and pushed to the loopback local registry. Deployments use the exact recorded image digest. The browser-facing staging origin is exactly `https://localhost:8443`; `localhost` is used because Google permits it for local OAuth clients while private pseudo-TLDs such as `.local` are not valid Google OAuth web origins.
 The staging image state also records exact Git `HEAD`, clean/dirty source state, and a SHA-256 over tracked plus non-ignored untracked worktree files. Build, deploy, and verification fail if that source provenance changes between stages. Dirty development work remains testable, but only a `clean` source state is exact commit evidence. A new all-service build replaces the prior image-state file before the first image build, so a partial build cannot silently reuse stale service digests.
 
 ## Security and data boundaries
@@ -73,7 +73,7 @@ The staging image state also records exact Git `HEAD`, clean/dirty source state,
 
 ## Optional provider staging credentials
 
-The default lane keeps Google OIDC and Notification delivery disabled. External credentials are
+The default lane keeps Google OIDC and Notification delivery disabled unless their optional private files are present. External credentials are
 owner-created state and MUST remain outside Git. Do not paste them into chat, shell arguments,
 environment variables, Helm values, or logs. The containing `.platform-runtime/staging/private`
 directory must be user-owned mode `0700`; every credential file must be a regular, non-symlink,
@@ -146,10 +146,30 @@ printing its contents and rejects unsafe ownership, mode, or symlinks.
 ### Google OIDC
 
 Google OIDC is only the optional browser “Sign in with Google” path. It is unrelated to Gmail SMTP or
-SMS.ir and is not required for the current Notification-provider evidence. The owner cannot provision
-its Google Cloud OAuth client in the current environment, so staging leaves it disabled; local-password
-authentication remains available. A future owner-authorized OIDC exercise follows ADR-0016 without
-changing this provider boundary.
+SMS.ir and is not required for Notification-provider evidence. Create a Google OAuth 2.0 **Web
+application** client with these exact entries:
+
+```text
+Authorized JavaScript origin: https://localhost:8443
+Authorized redirect URI:      https://localhost:8443/api/v1/auth/oidc/google/callback
+```
+
+The JavaScript origin contains only scheme, host, and port; the callback path belongs only in the
+redirect URI. Download the client JSON directly into the user-owned mode-`0700` private directory as
+a regular mode-`0600` file:
+
+```text
+.platform-runtime/staging/private/google-oidc-client.json
+```
+
+`scripts/platform/staging_secrets_apply.sh` validates the Web-client shape and atomically derives a
+mode-`0600` client-secret file plus a private client-ID Helm overlay without printing either value.
+`staging_deploy_service.sh web-bff` detects that overlay, enables OIDC, mounts the independent client
+Secret, and renders only the fixed Google HTTPS egress. The Gmail App Password and OAuth client secret
+remain purpose-separated and must never be substituted for one another. Local-password authentication
+remains available when the optional file is absent. Trust the repository-generated localhost test
+certificate in the test browser before an interactive provider exercise; bypassing TLS validation is
+not provider evidence.
 
 ## Verification
 

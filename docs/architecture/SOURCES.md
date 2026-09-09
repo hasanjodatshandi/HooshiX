@@ -124,10 +124,20 @@ ADR-0015 owns HooshiX topology, durability, security, replay, and recovery seman
 documents combined broker/controller nodes as a small/development configuration rather than a
 critical-production recommendation.
 
+### Istio Ambient authorization
+
+- Istio Ambient policy migration: `https://istio.io/latest/docs/ambient/migrate/migrate-policies/`
+- Istio waypoint usage: `https://istio.io/latest/docs/ambient/usage/waypoint/`
+
+Istio documents L4 policy as a ztunnel responsibility and L7 method/path/header policy as a waypoint
+responsibility attached with `targetRefs`. ADR-0002 converts that behavior into the HooshiX explicit
+waypoint and positive/negative verification rules.
+
 ### Google identity and Gmail SMTP
 
 - Google OpenID Connect documentation: `https://developers.google.com/identity/openid-connect/openid-connect`
 - Google OAuth 2.0 web-server flow: `https://developers.google.com/identity/protocols/oauth2/web-server`
+- Google OAuth client URI validation: `https://support.google.com/cloud/answer/15549257`
 - Google App Passwords: `https://support.google.com/accounts/answer/185833`
 - Gmail SMTP server configuration: `https://developers.google.com/gmail/imap/imap-smtp`
 - Gmail sending limits: `https://support.google.com/mail/answer/22839`

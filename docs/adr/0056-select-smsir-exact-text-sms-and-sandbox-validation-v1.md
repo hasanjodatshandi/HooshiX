@@ -91,8 +91,10 @@ readiness.
 ### Google OIDC separation
 
 Google OIDC is a separate optional Web BFF end-user login method. It is unrelated to SMTP Email or
-SMS.ir, is disabled in the current staging execution, and is not a Notification-provider evidence
-requirement. Deferring it does not weaken local-password authentication or provider testing.
+SMS.ir and is not a Notification-provider evidence requirement. Its owner-approved local staging
+configuration, when present, uses a separate Google OAuth client Secret and exact localhost callback;
+it never consumes the SMS.ir or Gmail SMTP credential. Disabling it does not weaken local-password
+authentication or provider testing.
 
 ## Verification requirements
 

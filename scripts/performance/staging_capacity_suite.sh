@@ -3,7 +3,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 output_root=${1:-"${root}/.platform-runtime/stage7/capacity"}
-base_url=${HOOSHIX_CAPACITY_BASE_URL:-https://hooshix.local:8443}
+base_url=${HOOSHIX_CAPACITY_BASE_URL:-https://localhost:8443}
 connect_host=${HOOSHIX_CAPACITY_CONNECT_HOST:-127.0.0.1}
 runner="${root}/scripts/performance/stack_capacity.py"
 workloads=(

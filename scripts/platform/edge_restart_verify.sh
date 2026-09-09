@@ -10,8 +10,8 @@ after=$(k get pod -n traefik-system -l app.kubernetes.io/name=traefik -o jsonpat
 
 code=000
 for _ in $(seq 1 30); do
-  code=$(curl -sk --resolve hooshix.local:8443:127.0.0.1 -o /dev/null -w '%{http_code}' \
-    https://hooshix.local:8443/ -H 'X-HooshiX-WAF-Test: block' || true)
+  code=$(curl -sk --resolve localhost:8443:127.0.0.1 -o /dev/null -w '%{http_code}' \
+    https://localhost:8443/ -H 'X-HooshiX-WAF-Test: block' || true)
   [[ "$code" == 403 ]] && break
   sleep 1
 done

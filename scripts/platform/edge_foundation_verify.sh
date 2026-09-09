@@ -59,11 +59,11 @@ ROUTE_JSON="$route_json" python3 - <<'PY'
 import json,os,sys
 r=json.loads(os.environ['ROUTE_JSON'])
 h=r['spec'].get('hostnames') or []
-if h != ['hooshix.local']: raise SystemExit('public HTTPRoute hostname is not exact hooshix.local')
+if h != ['localhost']: raise SystemExit('public HTTPRoute hostname is not exact localhost')
 refs=[b.get('name') for rule in r['spec'].get('rules',[]) for b in rule.get('backendRefs',[])]
 if refs != ['edge-waf'] or 'web-bff' in refs: raise SystemExit('public HTTPRoute must point only to edge-waf')
 PY
-code=$(curl -sk --resolve hooshix.local:8443:127.0.0.1 -o /tmp/hooshix-waf-block.body -D /tmp/hooshix-waf-block.headers -w '%{http_code}' https://hooshix.local:8443/ -H 'X-HooshiX-WAF-Test: block')
+code=$(curl -sk --resolve localhost:8443:127.0.0.1 -o /tmp/hooshix-waf-block.body -D /tmp/hooshix-waf-block.headers -w '%{http_code}' https://localhost:8443/ -H 'X-HooshiX-WAF-Test: block')
 [[ "$code" == 403 ]] || fail "controlled WAF request expected 403, got $code"
 grep -qi '^X-HooshiX-WAF-Blocked: true' /tmp/hooshix-waf-block.headers || fail "controlled WAF marker missing"
 echo "Traefik/Gateway/WAF foundation verification PASSED"

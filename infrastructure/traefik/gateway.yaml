@@ -23,7 +23,7 @@ spec:
             matchLabels:
               platform.local/gateway-access: "true"
     - name: websecure
-      hostname: hooshix.local
+      hostname: localhost
       port: 8443
       protocol: HTTPS
       tls:

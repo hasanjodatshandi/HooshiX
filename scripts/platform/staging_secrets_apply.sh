@@ -29,9 +29,17 @@ if [[ -e "$provider_file" || -L "$provider_file" ]]; then
 else
   echo 'staging notification provider secret skipped because no local credential file is present'
 fi
+google_oidc_json="$ROOT/.platform-runtime/staging/private/google-oidc-client.json"
 google_oidc_secret="$ROOT/.platform-runtime/staging/private/web-bff-google-client-secret"
+google_oidc_values="$ROOT/.platform-runtime/staging/private/web-bff-google-values.yaml"
+if [[ -e "$google_oidc_json" || -L "$google_oidc_json" ]]; then
+  verify_private_file "$google_oidc_json" "staging Google OIDC client JSON"
+  python3 "$ROOT/scripts/platform/google_oidc_staging.py" --source "$google_oidc_json" --secret-output "$google_oidc_secret" --values-output "$google_oidc_values"
+  echo 'staging Google OIDC client files derived without printing credential values'
+fi
 if [[ -e "$google_oidc_secret" || -L "$google_oidc_secret" ]]; then
   verify_private_file "$google_oidc_secret" "staging Google OIDC client secret"
+  verify_private_file "$google_oidc_values" "staging Google OIDC values"
   k -n platform-apps create secret generic web-bff-google-client --from-file="client-secret=$google_oidc_secret" --dry-run=client -o yaml | k apply -f - >/dev/null
   echo 'staging Google OIDC client secret created without printing its value'
 else

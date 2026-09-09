@@ -12,6 +12,14 @@ repo_var="${key}_REPOSITORY"; digest_var="${key}_DIGEST"; repo=${!repo_var}; dig
 chart="$ROOT/services/$service/deploy/helm/$service"
 values="$ROOT/deploy/staging/$service.yaml"
 extra=()
+if [[ "$service" == web-bff ]]; then
+  google_values="$ROOT/.platform-runtime/staging/private/web-bff-google-values.yaml"
+  if [[ -e "$google_values" || -L "$google_values" ]]; then
+    [[ -f "$google_values" && ! -L "$google_values" ]] || fail "staging Google OIDC values must be a regular non-symlink file"
+    [[ "$(stat -c '%u' "$google_values")" == "$(id -u)" && "$(stat -c '%a' "$google_values")" == 600 ]] || fail "staging Google OIDC values must be user-owned mode 0600"
+    extra+=(-f "$google_values")
+  fi
+fi
 if [[ "$service" == compromised-password-service ]]; then
   dataset_state="$ROOT/.platform-runtime/staging/dataset.env"
   [[ -f "$dataset_state" ]] || fail "generated staging dataset state is missing; run staging-data-install first"

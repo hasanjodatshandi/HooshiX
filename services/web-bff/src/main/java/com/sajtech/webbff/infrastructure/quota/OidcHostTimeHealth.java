@@ -13,8 +13,15 @@ public final class OidcHostTimeHealth {
 
   public boolean synchronizedHealthy() {
     try {
-      return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
-          && "synchronized".equals(Files.readString(path, StandardCharsets.UTF_8).strip());
+      Path absolute = path.toAbsolutePath().normalize();
+      Path parent = absolute.getParent();
+      if (parent == null || !Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)) return false;
+      Path trustedRoot = parent.toRealPath();
+      Path resolved = absolute.toRealPath();
+      return resolved.startsWith(trustedRoot)
+          && Files.isRegularFile(resolved, LinkOption.NOFOLLOW_LINKS)
+          && Files.size(resolved) <= 64
+          && "synchronized".equals(Files.readString(resolved, StandardCharsets.UTF_8).strip());
     } catch (IOException exception) {
       return false;
     }

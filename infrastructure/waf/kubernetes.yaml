@@ -128,7 +128,7 @@ metadata:
 spec:
   parentRefs:
     - {name: hooshix-public, namespace: traefik-system, sectionName: websecure}
-  hostnames: ["hooshix.local"]
+  hostnames: ["localhost"]
   rules:
     - backendRefs:
         - {name: edge-waf, port: 8080}

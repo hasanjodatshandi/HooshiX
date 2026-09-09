@@ -229,7 +229,7 @@ application:    gRPC 9090
 management:     separate configured port
 ```
 
-Only registered workloads/operations are reachable under deny-by-default NetworkPolicy and Istio authorization. Strict Ambient mTLS remains mandatory. Provider egress is limited to explicitly owned Identity integrations; Compromised Password/HIBP runtime egress is not allowed.
+Only registered workloads/operations are reachable under deny-by-default NetworkPolicy and Istio authorization. Strict Ambient mTLS remains mandatory. Identity owns an explicit service waypoint because Authorization and Notification may call only the `BeginParticipantErasure` gRPC operation; the waypoint policy binds that path to those workload principals, while the ztunnel policy admits only the waypoint principal to the workload. The platform waypoint NetworkPolicy permits only the reviewed callers and destinations. Provider egress is limited to explicitly owned Identity integrations; Compromised Password/HIBP runtime egress is not allowed.
 
 Single-server uses one replica/HPA off/availability PDB off. HA uses the current replicated target.
 

@@ -2,7 +2,7 @@ runtime:
   enabled: true
   erasureRuntimeEnabled: true
   requireFetchMetadata: true
-  publicOrigin: https://hooshix.local:8443
+  publicOrigin: https://localhost:8443
 database:
   jdbcUrl: jdbc:postgresql://postgresql.platform-data.svc.cluster.local:5432/web_bff
   podLabels: {app.kubernetes.io/name: postgresql}
