@@ -230,7 +230,8 @@ edges:
     policy_refs:
       - docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md
       - docs/adr/0007-define-notification-v1-runtime.md
-      - docs/adr/0020-select-ippanel-webservice-sms-for-iran.md
+      - docs/adr/0055-use-provider-neutral-smtp-with-google-gmail-staging-v1.md
+      - docs/adr/0056-select-smsir-exact-text-sms-and-sandbox-validation-v1.md
 
   - operation_id: web-bff.google-oidc-login
     caller_owner: Web BFF

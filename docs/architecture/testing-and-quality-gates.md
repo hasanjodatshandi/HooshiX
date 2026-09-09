@@ -328,10 +328,16 @@ Its successful aggregate receipt is stored outside Git at
 `.local-runtime/erasure-recovery-evidence.json`; the closed receipt contains no User,
 request, event, provider, or contact identifier and is bound to the full Git revision.
 
+The production-fidelity kind lane separately exposes `make staging-erasure-recovery`. It requires a
+clean commit-bound five-image deployment, snapshots only the four participant-owned staging
+databases, verifies terminal evidence across deployment restart, restores the pre-completion
+snapshots, and requires normal Outbox/Kafka/Inbox reconciliation without reappearance. Its
+identifier-free aggregate is staging evidence only and cannot prove Production PITR/DR.
+
 `scripts/performance/external_runtime_evidence.py` rejects fixture-corpus claims,
-stale or incomplete HIBP measurements, unexecuted Google/Liara/IPPanel paths,
-missing ambiguity/failure checks, partial four-participant erasure, or evidence that
-contains unknown fields such as credentials. Passing its unit tests proves only the
+stale or incomplete HIBP measurements, unexecuted Google Gmail/SMS.ir Sandbox paths,
+missing ambiguity/failure checks, partial four-participant erasure, any SMS Sandbox delivery claim,
+or evidence that contains unknown fields such as credentials. Passing its unit tests proves only the
 claim validator. The external evidence itself remains `Not verified` until real
 approved inputs and staging execution produce and validate a record.
 

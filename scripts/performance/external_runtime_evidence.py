@@ -10,7 +10,7 @@ import math
 import re
 from pathlib import Path
 
-SCHEMA = "hooshix-stage7-external-runtime-v1"
+SCHEMA = "hooshix-stage7-external-runtime-v3"
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 REVISION = re.compile(r"^[0-9a-f]{40}$")
 
@@ -109,17 +109,27 @@ def validate_evidence(data: object) -> list[str]:
         if not _positive_number(hibp.get(field)):
             errors.append(f"hibp.{field} must be positive")
 
-    providers = _exact_keys(
-        root.get("providers"), {"google", "liara", "ippanel"}, "providers", errors
-    )
+    providers = _exact_keys(root.get("providers"), {"email", "sms"}, "providers", errors)
     provider_fields = {
-        "google": ("executed", "success", "state_nonce_pkce_replay_failure", "no_email_auto_link", "passed"),
-        "liara": ("executed", "starttls_auth", "definitive_acceptance", "auth_failure", "ambiguity", "passed"),
-        "ippanel": ("executed", "one_recipient", "definitive_acceptance", "recipient_delivery", "ambiguity", "passed"),
+        "email": ("executed", "starttls_auth", "hostname_verified", "definitive_acceptance", "auth_failure", "ambiguity", "passed"),
+        "sms": (
+            "executed",
+            "tls_hostname_verified",
+            "authentication_success",
+            "request_validation",
+            "simulated_acceptance",
+            "auth_failure",
+            "adapter_ambiguity",
+            "passed",
+        ),
     }
     for provider, fields in provider_fields.items():
-        evidence = _exact_keys(providers.get(provider), set(fields), provider, errors)
+        evidence = _exact_keys(providers.get(provider), {"provider", *fields}, provider, errors)
         _all_true(evidence, fields, provider, errors)
+    if providers.get("email", {}).get("provider") != "GOOGLE_GMAIL":
+        errors.append("email.provider must identify the staging provider")
+    if providers.get("sms", {}).get("provider") != "SMSIR_SANDBOX":
+        errors.append("sms.provider must identify the SMS.ir Sandbox")
 
     erasure = _exact_keys(
         root.get("erasure"),

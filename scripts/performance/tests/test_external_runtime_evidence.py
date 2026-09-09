@@ -31,27 +31,25 @@ class ExternalRuntimeEvidenceTest(unittest.TestCase):
                 "passed": True,
             },
             "providers": {
-                "google": {
-                    "executed": True,
-                    "success": True,
-                    "state_nonce_pkce_replay_failure": True,
-                    "no_email_auto_link": True,
-                    "passed": True,
-                },
-                "liara": {
+                "email": {
+                    "provider": "GOOGLE_GMAIL",
                     "executed": True,
                     "starttls_auth": True,
+                    "hostname_verified": True,
                     "definitive_acceptance": True,
                     "auth_failure": True,
                     "ambiguity": True,
                     "passed": True,
                 },
-                "ippanel": {
+                "sms": {
+                    "provider": "SMSIR_SANDBOX",
                     "executed": True,
-                    "one_recipient": True,
-                    "definitive_acceptance": True,
-                    "recipient_delivery": True,
-                    "ambiguity": True,
+                    "tls_hostname_verified": True,
+                    "authentication_success": True,
+                    "request_validation": True,
+                    "simulated_acceptance": True,
+                    "auth_failure": True,
+                    "adapter_ambiguity": True,
                     "passed": True,
                 },
             },
@@ -74,19 +72,33 @@ class ExternalRuntimeEvidenceTest(unittest.TestCase):
         evidence = copy.deepcopy(self.evidence)
         evidence["hibp"]["source_kind"] = "GENERATED_TEST_FIXTURE"
         evidence["hibp"]["source_age_days"] = 36
-        evidence["providers"]["google"]["executed"] = False
+        evidence["providers"]["sms"]["executed"] = False
         errors = external_runtime_evidence.validate_evidence(evidence)
         self.assertTrue(any("complete-corpus" in error for error in errors))
         self.assertTrue(any("readiness bound" in error for error in errors))
-        self.assertTrue(any("google.executed" in error for error in errors))
+        self.assertTrue(any("sms.executed" in error for error in errors))
 
     def test_rejects_partial_erasure_and_unknown_evidence_fields(self) -> None:
         evidence = copy.deepcopy(self.evidence)
         evidence["erasure"]["participant_count"] = 3
-        evidence["providers"]["liara"]["credential"] = "must-not-be-recorded"
+        evidence["providers"]["email"]["credential"] = "must-not-be-recorded"
         errors = external_runtime_evidence.validate_evidence(evidence)
         self.assertTrue(any("participant_count" in error for error in errors))
-        self.assertTrue(any("liara structure" in error for error in errors))
+        self.assertTrue(any("email structure" in error for error in errors))
+
+    def test_rejects_any_sandbox_real_delivery_claim(self) -> None:
+        evidence = copy.deepcopy(self.evidence)
+        evidence["providers"]["sms"]["real_delivery_claimed"] = True
+        errors = external_runtime_evidence.validate_evidence(evidence)
+        self.assertTrue(any("sms structure" in error for error in errors))
+
+    def test_rejects_wrong_provider_identities(self) -> None:
+        evidence = copy.deepcopy(self.evidence)
+        evidence["providers"]["email"]["provider"] = "GENERIC_SMTP"
+        evidence["providers"]["sms"]["provider"] = "OTHER"
+        errors = external_runtime_evidence.validate_evidence(evidence)
+        self.assertTrue(any("email.provider" in error for error in errors))
+        self.assertTrue(any("sms.provider" in error for error in errors))
 
 
 if __name__ == "__main__":

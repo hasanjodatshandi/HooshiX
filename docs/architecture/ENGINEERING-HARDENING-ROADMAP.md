@@ -92,7 +92,7 @@ evidence gap is not reported as a confirmed runtime defect.
 | HR-011 | MEDIUM | CI/tooling maintainability | Five service workflows repeat substantial security/build setup. Repository shell/Python/workflow scripts have custom tests but no selected high-signal ShellCheck/actionlint/Python static gate. | 6 |
 | HR-012 | HIGH | Capacity/performance evidence | No executable load/soak/chaos suite or complete-stack headroom proof exists; representative sensitive-query `EXPLAIN` evidence was not found. Required Production headroom remains `NOT VERIFIED`. | 7 |
 | HR-013 | MEDIUM | Test depth | Java and frontend coverage thresholds are absent; selective mutation testing for security state machines is absent; BDD/scenario coverage is narrow. | 7 |
-| HR-014 | HIGH | External/runtime evidence | Full HIBP corpus bounds, real Google/Liara/IPPanel execution, erasure redeploy/restore scenarios, provider ambiguity, and real staging failure evidence remain incomplete or `NOT VERIFIED`. | 7 |
+| HR-014 | HIGH | External/runtime evidence | Full HIBP corpus bounds, Google Gmail execution, production SMS.ir delivery, erasure redeploy/restore scenarios, and provider ambiguity remain incomplete or `NOT VERIFIED`. The simulated SMS.ir Sandbox contract/failure probe is `Passed`; Google OIDC execution is owner-deferred and not applicable to Notification-provider evidence. | 7 |
 | HR-015 | HIGH | MLOps governance | Conversation architecture has no versioned offline synthetic/adversarial evaluation suite, quality/safety/cost/latency promotion thresholds, canary policy, or model/prompt rollback evidence. | 8 |
 | HR-016 | HIGH | AI safety/data control | Content-safety/acceptable-use ownership, provider data-control approval, feedback handling, and drift policy require an explicit reviewed decision before model execution is enabled. | 8 |
 | HR-017 | HIGH | Core product | ADR-0054 Conversation/ModelRun is designed but no executable service, contracts, database, worker/provider adapter, BFF/UI, or lifecycle implementation exists. | 9 |
@@ -200,6 +200,14 @@ not proof for later changes.
 - **Passed:** frontend Vitest/V8 coverage has global and risk-module thresholds, with
   47 current tests; representative Authorization and Notification PostgreSQL plans use
   the intended indexes on realistic local cardinalities without sequential scans.
+- **Passed:** the owner-authorized SMS.ir Sandbox probe verified TLS hostname checking,
+  credential acceptance, invalid-credential rejection, invalid-input rejection, and the
+  documented simulated-success shape. Its identifier-free mode-0600 receipt explicitly
+  records no real delivery claim; it is not production SMS acceptance or delivery evidence.
+- **Partially verified:** the local production-fidelity staging lane now has an exact-digest
+  Kafka 4.2.1 combined KRaft workload, explicit erasure topics, strict mesh/workload policy,
+  per-service connection Secrets, and all four participant gates. Static/platform checks and
+  datastore verification pass; the clean-commit redeploy/restore rehearsal remains pending.
 - **Passed:** `make local-runtime-smoke-erasure-recovery` completed a developer-local
   four-participant erasure, full service redeploy, pre-completion PostgreSQL 18 snapshot
   restore, and normal Outbox/Kafka/Inbox reconciliation without reappearance. Its
@@ -222,9 +230,10 @@ not proof for later changes.
   sampled traces did not retain a classified cause; these are not claimed as diagnosed
   Redis timeouts or as zero-error evidence. This prompted the session-failure follow-up
   below despite the capacity suite passing its unchanged thresholds.
-- **Not verified:** complete official HIBP corpus provenance/bounds, real Google,
-  Liara, and IPPanel executions, and a real staging four-participant erasure
-  restore/redeploy/provider-ambiguity/failure exercise. No real provider call is made
+- **Not verified:** complete official HIBP corpus provenance/bounds, real Google Gmail execution,
+  production SMS.ir delivery, and a real staging four-participant erasure
+  restore/redeploy/provider-ambiguity/failure exercise. Google OIDC is owner-deferred and not part of
+  Notification-provider evidence. No real provider call is made
   without the required credentials, recipient, cost/side-effect authority, and
   environment.
 
@@ -357,8 +366,9 @@ Owner-approved local rebuild and refreshed capacity receipt, 2026-09-08:
   service suites. Authorization and Compromised Password integration steps failed on
   attempt 1 but passed unchanged on the fresh runner; no test or gate was weakened.
   Frontend run `34251259315`, attempt 1, passed. Both runs are bound to `dd95740`.
-- **Not verified:** official complete HIBP corpus, authorized real Google/Liara/IPPanel
-  exercises and real staging four-participant erasure restore/redeploy evidence.
+- **Not verified:** official complete HIBP corpus, authorized real Google Gmail and production SMS.ir
+  exercises, and real staging four-participant erasure restore/redeploy evidence. Google OIDC is an
+  independently implemented optional login path and is owner-deferred for this stage.
   Generated local fixtures cannot satisfy those gates; secrets must not be sent in chat.
 
 #### Load-finding remediation review report

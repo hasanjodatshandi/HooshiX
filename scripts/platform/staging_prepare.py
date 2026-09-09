@@ -50,6 +50,9 @@ def main():
     write('authorization-quota-redis/AUTHORIZATION_QUOTA_REDIS_URI',f"redis://authorization:{data['redis_authorization']}@{redis_host}",False)
     write('identity-quota-redis/quota_redis_uri',f"redis://identity:{data['redis_identity']}@{redis_host}",False)
     write('web-bff-redis/WEB_BFF_REDIS_URI',f"redis://webbff:{data['redis_webbff']}@{redis_host}",False)
+    kafka_bootstrap='kafka.platform-data.svc.cluster.local:9093'
+    for service in ('authorization','identity','notification','web-bff'):
+        write(f'{service}-kafka/spring.kafka.bootstrap-servers',kafka_bootstrap,False)
     write('redis-health/password',data['redis_health'],False)
     write('grafana-admin/password',data['grafana_admin'],False)
     write('redis-verify/password',data['redis_verify'],False)

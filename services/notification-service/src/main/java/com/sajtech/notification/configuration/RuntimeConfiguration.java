@@ -34,10 +34,12 @@ import com.sajtech.notification.infrastructure.persistence.JooqNotificationResul
 import com.sajtech.notification.infrastructure.persistence.JooqNotificationTemplateCatalog;
 import com.sajtech.notification.infrastructure.persistence.PostgresDatabaseTime;
 import com.sajtech.notification.infrastructure.persistence.SpringTransactionRunner;
+import com.sajtech.notification.infrastructure.provider.EmailProviderKind;
 import com.sajtech.notification.infrastructure.provider.FileBackedNotificationProviderConfiguration;
 import com.sajtech.notification.infrastructure.provider.NotificationProviderConfiguration;
-import com.sajtech.notification.infrastructure.provider.ippanel.IpPanelSmsProviderAdapter;
-import com.sajtech.notification.infrastructure.provider.liara.LiaraSmtpProviderAdapter;
+import com.sajtech.notification.infrastructure.provider.google.GoogleGmailSmtpProviderAdapter;
+import com.sajtech.notification.infrastructure.provider.smsir.SmsIrSmsProviderAdapter;
+import com.sajtech.notification.infrastructure.provider.smtp.SmtpEmailProviderAdapter;
 import com.sajtech.notification.infrastructure.runtime.delivery.NotificationDeliveryWorker;
 import com.sajtech.notification.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.notification.infrastructure.runtime.result.NotificationResultDispatcher;
@@ -237,9 +239,11 @@ public class RuntimeConfiguration {
       prefix = "notification",
       name = "delivery-runtime-enabled",
       havingValue = "true")
-  NotificationProviderGateway liaraSmtpProviderAdapter(
+  NotificationProviderGateway smtpEmailProviderAdapter(
       NotificationProviderConfiguration configuration) {
-    return new LiaraSmtpProviderAdapter(configuration);
+    return configuration.email().provider() == EmailProviderKind.GOOGLE_GMAIL
+        ? new GoogleGmailSmtpProviderAdapter(configuration.email())
+        : new SmtpEmailProviderAdapter(configuration.email());
   }
 
   @Bean
@@ -247,9 +251,9 @@ public class RuntimeConfiguration {
       prefix = "notification",
       name = "delivery-runtime-enabled",
       havingValue = "true")
-  NotificationProviderGateway ipPanelSmsProviderAdapter(
+  NotificationProviderGateway smsIrSmsProviderAdapter(
       NotificationProviderConfiguration configuration) {
-    return new IpPanelSmsProviderAdapter(configuration);
+    return new SmsIrSmsProviderAdapter(configuration.sms());
   }
 
   @Bean

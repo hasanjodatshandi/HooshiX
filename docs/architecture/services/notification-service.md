@@ -159,7 +159,7 @@ The one-record claim invariant applies to delivery, reconciliation, and terminal
 callback workers. Each record is durably completed/rescheduled before the next claim,
 so later work never consumes the elapsed time of an earlier remote call within its
 lease. Current maximum single dependency budgets remain below the 30-second lease:
-IPPanel has a 1,500 ms total timeout, SMTP has bounded 500 ms connection and 1,500 ms
+SMS.ir has a 1,500 ms total timeout, SMTP has bounded 500 ms connection and 1,500 ms
 read/write timeouts, and the Identity result callback has a 750 ms deadline. These
 limits do not authorize an in-transaction remote call or a transport retry.
 
@@ -187,24 +187,31 @@ Sensitive ciphertext has a 24-hour hard maximum and is deleted earlier at applic
 
 ## 12. Email provider
 
-Production Email uses Liara Transactional Email via authenticated SMTP with STARTTLS.
+Email uses the provider-neutral authenticated SMTP boundary under ADR-0055. The current
+`GOOGLE_GMAIL` profile is bounded to non-production staging; Production provider selection remains
+deferred. `GENERIC_SMTP` is an adapter capability and still requires reviewed provider, sender,
+egress, failure, and environment evidence before activation.
 
 ```text
-domain       = hooshix.com
-from         = no-reply@hooshix.com
-display name = Hooshix
-reply-to     = omitted
+Google staging host = smtp.gmail.com:587
+transport           = SMTP with required STARTTLS and hostname verification
+from                = authenticated Gmail test mailbox
+display name        = Hooshix
+reply-to            = omitted
 ```
 
-SPF, DKIM, and DMARC must pass before readiness. Final SMTP `2xx/250` is `DEFINITIVE_ACCEPTED` -> `PROVIDER_ACCEPTED`, never `DELIVERED`. Without authenticated provider-correlated delivery evidence, final reconciliation after 72h produces `DELIVERY_STATUS_UNKNOWN`.
+Production sender-domain SPF, DKIM, and DMARC must pass before readiness. Final SMTP `2xx/250` is
+`DEFINITIVE_ACCEPTED` -> `PROVIDER_ACCEPTED`, never `DELIVERED`. Without authenticated
+provider-correlated delivery evidence, final reconciliation after 72h produces
+`DELIVERY_STATUS_UNKNOWN`.
 
 ## 13. SMS provider
 
-Production Iran SMS uses IPPanel Edge Webservice mode under ADR-0020. Notification renders exact versioned SMS content itself; provider-managed Pattern rendering is prohibited as semantic authority.
+Iran SMS uses SMS.ir exact-text bulk sending under ADR-0056. Notification renders exact versioned SMS content itself; provider-managed Verify/Pattern rendering is prohibited as Production semantic authority.
 
-Provider HTTP uses 500ms connect / 1500ms total timeout and no automatic client retry. Timeout/connection loss/unproven acceptance is `AMBIGUOUS` and is never blindly resubmitted. `DEFINITIVE_ACCEPTED` requires the sandbox-pinned successful response with provider correlation identity.
+Provider HTTP uses 500ms connect / 1500ms total timeout, a 64 KiB response bound, and no automatic client retry. Timeout/connection loss/unproven acceptance is `AMBIGUOUS` and is never blindly resubmitted. `DEFINITIVE_ACCEPTED` requires HTTP 200 plus `status=1` and exactly one positive message ID from the production bulk-send response. The SMS.ir Sandbox is simulated and never maps to a canonical runtime outcome.
 
-Authenticated recipient-level report polling maps pinned provider status `2` to `DELIVERED`, `3`/`4` to permanent non-delivery, and `0`/`1` to non-terminal observation. Bulk/outbox-level sent status is never delivery evidence. Polling is bounded within the 12-hour observation window.
+Authenticated message-specific report polling requires exact message-ID correlation and maps delivery state `1` to `DELIVERED`, `2`/`4`/`6`/`7` to permanent non-delivery, and `3`/`5`/`null` to non-terminal observation. Bulk/pack acceptance is never delivery evidence. Polling is bounded within the 12-hour observation window.
 
 Local development may use `LoggingSmsProviderAdapter` only under `local & !staging & !production`; it is never a staging/production fallback and `SIMULATED` never maps to a canonical provider outcome.
 
@@ -230,7 +237,7 @@ Metric labels never contain recipient, raw/pseudonymous request identifiers, cod
 
 ## 16. Current repository evidence
 
-The current implemented slice includes Flyway V4 delivery-runtime state, bounded SKIP LOCKED dispatch claims, durable pre-provider DISPATCHING identity, authenticated AES-GCM delivery-time decryption, ambiguity-safe reconciliation, terminal escrow erasure, durable terminal-result callbacks to Identity, and Day-One delivery metrics. V6 adds the ADR-0028 participant with validated Protobuf Kafka input, atomic durable Inbox/idempotency, Identity target paging, bounded subject-linked Notification deletion, non-PII receipt Outbox, finite retry/exhaustion, Helm Kafka secret/egress, metrics, and alerts. Production adapters remain Liara authenticated SMTP with STARTTLS and IPPanel Edge Webservice SMS with bounded one-recipient dispatch and recipient-status reconciliation. Current full Gradle verification, pinned provider fixtures, contract gates, Helm/Prometheus checks, and the real local four-participant Kafka smoke pass. Real provider credentials/egress, staging or production Kafka/delivery, SPF/DKIM/DMARC, and production readiness remain NOT VERIFIED.
+The current implemented slice includes Flyway V4 delivery-runtime state, bounded SKIP LOCKED dispatch claims, durable pre-provider DISPATCHING identity, authenticated AES-GCM delivery-time decryption, ambiguity-safe reconciliation, terminal escrow erasure, durable terminal-result callbacks to Identity, and Day-One delivery metrics. V6 adds the ADR-0028 participant with validated Protobuf Kafka input, atomic durable Inbox/idempotency, Identity target paging, bounded subject-linked Notification deletion, non-PII receipt Outbox, finite retry/exhaustion, Helm Kafka secret/egress, metrics, and alerts. Provider code includes provider-neutral authenticated SMTP with a constrained Google Gmail staging profile and SMS.ir exact-text SMS with bounded one-recipient dispatch and message-specific reconciliation. The SMS.ir Sandbox probe validates only simulated TLS/authentication/input/response behavior and explicitly claims no real delivery. Current full Gradle verification, pinned provider fixtures, contract gates, Helm/Prometheus checks, and the real local four-participant Kafka smoke pass. Real Gmail execution, production SMS.ir credentials/sender/delivery, staging or production Kafka/delivery, SPF/DKIM/DMARC, and production readiness remain NOT VERIFIED.
 
 ## 17. Verification
 
@@ -247,8 +254,8 @@ Notification changes require applicable tests for:
 - distinct Notification database/runtime/migration role/Flyway ownership and cross-service privilege denial in both profiles;
 - jOOQ/Flyway/migration compatibility;
 - template versioning/activation/concurrency/rendering;
-- Liara SMTP STARTTLS/auth/outcome classification;
-- IPPanel submission/report fixtures, polling/backpressure, and ambiguity handling;
+- generic and Google Gmail SMTP configuration, STARTTLS/auth/hostname-verification/outcome classification;
+- SMS.ir exact-text submission/report fixtures, correlation, polling/backpressure, Sandbox separation, and ambiguity handling;
 - local key-ring rotation/refresh/corruption/erasure and proof of no OpenBao hot-path RPC;
 - callback idempotency/destination allow-list;
 - PII-safe telemetry;

@@ -8,4 +8,6 @@ Fingerprint-key rotation retains historical verification keys for the lifetime o
 
 The service must not place recipient addresses, verification codes, rendered message content, request IDs, notification IDs, provider response bodies, or raw exceptions into ordinary telemetry.
 
-Provider delivery metrics are added with the production provider adapters. This slice does not report simulated local sends as canonical provider acceptance or delivery outcomes and does not claim production Liara/IPPanel evidence.
+Provider delivery metrics are added with live provider adapters. This slice does not report simulated
+local sends as canonical provider acceptance or delivery outcomes and does not claim real Google
+Gmail/SMS.ir Production provider evidence. SMS.ir Sandbox output is simulated contract evidence only.

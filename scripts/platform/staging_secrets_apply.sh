@@ -8,10 +8,35 @@ secret_dir() {
   local args=(); while IFS= read -r -d '' f; do args+=(--from-file="$(basename "$f")=$f"); done < <(find "$dir" -maxdepth 1 -type f -print0 | sort -z)
   k -n "$ns" create secret generic "$name" "${args[@]}" --dry-run=client -o yaml | k apply -f - >/dev/null
 }
+verify_private_file() {
+  local path=$1 label=$2 parent
+  parent=$(dirname "$path")
+  [[ -d "$parent" && ! -L "$parent" ]] || fail "$label parent must be a regular directory"
+  [[ "$(stat -c '%u' "$parent")" == "$(id -u)" && "$(stat -c '%a' "$parent")" == "700" ]] || fail "$label parent must be user-owned mode 0700"
+  [[ -f "$path" && ! -L "$path" ]] || fail "$label must be a regular non-symlink file"
+  [[ "$(stat -c '%u' "$path")" == "$(id -u)" ]] || fail "$label must be owned by the invoking user"
+  [[ "$(stat -c '%a' "$path")" == "600" ]] || fail "$label must have mode 0600"
+}
 for n in postgres-admin redis-health redis-verify redis-acl; do secret_dir platform-data "$n" "$F/$n"; done
 secret_dir platform-observability grafana-admin "$F/grafana-admin"
 for n in authorization-db-migration authorization-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime; do secret_dir platform-data "$n" "$F/$n"; done
-for n in authorization-db-migration authorization-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime authorization-quota-redis identity-quota-redis web-bff-redis authorization-fingerprint authorization-quota-key identity-fingerprint identity-challenge identity-handoff identity-mfa identity-quota identity-refresh identity-jwt-private notification-fingerprint notification-delivery web-bff-locator web-bff-csrf web-bff-refresh web-bff-quota; do secret_dir platform-apps "$n" "$F/$n"; done
+for n in authorization-db-migration authorization-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime authorization-quota-redis identity-quota-redis web-bff-redis authorization-kafka identity-kafka notification-kafka web-bff-kafka authorization-fingerprint authorization-quota-key identity-fingerprint identity-challenge identity-handoff identity-mfa identity-quota identity-refresh identity-jwt-private notification-fingerprint notification-delivery web-bff-locator web-bff-csrf web-bff-refresh web-bff-quota; do secret_dir platform-apps "$n" "$F/$n"; done
+provider_file="$ROOT/.platform-runtime/staging/private/notification-providers.properties"
+if [[ -e "$provider_file" || -L "$provider_file" ]]; then
+  verify_private_file "$provider_file" "staging provider configuration"
+  k -n platform-apps create secret generic notification-providers --from-file="providers.properties=$provider_file" --dry-run=client -o yaml | k apply -f - >/dev/null
+  echo 'staging notification provider secret created without printing secret values'
+else
+  echo 'staging notification provider secret skipped because no local credential file is present'
+fi
+google_oidc_secret="$ROOT/.platform-runtime/staging/private/web-bff-google-client-secret"
+if [[ -e "$google_oidc_secret" || -L "$google_oidc_secret" ]]; then
+  verify_private_file "$google_oidc_secret" "staging Google OIDC client secret"
+  k -n platform-apps create secret generic web-bff-google-client --from-file="client-secret=$google_oidc_secret" --dry-run=client -o yaml | k apply -f - >/dev/null
+  echo 'staging Google OIDC client secret created without printing its value'
+else
+  echo 'staging Google OIDC client secret skipped because no local credential file is present'
+fi
 k -n platform-apps create configmap identity-jwt-public --from-file=verifier.properties="$F/identity-jwt-public/verifier.properties" --dry-run=client -o yaml | k apply -f - >/dev/null
 k -n platform-apps create configmap authorization-identity-jwt --from-file=verifier.properties="$F/identity-jwt-public/verifier.properties" --dry-run=client -o yaml | k apply -f - >/dev/null
 for n in authorization identity web-bff; do k -n platform-apps create configmap "$n-host-time" --from-literal=host-time-synchronized=synchronized --dry-run=client -o yaml | k apply -f - >/dev/null; done

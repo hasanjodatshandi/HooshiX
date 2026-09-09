@@ -11,6 +11,10 @@
 {{- $migrationDbSecret := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
 {{- $fingerprintSecret := required "secrets.fingerprintSecretName is required" .Values.secrets.fingerprintSecretName -}}
 {{- $deliverySecret := required "secrets.deliverySecretName is required" .Values.secrets.deliverySecretName -}}
+{{- $providerSecret := "" -}}
+{{- if .Values.runtime.deliveryRuntimeEnabled -}}
+{{- $providerSecret = required "secrets.providerSecretName is required when delivery runtime is enabled" .Values.secrets.providerSecretName -}}
+{{- end -}}
 {{- if eq $runtimeDbSecret $migrationDbSecret -}}
 {{- fail "runtime and migration database credentials must use distinct Secrets" -}}
 {{- end -}}
@@ -187,6 +191,15 @@ spec:
             items:
               - key: delivery.properties
                 path: delivery.properties
+        {{- if .Values.runtime.deliveryRuntimeEnabled }}
+        - name: notification-providers
+          secret:
+            secretName: {{ $providerSecret | quote }}
+            defaultMode: 0440
+            items:
+              - key: providers.properties
+                path: providers.properties
+        {{- end }}
         - name: temporary
           emptyDir:
             sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}

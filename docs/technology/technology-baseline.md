@@ -97,8 +97,8 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | `production-single-server` management network | host-supported WireGuard | exact host package/kernel pinned; public TCP/22 denied |
 | `production-single-server` human access | supported OpenSSH + hardware FIDO2 + JIT + `sudo`/system audit | ADR-0030/0043 |
 | `production-ha` human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session evidence |
-| Email | Liara Transactional Email, SMTP + STARTTLS | Notification provider |
-| SMS | IPPanel Edge Webservice mode for Iran | local logging adapter local-only |
+| Email | Provider-neutral authenticated SMTP + required STARTTLS; Google Gmail profile for bounded staging only | Production provider deferred under ADR-0055 |
+| SMS | SMS.ir exact-text bulk send for Iran; SMS.ir Verify Sandbox for simulated contract validation only | local logging adapter local-only |
 
 ## 3. Selected production profile: `production-single-server`
 

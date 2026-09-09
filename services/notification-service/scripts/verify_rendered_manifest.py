@@ -33,8 +33,15 @@ def main() -> int:
     require(text, r'secretName: "notification-fingerprint"', "fingerprint key-ring Secret is missing")
     require(text, r'secretName: "notification-delivery"', "delivery key-ring Secret is missing")
     require(text, r'secretName: "notification-kafka"', "Kafka connection Secret is missing")
-    if text.count("defaultMode: 0440") != 5:
+    require(text, r'secretName: "notification-providers"', "provider Secret is missing")
+    require(text, r"path: providers\.properties", "provider Secret key mapping is missing")
+    if text.count("defaultMode: 0440") != 6:
         raise AssertionError("all Notification Secret volumes must use defaultMode 0440")
+    require(text, r"^kind: ServiceEntry$", "provider ServiceEntry is missing")
+    require(text, r'hosts: \["smtp\.gmail\.com"\]', "reviewed Gmail SMTP destination is missing")
+    require(text, r'hosts: \["api\.sms\.ir"\]', "reviewed SMS.ir destination is missing")
+    require(text, r"port: 587", "SMTP egress port is missing")
+    require(text, r"port: 443", "SMS HTTPS egress port is missing")
     require(text, r"NOTIFICATION_ERASURE_RUNTIME_ENABLED", "erasure runtime gate is missing")
     require(text, r"notification-kafka", "Kafka egress selector is missing")
     require(text, r'serviceAccountName: "notification-service"', "dedicated ServiceAccount is missing")

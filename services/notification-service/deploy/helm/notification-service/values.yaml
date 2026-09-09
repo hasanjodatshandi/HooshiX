@@ -48,6 +48,14 @@ secrets:
   deliverySecretName: ""
   providerSecretName: ""
 
+providers:
+  email:
+    host: ""
+    port: 587
+  sms:
+    host: ""
+    port: 443
+
 identity:
   namespace: platform-apps
   resultPort: 9091

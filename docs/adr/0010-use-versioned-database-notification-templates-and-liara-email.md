@@ -1,8 +1,8 @@
-# ADR-0010: Versioned Database Templates and Liara Email
+# ADR-0010: Versioned Database Notification Templates
 
 ## Status
 
-Accepted — current effective decision
+Accepted — current template decision; former Liara provider selection superseded by ADR-0055
 
 ## Date
 
@@ -38,29 +38,17 @@ Placeholders are allow-listed per semantic type. Verification templates accept e
 
 Email requires subject + text body + HTML body. SMS contains text body only. Approved Persian/English initial templates are versioned database seed data, not Java constants.
 
-### Production Email
+### Email provider ownership
 
-Production Email uses Liara Transactional Email via authenticated SMTP + STARTTLS.
-
-Credential material is sourced through OpenBao/External Secrets and never stored in Git, images, ordinary environment variables, logs, traces, metrics, or message payloads.
-
-Sender identity:
-
-```text
-domain       = hooshix.com
-from         = no-reply@hooshix.com
-display name = Hooshix
-reply-to     = omitted
-```
-
-SPF, DKIM, and DMARC MUST pass before production readiness.
-
-Final SMTP `2xx/250` is `DEFINITIVE_ACCEPTED` and transitions to `PROVIDER_ACCEPTED`; it is never `DELIVERED`. Delivery requires authenticated/correlated provider evidence. Correlation inferred from recipient, subject, or time is prohibited. Without conclusive evidence, final reconciliation after the 72-hour observation window produces `DELIVERY_STATUS_UNKNOWN`.
+ADR-0055 supersedes this ADR's former Liara provider selection and owns the current
+provider-neutral SMTP/Google Gmail staging decision. Credential, transport, sender, outcome,
+reconciliation, and production-selection gates follow ADR-0055 without changing the template and
+exact-content rules above.
 
 ## Verification requirements
 
-Tests cover version immutability, pointer activation/concurrent activation, pointer rollback generation, seed digests, placeholder validation, HTML escaping, content limits, exact-version retry, SMTP STARTTLS/authentication, bounded timeout/outcome classification, ambiguity, credential/PII redaction, and no inferred delivery.
+Tests cover version immutability, pointer activation/concurrent activation, pointer rollback generation, seed digests, placeholder validation, HTML escaping, content limits, and exact-version retry. ADR-0055 owns SMTP/provider verification.
 
 ## Rollback considerations
 
-Rollback may repoint activation to an earlier approved `PUBLISHED` template version. It MUST NOT delete/modify immutable published content, alter already accepted Notification content, infer delivery, or switch Email provider without a new reviewed current decision and migration/contract evidence.
+Rollback may repoint activation to an earlier approved `PUBLISHED` template version. It MUST NOT delete/modify immutable published content, alter already accepted Notification content, infer delivery, or restore a superseded provider decision.

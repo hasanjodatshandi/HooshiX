@@ -10,9 +10,17 @@ database:
 secrets:
   fingerprintSecretName: notification-fingerprint
   deliverySecretName: notification-delivery
+  providerSecretName: notification-providers
 
 runtime:
   erasureRuntimeEnabled: true
+  deliveryRuntimeEnabled: true
+
+providers:
+  email:
+    host: smtp.gmail.com
+  sms:
+    host: api.sms.ir
 
 kafka:
   connectionSecretName: notification-kafka

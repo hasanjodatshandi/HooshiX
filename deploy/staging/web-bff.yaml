@@ -1,5 +1,6 @@
 runtime:
   enabled: true
+  erasureRuntimeEnabled: true
   requireFetchMetadata: true
   publicOrigin: https://hooshix.local:8443
 database:
@@ -7,6 +8,7 @@ database:
   podLabels: {app.kubernetes.io/name: postgresql}
   runtimeSecretName: web-bff-db-runtime
   migrationSecretName: web-bff-db-migration
+kafka: {connectionSecretName: web-bff-kafka}
 redis:
   podLabels: {app.kubernetes.io/name: security-redis}
   connectionSecretName: web-bff-redis
@@ -23,7 +25,7 @@ quota:
 googleOidc:
   enabled: false
   clientId: ""
-  clientSecretName: ""
+  clientSecretName: web-bff-google-client
   maximumConcurrentCalls: 16
 edge:
   namespace: platform-edge

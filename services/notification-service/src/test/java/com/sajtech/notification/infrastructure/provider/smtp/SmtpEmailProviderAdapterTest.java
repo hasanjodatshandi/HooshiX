@@ -1,4 +1,4 @@
-package com.sajtech.notification.infrastructure.provider.liara;
+package com.sajtech.notification.infrastructure.provider.smtp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -6,17 +6,17 @@ import com.sajtech.notification.application.delivery.model.ProviderReconciliatio
 import com.sajtech.notification.application.delivery.model.ProviderReconciliationStatus;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
-import com.sajtech.notification.infrastructure.provider.NotificationProviderConfiguration;
-import java.net.URI;
+import com.sajtech.notification.infrastructure.provider.EmailProviderKind;
+import com.sajtech.notification.infrastructure.provider.SmtpEmailProviderConfiguration;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.MailSendException;
 
-class LiaraSmtpProviderAdapterTest {
+class SmtpEmailProviderAdapterTest {
   @Test
-  void senderRequiresAuthenticatedStartTlsAndFiniteTimeouts() {
-    var sender = LiaraSmtpProviderAdapter.configuredSender(configuration());
+  void senderRequiresAuthenticatedStartTlsHostnameVerificationAndFiniteTimeouts() {
+    var sender = SmtpEmailProviderAdapter.configuredSender(configuration());
     var properties = sender.getJavaMailProperties();
 
     assertThat(sender.getHost()).isEqualTo("smtp.fixture.invalid");
@@ -24,6 +24,8 @@ class LiaraSmtpProviderAdapterTest {
     assertThat(properties.getProperty("mail.smtp.auth")).isEqualTo("true");
     assertThat(properties.getProperty("mail.smtp.starttls.enable")).isEqualTo("true");
     assertThat(properties.getProperty("mail.smtp.starttls.required")).isEqualTo("true");
+    assertThat(properties.getProperty("mail.smtp.ssl.checkserveridentity")).isEqualTo("true");
+    assertThat(properties.getProperty("mail.smtp.ssl.protocols")).isEqualTo("TLSv1.3 TLSv1.2");
     assertThat(properties.getProperty("mail.smtp.connectiontimeout")).isEqualTo("500");
     assertThat(properties.getProperty("mail.smtp.timeout")).isEqualTo("1500");
     assertThat(properties.getProperty("mail.smtp.writetimeout")).isEqualTo("1500");
@@ -32,18 +34,18 @@ class LiaraSmtpProviderAdapterTest {
   @Test
   void authenticationFailureIsPermanentAndUnknownTransportFailureIsAmbiguous() {
     assertThat(
-            LiaraSmtpProviderAdapter.classifyMailFailure(new MailAuthenticationException("fixture"))
+            SmtpEmailProviderAdapter.classifyMailFailure(new MailAuthenticationException("fixture"))
                 .classification())
         .isEqualTo(ProviderAttemptClassification.DEFINITIVE_PERMANENT_FAILURE);
     assertThat(
-            LiaraSmtpProviderAdapter.classifyMailFailure(new MailSendException("fixture"))
+            SmtpEmailProviderAdapter.classifyMailFailure(new MailSendException("fixture"))
                 .classification())
         .isEqualTo(ProviderAttemptClassification.AMBIGUOUS);
   }
 
   @Test
   void smtpHasNoFabricatedDeliveryEvidence() {
-    var adapter = new LiaraSmtpProviderAdapter(configuration());
+    var adapter = new SmtpEmailProviderAdapter(configuration());
     var result =
         adapter.reconcile(
             new ProviderReconciliationRequest(
@@ -55,14 +57,14 @@ class LiaraSmtpProviderAdapterTest {
     assertThat(result.status()).isEqualTo(ProviderReconciliationStatus.INCONCLUSIVE);
   }
 
-  private static NotificationProviderConfiguration configuration() {
-    return new NotificationProviderConfiguration(
+  private static SmtpEmailProviderConfiguration configuration() {
+    return new SmtpEmailProviderConfiguration(
+        EmailProviderKind.GENERIC_SMTP,
         "smtp.fixture.invalid",
         587,
         "fixture-user",
         "fixture-value",
-        URI.create("https://sms.fixture.invalid/v1"),
-        "fixture-token-value",
-        "+983000505");
+        "no-reply@fixture.invalid",
+        "Hooshix");
   }
 }

@@ -51,3 +51,31 @@ spec:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-data}}
           podSelector: {matchLabels: {app.kubernetes.io/name: postgresql}}
       ports: [{protocol: TCP, port: 5432}, {protocol: TCP, port: 15008}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: kafka, namespace: platform-data}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: kafka}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: authorization-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: notification-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-data}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: kafka}}
+      ports: [{protocol: TCP, port: 9093}, {protocol: TCP, port: 15008}]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-data}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: kafka}}
+      ports: [{protocol: TCP, port: 9093}, {protocol: TCP, port: 15008}]
