@@ -13,6 +13,28 @@ SPEC.loader.exec_module(rehearsal)
 
 
 class StagingErasureRecoveryTest(unittest.TestCase):
+    def test_image_state_requires_exact_five_service_repositories_and_digests(self):
+        lines = [
+            "BUILD_GIT_REVISION=" + "a" * 40,
+            "BUILD_SOURCE_STATE=clean",
+            "BUILD_WORKTREE_SHA256=" + "b" * 64,
+        ]
+        for application, repository in rehearsal.IMAGE_REPOSITORIES.items():
+            prefix = application.upper().replace("-", "_")
+            lines.extend(
+                [
+                    prefix + "_REPOSITORY=" + repository,
+                    prefix + "_DIGEST=sha256:" + "c" * 64,
+                ]
+            )
+        valid = "\n".join(lines) + "\n"
+        self.assertEqual(13, len(rehearsal.parse_image_state(valid)))
+
+        with self.assertRaisesRegex(rehearsal.RehearsalError, "invalid"):
+            rehearsal.parse_image_state(valid + "UNEXPECTED=value\n")
+        with self.assertRaisesRegex(rehearsal.RehearsalError, "invalid"):
+            rehearsal.parse_image_state(valid.replace("sha256:" + "c" * 64, "latest", 1))
+
     def test_seed_is_non_pii_and_has_all_participants(self):
         sql = rehearsal.erasure_seed_sql(
             uuid.UUID("10000000-0000-4000-8000-000000000001"),

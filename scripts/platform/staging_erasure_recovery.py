@@ -26,6 +26,9 @@ APPLICATIONS = (
     "notification-service",
     "web-bff",
 )
+IMAGE_REPOSITORIES = {
+    application: f"localhost:5001/hooshix/{application}" for application in APPLICATIONS
+}
 PARTICIPANT_DATABASES = {
     "authorization": ("authorization_erasure_inbox", "authorization_erasure_evidence"),
     "identity": ("identity_erasure_command_inbox", "identity_erasure_evidence"),
@@ -312,6 +315,38 @@ def _write_private_json(path: Path, value: dict[str, object]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def parse_image_state(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        key, separator, value = line.partition("=")
+        if not separator or not key or not value or key in values:
+            raise RehearsalError("staging image provenance state is invalid")
+        values[key] = value
+    expected = {
+        "BUILD_GIT_REVISION",
+        "BUILD_SOURCE_STATE",
+        "BUILD_WORKTREE_SHA256",
+    }
+    for application in APPLICATIONS:
+        prefix = application.upper().replace("-", "_")
+        expected.update({prefix + "_REPOSITORY", prefix + "_DIGEST"})
+    if set(values) != expected:
+        raise RehearsalError("staging image provenance state is invalid")
+    if (
+        re.fullmatch(r"[0-9a-f]{40}", values["BUILD_GIT_REVISION"]) is None
+        or values["BUILD_SOURCE_STATE"] != "clean"
+        or re.fullmatch(r"[0-9a-f]{64}", values["BUILD_WORKTREE_SHA256"]) is None
+    ):
+        raise RehearsalError("staging image provenance state is invalid")
+    for application, repository in IMAGE_REPOSITORIES.items():
+        prefix = application.upper().replace("-", "_")
+        if values[prefix + "_REPOSITORY"] != repository or re.fullmatch(
+            r"sha256:[0-9a-f]{64}", values[prefix + "_DIGEST"]
+        ) is None:
+            raise RehearsalError("staging image provenance state is invalid")
+    return values
+
+
 def _preflight() -> str:
     if shutil.which("kubectl") is None:
         raise RehearsalError("kubectl is unavailable")
@@ -321,22 +356,9 @@ def _preflight() -> str:
     if _command(["kubectl", "config", "current-context"], capture=True, timeout=10) != CONTEXT:
         raise RehearsalError("unexpected Kubernetes context")
     state = ROOT / ".platform-runtime" / "staging" / "images.env"
-    values: dict[str, str] = {}
-    for line in state.read_text(encoding="utf-8").splitlines():
-        key, separator, value = line.partition("=")
-        if not separator or key in values:
-            raise RehearsalError("staging image provenance state is invalid")
-        values[key] = value
-    if set(values) != {
-        "BUILD_GIT_REVISION",
-        "BUILD_SOURCE_STATE",
-        "BUILD_WORKTREE_SHA256",
-    }:
-        raise RehearsalError("staging image provenance state is invalid")
+    values = parse_image_state(state.read_text(encoding="utf-8"))
     if (
         values["BUILD_GIT_REVISION"] != revision
-        or values["BUILD_SOURCE_STATE"] != "clean"
-        or re.fullmatch(r"[0-9a-f]{64}", values["BUILD_WORKTREE_SHA256"]) is None
     ):
         raise RehearsalError("staging images are not clean and bound to current HEAD")
     _command(
@@ -367,6 +389,19 @@ def _preflight() -> str:
         )
         if replicas != "1:1":
             raise RehearsalError("staging applications are not ready at one replica")
+        prefix = application.upper().replace("-", "_")
+        deployed_image = _kubectl(
+            "-n",
+            APP_NAMESPACE,
+            "get",
+            "deployment/" + application,
+            "-o",
+            "jsonpath={.spec.template.spec.containers[0].image}",
+            capture=True,
+        )
+        expected_image = values[prefix + "_REPOSITORY"] + "@" + values[prefix + "_DIGEST"]
+        if deployed_image != expected_image:
+            raise RehearsalError("staging deployment image does not match provenance state")
     return revision
 
 
