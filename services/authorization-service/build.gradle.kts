@@ -20,7 +20,7 @@ jacoco { toolVersion = "0.8.15" }
 dependencies {
     implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
-    implementation(platform("io.netty:netty-bom:4.2.16.Final"))
+    implementation(platform("io.netty:netty-bom:4.2.17.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-jooq")

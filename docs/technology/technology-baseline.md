@@ -189,6 +189,9 @@ Each service uses native Gradle constraints over the Spring Boot BOM; no new dep
 plugin or authentication mode is introduced. The affected CI advisory findings require the patch
 regardless of whether a vulnerable container authentication configuration is active. Strict service
 checks, advisory rescans, and refreshed staging/runtime evidence are required before promotion.
+Netty modules remain aligned through the official BOM; the Stage 7 security refresh moves the affected
+services to `4.2.17.Final`. The frontend root override pins transitive `js-yaml` to `4.3.2` until its
+owning OpenAPI toolchain resolves at least that fixed version directly.
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
 - Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
