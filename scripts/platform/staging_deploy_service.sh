@@ -12,6 +12,7 @@ repo_var="${key}_REPOSITORY"; digest_var="${key}_DIGEST"; repo=${!repo_var}; dig
 chart="$ROOT/services/$service/deploy/helm/$service"
 values="$ROOT/deploy/staging/$service.yaml"
 extra=()
+helm_timeout=70s
 if [[ "$service" == web-bff ]]; then
   google_values="$ROOT/.platform-runtime/staging/private/web-bff-google-values.yaml"
   if [[ -e "$google_values" || -L "$google_values" ]]; then
@@ -31,9 +32,10 @@ if [[ "$service" == compromised-password-service ]]; then
     [[ -f "$hibp_values" && ! -L "$hibp_values" ]] || fail "staging HIBP values must be a regular non-symlink file"
     [[ "$(stat -c '%u' "$hibp_values")" == "$(id -u)" && "$(stat -c '%a' "$hibp_values")" == 600 ]] || fail "staging HIBP values must be user-owned mode 0600"
     extra+=(-f "$hibp_values")
+    helm_timeout=1900s
   fi
 fi
 helm lint "$chart" -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" >/dev/null
-h upgrade --install "$service" "$chart" -n platform-apps -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" --wait --timeout 70s
+h upgrade --install "$service" "$chart" -n platform-apps -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" --wait --timeout "$helm_timeout"
 k rollout status deployment/$service -n platform-apps --timeout=30s >/dev/null
 echo "$service staging release PASSED"

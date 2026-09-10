@@ -169,6 +169,8 @@ Dataset is recovered by redeploying the exact approved immutable artifact or reb
 
 Service remains unready until dataset source identity, manifest digest, SQLite digest, schema, integrity, freshness, and compatibility bounds validate.
 
+The production chart gives this complete-artifact validation a bounded 30-minute startup window and a 35-minute Deployment progress deadline. Local staging uses an approximately 32-minute Helm wait only when the reviewed complete-corpus overlay is present; fixture deployments retain the short default orchestration wait. Timeout growth never skips or weakens validation.
+
 ## 9. Verification
 
 Implementation/release evidence includes:

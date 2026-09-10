@@ -85,7 +85,7 @@ scripts/platform/staging_deploy_service.sh compromised-password-service
 make staging-verify
 ```
 
-The installer rejects symlinks, stale or wrong-source manifests, incompatible bounds, a builder revision different from current `HEAD`, and artifact-digest mismatch. It scales the current service to zero before replacing the verified node-local immutable pair, uses the dedicated `compromised-password-hibp-dataset` claim, and publishes its Git-ignored mode-`0600` overlay only after the copied artifacts verify. Running `scripts/platform/staging_dataset_install.sh` removes that overlay and restores the default fixture identity on the next deployment.
+The installer rejects symlinks, stale or wrong-source manifests, incompatible bounds, a builder revision different from current `HEAD`, and artifact-digest mismatch. It scales the current service to zero before replacing the verified node-local immutable pair, uses the dedicated `compromised-password-hibp-dataset` claim, and publishes its Git-ignored mode-`0600` overlay only after the copied artifacts verify. Complete-corpus startup retains full artifact digest and SQLite integrity verification; its bounded 30-minute startup-probe window, approximately 32-minute Helm wait, and 35-minute Deployment progress deadline accommodate those scans without weakening readiness. Running `scripts/platform/staging_dataset_install.sh` removes that overlay and restores the default fixture identity on the next deployment.
 
 ## Optional provider staging credentials
 
