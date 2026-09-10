@@ -26,6 +26,12 @@ if [[ "$service" == compromised-password-service ]]; then
   line=$(cat "$dataset_state")
   [[ "$line" =~ ^COMPROMISED_PASSWORD_MANIFEST_SHA256=([0-9a-f]{64})$ ]] || fail "generated staging dataset state is invalid"
   extra+=(--set-string "dataset.expectedManifestSha256=${BASH_REMATCH[1]}")
+  hibp_values="$ROOT/.platform-runtime/staging/private/compromised-password-hibp-values.yaml"
+  if [[ -e "$hibp_values" || -L "$hibp_values" ]]; then
+    [[ -f "$hibp_values" && ! -L "$hibp_values" ]] || fail "staging HIBP values must be a regular non-symlink file"
+    [[ "$(stat -c '%u' "$hibp_values")" == "$(id -u)" && "$(stat -c '%a' "$hibp_values")" == 600 ]] || fail "staging HIBP values must be user-owned mode 0600"
+    extra+=(-f "$hibp_values")
+  fi
 fi
 helm lint "$chart" -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" >/dev/null
 h upgrade --install "$service" "$chart" -n platform-apps -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" --wait --timeout 70s

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
+hibp_overlay="$ROOT/.platform-runtime/staging/private/compromised-password-hibp-values.yaml"
+if [[ -e "$hibp_overlay" || -L "$hibp_overlay" ]]; then
+  [[ -f "$hibp_overlay" && ! -L "$hibp_overlay" ]] || fail "stale HIBP overlay is not a regular non-symlink file"
+  unlink "$hibp_overlay"
+fi
 python3 - <<'PY'
 import importlib.util
 from pathlib import Path

@@ -29,6 +29,7 @@ public final class DatasetBuilder {
   private static final int MAX_SOURCE_LINE_BYTES = 96;
   private static final int SOURCE_READ_BUFFER_BYTES = 64 * 1024;
   private static final int INSERT_BATCH_SIZE = 10_000;
+  private static final int UTF8_BOM_BYTES = 3;
   private static final int SHA1_SUFFIX_ASCII_BYTES = 35;
   private static final HexFormat LOWER_HEX = HexFormat.of();
   private static final String CREATE_TABLE_SQL =
@@ -144,7 +145,9 @@ public final class DatasetBuilder {
         int lineLength;
         while ((lineLength = lineReader.readLine()) >= 0) {
           sourceLineCount++;
-          parseAndAddBatchRecord(lineReader.lineBuffer(), lineLength, sourceLineCount, upsert);
+          int lineOffset = skipOptionalUtf8Bom(lineReader.lineBuffer(), lineLength);
+          parseAndAddBatchRecord(
+              lineReader.lineBuffer(), lineOffset, lineLength, sourceLineCount, upsert);
           pendingBatch++;
           if (pendingBatch == INSERT_BATCH_SIZE) {
             upsert.executeBatch();
@@ -250,14 +253,16 @@ public final class DatasetBuilder {
   }
 
   private static void parseAndAddBatchRecord(
-      byte[] line, int lineLength, long lineNumber, PreparedStatement upsert) throws SQLException {
-    if (lineLength < 42 || lineLength > 60 || line[40] != ':') {
+      byte[] line, int lineOffset, int lineLength, long lineNumber, PreparedStatement upsert)
+      throws SQLException {
+    int recordLength = lineLength - lineOffset;
+    if (recordLength < 42 || recordLength > 60 || line[lineOffset + 40] != ':') {
       throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
     }
     byte[] hash = new byte[20];
     for (int index = 0; index < hash.length; index++) {
-      int high = hexValue(line[index * 2]);
-      int low = hexValue(line[index * 2 + 1]);
+      int high = hexValue(line[lineOffset + index * 2]);
+      int low = hexValue(line[lineOffset + index * 2 + 1]);
       if (high < 0 || low < 0) {
         throw new DatasetBuildException(
             DatasetBuildException.Reason.INVALID_SOURCE_LINE, lineNumber);
@@ -265,7 +270,7 @@ public final class DatasetBuilder {
       hash[index] = (byte) ((high << 4) | low);
     }
     long occurrenceCount = 0;
-    for (int index = 41; index < lineLength; index++) {
+    for (int index = lineOffset + 41; index < lineLength; index++) {
       int digit = line[index] - '0';
       if (digit < 0 || digit > 9 || occurrenceCount > (Long.MAX_VALUE - digit) / 10) {
         throw new DatasetBuildException(
@@ -280,6 +285,16 @@ public final class DatasetBuilder {
     upsert.setBytes(2, hash);
     upsert.setLong(3, occurrenceCount);
     upsert.addBatch();
+  }
+
+  private static int skipOptionalUtf8Bom(byte[] line, int lineLength) {
+    if (lineLength >= UTF8_BOM_BYTES
+        && (line[0] & 0xFF) == 0xEF
+        && (line[1] & 0xFF) == 0xBB
+        && (line[2] & 0xFF) == 0xBF) {
+      return UTF8_BOM_BYTES;
+    }
+    return 0;
   }
 
   private static int hexValue(byte value) {
@@ -421,7 +436,12 @@ public final class DatasetBuilder {
           }
           return length;
         }
-        if (length == lineBuffer.length || value > 0x7F) {
+        boolean possibleUtf8BomByte =
+            length < UTF8_BOM_BYTES
+                && ((length == 0 && value == 0xEF)
+                    || (length == 1 && value == 0xBB)
+                    || (length == 2 && value == 0xBF));
+        if (length == lineBuffer.length || (value > 0x7F && !possibleUtf8BomByte)) {
           throw new DatasetBuildException(DatasetBuildException.Reason.INVALID_SOURCE_LINE);
         }
         lineBuffer[length++] = (byte) value;

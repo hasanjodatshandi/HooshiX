@@ -147,6 +147,8 @@ Measure actual approved HIBP SHA-1 corpus:
 
 A static historical cardinality assumption is not evidence because HIBP corpus grows. Release selects compatibility bounds from measured complete corpus + safety margin and fails build rather than truncate results.
 
+The official complete download acquired on 2026-09-09 contained `2,068,408,781` canonical unique records. Its measured worst prefix contained `2,509` records and serialized to `102,932` Protobuf bytes. The reviewed compatibility envelope is `4,096` records and `131,072` bytes: each exceeds the observation by at least 25%, and the Identity client transport is explicitly configured for the same 128-KiB response ceiling. These measurements establish compatibility inputs; the separate staging latency/saturation receipt remains the runtime evidence authority.
+
 ## 6. Reference Data
 
 Before independent-service trigger, measure bundle size/startup heap/serialization/cache effectiveness inside owning deployable. A local immutable bundle is cheaper than a speculative gRPC hop.

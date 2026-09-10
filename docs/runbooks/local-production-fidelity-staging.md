@@ -69,7 +69,23 @@ The staging image state also records exact Git `HEAD`, clean/dirty source state,
   ephemeral, non-HA, and uses mesh-protected plaintext inside this local lane; it does not satisfy
   Production native Kafka TLS, per-service authentication/ACL, quota, durability, or recovery gates.
 - Staging credentials, TLS/key material, generated image state, and verification logs remain under Git-ignored `.platform-runtime/` or Kubernetes Secrets created from local generated state. They are not production secrets.
-- Compromised Password uses a deterministic `GENERATED_TEST_FIXTURE`, not the production HIBP corpus. The exact generated manifest SHA-256 is bound into the deployed service at runtime and verified against the mounted manifest.
+- Compromised Password uses a deterministic `GENERATED_TEST_FIXTURE` by default, not the production HIBP corpus. The exact generated manifest SHA-256 is bound into the deployed service at runtime and verified against the mounted manifest. The separate complete-corpus evidence procedure below uses its own 128-GiB static claim and private values overlay, so normal staging cannot silently claim HIBP evidence.
+
+## Optional complete-corpus HIBP staging evidence
+
+Keep the raw official SHA-1/count download and the generated SQLite release outside Git and container images. The builder accepts the UTF-8 BOMs emitted at official-downloader range boundaries, validates every canonical record, and keeps those bytes inside the verified source SHA-256. Select compatibility bounds only after measuring the complete current source; the 2026-09-09 profile selected `4096` records and `131072` serialized bytes from observed maxima `2509` and `102932`.
+
+Build the reviewed release with `buildCompromisedPasswordDataset` as documented in `services/compromised-password-service/dataset/README.md`, then install only its SQLite artifact and manifest:
+
+```bash
+scripts/platform/staging_hibp_dataset_install.sh \
+  /approved-local-release/compromised-password.sqlite \
+  /approved-local-release/compromised-password.manifest.json
+scripts/platform/staging_deploy_service.sh compromised-password-service
+make staging-verify
+```
+
+The installer rejects symlinks, stale or wrong-source manifests, incompatible bounds, a builder revision different from current `HEAD`, and artifact-digest mismatch. It scales the current service to zero before replacing the verified node-local immutable pair, uses the dedicated `compromised-password-hibp-dataset` claim, and publishes its Git-ignored mode-`0600` overlay only after the copied artifacts verify. Running `scripts/platform/staging_dataset_install.sh` removes that overlay and restores the default fixture identity on the next deployment.
 
 ## Optional provider staging credentials
 

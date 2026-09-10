@@ -34,7 +34,7 @@ The builder accepts canonical records only:
 40 uppercase hexadecimal SHA-1 characters:positive decimal occurrence count
 ```
 
-Both CRLF and LF line endings are accepted. Count `0`, lowercase/non-hex hashes, malformed or oversized lines, count overflow, an empty source, and source-digest mismatch fail the build. Duplicate hashes are aggregated in SQLite; integer overflow fails the SQLite constraint instead of producing a release artifact.
+Both CRLF and LF line endings are accepted. The UTF-8 byte-order marks emitted at official-downloader range boundaries are accepted only as the exact first three bytes of a record and remain covered by the source SHA-256; a BOM inside a record is rejected. Count `0`, lowercase/non-hex hashes, malformed or oversized lines, count overflow, an empty source, and source-digest mismatch fail the build. Duplicate hashes are aggregated in SQLite; integer overflow fails the SQLite constraint instead of producing a release artifact.
 
 The source file is read with bounded buffers. It is never copied into the repository or the final service image and is not cached in JVM memory.
 

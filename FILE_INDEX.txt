@@ -332,6 +332,7 @@ infrastructure/production/release/release-policy.json
 infrastructure/production/secrets/secrets-policy.json
 infrastructure/registry/pins.env
 infrastructure/staging/authorizationpolicy.yaml
+infrastructure/staging/compromised-password-hibp-pv.yaml
 infrastructure/staging/compromised-password-pv.yaml
 infrastructure/staging/data.yaml
 infrastructure/staging/networkpolicy.yaml
@@ -376,6 +377,7 @@ scripts/platform/edge_restart_verify.sh
 scripts/platform/edge_verify.sh
 scripts/platform/git_provenance.py
 scripts/platform/google_oidc_staging.py
+scripts/platform/hibp_dataset_staging.py
 scripts/platform/istio_delete.sh
 scripts/platform/istio_foundation_verify.sh
 scripts/platform/istio_install.sh
@@ -410,12 +412,14 @@ scripts/platform/staging_dataset_install.sh
 scripts/platform/staging_deploy_all.sh
 scripts/platform/staging_deploy_service.sh
 scripts/platform/staging_erasure_recovery.py
+scripts/platform/staging_hibp_dataset_install.sh
 scripts/platform/staging_prepare.py
 scripts/platform/staging_secrets_apply.sh
 scripts/platform/staging_verify.sh
 scripts/platform/tests/test_deterministic_bootstrap.py
 scripts/platform/tests/test_git_provenance.py
 scripts/platform/tests/test_google_oidc_staging.py
+scripts/platform/tests/test_hibp_dataset_staging.py
 scripts/platform/tests/test_staging_erasure_recovery.py
 scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh

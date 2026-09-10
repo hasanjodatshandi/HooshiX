@@ -19,6 +19,7 @@ runtime:
   maxGlobalConcurrentCalls: 128
   argon2MaxConcurrentHashes: 0
   compromisedPasswordMaxInFlight: 32
+  compromisedPasswordMaxResponseBytes: 131072
   phoneRegistrationEnabled: false
   notificationDispatchEnabled: true
   temporaryStorageLimit: 256Mi

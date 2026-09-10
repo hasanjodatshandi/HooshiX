@@ -58,7 +58,7 @@ NFC password
 -> exact full SHA-1 comparison inside Identity
 ```
 
-Raw password and full screening SHA-1 never leave Identity. SHA-1 is **not** password storage and is not reused as a credential verifier. Malformed/truncated/stale/unavailable lookup fails closed. There is no runtime HIBP call from Identity or Compromised Password.
+Raw password and full screening SHA-1 never leave Identity. SHA-1 is **not** password storage and is not reused as a credential verifier. Malformed/truncated/stale/unavailable lookup fails closed. There is no runtime HIBP call from Identity or Compromised Password. The Compromised Password client accepts at least the reviewed 128-KiB complete-corpus response envelope, disables transport retry, and retains bounded in-flight admission; a response above the release/runtime compatibility bound still fails closed.
 
 Compromised Password dependency remains 900ms overall, one attempt, no automatic retry/fallback, bounded concurrency and cancellation where supported.
 

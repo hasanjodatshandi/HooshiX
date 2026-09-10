@@ -67,10 +67,12 @@ Rules:
 
 - all official prefix ranges or equivalent complete-download evidence are required for production release;
 - count must be positive; HIBP padding count `0` is rejected;
+- official-downloader UTF-8 BOMs are accepted only as the exact first three bytes of a range-boundary record and remain part of the verified source artifact digest;
 - records are canonical/deduplicated/validated;
 - source is streamed with bounded buffers and bounded SQLite batches; no full-corpus JVM cache exists;
 - release build measures full-corpus prefix cardinality and serialized response size;
 - build fails when observed data exceeds reviewed runtime compatibility bounds selected from real complete-corpus evidence plus safety margin;
+- the 2026-09-09 complete-corpus profile measured `2,509` records and `102,932` serialized bytes at the largest prefix; the reviewed release envelope rounds the measured values up to `4,096` records and `131,072` bytes, providing at least 25% growth headroom while remaining aligned with Identity's bounded transport;
 - no runtime truncation is permitted;
 - dataset age <=35 days at production readiness/deployment;
 - acquisition/build verification at least every 30 days;

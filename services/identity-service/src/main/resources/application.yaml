@@ -51,6 +51,7 @@ identity:
   phone-registration-enabled: ${IDENTITY_PHONE_REGISTRATION_ENABLED:false}
   compromised-password-target: ${IDENTITY_COMPROMISED_PASSWORD_TARGET:dns:///compromised-password-service.platform-apps.svc.cluster.local:9090}
   compromised-password-max-in-flight: ${IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT:32}
+  compromised-password-max-response-bytes: ${IDENTITY_COMPROMISED_PASSWORD_MAX_RESPONSE_BYTES:131072}
   notification-target: ${IDENTITY_NOTIFICATION_TARGET:dns:///notification-service.platform-apps.svc.cluster.local:9090}
   notification-result-grpc-port: ${IDENTITY_NOTIFICATION_RESULT_GRPC_PORT:9091}
   notification-result-runtime-enabled: ${IDENTITY_NOTIFICATION_RESULT_RUNTIME_ENABLED:false}

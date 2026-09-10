@@ -5,6 +5,7 @@ runtime:
   erasureRuntimeEnabled: true
   argon2MaxConcurrentHashes: 2
   compromisedPasswordMaxInFlight: 16
+  compromisedPasswordMaxResponseBytes: 131072
   phoneRegistrationEnabled: true
   notificationDispatchEnabled: true
 database:

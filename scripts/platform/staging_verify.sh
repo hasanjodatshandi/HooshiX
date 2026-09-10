@@ -61,6 +61,11 @@ deployed_dataset_sha=$(k get deployment compromised-password-service -n platform
 [[ "$deployed_dataset_sha" == "$dataset_sha" ]] || fail "Compromised Password deployed manifest digest does not match generated staging state"
 mounted_dataset_sha=$(docker exec platform-local-worker sha256sum /var/local/hooshix/compromised-password/release-manifest.json | awk '{print $1}')
 [[ "$mounted_dataset_sha" == "$dataset_sha" ]] || fail "Compromised Password mounted manifest digest mismatch"
+mounted_dataset_profile=$(docker exec platform-local-worker cat /var/local/hooshix/compromised-password/release-manifest.json | python3 -c 'import json,sys; d=json.load(sys.stdin); print("{}:{}:{}".format(d["source_kind"], d["prefix_cardinality_bound"], d["serialized_response_bytes_bound"]))')
+deployed_dataset_kind=$(k get deployment compromised-password-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HOOSHIX_COMPROMISED_PASSWORD_DATASET_REQUIRED_SOURCE_KIND")].value}')
+deployed_prefix_bound=$(k get deployment compromised-password-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_PREFIX_CARDINALITY")].value}')
+deployed_response_bound=$(k get deployment compromised-password-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HOOSHIX_COMPROMISED_PASSWORD_DATASET_MAX_SERIALIZED_RESPONSE_BYTES")].value}')
+[[ "$mounted_dataset_profile" == "$deployed_dataset_kind:$deployed_prefix_bound:$deployed_response_bound" ]] || fail "Compromised Password deployed source/compatibility profile does not match mounted manifest"
 ready=$(k get --raw='/readyz' | tail -1); [[ "$ready" == ok ]] || fail "Kubernetes API readyz is not ok"
 mount_source=$(docker inspect platform-local-control-plane --format '{{range .Mounts}}{{if eq .Destination "/var/lib/etcd"}}{{.Source}}{{end}}{{end}}')
 [[ "$mount_source" == '/dev/shm/hooshix-kind/etcd' ]] || fail "kind etcd is not bind-mounted from the reviewed WSL tmpfs path: $mount_source"

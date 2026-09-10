@@ -432,7 +432,7 @@ class IdentityCoreRuntimeConfiguration {
     return NettyChannelBuilder.forTarget(p.compromisedPasswordTarget())
         .usePlaintext()
         .disableRetry()
-        .maxInboundMessageSize(64 * 1024)
+        .maxInboundMessageSize(p.compromisedPasswordMaxResponseBytes())
         .build();
   }
 
