@@ -32,7 +32,7 @@ if [[ "$service" == compromised-password-service ]]; then
     [[ -f "$hibp_values" && ! -L "$hibp_values" ]] || fail "staging HIBP values must be a regular non-symlink file"
     [[ "$(stat -c '%u' "$hibp_values")" == "$(id -u)" && "$(stat -c '%a' "$hibp_values")" == 600 ]] || fail "staging HIBP values must be user-owned mode 0600"
     extra+=(-f "$hibp_values")
-    helm_timeout=1900s
+    helm_timeout=7500s
   fi
 fi
 helm lint "$chart" -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" >/dev/null

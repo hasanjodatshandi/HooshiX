@@ -15,10 +15,10 @@ service:
 runtime:
   maxConcurrentLookups: 32
   temporaryStorageLimit: 256Mi
-  startupFailureThreshold: 180
+  startupFailureThreshold: 720
 
 deployment:
-  progressDeadlineSeconds: 2100
+  progressDeadlineSeconds: 7800
 
 resources:
   requests:
