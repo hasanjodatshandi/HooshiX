@@ -1,6 +1,7 @@
 import importlib.util
 import unittest
 import uuid
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -13,6 +14,24 @@ SPEC.loader.exec_module(rehearsal)
 
 
 class StagingErasureRecoveryTest(unittest.TestCase):
+    @mock.patch.object(rehearsal, "_kubectl")
+    def test_scale_uses_complete_corpus_timeout_only_for_compromised_password(self, kubectl):
+        rehearsal._scale(1)
+
+        rollout_calls = [
+            call for call in kubectl.call_args_list if "rollout" in call.args
+        ]
+        self.assertEqual(len(rehearsal.APPLICATIONS), len(rollout_calls))
+        for call in rollout_calls:
+            application = call.args[4].removeprefix("deployment/")
+            expected = (
+                rehearsal.COMPROMISED_PASSWORD_ROLLOUT_TIMEOUT_SECONDS
+                if application == "compromised-password-service"
+                else rehearsal.DEFAULT_ROLLOUT_TIMEOUT_SECONDS
+            )
+            self.assertIn(f"--timeout={expected}s", call.args)
+            self.assertEqual(expected + 10, call.kwargs["timeout"])
+
     def test_image_state_requires_exact_five_service_repositories_and_digests(self):
         lines = [
             "BUILD_GIT_REVISION=" + "a" * 40,

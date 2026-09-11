@@ -37,6 +37,8 @@ PARTICIPANT_DATABASES = {
 }
 STATE_ROOT = ROOT / ".platform-runtime" / "stage7"
 EVIDENCE_PATH = STATE_ROOT / "staging-erasure-recovery.json"
+DEFAULT_ROLLOUT_TIMEOUT_SECONDS = 120
+COMPROMISED_PASSWORD_ROLLOUT_TIMEOUT_SECONDS = 7500
 
 
 class RehearsalError(RuntimeError):
@@ -232,14 +234,19 @@ def _scale(replicas: int) -> None:
             time.sleep(1)
         raise RehearsalError("application pods did not stop within the bound")
     for application in APPLICATIONS:
+        rollout_timeout = (
+            COMPROMISED_PASSWORD_ROLLOUT_TIMEOUT_SECONDS
+            if application == "compromised-password-service"
+            else DEFAULT_ROLLOUT_TIMEOUT_SECONDS
+        )
         _kubectl(
             "-n",
             APP_NAMESPACE,
             "rollout",
             "status",
             "deployment/" + application,
-            "--timeout=120s",
-            timeout=130,
+            f"--timeout={rollout_timeout}s",
+            timeout=rollout_timeout + 10,
         )
 
 
@@ -421,8 +428,8 @@ def run(timeout_seconds: int) -> dict[str, object]:
             _psql(erasure_seed_sql(user_id, request_id, event_id), "identity")
             snapshots = _snapshot_databases(snapshot_directory)
 
-            _scale(1)
             stopped = False
+            _scale(1)
             _wait_complete(user_id, request_id, timeout_seconds)
             _verify_participants(request_id)
             time.sleep(5)
@@ -437,6 +444,7 @@ def run(timeout_seconds: int) -> dict[str, object]:
                     "restart",
                     "deployment/" + application,
                 )
+            stopped = False
             _scale(1)
             _wait_complete(user_id, request_id, timeout_seconds)
             _verify_participants(request_id)
@@ -444,8 +452,8 @@ def run(timeout_seconds: int) -> dict[str, object]:
             _scale(0)
             stopped = True
             _restore_databases(snapshots)
-            _scale(1)
             stopped = False
+            _scale(1)
             _wait_complete(user_id, request_id, timeout_seconds)
             _verify_participants(request_id)
             time.sleep(5)
