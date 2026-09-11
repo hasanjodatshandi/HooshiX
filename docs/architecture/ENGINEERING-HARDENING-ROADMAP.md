@@ -162,7 +162,7 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Both measured load findings are corrected. Exact-commit image/deploy, production-fidelity, zero-unexpected-result load/soak, and protected CI passed at `dd95740`; required external HIBP/provider/real-staging erasure evidence remains open. |
+| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Both measured load findings are corrected. Exact-commit image/deploy, production-fidelity, zero-unexpected-result load/soak, protected CI, complete-corpus HIBP staging, SMS.ir Sandbox, and real staging erasure/redeploy/restore evidence passed. Real Google Gmail and Production SMS.ir delivery evidence remain open. |
 | 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
@@ -204,10 +204,13 @@ not proof for later changes.
   credential acceptance, invalid-credential rejection, invalid-input rejection, and the
   documented simulated-success shape. Its identifier-free mode-0600 receipt explicitly
   records no real delivery claim; it is not production SMS acceptance or delivery evidence.
-- **Partially verified:** the local production-fidelity staging lane now has an exact-digest
+- **Passed:** the local production-fidelity staging lane now has an exact-digest
   Kafka 4.2.1 combined KRaft workload, explicit erasure topics, strict mesh/workload policy,
-  per-service connection Secrets, and all four participant gates. Static/platform checks and
-  datastore verification pass; the clean-commit redeploy/restore rehearsal remains pending.
+  per-service connection Secrets, and all four participant gates. At
+  `f19746fb54add27f4edc52a7344b6bcc6e734301`, the clean-commit rehearsal deleted the
+  synthetic Identity, verified all four participant receipts, restarted all five applications,
+  restored all four pre-completion database snapshots, and verified normal replay without
+  reappearance. The identifier-free receipt is mode `0600`.
 - **Passed:** `make local-runtime-smoke-erasure-recovery` completed a developer-local
   four-participant erasure, full service redeploy, pre-completion PostgreSQL 18 snapshot
   restore, and normal Outbox/Kafka/Inbox reconciliation without reappearance. Its
@@ -230,9 +233,23 @@ not proof for later changes.
   sampled traces did not retain a classified cause; these are not claimed as diagnosed
   Redis timeouts or as zero-error evidence. This prompted the session-failure follow-up
   below despite the capacity suite passing its unchanged thresholds.
-- **Not verified:** complete official HIBP corpus provenance/bounds, real Google Gmail execution,
-  production SMS.ir delivery, and a real staging four-participant erasure
-  restore/redeploy/provider-ambiguity/failure exercise. Google OIDC is owner-deferred and not part of
+- **Passed:** the official complete HIBP corpus acquired on 2026-09-09 was built into a
+  72,477,519,872-byte immutable SQLite artifact with 2,068,408,781 records. The observed
+  maximum prefix cardinality is 2,509 and maximum Protobuf response is 102,932 bytes,
+  within the reviewed 4,096-record/131,072-byte compatibility bounds. On the exact
+  `f19746f` image, 256 cold and warm random lookups measured p99 32.640 ms and 8.353 ms;
+  a one-connection 64-stream run, including bounded read-only storage pressure, completed
+  64/64 with no transport or unexpected status. It did not observe a fail-fast rejection,
+  so no rejection claim is made. Rebuild/redeploy/recovery and full post-restore staging and
+  production-fidelity verification passed. The identifier-free receipt is mode `0600` at
+  `.platform-runtime/stage7/hibp-staging-evidence.json`.
+- **Passed:** protected Repository baseline run `34630982537` and Web frontend E2E
+  run `34630981897` completed successfully for exact implementation
+  `f19746fb54add27f4edc52a7344b6bcc6e734301`, including every five-service security
+  suite, contract/examples, WAF privacy boundary, frontend journeys, and both final
+  aggregators. PR #126 remains Draft while provider evidence is open.
+- **Not verified:** real Google Gmail execution and Production SMS.ir sender/acceptance/
+  delivery/reconciliation evidence. Google OIDC is owner-deferred and not part of
   Notification-provider evidence. No real provider call is made
   without the required credentials, recipient, cost/side-effect authority, and
   environment.
@@ -366,10 +383,12 @@ Owner-approved local rebuild and refreshed capacity receipt, 2026-09-08:
   service suites. Authorization and Compromised Password integration steps failed on
   attempt 1 but passed unchanged on the fresh runner; no test or gate was weakened.
   Frontend run `34251259315`, attempt 1, passed. Both runs are bound to `dd95740`.
-- **Not verified:** official complete HIBP corpus, authorized real Google Gmail and production SMS.ir
-  exercises, and real staging four-participant erasure restore/redeploy evidence. Google OIDC is an
-  independently implemented optional login path and is owner-deferred for this stage.
-  Generated local fixtures cannot satisfy those gates; secrets must not be sent in chat.
+- **Passed later at `f19746f`:** official complete-corpus HIBP staging latency/load/
+  recovery and real staging four-participant erasure restart/restore/reconciliation.
+  **Not verified:** authorized real Google Gmail and Production SMS.ir delivery exercises.
+  Google OIDC is an independently implemented optional login path and is owner-deferred
+  for this stage. Generated local fixtures cannot satisfy provider gates; secrets must
+  not be sent in chat.
 
 #### Load-finding remediation review report
 
@@ -454,16 +473,16 @@ CI remediation completion receipt, not Stage 7 completion:
   test strength. No CI bypass, checksum wildcard, suppression, or reduced gate was used.
 - The two original CI failures and the fresh-CI metadata failure are resolved.
   The cluster blocker was subsequently removed by the approved rebuild above.
-  The later commit-bound load-finding verification is recorded above. Required
-  external-runtime evidence remains open, not unfinished CI remediation. PR #126 remains
+  The later commit-bound load-finding verification is recorded above. Some required
+  provider runtime evidence remains open, not unfinished CI remediation. PR #126 remains
   Draft and Stage 7 remains
   `IN PROGRESS`; `main` was not changed.
-- **Continuation action:** obtain the complete official HIBP corpus path/provenance
-  and authorized staging provider configuration/test-recipient paths before the
-  required external exercises.
+- **Continuation action:** obtain the Google Gmail App Password through the private
+  staging secret path and a Production SMS.ir key/sender/test-recipient configuration
+  before those remaining provider exercises.
   Never request secret values in chat or substitute synthetic claims for these runs.
 
-Then obtain and validate the remaining external-runtime evidence. Keep Stage 7
+Then obtain and validate the remaining provider runtime evidence. Keep Stage 7
 `IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
 review; do not advance to Stage 8 before then.
 

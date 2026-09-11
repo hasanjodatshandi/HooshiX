@@ -149,6 +149,19 @@ A static historical cardinality assumption is not evidence because HIBP corpus g
 
 The official complete download acquired on 2026-09-09 contained `2,068,408,781` canonical unique records. Its measured worst prefix contained `2,509` records and serialized to `102,932` Protobuf bytes. The reviewed compatibility envelope is `4,096` records and `131,072` bytes: each exceeds the observation by at least 25%, and the Identity client transport is explicitly configured for the same 128-KiB response ceiling. These measurements establish compatibility inputs; the separate staging latency/saturation receipt remains the runtime evidence authority.
 
+The exact `f19746fb54add27f4edc52a7344b6bcc6e734301` staging image mounted the
+72,477,519,872-byte complete-corpus SQLite artifact and passed 256 random disk-backed
+lookups per phase. Cold p95/p99 were 20.264/32.640 ms and warm p95/p99 were
+7.357/8.353 ms under the 900 ms request deadline. A one-connection 64-stream run,
+twice the configured 32-lookup bound, returned 64 successful responses with no
+transport or unexpected status while 32 bounded read-only workers applied storage
+pressure. The limiter did not reject a request in that run, so this evidence proves
+the exercised 2x load boundary, not the exact saturation point or a Production host
+capacity claim. Three full-corpus starts across erasure restart/restore/reconciliation,
+followed by the composite staging and production-fidelity verifiers, passed without an
+unexpected container restart. The mode-`0600` identifier-free local receipt is
+`.platform-runtime/stage7/hibp-staging-evidence.json`.
+
 ## 6. Reference Data
 
 Before independent-service trigger, measure bundle size/startup heap/serialization/cache effectiveness inside owning deployable. A local immutable bundle is cheaper than a speculative gRPC hop.

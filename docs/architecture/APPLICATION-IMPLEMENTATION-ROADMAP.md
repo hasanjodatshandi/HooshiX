@@ -42,7 +42,7 @@ The application is not yet a complete end-user product. Current material gaps ar
 - the browser frontend foundation, onboarding, profile/contact, password lifecycle, localization, and repository accessibility slices exist, while dependency/release alignment and deployed journey evidence remain incomplete;
 - the mandatory repository-wide audit remediation track in `ENGINEERING-HARDENING-ROADMAP.md`
   is active and must complete its ordered stages before the Conversation implementation;
-- real Google Gmail staging and Production-selected Email provider execution, production SMS.ir delivery evidence, and the staging erasure exercise remain NOT VERIFIED; the SMS.ir Sandbox contract probe passes but is simulated, while Google OIDC execution is owner-deferred and not a Notification-provider gate;
+- complete-corpus HIBP staging and the four-participant staging erasure restart/restore/reconciliation exercise pass at exact commit `f19746f`; real Google Gmail staging and Production-selected Email provider execution plus Production SMS.ir delivery remain NOT VERIFIED; the SMS.ir Sandbox contract probe passes but is simulated, while Google OIDC execution is owner-deferred and not a Notification-provider gate;
 - Google OIDC/ExternalIdentity is implemented in the repository; deployed real-provider execution remains NOT VERIFIED;
 - data-subject erasure and its first justified application Kafka workflow are repository-complete
   and verified in the developer-only integrated runtime; production deployment remains unverified;
