@@ -90,8 +90,8 @@ The following is the one ordered application-completion sequence. Do not start a
 | 4 | Complete Tenant lifecycle | `COMPLETED` | Suspend/resume/delete/restore and Invitation decline/revoke/expire/reissue are implemented with Identity/Authorization coordination, owner safety, durable replay, BFF OpenAPI/UI, migration, observability, and negative/recovery tests. |
 | 5 | Data Subject Erasure + Kafka | `COMPLETED` | Identity coordination, atomic self-erasure acceptance, Transactional Outbox, versioned/validated/exampled Kafka Protobuf events, participant Inbox/idempotency, service-owned effects, legal-hold rules, non-PII receipts, finite observable retry/DLT, 35-day evidence, restore/replay procedure, Helm/network policy, frontend flow, and a real four-participant local Kafka smoke are implemented and verified. Production deployment/readiness remains separate and unverified. |
 | 6 | Core AI Product Architecture | `COMPLETED` | ADR-0054 and `services/conversation-service.md` define the private text Conversation journey, aggregates, ownership, OpenAI `store=false` no-tool adapter boundary, authorization, encrypted persistence, durable worker, quotas/cost, retention/erasure, audit, reliability, observability, deployment evidence, and explicit non-goals. |
-| 6A | Engineering hardening audit remediation | `IN PROGRESS` | Complete stages 1-8 in `ENGINEERING-HARDENING-ROADMAP.md` in order. Each stage remains incomplete until its full diff and applicable repository gates are reviewed and recorded. |
-| 7 | Core AI Product vertical slices | `PLANNED` | After hardening stages 1-8 complete, implement the accepted first private Conversation + asynchronous ModelRun slice exactly within ADR-0054 acceptance; Workflow/Agent/tool/RAG/streaming/BYOK/shared-conversation boundaries remain excluded. |
+| 6A | Engineering hardening audit remediation | `COMPLETED` | Stages 1-8 in `ENGINEERING-HARDENING-ROADMAP.md` are complete with recorded diff review and protected repository evidence. Production-only gates remain separate in deferred step 8. |
+| 7 | Core AI Product vertical slices | `NEXT` | Implement the accepted first private Conversation + asynchronous ModelRun slice exactly within ADR-0054/0057 acceptance; Workflow/Agent/tool/RAG/streaming/BYOK/shared-conversation boundaries remain excluded. |
 | 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
 
 Reference Data is a separate conditional track, not part of the numbered completion sequence:
@@ -105,14 +105,13 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 8 — MLOps evaluation and safety architecture gate
+Core AI Product private Conversation + ModelRun vertical slice (Engineering Hardening Stage 9)
 ```
 
-Its completion boundary and interruption-safe status are owned by
-`ENGINEERING-HARDENING-ROADMAP.md`. Stage 7 is complete at reviewed implementation/evidence
-head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; Stage 8 is `IN PROGRESS` in Draft PR #127.
-Conversation implementation remains ordered after hardening stages 1-8. Its future
-target invariant remains:
+Its completion boundary and interruption-safe status are owned by ADR-0054, ADR-0057,
+`services/conversation-service.md`, and `ENGINEERING-HARDENING-ROADMAP.md`. Stage 8 is complete at
+reviewed implementation/evidence head `b85f112c83f41d06e93151dee300c2d82ab8eece`; Stage 9 is `NEXT`.
+The implementation target remains:
 
 ```text
 service foundation                  -> one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, key ring, and Day-One telemetry
