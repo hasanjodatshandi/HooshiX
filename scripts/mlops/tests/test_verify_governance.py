@@ -62,6 +62,13 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
             self.update_governance(root, lambda value: value.update(promotion_policy=[]))
             self.assertTrue(any("promotion_policy must be an object" in error for error in verifier.validate(root)))
 
+    def test_malformed_price_is_reported_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.copy_bundle(root)
+            self.update_governance(root, lambda value: value["price_catalog"][0].update(maximum_request_reservation_micro_usd="unbounded"))
+            self.assertTrue(any("reservation must be a positive integer" in error for error in verifier.validate(root)))
+
     def test_critical_eval_regression_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
