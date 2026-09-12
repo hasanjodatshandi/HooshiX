@@ -92,7 +92,7 @@ evidence gap is not reported as a confirmed runtime defect.
 | HR-011 | MEDIUM | CI/tooling maintainability | Five service workflows repeat substantial security/build setup. Repository shell/Python/workflow scripts have custom tests but no selected high-signal ShellCheck/actionlint/Python static gate. | 6 |
 | HR-012 | HIGH | Capacity/performance evidence | No executable load/soak/chaos suite or complete-stack headroom proof exists; representative sensitive-query `EXPLAIN` evidence was not found. Required Production headroom remains `NOT VERIFIED`. | 7 |
 | HR-013 | MEDIUM | Test depth | Java and frontend coverage thresholds are absent; selective mutation testing for security state machines is absent; BDD/scenario coverage is narrow. | 7 |
-| HR-014 | HIGH | External/runtime evidence | Full HIBP corpus bounds, Google Gmail execution, production SMS.ir delivery, erasure redeploy/restore scenarios, and provider ambiguity remain incomplete or `NOT VERIFIED`. The simulated SMS.ir Sandbox contract/failure probe is `Passed`; Google OIDC execution is owner-deferred and not applicable to Notification-provider evidence. | 7 |
+| HR-014 | HIGH | External/runtime evidence | Production SMS.ir delivery and provider ambiguity remain incomplete or `NOT VERIFIED`. Full HIBP corpus bounds, Google Gmail acceptance, SMS.ir production credential/sender/acceptance, and erasure redeploy/restore scenarios pass in local staging. The simulated SMS.ir Sandbox contract/failure probe is separately `Passed`; Google OIDC execution is owner-deferred and not applicable to Notification-provider evidence. | 7 |
 | HR-015 | HIGH | MLOps governance | Conversation architecture has no versioned offline synthetic/adversarial evaluation suite, quality/safety/cost/latency promotion thresholds, canary policy, or model/prompt rollback evidence. | 8 |
 | HR-016 | HIGH | AI safety/data control | Content-safety/acceptable-use ownership, provider data-control approval, feedback handling, and drift policy require an explicit reviewed decision before model execution is enabled. | 8 |
 | HR-017 | HIGH | Core product | ADR-0054 Conversation/ModelRun is designed but no executable service, contracts, database, worker/provider adapter, BFF/UI, or lifecycle implementation exists. | 9 |
@@ -162,7 +162,7 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Both measured load findings are corrected. Exact-commit image/deploy, production-fidelity, zero-unexpected-result load/soak, protected CI, complete-corpus HIBP staging, SMS.ir Sandbox, and real staging erasure/redeploy/restore evidence passed. Real Google Gmail and Production SMS.ir delivery evidence remain open. |
+| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Both measured load findings are corrected. Exact-commit image/deploy, production-fidelity, zero-unexpected-result load/soak, protected CI, complete-corpus HIBP staging, SMS.ir Sandbox, real Gmail acceptance, SMS.ir production acceptance, and real staging erasure/redeploy/restore evidence passed. SMS.ir delivery remains open because the authenticated correlated report returned permanent state `7` for the allow-listed recipient. |
 | 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
@@ -253,11 +253,14 @@ not proof for later changes.
   human-read claim is made. Credentials and recipients remained in mode-`0600` Git-ignored state
   and do not appear in the identifier-free receipt.
 - **Partially verified:** a Production SMS.ir API key authenticated, `GET /v1/line` returned exactly
-  one numeric sender line, and the real exact-text path was exercised without credential/recipient
-  disclosure. SMS.ir rejected bulk submission with HTTP `400`, provider status `123` (sender-line
-  activation required). Notification classified the explicit rejection as permanent and performed
-  no blind retry. Production acceptance, delivery, and reconciliation remain `Not verified` until
-  the account owner activates the sender line and the bounded exercise is repeated.
+  one numeric sender line, and the owner-supplied replacement line passed the real exact-text path
+  without credential/recipient disclosure. Bulk submission returned HTTP `200`, provider status
+  `1`, and exactly one positive message identifier, so Notification reached `PROVIDER_ACCEPTED`
+  with one attempt and began authenticated message-specific reconciliation. The correlated report
+  then returned permanent delivery state `7` (recipient blacklist); delivery was correctly not
+  claimed and no blind submission retry occurred. Production sender activation/acceptance now pass;
+  actual delivery remains `Not verified` until an owner-approved recipient that is not operator/
+  provider blacklisted is used.
 - Google OIDC remains owner-deferred and is not part of Notification-provider evidence.
 
 Corrective work already included in the measured revision:
@@ -391,7 +394,9 @@ Owner-approved local rebuild and refreshed capacity receipt, 2026-09-08:
   Frontend run `34251259315`, attempt 1, passed. Both runs are bound to `dd95740`.
 - **Passed later at `f19746f`:** official complete-corpus HIBP staging latency/load/
   recovery and real staging four-participant erasure restart/restore/reconciliation.
-  **Not verified:** authorized real Google Gmail and Production SMS.ir delivery exercises.
+  **Passed later:** authorized real Google Gmail acceptance and Production SMS.ir credential,
+  sender-line, bulk-acceptance, and authenticated message-report execution. SMS.ir delivery remains
+  `Not verified` because the correlated report returned permanent recipient-blacklist state `7`.
   Google OIDC is an independently implemented optional login path and is owner-deferred
   for this stage. Generated local fixtures cannot satisfy provider gates; secrets must
   not be sent in chat.
@@ -483,10 +488,10 @@ CI remediation completion receipt, not Stage 7 completion:
   provider runtime evidence remains open, not unfinished CI remediation. PR #126 remains
   Draft and Stage 7 remains
   `IN PROGRESS`; `main` was not changed.
-- **Continuation action:** activate the sole sender line returned by the authenticated SMS.ir
-  account, then repeat the bounded Production SMS.ir acceptance/delivery/reconciliation exercise.
-  Gmail staging execution is complete. Never request secret values in chat or substitute synthetic
-  claims for the remaining run.
+- **Continuation action:** use one explicitly owner-approved SMS recipient that is not on the
+  operator/provider blacklist, then repeat only the bounded Production SMS.ir delivery exercise.
+  Gmail staging execution and SMS.ir production sender acceptance are complete. Never request secret
+  values in chat or substitute synthetic claims for the remaining run.
 
 Then obtain and validate the remaining provider runtime evidence. Keep Stage 7
 `IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
