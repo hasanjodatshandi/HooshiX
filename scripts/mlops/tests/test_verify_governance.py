@@ -47,13 +47,20 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_bundle(root)
-            outside = root.parent / "outside-prompt.txt"
+            outside = root.parent / f"{root.name}-outside-prompt.txt"
             outside.write_text("outside\n", encoding="utf-8")
             try:
-                self.update_governance(root, lambda value: value["prompt_catalog"][0].update(path="../outside-prompt.txt"))
+                self.update_governance(root, lambda value: value["prompt_catalog"][0].update(path=f"../{outside.name}"))
                 self.assertTrue(any("inside the repository" in error for error in verifier.validate(root)))
             finally:
                 outside.unlink(missing_ok=True)
+
+    def test_malformed_policy_shape_is_reported_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.copy_bundle(root)
+            self.update_governance(root, lambda value: value.update(promotion_policy=[]))
+            self.assertTrue(any("promotion_policy must be an object" in error for error in verifier.validate(root)))
 
     def test_critical_eval_regression_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

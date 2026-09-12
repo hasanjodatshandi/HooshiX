@@ -30,8 +30,12 @@ def validate_evaluation(root: Path, errors: list[str]) -> dict[str, Any]:
     path = root / "mlops/evaluations/conversation-v1.json"
     try:
         suite = load_json(path)
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         errors.append(f"evaluation suite cannot be read: {exc}")
+        return {}
+
+    require(errors, isinstance(suite, dict), "evaluation suite root must be an object")
+    if not isinstance(suite, dict):
         return {}
 
     require(errors, suite.get("schema_version") == 1, "evaluation schema_version must be 1")
@@ -85,8 +89,12 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
     path = root / "mlops/governance/v1/governance.json"
     try:
         governance = load_json(path)
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         errors.append(f"governance bundle cannot be read: {exc}")
+        return
+
+    require(errors, isinstance(governance, dict), "governance root must be an object")
+    if not isinstance(governance, dict):
         return
 
     require(errors, governance.get("schema_version") == 1, "governance schema_version must be 1")
@@ -106,6 +114,9 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
         return
 
     approval = governance.get("provider_data_controls", {})
+    require(errors, isinstance(approval, dict), "provider_data_controls must be an object")
+    if not isinstance(approval, dict):
+        approval = {}
     pending = approval.get("approval_status") != "APPROVED"
     require(errors, model.get("provider") == "openai" and model.get("endpoint") == "responses", "model must use the reviewed OpenAI Responses boundary")
     require(errors, re.fullmatch(r"gpt-[a-z0-9.-]+-20[0-9]{2}-[0-9]{2}-[0-9]{2}", str(model.get("provider_model_id", ""))) is not None, "provider model must be an exact dated snapshot")
@@ -143,26 +154,44 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
         require(errors, price.get("maximum_request_reservation_micro_usd") == worst_case, "maximum request reservation must equal worst-case catalog price")
 
     promotion = governance.get("promotion_policy", {})
+    require(errors, isinstance(promotion, dict), "promotion_policy must be an object")
+    if not isinstance(promotion, dict):
+        promotion = {}
     require(errors, promotion.get("minimum_critical_eval_pass_rate_basis_points") == 10000, "critical eval pass rate must be 100%")
     require(errors, promotion.get("maximum_eval_error_count") == 0, "evaluation errors must block promotion")
     require(errors, promotion.get("hard_provider_deadline_ms") == 60000, "provider deadline must preserve ADR-0054")
-    require(errors, set(promotion.get("required_approvals", [])) == {"product-owner", "security-owner", "privacy-owner", "platform-owner"}, "promotion owner approvals are incomplete")
+    approvals = promotion.get("required_approvals", [])
+    require(errors, isinstance(approvals, list) and all(isinstance(item, str) for item in approvals) and set(approvals) == {"product-owner", "security-owner", "privacy-owner", "platform-owner"}, "promotion owner approvals are incomplete")
     steps = promotion.get("canary_steps_percent")
     valid_steps = isinstance(steps, list) and bool(steps) and all(isinstance(step, int) for step in steps)
     require(errors, valid_steps and steps == sorted(set(steps)) and steps[0] == 1 and steps[-1] == 100, "canary steps must be unique, ordered, and reach 100%")
     triggers = promotion.get("rollback_triggers", {})
+    require(errors, isinstance(triggers, dict), "rollback_triggers must be an object")
+    if not isinstance(triggers, dict):
+        triggers = {}
     require(errors, triggers.get("confirmed_critical_safety_or_privacy_incidents") == 1, "one confirmed critical incident must trigger rollback")
 
     safety = governance.get("safety_policy", {})
+    require(errors, isinstance(safety, dict), "safety_policy must be an object")
+    if not isinstance(safety, dict):
+        safety = {}
     require(errors, safety.get("model_output_is_untrusted") is True and safety.get("model_output_can_grant_authority") is False and safety.get("model_output_can_execute_side_effects") is False, "model output authority boundary is invalid")
-    require(errors, set(safety.get("blocked_capabilities", [])) >= {"tools", "mcp", "web-search", "code-execution", "external-actions"}, "v1 blocked capabilities are incomplete")
+    blocked_capabilities = safety.get("blocked_capabilities", [])
+    require(errors, isinstance(blocked_capabilities, list) and all(isinstance(item, str) for item in blocked_capabilities) and set(blocked_capabilities) >= {"tools", "mcp", "web-search", "code-execution", "external-actions"}, "v1 blocked capabilities are incomplete")
 
     feedback = governance.get("feedback_policy", {})
+    require(errors, isinstance(feedback, dict), "feedback_policy must be an object")
+    if not isinstance(feedback, dict):
+        feedback = {}
     require(errors, feedback.get("free_text_enabled") is False and feedback.get("training_use_enabled") is False, "v1 feedback must not collect free text or train models")
     require(errors, feedback.get("tenant_and_erasure_scope_required") is True, "feedback must participate in tenant and erasure scope")
     drift = governance.get("drift_policy", {})
+    require(errors, isinstance(drift, dict), "drift_policy must be an object")
+    if not isinstance(drift, dict):
+        drift = {}
     require(errors, drift.get("automatic_model_training_from_production_content") is False, "production content must not train models automatically")
-    require(errors, set(drift.get("mandatory_rerun_triggers", [])) >= {"model-change", "prompt-change", "price-change", "provider-policy-change", "safety-incident"}, "drift rerun triggers are incomplete")
+    rerun_triggers = drift.get("mandatory_rerun_triggers", [])
+    require(errors, isinstance(rerun_triggers, list) and all(isinstance(item, str) for item in rerun_triggers) and set(rerun_triggers) >= {"model-change", "prompt-change", "price-change", "provider-policy-change", "safety-incident"}, "drift rerun triggers are incomplete")
 
 
 def validate(root: Path = ROOT) -> list[str]:
@@ -174,7 +203,7 @@ def validate(root: Path = ROOT) -> list[str]:
         try:
             schema = load_json(root / relative)
             require(errors, schema.get("$id") == expected_id, f"{relative} has an invalid $id")
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             errors.append(f"{relative} cannot be read: {exc}")
     suite = validate_evaluation(root, errors)
     validate_governance(root, suite, errors)

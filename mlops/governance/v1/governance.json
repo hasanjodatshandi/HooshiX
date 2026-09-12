@@ -70,7 +70,7 @@
     "maximum_p95_latency_ms": 20000,
     "maximum_p99_latency_ms": 45000,
     "hard_provider_deadline_ms": 60000,
-    "maximum_p95_cost_micro_usd": 70000,
+    "maximum_p95_cost_micro_usd": 25000,
     "canary_steps_percent": [1, 5, 25, 100],
     "minimum_canary_observation_minutes": [60, 120, 240, 1440],
     "rollback_triggers": {
