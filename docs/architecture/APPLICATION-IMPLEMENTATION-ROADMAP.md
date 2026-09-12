@@ -39,7 +39,9 @@ The implemented foundation already includes substantial registration, local auth
 
 The application is not yet a complete end-user product. Current material gaps are:
 
-- the browser frontend foundation, onboarding, profile/contact, password lifecycle, localization, and repository accessibility slices exist, while dependency/release alignment and deployed journey evidence remain incomplete;
+- the browser frontend foundation, onboarding, profile/contact, password lifecycle, localization,
+  repository accessibility, and repository release-alignment slices exist, while deployed journey
+  and Production promotion evidence remain incomplete;
 - the mandatory repository-wide audit remediation track in `ENGINEERING-HARDENING-ROADMAP.md`
   is active and must complete its ordered stages before the Conversation implementation;
 - complete-corpus HIBP staging and the four-participant staging erasure restart/restore/reconciliation exercise pass at exact commit `f19746f`; real Gmail SMTP acceptance plus Production SMS.ir credential/sender/bulk acceptance/authenticated report execution pass in local staging, but SMS delivery remains NOT VERIFIED after the allow-listed recipient returned permanent blacklist state `7`; Production-selected Email-provider execution also remains NOT VERIFIED, the SMS.ir Sandbox contract probe passes but is simulated, and Google OIDC execution is owner-deferred and not a Notification-provider gate;
@@ -103,12 +105,12 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 7 — Performance, reliability, and test evidence
+Engineering Hardening Stage 8 — MLOps evaluation and safety architecture gate
 ```
 
 Its completion boundary and interruption-safe status are owned by
-`ENGINEERING-HARDENING-ROADMAP.md`. Stage 6 is complete; Stage 7 is in progress and
-remains incomplete until its repository evidence boundary is fully verified.
+`ENGINEERING-HARDENING-ROADMAP.md`. Stage 7 is complete at reviewed implementation/evidence
+head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; Stage 8 is `NEXT`.
 Conversation implementation remains ordered after hardening stages 1-8. Its future
 target invariant remains:
 

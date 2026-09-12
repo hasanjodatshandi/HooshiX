@@ -92,7 +92,7 @@ evidence gap is not reported as a confirmed runtime defect.
 | HR-011 | MEDIUM | CI/tooling maintainability | Five service workflows repeat substantial security/build setup. Repository shell/Python/workflow scripts have custom tests but no selected high-signal ShellCheck/actionlint/Python static gate. | 6 |
 | HR-012 | HIGH | Capacity/performance evidence | No executable load/soak/chaos suite or complete-stack headroom proof exists; representative sensitive-query `EXPLAIN` evidence was not found. Required Production headroom remains `NOT VERIFIED`. | 7 |
 | HR-013 | MEDIUM | Test depth | Java and frontend coverage thresholds are absent; selective mutation testing for security state machines is absent; BDD/scenario coverage is narrow. | 7 |
-| HR-014 | HIGH | External/runtime evidence | Production SMS.ir delivery and provider ambiguity remain incomplete or `NOT VERIFIED`. Full HIBP corpus bounds, Google Gmail acceptance, SMS.ir production credential/sender/acceptance, and erasure redeploy/restore scenarios pass in local staging. The simulated SMS.ir Sandbox contract/failure probe is separately `Passed`; Google OIDC execution is owner-deferred and not applicable to Notification-provider evidence. | 7 |
+| HR-014 | HIGH | External/runtime evidence | `CLOSED FOR STAGE 7 / DEFERRED TO STAGE 10`: full HIBP corpus bounds, Google Gmail acceptance, SMS.ir production credential/sender/acceptance plus authenticated terminal reconciliation, provider ambiguity/failure behavior, and erasure redeploy/restore scenarios pass in local staging. Actual SMS `DELIVERED` evidence remains `NOT VERIFIED` after the approved recipient returned blacklist state `7`; on 2026-09-12 the owner explicitly accepted this environment-specific outcome for Stage 7 without making a delivery or Production-readiness claim. The simulated SMS.ir Sandbox contract/failure probe is separately `Passed`; Google OIDC execution is owner-deferred and not applicable to Notification-provider evidence. | 7 / 10 |
 | HR-015 | HIGH | MLOps governance | Conversation architecture has no versioned offline synthetic/adversarial evaluation suite, quality/safety/cost/latency promotion thresholds, canary policy, or model/prompt rollback evidence. | 8 |
 | HR-016 | HIGH | AI safety/data control | Content-safety/acceptable-use ownership, provider data-control approval, feedback handling, and drift policy require an explicit reviewed decision before model execution is enabled. | 8 |
 | HR-017 | HIGH | Core product | ADR-0054 Conversation/ModelRun is designed but no executable service, contracts, database, worker/provider adapter, BFF/UI, or lifecycle implementation exists. | 9 |
@@ -162,8 +162,8 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `IN PROGRESS` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Both measured load findings are corrected. Exact-commit image/deploy, production-fidelity, zero-unexpected-result load/soak, protected CI, complete-corpus HIBP staging, SMS.ir Sandbox, real Gmail acceptance, SMS.ir production acceptance, and real staging erasure/redeploy/restore evidence passed. SMS.ir delivery remains open because the authenticated correlated report returned permanent state `7` for the allow-listed recipient. |
-| 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
+| 7 | Performance, reliability, and test evidence | `COMPLETED` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. Repository/staging completion explicitly requires provider contract, acceptance, failure, ambiguity, and reconciliation evidence; actual Production delivery remains a Stage 10 commissioning gate. | Final reviewed implementation/evidence head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; protected repository baseline run `34674964250` and frontend E2E run `34674964129` passed. Exact-digest/runtime, load/soak/headroom, full-corpus HIBP, erasure restore/redeploy, Gmail acceptance, SMS.ir production acceptance and terminal reconciliation all passed their Stage 7 boundary. SMS `DELIVERED` was not observed and is not claimed. |
+| 8 | MLOps evaluation and safety architecture gate | `NEXT` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
 
@@ -181,10 +181,11 @@ cancellation behavior is bounded and testable.
 | 4 | `ae68a2f9f7351826fbee952bb5e97ffe8285a070` | `4f29bdccc60581b2a2144ef296d6e31647b86e42` | `COMPLETED`: complete Stage 4 diff reviewed with no remaining HR-005/HR-006 finding. Context7 was invoked for Vitest, React Testing Library, and axe documentation but its transport was unavailable; current official project documentation and exact installed-version behavior were used as the fallback. Typed `fa`/`en` catalogs now drive every current journey, request locale, and document RTL/LTR without persistent browser state; route headings receive client-navigation focus and every direct route has a main landmark. Three Vitest/RTL component tests, three Chromium/axe test journeys covering two directions and eleven stable route shells, twenty-four other Playwright journeys, generated OpenAPI drift, TypeScript/build, npm advisory, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected frontend run `33247612549` passed and repository baseline run `33247612662` passed structure, contracts, all five service security suites, and its final aggregator. Coverage thresholds remain Stage 7; frontend SAST/advisory/release alignment remains Stage 5; deployed-browser/Production evidence remains Stage 10 and `NOT VERIFIED`. |
 | 5 | `c6a972d2d770ddb8a50b48dc57630856d2920597` | `209684a5a465477e87ff9c257c0511ace5af3a0f` | `COMPLETED`: the complete Stage 5 diff was reviewed against unchanged `origin/main` with no remaining HR-007/HR-008/HR-009 finding. Context7-confirmed React 19.2.7 alignment, OSV npm-lock scanning, and explicit protoc 4.34.2 configuration were applied. Frontend manifest and lockfile pins, OSV scan, eight-rule Semgrep source policy with positive/negative fixtures, non-root/read-only/no-capability Caddy image health/SPA smoke, Production six-component release validation/rescan/Syft/Grype/Cosign/Kyverno wiring, all five strict Gradle checks, production tests, component/API/build/accessibility/twenty-four other browser journeys, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected frontend run `33301549573` passed every new frontend gate and protected repository baseline run `33301549810` passed contracts, structure, all five service security suites, and its final aggregator. Actual frontend staging/Production workload/routing, real release signing/scanning/admission execution, deployed browser journeys, and Production readiness remain Stage 10 and `NOT VERIFIED`. |
 | 6 | `703333fabcdd97808863a33604a19d161c9a8d2b` | `56bb71c29b96ddb4cce7f0b276f25c53417a32fc` | `COMPLETED`: the complete Stage 6 diff was reviewed against unchanged `origin/main` with no remaining HR-010/HR-011 finding. Characterization tests fixed the public facade constructors/interfaces and critical Spring bean names, conditions, profiles, and destroy methods before refactoring. Authorization persistence, Identity tenant persistence, Identity runtime configuration, and the BFF Identity client are now capability-focused facades/components; transaction-call counts, BFF deadline counts, and Identity bean counts match the pre-refactor surfaces, and no contract, migration, deployment, or dependency file changed. The five service workflows now share one executable Gitleaks/OSV implementation while retaining four explicit blocking security steps each. Checksum-pinned ShellCheck 0.11.0, actionlint 1.7.12, and Ruff 0.16.5 enforce selected high-signal repository source checks. Context7-confirmed Spring configuration composition/profile behavior, jOOQ transaction-scoped context use, and actionlint/ShellCheck integration informed the review. Authorization, Identity, and Web BFF formatting, unit, integration, architecture, SpotBugs, and runtime-JAR gates, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected repository baseline run `33322638261` passed source lint, contracts, all five complete service security suites, and its final aggregator; frontend E2E run `33322638140` passed. Stage 7 retains all coverage, mutation, performance, load, soak, fault, provider, and capacity evidence work. |
+| 7 | `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` | `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7` | `COMPLETED`: the complete Stage 7 diff was reviewed against unchanged `origin/main` with no unresolved Critical/High repository finding. Coverage and selective mutation gates, representative query plans, dependency/advisory corrections, exact-digest local production-fidelity, load/soak/fault/headroom, full-corpus HIBP, provider contract/failure/ambiguity, real Gmail acceptance, SMS.ir production sender/acceptance/terminal reconciliation, and erasure restart/restore/redeploy evidence passed. Protected repository baseline run `34674964250` and frontend E2E run `34674964129` passed at the reviewed head. The owner accepted the SMS recipient-blacklist state `7` as sufficient environment evidence for this repository stage; `DELIVERED` is explicitly not claimed and remains a Stage 10 commissioning gate. |
 
-### Stage 7 continuation receipt
+### Stage 7 completion evidence
 
-This is interruption-safe progress evidence, not a completion receipt. The latest
+This is the interruption-safe evidence behind the Stage 7 completion receipt. The latest
 completed local production-fidelity and capacity run used the clean implementation
 revision `25b747e4a7070d6cfc0602eb0506d6b5bebb5866` on 2026-09-08, as recorded in the
 rebuild receipt below. The following 2026-09-07 measurements belong to
@@ -247,20 +248,21 @@ not proof for later changes.
   run `34630981897` completed successfully for exact implementation
   `f19746fb54add27f4edc52a7344b6bcc6e734301`, including every five-service security
   suite, contract/examples, WAF privacy boundary, frontend journeys, and both final
-  aggregators. PR #126 remains Draft while provider evidence is open.
+  aggregators. At that historical commit PR #126 remained Draft while provider evidence was open.
 - **Passed:** a bounded owner-authorized Google Gmail staging execution reached the real provider
   and the final SMTP response moved the attempt to `PROVIDER_ACCEPTED`; no mailbox-delivery or
   human-read claim is made. Credentials and recipients remained in mode-`0600` Git-ignored state
   and do not appear in the identifier-free receipt.
-- **Partially verified:** a Production SMS.ir API key authenticated, `GET /v1/line` returned exactly
+- **Accepted Stage 7 environment evidence / actual delivery not verified:** a Production SMS.ir API key authenticated, `GET /v1/line` returned exactly
   one numeric sender line, and the owner-supplied replacement line passed the real exact-text path
   without credential/recipient disclosure. Bulk submission returned HTTP `200`, provider status
   `1`, and exactly one positive message identifier, so Notification reached `PROVIDER_ACCEPTED`
   with one attempt and began authenticated message-specific reconciliation. The correlated report
   then returned permanent delivery state `7` (recipient blacklist); delivery was correctly not
   claimed and no blind submission retry occurred. Production sender activation/acceptance now pass;
-  actual delivery remains `Not verified` until an owner-approved recipient that is not operator/
-  provider blacklisted is used.
+  actual delivery remains `Not verified`. On 2026-09-12 the owner confirmed the recipient had
+  intentionally disabled promotional SMS, accepted this terminal outcome for Stage 7, and deferred
+  a later successful-delivery recheck to commissioning after the operator-side setting propagates.
 - Google OIDC remains owner-deferred and is not part of Notification-provider evidence.
 
 Corrective work already included in the measured revision:
@@ -472,7 +474,7 @@ CI recheck of implementation `330ced32e03ac57a10ec83762688d93de319a2ea`:
   cache success did not prove a fresh CI dependency-resolution path; that path was
   subsequently verified by the corrected-metadata protected run below.
 
-CI remediation completion receipt, not Stage 7 completion:
+Historical CI remediation receipt:
 
 - Reviewed corrected implementation: `ca6d4803ebf9d398dba0590a601076743497d467`.
 - **Passed:** protected repository baseline run `34151203292`, including structure,
@@ -485,17 +487,8 @@ CI remediation completion receipt, not Stage 7 completion:
 - The two original CI failures and the fresh-CI metadata failure are resolved.
   The cluster blocker was subsequently removed by the approved rebuild above.
   The later commit-bound load-finding verification is recorded above. Some required
-  provider runtime evidence remains open, not unfinished CI remediation. PR #126 remains
-  Draft and Stage 7 remains
-  `IN PROGRESS`; `main` was not changed.
-- **Continuation action:** use one explicitly owner-approved SMS recipient that is not on the
-  operator/provider blacklist, then repeat only the bounded Production SMS.ir delivery exercise.
-  Gmail staging execution and SMS.ir production sender acceptance are complete. Never request secret
-  values in chat or substitute synthetic claims for the remaining run.
-
-Then obtain and validate the remaining provider runtime evidence. Keep Stage 7
-`IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
-review; do not advance to Stage 8 before then.
+  provider runtime evidence was still open at that historical point; the later final provider and
+  protected-CI evidence above supersedes that continuation state.
 
 #### CI remediation review report
 
@@ -523,6 +516,31 @@ This report covers the bounded CI follow-up, not completion of the entire Stage 
 | Tests executed | Exact local and protected-run outcomes recorded above; failed/unverified runtime gates remain explicit |
 | Architecture deviations | None identified within this bounded follow-up |
 | Rollback considerations | Do not promote/revert to known vulnerable Tomcat artifacts; fail forward with a reviewed fixed compatible patch. Cluster recovery/backup is not established, so no destructive rebuild without explicit owner approval |
+
+#### Stage 7 final review report
+
+| Required field | Review evidence |
+| --- | --- |
+| Architecture review mode | `full-read`; security, PII, provider, durable messaging, persistence, and staging infrastructure reviewed under `minimal-safe-engineering` critical priorities |
+| Architecture document version/commit | Current authorities and the complete Stage 7 diff reviewed at `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; latest `origin/main` remained `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` |
+| Architecture sections reviewed | Mandatory source order; service/platform/network/security/threat/data/reliability/performance/runtime/testing/readiness/status authorities; applicable operations/runbooks; complete changed-file inventory and risk scans |
+| Search terms used | `Stage 7`, `IN PROGRESS`, `HR-012`, `HR-013`, `HR-014`, `ambiguity`, `provider`, `retry`, `deadline`, `hostPath`, `secret`, `PII`, `ignoreFailures`, `TODO`, `latest` |
+| ADRs reviewed or changed | ADR-0005/0006/0007/0010/0012/0014/0016/0017/0018/0024/0025/0028/0031/0033/0035/0038/0039/0040/0042/0043/0044/0045/0046/0055/0056; ADR-0055/0056 added and ADR-0020 retained as superseded provenance |
+| Changed bounded context/module | Cross-service/front-end/platform test and evidence gates; Compromised Password complete-corpus path; Notification provider adapters; bounded Identity/Authorization/BFF reliability corrections; no new deployable boundary |
+| Contracts changed | BFF OpenAPI moved to pre-Production `2.0.0` with UUIDv4 `Idempotency-Key` business authority and generated frontend parity; neutral Protobuf package remains `1.8.0` with validation/examples/compatibility passing |
+| Database migration | Notification additive V7 reconciliation-receipt lookup index; migration/profile/integration gates passed; no executed migration was edited |
+| Transaction boundary | Remote provider/gRPC/Redis/Kafka I/O remains outside DB transactions; operation-specific database budgets and one-record worker lease freshness passed integration/load evidence |
+| Timeout/deadline behavior | Existing bounded caller/provider/Redis/database budgets retained or tightened; no unbounded wait or SLO relaxation introduced |
+| Retry/cancellation/concurrency behavior | Finite single-owner retries, no blind retry after ambiguous/provider-accepted execution, abortable BFF requests, bounded pools/queues/concurrency, and restart/lease behavior verified |
+| Kafka/event and idempotency behavior | Transactional Outbox, at-least-once Inbox/dedup, stable erasure identities, replay/restart/restore, and four participant receipts passed; Kafka remains non-authoritative async transport |
+| Security impact | Secrets stayed in mode-`0600` Git-ignored files; no credential/recipient/provider ID entered tracked evidence; WAF/privacy, Gitleaks history/tree, Semgrep, OSV, dependency integrity, hardened manifests, and negative trust-boundary gates passed |
+| Istio identity and authorization impact | Existing strict Ambient workload identities, least-privilege AuthorizationPolicy/NetworkPolicy, WAF-only public route, provider egress bounds, and positive/negative runtime checks passed |
+| Logging and PII impact | Structured allow-list telemetry, WAF request-text removal, privacy canaries, bounded labels, and identifier-free evidence passed; no delivery claim is inferred from provider acceptance |
+| Observability added or changed | Capacity/load/soak/restart/provider/erasure evidence and low-cardinality failure/saturation metrics added; telemetry remains non-authoritative and backend outage tests passed |
+| Build/CI/architecture enforcement changed | Risk-based JaCoCo/Vitest coverage, selective PIT, source lint, npm advisory/SAST/image gates, exact dependency locks/checksums, provider/render/platform checks, and final baseline enforcement added without suppression/threshold weakening |
+| Tests executed | Local unit/integration/architecture/SpotBugs/format/contract/migration/render/security/browser/coverage/mutation/plan/load/soak/fault/staging/erasure/HIBP/provider/baseline checks recorded above; protected baseline `34674964250` and frontend E2E `34674964129` passed at `fb18a08`. A later completion-document-only `staging_verify.sh` invocation correctly failed closed because the intentionally dirty documentation worktree did not match the clean staged application provenance `1ec6d7f`; no executable image rebuild is claimed or required for that documentation-only delta |
+| Architecture deviations | None identified. Owner acceptance changes only the Stage 7 evidence boundary; Notification still requires authenticated correlated state `1` before lifecycle `DELIVERED`, and Production readiness remains `NOT VERIFIED` |
+| Rollback considerations | Preserve immutable migrations/evidence and ambiguity/no-blind-retry semantics. Do not restore vulnerable dependencies, unsafe WAF logging, weakened quota/lease controls, simulated provider claims, or pre-fix full-corpus behavior |
 
 ## 7. Stage review checklist
 
