@@ -30,8 +30,8 @@ services/authorization-service/
 services/web-bff/
 ```
 
-ADR-0054/0057, `services/conversation-service.md`, and `mlops-evaluation-and-safety.md` now define the first core AI-product boundary:
-private text Conversation plus asynchronous ModelRun through a platform-approved, stateless
+ADR-0054/0057, `services/conversation-service.md`, and `mlops-evaluation-and-safety.md` now define
+the first core AI-product boundary: private text Conversation plus asynchronous ModelRun through a platform-approved, stateless
 `store=false` OpenAI adapter with no tools. Versioned model/prompt/price catalogs, a bilingual
 synthetic non-PII adversarial suite, promotion/canary/rollback thresholds, safety/feedback/drift and
 provider-data-control requirements, schemas, and a deterministic repository validator are present;

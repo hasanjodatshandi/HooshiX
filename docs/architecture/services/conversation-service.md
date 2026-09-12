@@ -159,10 +159,10 @@ not choose another model.
 
 ## 8. Cost and abuse safety
 
-Conversation is authoritative for run budget and cost. The Git-owned ADR-0057 catalog records a stable model
-alias, provider identifier, model identifier, input/output limits, integer micro-unit prices, and
-effective version. The browser sees the safe alias and bounded estimated/actual cost only when the
-product contract explicitly exposes it.
+Conversation is authoritative for run budget and cost. The Git-owned ADR-0057 catalog records a
+stable model alias, provider identifier, model identifier, input/output limits, integer micro-unit
+prices, and effective version. The browser sees the safe alias and bounded estimated/actual cost only
+when the product contract explicitly exposes it.
 
 Acceptance reserves worst-case cost before queueing. Completion charges provider-reported usage;
 unused reservation is released. Missing trustworthy usage after an ambiguous outcome conservatively
@@ -228,8 +228,9 @@ load, erasure, provider-fixture, canary, and rollback evidence pass.
 
 ## 12. First vertical-slice Definition of Done
 
-ADR-0054 §9 and ADR-0057 are the acceptance authorities. In addition, tests must prove cross-tenant/other-owner deny,
-RLS pool reuse, dedup conflict, cancel/complete races, no DB lock across remote I/O, no blind retry,
-unknown-outcome charging, integer overflow rejection, provider option/URL/tool injection rejection,
-`store=false`, encrypted-content tamper/key rotation, prompt/output telemetry canaries, erasure/legal
-hold/restore ordering, fixed egress, workload identity, and browser-to-BFF-only routing.
+ADR-0054 §9 and ADR-0057 are the acceptance authorities. In addition, tests must prove
+cross-tenant/other-owner deny, RLS pool reuse, dedup conflict, cancel/complete races, no DB lock
+across remote I/O, no blind retry, unknown-outcome charging, integer overflow rejection, provider
+option/URL/tool injection rejection, `store=false`, encrypted-content tamper/key rotation,
+prompt/output telemetry canaries, erasure/legal-hold/restore ordering, fixed egress, workload
+identity, and browser-to-BFF-only routing.
