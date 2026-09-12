@@ -195,6 +195,31 @@ class RedisSemanticQuotaIntegrationTest {
   }
 
   @Test
+  void memoryHeadroomGuardAppliesOnlyToNewSecurityState() throws Exception {
+    Clock clock = Clock.systemUTC();
+    byte[] address = new byte[] {(byte) 203, 0, 113, 92};
+    QuotaRequest existing =
+        new QuotaRequest(QuotaOperation.REGISTER, email("existing@example.com"), address);
+    try (QuotaFixture fixture = quotaFixture(clock, 1000, 1000, 30)) {
+      fixture.quota().consume(existing);
+    }
+
+    try (QuotaFixture fixture = quotaFixture(clock, 1000, 1000, 99)) {
+      fixture.quota().consume(existing);
+      assertThatThrownBy(
+              () ->
+                  fixture
+                      .quota()
+                      .consume(
+                          new QuotaRequest(
+                              QuotaOperation.REGISTER, email("new-state@example.com"), address)))
+          .isInstanceOf(RegistrationException.class)
+          .extracting(error -> ((RegistrationException) error).error())
+          .isEqualTo(RegistrationError.QUOTA_CAPACITY_UNHEALTHY);
+    }
+  }
+
+  @Test
   void loginExactIpIsHardWhileAggregatePressureAloneDoesNotReject() throws Exception {
     Clock clock = Clock.systemUTC();
     byte[] exact = new byte[] {(byte) 192, 0, 2, 88};
@@ -234,6 +259,23 @@ class RedisSemanticQuotaIntegrationTest {
         secondClient.shutdown();
       }
       fixture.quota().checkSource(exact);
+    }
+  }
+
+  @Test
+  void loginMemoryHeadroomGuardDoesNotRecheckExistingBuckets() throws Exception {
+    Clock clock = Clock.systemUTC();
+    byte[] existing = new byte[] {(byte) 198, 51, 100, 80};
+    try (LoginQuotaFixture fixture = loginQuotaFixture(clock, 1000, 1000, 30)) {
+      fixture.quota().checkSource(existing);
+    }
+
+    try (LoginQuotaFixture fixture = loginQuotaFixture(clock, 1000, 1000, 99)) {
+      fixture.quota().checkSource(existing);
+      assertThatThrownBy(() -> fixture.quota().checkSource(new byte[] {(byte) 198, 51, 100, 81}))
+          .isInstanceOf(AuthenticationException.class)
+          .extracting(error -> ((AuthenticationException) error).error())
+          .isEqualTo(AuthenticationError.QUOTA_CAPACITY_UNHEALTHY);
     }
   }
 
@@ -319,6 +361,12 @@ class RedisSemanticQuotaIntegrationTest {
 
   private LoginQuotaFixture loginQuotaFixture(Clock clock, int maxActive, int maxNewPerMinute)
       throws Exception {
+    return loginQuotaFixture(clock, maxActive, maxNewPerMinute, 30);
+  }
+
+  private LoginQuotaFixture loginQuotaFixture(
+      Clock clock, int maxActive, int maxNewPerMinute, int minimumMemoryHeadroomPercent)
+      throws Exception {
     Path keyRing = temp.resolve("login-quota-" + System.nanoTime() + ".properties");
     byte[] key = new byte[32];
     Arrays.fill(key, (byte) 9);
@@ -335,7 +383,8 @@ class RedisSemanticQuotaIntegrationTest {
             () -> true,
             maxActive,
             maxNewPerMinute,
-            30);
+            minimumMemoryHeadroomPercent);
+    assertThat(quota.connection().getTimeout()).isEqualTo(Duration.ofMillis(75));
     return new LoginQuotaFixture(quota, encoder);
   }
 
@@ -354,6 +403,12 @@ class RedisSemanticQuotaIntegrationTest {
 
   private QuotaFixture quotaFixture(Clock clock, int maxActive, int maxNewPerMinute)
       throws Exception {
+    return quotaFixture(clock, maxActive, maxNewPerMinute, 30);
+  }
+
+  private QuotaFixture quotaFixture(
+      Clock clock, int maxActive, int maxNewPerMinute, int minimumMemoryHeadroomPercent)
+      throws Exception {
     Path keyRing = temp.resolve("quota-" + System.nanoTime() + ".properties");
     byte[] key = new byte[32];
     Arrays.fill(key, (byte) 7);
@@ -365,7 +420,14 @@ class RedisSemanticQuotaIntegrationTest {
     ClockSafetyGuard guard = new ClockSafetyGuard(clock);
     RedisSemanticQuota quota =
         new RedisSemanticQuota(
-            redisUri(), encoder, guard, () -> true, maxActive, maxNewPerMinute, 30);
+            redisUri(),
+            encoder,
+            guard,
+            () -> true,
+            maxActive,
+            maxNewPerMinute,
+            minimumMemoryHeadroomPercent);
+    assertThat(quota.connection().getTimeout()).isEqualTo(Duration.ofMillis(75));
     return new QuotaFixture(quota, encoder);
   }
 

@@ -200,3 +200,10 @@ Pass requires no OOM/sustained swap/MemoryPressure, >=30% validated CPU+memory h
 Every exercise stores exact versions/profile, timestamps, fault/recovery timeline, expected vs actual behavior, measured SLI/RPO/RTO/resources, security/data result, audit/runbook links, `PASS`/`FAIL`, and remediation owner/deadline.
 
 A failed mandatory exercise blocks the dependent production promotion. Do not relabel failure `Not applicable` because single-server intentionally lacks HA.
+
+Stage 7 repository evidence uses the strict aggregate contract implemented by
+`scripts/performance/external_runtime_evidence.py`. It records only bounded booleans,
+counts, hashes, timing aggregates, and the tested Git revision; provider credentials,
+recipients, account identifiers, provider correlation identifiers, and raw HIBP
+records are prohibited by the closed schema. A validator test or deterministic
+provider fixture is never reported as real-provider/full-corpus execution.

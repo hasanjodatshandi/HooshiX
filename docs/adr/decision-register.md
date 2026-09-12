@@ -15,7 +15,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0007 | Notification runtime |
 | ADR-0008 | registration locale persistence/resend reuse |
 | ADR-0009 | Identity registration runtime |
-| ADR-0010 | versioned database Notification templates/Liara email |
+| ADR-0010 | versioned database Notification templates; former Liara provider selection superseded by ADR-0055 |
 | ADR-0011 | GitOps/OpenBao production secret authority |
 | ADR-0012 | Identity tenant/session/external identity/MFA |
 | ADR-0013 | online Authorization without permission cache/Kafka |
@@ -25,7 +25,6 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0017 | signed artifacts/provenance/admission; Kyverno CEL policy APIs |
 | ADR-0018 | Notification clock/dispatch safety |
 | ADR-0019 | CloudNativePG/Barman persistence baseline |
-| ADR-0020 | IPPanel SMS provider |
 | ADR-0021 | production platform compatibility/CNI |
 | ADR-0022 | self-hosted Kubernetes HA expansion topology |
 | ADR-0023 | Identity JWT signing-key lifecycle |
@@ -60,9 +59,13 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0052 | Versioned Protobuf contract package and service decoupling |
 | ADR-0053 | Identity password policy v1 |
 | ADR-0054 | Core private Conversation and model-execution architecture v1 |
+| ADR-0055 | provider-neutral authenticated SMTP with Google Gmail staging; production Email provider deferred |
+| ADR-0056 | SMS.ir exact-text SMS provider with simulated Sandbox contract boundary |
 
 ## Superseded ADR identifiers
 
-None currently retained as fully superseded tombstones.
+| ADR | Superseded by |
+| --- | --- |
+| ADR-0020 | ADR-0056 |
 
 When a current ADR becomes fully superseded, keep its stable original file/ID with `Status: Superseded by ...` and list it here. A superseded entry is provenance, not implementation authority.

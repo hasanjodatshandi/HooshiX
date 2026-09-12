@@ -71,7 +71,7 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/baseline/verify_repository.py",
 )
 
-IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "dist", "test-results"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "dist", "coverage", "test-results"}
 IGNORED_SUFFIXES = {".pyc", ".pyo", ".tsbuildinfo"}
 
 EXTERNALIZED_MCP_PATHS = (

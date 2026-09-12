@@ -110,6 +110,27 @@ jobs:
     name: Web BFF security suite
     uses: ./.github/workflows/web-bff.yml
 
+  edge-waf-security:
+    name: WAF privacy and cookie boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify pinned WAF build and embedded regression tests
+        run: docker build --provenance=false --pull=false -t hooshix-waf-verification infrastructure/waf
+      - name: Validate packaged Caddy and Coraza configuration
+        run: >-
+          docker run --rm --network none --read-only --cap-drop ALL
+          --security-opt no-new-privileges
+          --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m
+          --entrypoint caddy hooshix-waf-verification
+          validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Verify isolated WAF block and backend-outage log privacy
+        run: python3 scripts/platform/waf_image_smoke.py hooshix-waf-verification
+
   baseline:
     name: Baseline verify
     if: ${{ always() }}
@@ -121,6 +142,7 @@ jobs:
       - identity-security
       - authorization-security
       - web-bff-security
+      - edge-waf-security
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -133,6 +155,7 @@ jobs:
           IDENTITY_RESULT: ${{ needs.identity-security.result }}
           AUTHORIZATION_RESULT: ${{ needs.authorization-security.result }}
           WEB_BFF_RESULT: ${{ needs.web-bff-security.result }}
+          EDGE_WAF_RESULT: ${{ needs.edge-waf-security.result }}
         run: |
           set -euo pipefail
           if [ "${CONTRACT_RESULT}" != 'success' ]; then
@@ -161,6 +184,10 @@ jobs:
           fi
           if [ "${WEB_BFF_RESULT}" != 'success' ]; then
             echo "Web BFF security result: ${WEB_BFF_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${EDGE_WAF_RESULT}" != 'success' ]; then
+            echo "WAF privacy/cookie verification result: ${EDGE_WAF_RESULT}" >&2
             exit 1
           fi
           echo 'Required repository and service security verification passed.'

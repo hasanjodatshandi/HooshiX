@@ -31,6 +31,11 @@ class StagingPrepareTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 staging_prepare.validate_metadata(invalid, names)
 
+    def test_staging_kafka_bootstrap_is_fixed_and_not_metadata_controlled(self) -> None:
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("kafka.platform-data.svc.cluster.local:9093", source)
+        self.assertIn("spring.kafka.bootstrap-servers", source)
+
 
 if __name__ == "__main__":
     unittest.main()

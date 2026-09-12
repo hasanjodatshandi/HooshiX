@@ -2,8 +2,10 @@ runtime:
   registrationRuntimeEnabled: true
   authenticationRuntimeEnabled: true
   tenantRuntimeEnabled: true
+  erasureRuntimeEnabled: true
   argon2MaxConcurrentHashes: 2
   compromisedPasswordMaxInFlight: 16
+  compromisedPasswordMaxResponseBytes: 131072
   phoneRegistrationEnabled: true
   notificationDispatchEnabled: true
 database:
@@ -11,6 +13,7 @@ database:
   podLabels: {app.kubernetes.io/name: postgresql}
   runtimeSecretName: identity-db-runtime
   migrationSecretName: identity-db-migration
+kafka: {connectionSecretName: identity-kafka}
 quota:
   redis: {podLabels: {app.kubernetes.io/name: security-redis}, connectionSecretName: identity-quota-redis}
   maxActiveBuckets: 10000
@@ -20,6 +23,7 @@ secrets:
   fingerprintSecretName: identity-fingerprint
   challengeSecretName: identity-challenge
   handoffSecretName: identity-handoff
+  mfaSecretName: identity-mfa
   quotaKeySecretName: identity-quota
   refreshSecretName: identity-refresh
   jwtPrivateSecretName: identity-jwt-private

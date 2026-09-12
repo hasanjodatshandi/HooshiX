@@ -2,9 +2,13 @@ package com.sajtech.webbff.infrastructure.session;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.sajtech.webbff.application.BffError;
+import com.sajtech.webbff.application.BffException;
 import com.sajtech.webbff.application.model.*;
 import com.sajtech.webbff.infrastructure.security.SessionCrypto;
 import com.sajtech.webbff.infrastructure.security.keyring.FileBackedKeyRing;
+import io.lettuce.core.RedisCommandTimeoutException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.file.*;
 import java.time.*;
 import java.util.*;
@@ -32,6 +36,7 @@ class RedisBffSessionRepositoryIntegrationTest {
   @TempDir Path temp;
   private RedisBffSessionRepository sessions;
   private Clock clock;
+  private SimpleMeterRegistry meters;
 
   @BeforeAll
   static void start() {
@@ -51,13 +56,94 @@ class RedisBffSessionRepositoryIntegrationTest {
             ring("locator", (byte) 1, "HmacSHA256", Duration.ofMinutes(5)),
             ring("csrf", (byte) 2, "HmacSHA256", Duration.ofMinutes(5)),
             ring("refresh", (byte) 3, "AES", Duration.ofHours(1)));
-    sessions = new RedisBffSessionRepository(uri(), crypto, clock);
+    meters = new SimpleMeterRegistry();
+    sessions = new RedisBffSessionRepository(uri(), crypto, clock, meters);
     sessions.connection().sync().flushall();
   }
 
   @AfterEach
   void close() {
     sessions.close();
+    meters.close();
+  }
+
+  @Test
+  void delayedSessionWriteFailsClosedAtCommandTimeoutWithoutApplicationRetry() throws Exception {
+    sessions.bootstrap();
+    assertThat(sessions.connection().getTimeout()).isEqualTo(Duration.ofMillis(75));
+    assertThat(REDIS.execInContainer("redis-cli", "CLIENT", "PAUSE", "300", "ALL").getExitCode())
+        .isZero();
+
+    assertThatThrownBy(sessions::bootstrap)
+        .isInstanceOfSatisfying(
+            BffException.class,
+            error -> assertThat(error.error()).isEqualTo(BffError.DEPENDENCY_UNAVAILABLE))
+        .hasCauseInstanceOf(RedisCommandTimeoutException.class);
+
+    assertThat(
+            meters
+                .get("web_bff.redis.duration")
+                .tags("operation", "create", "outcome", "timeout")
+                .timer()
+                .count())
+        .isEqualTo(1);
+    // A timed-out write may still execute; no grant was returned and no retry is made.
+    assertThat(
+            meters
+                .get("web_bff.redis.duration")
+                .tags("operation", "create", "outcome", "ok")
+                .timer()
+                .count())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void closedRedisConnectionNeverBecomesMissingSessionOrSuccessfulMutation() {
+    var preauth = sessions.bootstrap();
+    UUID userId = UUID.randomUUID();
+    sessions.connection().close();
+
+    for (org.assertj.core.api.ThrowableAssert.ThrowingCallable operation :
+        List.<org.assertj.core.api.ThrowableAssert.ThrowingCallable>of(
+            sessions::bootstrap,
+            () -> sessions.load(preauth.cookieValue()),
+            () -> sessions.touch(preauth.session()),
+            () ->
+                sessions.rotateMfaPreauth(
+                    preauth.session(), userId, "M".repeat(43), clock.instant().plusSeconds(300)),
+            () ->
+                sessions.rotateAuthenticated(
+                    preauth.session(),
+                    userId,
+                    "s".repeat(43),
+                    UUID.randomUUID(),
+                    "refresh-canary",
+                    clock.instant().plusSeconds(600),
+                    clock.instant().plusSeconds(1200)),
+            () -> sessions.destroy(preauth.session()),
+            () -> sessions.eraseUser(userId))) {
+      assertThatThrownBy(operation)
+          .isInstanceOfSatisfying(
+              BffException.class,
+              error -> assertThat(error.error()).isEqualTo(BffError.DEPENDENCY_UNAVAILABLE));
+    }
+    assertThat(meters.getMeters())
+        .allSatisfy(
+            meter -> {
+              assertThat(meter.getId().getTags())
+                  .extracting(io.micrometer.core.instrument.Tag::getKey)
+                  .containsExactlyInAnyOrder("operation", "outcome");
+              assertThat(meter.getId().getTag("operation"))
+                  .isIn(
+                      "create",
+                      "load",
+                      "touch",
+                      "rotate_mfa",
+                      "rotate",
+                      "destroy_load",
+                      "erase_scan");
+              assertThat(meter.getId().getTag("outcome")).isIn("ok", "unavailable");
+            });
   }
 
   @Test

@@ -3,6 +3,7 @@
 {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) }}{{ fail "image.digest must be an immutable sha256 digest" }}{{ end -}}
 {{- if ne (int .Values.replicaCount) 1 }}{{ fail "Identity single-server profile must render exactly one replica" }}{{ end -}}
 {{- if le (int .Values.runtime.argon2MaxConcurrentHashes) 0 }}{{ fail "runtime.argon2MaxConcurrentHashes must be measured and positive" }}{{ end -}}
+{{- if or (lt (int .Values.runtime.compromisedPasswordMaxResponseBytes) 131072) (gt (int .Values.runtime.compromisedPasswordMaxResponseBytes) 4194304) }}{{ fail "runtime.compromisedPasswordMaxResponseBytes must remain within the reviewed 128 KiB to 4 MiB envelope" }}{{ end -}}
 {{- if le (int .Values.quota.maxActiveBuckets) 0 }}{{ fail "quota.maxActiveBuckets must be measured and positive" }}{{ end -}}
 {{- if le (int .Values.quota.maxNewBucketsPerMinute) 0 }}{{ fail "quota.maxNewBucketsPerMinute must be measured and positive" }}{{ end -}}
 {{- if lt (int .Values.quota.minimumMemoryHeadroomPercent) 30 }}{{ fail "quota.minimumMemoryHeadroomPercent must be at least 30" }}{{ end -}}
@@ -109,6 +110,7 @@ spec:
             - {name: IDENTITY_MAX_GLOBAL_CONCURRENT_CALLS, value: {{ .Values.runtime.maxGlobalConcurrentCalls | quote }}}
             - {name: IDENTITY_ARGON2_MAX_CONCURRENT_HASHES, value: {{ .Values.runtime.argon2MaxConcurrentHashes | quote }}}
             - {name: IDENTITY_COMPROMISED_PASSWORD_MAX_IN_FLIGHT, value: {{ .Values.runtime.compromisedPasswordMaxInFlight | quote }}}
+            - {name: IDENTITY_COMPROMISED_PASSWORD_MAX_RESPONSE_BYTES, value: {{ .Values.runtime.compromisedPasswordMaxResponseBytes | quote }}}
             - {name: IDENTITY_PHONE_REGISTRATION_ENABLED, value: {{ .Values.runtime.phoneRegistrationEnabled | quote }}}
             - {name: IDENTITY_NOTIFICATION_DISPATCH_ENABLED, value: {{ .Values.runtime.notificationDispatchEnabled | quote }}}
             - {name: IDENTITY_COMPROMISED_PASSWORD_TARGET, value: {{ .Values.compromisedPassword.target | quote }}}

@@ -1,4 +1,4 @@
-package com.sajtech.notification.infrastructure.provider.liara;
+package com.sajtech.notification.infrastructure.provider.smtp;
 
 import com.sajtech.notification.application.delivery.model.ProviderDispatchMessage;
 import com.sajtech.notification.application.delivery.model.ProviderDispatchOutcome;
@@ -8,7 +8,7 @@ import com.sajtech.notification.application.delivery.model.ProviderReconciliatio
 import com.sajtech.notification.application.delivery.port.out.NotificationProviderGateway;
 import com.sajtech.notification.domain.notification.model.NotificationChannel;
 import com.sajtech.notification.domain.notification.model.ProviderAttemptClassification;
-import com.sajtech.notification.infrastructure.provider.NotificationProviderConfiguration;
+import com.sajtech.notification.infrastructure.provider.SmtpEmailProviderConfiguration;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
@@ -19,12 +19,12 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 
-public final class LiaraSmtpProviderAdapter implements NotificationProviderGateway {
-  static final String FROM_ADDRESS = "no-reply@hooshix.com";
-  static final String FROM_NAME = "Hooshix";
+public final class SmtpEmailProviderAdapter implements NotificationProviderGateway {
+  private final SmtpEmailProviderConfiguration configuration;
   private final JavaMailSenderImpl sender;
 
-  public LiaraSmtpProviderAdapter(NotificationProviderConfiguration configuration) {
+  public SmtpEmailProviderAdapter(SmtpEmailProviderConfiguration configuration) {
+    this.configuration = configuration;
     this.sender = configuredSender(configuration);
   }
 
@@ -41,12 +41,12 @@ public final class LiaraSmtpProviderAdapter implements NotificationProviderGatew
   @Override
   public ProviderDispatchOutcome dispatch(ProviderDispatchMessage message) {
     if (message == null || message.channel() != NotificationChannel.EMAIL) {
-      throw new IllegalArgumentException("Liara SMTP accepts Email dispatch only");
+      throw new IllegalArgumentException("SMTP provider accepts Email dispatch only");
     }
     try {
       MimeMessage mime = sender.createMimeMessage();
       MimeMessageHelper helper = new MimeMessageHelper(mime, true, StandardCharsets.UTF_8.name());
-      helper.setFrom(FROM_ADDRESS, FROM_NAME);
+      helper.setFrom(configuration.fromAddress(), configuration.fromName());
       helper.setTo(message.recipient());
       helper.setSubject(message.subject());
       if (message.html() == null) {
@@ -56,7 +56,7 @@ public final class LiaraSmtpProviderAdapter implements NotificationProviderGatew
       }
       sender.send(mime);
       return ProviderDispatchOutcome.live(
-          ProviderAttemptClassification.DEFINITIVE_ACCEPTED, "SMTP_250", null);
+          ProviderAttemptClassification.DEFINITIVE_ACCEPTED, "SMTP_ACCEPTED", null);
     } catch (MailAuthenticationException exception) {
       return classifyMailFailure(exception);
     } catch (MessagingException | UnsupportedEncodingException exception) {
@@ -72,7 +72,7 @@ public final class LiaraSmtpProviderAdapter implements NotificationProviderGatew
   @Override
   public ProviderReconciliationOutcome reconcile(ProviderReconciliationRequest request) {
     if (request == null || request.channel() != NotificationChannel.EMAIL) {
-      throw new IllegalArgumentException("Liara SMTP reconciliation accepts Email only");
+      throw new IllegalArgumentException("SMTP reconciliation accepts Email only");
     }
     return ProviderReconciliationOutcome.live(
         ProviderReconciliationStatus.INCONCLUSIVE, null, request.providerCorrelationId());
@@ -86,18 +86,20 @@ public final class LiaraSmtpProviderAdapter implements NotificationProviderGatew
     return ProviderDispatchOutcome.live(ProviderAttemptClassification.AMBIGUOUS, null, null);
   }
 
-  static JavaMailSenderImpl configuredSender(NotificationProviderConfiguration configuration) {
+  static JavaMailSenderImpl configuredSender(SmtpEmailProviderConfiguration configuration) {
     JavaMailSenderImpl result = new JavaMailSenderImpl();
     result.setProtocol("smtp");
-    result.setHost(configuration.smtpHost());
-    result.setPort(configuration.smtpPort());
-    result.setUsername(configuration.smtpUsername());
-    result.setPassword(configuration.smtpPassword());
+    result.setHost(configuration.host());
+    result.setPort(configuration.port());
+    result.setUsername(configuration.username());
+    result.setPassword(configuration.password());
     result.setDefaultEncoding(StandardCharsets.UTF_8.name());
     Properties properties = result.getJavaMailProperties();
     properties.setProperty("mail.smtp.auth", "true");
     properties.setProperty("mail.smtp.starttls.enable", "true");
     properties.setProperty("mail.smtp.starttls.required", "true");
+    properties.setProperty("mail.smtp.ssl.checkserveridentity", "true");
+    properties.setProperty("mail.smtp.ssl.protocols", "TLSv1.3 TLSv1.2");
     properties.setProperty("mail.smtp.connectiontimeout", "500");
     properties.setProperty("mail.smtp.timeout", "1500");
     properties.setProperty("mail.smtp.writetimeout", "1500");

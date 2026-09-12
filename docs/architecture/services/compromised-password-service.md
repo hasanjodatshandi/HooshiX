@@ -67,10 +67,12 @@ Rules:
 
 - all official prefix ranges or equivalent complete-download evidence are required for production release;
 - count must be positive; HIBP padding count `0` is rejected;
+- official-downloader UTF-8 BOMs are accepted only as the exact first three bytes of a range-boundary record and remain part of the verified source artifact digest;
 - records are canonical/deduplicated/validated;
 - source is streamed with bounded buffers and bounded SQLite batches; no full-corpus JVM cache exists;
 - release build measures full-corpus prefix cardinality and serialized response size;
 - build fails when observed data exceeds reviewed runtime compatibility bounds selected from real complete-corpus evidence plus safety margin;
+- the 2026-09-09 complete-corpus profile measured `2,509` records and `102,932` serialized bytes at the largest prefix; the reviewed release envelope rounds the measured values up to `4,096` records and `131,072` bytes, providing at least 25% growth headroom while remaining aligned with Identity's bounded transport;
 - no runtime truncation is permitted;
 - dataset age <=35 days at production readiness/deployment;
 - acquisition/build verification at least every 30 days;
@@ -166,6 +168,8 @@ OTLP/telemetry outage is not a lookup fallback and does not change fail-closed p
 Dataset is recovered by redeploying the exact approved immutable artifact or rebuilding a reviewed equivalent from approved HIBP acquisition evidence. No PostgreSQL PITR exists for this reference artifact.
 
 Service remains unready until dataset source identity, manifest digest, SQLite digest, schema, integrity, freshness, and compatibility bounds validate.
+
+The production chart gives this complete-artifact validation a bounded 120-minute startup window and a 130-minute Deployment progress deadline. The bound reflects the first real two-billion-row staging run, where the manifest-bound artifact digest completed but full SQLite integrity validation could not fit the earlier 30-minute allowance on the local Docker volume. Local staging uses an approximately 125-minute Helm wait only when the reviewed complete-corpus overlay is present; fixture deployments retain the short default orchestration wait. Timeout growth never skips or weakens validation.
 
 ## 9. Verification
 

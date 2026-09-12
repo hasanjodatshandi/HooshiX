@@ -26,6 +26,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(CompromisedPasswordProperties.class)
 public class RuntimeConfiguration {
+  private static final int TRANSPORT_TO_LOOKUP_CONCURRENCY_RATIO = 2;
+
   @Bean
   Clock clock() {
     return Clock.systemUTC();
@@ -103,10 +105,14 @@ public class RuntimeConfiguration {
     return new GrpcServerLifecycle(
         bindAddress,
         properties.grpcPort(),
-        properties.maxConcurrentLookups(),
+        grpcTransportConcurrencyLimit(properties.maxConcurrentLookups()),
         service,
         tracingInterceptor,
         validationInterceptor);
+  }
+
+  static int grpcTransportConcurrencyLimit(int maxConcurrentLookups) {
+    return Math.multiplyExact(maxConcurrentLookups, TRANSPORT_TO_LOOKUP_CONCURRENCY_RATIO);
   }
 
   @Bean(name = "compromisedPasswordDatasetHealthIndicator")

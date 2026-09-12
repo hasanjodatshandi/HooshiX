@@ -6,7 +6,9 @@ This matrix records production technology combinations that must remain compatib
 | --- | --- | --- |
 | Java | 25 LTS | Spring Boot/application libraries support Java 25 |
 | Spring Boot | 4.1.0 | Java 25; Gradle 9.x; Spring MVC/Virtual Threads; Micrometer Observation/Tracing |
+| Embedded Tomcat | 11.0.25 | Spring Boot 4.1.0 / Jakarta Servlet 6.1; aligned core/el/websocket constraints and verified artifacts across all five Java services; strict checks, advisory rescan, and refreshed HTTP/staging evidence required for the security override |
 | Gradle | 9.6.1 | selected Spring Boot build plugin/toolchain |
+| JaCoCo / PIT | 0.8.15 / 1.22.1 | Java 25/Gradle 9.6.1; Gradle PIT plugin 1.19.0 and PIT JUnit 5 plugin 1.2.3; combined unit/integration coverage and selective mutation thresholds remain blocking |
 | gRPC Java | 1.83.1 | Java 25; Protobuf/runtime/stubs/codegen/testing aligned; Netty transport stream-limit enforcement retained and bounded server concurrency configured where applicable |
 | Protobuf / Protovalidate Java | 4.34.2 / 1.2.2 | gRPC 1.83.1 and Java 25; generated v1 schemas, CEL rules, consumer examples, and server interceptor tests aligned |
 | Gitleaks CLI | 8.30.0 | ADR-0045 current-tree + Git-history secret scan; reviewed fallback from defective 8.30.1; redacted output; immutable official image digest and positive detection control pinned in CI |
@@ -46,7 +48,7 @@ This matrix records production technology combinations that must remain compatib
 | `production-single-server` human access | host OpenSSH + FIDO2 + JIT + audit | exact package pin; WireGuard separate; no root/password/shared key |
 | `production-ha` human access | Teleport 18.10.0 | JIT/SSO/WebAuthn/session-audit evidence |
 | OpenBao | 2.6.1 | exact secret authority; unchanged by current single-server/network/observability/DevSecOps decisions |
-| Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0; combined image/rules tests |
+| Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0 with repository safe-rule-logging patch; combined image/rules, opaque-cookie and log-privacy tests |
 | Argo CD | 3.4.2 | security-patched line; reconciliation/rollback validation |
 
 Trivy and OWASP Dependency-Check are not current baseline components. Under ADR-0045 they are reconsidered only if a distinct coverage gap is evidenced and the compatibility/ownership/exception model is reviewed.

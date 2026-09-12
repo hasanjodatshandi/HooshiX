@@ -146,21 +146,22 @@ public final class OidcController {
 
   @GetMapping("/api/v1/identity/external-identities")
   public ExternalIdentityStatus status(
-      @RequestHeader("X-Request-Id") String requestId, HttpServletRequest request) {
+      @RequestHeader("Idempotency-Key") String requestId, HttpServletRequest request) {
     BrowserSession session = HttpSupport.authenticated(request);
     return new ExternalIdentityStatus(
         identity.googleIdentityLinked(
-            HttpSupport.requestId(requestId), session.refreshCredential()));
+            HttpSupport.idempotencyKey(requestId), session.refreshCredential()));
   }
 
   @DeleteMapping("/api/v1/identity/external-identities/google")
   public ResponseEntity<Void> unlink(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession old = HttpSupport.authenticated(request);
     IdentityGateway.LoginResult result =
-        identity.unlinkExternalIdentity(HttpSupport.requestId(requestId), old.refreshCredential());
+        identity.unlinkExternalIdentity(
+            HttpSupport.idempotencyKey(requestId), old.refreshCredential());
     BrowserSessionGrant grant =
         sessions.rotateSecurityState(
             old, result.refreshCredential(), result.idleExpiresAt(), result.absoluteExpiresAt());

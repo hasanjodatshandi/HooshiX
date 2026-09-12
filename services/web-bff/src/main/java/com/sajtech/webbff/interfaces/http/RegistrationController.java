@@ -27,13 +27,13 @@ public final class RegistrationController {
 
   @PostMapping
   public ResponseEntity<Accepted> register(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody Register body) {
     boolean accepted =
         identity
             .register(
-                HttpSupport.requestId(requestId),
+                HttpSupport.idempotencyKey(requestId),
                 body.channel(),
                 body.contact(),
                 body.password(),
@@ -48,12 +48,12 @@ public final class RegistrationController {
 
   @PostMapping("/resend")
   public ResponseEntity<Accepted> resend(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody Resend body) {
     boolean accepted =
         identity.resendRegistration(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             body.channel(),
             body.contact(),
             addresses.parse(clientIp));
@@ -62,12 +62,12 @@ public final class RegistrationController {
 
   @PostMapping("/confirm")
   public Confirmed confirm(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody Confirm body) {
     return new Confirmed(
         identity.confirmRegistration(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             body.channel(),
             body.contact(),
             body.code(),

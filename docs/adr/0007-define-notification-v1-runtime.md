@@ -12,7 +12,7 @@ Accepted — current effective decision
 
 ### Provider model
 
-Notification owns Email/SMS provider adapters and provider-specific telemetry. Production Email uses Liara Transactional Email via authenticated SMTP + STARTTLS under ADR-0010. Production Iran SMS uses IPPanel Edge Webservice mode under ADR-0020. Local development may use `LoggingSmsProviderAdapter` only under `local & !staging & !production`; it is never a production fallback.
+Notification owns Email/SMS provider adapters and provider-specific telemetry. Email uses the provider-neutral authenticated STARTTLS SMTP boundary under ADR-0055; Google Gmail is the bounded temporary staging profile and Production selection remains deferred. Iran SMS uses the SMS.ir exact-text boundary under ADR-0056; the SMS.ir Sandbox Verify path is simulated contract evidence only. Local development may use `LoggingSmsProviderAdapter` only under `local & !staging & !production`; it is never a production fallback.
 
 Notification renders exact versioned content itself. Provider-managed SMS pattern rendering is not the production source of message semantics.
 
@@ -132,8 +132,8 @@ Alert thresholds are based on current SLO/burn policy and service runbooks; obso
 
 - provider credentials are least privilege, secret-managed, rotated, and never logged;
 - provider HTTP/SMTP settings use finite timeouts and no unsafe layered retry;
-- IPPanel accepted/report status fixtures and ambiguous-submission behavior are contract-tested;
-- Liara STARTTLS/authentication/outcome mapping is contract-tested;
+- SMS.ir exact-text accepted/report status fixtures, correlation, bounded parsing, and ambiguous-submission behavior are contract-tested;
+- generic/Google SMTP STARTTLS, hostname-verification, authentication, configuration, and outcome mapping is contract-tested;
 - persistence tests cover uniqueness, state transitions, terminal immutability, `SKIP LOCKED` concurrency, dispatch locking, bounded cleanup, query plans, and Flyway compatibility;
 - crash tests cover immediately before/after the `DISPATCHING` commit;
 - single-server tests prove shared PostgreSQL loss/recovery never causes blind redispatch and that Notification DB/role/Flyway isolation remains intact;

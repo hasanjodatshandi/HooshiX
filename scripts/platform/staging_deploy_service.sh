@@ -12,14 +12,30 @@ repo_var="${key}_REPOSITORY"; digest_var="${key}_DIGEST"; repo=${!repo_var}; dig
 chart="$ROOT/services/$service/deploy/helm/$service"
 values="$ROOT/deploy/staging/$service.yaml"
 extra=()
+helm_timeout=70s
+if [[ "$service" == web-bff ]]; then
+  google_values="$ROOT/.platform-runtime/staging/private/web-bff-google-values.yaml"
+  if [[ -e "$google_values" || -L "$google_values" ]]; then
+    [[ -f "$google_values" && ! -L "$google_values" ]] || fail "staging Google OIDC values must be a regular non-symlink file"
+    [[ "$(stat -c '%u' "$google_values")" == "$(id -u)" && "$(stat -c '%a' "$google_values")" == 600 ]] || fail "staging Google OIDC values must be user-owned mode 0600"
+    extra+=(-f "$google_values")
+  fi
+fi
 if [[ "$service" == compromised-password-service ]]; then
   dataset_state="$ROOT/.platform-runtime/staging/dataset.env"
   [[ -f "$dataset_state" ]] || fail "generated staging dataset state is missing; run staging-data-install first"
   line=$(cat "$dataset_state")
   [[ "$line" =~ ^COMPROMISED_PASSWORD_MANIFEST_SHA256=([0-9a-f]{64})$ ]] || fail "generated staging dataset state is invalid"
   extra+=(--set-string "dataset.expectedManifestSha256=${BASH_REMATCH[1]}")
+  hibp_values="$ROOT/.platform-runtime/staging/private/compromised-password-hibp-values.yaml"
+  if [[ -e "$hibp_values" || -L "$hibp_values" ]]; then
+    [[ -f "$hibp_values" && ! -L "$hibp_values" ]] || fail "staging HIBP values must be a regular non-symlink file"
+    [[ "$(stat -c '%u' "$hibp_values")" == "$(id -u)" && "$(stat -c '%a' "$hibp_values")" == 600 ]] || fail "staging HIBP values must be user-owned mode 0600"
+    extra+=(-f "$hibp_values")
+    helm_timeout=7500s
+  fi
 fi
 helm lint "$chart" -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" >/dev/null
-h upgrade --install "$service" "$chart" -n platform-apps -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" --wait --timeout 70s
+h upgrade --install "$service" "$chart" -n platform-apps -f "$values" --set "image.repository=$repo" --set "image.digest=$digest" "${extra[@]}" --wait --timeout "$helm_timeout"
 k rollout status deployment/$service -n platform-apps --timeout=30s >/dev/null
 echo "$service staging release PASSED"

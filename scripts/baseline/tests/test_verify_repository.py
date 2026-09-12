@@ -87,6 +87,7 @@ edges:
                 root / ".platform-runtime/staging/files/generated-secret",
                 root / "services/sample/build/generated.txt",
                 root / "services/sample/.gradle/cache.bin",
+                root / "apps/sample/coverage/coverage-summary.json",
             ]
             for path in generated:
                 path.parent.mkdir(parents=True, exist_ok=True)

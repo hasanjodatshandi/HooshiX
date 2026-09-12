@@ -30,6 +30,7 @@ Run the complete synthetic erasure/Kafka journey after the runtime is ready:
 
 ```bash
 python3 scripts/local/runtime.py smoke-erasure
+python3 scripts/local/runtime.py smoke-erasure-recovery
 ```
 
 `local-runtime-up` builds the service Boot JARs, starts PostgreSQL/Redis/Kafka, creates the versioned erasure topics, applies each service-owned Flyway migration with a distinct migration role, grants the distinct runtime role only its own database objects, creates or reuses restart-stable local key material, and starts all five service processes with the erasure participants enabled.
@@ -40,3 +41,14 @@ The browser-facing local Web BFF endpoint is `https://localhost:18443`. Manageme
 Identity outbox, and waits until Identity, Authorization, Notification, and Web BFF have all emitted
 durable receipts and the coordinator reaches `COMPLETED`. It fails rather than treating a partial or
 timed-out workflow as success.
+
+`smoke-erasure-recovery` is the destructive-to-test-state local recovery rehearsal.
+It stops the five local service processes, snapshots only the four service-owned local
+databases with PostgreSQL 18 `pg_dump --clean --if-exists`, completes the same synthetic
+four-participant request, restarts all services and verifies terminal evidence, restores
+the pre-completion snapshots while traffic is stopped, and requires normal Outbox/Kafka/
+Inbox reconciliation to complete the original request again. Snapshot files are mode
+`0600`, temporary, and removed after the run. It never targets databases outside the
+generated `.local-runtime` lane and is not staging or Production restore evidence.
+On success it atomically writes a mode-`0600`, identifier-free aggregate receipt to
+`.local-runtime/erasure-recovery-evidence.json`, bound to the exact Git revision.

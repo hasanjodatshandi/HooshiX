@@ -3,6 +3,8 @@ package com.sajtech.webbff.infrastructure.security;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.sajtech.webbff.application.BffError;
+import com.sajtech.webbff.application.BffException;
 import com.sajtech.webbff.application.model.*;
 import com.sajtech.webbff.configuration.WebBffProperties;
 import com.sajtech.webbff.infrastructure.session.RedisBffSessionRepository;
@@ -13,6 +15,8 @@ import java.nio.file.Path;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.*;
 
 class BrowserSecurityFilterTest {
@@ -229,6 +233,38 @@ class BrowserSecurityFilterTest {
     filter.doFilter(request, response, chain);
     assertThat(response.getStatus()).isEqualTo(401);
     assertThat(response.getHeader("Set-Cookie")).contains("Max-Age=0");
+    verifyNoInteractions(chain);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void unavailableSessionLookupOrTouchReturnsSafe503AndNeverDispatches(boolean failTouch)
+      throws Exception {
+    var session = session();
+    var unavailable = new BffException(BffError.DEPENDENCY_UNAVAILABLE, "sensitive-cause-canary");
+    if (failTouch) {
+      when(sessions.load("cookie")).thenReturn(Optional.of(session));
+      when(sessions.touch(session)).thenThrow(unavailable);
+    } else {
+      when(sessions.load("cookie")).thenThrow(unavailable);
+    }
+    var request = new MockHttpServletRequest("GET", "/api/v1/identity/profile");
+    request.setCookies(new Cookie(BrowserSecurityFilter.COOKIE, "cookie"));
+    var response = new MockHttpServletResponse();
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(request, response, chain);
+
+    assertThat(response.getStatus()).isEqualTo(503);
+    assertThat(response.getContentAsString())
+        .contains("DEPENDENCY_UNAVAILABLE")
+        .doesNotContain("sensitive-cause-canary", "cookie");
+    assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+    assertThat(response.getHeader("Set-Cookie")).isNull();
+    assertThat(request.getAttribute(BrowserSecurityContext.SESSION_ATTRIBUTE)).isNull();
+    verify(sessions).load("cookie");
+    if (failTouch) verify(sessions).touch(session);
+    verifyNoMoreInteractions(sessions);
     verifyNoInteractions(chain);
   }
 

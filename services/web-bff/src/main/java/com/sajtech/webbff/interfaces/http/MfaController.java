@@ -39,22 +39,23 @@ public final class MfaController {
 
   @GetMapping
   public MfaStatusResponse status(
-      @RequestHeader("X-Request-Id") String requestId, HttpServletRequest request) {
+      @RequestHeader("Idempotency-Key") String requestId, HttpServletRequest request) {
     BrowserSession session = HttpSupport.authenticated(request);
-    var status = identity.mfaStatus(HttpSupport.requestId(requestId), session.refreshCredential());
+    var status =
+        identity.mfaStatus(HttpSupport.idempotencyKey(requestId), session.refreshCredential());
     return new MfaStatusResponse(status.totpEnabled(), status.recoveryCodesRemaining());
   }
 
   @PostMapping("/totp/enrollment")
   public TotpEnrollmentResponse startEnrollment(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody StartEnrollmentRequest body,
       HttpServletRequest request) {
     BrowserSession session = HttpSupport.authenticated(request);
     var started =
         identity.startTotpEnrollment(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             session.refreshCredential(),
             addresses.parse(clientIp),
             body.currentProof() == null ? null : proof(body.currentProof()));
@@ -67,7 +68,7 @@ public final class MfaController {
 
   @PostMapping("/totp/enrollment/confirm")
   public RecoveryCodesResponse confirmEnrollment(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody ConfirmEnrollmentRequest body,
       HttpServletRequest request,
@@ -75,7 +76,7 @@ public final class MfaController {
     BrowserSession old = HttpSupport.authenticated(request);
     var mutation =
         identity.confirmTotpEnrollment(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             old.refreshCredential(),
             body.enrollmentChallenge(),
             body.totpCode(),
@@ -86,7 +87,7 @@ public final class MfaController {
 
   @DeleteMapping("/totp")
   public void disable(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody ProofRequest body,
       HttpServletRequest request,
@@ -94,7 +95,7 @@ public final class MfaController {
     BrowserSession old = HttpSupport.authenticated(request);
     var mutation =
         identity.disableTotp(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             old.refreshCredential(),
             proof(body),
             addresses.parse(clientIp));
@@ -103,7 +104,7 @@ public final class MfaController {
 
   @PostMapping("/recovery-codes/rotate")
   public RecoveryCodesResponse rotateRecoveryCodes(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody ProofRequest body,
       HttpServletRequest request,
@@ -111,7 +112,7 @@ public final class MfaController {
     BrowserSession old = HttpSupport.authenticated(request);
     var mutation =
         identity.rotateRecoveryCodes(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             old.refreshCredential(),
             proof(body),
             addresses.parse(clientIp));

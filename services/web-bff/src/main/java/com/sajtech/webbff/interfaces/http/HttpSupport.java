@@ -28,14 +28,15 @@ final class HttpSupport {
     return s;
   }
 
-  static UUID requestId(String value) {
+  static UUID idempotencyKey(String value) {
+    UUID id;
     try {
-      UUID id = UUID.fromString(value);
-      if (id.version() != 4 || !id.toString().equals(value)) throw invalid();
-      return id;
-    } catch (RuntimeException e) {
+      id = UUID.fromString(value);
+    } catch (IllegalArgumentException e) {
       throw invalid();
     }
+    if (id.version() != 4 || !id.toString().equals(value)) throw invalid();
+    return id;
   }
 
   static UUID id(String value) {
@@ -100,7 +101,7 @@ final class HttpSupport {
   }
 
   private static BffException invalid() {
-    return new BffException(BffError.INVALID_REQUEST, "Request identifier is invalid");
+    return new BffException(BffError.INVALID_REQUEST, "Idempotency key is invalid");
   }
 
   private HttpSupport() {}

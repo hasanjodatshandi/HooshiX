@@ -385,7 +385,7 @@ Production Iran SMS MFA is enabled only when all current controls are healthy/ve
 
 - semantic quota enforcement/time safety;
 - Notification durable encrypted exact-content handoff;
-- IPPanel Webservice production credentials/contract fixtures;
+- SMS.ir production credentials/sender plus exact-text and delivery-report contract fixtures;
 - provider ambiguity/reconciliation/delivery-evidence behavior;
 - Identity MFA/session/recent-auth controls;
 - workload/network authorization and PII-safe telemetry.

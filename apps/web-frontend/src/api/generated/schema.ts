@@ -1681,7 +1681,7 @@ export interface components {
     };
     parameters: {
         /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-        RequestId: string;
+        IdempotencyKey: string;
         ContactId: string;
         /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
         CsrfToken: string;
@@ -1707,7 +1707,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
                 "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
@@ -1745,7 +1745,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
                 "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
@@ -1783,7 +1783,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
                 "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
@@ -1843,7 +1843,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -1898,7 +1898,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -1933,7 +1933,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -1965,7 +1965,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2001,7 +2001,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2033,7 +2033,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2065,7 +2065,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path?: never;
             cookie?: never;
@@ -2091,7 +2091,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2136,7 +2136,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2170,7 +2170,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2204,7 +2204,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2236,7 +2236,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2270,7 +2270,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2306,7 +2306,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
                 "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
@@ -2340,7 +2340,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
                 "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
@@ -2402,7 +2402,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Required only when the anonymous-capable request carries an existing BFF session cookie; do not persist it. */
                 "X-CSRF-Token"?: components["parameters"]["OptionalCsrfToken"];
             };
@@ -2431,7 +2431,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2466,7 +2466,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2500,7 +2500,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2572,7 +2572,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2606,7 +2606,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2663,7 +2663,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2719,7 +2719,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2751,7 +2751,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2783,7 +2783,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2815,7 +2815,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2847,7 +2847,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2879,7 +2879,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2911,7 +2911,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2943,7 +2943,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -2975,7 +2975,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3063,7 +3063,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3124,7 +3124,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3162,7 +3162,7 @@ export interface operations {
             };
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3194,7 +3194,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3257,7 +3257,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3292,7 +3292,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3327,7 +3327,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3362,7 +3362,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };
@@ -3455,7 +3455,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path?: never;
             cookie?: never;
@@ -3513,7 +3513,7 @@ export interface operations {
             query?: never;
             header: {
                 /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
-                "X-Request-Id": components["parameters"]["RequestId"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
                 "X-CSRF-Token": components["parameters"]["CsrfToken"];
             };

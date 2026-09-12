@@ -4,17 +4,11 @@ import com.sajtech.identity.application.transaction.model.TransactionFailure;
 import com.sajtech.identity.application.transaction.model.TransactionProfile;
 import com.sajtech.identity.application.transaction.model.TransactionUnavailableException;
 import com.sajtech.identity.application.transaction.port.out.TransactionRunner;
-import java.sql.SQLException;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.QueryTimeoutException;
-import org.springframework.jdbc.CannotGetJdbcConnectionException;
-import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 public final class SpringTransactionRunner implements TransactionRunner {
@@ -61,7 +55,8 @@ public final class SpringTransactionRunner implements TransactionRunner {
                 return work.get();
               });
     } catch (RuntimeException exception) {
-      TransactionFailure failure = classify(exception);
+      if (exception instanceof TransactionUnavailableException) throw exception;
+      TransactionFailure failure = DatabaseFailureTranslation.classify(exception);
       if (failure == null) throw exception;
       throw new TransactionUnavailableException(failure, exception);
     }
@@ -73,32 +68,6 @@ public final class SpringTransactionRunner implements TransactionRunner {
     result.put(TransactionProfile.WORK_CLAIM, new TransactionBudget(1, 500, 100));
     result.put(TransactionProfile.MAINTENANCE, new TransactionBudget(3, 2000, 100));
     return Map.copyOf(result);
-  }
-
-  private static TransactionFailure classify(Throwable failure) {
-    for (Throwable current = failure; current != null; current = current.getCause()) {
-      if (current instanceof TransactionTimedOutException) {
-        return TransactionFailure.TRANSACTION_DEADLINE;
-      }
-      if (current instanceof CannotAcquireLockException) {
-        return TransactionFailure.LOCK_TIMEOUT;
-      }
-      if (current instanceof QueryTimeoutException) {
-        return TransactionFailure.STATEMENT_TIMEOUT;
-      }
-      if (current instanceof CannotCreateTransactionException
-          || current instanceof CannotGetJdbcConnectionException) {
-        return TransactionFailure.POOL_UNAVAILABLE;
-      }
-      if (current instanceof SQLException sql) {
-        if ("55P03".equals(sql.getSQLState())) return TransactionFailure.LOCK_TIMEOUT;
-        if ("57014".equals(sql.getSQLState())) return TransactionFailure.STATEMENT_TIMEOUT;
-        if (sql.getSQLState() != null && sql.getSQLState().startsWith("08")) {
-          return TransactionFailure.POOL_UNAVAILABLE;
-        }
-      }
-    }
-    return null;
   }
 
   private record TransactionBudget(

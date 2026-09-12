@@ -1,5 +1,6 @@
 runtime:
   enabled: true
+  erasureRuntimeEnabled: true
   maxConcurrentCallsPerConnection: 128
   checkPermission: {globalConcurrency: 8, perCallerConcurrency: 4, globalQueueCapacity: 8, perCallerQueueCapacity: 2, maxCallerBuckets: 64, queueWait: PT0.025S}
 database:
@@ -7,6 +8,7 @@ database:
   podLabels: {app.kubernetes.io/name: postgresql}
   runtimeSecretName: authorization-db-runtime
   migrationSecretName: authorization-db-migration
+kafka: {connectionSecretName: authorization-kafka}
 quota:
   redis: {podLabels: {app.kubernetes.io/name: security-redis}, connectionSecretName: authorization-quota-redis}
   maxActiveBuckets: 10000

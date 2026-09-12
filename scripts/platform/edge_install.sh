@@ -8,14 +8,29 @@ mkdir -p "$RUNTIME/tls"; chmod 700 "$RUNTIME" "$RUNTIME/tls"
 verify_sha "$TRAEFIK_CHART_SHA256" "$ROOT/infrastructure/traefik/chart/$TRAEFIK_CHART_VERSION/traefik-$TRAEFIK_CHART_VERSION.tgz"
 verify_sha "$CRS_ARCHIVE_SHA256" "$ROOT/infrastructure/waf/vendor/$CRS_VERSION/coreruleset-$CRS_VERSION.tar.gz"
 helm lint "$ROOT/infrastructure/traefik/chart/$TRAEFIK_CHART_VERSION/traefik-$TRAEFIK_CHART_VERSION.tgz" -f "$ROOT/infrastructure/traefik/values-local.yaml" >/dev/null
-if [[ ! -f "$RUNTIME/tls/hooshix.local.crt" || ! -f "$RUNTIME/tls/hooshix.local.key" ]]; then
-  openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 30 -subj '/CN=hooshix.local' -addext 'subjectAltName=DNS:hooshix.local' -keyout "$RUNTIME/tls/hooshix.local.key" -out "$RUNTIME/tls/hooshix.local.crt" >/dev/null 2>&1
-  chmod 600 "$RUNTIME/tls/hooshix.local.key"; chmod 644 "$RUNTIME/tls/hooshix.local.crt"
+if [[ ! -f "$RUNTIME/tls/localhost.crt" || ! -f "$RUNTIME/tls/localhost.key" ]]; then
+  openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 30 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' -keyout "$RUNTIME/tls/localhost.key" -out "$RUNTIME/tls/localhost.crt" >/dev/null 2>&1
+  chmod 600 "$RUNTIME/tls/localhost.key"; chmod 644 "$RUNTIME/tls/localhost.crt"
 fi
 k apply -f "$ROOT/infrastructure/traefik/service-account.yaml"
-k -n traefik-system create secret tls hooshix-local-tls --cert="$RUNTIME/tls/hooshix.local.crt" --key="$RUNTIME/tls/hooshix.local.key" --dry-run=client -o yaml | k apply -f -
-h upgrade --install traefik "$ROOT/infrastructure/traefik/chart/$TRAEFIK_CHART_VERSION/traefik-$TRAEFIK_CHART_VERSION.tgz" -n traefik-system -f "$ROOT/infrastructure/traefik/values-local.yaml" --wait --timeout 80s
+k -n traefik-system create secret tls hooshix-local-tls --cert="$RUNTIME/tls/localhost.crt" --key="$RUNTIME/tls/localhost.key" --dry-run=client -o yaml | k apply -f -
 k apply -f "$ROOT/infrastructure/traefik/networkpolicy.yaml"
+api_endpoint_json=$(k get endpointslice -n default -l kubernetes.io/service-name=kubernetes -o json)
+read -r api_cidr api_port < <(API_ENDPOINT_JSON="$api_endpoint_json" python3 -c '
+import ipaddress, json, os
+d=json.loads(os.environ["API_ENDPOINT_JSON"])
+addresses=[address for item in d["items"] for endpoint in item.get("endpoints",[]) if endpoint.get("conditions",{}).get("ready") is not False for address in endpoint.get("addresses",[])]
+ports=[port.get("port") for item in d["items"] for port in item.get("ports",[]) if port.get("name") == "https" and port.get("protocol") == "TCP"]
+assert len(addresses) == 1 and len(ports) == 1, "local Kubernetes API endpoint is not singular"
+address=ipaddress.ip_address(addresses[0]); assert address.version == 4, "local Kubernetes API endpoint is not IPv4"
+port=ports[0]; assert isinstance(port,int) and 1 <= port <= 65535, "local Kubernetes API endpoint port is invalid"
+print(f"{address}/32 {port}")
+')
+API_CIDR="$api_cidr" API_PORT="$api_port" python3 -c '
+import json, os
+json.dump({"apiVersion":"networking.k8s.io/v1","kind":"NetworkPolicy","metadata":{"name":"traefik-kube-api-egress","namespace":"traefik-system"},"spec":{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"traefik"}},"policyTypes":["Egress"],"egress":[{"to":[{"ipBlock":{"cidr":os.environ["API_CIDR"]}}],"ports":[{"protocol":"TCP","port":int(os.environ["API_PORT"])}]}]}},__import__("sys").stdout)
+' | k apply -f -
+h upgrade --install traefik "$ROOT/infrastructure/traefik/chart/$TRAEFIK_CHART_VERSION/traefik-$TRAEFIK_CHART_VERSION.tgz" -n traefik-system -f "$ROOT/infrastructure/traefik/values-local.yaml" --wait --timeout 80s
 k apply -f "$ROOT/infrastructure/traefik/gateway.yaml"
 k apply -f "$ROOT/infrastructure/waf/kubernetes.yaml"
 k rollout status deployment/edge-waf -n platform-edge --timeout=80s

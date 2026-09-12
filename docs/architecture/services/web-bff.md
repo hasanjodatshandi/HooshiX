@@ -69,6 +69,14 @@ Session/pre-auth state remains server-side Redis authority under current ADRs. B
 
 Session creation/rotation/revocation/idle/absolute lifetime, user-session index, retained refresh encryption/key-ring behavior, and OIDC pre-auth limits remain under current ADR-0016/Identity contracts.
 
+Browser-session Redis commands have a 75ms command deadline and no application retry.
+Transport/server failures and timeouts map to `503/DEPENDENCY_UNAVAILABLE`, including
+session lookup/touch in the browser filter. Dependency failure is not an invalid-session
+result: it neither clears a valid browser cookie nor permits dispatch. A timed-out
+write may already have executed; the caller receives no grant/success, and any anonymous
+state left by an ambiguous bootstrap expires under its existing ten-minute TTL.
+Atomic rotation and revocation semantics are unchanged.
+
 For active TOTP, the BFF converts Identity's primary-proof result into a five-minute `MFA_PREAUTH` browser session. The Identity challenge is AES-GCM encrypted in Redis with locator/purpose binding and is never returned to browser JavaScript. TOTP or recovery proof completion uses that server-held challenge once, has a 1500ms child deadline, no automatic retry, no fallback, and atomically rotates into the completed authenticated browser session. MFA enrollment/disable/replacement/recovery-code mutations likewise use only the server-held Identity refresh credential and rotate cookie, CSRF, and encrypted refresh state from Identity's result.
 
 CSRF tokens remain JavaScript-memory-only. `/api/v1/auth/session/csrf` is the narrow reload-recovery path: it is exempt only from the lost CSRF proof itself, still requires exact same-origin Origin and Fetch Metadata, uses SameSite cookie binding, rotates the server-side browser locator/CSRF state, and preserves any encrypted Identity refresh credential or MFA challenge only server-side. Cross-origin, missing Fetch Metadata, invalid/expired session, and ordinary unsafe-route CSRF negatives remain fail closed.
@@ -89,6 +97,13 @@ Protected resource services still perform final online Authorization and local r
 Every BFF internal edge is registered with exact workload identity, criticality/failure action, finite child deadline inside the outer request budget, one retry owner, bounded concurrency, cancellation, and no unreviewed fallback.
 
 Authoritative security dependencies do not use automatic retry/stale allow.
+
+Identity `RESOURCE_EXHAUSTED` is not automatically a user quota response. Only the
+reviewed `QUOTA_EXCEEDED` semantic (plus the existing profile contact-count business
+limit `CONTACT_LIMIT_REACHED`) maps to HTTP 429. Database-pool exhaustion,
+authentication admission pressure and other capacity/unknown exhaustion map to the
+stable dependency-unavailable HTTP 503 response. The BFF does not retry or infer an
+authentication/session result after this ambiguous dependency failure.
 
 Reference Data:
 
@@ -195,7 +210,13 @@ The BFF is repository-complete for the implemented slice only when applicable so
 
 ## 12. Public REST contract
 
-The canonical browser-facing contract is BFF-owned OpenAPI 3.1, version 1.6.0, under `services/web-bff/contracts/openapi.yaml`. It covers all 58 implemented public controller method/path mappings, including authenticated self-erasure. A compatible contract change follows SemVer, contains schema validation and a consumer example for every operation, preserves controller/OpenAPI parity, and regenerates frontend transport types; the generated-type drift gate rejects stale client output.
+The canonical browser-facing contract is BFF-owned OpenAPI 3.1, version 2.0.0, under `services/web-bff/contracts/openapi.yaml`. It covers all 58 implemented public controller method/path mappings, including authenticated self-erasure. A compatible contract change follows SemVer, contains schema validation and a consumer example for every operation, preserves controller/OpenAPI parity, and regenerates frontend transport types; the generated-type drift gate rejects stale client output.
+
+Version 2.0.0 deliberately replaces the pre-Production `X-Request-Id` business input
+with the required UUIDv4 `Idempotency-Key` header. `X-Request-Id` remains untrusted
+telemetry context that Envoy may generate or mutate and is never accepted as business
+idempotency authority. The edge regression sends both headers and proves that mutation
+of the telemetry header cannot alter the idempotency key or business result.
 
 The anonymous registration subset remains:
 
@@ -211,4 +232,4 @@ Web BFF performs transport validation and non-enumerating RFC 9457 error mapping
 
 ## Current repository implementation evidence
 
-The current repository contains the executable Web BFF slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement and reload recovery, local password+MFA authentication/logout, Google Authorization Code with PKCE S256/state/nonce, bounded encrypted pre-auth state, provider-token custody, OIDC semantic quota, ExternalIdentity and TOTP lifecycle, complete Tenant/Invitation/Profile/Contact/password routes, Authorization management, exact audience brokerage, and the canonical OpenAPI 3.1 version-1.6.0 browser facade with 58-operation parity. It also contains the authenticated self-erasure route and ADR-0028 Kafka participant: PostgreSQL-owned Inbox/receipt Outbox state, Identity-owned subject resolution, indexed Redis browser-session deletion, finite retries, non-PII receipts, migration profile, hardened Helm/Kafka egress, and alerting. The frontend clears browser authority immediately after acceptance. Provider tokens never reach browser or Identity; application ports retain ArchUnit enforcement. The full local check and four-participant Kafka smoke pass. Production BFF/Kafka runtime and real Google-provider execution remain `NOT VERIFIED`.
+The current repository contains the executable Web BFF slice under `services/web-bff/`, including server-side Redis sessions, same-origin/CSRF/Fetch-Metadata enforcement and reload recovery, local password+MFA authentication/logout, Google Authorization Code with PKCE S256/state/nonce, bounded encrypted pre-auth state, provider-token custody, OIDC semantic quota, ExternalIdentity and TOTP lifecycle, complete Tenant/Invitation/Profile/Contact/password routes, Authorization management, exact audience brokerage, and the canonical OpenAPI 3.1 version-2.0.0 browser facade with 58-operation parity. It also contains the authenticated self-erasure route and ADR-0028 Kafka participant: PostgreSQL-owned Inbox/receipt Outbox state, Identity-owned subject resolution, indexed Redis browser-session deletion, finite retries, non-PII receipts, migration profile, hardened Helm/Kafka egress, and alerting. The frontend clears browser authority immediately after acceptance. Provider tokens never reach browser or Identity; application ports retain ArchUnit enforcement. The full local check and four-participant Kafka smoke pass. Production BFF/Kafka runtime and real Google-provider execution remain `NOT VERIFIED`.

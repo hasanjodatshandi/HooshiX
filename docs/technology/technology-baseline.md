@@ -17,6 +17,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | --- | --- | --- |
 | JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | official runtime archive SHA-256 and runtime base-image digest pinned by owning service; CI verifies exact runtime build |
 | Framework | Spring Boot 4.1.0 | current stable project baseline |
+| Embedded servlet container | Apache Tomcat 11.0.25 (`core`, `el`, `websocket` aligned) | reviewed security override of the Boot-managed version; resolves GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6, and GHSA-h3x4-894j-xpx5; all five service locks/checksums must align |
 | HTTP model | Spring MVC | WebFlux/Reactor prohibited without revised decision |
 | Request/I/O concurrency | Virtual Threads | `spring.threads.virtual.enabled=true` |
 | Build | Gradle Wrapper 9.6.1 + Kotlin DSL | wrapper per independently deployable service |
@@ -48,6 +49,8 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Trace export protocol | OTLP | services -> approved internal Collector |
 | Logging | structured JSON stdout + ADR-0031 controls | allow-list/redaction/canary/runtime detection |
 | Backend test | JUnit 5 + Testcontainers | service locks |
+| Java coverage | JaCoCo 0.8.15 | combined unit/integration risk thresholds in every Java service |
+| Selective mutation | Gradle PIT plugin 1.19.0 / PIT 1.22.1 / PIT JUnit 5 plugin 1.2.3 | Identity cryptography/erasure and BFF browser-edge security only; measured baselines are blocking |
 | Architecture test | ArchUnit | mandatory Java architecture rules |
 | Formatting | Spotless + one approved pinned formatter | exact plugin/formatter in build metadata |
 | Java bug analysis | SpotBugs | blocking production-code gate |
@@ -57,7 +60,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Repository source lint | ShellCheck 0.11.0 + actionlint 1.7.12 + Ruff 0.16.5 | checksum-pinned official Linux/x64 artifacts; selected high-signal shell, GitHub Actions, and Python source checks in repository baseline CI |
 | CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
 | BDD | Cucumber-JVM + Gherkin | critical behavior only |
-| Frontend unit/component | Vitest + React Testing Library | frontend lockfile |
+| Frontend unit/component | Vitest 4.1.11 + `@vitest/coverage-v8` 4.1.11 + React Testing Library | exact frontend lockfile; global baseline plus higher risk-module thresholds |
 | Browser E2E | Playwright Test + TypeScript | frontend lockfile |
 
 ## 2. Platform baseline
@@ -74,7 +77,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Edge gateway | Traefik 3.7.10 | Helm chart 41.2.0; bundled K3s Traefik disabled |
 | Kubernetes routing API | Gateway API 1.5.1 | Traefik 3.7-supported Standard version |
 | WAF server | Caddy 2.11.4 | immutable digest |
-| WAF connector | coraza-caddy 2.5.0 | version/digest pinned |
+| WAF connector | coraza-caddy 2.5.0 | version/digest pinned; repository safe-rule-logging patch, verified upstream module bytes; see local edge runbook |
 | WAF engine | Coraza 3.7.0 | current choice |
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
@@ -94,8 +97,8 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | `production-single-server` management network | host-supported WireGuard | exact host package/kernel pinned; public TCP/22 denied |
 | `production-single-server` human access | supported OpenSSH + hardware FIDO2 + JIT + `sudo`/system audit | ADR-0030/0043 |
 | `production-ha` human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session evidence |
-| Email | Liara Transactional Email, SMTP + STARTTLS | Notification provider |
-| SMS | IPPanel Edge Webservice mode for Iran | local logging adapter local-only |
+| Email | Provider-neutral authenticated SMTP + required STARTTLS; Google Gmail profile for bounded staging only | Production provider deferred under ADR-0055 |
+| SMS | SMS.ir exact-text bulk send for Iran; SMS.ir Verify Sandbox for simulated contract validation only | local logging adapter local-only |
 
 ## 3. Selected production profile: `production-single-server`
 
@@ -180,6 +183,15 @@ Both profiles preserve:
 - zero-standing-privilege human access.
 
 ## 6. Version governance
+
+The Tomcat patch override follows the [official Tomcat 11 security notices](https://tomcat.apache.org/security-11.html).
+Each service uses native Gradle constraints over the Spring Boot BOM; no new dependency-management
+plugin or authentication mode is introduced. The affected CI advisory findings require the patch
+regardless of whether a vulnerable container authentication configuration is active. Strict service
+checks, advisory rescans, and refreshed staging/runtime evidence are required before promotion.
+Netty modules remain aligned through the official BOM; the Stage 7 security refresh moves the affected
+services to `4.2.17.Final`. The frontend root override pins transitive `js-yaml` to `4.3.2` until its
+owning OpenAPI toolchain resolves at least that fixed version directly.
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
 - Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;

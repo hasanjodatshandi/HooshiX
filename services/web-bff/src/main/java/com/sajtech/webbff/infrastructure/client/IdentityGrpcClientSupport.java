@@ -69,7 +69,10 @@ abstract class IdentityGrpcClientSupport {
       case PERMISSION_DENIED, FAILED_PRECONDITION ->
           new BffException(BffError.PASSWORD_REJECTED, "Password request was rejected", e);
       case RESOURCE_EXHAUSTED ->
-          new BffException(BffError.RATE_LIMITED, "Password request quota exceeded", e);
+          "QUOTA_EXCEEDED".equals(description)
+              ? new BffException(BffError.RATE_LIMITED, "Password request quota exceeded", e)
+              : new BffException(
+                  BffError.DEPENDENCY_UNAVAILABLE, "Password service is unavailable", e);
       case INVALID_ARGUMENT ->
           new BffException(BffError.INVALID_REQUEST, "Password request is invalid", e);
       default ->
@@ -82,7 +85,9 @@ abstract class IdentityGrpcClientSupport {
       case UNAUTHENTICATED ->
           new BffException(BffError.AUTHENTICATION_FAILED, "MFA proof was rejected", e);
       case RESOURCE_EXHAUSTED ->
-          new BffException(BffError.RATE_LIMITED, "MFA request quota exceeded", e);
+          "QUOTA_EXCEEDED".equals(e.getStatus().getDescription())
+              ? new BffException(BffError.RATE_LIMITED, "MFA request quota exceeded", e)
+              : new BffException(BffError.DEPENDENCY_UNAVAILABLE, "MFA is unavailable", e);
       case FAILED_PRECONDITION, ABORTED ->
           new BffException(BffError.INVALID_REQUEST, "MFA request precondition failed", e);
       case INVALID_ARGUMENT ->
@@ -127,7 +132,10 @@ abstract class IdentityGrpcClientSupport {
       case PERMISSION_DENIED ->
           new BffException(BffError.AUTHORIZATION_DENIED, "Authorization denied", e);
       case RESOURCE_EXHAUSTED ->
-          new BffException(BffError.RATE_LIMITED, "Request quota exceeded", e);
+          "QUOTA_EXCEEDED".equals(e.getStatus().getDescription())
+                  || "CONTACT_LIMIT_REACHED".equals(e.getStatus().getDescription())
+              ? new BffException(BffError.RATE_LIMITED, "Request quota exceeded", e)
+              : new BffException(BffError.DEPENDENCY_UNAVAILABLE, "Identity is unavailable", e);
       case FAILED_PRECONDITION ->
           new BffException(
               "TENANT_SELECTION_REQUIRED".equals(e.getStatus().getDescription())

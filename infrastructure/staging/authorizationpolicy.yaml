@@ -18,6 +18,7 @@ spec:
               - prod.sajtech.internal/ns/platform-apps/sa/authorization-service
               - prod.sajtech.internal/ns/platform-apps/sa/identity-service
               - prod.sajtech.internal/ns/platform-apps/sa/notification-service
+              - prod.sajtech.internal/ns/platform-apps/sa/web-bff
               - prod.sajtech.internal/ns/platform-data/sa/postgres-bootstrap
       to: [{operation: {ports: ["5432"]}}]
 ---
@@ -42,3 +43,27 @@ spec:
               - prod.sajtech.internal/ns/platform-apps/sa/identity-service
               - prod.sajtech.internal/ns/platform-apps/sa/web-bff
       to: [{operation: {ports: ["6379"]}}]
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata: {name: kafka, namespace: platform-data}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: kafka}}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: kafka, namespace: platform-data}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: kafka}}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - prod.sajtech.internal/ns/platform-apps/sa/authorization-service
+              - prod.sajtech.internal/ns/platform-apps/sa/identity-service
+              - prod.sajtech.internal/ns/platform-apps/sa/notification-service
+              - prod.sajtech.internal/ns/platform-apps/sa/web-bff
+              - prod.sajtech.internal/ns/platform-data/sa/kafka
+      to: [{operation: {ports: ["9093"]}}]

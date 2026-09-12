@@ -1,0 +1,64 @@
+--- a/coraza.go
++++ b/coraza.go
+@@ -178,1 +178,1 @@
+-			m.logger.Warn("Failed to close the transaction", zap.String("tx_id", tx.ID()), zap.Error(err))
++			m.logger.Warn("waf_transaction_close_failed")
+@@ -207,1 +207,1 @@
+-			Err:        err,
++			Err:        errors.New("WAF request processing failed"),
+@@ -211,6 +211,1 @@
+-		m.logger.Error("WAF rule violation detected",
+-			zap.String("hostname", r.Host),
+-			zap.String("uri", r.RequestURI),
+-			zap.String("client_ip", r.RemoteAddr),
+-			zap.String("unique_id", tx.ID()),
+-		)
++		m.logger.Error("waf_request_blocked", zap.Int("rule_id", it.RuleID), zap.Int("status", it.Status))
+@@ -273,22 +268,25 @@
+-func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
+-	return func(mr types.MatchedRule) {
+-		logMsg := mr.ErrorLog()
+-		switch mr.Rule().Severity() {
+-		case types.RuleSeverityEmergency,
+-			types.RuleSeverityAlert,
+-			types.RuleSeverityCritical,
+-			types.RuleSeverityError:
+-			logger.Error(logMsg)
+-		case types.RuleSeverityWarning:
+-			logger.Warn(logMsg)
+-		case types.RuleSeverityNotice:
+-			logger.Info(logMsg)
+-		case types.RuleSeverityInfo:
+-			logger.Info(logMsg)
+-		case types.RuleSeverityDebug:
+-			logger.Debug(logMsg)
+-		default:
+-			logger.Warn(logMsg)
+-		}
+-	}
+-}
++func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
++	return func(mr types.MatchedRule) {
++		// ErrorLog, Message and Data may expand credentials or request bodies.
++		log := logger.With(zap.Int("rule_id", mr.Rule().ID()),
++			zap.Int("severity", int(mr.Rule().Severity())))
++		const logMsg = "waf_rule_match"
++		switch mr.Rule().Severity() {
++		case types.RuleSeverityEmergency,
++			types.RuleSeverityAlert,
++			types.RuleSeverityCritical,
++			types.RuleSeverityError:
++			log.Error(logMsg)
++		case types.RuleSeverityWarning:
++			log.Warn(logMsg)
++		case types.RuleSeverityNotice:
++			log.Info(logMsg)
++		case types.RuleSeverityInfo:
++			log.Info(logMsg)
++		case types.RuleSeverityDebug:
++			log.Debug(logMsg)
++		default:
++			log.Warn(logMsg)
++		}
++	}
++}

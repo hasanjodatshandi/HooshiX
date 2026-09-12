@@ -92,7 +92,7 @@ evidence gap is not reported as a confirmed runtime defect.
 | HR-011 | MEDIUM | CI/tooling maintainability | Five service workflows repeat substantial security/build setup. Repository shell/Python/workflow scripts have custom tests but no selected high-signal ShellCheck/actionlint/Python static gate. | 6 |
 | HR-012 | HIGH | Capacity/performance evidence | No executable load/soak/chaos suite or complete-stack headroom proof exists; representative sensitive-query `EXPLAIN` evidence was not found. Required Production headroom remains `NOT VERIFIED`. | 7 |
 | HR-013 | MEDIUM | Test depth | Java and frontend coverage thresholds are absent; selective mutation testing for security state machines is absent; BDD/scenario coverage is narrow. | 7 |
-| HR-014 | HIGH | External/runtime evidence | Full HIBP corpus bounds, real Google/Liara/IPPanel execution, erasure redeploy/restore scenarios, provider ambiguity, and real staging failure evidence remain incomplete or `NOT VERIFIED`. | 7 |
+| HR-014 | HIGH | External/runtime evidence | `CLOSED FOR STAGE 7 / DEFERRED TO STAGE 10`: full HIBP corpus bounds, Google Gmail acceptance, SMS.ir production credential/sender/acceptance plus authenticated terminal reconciliation, provider ambiguity/failure behavior, and erasure redeploy/restore scenarios pass in local staging. Actual SMS `DELIVERED` evidence remains `NOT VERIFIED` after the approved recipient returned blacklist state `7`; on 2026-09-12 the owner explicitly accepted this environment-specific outcome for Stage 7 without making a delivery or Production-readiness claim. The simulated SMS.ir Sandbox contract/failure probe is separately `Passed`; Google OIDC execution is owner-deferred and not applicable to Notification-provider evidence. | 7 / 10 |
 | HR-015 | HIGH | MLOps governance | Conversation architecture has no versioned offline synthetic/adversarial evaluation suite, quality/safety/cost/latency promotion thresholds, canary policy, or model/prompt rollback evidence. | 8 |
 | HR-016 | HIGH | AI safety/data control | Content-safety/acceptable-use ownership, provider data-control approval, feedback handling, and drift policy require an explicit reviewed decision before model execution is enabled. | 8 |
 | HR-017 | HIGH | Core product | ADR-0054 Conversation/ModelRun is designed but no executable service, contracts, database, worker/provider adapter, BFF/UI, or lifecycle implementation exists. | 9 |
@@ -162,8 +162,8 @@ Remediation must not weaken these verified current properties:
 | 4 | Frontend testing, localization, and accessibility | `COMPLETED` | Add Vitest/RTL component coverage, automated accessibility gate, real `fa`/`en` consumption and RTL/LTR switching, keyboard/focus/error semantics, and broader Playwright journeys. | Final reviewed implementation head `4f29bdccc60581b2a2144ef296d6e31647b86e42`; protected repository baseline run `33247612662` and frontend E2E run `33247612549` passed |
 | 5 | Dependency, DevSecOps, and frontend release alignment | `COMPLETED` | Replace dynamic manifest versions with reviewed pins, align React types/runtime and Protobuf compiler, add distinct JS advisory/SAST gates, and include the frontend in immutable image/SBOM/Grype/Cosign/Kyverno release evidence. | Final reviewed implementation head `209684a5a465477e87ff9c257c0511ace5af3a0f`; protected repository baseline run `33301549810` and frontend E2E run `33301549573` passed |
 | 6 | Characterization-first maintainability refactor | `COMPLETED` | Add characterization tests, then split identified stores/config/client/workflows by existing capabilities without changing public contracts, transaction boundaries, failure semantics, or security gates. | Final reviewed implementation head `56bb71c29b96ddb4cce7f0b276f25c53417a32fc`; protected repository baseline run `33322638261` and frontend E2E run `33322638140` passed |
-| 7 | Performance, reliability, and test evidence | `NEXT` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. | Pending |
-| 8 | MLOps evaluation and safety architecture gate | `PLANNED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
+| 7 | Performance, reliability, and test evidence | `COMPLETED` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. Repository/staging completion explicitly requires provider contract, acceptance, failure, ambiguity, and reconciliation evidence; actual Production delivery remains a Stage 10 commissioning gate. | Final reviewed implementation/evidence head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; protected repository baseline run `34674964250` and frontend E2E run `34674964129` passed. Exact-digest/runtime, load/soak/headroom, full-corpus HIBP, erasure restore/redeploy, Gmail acceptance, SMS.ir production acceptance and terminal reconciliation all passed their Stage 7 boundary. SMS `DELIVERED` was not observed and is not claimed. |
+| 8 | MLOps evaluation and safety architecture gate | `NEXT` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Pending |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `PLANNED` | Implement the accepted service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice and its security/privacy/failure/load/browser/Helm evidence, preserving every ADR-0054 exclusion. | Pending |
 | 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
 
@@ -181,6 +181,366 @@ cancellation behavior is bounded and testable.
 | 4 | `ae68a2f9f7351826fbee952bb5e97ffe8285a070` | `4f29bdccc60581b2a2144ef296d6e31647b86e42` | `COMPLETED`: complete Stage 4 diff reviewed with no remaining HR-005/HR-006 finding. Context7 was invoked for Vitest, React Testing Library, and axe documentation but its transport was unavailable; current official project documentation and exact installed-version behavior were used as the fallback. Typed `fa`/`en` catalogs now drive every current journey, request locale, and document RTL/LTR without persistent browser state; route headings receive client-navigation focus and every direct route has a main landmark. Three Vitest/RTL component tests, three Chromium/axe test journeys covering two directions and eleven stable route shells, twenty-four other Playwright journeys, generated OpenAPI drift, TypeScript/build, npm advisory, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected frontend run `33247612549` passed and repository baseline run `33247612662` passed structure, contracts, all five service security suites, and its final aggregator. Coverage thresholds remain Stage 7; frontend SAST/advisory/release alignment remains Stage 5; deployed-browser/Production evidence remains Stage 10 and `NOT VERIFIED`. |
 | 5 | `c6a972d2d770ddb8a50b48dc57630856d2920597` | `209684a5a465477e87ff9c257c0511ace5af3a0f` | `COMPLETED`: the complete Stage 5 diff was reviewed against unchanged `origin/main` with no remaining HR-007/HR-008/HR-009 finding. Context7-confirmed React 19.2.7 alignment, OSV npm-lock scanning, and explicit protoc 4.34.2 configuration were applied. Frontend manifest and lockfile pins, OSV scan, eight-rule Semgrep source policy with positive/negative fixtures, non-root/read-only/no-capability Caddy image health/SPA smoke, Production six-component release validation/rescan/Syft/Grype/Cosign/Kyverno wiring, all five strict Gradle checks, production tests, component/API/build/accessibility/twenty-four other browser journeys, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected frontend run `33301549573` passed every new frontend gate and protected repository baseline run `33301549810` passed contracts, structure, all five service security suites, and its final aggregator. Actual frontend staging/Production workload/routing, real release signing/scanning/admission execution, deployed browser journeys, and Production readiness remain Stage 10 and `NOT VERIFIED`. |
 | 6 | `703333fabcdd97808863a33604a19d161c9a8d2b` | `56bb71c29b96ddb4cce7f0b276f25c53417a32fc` | `COMPLETED`: the complete Stage 6 diff was reviewed against unchanged `origin/main` with no remaining HR-010/HR-011 finding. Characterization tests fixed the public facade constructors/interfaces and critical Spring bean names, conditions, profiles, and destroy methods before refactoring. Authorization persistence, Identity tenant persistence, Identity runtime configuration, and the BFF Identity client are now capability-focused facades/components; transaction-call counts, BFF deadline counts, and Identity bean counts match the pre-refactor surfaces, and no contract, migration, deployment, or dependency file changed. The five service workflows now share one executable Gitleaks/OSV implementation while retaining four explicit blocking security steps each. Checksum-pinned ShellCheck 0.11.0, actionlint 1.7.12, and Ruff 0.16.5 enforce selected high-signal repository source checks. Context7-confirmed Spring configuration composition/profile behavior, jOOQ transaction-scoped context use, and actionlint/ShellCheck integration informed the review. Authorization, Identity, and Web BFF formatting, unit, integration, architecture, SpotBugs, and runtime-JAR gates, `make context-verify`, `make context-bootstrap`, and `make baseline-verify` passed locally. Protected repository baseline run `33322638261` passed source lint, contracts, all five complete service security suites, and its final aggregator; frontend E2E run `33322638140` passed. Stage 7 retains all coverage, mutation, performance, load, soak, fault, provider, and capacity evidence work. |
+| 7 | `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` | `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7` | `COMPLETED`: the complete Stage 7 diff was reviewed against unchanged `origin/main` with no unresolved Critical/High repository finding. Coverage and selective mutation gates, representative query plans, dependency/advisory corrections, exact-digest local production-fidelity, load/soak/fault/headroom, full-corpus HIBP, provider contract/failure/ambiguity, real Gmail acceptance, SMS.ir production sender/acceptance/terminal reconciliation, and erasure restart/restore/redeploy evidence passed. Protected repository baseline run `34674964250` and frontend E2E run `34674964129` passed at the reviewed head. The owner accepted the SMS recipient-blacklist state `7` as sufficient environment evidence for this repository stage; `DELIVERED` is explicitly not claimed and remains a Stage 10 commissioning gate. |
+
+### Stage 7 completion evidence
+
+This is the interruption-safe evidence behind the Stage 7 completion receipt. The latest
+completed local production-fidelity and capacity run used the clean implementation
+revision `25b747e4a7070d6cfc0602eb0506d6b5bebb5866` on 2026-09-08, as recorded in the
+rebuild receipt below. The following 2026-09-07 measurements belong to
+`a29486549bec3b258376c6c66b51714f94e94947`. Earlier coverage,
+mutation, plan, and developer-local erasure receipts were recorded at
+`a8d100edcbd61d37ec314d9ac138a95266a3e24c`; they are commit-bound historical evidence,
+not proof for later changes.
+
+- **Passed:** all five Java services have enforced global and risk-focused JaCoCo
+  thresholds over combined unit/integration execution; the Identity security slice
+  killed 33 of 34 PIT mutants (97%), and the Web BFF boundary killed 108 of 245 PIT
+  mutants (44%) under their reviewed risk-specific thresholds.
+- **Passed:** frontend Vitest/V8 coverage has global and risk-module thresholds, with
+  47 current tests; representative Authorization and Notification PostgreSQL plans use
+  the intended indexes on realistic local cardinalities without sequential scans.
+- **Passed:** the owner-authorized SMS.ir Sandbox probe verified TLS hostname checking,
+  credential acceptance, invalid-credential rejection, invalid-input rejection, and the
+  documented simulated-success shape. Its identifier-free mode-0600 receipt explicitly
+  records no real delivery claim; it is not production SMS acceptance or delivery evidence.
+- **Passed:** the local production-fidelity staging lane now has an exact-digest
+  Kafka 4.2.1 combined KRaft workload, explicit erasure topics, strict mesh/workload policy,
+  per-service connection Secrets, and all four participant gates. At
+  `f19746fb54add27f4edc52a7344b6bcc6e734301`, the clean-commit rehearsal deleted the
+  synthetic Identity, verified all four participant receipts, restarted all five applications,
+  restored all four pre-completion database snapshots, and verified normal replay without
+  reappearance. The identifier-free receipt is mode `0600`.
+- **Passed:** `make local-runtime-smoke-erasure-recovery` completed a developer-local
+  four-participant erasure, full service redeploy, pre-completion PostgreSQL 18 snapshot
+  restore, and normal Outbox/Kafka/Inbox reconciliation without reappearance. Its
+  identifier-free mode-0600 receipt is bound to `a8d100edcbd61d37ec314d9ac138a95266a3e24c`. This is not
+  staging or Production restore evidence.
+- **Passed:** the complete local production-fidelity staging lane, including five
+  services, persistence, strict Ambient mTLS/workload-identity negatives, edge/WAF,
+  metrics, traces, privacy-filtered logs, Grafana, and telemetry-backend outage
+  non-authority behavior, passed at `a29486549bec3b258376c6c66b51714f94e94947`.
+- **Passed:** the 60-second invalid-login load at concurrency 16 completed 5,940
+  operations with 100% exact safe outcomes, no unexpected failures, p99 510.596 ms,
+  minimum CPU headroom 42.056%, and minimum memory headroom 67.778%.
+- **Passed:** the 1,800-second session-bootstrap soak at concurrency 8 completed
+  273,524 operations with 273,520 successes (99.999%), p99 62.509 ms, minimum CPU
+  headroom 67.4%, and minimum memory headroom 66.891%. Both profiles recorded zero
+  swap movement, restarts, OOM kills, or application pod-UID changes. Results are in
+  `.platform-runtime/stage7/capacity/` with the exact revision and UTC timestamps.
+- **Inconclusive:** the soak recorded four `BOOTSTRAP_HTTP_500_INTERNAL_ERROR`
+  outcomes. Prometheus confirmed all four on the bootstrap route, but logs and
+  sampled traces did not retain a classified cause; these are not claimed as diagnosed
+  Redis timeouts or as zero-error evidence. This prompted the session-failure follow-up
+  below despite the capacity suite passing its unchanged thresholds.
+- **Passed:** the official complete HIBP corpus acquired on 2026-09-09 was built into a
+  72,477,519,872-byte immutable SQLite artifact with 2,068,408,781 records. The observed
+  maximum prefix cardinality is 2,509 and maximum Protobuf response is 102,932 bytes,
+  within the reviewed 4,096-record/131,072-byte compatibility bounds. On the exact
+  `f19746f` image, 256 cold and warm random lookups measured p99 32.640 ms and 8.353 ms;
+  a one-connection 64-stream run, including bounded read-only storage pressure, completed
+  64/64 with no transport or unexpected status. It did not observe a fail-fast rejection,
+  so no rejection claim is made. Rebuild/redeploy/recovery and full post-restore staging and
+  production-fidelity verification passed. The identifier-free receipt is mode `0600` at
+  `.platform-runtime/stage7/hibp-staging-evidence.json`.
+- **Passed:** protected Repository baseline run `34630982537` and Web frontend E2E
+  run `34630981897` completed successfully for exact implementation
+  `f19746fb54add27f4edc52a7344b6bcc6e734301`, including every five-service security
+  suite, contract/examples, WAF privacy boundary, frontend journeys, and both final
+  aggregators. At that historical commit PR #126 remained Draft while provider evidence was open.
+- **Passed:** a bounded owner-authorized Google Gmail staging execution reached the real provider
+  and the final SMTP response moved the attempt to `PROVIDER_ACCEPTED`; no mailbox-delivery or
+  human-read claim is made. Credentials and recipients remained in mode-`0600` Git-ignored state
+  and do not appear in the identifier-free receipt.
+- **Accepted Stage 7 environment evidence / actual delivery not verified:** a Production SMS.ir API key authenticated, `GET /v1/line` returned exactly
+  one numeric sender line, and the owner-supplied replacement line passed the real exact-text path
+  without credential/recipient disclosure. Bulk submission returned HTTP `200`, provider status
+  `1`, and exactly one positive message identifier, so Notification reached `PROVIDER_ACCEPTED`
+  with one attempt and began authenticated message-specific reconciliation. The correlated report
+  then returned permanent delivery state `7` (recipient blacklist); delivery was correctly not
+  claimed and no blind submission retry occurred. Production sender activation/acceptance now pass;
+  actual delivery remains `Not verified`. On 2026-09-12 the owner confirmed the recipient had
+  intentionally disabled promotional SMS, accepted this terminal outcome for Stage 7, and deferred
+  a later successful-delivery recheck to commissioning after the operator-side setting propagates.
+- Google OIDC remains owner-deferred and is not part of Notification-provider evidence.
+
+Corrective work already included in the measured revision:
+
+- The Identity soak failure was traced to one `OOMKilled` restart: a 75% JVM heap
+  envelope inside the 1 GiB container left insufficient native/runtime reserve. The
+  image uses 50% without changing Argon2 security or workload limits.
+- Authorization and Web BFF explicitly disable duplicate OTLP metrics export while
+  retaining Prometheus metrics and OTLP tracing; the full production-fidelity verifier
+  passed this configuration, including absence of OTLP metrics-push errors.
+- The intermittent login `INVALID_REQUEST` was reproduced with one canonical UUIDv4.
+  Direct BFF access accepted it, while WAF-to-waypoint access rejected it. Effective
+  Envoy configuration uses `UuidRequestIdConfig`, and official Envoy documentation
+  confirms that `x-request-id` is generated/mutated telemetry. OpenAPI 2.0.0 therefore
+  moves business replay identity to UUIDv4 `Idempotency-Key`; frontend/controller and
+  edge regression coverage move atomically with it.
+- Capacity evidence schema v2 snapshots the five application workloads before and
+  after each run; any restart, OOM observation, or pod-set replacement now fails the
+  result rather than being hidden by aggregate host headroom. The runner also refuses
+  dirty worktrees so formal evidence cannot be misattributed to the preceding commit.
+- Quota capacity/noeviction checks execute inside the same atomic EVAL only for new
+  bucket allocation. Four adapters use the existing 75ms Lettuce command timeout;
+  the duplicate elapsed-time rejection after a successful Redis decision is removed.
+  Context7 Redis/Lettuce documentation, Redis 8.2.8 integration tests, and the Identity,
+  Authorization, and BFF full Gradle checks support the change. No security budget,
+  retry, fail-closed result, or memory reserve was relaxed.
+
+Session-failure implementation and historical deployment interruption:
+
+- Session Redis commands now share the existing timing/error boundary, classify only
+  fixed `timeout`/`unavailable` outcomes, and translate dependency failure into stable
+  `503/DEPENDENCY_UNAVAILABLE`. Browser-filter lookup/touch stops dispatch without
+  clearing a valid cookie. No application retry or session grant follows ambiguity.
+- **Passed:** focused real-Redis delayed-write/closed-connection tests and HTTP/filter
+  rejection, no-grant, no-retry, and safe-label/error tests; full BFF Gradle check
+  (unit/integration/architecture/SpotBugs/format/coverage); BFF PIT 110/248 mutants
+  killed (44%) under the existing threshold; official checksum-pinned
+  repository actionlint/ShellCheck/Ruff and baseline gates.
+- **Passed:** all five staging images were built from clean session-failure revision
+  `bbbfb448297c777ca810c078aca55b588a38194f`.
+- **Failed:** deployment of that revision stopped at the first Kubernetes apply with
+  `Forbidden`. The configured `kubernetes-admin` cannot list namespaces in
+  `kind-platform-local`; the failure was reconfirmed before the CI remediation below.
+  Read-only container diagnostics show the control plane restarted at
+  `2026-09-07T10:40:06Z`, after the earlier capacity run, with only its core static
+  pods running. Earlier API startup diagnostics reported missing system namespaces.
+  Its exact historical cause remains **Inconclusive**. The configured etcd storage
+  is the explicitly ephemeral `/dev/shm/hooshix-kind/etcd`; loss on WSL restart is
+  consistent with the documented topology, not evidence of a persistent-volume
+  recovery guarantee. The subsequent owner-approved rebuild is recorded below.
+
+Owner-approved local rebuild and refreshed capacity receipt, 2026-09-08:
+
+- The owner explicitly approved deleting/rebuilding only `platform-local`. Its three
+  old kind nodes and cluster-local state were removed; repository/Git data and the
+  existing local registry were preserved. Recovery of removed cluster data is not
+  established. Do not repeat `production-fidelity-up` merely to resume: it deletes
+  and recreates this ephemeral cluster. Use the component deploy/verify commands.
+- **Passed:** `production-fidelity-up` at clean
+  `25b747e4a7070d6cfc0602eb0506d6b5bebb5866`: restored configured operator access,
+  all three Ready nodes, five exact-source service images, persistence, strict Ambient
+  identity/bypass negatives, Kyverno, edge/WAF, and full observability including
+  backend-outage non-authority tests. Log: `.platform-runtime/stage7/approved-rebuild.log`.
+- **Passed:** unchanged 60-second/concurrency-16 invalid-login capacity thresholds,
+  UTC `03:26:32`–`03:27:32`: 6,514 operations, 6,510 expected outcomes (99.939%),
+  p99 441.052 ms, minimum CPU/memory headroom 52.116%/72.210%.
+  Four unexpected responses remain material follow-up, not zero-error evidence:
+  three `LOGIN_HTTP_403_INVALID_PROBLEM` and one
+  `LOGIN_HTTP_503_DEPENDENCY_UNAVAILABLE`.
+- **Passed:** unchanged 1,800-second/concurrency-8 bootstrap soak, UTC
+  `03:27:32`–`03:57:33`: 283,189/283,189 successes (100%), no unexpected failure,
+  p99 59.126 ms, minimum CPU/memory headroom 70.737%/71.138%.
+  Both runs recorded zero application restarts, OOM kills or pod-UID changes.
+  Swap movement was nonzero but isolated (maximum consecutive active samples: one
+  in each run), below the unchanged five-consecutive-sample failure threshold.
+  Exact mode-0600 JSON receipts: `.platform-runtime/stage7/capacity-25b747e-20260908/`.
+- **Passed:** BFF session Redis metric aggregates contained only fixed `ok` outcomes
+  through these runs. The previous four bootstrap 500s did not recur; this does not
+  retroactively establish their original cause.
+- **Passed locally:** all three load 403s were traced to CRS rule 930120 inspecting
+  a valid opaque session locator. The exact one-cookie locator shape is now excluded
+  only from that rule; malformed/duplicate/other cookies, arguments, bodies and other
+  rules remain inspected. The pinned coraza-caddy source is checksum-verified, patched
+  before compilation to emit only fixed events plus numeric rule metadata, and covered
+  by embedded CRS/privacy tests. Audit/debug expansion is off, Caddy request metadata
+  is dropped, and the immutable local image is
+  `sha256:22ba62be1b1bdc55c4f5a5ce7236e006c93f58ff02ca5caca133494b5171efab`.
+  Its no-network packaged-image smoke and configuration validation passed.
+- **Passed locally:** Traefik chart-41 access logging now uses a response/timing-only
+  allowlist. Its single-node host-port update does not surge. An exact current
+  Kubernetes API EndpointSlice `/32` and TCP port is installed before the chart so a
+  replacement pod can restore Gateway watches without broad egress. The complete edge
+  verifier passed foundation, strict Ambient identity positives/negatives, synthetic
+  privacy canaries, a real Traefik pod replacement and post-restart WAF routing.
+- **Passed locally:** the Identity SQL connection-acquisition exception was confirmed
+  to escape a direct pre-transaction credential read. Direct and transactional jOOQ
+  paths now share type/SQLSTATE-based finite failure translation; the unary boundary
+  returns `RESOURCE_EXHAUSTED / IDENTITY_DATABASE_POOL_UNAVAILABLE` without a cause,
+  grant, retry or second quota charge and recovers after the held connection releases.
+  BFF maps only reviewed quota/business-limit descriptions to 429 and maps capacity or
+  unknown exhaustion to stable 503. Fresh full Identity and BFF `check bootJar` runs,
+  including integration, architecture, SpotBugs, formatting and coverage gates, passed.
+  One Identity unit test first exceeded its existing 100 ms client deadline while both
+  service suites were deliberately rerun concurrently; the isolated unchanged suite
+  then passed all 23 executed tasks. No production deadline was relaxed.
+- **Passed:** all five service images were built and deployed from clean commit
+  `dd9574075b63e4c2251d1ae469ae6f51fc9f4a87` with exact Git/worktree provenance.
+  The complete local production-fidelity verifier then passed five-service persistence,
+  strict Ambient identity positives/negatives, edge privacy and Traefik replacement
+  recovery, Prometheus/Tempo/Loki/Grafana, and telemetry-backend outage non-authority.
+  Docker Hub returned 403 for the already pinned disposable curl canary on one node;
+  the failed attempt remains recorded. The exact committed verifier passed after that
+  node was temporarily cordoned without eviction so Kubernetes selected the other
+  worker's identical cached digest, and all three nodes were uncordoned afterward.
+  This is local functional evidence, not offline-registry or Production evidence.
+- **Passed:** formal post-fix 60-second/concurrency-16 invalid-login load, UTC
+  `16:44:49`–`16:45:50`, completed 6,260/6,260 expected outcomes (100%), zero
+  unexpected responses, p99 478.965 ms, minimum CPU/memory headroom
+  49.177%/64.468%, and zero swap movement, restart, OOM or pod-UID change.
+- **Passed:** formal post-fix 1,800-second/concurrency-8 session-bootstrap soak, UTC
+  `16:45:50`–`17:15:50`, completed 280,071/280,071 successes (100%), zero
+  unexpected responses, p99 60.617 ms, minimum CPU/memory headroom
+  67.861%/63.881%, and zero swap movement, restart, OOM or pod-UID change. Both
+  schema-v2 receipts independently verify and are mode 0600 under
+  `.platform-runtime/stage7/capacity-dd95740-20260908/`. Neither earlier WAF 403 nor
+  Identity-pool 503 recurred.
+- **Passed:** protected repository baseline run `34251259796`, attempt 2, passed
+  contracts/examples, structure, the new WAF privacy/cookie image gate, and all five
+  service suites. Authorization and Compromised Password integration steps failed on
+  attempt 1 but passed unchanged on the fresh runner; no test or gate was weakened.
+  Frontend run `34251259315`, attempt 1, passed. Both runs are bound to `dd95740`.
+- **Passed later at `f19746f`:** official complete-corpus HIBP staging latency/load/
+  recovery and real staging four-participant erasure restart/restore/reconciliation.
+  **Passed later:** authorized real Google Gmail acceptance and Production SMS.ir credential,
+  sender-line, bulk-acceptance, and authenticated message-report execution. SMS.ir delivery remains
+  `Not verified` because the correlated report returned permanent recipient-blacklist state `7`.
+  Google OIDC is an independently implemented optional login path and is owner-deferred
+  for this stage. Generated local fixtures cannot satisfy provider gates; secrets must
+  not be sent in chat.
+
+#### Load-finding remediation review report
+
+This report covers only the bounded WAF/Traefik and Identity/BFF corrections caused by
+the measured load findings. It is not a Stage 7 completion receipt.
+
+| Required field | Review evidence |
+| --- | --- |
+| Architecture review mode | `full-read`; security/PII/persistence/platform work reviewed under `minimal-safe-engineering` critical priorities |
+| Architecture document version/commit | Correction implementation `dd9574075b63e4c2251d1ae469ae6f51fc9f4a87`; `origin/main` reviewed at `a52dfd82856a1da9419e7d9cd4c20b96acf783fe`; final documentation commit and base reconciliation remain pre-merge gates |
+| Architecture sections reviewed | Mandatory source order; edge/network/client trust, BFF/Identity service boundaries, synchronous failure containment, PII-safe observability, performance/capacity, test/CI and local edge runbook |
+| Search terms used | `930120`, `MATCHED_VAR`, `ErrorLog`, `accessLog.fields`, `EndpointSlice`, `NetworkPolicy`, `RESOURCE_EXHAUSTED`, `SQLTransientConnectionException`, `TransactionUnavailableException`, `QUOTA_EXCEEDED` |
+| ADRs reviewed or changed | ADR-0001/0016/0024/0025/0031/0039/0042/0043/0044/0045; no ADR changed |
+| Changed bounded context/module | Local Traefik/WAF edge; Identity persistence failure adapter/transport evidence; Web BFF Identity failure mapping; protected baseline wiring |
+| Contracts changed | No schema or public route changed. Existing stable gRPC descriptions and HTTP problem codes are classified more narrowly; compatibility tests cover the mappings |
+| Database migration | Not applicable; no schema, query or migration changed |
+| Transaction boundary | Unchanged. The same classifier now also covers direct jOOQ execution before a transaction begins |
+| Timeout/deadline behavior | Unchanged: query, pool-acquisition, gRPC and BFF deadlines were not increased |
+| Retry/cancellation/concurrency behavior | No retry added and no pool/concurrency limit increased. Local one-replica Traefik uses `maxSurge: 0`/`maxUnavailable: 1` because its host ports are exclusive |
+| Kafka/event and idempotency behavior | Unchanged; no event, Outbox/Inbox or idempotency contract changed |
+| Security impact | Removes valid opaque-locator false positives without disabling a rule globally; preserves WAF enforcement; capacity ambiguity fails closed as 503 rather than a false user quota result; API egress is one resolved `/32` and port |
+| Istio identity and authorization impact | Existing strict Ambient identity and WAF-only public route remain unchanged and passed positive/negative runtime verification |
+| Logging and PII impact | Expanded Coraza match/request text and Traefik request metadata are removed; fixed low-cardinality numeric WAF events remain. Synthetic canaries and all severity levels are tested |
+| Observability added or changed | Edge log fields narrowed; Identity retains the existing low-cardinality `failure` metric. Telemetry remains non-authoritative |
+| Build/CI/architecture enforcement changed | Protected baseline now requires checksum-pinned WAF source build, embedded rule/privacy tests, packaged configuration validation and no-network image smoke; repository/platform static tests cover the wiring |
+| Tests executed | WAF build/embedded tests and image smoke, Caddy validation, full local edge/identity/restart verification, 17 platform tests, all repository baseline suites, fresh full Identity/BFF Gradle suites, exact-commit five-image build/deploy, complete production-fidelity, formal load/soak, and protected CI passed; all initial/retry failures are recorded above |
+| Architecture deviations | None identified within this correction. Local single-node restart briefly interrupts ingress and is not an HA claim |
+| Rollback considerations | Do not restore raw WAF/request logging, remove exact API watch egress, globally disable CRS 930120, route around WAF, or map unknown capacity to 429. Replace the source patch only with an upstream version that passes the same privacy/boundary gates |
+
+Stage 7 CI remediation on 2026-09-07:
+
+- Protected baseline run `34125212492` at `bbbfb448297c777ca810c078aca55b588a38194f`
+  failed all five service jobs at the OSV dependency gate. Three Critical-rated OSV
+  advisories in embedded Tomcat require the official fixed patch; this is a
+  pre-existing dependency finding exposed by refreshed advisory data, not a
+  demonstrated exploit of the application's configured authentication paths.
+- Frontend run `34125212165` failed five Semgrep findings in the new Stage 7
+  `storage.test.ts` fixtures. This was introduced by this PR's test setup, not a
+  production storage change. The fixtures now seed isolated in-memory Storage
+  doubles; the real adapter remains under test, including disabled access and failed
+  reads/writes/removals. No scanner rule, exclusion, or coverage threshold changed.
+- All five service builds now constrain the three embedded Tomcat modules to the
+  security-fixed baseline in `../technology/technology-baseline.md`. Selective Gradle
+  lock regeneration changed only these three modules; all six new JAR/POM checksums
+  in each service match the published Maven Central SHA-256 values. Spring Boot,
+  Gradle, and Vitest documentation was retrieved through Context7.
+- **Passed:** checksum-pinned OSV rescans of all five updated service lockfiles;
+  all five strict Gradle `check bootJar` executions (unit, integration, architecture,
+  SpotBugs, formatting, dependency integrity, and existing risk-coverage thresholds);
+  frontend 51 Vitest tests with existing coverage thresholds, OpenAPI generated-client
+  parity, TypeScript/build, 3 accessibility journeys, 24 other Playwright journeys,
+  and unchanged eight-rule Semgrep with positive/negative controls; repository baseline,
+  actionlint/ShellCheck/Ruff, context verification/bootstrap, and whitespace checks.
+- Protected recheck outcomes are recorded below by exact implementation revision.
+  Previous failed runs remain provenance, never passing evidence for a later commit.
+
+CI recheck of implementation `330ced32e03ac57a10ec83762688d93de319a2ea`:
+
+- **Passed:** frontend run `34150784062`, and all five clean staging image builds
+  with Git-bound metadata. Each packaged JAR contains the three aligned fixed Tomcat
+  modules. These images have not been deployed into the inaccessible cluster.
+- **Failed:** baseline run `34150784378` reached BFF mutation testing after its
+  OSV/unit/integration/coverage/architecture gates passed, then strict dependency
+  verification rejected the unrecorded `groovy-bom-4.0.11.module` metadata artifact.
+  The corresponding POM was already recorded. The exact module bytes and published
+  SHA-256 were independently matched against Maven Central; only that missing artifact
+  checksum is added, without disabling metadata verification or changing dependencies.
+- **Passed:** local BFF PIT at the Tomcat-patched revision still kills 110/248 mutants
+  (44%), with 67% line coverage of selected classes and 59% test strength. Local
+  cache success did not prove a fresh CI dependency-resolution path; that path was
+  subsequently verified by the corrected-metadata protected run below.
+
+Historical CI remediation receipt:
+
+- Reviewed corrected implementation: `ca6d4803ebf9d398dba0590a601076743497d467`.
+- **Passed:** protected repository baseline run `34151203292`, including structure,
+  contract validation/examples, every complete service security suite, both selective
+  mutation gates, and the final baseline aggregator. Frontend run `34151203110` also
+  passed all advisory, SAST, coverage, image, accessibility, and browser gates.
+- **Passed:** forced local BFF mutation rerun with strict verification: all ten tasks
+  executed, 110/248 mutants killed (44%), 67% selected-class line coverage and 59%
+  test strength. No CI bypass, checksum wildcard, suppression, or reduced gate was used.
+- The two original CI failures and the fresh-CI metadata failure are resolved.
+  The cluster blocker was subsequently removed by the approved rebuild above.
+  The later commit-bound load-finding verification is recorded above. Some required
+  provider runtime evidence was still open at that historical point; the later final provider and
+  protected-CI evidence above supersedes that continuation state.
+
+#### CI remediation review report
+
+This report covers the bounded CI follow-up, not completion of the entire Stage 7 PR.
+
+| Required field | Review evidence |
+| --- | --- |
+| Architecture review mode | `full-read`, continued from the Stage 7 review; `minimal-safe-engineering` in `critical` mode |
+| Architecture document version/commit | Current authorities reconciled at `bbbfb448297c777ca810c078aca55b588a38194f`; `origin/main` remained `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` |
+| Architecture sections reviewed | Mandatory source order; BFF browser/session ownership; version governance/compatibility; build/CI, testing, performance and interruption-safe evidence |
+| Search terms used | `Tomcat`, `constraints`, `verification`, `lock`, `storage`, `Stage 7`, `IN PROGRESS` |
+| ADRs reviewed or changed | Existing Stage 7 ADR review retained, including ADR-0016/0039/0045 for this follow-up; no ADR changed |
+| Changed bounded context/module | Build dependencies of all five Java services; frontend storage unit-test fixtures; baseline/compatibility and roadmap evidence |
+| Contracts changed | None in this CI follow-up; earlier PR OpenAPI change remains under Stage 7 review |
+| Database migration | Not applicable to the CI follow-up |
+| Transaction boundary | Unchanged |
+| Timeout/deadline behavior | Unchanged; no budget increase |
+| Retry/cancellation/concurrency behavior | Unchanged; no runtime retry added |
+| Kafka/event and idempotency behavior | Unchanged |
+| Security impact | Patch known vulnerable servlet-container dependency; preserve all source, secret, integrity, advisory and test gates |
+| Istio identity and authorization impact | Unchanged; no bypass of the failed cluster RBAC boundary |
+| Logging and PII impact | No runtime change; only synthetic in-memory frontend test data |
+| Observability added or changed | None in this CI follow-up; earlier session metrics remain subject to renewed staging evidence |
+| Build/CI/architecture enforcement changed | Aligned Tomcat constraints/locks and verified checksum metadata; no scanner suppression, threshold reduction, new plugin or workflow relaxation |
+| Tests executed | Exact local and protected-run outcomes recorded above; failed/unverified runtime gates remain explicit |
+| Architecture deviations | None identified within this bounded follow-up |
+| Rollback considerations | Do not promote/revert to known vulnerable Tomcat artifacts; fail forward with a reviewed fixed compatible patch. Cluster recovery/backup is not established, so no destructive rebuild without explicit owner approval |
+
+#### Stage 7 final review report
+
+| Required field | Review evidence |
+| --- | --- |
+| Architecture review mode | `full-read`; security, PII, provider, durable messaging, persistence, and staging infrastructure reviewed under `minimal-safe-engineering` critical priorities |
+| Architecture document version/commit | Current authorities and the complete Stage 7 diff reviewed at `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; latest `origin/main` remained `a52dfd82856a1da9419e7d9cd4c20b96acf783fe` |
+| Architecture sections reviewed | Mandatory source order; service/platform/network/security/threat/data/reliability/performance/runtime/testing/readiness/status authorities; applicable operations/runbooks; complete changed-file inventory and risk scans |
+| Search terms used | `Stage 7`, `IN PROGRESS`, `HR-012`, `HR-013`, `HR-014`, `ambiguity`, `provider`, `retry`, `deadline`, `hostPath`, `secret`, `PII`, `ignoreFailures`, `TODO`, `latest` |
+| ADRs reviewed or changed | ADR-0005/0006/0007/0010/0012/0014/0016/0017/0018/0024/0025/0028/0031/0033/0035/0038/0039/0040/0042/0043/0044/0045/0046/0055/0056; ADR-0055/0056 added and ADR-0020 retained as superseded provenance |
+| Changed bounded context/module | Cross-service/front-end/platform test and evidence gates; Compromised Password complete-corpus path; Notification provider adapters; bounded Identity/Authorization/BFF reliability corrections; no new deployable boundary |
+| Contracts changed | BFF OpenAPI moved to pre-Production `2.0.0` with UUIDv4 `Idempotency-Key` business authority and generated frontend parity; neutral Protobuf package remains `1.8.0` with validation/examples/compatibility passing |
+| Database migration | Notification additive V7 reconciliation-receipt lookup index; migration/profile/integration gates passed; no executed migration was edited |
+| Transaction boundary | Remote provider/gRPC/Redis/Kafka I/O remains outside DB transactions; operation-specific database budgets and one-record worker lease freshness passed integration/load evidence |
+| Timeout/deadline behavior | Existing bounded caller/provider/Redis/database budgets retained or tightened; no unbounded wait or SLO relaxation introduced |
+| Retry/cancellation/concurrency behavior | Finite single-owner retries, no blind retry after ambiguous/provider-accepted execution, abortable BFF requests, bounded pools/queues/concurrency, and restart/lease behavior verified |
+| Kafka/event and idempotency behavior | Transactional Outbox, at-least-once Inbox/dedup, stable erasure identities, replay/restart/restore, and four participant receipts passed; Kafka remains non-authoritative async transport |
+| Security impact | Secrets stayed in mode-`0600` Git-ignored files; no credential/recipient/provider ID entered tracked evidence; WAF/privacy, Gitleaks history/tree, Semgrep, OSV, dependency integrity, hardened manifests, and negative trust-boundary gates passed |
+| Istio identity and authorization impact | Existing strict Ambient workload identities, least-privilege AuthorizationPolicy/NetworkPolicy, WAF-only public route, provider egress bounds, and positive/negative runtime checks passed |
+| Logging and PII impact | Structured allow-list telemetry, WAF request-text removal, privacy canaries, bounded labels, and identifier-free evidence passed; no delivery claim is inferred from provider acceptance |
+| Observability added or changed | Capacity/load/soak/restart/provider/erasure evidence and low-cardinality failure/saturation metrics added; telemetry remains non-authoritative and backend outage tests passed |
+| Build/CI/architecture enforcement changed | Risk-based JaCoCo/Vitest coverage, selective PIT, source lint, npm advisory/SAST/image gates, exact dependency locks/checksums, provider/render/platform checks, and final baseline enforcement added without suppression/threshold weakening |
+| Tests executed | Local unit/integration/architecture/SpotBugs/format/contract/migration/render/security/browser/coverage/mutation/plan/load/soak/fault/staging/erasure/HIBP/provider/baseline checks recorded above; protected baseline `34674964250` and frontend E2E `34674964129` passed at `fb18a08`. A later completion-document-only `staging_verify.sh` invocation correctly failed closed because the intentionally dirty documentation worktree did not match the clean staged application provenance `1ec6d7f`; no executable image rebuild is claimed or required for that documentation-only delta |
+| Architecture deviations | None identified. Owner acceptance changes only the Stage 7 evidence boundary; Notification still requires authenticated correlated state `1` before lifecycle `DELIVERED`, and Production readiness remains `NOT VERIFIED` |
+| Rollback considerations | Preserve immutable migrations/evidence and ambiguity/no-blind-retry semantics. Do not restore vulnerable dependencies, unsafe WAF logging, weakened quota/lease controls, simulated provider claims, or pre-fix full-corpus behavior |
 
 ## 7. Stage review checklist
 

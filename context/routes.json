@@ -139,15 +139,16 @@
       "id": "notification",
       "title": "Notification",
       "review_mode": "targeted",
-      "match_terms": ["notification", "email", "sms", "ippanel", "liara", "template", "delivery", "اعلان", "ایمیل", "پیامک"],
+      "match_terms": ["notification", "email", "smtp", "gmail", "google smtp", "sms", "sms.ir", "smsir", "template", "delivery", "اعلان", "ایمیل", "پیامک"],
       "minimum_sources": [
         "docs/architecture/services/notification-service.md",
         "docs/adr/0006-finalize-notification-v1-handoff-and-semantic-contract.md",
         "docs/adr/0007-define-notification-v1-runtime.md",
         "docs/adr/0010-use-versioned-database-notification-templates-and-liara-email.md",
+        "docs/adr/0055-use-provider-neutral-smtp-with-google-gmail-staging-v1.md",
         "docs/adr/0014-use-local-notification-delivery-key-ring-in-v1.md",
         "docs/adr/0018-simplify-notification-clock-safety-and-remove-dispatch-fence-v1.md",
-        "docs/adr/0020-select-ippanel-webservice-sms-for-iran.md",
+        "docs/adr/0056-select-smsir-exact-text-sms-and-sandbox-validation-v1.md",
         "docs/architecture/data-and-messaging.md",
         "docs/architecture/testing-and-quality-gates.md",
         "docs/runbooks/production-cold-dr.md"

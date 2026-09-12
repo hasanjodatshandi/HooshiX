@@ -58,7 +58,7 @@ NFC password
 -> exact full SHA-1 comparison inside Identity
 ```
 
-Raw password and full screening SHA-1 never leave Identity. SHA-1 is **not** password storage and is not reused as a credential verifier. Malformed/truncated/stale/unavailable lookup fails closed. There is no runtime HIBP call from Identity or Compromised Password.
+Raw password and full screening SHA-1 never leave Identity. SHA-1 is **not** password storage and is not reused as a credential verifier. Malformed/truncated/stale/unavailable lookup fails closed. There is no runtime HIBP call from Identity or Compromised Password. The Compromised Password client accepts at least the reviewed 128-KiB complete-corpus response envelope, disables transport retry, and retains bounded in-flight admission; a response above the release/runtime compatibility bound still fails closed.
 
 Compromised Password dependency remains 900ms overall, one attempt, no automatic retry/fallback, bounded concurrency and cancellation where supported.
 
@@ -181,6 +181,13 @@ pooled connection. Direct jOOQ statements retain a three-second outer query time
 the Notification handoff/result stores additionally apply the applicable transaction-
 local worker budgets.
 
+The same finite database-failure classifier is installed as Spring Boot's jOOQ
+exception translator, so direct pre-transaction reads do not bypass the transport
+contract. Only recognized deadline, lock and connection/pool categories are
+translated; unknown and constraint failures retain the framework's normal specific
+translation. Classification uses exception types and reviewed SQLSTATE categories,
+never SQL text, bind values or vendor messages.
+
 Expected deadline/capacity failures are mapped without database detail disclosure:
 transaction or statement expiry is `DEADLINE_EXCEEDED / IDENTITY_DATABASE_DEADLINE`,
 lock-budget exhaustion is `UNAVAILABLE / IDENTITY_DATABASE_LOCK_UNAVAILABLE`, and
@@ -222,7 +229,7 @@ application:    gRPC 9090
 management:     separate configured port
 ```
 
-Only registered workloads/operations are reachable under deny-by-default NetworkPolicy and Istio authorization. Strict Ambient mTLS remains mandatory. Provider egress is limited to explicitly owned Identity integrations; Compromised Password/HIBP runtime egress is not allowed.
+Only registered workloads/operations are reachable under deny-by-default NetworkPolicy and Istio authorization. Strict Ambient mTLS remains mandatory. Identity owns an explicit service waypoint because Authorization and Notification may call only the `BeginParticipantErasure` gRPC operation; the waypoint policy binds that path to those workload principals, while the ztunnel policy admits only the waypoint principal to the workload. The platform waypoint NetworkPolicy permits only the reviewed callers and destinations. Provider egress is limited to explicitly owned Identity integrations; Compromised Password/HIBP runtime egress is not allowed.
 
 Single-server uses one replica/HPA off/availability PDB off. HA uses the current replicated target.
 

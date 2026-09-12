@@ -73,6 +73,10 @@ authorization:
 management:
   server:
     port: 9092
+  otlp:
+    metrics:
+      export:
+        enabled: false
   endpoints:
     web:
       exposure:

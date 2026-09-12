@@ -37,6 +37,8 @@ spec:
             - {name: ID_RUN, valueFrom: {secretKeyRef: {name: identity-db-runtime, key: spring.datasource.password}}}
             - {name: NOTIF_MIG, valueFrom: {secretKeyRef: {name: notification-db-migration, key: spring.datasource.password}}}
             - {name: NOTIF_RUN, valueFrom: {secretKeyRef: {name: notification-db-runtime, key: spring.datasource.password}}}
+            - {name: BFF_MIG, valueFrom: {secretKeyRef: {name: web-bff-db-migration, key: spring.datasource.password}}}
+            - {name: BFF_RUN, valueFrom: {secretKeyRef: {name: web-bff-db-runtime, key: spring.datasource.password}}}
           command: [sh, -ec]
           args:
             - |
@@ -48,15 +50,19 @@ spec:
                 IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='identity_runtime') THEN CREATE ROLE identity_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD '$ID_RUN'; END IF;
                 IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='notification_migration') THEN CREATE ROLE notification_migration LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD '$NOTIF_MIG'; END IF;
                 IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='notification_runtime') THEN CREATE ROLE notification_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD '$NOTIF_RUN'; END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='web_bff_migration') THEN CREATE ROLE web_bff_migration LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD '$BFF_MIG'; END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='web_bff_runtime') THEN CREATE ROLE web_bff_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD '$BFF_RUN'; END IF;
               END \$\$;
               SELECT 'CREATE DATABASE "authorization" OWNER authorization_migration' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='authorization')\gexec
               SELECT 'CREATE DATABASE identity OWNER identity_migration' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='identity')\gexec
               SELECT 'CREATE DATABASE notification OWNER notification_migration' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='notification')\gexec
+              SELECT 'CREATE DATABASE web_bff OWNER web_bff_migration' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='web_bff')\gexec
               REVOKE CONNECT ON DATABASE "authorization" FROM PUBLIC; GRANT CONNECT ON DATABASE "authorization" TO authorization_migration, authorization_runtime;
               REVOKE CONNECT ON DATABASE identity FROM PUBLIC; GRANT CONNECT ON DATABASE identity TO identity_migration, identity_runtime;
               REVOKE CONNECT ON DATABASE notification FROM PUBLIC; GRANT CONNECT ON DATABASE notification TO notification_migration, notification_runtime;
+              REVOKE CONNECT ON DATABASE web_bff FROM PUBLIC; GRANT CONNECT ON DATABASE web_bff TO web_bff_migration, web_bff_runtime;
               SQL
-              for spec in 'authorization authorization_migration authorization_runtime' 'identity identity_migration identity_runtime' 'notification notification_migration notification_runtime'; do
+              for spec in 'authorization authorization_migration authorization_runtime' 'identity identity_migration identity_runtime' 'notification notification_migration notification_runtime' 'web_bff web_bff_migration web_bff_runtime'; do
                 set -- $spec; db=$1; mig=$2; run=$3
                 psql -h postgresql -U postgres -d "$db" -v ON_ERROR_STOP=1 -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO $run; ALTER DEFAULT PRIVILEGES FOR ROLE $mig IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO $run; ALTER DEFAULT PRIVILEGES FOR ROLE $mig IN SCHEMA public GRANT USAGE,SELECT,UPDATE ON SEQUENCES TO $run;"
               done

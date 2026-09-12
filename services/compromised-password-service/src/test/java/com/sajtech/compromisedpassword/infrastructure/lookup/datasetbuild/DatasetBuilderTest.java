@@ -99,6 +99,55 @@ class DatasetBuilderTest {
   }
 
   @Test
+  void acceptsOfficialDownloaderUtf8BomAtRangeBoundaries() throws Exception {
+    Path source = tempDirectory.resolve("bom-source.txt");
+    byte[] first = ("12345" + "1".repeat(35) + ":2\n").getBytes(StandardCharsets.US_ASCII);
+    byte[] second = ("ABCDE" + "2".repeat(35) + ":3\n").getBytes(StandardCharsets.US_ASCII);
+    byte[] sourceBytes = new byte[3 + first.length + 3 + second.length];
+    sourceBytes[0] = (byte) 0xEF;
+    sourceBytes[1] = (byte) 0xBB;
+    sourceBytes[2] = (byte) 0xBF;
+    System.arraycopy(first, 0, sourceBytes, 3, first.length);
+    sourceBytes[3 + first.length] = (byte) 0xEF;
+    sourceBytes[3 + first.length + 1] = (byte) 0xBB;
+    sourceBytes[3 + first.length + 2] = (byte) 0xBF;
+    System.arraycopy(second, 0, sourceBytes, 3 + first.length + 3, second.length);
+    Files.write(source, sourceBytes);
+    Path sqlite = tempDirectory.resolve("bom.sqlite");
+    Path manifest = tempDirectory.resolve("bom.json");
+
+    DatasetReleaseManifest result =
+        new DatasetBuilder().build(request(source, sqlite, manifest, sha256(source)));
+
+    assertThat(result.sourceLineCount()).isEqualTo(2);
+    assertThat(result.recordCount()).isEqualTo(2);
+    assertThat(result.sourceArtifactSha256()).isEqualTo(sha256(source));
+  }
+
+  @Test
+  void rejectsUtf8BomInsideSourceRecord() throws Exception {
+    Path source = tempDirectory.resolve("embedded-bom-source.txt");
+    byte[] record = ("ABCDE" + "1".repeat(35) + ":2\n").getBytes(StandardCharsets.US_ASCII);
+    byte[] sourceBytes = new byte[record.length + 3];
+    System.arraycopy(record, 0, sourceBytes, 0, 5);
+    sourceBytes[5] = (byte) 0xEF;
+    sourceBytes[6] = (byte) 0xBB;
+    sourceBytes[7] = (byte) 0xBF;
+    System.arraycopy(record, 5, sourceBytes, 8, record.length - 5);
+    Files.write(source, sourceBytes);
+    Path sqlite = tempDirectory.resolve("embedded-bom.sqlite");
+    Path manifest = tempDirectory.resolve("embedded-bom.json");
+
+    assertThatThrownBy(
+            () -> new DatasetBuilder().build(request(source, sqlite, manifest, sha256(source))))
+        .isInstanceOf(DatasetBuildException.class)
+        .extracting(exception -> ((DatasetBuildException) exception).reason())
+        .isEqualTo(DatasetBuildException.Reason.INVALID_SOURCE_LINE);
+    assertThat(sqlite).doesNotExist();
+    assertThat(manifest).doesNotExist();
+  }
+
+  @Test
   void publishesManifestBeforeSqliteSoSqliteIsTheFinalReleaseCommitPoint() throws Exception {
     Path source = tempDirectory.resolve("publication-order.txt");
     Files.writeString(source, "ABCDE" + "1".repeat(35) + ":1\n", StandardCharsets.US_ASCII);

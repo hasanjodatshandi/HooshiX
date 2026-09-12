@@ -79,7 +79,7 @@ public final class BrowserAuthController {
 
   @PostMapping("/local")
   public SessionResponse login(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody LocalLoginRequest body,
       HttpServletRequest request,
@@ -89,7 +89,7 @@ public final class BrowserAuthController {
       throw new BffException(BffError.INVALID_REQUEST, "Pre-auth session is required");
     var result =
         identity.login(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             body.channel(),
             body.contact(),
             body.password(),
@@ -135,7 +135,7 @@ public final class BrowserAuthController {
 
   @PostMapping("/mfa/complete")
   public SessionResponse completeMfa(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @RequestHeader("X-HooshiX-Client-IP") String clientIp,
       @Valid @RequestBody MfaProofRequest body,
       HttpServletRequest request,
@@ -146,7 +146,7 @@ public final class BrowserAuthController {
     }
     var result =
         identity.completeMfaAuthentication(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             old.mfaChallenge(),
             new IdentityGateway.MfaProof(body.type(), body.code()),
             addresses.parse(clientIp));
@@ -189,13 +189,13 @@ public final class BrowserAuthController {
 
   @PostMapping("/logout")
   public ResponseEntity<Void> logout(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession s = HttpSupport.authenticated(request);
     BffException failure = null;
     try {
-      identity.logout(HttpSupport.requestId(requestId), s.refreshCredential());
+      identity.logout(HttpSupport.idempotencyKey(requestId), s.refreshCredential());
     } catch (BffException e) {
       failure = e;
     } finally {

@@ -52,6 +52,7 @@ class RedisAdminQuotaIntegrationTest {
     try (RedisAdminQuota quota =
         new RedisAdminQuota(
             uri(), ring, new ClockSafetyGuard(clock), () -> true, 10_000, 1_000, 30)) {
+      assertThat(quota.connection().getTimeout()).isEqualTo(Duration.ofMillis(75));
       quota.connection().sync().flushall();
       ActorContext actor =
           new ActorContext(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "s".repeat(43));
@@ -99,6 +100,40 @@ class RedisAdminQuotaIntegrationTest {
           .isInstanceOfSatisfying(
               AuthorizationException.class,
               e -> assertThat(e.error()).isEqualTo(AuthorizationError.QUOTA_EXCEEDED));
+    }
+  }
+
+  @Test
+  void memoryHeadroomGuardDoesNotRecheckExistingBuckets() throws Exception {
+    Path ringPath = temp.resolve("headroom-quota.properties");
+    byte[] key = filled((byte) 4);
+    Files.writeString(
+        ringPath, "active_key_id=k1\nkey.k1=" + Base64.getEncoder().encodeToString(key) + "\n");
+    Clock clock = Clock.systemUTC();
+    FileBackedKeyRing ring =
+        new FileBackedKeyRing(ringPath, "HmacSHA256", 32, clock, Duration.ofMinutes(5));
+    UUID tenantId = UUID.randomUUID();
+    ActorContext existing =
+        new ActorContext(UUID.randomUUID(), tenantId, UUID.randomUUID(), "s".repeat(43));
+
+    try (RedisAdminQuota quota =
+        new RedisAdminQuota(
+            uri(), ring, new ClockSafetyGuard(clock), () -> true, 10_000, 1_000, 30)) {
+      quota.connection().sync().flushall();
+      quota.acquire(existing, 1);
+    }
+
+    try (RedisAdminQuota quota =
+        new RedisAdminQuota(
+            uri(), ring, new ClockSafetyGuard(clock), () -> true, 10_000, 1_000, 99)) {
+      quota.acquire(existing, 1);
+      ActorContext newActor =
+          new ActorContext(UUID.randomUUID(), tenantId, UUID.randomUUID(), "s".repeat(43));
+      assertThatThrownBy(() -> quota.acquire(newActor, 1))
+          .isInstanceOfSatisfying(
+              AuthorizationException.class,
+              exception ->
+                  assertThat(exception.error()).isEqualTo(AuthorizationError.QUOTA_UNAVAILABLE));
     }
   }
 

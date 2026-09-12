@@ -27,14 +27,14 @@ public final class ErasureController {
 
   @PostMapping
   public ResponseEntity<ErasureAccepted> request(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @Valid @RequestBody ErasureBody body,
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession session = HttpSupport.authenticated(request);
     var result =
         identity.requestSelfErasure(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             session.refreshCredential(),
             body.confirmation(),
             body.mfaProof() == null

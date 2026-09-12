@@ -79,6 +79,29 @@ no security/admission/backup/audit/network-trust/observability bypass
 
 If it fails, tune safe cardinality/retention/concurrency, add CPU/RAM/SSD/network, externalize ordinary observability, or move HA. Do not remove OpenBao/Kyverno/Ambient/PITR/MFA/WAF/fail-closed controls or required audit.
 
+### Executable staging evidence
+
+Run the repository-owned bounded suite only after the production-fidelity lane is
+healthy:
+
+```bash
+make production-fidelity-verify
+scripts/performance/staging_capacity_suite.sh
+```
+
+It records a 60-second invalid-login load and a 30-minute session-bootstrap soak,
+with >=30% CPU and memory headroom, no sustained swap activity (five consecutive
+one-second swap-active samples), finite latency limits, exact expected security-outcome
+counts, and exact Git
+revision. Evidence is written below `.platform-runtime/stage7/capacity/` and is
+validated again after execution. The loopback connection override preserves the
+`localhost` TLS/Host identity and refuses non-loopback destinations.
+
+This suite is a safe, repeatable staging lower bound. It does not measure the
+Production K3s host, Production HIBP corpus, real providers, backups, external host
+monitor, or the full WAL/AOF/Kafka/telemetry concurrent-IO envelope. Those claims
+remain `NOT VERIFIED` until their owning environment executes the complete register.
+
 ## 2. Semantic quota attack capacity
 
 Normal user load is insufficient capacity evidence because attacker-selected unique inputs can grow Redis security state.
@@ -123,6 +146,21 @@ Measure actual approved HIBP SHA-1 corpus:
 - >=2x projected credential-write peak.
 
 A static historical cardinality assumption is not evidence because HIBP corpus grows. Release selects compatibility bounds from measured complete corpus + safety margin and fails build rather than truncate results.
+
+The official complete download acquired on 2026-09-09 contained `2,068,408,781` canonical unique records. Its measured worst prefix contained `2,509` records and serialized to `102,932` Protobuf bytes. The reviewed compatibility envelope is `4,096` records and `131,072` bytes: each exceeds the observation by at least 25%, and the Identity client transport is explicitly configured for the same 128-KiB response ceiling. These measurements establish compatibility inputs; the separate staging latency/saturation receipt remains the runtime evidence authority.
+
+The exact `f19746fb54add27f4edc52a7344b6bcc6e734301` staging image mounted the
+72,477,519,872-byte complete-corpus SQLite artifact and passed 256 random disk-backed
+lookups per phase. Cold p95/p99 were 20.264/32.640 ms and warm p95/p99 were
+7.357/8.353 ms under the 900 ms request deadline. A one-connection 64-stream run,
+twice the configured 32-lookup bound, returned 64 successful responses with no
+transport or unexpected status while 32 bounded read-only workers applied storage
+pressure. The limiter did not reject a request in that run, so this evidence proves
+the exercised 2x load boundary, not the exact saturation point or a Production host
+capacity claim. Three full-corpus starts across erasure restart/restore/reconciliation,
+followed by the composite staging and production-fidelity verifiers, passed without an
+unexpected container restart. The mode-`0600` identifier-free local receipt is
+`.platform-runtime/stage7/hibp-staging-evidence.json`.
 
 ## 6. Reference Data
 

@@ -14,6 +14,13 @@ import org.springframework.context.annotation.Profile;
 
 class RuntimeConfigurationCharacterizationTest {
   @Test
+  void runtimeUsesSharedDatabaseFailureTranslationForDirectJooqOperations() {
+    assertThat(new IdentityCoreRuntimeConfiguration().identityDatabaseExceptionTranslator())
+        .isInstanceOf(
+            com.sajtech.identity.infrastructure.persistence.DatabaseFailureTranslation.class);
+  }
+
+  @Test
   void composedRuntimeConfigurationRetainsCriticalBeanNamesConditionsAndLifecycle() {
     Set<Class<?>> configurationTypes = configurationTypes(RuntimeConfiguration.class);
     Set<Method> beanMethods = new HashSet<>();

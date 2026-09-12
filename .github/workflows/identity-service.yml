@@ -86,9 +86,17 @@ jobs:
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew integrationTest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
+      - name: Verify risk-based coverage thresholds
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew jacocoRiskCoverage --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
       - name: Verify architecture tests
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew architectureTest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
+
+      - name: Verify selective security mutation thresholds
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: ./gradlew pitest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify SpotBugs and runtime JAR
         working-directory: ${{ env.SERVICE_DIR }}

@@ -84,7 +84,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: edge-waf
-          image: localhost:5001/hooshix/edge-waf@sha256:7c8585e9b6fd6ff662e31cab5496b658cc5a89729fefdc899b8b7c3fddaaff51
+          image: localhost:5001/hooshix/edge-waf@sha256:22ba62be1b1bdc55c4f5a5ce7236e006c93f58ff02ca5caca133494b5171efab
           imagePullPolicy: IfNotPresent
           ports:
             - {name: http, containerPort: 8080}
@@ -128,7 +128,7 @@ metadata:
 spec:
   parentRefs:
     - {name: hooshix-public, namespace: traefik-system, sectionName: websecure}
-  hostnames: ["hooshix.local"]
+  hostnames: ["localhost"]
   rules:
     - backendRefs:
         - {name: edge-waf, port: 8080}

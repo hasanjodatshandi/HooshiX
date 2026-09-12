@@ -40,26 +40,26 @@ public final class IdentityTenantController {
 
   @PostMapping("/tenants")
   public TenantCreated create(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @Valid @RequestBody CreateTenant body,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.authenticated(request);
     var r =
         identity.createTenant(
-            HttpSupport.requestId(requestId), s.refreshCredential(), body.name(), body.slug());
+            HttpSupport.idempotencyKey(requestId), s.refreshCredential(), body.name(), body.slug());
     return new TenantCreated(r.tenantId(), r.membershipId(), r.lifecycle());
   }
 
   @PostMapping("/tenant-selection")
   public TenantSelectionResponse select(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @Valid @RequestBody SelectTenant body,
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession old = HttpSupport.authenticated(request);
     var r =
         identity.selectTenant(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             old.refreshCredential(),
             HttpSupport.id(body.membershipId()),
             "authorization-service");
@@ -85,13 +85,13 @@ public final class IdentityTenantController {
 
   @PostMapping("/invitations")
   public InvitationCreated invite(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @Valid @RequestBody Invite body,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     var r =
         identity.invite(
-            HttpSupport.requestId(requestId),
+            HttpSupport.idempotencyKey(requestId),
             s.refreshCredential(),
             HttpSupport.id(body.targetContactId()));
     return new InvitationCreated(r.invitationId(), r.expiresAt().toString());
@@ -99,25 +99,28 @@ public final class IdentityTenantController {
 
   @PostMapping("/invitations/{invitationId}/accept")
   public AcceptedInvitation accept(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String invitationId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.authenticated(request);
     var r =
         identity.accept(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(invitationId));
     return new AcceptedInvitation(r.tenantId(), r.membershipId());
   }
 
   @DeleteMapping("/memberships/{membershipId}")
   public RemovalResult remove(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String membershipId,
       HttpServletRequest request,
       HttpServletResponse response) {
     BrowserSession old = HttpSupport.tenant(request);
     UUID target = HttpSupport.id(membershipId);
-    identity.removeMembership(HttpSupport.requestId(requestId), old.refreshCredential(), target);
+    identity.removeMembership(
+        HttpSupport.idempotencyKey(requestId), old.refreshCredential(), target);
     if (target.equals(old.selectedMembershipId())) {
       BrowserSessionGrant grant =
           sessions.rotateAuthenticated(
@@ -139,29 +142,33 @@ public final class IdentityTenantController {
 
   @PostMapping("/tenants/{tenantId}/suspend")
   public LifecycleResult suspend(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String tenantId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.authenticated(request);
     return lifecycle(
         identity.suspendTenant(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(tenantId)));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(tenantId)));
   }
 
   @PostMapping("/tenants/{tenantId}/resume")
   public LifecycleResult resume(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String tenantId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.authenticated(request);
     return lifecycle(
         identity.resumeTenant(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(tenantId)));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(tenantId)));
   }
 
   @DeleteMapping("/tenants/{tenantId}")
   public LifecycleResult delete(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String tenantId,
       HttpServletRequest request,
       HttpServletResponse response) {
@@ -172,7 +179,7 @@ public final class IdentityTenantController {
     var result =
         lifecycle(
             identity.deleteTenant(
-                HttpSupport.requestId(requestId), old.refreshCredential(), target));
+                HttpSupport.idempotencyKey(requestId), old.refreshCredential(), target));
     BrowserSessionGrant grant =
         sessions.rotateAuthenticated(
             old,
@@ -197,13 +204,15 @@ public final class IdentityTenantController {
 
   @PostMapping("/tenants/{tenantId}/restore")
   public LifecycleResult restore(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String tenantId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.authenticated(request);
     return lifecycle(
         identity.restoreTenant(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(tenantId)));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(tenantId)));
   }
 
   @GetMapping("/invitations/received")
@@ -220,37 +229,43 @@ public final class IdentityTenantController {
 
   @PostMapping("/invitations/{invitationId}/decline")
   public InvitationState decline(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String invitationId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.authenticated(request);
     var r =
         identity.declineInvitation(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(invitationId));
     return new InvitationState(r.invitationId(), r.state());
   }
 
   @PostMapping("/invitations/{invitationId}/revoke")
   public InvitationState revoke(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String invitationId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     var r =
         identity.revokeInvitation(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(invitationId));
     return new InvitationState(r.invitationId(), r.state());
   }
 
   @PostMapping("/invitations/{invitationId}/reissue")
   public InvitationCreated reissue(
-      @RequestHeader("X-Request-Id") String requestId,
+      @RequestHeader("Idempotency-Key") String requestId,
       @PathVariable String invitationId,
       HttpServletRequest request) {
     BrowserSession s = HttpSupport.tenant(request);
     var r =
         identity.reissueInvitation(
-            HttpSupport.requestId(requestId), s.refreshCredential(), HttpSupport.id(invitationId));
+            HttpSupport.idempotencyKey(requestId),
+            s.refreshCredential(),
+            HttpSupport.id(invitationId));
     return new InvitationCreated(r.invitationId(), r.expiresAt().toString());
   }
 

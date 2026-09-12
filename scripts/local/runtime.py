@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime as dt
 import hashlib
 import json
 import os
@@ -11,6 +12,7 @@ import secrets
 import signal
 import socket
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -27,6 +29,7 @@ LOGS = RUNTIME / "logs"
 PIDS = RUNTIME / "pids"
 DATASET = RUNTIME / "compromised-password"
 HOST_TIME = RUNTIME / "host-time-status"
+ERASURE_RECOVERY_EVIDENCE = RUNTIME / "erasure-recovery-evidence.json"
 POSTGRES_PORT = 15432
 REDIS_PORT = 16379
 KAFKA_PORT = 19092
@@ -269,10 +272,7 @@ VALUES (
 """
 
 
-def smoke_erasure(timeout_seconds: int = 60) -> None:
-    status(require_ready=True)
-    user_id, request_id, event_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-    psql(erasure_smoke_seed_sql(user_id, request_id, event_id), database="identity")
+def wait_for_erasure(user_id: uuid.UUID, request_id: uuid.UUID, timeout_seconds: int) -> None:
     expected_participants = (
         "AUTHORIZATION_SERVICE:COMPLETED,IDENTITY_SERVICE:COMPLETED,"
         "NOTIFICATION_SERVICE:COMPLETED,WEB_BFF:COMPLETED")
@@ -290,17 +290,156 @@ GROUP BY r.state,u.status;
     while time.monotonic() < deadline:
         last = psql_query(query, database="identity") or "missing"
         if last == f"COMPLETED|DELETED|{expected_participants}":
-            print(json.dumps({
-                "erasure_request_id": str(request_id),
-                "event_id": str(event_id),
-                "state": "COMPLETED",
-                "user_state": "DELETED",
-                "participants": 4,
-            }, indent=2))
             return
         time.sleep(1)
     raise SystemExit(
         f"Erasure Kafka smoke did not complete for request {request_id}; last state: {last}")
+
+
+def verify_erasure_participant_evidence(request_id: uuid.UUID) -> None:
+    checks = {
+        "authorization": (
+            "authorization_erasure_inbox", "authorization_erasure_evidence"),
+        "identity": ("identity_erasure_command_inbox", "identity_erasure_evidence"),
+        "notification": ("notification_erasure_inbox", "notification_erasure_evidence"),
+        "web_bff": ("web_bff_erasure_inbox", "web_bff_erasure_evidence"),
+    }
+    for database, (inbox, evidence) in checks.items():
+        result = psql_query(
+            f"""
+SELECT
+  (SELECT count(*) FROM {inbox}
+   WHERE erasure_request_id='{request_id}' AND state='COMPLETED') || '|' ||
+  (SELECT count(*) FROM {evidence}
+   WHERE erasure_request_id='{request_id}' AND event_code='ERASURE_COMPLETED');
+""",
+            database=database,
+        )
+        if result != "1|1":
+            raise SystemExit(
+                f"Erasure participant evidence is incomplete for {database}; aggregate={result}")
+
+
+def smoke_erasure(timeout_seconds: int = 60) -> None:
+    status(require_ready=True)
+    user_id, request_id, event_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    psql(erasure_smoke_seed_sql(user_id, request_id, event_id), database="identity")
+    wait_for_erasure(user_id, request_id, timeout_seconds)
+    verify_erasure_participant_evidence(request_id)
+    print(json.dumps({
+        "erasure_request_id": str(request_id),
+        "event_id": str(event_id),
+        "state": "COMPLETED",
+        "user_state": "DELETED",
+        "participants": 4,
+    }, indent=2))
+
+
+def pg_dump_args(database: str) -> list[str]:
+    if database not in DATABASES:
+        raise ValueError("database is outside the service-owned local restore set")
+    return compose_args(
+        "exec", "-T", "postgres", "pg_dump", "-U", "postgres", "-d", database,
+        "--format=plain", "--clean", "--if-exists")
+
+
+def dump_erasure_restore_databases(destination: Path) -> dict[str, Path]:
+    snapshots: dict[str, Path] = {}
+    for database in DATABASES:
+        path = destination / f"{database}.sql"
+        with path.open("w", encoding="utf-8") as handle:
+            subprocess.run(
+                pg_dump_args(database),
+                cwd=ROOT,
+                text=True,
+                check=True,
+                stdout=handle,
+                stderr=subprocess.PIPE,
+                timeout=120,
+            )
+        path.chmod(0o600)
+        snapshots[database] = path
+    return snapshots
+
+
+def restore_erasure_databases(snapshots: dict[str, Path]) -> None:
+    if set(snapshots) != set(DATABASES):
+        raise ValueError("restore snapshot set does not match service-owned databases")
+    for database in DATABASES:
+        path = snapshots[database]
+        if not path.is_file() or path.stat().st_mode & 0o077:
+            raise ValueError("restore snapshot is missing or has unsafe permissions")
+        with path.open("r", encoding="utf-8") as handle:
+            subprocess.run(
+                compose_args(
+                    "exec", "-T", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1",
+                    "-U", "postgres", "-d", database),
+                cwd=ROOT,
+                text=True,
+                check=True,
+                stdin=handle,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=120,
+            )
+
+
+def erasure_recovery_evidence(revision: str) -> dict[str, object]:
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise ValueError("recovery evidence requires a full Git revision")
+    return {
+        "schema": "hooshix-local-erasure-recovery-v1",
+        "git_revision": revision,
+        "environment": "developer-local",
+        "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "redeploy_completed": True,
+        "restore_reconciliation_completed": True,
+        "participant_count": 4,
+        "identity_deleted": True,
+        "no_reappearance": True,
+        "passed": True,
+    }
+
+
+def write_private_json(path: Path, value: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        temporary.chmod(0o600)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def smoke_erasure_recovery(timeout_seconds: int = 120) -> None:
+    status(require_ready=True)
+    user_id, request_id, event_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    stop_processes()
+    psql(erasure_smoke_seed_sql(user_id, request_id, event_id), database="identity")
+    with tempfile.TemporaryDirectory(prefix="erasure-restore-", dir=RUNTIME) as temp_dir:
+        snapshots = dump_erasure_restore_databases(Path(temp_dir))
+
+        up(skip_build=True)
+        wait_for_erasure(user_id, request_id, timeout_seconds)
+        verify_erasure_participant_evidence(request_id)
+
+        up(skip_build=True)
+        wait_for_erasure(user_id, request_id, timeout_seconds)
+        verify_erasure_participant_evidence(request_id)
+
+        stop_processes()
+        restore_erasure_databases(snapshots)
+        up(skip_build=True)
+        wait_for_erasure(user_id, request_id, timeout_seconds)
+        verify_erasure_participant_evidence(request_id)
+
+    evidence = erasure_recovery_evidence(output(["git", "rev-parse", "HEAD"]))
+    write_private_json(ERASURE_RECOVERY_EVIDENCE, evidence)
+    print(json.dumps(evidence, indent=2))
 
 
 def provision_databases(values: dict[str, str]) -> None:
@@ -765,6 +904,8 @@ def main() -> None:
     down_parser.add_argument("--remove-data", action="store_true")
     erasure_parser = sub.add_parser("smoke-erasure")
     erasure_parser.add_argument("--timeout-seconds", type=int, default=60)
+    recovery_parser = sub.add_parser("smoke-erasure-recovery")
+    recovery_parser.add_argument("--timeout-seconds", type=int, default=120)
     args = parser.parse_args()
     if args.command == "up":
         up(args.skip_build)
@@ -776,6 +917,8 @@ def main() -> None:
         down(args.remove_data)
     elif args.command == "smoke-erasure":
         smoke_erasure(max(1, min(args.timeout_seconds, 300)))
+    elif args.command == "smoke-erasure-recovery":
+        smoke_erasure_recovery(max(30, min(args.timeout_seconds, 300)))
 
 
 if __name__ == "__main__":

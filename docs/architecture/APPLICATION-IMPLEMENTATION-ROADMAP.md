@@ -39,10 +39,12 @@ The implemented foundation already includes substantial registration, local auth
 
 The application is not yet a complete end-user product. Current material gaps are:
 
-- the browser frontend foundation, onboarding, profile/contact, password lifecycle, localization, and repository accessibility slices exist, while dependency/release alignment and deployed journey evidence remain incomplete;
+- the browser frontend foundation, onboarding, profile/contact, password lifecycle, localization,
+  repository accessibility, and repository release-alignment slices exist, while deployed journey
+  and Production promotion evidence remain incomplete;
 - the mandatory repository-wide audit remediation track in `ENGINEERING-HARDENING-ROADMAP.md`
   is active and must complete its ordered stages before the Conversation implementation;
-- real staging/production Liara/IPPanel provider execution and production delivery evidence remain NOT VERIFIED;
+- complete-corpus HIBP staging and the four-participant staging erasure restart/restore/reconciliation exercise pass at exact commit `f19746f`; real Gmail SMTP acceptance plus Production SMS.ir credential/sender/bulk acceptance/authenticated report execution pass in local staging, but SMS delivery remains NOT VERIFIED after the allow-listed recipient returned permanent blacklist state `7`; Production-selected Email-provider execution also remains NOT VERIFIED, the SMS.ir Sandbox contract probe passes but is simulated, and Google OIDC execution is owner-deferred and not a Notification-provider gate;
 - Google OIDC/ExternalIdentity is implemented in the repository; deployed real-provider execution remains NOT VERIFIED;
 - data-subject erasure and its first justified application Kafka workflow are repository-complete
   and verified in the developer-only integrated runtime; production deployment remains unverified;
@@ -82,7 +84,7 @@ The following is the one ordered application-completion sequence. Do not start a
 
 | Order | Completion step | Current state | Completion boundary / next-step rule |
 | ---: | --- | --- | --- |
-| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 1.6.0 covers all 58 implemented public controller method/path mappings. Its SemVer-compatible contract evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift gate are part of the completion boundary. |
+| 1 | Public REST Contract Coverage / BFF parity | `COMPLETED` | BFF-owned OpenAPI 2.0.0 covers all 58 implemented public controller method/path mappings. The breaking pre-Production 2.0 boundary separates UUIDv4 `Idempotency-Key` business authority from mutable `X-Request-Id` telemetry. SemVer-compatible evolution, request/response validation, consumer examples, controller/OpenAPI parity, generated frontend transport types, and generated-type drift are enforced. |
 | 2 | MFA/TOTP | `COMPLETED` | TOTP enrollment/challenge/replacement/disable, recovery codes, anti-replay, assurance rules, no-factor-downgrade behavior, BFF/OpenAPI/UI, CSRF reload recovery, and repository security evidence are implemented. Deployed production evidence remains a separate readiness concern. |
 | 3 | Google OIDC / ExternalIdentity | `COMPLETED` | BFF Authorization Code + PKCE/state/nonce, bounded encrypted pre-auth custody, Google issuer/audience/authorized-party/time validation, fail-closed semantic quota, Identity issuer+subject binding/link semantics, email collision protection, provider-token isolation, MFA continuation, OpenAPI/UI, observability, and negative/replay tests are implemented. Real deployed Google-provider execution remains a separate readiness concern. |
 | 4 | Complete Tenant lifecycle | `COMPLETED` | Suspend/resume/delete/restore and Invitation decline/revoke/expire/reissue are implemented with Identity/Authorization coordination, owner safety, durable replay, BFF OpenAPI/UI, migration, observability, and negative/recovery tests. |
@@ -103,11 +105,12 @@ Reference Data is a separate conditional track, not part of the numbered complet
 At the current state, the next coherent engineering task is:
 
 ```text
-Engineering Hardening Stage 7 — Performance, reliability, and test evidence
+Engineering Hardening Stage 8 — MLOps evaluation and safety architecture gate
 ```
 
 Its completion boundary and interruption-safe status are owned by
-`ENGINEERING-HARDENING-ROADMAP.md`. Stage 6 is complete; Stage 7 has not started.
+`ENGINEERING-HARDENING-ROADMAP.md`. Stage 7 is complete at reviewed implementation/evidence
+head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; Stage 8 is `NEXT`.
 Conversation implementation remains ordered after hardening stages 1-8. Its future
 target invariant remains:
 

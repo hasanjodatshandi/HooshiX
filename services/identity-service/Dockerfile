@@ -14,4 +14,4 @@ COPY --chown=10001:10001 ${APP_JAR} /app/application.jar
 USER 10001:10001
 EXPOSE 9090 9092
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-Djava.io.tmpdir=/tmp", "-jar", "/app/application.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=50", "-Djava.io.tmpdir=/tmp", "-jar", "/app/application.jar"]

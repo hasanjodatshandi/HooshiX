@@ -15,6 +15,12 @@
 {{- if lt (int64 .Values.dataset.maxSerializedResponseBytes) 1 -}}
 {{- fail "dataset.maxSerializedResponseBytes must be positive and come from reviewed release evidence" -}}
 {{- end -}}
+{{- if or (lt (int .Values.runtime.startupFailureThreshold) 1) (gt (int .Values.runtime.startupFailureThreshold) 720) -}}
+{{- fail "runtime.startupFailureThreshold must be between 1 and 720" -}}
+{{- end -}}
+{{- if lt (int .Values.deployment.progressDeadlineSeconds) (add (mul (int .Values.runtime.startupFailureThreshold) 10) 60) -}}
+{{- fail "deployment.progressDeadlineSeconds must exceed the startup-probe window by at least 60 seconds" -}}
+{{- end -}}
 {{- if not .Values.observability.tracing.enabled -}}
 {{- fail "Day-One tracing must remain enabled" -}}
 {{- end -}}
@@ -33,6 +39,7 @@ metadata:
     {{- include "compromised-password-service.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  progressDeadlineSeconds: {{ .Values.deployment.progressDeadlineSeconds }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -99,7 +106,7 @@ spec:
               path: /actuator/health/readiness
               port: management
             periodSeconds: 10
-            failureThreshold: 60
+            failureThreshold: {{ .Values.runtime.startupFailureThreshold }}
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness

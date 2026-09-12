@@ -7,6 +7,7 @@ cleanup() {
   k delete pod mesh-waf-positive -n platform-edge --ignore-not-found --wait=false >/dev/null 2>&1 || true
   k delete pod mesh-unauthorized -n default --ignore-not-found --wait=false >/dev/null 2>&1 || true
   k delete pod authorization-identity-policy -n platform-apps --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  k delete pod identity-erasure-policy -n platform-apps --ignore-not-found --wait=false >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 for d in edge-waf:platform-edge web-bff:platform-apps authorization-service:platform-apps identity-service:platform-apps notification-service:platform-apps compromised-password-service:platform-apps; do
@@ -42,7 +43,7 @@ k wait --for=condition=Ready pod/mesh-traefik-positive -n traefik-system --timeo
 headers=$(k exec -n traefik-system mesh-traefik-positive -- curl -sS -m 8 -D - -o /dev/null http://edge-waf.platform-edge.svc.cluster.local:8080/ -H 'X-HooshiX-WAF-Test: block')
 echo "$headers" | grep -qi '^X-HooshiX-WAF-Blocked: true' || fail "Traefik ServiceAccount did not reach WAF through approved mTLS identity path"
 set +e
-code=$(k exec -n traefik-system mesh-traefik-positive -- curl -sS -m 5 -o /dev/null -w '%{http_code}' -X POST http://web-bff.platform-apps.svc.cluster.local:8080/api/v1/auth/session/bootstrap -H 'Origin: https://hooshix.local:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty' 2>/dev/null)
+code=$(k exec -n traefik-system mesh-traefik-positive -- curl -sS -m 5 -o /dev/null -w '%{http_code}' -X POST http://web-bff.platform-apps.svc.cluster.local:8080/api/v1/auth/session/bootstrap -H 'Origin: https://localhost:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty' 2>/dev/null)
 rc=$?
 set -e
 [[ "$code" == 000 || "$code" == 403 || $rc -ne 0 ]] || fail "Traefik ServiceAccount bypassed WAF and reached Web BFF directly (HTTP $code)"
@@ -66,7 +67,7 @@ spec:
       securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
 POD
 k wait --for=condition=Ready pod/mesh-waf-positive -n platform-edge --timeout=60s >/dev/null
-code=$(k exec -n platform-edge mesh-waf-positive -- curl -sS -m 8 -o /dev/null -w '%{http_code}' -X POST http://web-bff.platform-apps.svc.cluster.local:8080/api/v1/auth/session/bootstrap -H 'Origin: https://hooshix.local:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty')
+code=$(k exec -n platform-edge mesh-waf-positive -- curl -sS -m 8 -o /dev/null -w '%{http_code}' -X POST http://web-bff.platform-apps.svc.cluster.local:8080/api/v1/auth/session/bootstrap -H 'Origin: https://localhost:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty')
 [[ "$code" == 201 ]] || fail "WAF ServiceAccount -> Web BFF approved identity path expected 201, got $code"
 k delete pod mesh-waf-positive -n platform-edge --wait=true >/dev/null
 cat <<POD | k apply -f - >/dev/null
@@ -110,6 +111,37 @@ k delete pod authorization-identity-policy -n platform-apps --wait=true >/dev/nu
 cat <<POD | k apply -f - >/dev/null
 apiVersion: v1
 kind: Pod
+metadata:
+  name: identity-erasure-policy
+  namespace: platform-apps
+  labels: {app.kubernetes.io/name: authorization-service}
+spec:
+  serviceAccountName: authorization-service
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+  containers:
+    - name: curl
+      image: $CURL_IMAGE
+      command: [sleep, "300"]
+      securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+POD
+k wait --for=condition=Ready pod/identity-erasure-policy -n platform-apps --timeout=60s >/dev/null
+identity_grpc='http://identity-service.platform-apps.svc.cluster.local:9090'
+identity_grpc_probe() {
+  local path=$1
+  k exec -n platform-apps identity-erasure-policy -- sh -c "printf '\000\000\000\000\000' | curl --http2-prior-knowledge -sS -D - -o /dev/null -X POST '$identity_grpc$path' -H 'content-type: application/grpc' -H 'te: trailers' --data-binary @-" | tr -d '\r'
+}
+allowed_headers=$(identity_grpc_probe '/hooshix.identity.v1.IdentityErasureService/BeginParticipantErasure')
+echo "$allowed_headers" | grep -Fxq 'grpc-status: 3' || fail "Authorization principal did not reach Identity participant-erasure application validation"
+echo "$allowed_headers" | grep -Fxq 'grpc-message: INVALID_ARGUMENT' || fail "Identity participant-erasure positive path did not reach application validation"
+denied_headers=$(identity_grpc_probe '/hooshix.identity.v1.IdentityProfileService/GetProfile')
+echo "$denied_headers" | grep -Fxq 'grpc-status: 7' || fail "Authorization principal reached an unapproved Identity operation"
+echo "$denied_headers" | grep -Fxq 'grpc-message: RBAC: access denied' || fail "Identity waypoint did not enforce the operation-level denial"
+k delete pod identity-erasure-policy -n platform-apps --wait=true >/dev/null
+cat <<POD | k apply -f - >/dev/null
+apiVersion: v1
+kind: Pod
 metadata: {name: mesh-unauthorized, namespace: default}
 spec:
   automountServiceAccountToken: false
@@ -124,7 +156,7 @@ POD
 k wait --for=condition=Ready pod/mesh-unauthorized -n default --timeout=60s >/dev/null
 for target in 'http://edge-waf.platform-edge.svc.cluster.local:8080/' 'http://web-bff.platform-apps.svc.cluster.local:8080/api/v1/auth/session/bootstrap'; do
   set +e
-  code=$(k exec -n default mesh-unauthorized -- curl -sS -m 5 -o /dev/null -w '%{http_code}' -X POST "$target" -H 'Origin: https://hooshix.local:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty' 2>/dev/null)
+  code=$(k exec -n default mesh-unauthorized -- curl -sS -m 5 -o /dev/null -w '%{http_code}' -X POST "$target" -H 'Origin: https://localhost:8443' -H 'Sec-Fetch-Site: same-origin' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty' 2>/dev/null)
   rc=$?
   set -e
   [[ "$code" == 000 || "$code" == 403 || $rc -ne 0 ]] || fail "non-enrolled unauthorized workload reached protected target $target (HTTP $code)"

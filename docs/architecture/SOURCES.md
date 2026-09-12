@@ -115,6 +115,49 @@ ADR-0045 converts these tool capabilities into the HooshiX responsibility map. O
 
 ADR-0040 converts those facts into HooshiX-specific offline SHA-1 corpus/freshness/provenance policy. HIBP source facts do not change Argon2id password storage.
 
+### Apache Kafka
+
+- Kafka KRaft operations: `https://kafka.apache.org/documentation/#kraft`
+- Kafka listener configuration: `https://kafka.apache.org/documentation/#security_configbroker`
+
+ADR-0015 owns HooshiX topology, durability, security, replay, and recovery semantics. Apache Kafka
+documents combined broker/controller nodes as a small/development configuration rather than a
+critical-production recommendation.
+
+### Istio Ambient authorization
+
+- Istio Ambient policy migration: `https://istio.io/latest/docs/ambient/migrate/migrate-policies/`
+- Istio waypoint usage: `https://istio.io/latest/docs/ambient/usage/waypoint/`
+
+Istio documents L4 policy as a ztunnel responsibility and L7 method/path/header policy as a waypoint
+responsibility attached with `targetRefs`. ADR-0002 converts that behavior into the HooshiX explicit
+waypoint and positive/negative verification rules.
+
+### Google identity and Gmail SMTP
+
+- Google OpenID Connect documentation: `https://developers.google.com/identity/openid-connect/openid-connect`
+- Google OAuth 2.0 web-server flow: `https://developers.google.com/identity/protocols/oauth2/web-server`
+- Google OAuth client URI validation: `https://support.google.com/cloud/answer/15549257`
+- Google App Passwords: `https://support.google.com/accounts/answer/185833`
+- Gmail SMTP server configuration: `https://developers.google.com/gmail/imap/imap-smtp`
+- Gmail sending limits: `https://support.google.com/mail/answer/22839`
+
+ADR-0016 owns Google OIDC browser authentication. ADR-0055 separately uses authenticated Gmail
+SMTP as a bounded non-production staging Email profile. These are purpose-separated credentials and
+runtime edges; neither source proves that external credentials are provisioned or that a real call
+passed.
+
+### SMS.ir SMS
+
+- SMS.ir official REST API documentation: `https://sms.ir/rest-api/`
+- SMS.ir official Web Service overview and Verify examples: `https://sms.ir/web-service/`
+
+ADR-0056 pins the exact-text bulk-send request, message-specific delivery report, fixed API host,
+status mappings, and the simulated Sandbox boundary. SMS.ir documents that Sandbox responses are
+simulated, do not send a real SMS or consume credit, and retain no reports. Provider documentation or
+a passing Sandbox probe does not prove a production sender line, real acceptance/delivery, or
+Production readiness.
+
 ### Spring application observability
 
 - Spring Boot Observability: `https://docs.spring.io/spring-boot/reference/actuator/observability.html`

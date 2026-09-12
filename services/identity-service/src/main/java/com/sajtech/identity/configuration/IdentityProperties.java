@@ -16,6 +16,7 @@ public record IdentityProperties(
     boolean phoneRegistrationEnabled,
     String compromisedPasswordTarget,
     int compromisedPasswordMaxInFlight,
+    int compromisedPasswordMaxResponseBytes,
     String notificationTarget,
     int notificationResultGrpcPort,
     boolean notificationResultRuntimeEnabled,
@@ -43,6 +44,8 @@ public record IdentityProperties(
     if (maxConcurrentCallsPerConnection <= 0
         || maxGlobalConcurrentCalls <= 0
         || compromisedPasswordMaxInFlight <= 0
+        || compromisedPasswordMaxResponseBytes < 131_072
+        || compromisedPasswordMaxResponseBytes > 4 * 1024 * 1024
         || argon2MaxConcurrentHashes <= 0) {
       throw new IllegalArgumentException("Identity concurrency configuration is invalid");
     }
