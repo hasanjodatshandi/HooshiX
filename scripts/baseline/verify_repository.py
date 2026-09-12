@@ -528,6 +528,11 @@ def validate_ci_source_quality(root: Path) -> list[str]:
         if not workflow.is_file():
             errors.append(f"missing service security workflow: {relative}")
             continue
+        wrapper = root / "services" / Path(relative).stem / "gradlew"
+        if not wrapper.is_file():
+            errors.append(f"missing service Gradle wrapper: {wrapper.relative_to(root)}")
+        elif not os.access(wrapper, os.X_OK):
+            errors.append(f"service Gradle wrapper is not executable: {wrapper.relative_to(root)}")
         workflow_text = read_text(workflow)
         for mode in SERVICE_SECURITY_MODES:
             invocation = invocation_prefix + mode
