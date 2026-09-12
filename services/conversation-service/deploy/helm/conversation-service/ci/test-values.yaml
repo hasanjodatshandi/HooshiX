@@ -1,0 +1,25 @@
+image:
+  repository: registry.invalid/hooshix/conversation-service
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+database:
+  jdbcUrl: jdbc:postgresql://conversation-postgresql.platform-data.svc:5432/conversation
+  runtimeSecretName: conversation-db-runtime
+  migrationSecretName: conversation-db-migration
+
+secrets:
+  contentKeyRingSecretName: conversation-content
+
+observability:
+  tracing:
+    otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces
+    collector:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: otel-collector
+  metrics:
+    prometheus:
+      namespace: platform-observability
+      podLabels:
+        app.kubernetes.io/name: prometheus
+      principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus

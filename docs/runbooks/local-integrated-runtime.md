@@ -41,7 +41,7 @@ cd /home/coder/workspace/Hooshix
 make local-runtime-up
 ```
 
-The command verifies the required Java/Docker/OpenSSL tools, builds Boot JARs, starts PostgreSQL and Redis, provisions isolated database roles, runs service-owned Flyway migrations, creates or reuses restart-stable local-only security material, builds the generated compromised-password fixture, and starts all five JVMs in dependency order. A service must become Ready before the next dependent service starts.
+The command verifies the required Java/Docker/OpenSSL tools, builds Boot JARs, starts PostgreSQL and Redis, provisions isolated database roles, runs service-owned Flyway migrations, creates or reuses restart-stable local-only security material, builds the generated compromised-password fixture, and starts the five fully integrated pre-Conversation JVMs in dependency order. A service must become Ready before the next dependent service starts. The Stage 9 Conversation foundation joins this lane only after its protected API/lifecycle activation slice exists.
 
 ## Inspect
 

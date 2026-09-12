@@ -1,0 +1,19 @@
+groups:
+  - name: conversation-service
+    rules:
+      - alert: ConversationServiceNotReady
+        expr: up{job="conversation-service"} == 0
+        for: 5m
+        labels:
+          severity: page
+          service: conversation-service
+        annotations:
+          summary: Conversation service readiness or scrape target is unavailable
+      - alert: ConversationDatabasePoolSaturated
+        expr: hikaricp_connections_pending{pool=~".*conversation.*"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: Conversation database pool has pending acquisition work

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: conversation-service
+description: Private HooshiX Conversation Service foundation
+version: 0.1.0
+appVersion: "0.1.0"
+type: application

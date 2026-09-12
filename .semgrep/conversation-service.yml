@@ -1,0 +1,67 @@
+rules:
+  - id: conversation-no-field-injection
+    languages: [java]
+    severity: ERROR
+    message: Required dependencies must use constructor injection.
+    paths: {include: [/services/conversation-service/src/main/java]}
+    pattern: |
+      @Autowired
+      $TYPE $FIELD;
+
+  - id: conversation-no-system-output
+    languages: [java]
+    severity: ERROR
+    message: Conversation runtime must use structured allow-list logging.
+    paths: {include: [/services/conversation-service/src/main/java]}
+    pattern-either:
+      - pattern: System.out.$METHOD(...)
+      - pattern: System.err.$METHOD(...)
+      - pattern: $EX.printStackTrace(...)
+
+  - id: conversation-no-sensitive-log-keys
+    languages: [java]
+    severity: ERROR
+    message: Conversation telemetry must not attach customer content or identifiers.
+    paths: {include: [/services/conversation-service/src/main/java]}
+    pattern-either:
+      - pattern: $LOG.addKeyValue("prompt", ...)
+      - pattern: $LOG.addKeyValue("output", ...)
+      - pattern: $LOG.addKeyValue("title", ...)
+      - pattern: $LOG.addKeyValue("user_id", ...)
+      - pattern: $LOG.addKeyValue("tenant_id", ...)
+      - pattern: $LOG.addKeyValue("membership_id", ...)
+      - pattern: $LOG.addKeyValue("conversation_id", ...)
+      - pattern: $LOG.addKeyValue("message_id", ...)
+      - pattern: $LOG.addKeyValue("run_id", ...)
+      - pattern: $LOG.addKeyValue("request_id", ...)
+      - pattern: $LOG.addKeyValue("token", ...)
+
+  - id: conversation-no-string-built-sql
+    languages: [java]
+    severity: ERROR
+    message: Conversation SQL must remain fixed and parameterized.
+    paths: {include: [/services/conversation-service/src/main/java]}
+    pattern-either:
+      - pattern: $JDBC.execute($SQL + $X, ...)
+      - pattern: $JDBC.query($SQL + $X, ...)
+      - pattern: $JDBC.update($SQL + $X, ...)
+
+  - id: conversation-no-thread-sleep
+    languages: [java]
+    severity: ERROR
+    message: Conversation coordination must not use Thread.sleep.
+    paths:
+      include:
+        - /services/conversation-service/src/main/java
+        - /services/conversation-service/src/test/java
+    pattern: Thread.sleep(...)
+
+  - id: conversation-no-weak-crypto
+    languages: [java]
+    severity: ERROR
+    message: Conversation content cryptography must not use legacy digest or ECB primitives.
+    paths: {include: [/services/conversation-service/src/main/java]}
+    pattern-either:
+      - pattern: MessageDigest.getInstance("MD5")
+      - pattern: MessageDigest.getInstance("SHA-1")
+      - pattern: Cipher.getInstance("AES/ECB/...")

@@ -106,6 +106,10 @@ jobs:
     name: Authorization security suite
     uses: ./.github/workflows/authorization-service.yml
 
+  conversation-security:
+    name: Conversation security suite
+    uses: ./.github/workflows/conversation-service.yml
+
   web-bff-security:
     name: Web BFF security suite
     uses: ./.github/workflows/web-bff.yml
@@ -141,6 +145,7 @@ jobs:
       - notification-security
       - identity-security
       - authorization-security
+      - conversation-security
       - web-bff-security
       - edge-waf-security
     runs-on: ubuntu-24.04
@@ -154,6 +159,7 @@ jobs:
           NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
           IDENTITY_RESULT: ${{ needs.identity-security.result }}
           AUTHORIZATION_RESULT: ${{ needs.authorization-security.result }}
+          CONVERSATION_RESULT: ${{ needs.conversation-security.result }}
           WEB_BFF_RESULT: ${{ needs.web-bff-security.result }}
           EDGE_WAF_RESULT: ${{ needs.edge-waf-security.result }}
         run: |
@@ -180,6 +186,10 @@ jobs:
           fi
           if [ "${AUTHORIZATION_RESULT}" != 'success' ]; then
             echo "Authorization security result: ${AUTHORIZATION_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${CONVERSATION_RESULT}" != 'success' ]; then
+            echo "Conversation security result: ${CONVERSATION_RESULT}" >&2
             exit 1
           fi
           if [ "${WEB_BFF_RESULT}" != 'success' ]; then

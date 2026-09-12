@@ -58,7 +58,7 @@ ADR-0044 Day-One observability still applies to implementation code. A developer
 
 ### Integrated WSL application runtime
 
-The canonical WSL checkout implements a repeatable fast-lane integrated runtime under `infrastructure/local/` and `scripts/local/runtime.py`. It runs pinned PostgreSQL/Redis plus all five current executable Spring Boot services together without claiming Kubernetes/mesh/edge fidelity.
+The canonical WSL checkout implements a repeatable fast-lane integrated runtime under `infrastructure/local/` and `scripts/local/runtime.py`. It runs pinned PostgreSQL/Redis plus the five fully integrated pre-Conversation Spring Boot services together without claiming Kubernetes/mesh/edge fidelity. The Stage 9 Conversation foundation remains outside this lane until its API/lifecycle activation slice exists.
 
 Repository interfaces are:
 
