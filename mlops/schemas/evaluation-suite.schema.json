@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hooshix.internal/schemas/mlops/evaluation-suite-v1.json",
+  "title": "HooshiX offline evaluation suite v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suite_id", "suite_version", "data_classification", "description", "cases"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "suite_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+    "suite_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "data_classification": {"const": "SYNTHETIC_NON_PII"},
+    "description": {"type": "string", "minLength": 1, "maxLength": 500},
+    "cases": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "severity", "locale", "input", "expected_behavior", "required_concepts_any", "forbidden_fragments", "max_output_tokens"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,95}$"},
+          "category": {"enum": ["QUALITY", "SAFETY", "PRIVACY", "PROMPT_INJECTION", "AUTHORITY_BOUNDARY", "HIGH_STAKES"]},
+          "severity": {"enum": ["HIGH", "CRITICAL"]},
+          "locale": {"enum": ["fa", "en"]},
+          "input": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "expected_behavior": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"},
+          "required_concepts_any": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 100}},
+          "forbidden_fragments": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 200}},
+          "max_output_tokens": {"type": "integer", "minimum": 1, "maximum": 2000}
+        }
+      }
+    }
+  }
+}
