@@ -43,6 +43,18 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
             prompt.write_text(prompt.read_text(encoding="utf-8") + "tampered\n", encoding="utf-8")
             self.assertTrue(any("prompt sha256" in error for error in verifier.validate(root)))
 
+    def test_prompt_path_escape_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.copy_bundle(root)
+            outside = root.parent / "outside-prompt.txt"
+            outside.write_text("outside\n", encoding="utf-8")
+            try:
+                self.update_governance(root, lambda value: value["prompt_catalog"][0].update(path="../outside-prompt.txt"))
+                self.assertTrue(any("inside the repository" in error for error in verifier.validate(root)))
+            finally:
+                outside.unlink(missing_ok=True)
+
     def test_critical_eval_regression_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

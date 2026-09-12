@@ -61,6 +61,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0054 | Core private Conversation and model-execution architecture v1 |
 | ADR-0055 | provider-neutral authenticated SMTP with Google Gmail staging; production Email provider deferred |
 | ADR-0056 | SMS.ir exact-text SMS provider with simulated Sandbox contract boundary |
+| ADR-0057 | versioned model/prompt/price/evaluation governance, safety/data-control gate, canary, and rollback |
 
 ## Superseded ADR identifiers
 

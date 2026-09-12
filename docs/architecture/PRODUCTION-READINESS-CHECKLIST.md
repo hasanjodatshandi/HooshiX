@@ -200,6 +200,16 @@ Compromised Password:
 - [ ] admin privilege-escalation/owner-safety/idempotency/audit tests pass.
 - [ ] platform capability cannot bypass tenant/resource authority.
 
+## 9.1 Conversation model governance and safety
+
+- [ ] exact ADR-0057 model/prompt digest/price/evaluation tuple is approved; no mutable provider alias is the rollback target.
+- [ ] current synthetic non-PII `fa`/`en` suite passes with zero errors, 100% critical cases, quality/regression, p95/p99 latency, and integer-cost thresholds.
+- [ ] privacy owner approves the exact provider organization/project retention, abuse-monitoring, region, and subprocessor controls.
+- [ ] adapter proves `store=false`, `background=false`, `tools=[]`, no provider state continuation, fixed egress, one attempt, and bounded cancellation/ambiguity.
+- [ ] bounded tenant-stable `1 -> 5 -> 25 -> 100` canary and disable/rollback rehearsal pass for the exact tuple.
+- [ ] feedback is enum-only, tenant/erasure scoped, not free text/training input; production content is not automatically copied into eval/training data.
+- [ ] one confirmed critical safety/privacy incident disables or rolls back; drift triggers and weekly evaluation are operational and alerted.
+
 ## 10. Human privileged access/OpenBao
 
 - [ ] no standing root/unrestricted K8s/DB superuser privilege.

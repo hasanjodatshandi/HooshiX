@@ -233,6 +233,7 @@ docs/adr/0053-define-identity-password-policy-v1.md
 docs/adr/0054-define-core-conversation-and-model-execution-v1.md
 docs/adr/0055-use-provider-neutral-smtp-with-google-gmail-staging-v1.md
 docs/adr/0056-select-smsir-exact-text-sms-and-sandbox-validation-v1.md
+docs/adr/0057-govern-model-evaluation-safety-and-promotion-v1.md
 docs/adr/decision-register.md
 docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md
 docs/architecture/ENGINEERING-HARDENING-ROADMAP.md
@@ -250,6 +251,7 @@ docs/architecture/dependency-criticality.schema.json
 docs/architecture/dependency-criticality.yaml
 docs/architecture/devsecops-security-toolchain.md
 docs/architecture/implementation-status.md
+docs/architecture/mlops-evaluation-and-safety.md
 docs/architecture/network-architecture.md
 docs/architecture/performance-and-bottlenecks.md
 docs/architecture/platform-architecture.md

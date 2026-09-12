@@ -138,7 +138,8 @@ The provider port accepts a service-owned request and returns only the normalize
 finish category, and bounded provider evidence needed for reconciliation. Provider transport models
 remain Infrastructure-only.
 
-The first adapter uses OpenAI Responses with:
+The first adapter uses OpenAI Responses under ADR-0057 and
+`../mlops-evaluation-and-safety.md` with:
 
 ```text
 store=false
@@ -158,7 +159,7 @@ not choose another model.
 
 ## 8. Cost and abuse safety
 
-Conversation is authoritative for run budget and cost. The platform catalog records a stable model
+Conversation is authoritative for run budget and cost. The Git-owned ADR-0057 catalog records a stable model
 alias, provider identifier, model identifier, input/output limits, integer micro-unit prices, and
 effective version. The browser sees the safe alias and bounded estimated/actual cost only when the
 product contract explicitly exposes it.
@@ -221,12 +222,13 @@ Ambient mTLS, deny-by-default NetworkPolicy, exact BFF/Authorization/Kafka/Postg
 Collector/DNS/OpenAI egress, and no public Service.
 
 Worker/API toggles may provide rollback inside the same deployment, but they do not create a second
-deployable. Provider execution stays disabled until credentials, model/price catalog, egress, privacy,
-quota/cost, load, erasure, and provider-fixture evidence pass.
+deployable. Provider execution stays disabled until credentials, the exact model/prompt/price/eval
+tuple passes ADR-0057 promotion and provider-data-control approval, and egress, privacy, quota/cost,
+load, erasure, provider-fixture, canary, and rollback evidence pass.
 
 ## 12. First vertical-slice Definition of Done
 
-ADR-0054 §9 is the acceptance authority. In addition, tests must prove cross-tenant/other-owner deny,
+ADR-0054 §9 and ADR-0057 are the acceptance authorities. In addition, tests must prove cross-tenant/other-owner deny,
 RLS pool reuse, dedup conflict, cancel/complete races, no DB lock across remote I/O, no blind retry,
 unknown-outcome charging, integer overflow rejection, provider option/URL/tool injection rejection,
 `store=false`, encrypted-content tamper/key rotation, prompt/output telemetry canaries, erasure/legal

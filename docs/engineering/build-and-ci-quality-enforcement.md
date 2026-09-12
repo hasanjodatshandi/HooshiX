@@ -2,6 +2,12 @@
 
 This document defines executable quality gates for independently deployable services and platform artifacts. Repository workflow governs PR-first delivery. Documentation alone never proves source/runtime compliance.
 
+ADR-0057 model-execution governance is validated by `make mlops-verify`, a mandatory
+`make baseline-verify` prerequisite. This standard-library gate validates catalog/evaluation schema
+identity, prompt integrity, cross-version references, non-PII fixtures, fail-closed provider controls,
+integer cost reservation, promotion/canary/rollback thresholds, and feedback/drift restrictions. It
+does not claim a real model evaluation or provider-account approval.
+
 ADR-0045 defines the current DevSecOps tool responsibility map. ADR-0017/0035/0038/0039 remain authoritative for signing/admission, final-artifact vulnerability policy, exception/threat-intelligence behavior, and Java executable-quality semantics. ADR-0046 defines repository Agent Context Engine governance. ADR-0047 defines the approved ChatGPT Web bridge to the unchanged read-only stdio Context MCP. ADR-0048 defines the separate policy-gated developer-host Ops MCP. ADR-0049 defines the separate policy-gated interactive Windows Desktop MCP; ADR-0050 narrowly adds its policy-bound local credential-use broker. ADR-0051 moves Context/Ops/Desktop MCP adapter/runtime source and runtime tests outside HooshiX while keeping project Context Engine governance in this repository.
 
 ## 1. Required Java PR gates

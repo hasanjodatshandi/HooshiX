@@ -190,7 +190,9 @@
       "match_terms": ["conversation service", "model run", "llm", "openai responses", "ai product", "prompt", "tool calling", "agent workflow", "سرویس گفتگو", "اجرای مدل", "محصول هوش مصنوعی"],
       "minimum_sources": [
         "docs/adr/0054-define-core-conversation-and-model-execution-v1.md",
+        "docs/adr/0057-govern-model-evaluation-safety-and-promotion-v1.md",
         "docs/architecture/services/conversation-service.md",
+        "docs/architecture/mlops-evaluation-and-safety.md",
         "docs/architecture/services/web-bff.md",
         "docs/architecture/services/authorization-service.md",
         "docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md",
@@ -206,7 +208,7 @@
         "docs/technology/technology-baseline.md",
         "docs/architecture/PRODUCTION-READINESS-CHECKLIST.md"
       ],
-      "summary": "ADR-0054 permits only the private text Conversation/ModelRun slice; keep model output untrusted, provider state stateless/store=false, tools absent, cost reserved, and erasure/lifecycle fail closed."
+      "summary": "ADR-0054 permits only the private text Conversation/ModelRun slice; ADR-0057 requires versioned catalogs/evals, fail-closed provider data-control approval, safety thresholds, canary, and rollback before model execution."
     },
     {
       "id": "application-observability",

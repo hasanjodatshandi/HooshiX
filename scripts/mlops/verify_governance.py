@@ -91,6 +91,7 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
 
     require(errors, governance.get("schema_version") == 1, "governance schema_version must be 1")
     require(errors, SEMVER.fullmatch(str(governance.get("governance_version", ""))) is not None, "governance_version must be SemVer")
+    require(errors, governance.get("decision_status") == "APPROVED_ARCHITECTURE_RUNTIME_DISABLED", "Stage 8 decision status must keep runtime disabled")
     models = governance.get("model_catalog")
     prompts = governance.get("prompt_catalog")
     prices = governance.get("price_catalog")
@@ -100,10 +101,14 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
     if not all(isinstance(value, list) and len(value) == 1 for value in (models, prompts, prices)):
         return
     model, prompt, price = models[0], prompts[0], prices[0]
+    require(errors, all(isinstance(value, dict) for value in (model, prompt, price)), "catalog entries must be objects")
+    if not all(isinstance(value, dict) for value in (model, prompt, price)):
+        return
 
     approval = governance.get("provider_data_controls", {})
     pending = approval.get("approval_status") != "APPROVED"
     require(errors, model.get("provider") == "openai" and model.get("endpoint") == "responses", "model must use the reviewed OpenAI Responses boundary")
+    require(errors, re.fullmatch(r"gpt-[a-z0-9.-]+-20[0-9]{2}-[0-9]{2}-[0-9]{2}", str(model.get("provider_model_id", ""))) is not None, "provider model must be an exact dated snapshot")
     require(errors, model.get("lifecycle") == "CANDIDATE", "initial model must remain CANDIDATE")
     require(errors, model.get("execution_enabled") is False, "Stage 8 model execution must remain disabled")
     require(errors, not pending or approval.get("runtime_must_remain_disabled_while_pending") is True, "pending provider approval must fail closed")
@@ -112,9 +117,11 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
     require(errors, request_settings == {"store": False, "background": False, "tools": []}, "provider request settings must be exact")
     require(errors, approval.get("provider_state_references_allowed") is False, "provider state references must be prohibited")
 
-    prompt_path = root / str(prompt.get("path", ""))
-    require(errors, prompt_path.is_file() and prompt_path.is_relative_to(root), "prompt path must resolve inside the repository")
-    if prompt_path.is_file() and prompt_path.is_relative_to(root):
+    resolved_root = root.resolve()
+    prompt_path = (root / str(prompt.get("path", ""))).resolve()
+    prompt_inside_root = prompt_path.is_relative_to(resolved_root)
+    require(errors, prompt_inside_root and prompt_path.is_file(), "prompt path must resolve inside the repository")
+    if prompt_inside_root and prompt_path.is_file():
         digest = hashlib.sha256(prompt_path.read_bytes()).hexdigest()
         require(errors, digest == prompt.get("sha256"), "prompt sha256 does not match prompt content")
 
@@ -124,19 +131,25 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
 
     require(errors, price.get("unit") == "MICRO_USD_PER_MILLION_TOKENS", "price unit must use integer micro-USD")
     input_price, output_price = price.get("input"), price.get("output")
+    max_input_tokens, max_output_tokens = model.get("max_input_tokens"), model.get("max_output_tokens")
     require(errors, isinstance(input_price, int) and input_price > 0, "input price must be a positive integer")
     require(errors, isinstance(output_price, int) and output_price > 0, "output price must be a positive integer")
-    if isinstance(input_price, int) and isinstance(output_price, int):
-        worst_case = (model["max_input_tokens"] * input_price + 999999) // 1000000
-        worst_case += (model["max_output_tokens"] * output_price + 999999) // 1000000
+    require(errors, isinstance(max_input_tokens, int) and 1 <= max_input_tokens <= 16000, "model max_input_tokens is invalid")
+    require(errors, isinstance(max_output_tokens, int) and 1 <= max_output_tokens <= 4096, "model max_output_tokens is invalid")
+    require(errors, price.get("source") == "https://developers.openai.com/api/docs/models/gpt-5.4", "price source must be the reviewed official model page")
+    if all(isinstance(value, int) for value in (input_price, output_price, max_input_tokens, max_output_tokens)):
+        worst_case = (max_input_tokens * input_price + 999999) // 1000000
+        worst_case += (max_output_tokens * output_price + 999999) // 1000000
         require(errors, price.get("maximum_request_reservation_micro_usd") == worst_case, "maximum request reservation must equal worst-case catalog price")
 
     promotion = governance.get("promotion_policy", {})
     require(errors, promotion.get("minimum_critical_eval_pass_rate_basis_points") == 10000, "critical eval pass rate must be 100%")
     require(errors, promotion.get("maximum_eval_error_count") == 0, "evaluation errors must block promotion")
     require(errors, promotion.get("hard_provider_deadline_ms") == 60000, "provider deadline must preserve ADR-0054")
+    require(errors, set(promotion.get("required_approvals", [])) == {"product-owner", "security-owner", "privacy-owner", "platform-owner"}, "promotion owner approvals are incomplete")
     steps = promotion.get("canary_steps_percent")
-    require(errors, steps == sorted(set(steps or [])) and steps and steps[0] == 1 and steps[-1] == 100, "canary steps must be unique, ordered, and reach 100%")
+    valid_steps = isinstance(steps, list) and bool(steps) and all(isinstance(step, int) for step in steps)
+    require(errors, valid_steps and steps == sorted(set(steps)) and steps[0] == 1 and steps[-1] == 100, "canary steps must be unique, ordered, and reach 100%")
     triggers = promotion.get("rollback_triggers", {})
     require(errors, triggers.get("confirmed_critical_safety_or_privacy_incidents") == 1, "one confirmed critical incident must trigger rollback")
 

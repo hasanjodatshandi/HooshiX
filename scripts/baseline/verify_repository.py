@@ -37,6 +37,11 @@ REQUIRED_BASELINE_PATHS = (
     "AGENTS.md",
     "FILE_INDEX.txt",
     "Makefile",
+    "mlops/evaluations/conversation-v1.json",
+    "mlops/governance/v1/governance.json",
+    "mlops/prompts/conversation-system-v1.txt",
+    "mlops/schemas/evaluation-suite.schema.json",
+    "mlops/schemas/governance.schema.json",
     "README.md",
     "context/bootstrap.json",
     "context/bootstrap.schema.json",
@@ -69,6 +74,8 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/context/tests/test_post_merge_checkpoint.py",
     "scripts/baseline/tests/test_verify_repository.py",
     "scripts/baseline/verify_repository.py",
+    "scripts/mlops/tests/test_verify_governance.py",
+    "scripts/mlops/verify_governance.py",
 )
 
 IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "dist", "coverage", "test-results"}

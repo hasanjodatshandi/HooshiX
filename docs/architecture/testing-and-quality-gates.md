@@ -213,6 +213,10 @@ Every executable service/critical path proves applicable:
 
 The first ADR-0054 executable slice must add blocking evidence for:
 
+- ADR-0057 catalog/schema/cross-reference/prompt-digest validation, synthetic non-PII bilingual
+  adversarial suite, exact model snapshot and price reservation, 100% critical gates, provider-data-
+  control fail-close, ordered canary, rollback, feedback, and drift-policy negatives;
+
 - versioned/validated/example-backed Protobuf plus BFF OpenAPI/controller/generated-client parity;
 - exact JWT audience, workload identity, four Authorization mappings, other-owner/cross-tenant deny,
   forced RLS and pooled-connection context isolation;
@@ -233,6 +237,9 @@ The first ADR-0054 executable slice must add blocking evidence for:
   browser-to-BFF-only E2E.
 
 Architecture documentation alone remains `NOT RUN`/`NOT VERIFIED` for this suite.
+The Stage 8 `make mlops-verify` gate proves only governance structure and fail-closed policy. It does
+not substitute for Stage 9 real model evaluation, provider-account approval, canary, or rollback
+execution evidence.
 
 ## 15. Developer-host Ops MCP tests
 

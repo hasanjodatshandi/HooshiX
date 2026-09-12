@@ -110,7 +110,7 @@ Engineering Hardening Stage 8 — MLOps evaluation and safety architecture gate
 
 Its completion boundary and interruption-safe status are owned by
 `ENGINEERING-HARDENING-ROADMAP.md`. Stage 7 is complete at reviewed implementation/evidence
-head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; Stage 8 is `NEXT`.
+head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; Stage 8 is `IN PROGRESS` in Draft PR #127.
 Conversation implementation remains ordered after hardening stages 1-8. Its future
 target invariant remains:
 

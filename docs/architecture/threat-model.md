@@ -418,6 +418,9 @@ Required:
 - one provider attempt, no blind retry/fallback, explicit `OUTCOME_UNKNOWN`, conservative
   reconciliation, and cancellation that never fabricates stopped work/refund;
 - `store=false`, content-free telemetry/events/audit/errors, ADR-0028 erasure, and lifecycle replay.
+- ADR-0057 exact model/prompt/price/eval tuple, 100% critical gates, provider-account data-control
+  receipt, bounded canary, immediate critical-incident rollback, and no automatic production-content
+  training/evaluation ingestion.
 
 Residual: the approved external provider necessarily receives the composed prompt for generation and
 may charge a request that HooshiX cannot conclusively reconcile after transport ambiguity. Provider
