@@ -209,6 +209,10 @@ provider-correlated delivery evidence, final reconciliation after 72h produces
 
 Iran SMS uses SMS.ir exact-text bulk sending under ADR-0056. Notification renders exact versioned SMS content itself; provider-managed Verify/Pattern rendering is prohibited as Production semantic authority.
 
+HooshiX retains the recipient as canonical Iranian E.164 (`+989xxxxxxxxx`). Only the SMS.ir
+Infrastructure adapter converts it to the provider's documented ten-digit local wire form
+(`9xxxxxxxxx`); callers cannot select that provider-specific representation.
+
 Provider HTTP uses 500ms connect / 1500ms total timeout, a 64 KiB response bound, and no automatic client retry. Timeout/connection loss/unproven acceptance is `AMBIGUOUS` and is never blindly resubmitted. `DEFINITIVE_ACCEPTED` requires HTTP 200 plus `status=1` and exactly one positive message ID from the production bulk-send response. The SMS.ir Sandbox is simulated and never maps to a canonical runtime outcome.
 
 Authenticated message-specific report polling requires exact message-ID correlation and maps delivery state `1` to `DELIVERED`, `2`/`4`/`6`/`7` to permanent non-delivery, and `3`/`5`/`null` to non-terminal observation. Bulk/pack acceptance is never delivery evidence. Polling is bounded within the 12-hour observation window.

@@ -11,6 +11,13 @@ import org.junit.jupiter.api.Test;
 
 class SmsIrSmsProviderAdapterTest {
   @Test
+  void canonicalIranRecipientUsesSmsIrLocalWireFormat() {
+    assertThat(SmsIrSmsProviderAdapter.toProviderMobile("+989120000000")).isEqualTo("9120000000");
+    assertThatThrownBy(() -> SmsIrSmsProviderAdapter.toProviderMobile("09120000000"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void configurationPinsOfficialApiBaseUriAndValidatesLineNumber() {
     var configuration = SmsIrSmsProviderConfiguration.production("fixture-token", "30004505000017");
     assertThat(configuration.baseUri().toString()).isEqualTo("https://api.sms.ir");

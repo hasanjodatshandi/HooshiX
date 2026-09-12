@@ -62,7 +62,7 @@ public final class SmsIrSmsProviderAdapter implements NotificationProviderGatewa
     if (message == null || message.channel() != NotificationChannel.SMS) {
       throw new IllegalArgumentException("SMS.ir accepts SMS dispatch only");
     }
-    if (!message.recipient().matches("[+]98[0-9]{10}")) {
+    if (!message.recipient().matches("[+]989[0-9]{9}")) {
       return ProviderDispatchOutcome.live(
           ProviderAttemptClassification.DEFINITIVE_PERMANENT_FAILURE,
           "SMSIR_RECIPIENT_REJECTED",
@@ -74,7 +74,7 @@ public final class SmsIrSmsProviderAdapter implements NotificationProviderGatewa
               Map.of(
                   "lineNumber", lineNumber,
                   "messageText", message.text(),
-                  "mobiles", List.of(message.recipient())));
+                  "mobiles", List.of(toProviderMobile(message.recipient()))));
       HttpRequest request =
           HttpRequest.newBuilder(endpoint("/v1/send/bulk"))
               .timeout(TOTAL_TIMEOUT)
@@ -235,6 +235,13 @@ public final class SmsIrSmsProviderAdapter implements NotificationProviderGatewa
 
   private URI endpoint(String suffix) {
     return URI.create(baseUri + suffix);
+  }
+
+  static String toProviderMobile(String canonicalRecipient) {
+    if (canonicalRecipient == null || !canonicalRecipient.matches("[+]989[0-9]{9}")) {
+      throw new IllegalArgumentException("SMS.ir recipient must be canonical Iran E.164");
+    }
+    return canonicalRecipient.substring(3);
   }
 
   private static ProviderDispatchOutcome ambiguous() {

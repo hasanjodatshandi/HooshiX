@@ -13,9 +13,9 @@ Accepted — current effective decision
 ### Provider boundary
 
 SMS.ir replaces IPPanel as the selected Iran SMS provider and fully supersedes ADR-0020. Notification
-remains the sole semantic template and rendering authority. The production-capable adapter sends one
-canonical `+98` recipient and the exact immutable accepted text through the official SMS.ir bulk-send
-contract:
+remains the sole semantic template and rendering authority. The production-capable adapter accepts
+one canonical `+98` recipient and sends the exact immutable accepted text through the official
+SMS.ir bulk-send contract:
 
 ```text
 POST https://api.sms.ir/v1/send/bulk
@@ -24,8 +24,13 @@ Content-Type: application/json
 
 lineNumber:  server-owned approved sender line
 messageText: exact Notification-rendered content
-mobiles:     exactly one canonical recipient
+mobiles:     exactly one SMS.ir local-format recipient
 ```
+
+Identity and Notification retain canonical Iranian E.164 (`+989xxxxxxxxx`) internally and in
+encrypted escrow. The Infrastructure adapter removes only the fixed `+98` country prefix at the
+provider boundary and sends SMS.ir's documented ten-digit `9xxxxxxxxx` wire representation. Callers
+cannot supply the provider wire form or bypass canonical validation.
 
 Provider-managed Verify templates are not a production semantic authority. Callers cannot select the
 provider, endpoint, sender line, template, or API key.
