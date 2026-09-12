@@ -231,6 +231,8 @@ Single-server accepts outages but never weaker decisions:
 
 ADR-0054 classifies Conversation title/prompt/output/composed context as restricted customer
 content and makes `conversation-service` the only first-slice model-execution authority.
+ADR-0057 makes the versioned model/prompt/price/evaluation tuple and provider-data-control receipt a
+fail-closed execution gate; catalog presence alone never enables a model.
 
 - browser/BFF input cannot select provider endpoint/credential/system prompt/tool/internal audience;
 - provider credentials are Conversation-only OpenBao material and never tenant/BFF/browser state;
@@ -246,6 +248,9 @@ content and makes `conversation-service` the only first-slice model-execution au
   success or blind retry;
 - Conversation participates in ADR-0028 erasure and Identity tenant lifecycle before user content is
   enabled.
+- synthetic non-PII evaluation data is Git-owned; production content/feedback never becomes an
+  automatic evaluation or training source; critical safety/privacy/injection/authority failures
+  block promotion and one confirmed critical incident rolls back/disables execution.
 
 Prompt-injection, cross-tenant content exposure, cost amplification, provider retention, model-output
 script injection, and cancellation/billing ambiguity require executable negative tests in the first

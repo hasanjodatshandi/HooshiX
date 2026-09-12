@@ -29,7 +29,7 @@ This file is a routing/source index. It does not duplicate normative architectur
 | Authorization | ADR-0013/0026/0032/0036 + service doc |
 | Identity/MFA/session | ADR-0012/0023 + service doc |
 | BFF/browser security | ADR-0016 + service doc |
-| Core AI product / Conversation / model execution | ADR-0054 + `services/conversation-service.md` |
+| Core AI product / Conversation / model execution | ADR-0054/0057 + `services/conversation-service.md` + `mlops-evaluation-and-safety.md` |
 | Data/messaging | `data-and-messaging.md` |
 | Testing/evidence | `testing-and-quality-gates.md` + security/readiness/fitness matrices |
 | Build/CI | `../engineering/build-and-ci-quality-enforcement.md` |
@@ -176,6 +176,16 @@ Current Spring Boot baseline uses Micrometer Observation/Tracing, Prometheus-com
 ADR-0054 uses these current provider facts to define the first adapter as stateless
 `store=false`, `background=false`, and tool-free. Provider features do not grant model output local
 authority or prove that the HooshiX adapter is implemented, enabled, privacy-approved, or ready.
+
+ADR-0057 additionally uses the official model page and data/safety guidance to bind an exact
+candidate snapshot, captured integer price snapshot, account-level retention approval gate, and
+versioned evaluation/promotion policy:
+
+- OpenAI GPT-5.4 model/snapshot/pricing: `https://developers.openai.com/api/docs/models/gpt-5.4`
+- OpenAI API safety best practices: `https://developers.openai.com/api/docs/guides/safety-best-practices`
+
+Provider documentation is time-sensitive. The committed price is a dated immutable reconciliation
+snapshot; it must be versioned and re-reviewed before promotion when provider pricing changes.
 
 ### OpenTelemetry Collector
 

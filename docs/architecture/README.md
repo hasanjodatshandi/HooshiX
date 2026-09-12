@@ -58,6 +58,7 @@ These are target decisions. `implementation-status.md` remains authoritative for
 - `performance-and-bottlenecks.md` — capacity/saturation/evidence triggers.
 - `runtime-and-deployment.md` — runtime/GitOps/profile behavior.
 - `testing-and-quality-gates.md` — executable verification portfolio.
+- `mlops-evaluation-and-safety.md` — versioned model/prompt/price/eval governance, safety/data-control promotion gate, canary, and rollback.
 - `security-verification-matrix.md` / `architecture-fitness-functions.md` — traceable security/architecture properties.
 - `PRODUCTION-READINESS-CHECKLIST.md` — production traffic gate.
 - `implementation-status.md` — actual repository implementation/evidence presence.

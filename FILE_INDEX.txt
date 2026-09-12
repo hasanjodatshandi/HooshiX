@@ -233,6 +233,7 @@ docs/adr/0053-define-identity-password-policy-v1.md
 docs/adr/0054-define-core-conversation-and-model-execution-v1.md
 docs/adr/0055-use-provider-neutral-smtp-with-google-gmail-staging-v1.md
 docs/adr/0056-select-smsir-exact-text-sms-and-sandbox-validation-v1.md
+docs/adr/0057-govern-model-evaluation-safety-and-promotion-v1.md
 docs/adr/decision-register.md
 docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md
 docs/architecture/ENGINEERING-HARDENING-ROADMAP.md
@@ -250,6 +251,7 @@ docs/architecture/dependency-criticality.schema.json
 docs/architecture/dependency-criticality.yaml
 docs/architecture/devsecops-security-toolchain.md
 docs/architecture/implementation-status.md
+docs/architecture/mlops-evaluation-and-safety.md
 docs/architecture/network-architecture.md
 docs/architecture/performance-and-bottlenecks.md
 docs/architecture/platform-architecture.md
@@ -351,6 +353,11 @@ infrastructure/waf/patches/hooshix_logging_test.go
 infrastructure/waf/patches/safe-rule-logging.patch
 infrastructure/waf/pins.env
 infrastructure/waf/vendor/4.25.1/coreruleset-4.25.1.tar.gz
+mlops/evaluations/conversation-v1.json
+mlops/governance/v1/governance.json
+mlops/prompts/conversation-system-v1.txt
+mlops/schemas/evaluation-suite.schema.json
+mlops/schemas/governance.schema.json
 scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
 scripts/ci/quality/verify_repository_sources.sh
@@ -362,6 +369,8 @@ scripts/context/tests/test_post_merge_checkpoint.py
 scripts/contracts/verify_protobuf_compatibility.sh
 scripts/local/runtime.py
 scripts/local/tests/test_runtime.py
+scripts/mlops/tests/test_verify_governance.py
+scripts/mlops/verify_governance.py
 scripts/performance/external_runtime_evidence.py
 scripts/performance/smsir_sandbox_probe.py
 scripts/performance/stack_capacity.py
