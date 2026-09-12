@@ -138,6 +138,12 @@ smsir.api-key=<production-capable-SMS.ir-key>
 smsir.line-number=<approved-SMS.ir-sender-line>
 ```
 
+When the panel does not display a usable sender line, retrieve the account-scoped list with
+authenticated `GET https://api.sms.ir/v1/line` and select only a positive decimal value returned in
+the successful `data` array. Listing a line is not proof that bulk sending is active: provider status
+`123` means the selected sender line still requires account-side activation, and the real delivery
+exercise must stop without retry until the owner resolves that condition in SMS.ir.
+
 A later reviewed authenticated STARTTLS provider can use the same file with the generic Email profile:
 
 ```properties

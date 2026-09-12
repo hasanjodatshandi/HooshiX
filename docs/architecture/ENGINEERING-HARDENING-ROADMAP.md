@@ -248,11 +248,17 @@ not proof for later changes.
   `f19746fb54add27f4edc52a7344b6bcc6e734301`, including every five-service security
   suite, contract/examples, WAF privacy boundary, frontend journeys, and both final
   aggregators. PR #126 remains Draft while provider evidence is open.
-- **Not verified:** real Google Gmail execution and Production SMS.ir sender/acceptance/
-  delivery/reconciliation evidence. Google OIDC is owner-deferred and not part of
-  Notification-provider evidence. No real provider call is made
-  without the required credentials, recipient, cost/side-effect authority, and
-  environment.
+- **Passed:** a bounded owner-authorized Google Gmail staging execution reached the real provider
+  and the final SMTP response moved the attempt to `PROVIDER_ACCEPTED`; no mailbox-delivery or
+  human-read claim is made. Credentials and recipients remained in mode-`0600` Git-ignored state
+  and do not appear in the identifier-free receipt.
+- **Partially verified:** a Production SMS.ir API key authenticated, `GET /v1/line` returned exactly
+  one numeric sender line, and the real exact-text path was exercised without credential/recipient
+  disclosure. SMS.ir rejected bulk submission with HTTP `400`, provider status `123` (sender-line
+  activation required). Notification classified the explicit rejection as permanent and performed
+  no blind retry. Production acceptance, delivery, and reconciliation remain `Not verified` until
+  the account owner activates the sender line and the bounded exercise is repeated.
+- Google OIDC remains owner-deferred and is not part of Notification-provider evidence.
 
 Corrective work already included in the measured revision:
 
@@ -477,10 +483,10 @@ CI remediation completion receipt, not Stage 7 completion:
   provider runtime evidence remains open, not unfinished CI remediation. PR #126 remains
   Draft and Stage 7 remains
   `IN PROGRESS`; `main` was not changed.
-- **Continuation action:** obtain the Google Gmail App Password through the private
-  staging secret path and a Production SMS.ir key/sender/test-recipient configuration
-  before those remaining provider exercises.
-  Never request secret values in chat or substitute synthetic claims for these runs.
+- **Continuation action:** activate the sole sender line returned by the authenticated SMS.ir
+  account, then repeat the bounded Production SMS.ir acceptance/delivery/reconciliation exercise.
+  Gmail staging execution is complete. Never request secret values in chat or substitute synthetic
+  claims for the remaining run.
 
 Then obtain and validate the remaining provider runtime evidence. Keep Stage 7
 `IN PROGRESS` until every completion-boundary item and the complete Stage 7 diff pass
