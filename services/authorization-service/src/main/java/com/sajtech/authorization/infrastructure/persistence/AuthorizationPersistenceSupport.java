@@ -29,6 +29,10 @@ abstract class AuthorizationPersistenceSupport {
       """;
   protected static final List<String> TENANT_PERMISSIONS =
       List.of(
+          "conversation.create",
+          "conversation.delete",
+          "conversation.generate",
+          "conversation.read",
           "membership.owner.assign",
           "membership.permission.manage",
           "membership.read",
@@ -41,7 +45,14 @@ abstract class AuthorizationPersistenceSupport {
           "tenant.delete",
           "tenant.read");
   protected static final List<String> MEMBER_PERMISSIONS =
-      List.of("membership.read", "role.read", "tenant.read");
+      List.of(
+          "conversation.create",
+          "conversation.delete",
+          "conversation.generate",
+          "conversation.read",
+          "membership.read",
+          "role.read",
+          "tenant.read");
   protected final DSLContext dsl;
   protected final AuthorizationSecurityTelemetry securityTelemetry;
 

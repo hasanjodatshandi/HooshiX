@@ -5,10 +5,10 @@ CATALOG = Path(__file__).resolve().parents[1] / "contracts" / "permissions" / "p
 KEY = re.compile(r"^  - key: ((?:[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)|platform\.legal_hold\.manage)$")
 SCOPE = re.compile(r"^    scope: (TENANT|PLATFORM)$")
 LIFE = re.compile(r"^    lifecycle: (ACTIVE|DEPRECATED|RETIRED)$")
-REQUIRED = {"tenant.read","tenant.delete","role.read","role.create","role.update","role.archive","role.permission.manage","membership.read","membership.role.assign","membership.permission.manage","membership.owner.assign","platform.tenant.create","platform.tenant.suspend","platform.tenant.resume","platform.tenant.restore","platform.legal_hold.manage"}
+REQUIRED = {"conversation.create","conversation.read","conversation.generate","conversation.delete","tenant.read","tenant.delete","role.read","role.create","role.update","role.archive","role.permission.manage","membership.read","membership.role.assign","membership.permission.manage","membership.owner.assign","platform.tenant.create","platform.tenant.suspend","platform.tenant.resume","platform.tenant.restore","platform.legal_hold.manage"}
 def main():
     lines = CATALOG.read_text(encoding="utf-8-sig").splitlines()
-    if lines[:2] != ["version: 1", "permissions:"]:
+    if lines[:2] != ["version: 2", "permissions:"]:
         print("invalid catalog header", file=sys.stderr); return 1
     rows=[]
     for i in range(2, len(lines), 3):

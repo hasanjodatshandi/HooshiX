@@ -86,6 +86,10 @@ class AuthorizationRlsIntegrationTest {
     var store = new JooqAuthorizationStore(runtime, () -> {});
     store.projectPermissionCatalog(
         List.of(
+                "conversation.create",
+                "conversation.delete",
+                "conversation.generate",
+                "conversation.read",
                 "tenant.read",
                 "tenant.delete",
                 "role.read",
@@ -100,7 +104,7 @@ class AuthorizationRlsIntegrationTest {
             .stream()
             .map(key -> new PermissionModel(key, "TENANT", "ACTIVE"))
             .toList(),
-        1,
+        2,
         NOW);
     tenantA = UUID.randomUUID();
     tenantB = UUID.randomUUID();

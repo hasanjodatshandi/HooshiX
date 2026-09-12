@@ -71,6 +71,10 @@ Promotion to `RETIRED` is blocked while an immutable SYSTEM-role definition stil
 Current tenant-management permission keys include:
 
 ```text
+conversation.create
+conversation.read
+conversation.generate
+conversation.delete
 tenant.read
 tenant.delete
 role.read
@@ -121,7 +125,8 @@ Current SYSTEM Roles:
 
 - `tenant_owner` — every current `ACTIVE` tenant permission;
 - `tenant_admin` — every current `ACTIVE` tenant permission except `tenant.delete` and `membership.owner.assign`;
-- `tenant_member` — `tenant.read`, `membership.read`, `role.read`.
+- `tenant_member` — private Conversation create/read/generate/delete plus `tenant.read`,
+  `membership.read`, and `role.read`.
 
 “All tenant permissions” is implemented from the reviewed catalog as explicit materialized/system-managed mappings. It is not a user-defined wildcard assignment.
 

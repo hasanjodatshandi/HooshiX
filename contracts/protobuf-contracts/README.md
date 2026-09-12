@@ -10,16 +10,17 @@ Maven coordinates:
 
 Example:
 
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.0")
 
 The JAR contains generated Protobuf and gRPC transport classes, Protovalidate rules, and the
 `ContractValidationServerInterceptor` used to enforce those rules at a server boundary.
 
-The current 1.8.0 release adds backward-compatible Identity data-subject erasure contracts. The
-self-erasure, legal-hold, participant-target resolution, Kafka command, and non-PII receipt
-messages have executable Protovalidate rules and tested consumer examples. Coordination events
-contain only non-PII workflow identifiers and policy metadata. It retains all 1.7.0 operations and
-wire field numbers.
+The current 1.9.0 release adds the backward-compatible `hooshix.conversation.v1` private
+Conversation and asynchronous ModelRun service contract, the Identity-owned non-PII tenant
+lifecycle event, and the Conversation erasure-participant identity. Every Conversation request has
+Protovalidate rules and a tested protobuf-JSON consumer example. Browser-controlled messages do not
+contain provider, model, endpoint, API-key, system-prompt, output-cap, or tool options. It retains all
+1.8.0 operations and wire field numbers.
 
 ## Validation
 

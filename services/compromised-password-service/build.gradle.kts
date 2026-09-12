@@ -21,7 +21,7 @@ java {
 jacoco { toolVersion = "0.8.15" }
 
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.8.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")

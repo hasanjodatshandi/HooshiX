@@ -1,5 +1,17 @@
-version: 1
+version: 2
 permissions:
+  - key: conversation.create
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: conversation.read
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: conversation.generate
+    scope: TENANT
+    lifecycle: ACTIVE
+  - key: conversation.delete
+    scope: TENANT
+    lifecycle: ACTIVE
   - key: tenant.read
     scope: TENANT
     lifecycle: ACTIVE
