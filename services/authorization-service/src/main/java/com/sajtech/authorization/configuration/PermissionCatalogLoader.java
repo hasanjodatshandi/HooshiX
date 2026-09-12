@@ -20,7 +20,7 @@ public final class PermissionCatalogLoader {
             new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
       List<String> l = reader.lines().toList();
       if (l.size() < 5
-          || !"version: 1".equals(l.get(0))
+          || !"version: 2".equals(l.get(0))
           || !"permissions:".equals(l.get(1))
           || (l.size() - 2) % 3 != 0) throw invalid();
       List<PermissionModel> out = new ArrayList<>();
@@ -34,7 +34,7 @@ public final class PermissionCatalogLoader {
         if (!seen.add(k) || k.length() > 128) throw invalid();
         out.add(new PermissionModel(k, l.get(i + 1).substring(11), l.get(i + 2).substring(15)));
       }
-      return new Catalog(1, out);
+      return new Catalog(2, out);
     } catch (IOException e) {
       throw new IllegalStateException("Permission catalog cannot be loaded", e);
     }

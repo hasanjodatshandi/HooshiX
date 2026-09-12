@@ -129,6 +129,17 @@ contracts/protobuf-contracts/build.gradle.kts
 contracts/protobuf-contracts/examples/authorization/v1/check-permission.valid.json
 contracts/protobuf-contracts/examples/compromisedpassword/v1/lookup-prefix.invalid.json
 contracts/protobuf-contracts/examples/compromisedpassword/v1/lookup-prefix.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/archive-conversation.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/cancel-model-run.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/create-conversation.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/create-model-run.invalid.json
+contracts/protobuf-contracts/examples/conversation/v1/create-model-run.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/delete-conversation.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/get-conversation.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/get-model-run.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/list-conversations.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/list-messages.valid.json
+contracts/protobuf-contracts/examples/conversation/v1/submit-run-feedback.valid.json
 contracts/protobuf-contracts/examples/identity/v1/add-contact.valid.json
 contracts/protobuf-contracts/examples/identity/v1/authenticate-local.valid.json
 contracts/protobuf-contracts/examples/identity/v1/begin-participant-erasure.valid.json
@@ -151,6 +162,7 @@ contracts/protobuf-contracts/examples/identity/v1/restore-tenant.valid.json
 contracts/protobuf-contracts/examples/identity/v1/resume-tenant.valid.json
 contracts/protobuf-contracts/examples/identity/v1/revoke-invitation.valid.json
 contracts/protobuf-contracts/examples/identity/v1/suspend-tenant.valid.json
+contracts/protobuf-contracts/examples/identity/v1/tenant-lifecycle-event.valid.json
 contracts/protobuf-contracts/examples/notification/v1/submit-notification.valid.json
 contracts/protobuf-contracts/gradle.lockfile
 contracts/protobuf-contracts/gradle/verification-metadata.xml
@@ -158,6 +170,7 @@ contracts/protobuf-contracts/settings.gradle.kts
 contracts/protobuf-contracts/src/main/java/com/sajtech/hooshix/contract/validation/ContractValidationServerInterceptor.java
 contracts/protobuf-contracts/src/main/proto/hooshix/authorization/v1/authorization.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/compromisedpassword/v1/compromised_password.proto
+contracts/protobuf-contracts/src/main/proto/hooshix/conversation/v1/conversation.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_authentication.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_erasure.proto
 contracts/protobuf-contracts/src/main/proto/hooshix/identity/v1/identity_external_identity.proto

@@ -26,6 +26,27 @@ service IdentityTenantService {
   rpc ReissueInvitation(ReissueInvitationRequest) returns (ReissueInvitationResponse);
 }
 
+// Kafka value. It contains only stable technical tenant lifecycle evidence and no subject PII.
+enum TenantLifecycleEventState {
+  TENANT_LIFECYCLE_EVENT_STATE_UNSPECIFIED = 0;
+  TENANT_LIFECYCLE_EVENT_STATE_ACTIVE = 1;
+  TENANT_LIFECYCLE_EVENT_STATE_SUSPENDED = 2;
+  TENANT_LIFECYCLE_EVENT_STATE_DELETING = 3;
+  TENANT_LIFECYCLE_EVENT_STATE_DELETED = 4;
+  TENANT_LIFECYCLE_EVENT_STATE_PROVISIONING = 5;
+}
+
+message TenantLifecycleEvent {
+  string event_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  string tenant_id = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"];
+  int64 lifecycle_version = 3 [(buf.validate.field).int64.gt = 0];
+  TenantLifecycleEventState state = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  google.protobuf.Timestamp occurred_at = 5 [(buf.validate.field).required = true];
+}
+
 message CreateTenantRequest {
   string request_id = 1 [(buf.validate.field).string = {pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}];
   string refresh_credential = 2 [(buf.validate.field).string.pattern = "^[A-Za-z0-9_-]{43}$"];

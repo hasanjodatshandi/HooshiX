@@ -72,7 +72,7 @@ class AuthorizationPersistenceIntegrationTest {
     runtime = DSL.using(new TransactionAwareDataSourceProxy(runtimeSource), SQLDialect.POSTGRES);
     auditFailures = new AtomicInteger();
     store = new JooqAuthorizationStore(runtime, auditFailures::incrementAndGet);
-    store.projectPermissionCatalog(catalog(), 1, NOW);
+    store.projectPermissionCatalog(catalog(), 2, NOW);
   }
 
   @Test
@@ -84,6 +84,10 @@ class AuthorizationPersistenceIntegrationTest {
         memberUser = UUID.randomUUID();
     store.provisionOwner(UUID.randomUUID(), digest(1), t1, ownerMembership, ownerUser, NOW);
     store.provisionMember(UUID.randomUUID(), digest(2), t1, member, memberUser, NOW);
+    assertThat(store.checkPermission(t1, member, "conversation.create")).isTrue();
+    assertThat(store.checkPermission(t1, member, "conversation.read")).isTrue();
+    assertThat(store.checkPermission(t1, member, "conversation.generate")).isTrue();
+    assertThat(store.checkPermission(t1, member, "conversation.delete")).isTrue();
     assertThat(store.checkPermission(t1, member, "tenant.read")).isTrue();
     assertThat(store.checkPermission(t1, member, "tenant.delete")).isFalse();
     ActorContext owner = new ActorContext(ownerUser, t1, ownerMembership, "s".repeat(43));
@@ -320,6 +324,10 @@ class AuthorizationPersistenceIntegrationTest {
 
   private static List<PermissionModel> catalog() {
     return List.of(
+            "conversation.create",
+            "conversation.delete",
+            "conversation.generate",
+            "conversation.read",
             "tenant.read",
             "tenant.delete",
             "role.read",

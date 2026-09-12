@@ -8,6 +8,16 @@ import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
 import com.sajtech.authorization.contract.v1.CheckPermissionRequest;
 import com.sajtech.compromisedpassword.contract.v1.LookupPrefixRequest;
+import com.sajtech.conversation.contract.v1.ArchiveConversationRequest;
+import com.sajtech.conversation.contract.v1.CancelModelRunRequest;
+import com.sajtech.conversation.contract.v1.CreateConversationRequest;
+import com.sajtech.conversation.contract.v1.CreateModelRunRequest;
+import com.sajtech.conversation.contract.v1.DeleteConversationRequest;
+import com.sajtech.conversation.contract.v1.GetConversationRequest;
+import com.sajtech.conversation.contract.v1.GetModelRunRequest;
+import com.sajtech.conversation.contract.v1.ListConversationsRequest;
+import com.sajtech.conversation.contract.v1.ListMessagesRequest;
+import com.sajtech.conversation.contract.v1.SubmitRunFeedbackRequest;
 import com.sajtech.identity.contract.v1.AddContactRequest;
 import com.sajtech.identity.contract.v1.AuthenticateLocalRequest;
 import com.sajtech.identity.contract.v1.AuthenticateLocalResponse;
@@ -35,6 +45,7 @@ import com.sajtech.identity.contract.v1.RevokeInvitationRequest;
 import com.sajtech.identity.contract.v1.ReportNotificationResultRequest;
 import com.sajtech.identity.contract.v1.RequestPasswordRecoveryRequest;
 import com.sajtech.identity.contract.v1.SuspendTenantRequest;
+import com.sajtech.identity.contract.v1.TenantLifecycleEvent;
 import com.sajtech.notification.contract.v1.SubmitNotificationRequest;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,6 +63,30 @@ final class ContractExamplesTest {
     return Stream.of(
             example("authorization/v1/check-permission.valid.json", CheckPermissionRequest.newBuilder()),
             example("compromisedpassword/v1/lookup-prefix.valid.json", LookupPrefixRequest.newBuilder()),
+            example(
+                "conversation/v1/create-conversation.valid.json",
+                CreateConversationRequest.newBuilder()),
+            example(
+                "conversation/v1/list-conversations.valid.json",
+                ListConversationsRequest.newBuilder()),
+            example(
+                "conversation/v1/get-conversation.valid.json", GetConversationRequest.newBuilder()),
+            example(
+                "conversation/v1/archive-conversation.valid.json",
+                ArchiveConversationRequest.newBuilder()),
+            example(
+                "conversation/v1/delete-conversation.valid.json",
+                DeleteConversationRequest.newBuilder()),
+            example("conversation/v1/list-messages.valid.json", ListMessagesRequest.newBuilder()),
+            example(
+                "conversation/v1/create-model-run.valid.json", CreateModelRunRequest.newBuilder()),
+            example(
+                "conversation/v1/get-model-run.valid.json", GetModelRunRequest.newBuilder()),
+            example(
+                "conversation/v1/cancel-model-run.valid.json", CancelModelRunRequest.newBuilder()),
+            example(
+                "conversation/v1/submit-run-feedback.valid.json",
+                SubmitRunFeedbackRequest.newBuilder()),
             example("identity/v1/authenticate-local.valid.json", AuthenticateLocalRequest.newBuilder()),
             example(
                 "identity/v1/complete-mfa-authentication.valid.json",
@@ -79,6 +114,9 @@ final class ContractExamplesTest {
                 "identity/v1/erasure-receipt-event.valid.json",
                 ErasureReceiptEvent.newBuilder()),
             example("identity/v1/create-tenant.valid.json", CreateTenantRequest.newBuilder()),
+            example(
+                "identity/v1/tenant-lifecycle-event.valid.json",
+                TenantLifecycleEvent.newBuilder()),
             example("identity/v1/suspend-tenant.valid.json", SuspendTenantRequest.newBuilder()),
             example("identity/v1/resume-tenant.valid.json", ResumeTenantRequest.newBuilder()),
             example("identity/v1/delete-tenant.valid.json", DeleteTenantRequest.newBuilder()),
@@ -121,6 +159,17 @@ final class ContractExamplesTest {
             example(
                 "compromisedpassword/v1/lookup-prefix.invalid.json",
                 LookupPrefixRequest.newBuilder()));
+
+    assertFalse(ValidatorFactory.newBuilder().build().validate(message).isSuccess());
+  }
+
+  @Test
+  void emptyConversationMessageExampleIsRejected() throws Exception {
+    Message message =
+        parse(
+            example(
+                "conversation/v1/create-model-run.invalid.json",
+                CreateModelRunRequest.newBuilder()));
 
     assertFalse(ValidatorFactory.newBuilder().build().validate(message).isSuccess());
   }
