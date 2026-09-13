@@ -1,7 +1,7 @@
 ARG CADDY_BUILDER_IMAGE=docker.io/library/caddy@sha256:c085abfb0fc68e5cbde7dcbf2cbf5ca416a75a6a3343372586c1851e960885cc
 ARG CADDY_RUNTIME_IMAGE=docker.io/library/caddy@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d
 FROM ${CADDY_BUILDER_IMAGE} AS builder
-ENV GOPROXY=https://goproxy.cn,direct GOSUMDB=sum.golang.org
+ENV GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org
 COPY patches/ /tmp/hooshix-waf-patches/
 RUN --mount=type=cache,target=/go/pkg/mod \
     mkdir /tmp/waf-upstream-check && cd /tmp/waf-upstream-check && \
