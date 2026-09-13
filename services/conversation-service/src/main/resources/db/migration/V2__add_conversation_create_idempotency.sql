@@ -1,6 +1,15 @@
 ALTER TABLE conversation
     ADD COLUMN create_request_id uuid;
 
+UPDATE conversation
+SET aggregate_version = 1
+WHERE aggregate_version = 0;
+
+ALTER TABLE conversation
+    ALTER COLUMN aggregate_version SET DEFAULT 1,
+    DROP CONSTRAINT ck_conversation_aggregate_version,
+    ADD CONSTRAINT ck_conversation_aggregate_version CHECK (aggregate_version >= 1);
+
 ALTER TABLE conversation
     ADD CONSTRAINT ck_conversation_id_uuid_v4 CHECK (
         (get_byte(uuid_send(conversation_id), 6) >> 4) = 4

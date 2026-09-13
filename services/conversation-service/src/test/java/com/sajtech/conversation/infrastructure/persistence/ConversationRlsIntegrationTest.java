@@ -270,6 +270,53 @@ class ConversationRlsIntegrationTest {
     }
   }
 
+  @Test
+  void versionTwoBackfillsFoundationAggregateVersion() throws Exception {
+    Flyway.configure()
+        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+        .cleanDisabled(false)
+        .load()
+        .clean();
+    Flyway.configure()
+        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+        .target("1")
+        .load()
+        .migrate();
+    UUID id = UUID.randomUUID();
+    try (Connection connection = adminConnection();
+        PreparedStatement insert =
+            connection.prepareStatement(
+                "INSERT INTO conversation (conversation_id, tenant_id, owner_membership_id, "
+                    + "title_key_id, title_nonce, title_ciphertext, lifecycle, aggregate_version, "
+                    + "created_at, last_activity_at) VALUES (?, ?, ?, 'k1', ?, ?, 'ACTIVE', 0, ?, ?)")) {
+      insert.setObject(1, id);
+      insert.setObject(2, UUID.randomUUID());
+      insert.setObject(3, UUID.randomUUID());
+      insert.setBytes(4, new byte[12]);
+      insert.setBytes(5, new byte[16]);
+      OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+      insert.setObject(6, now);
+      insert.setObject(7, now);
+      assertThat(insert.executeUpdate()).isEqualTo(1);
+    }
+
+    Flyway.configure()
+        .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+        .load()
+        .migrate();
+
+    try (Connection connection = adminConnection();
+        PreparedStatement query =
+            connection.prepareStatement(
+                "SELECT aggregate_version FROM conversation WHERE conversation_id = ?")) {
+      query.setObject(1, id);
+      try (ResultSet row = query.executeQuery()) {
+        assertThat(row.next()).isTrue();
+        assertThat(row.getLong(1)).isEqualTo(1);
+      }
+    }
+  }
+
   private static ConversationActor actor(UUID tenant, UUID membership) {
     return new ConversationActor(UUID.randomUUID(), tenant, membership, "s".repeat(43));
   }
@@ -291,7 +338,7 @@ class ConversationRlsIntegrationTest {
               "INSERT INTO conversation "
                   + "(conversation_id, tenant_id, owner_membership_id, title_key_id, title_nonce, "
                   + "title_ciphertext, lifecycle, aggregate_version, created_at, last_activity_at) "
-                  + "VALUES (?, ?, ?, 'k1', ?, ?, 'ACTIVE', 0, ?, ?)")) {
+                  + "VALUES (?, ?, ?, 'k1', ?, ?, 'ACTIVE', 1, ?, ?)")) {
         insert.setObject(1, UUID.randomUUID());
         insert.setObject(2, tenant);
         insert.setObject(3, UUID.randomUUID());

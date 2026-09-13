@@ -18,7 +18,7 @@ import org.springframework.context.SmartLifecycle;
 
 public final class GrpcServerLifecycle implements SmartLifecycle {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcServerLifecycle.class);
-  private static final int MAX_MESSAGE_BYTES = 24 * 1024;
+  private static final int MAX_MESSAGE_BYTES = 72 * 1024;
   private static final int MAX_METADATA_BYTES = 16 * 1024;
   private final Server server;
   private final ExecutorService executor;

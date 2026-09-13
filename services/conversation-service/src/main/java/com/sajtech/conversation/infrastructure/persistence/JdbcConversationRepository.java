@@ -334,8 +334,8 @@ public final class JdbcConversationRepository implements ConversationRepository 
           context.executeQuery().close();
         }
         try (Statement limits = connection.createStatement()) {
-          limits.execute("SET LOCAL lock_timeout = '200ms'");
-          limits.execute("SET LOCAL statement_timeout = '800ms'");
+          limits.execute("SET LOCAL lock_timeout = '100ms'");
+          limits.execute("SET LOCAL statement_timeout = '500ms'");
         }
         T result = work.execute(connection);
         connection.commit();
