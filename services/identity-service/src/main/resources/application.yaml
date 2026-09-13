@@ -80,7 +80,7 @@ identity:
     private-key-ring-path: ${IDENTITY_JWT_PRIVATE_KEY_RING_PATH:/run/secrets/identity-jwt-private/signing.properties}
     public-verifier-bundle-path: ${IDENTITY_JWT_PUBLIC_VERIFIER_BUNDLE_PATH:/run/config/identity-jwt-public/verifier.properties}
     issuer: ${IDENTITY_JWT_ISSUER:https://identity.sajtech.internal}
-    allowed-audiences: ${IDENTITY_JWT_ALLOWED_AUDIENCES:authorization-service}
+    allowed-audiences: ${IDENTITY_JWT_ALLOWED_AUDIENCES:authorization-service,conversation-service}
 
 server:
   port: -1

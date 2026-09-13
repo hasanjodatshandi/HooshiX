@@ -22,6 +22,20 @@ edges:
       - docs/adr/0032-finalize-authorization-slo-alerting-and-breaker-recovery-v1.md
       - docs/adr/0036-refine-authorization-breaker-recovery-and-dependency-policy-governance-v1.md
 
+  - operation_id: conversation.authorization-permission-check
+    caller_owner: Conversation
+    dependency_id: authorization.CheckPermission
+    class: AUTHORITATIVE_SECURITY
+    failure_action: "Conversation operation unavailable; fail closed"
+    retry_owner: none
+    fallback: "none; no permission cache/stale allow"
+    owner: Conversation
+    policy_refs:
+      - docs/adr/0013-use-online-authorization-without-cache-or-kafka-v1.md
+      - docs/adr/0026-harden-online-authorization-overload-and-slo-v1.md
+      - docs/adr/0054-define-core-conversation-and-model-execution-v1.md
+      - docs/architecture/services/conversation-service.md
+
   - operation_id: identity.security-semantic-quota
     caller_owner: Identity
     dependency_id: security-redis.semantic-quota

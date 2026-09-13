@@ -2,8 +2,8 @@
 
 ## 1. Responsibility and implementation state
 
-`conversation-service` is the accepted but not yet implemented ADR-0054 bounded context for private
-tenant conversations and model execution. Its planned repository boundary is:
+`conversation-service` is the implemented foundation of the ADR-0054 bounded context for private
+tenant conversations and model execution. Its current repository boundary is:
 
 ```text
 services/conversation-service
@@ -106,11 +106,11 @@ queues:                       zero for RPC; finite durable DB worker queue
 Client/BFF/mesh must not add a retry layer. Cancellation propagates where safe but never fabricates
 provider cancellation.
 
-Before implementation becomes production-eligible, canonical dependency-registry entries must be
-added for `web-bff.conversation-api-dispatch` (`AUTHORITATIVE_STATE`),
-`conversation.authorization-permission-check` (`AUTHORITATIVE_SECURITY`), and
-`conversation.model-provider-execution` (`EXTERNAL_SIDE_EFFECT`). The registry is not changed by
-this architecture-only milestone because none of those runtime edges exists yet.
+The canonical registry now includes `conversation.authorization-permission-check`
+(`AUTHORITATIVE_SECURITY`) because the fail-closed JWT/Authorization boundary exists. Before the
+remaining implementation becomes production-eligible, it must also add
+`web-bff.conversation-api-dispatch` (`AUTHORITATIVE_STATE`) and
+`conversation.model-provider-execution` (`EXTERNAL_SIDE_EFFECT`) when those runtime edges exist.
 
 ## 6. Persistence and transaction boundaries
 

@@ -38,6 +38,11 @@ resourceCallers:
       app.kubernetes.io/name: workflow-service
     principal: prod.sajtech.internal/ns/platform-apps/sa/workflow-service
     callerId: workflow-service
+  - namespace: platform-apps
+    podLabels:
+      app.kubernetes.io/name: conversation-service
+    principal: prod.sajtech.internal/ns/platform-apps/sa/conversation-service
+    callerId: conversation-service
 observability:
   tracing:
     enabled: true

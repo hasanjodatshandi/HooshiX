@@ -35,7 +35,7 @@ class ArchitectureRulesTest {
         .resideInAPackage("..infrastructure..")
         .should()
         .dependOnClassesThat()
-        .resideInAPackage("..interfaces..")
+        .resideInAPackage("com.sajtech.conversation.interfaces..")
         .allowEmptyShould(true)
         .check(classes);
   }

@@ -45,6 +45,18 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.authorization.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.authorization.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.authorization.port }}
+        - protocol: TCP
+          port: 15008
+    - to:
+        - namespaceSelector:
+            matchLabels:
               kubernetes.io/metadata.name: {{ required "observability tracing namespace is required" .Values.observability.tracing.collector.namespace | quote }}
           podSelector:
             matchLabels:

@@ -4,6 +4,7 @@ plugins {
     java
     jacoco
     id("org.springframework.boot") version "4.1.0"
+    id("com.google.protobuf") version "0.10.0"
     id("com.diffplug.spotless") version "8.9.0"
     id("com.github.spotbugs") version "6.5.9"
 }
@@ -18,7 +19,9 @@ java {
 jacoco { toolVersion = "0.8.15" }
 
 dependencies {
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.0")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
+    implementation(platform("io.netty:netty-bom:4.2.17.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
@@ -26,6 +29,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("io.grpc:grpc-netty-shaded:1.83.1")
+    implementation("io.grpc:grpc-protobuf:1.83.1")
+    implementation("io.grpc:grpc-stub:1.83.1")
+    compileOnly("javax.annotation:javax.annotation-api:1.3.2")
     runtimeOnly("org.postgresql:postgresql:42.7.13")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
@@ -49,8 +56,16 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")
+    testImplementation("io.grpc:grpc-inprocess:1.83.1")
+    testImplementation("io.grpc:grpc-testing:1.83.1")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:4.34.2" }
+    plugins { maybeCreate("grpc").artifact = "io.grpc:protoc-gen-grpc-java:1.83.1" }
+    generateProtoTasks { all().forEach { task -> task.plugins.maybeCreate("grpc") } }
 }
 
 spotless {
