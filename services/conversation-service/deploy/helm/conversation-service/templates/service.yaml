@@ -9,6 +9,10 @@ spec:
   selector:
     {{- include "conversation-service.selectorLabels" . | nindent 4 }}
   ports:
+    - name: grpc
+      port: {{ .Values.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
     - name: management
       port: {{ .Values.service.managementPort }}
       targetPort: management
