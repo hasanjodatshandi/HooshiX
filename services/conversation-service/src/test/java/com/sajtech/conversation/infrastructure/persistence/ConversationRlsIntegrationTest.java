@@ -2,14 +2,28 @@ package com.sajtech.conversation.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.sajtech.conversation.application.ConversationError;
+import com.sajtech.conversation.application.ConversationException;
+import com.sajtech.conversation.application.model.ConversationActor;
+import com.sajtech.conversation.domain.ConversationLifecycle;
+import com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto;
+import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.sql.*;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -25,7 +39,9 @@ class ConversationRlsIntegrationTest {
           .withPassword("migration_test_password");
   private static final String RUNTIME_ROLE = "conversation_runtime_test";
   private static final String RUNTIME_PASSWORD = "runtime_test_password";
+  @TempDir Path directory;
   private HikariDataSource runtime;
+  private JdbcConversationRepository repository;
 
   @BeforeAll
   static void start() {
@@ -70,6 +86,17 @@ class ConversationRlsIntegrationTest {
     config.setMinimumIdle(1);
     config.setPoolName("conversation-rls-test");
     runtime = new HikariDataSource(config);
+    byte[] key = new byte[32];
+    java.util.Arrays.fill(key, (byte) 7);
+    Path keyRing = directory.resolve("content.properties");
+    Files.writeString(
+        keyRing, "active_key_id=k1\nkey.k1=" + Base64.getEncoder().encodeToString(key) + "\n");
+    repository =
+        new JdbcConversationRepository(
+            runtime,
+            new AesGcmContentCrypto(
+                new FileBackedContentKeyRing(keyRing, Clock.systemUTC(), Duration.ofMinutes(5)),
+                new SecureRandom()));
   }
 
   @AfterEach
@@ -127,6 +154,53 @@ class ConversationRlsIntegrationTest {
               }
             })
         .isInstanceOf(SQLException.class);
+  }
+
+  @Test
+  void repositoryEnforcesPrivateOwnershipIdempotencyLifecycleAndRls() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID ownerMembership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, ownerMembership);
+    ConversationActor otherMember = actor(tenant, UUID.randomUUID());
+    ConversationActor otherTenant = actor(UUID.randomUUID(), ownerMembership);
+    UUID requestId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    Instant createdAt = Instant.parse("2026-09-13T08:00:00Z");
+
+    var created = repository.create(owner, requestId, conversationId, "private title", createdAt);
+    var replay =
+        repository.create(
+            owner, requestId, UUID.randomUUID(), "private title", createdAt.plusSeconds(1));
+
+    assertThat(created.id()).isEqualTo(conversationId);
+    assertThat(replay.id()).isEqualTo(conversationId);
+    assertThat(repository.getOwned(owner, conversationId).title()).isEqualTo("private title");
+    assertThat(repository.listOwned(owner, 20, "").conversations()).containsExactly(created);
+    assertNotFound(() -> repository.getOwned(otherMember, conversationId));
+    assertNotFound(() -> repository.getOwned(otherTenant, conversationId));
+
+    var archived =
+        repository.archiveOwned(
+            owner, UUID.randomUUID(), conversationId, 1, createdAt.plusSeconds(2));
+    assertThat(archived.lifecycle()).isEqualTo(ConversationLifecycle.ARCHIVED);
+    assertThat(archived.version()).isEqualTo(2);
+
+    repository.deleteOwned(owner, UUID.randomUUID(), conversationId, 2, createdAt.plusSeconds(3));
+    assertNotFound(() -> repository.getOwned(owner, conversationId));
+    assertThat(repository.listOwned(owner, 20, "").conversations()).isEmpty();
+    assertThat(countVisibleWithoutContext()).isZero();
+  }
+
+  private static ConversationActor actor(UUID tenant, UUID membership) {
+    return new ConversationActor(UUID.randomUUID(), tenant, membership, "s".repeat(43));
+  }
+
+  private static void assertNotFound(Runnable query) {
+    assertThatThrownBy(query::run)
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(ConversationError.CONVERSATION_NOT_FOUND));
   }
 
   private void insertConversation(UUID tenant) throws Exception {
