@@ -11,6 +11,18 @@ serviceAccount:
 service:
   managementPort: 9092
 
+authorization:
+  target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: authorization-service
+  port: 9090
+  maximumConcurrentChecks: 4
+
+identity:
+  jwtVerifierConfigMapName: ""
+  jwtIssuer: https://identity.sajtech.internal
+
 runtime:
   providerRuntimeEnabled: false
   temporaryStorageLimit: 256Mi

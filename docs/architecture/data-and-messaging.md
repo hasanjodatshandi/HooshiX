@@ -177,7 +177,8 @@ Applicable evidence includes:
 
 ## 11. Conversation/model-execution data
 
-ADR-0054 adds one accepted, not-yet-implemented mutable service boundary. Conversation will own a
+ADR-0054 adds one mutable service boundary whose executable foundation and authority edge are now
+implemented. Conversation owns a
 distinct PostgreSQL database/Flyway/role/RLS lifecycle for encrypted Conversation, Message,
 ModelRun, budget reservation, usage/cost, dedup, audit, tenant-lifecycle projection, and ADR-0028
 Inbox/Outbox evidence.

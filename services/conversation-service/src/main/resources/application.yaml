@@ -24,6 +24,12 @@ conversation:
   content-key-ring-path: ${CONVERSATION_CONTENT_KEY_RING_PATH:/run/secrets/conversation-content/content.properties}
   key-ring-refresh-interval: 30s
   key-ring-maximum-staleness: 2m
+  authorization-target: ${CONVERSATION_AUTHORIZATION_TARGET:dns:///authorization-service.platform-apps.svc.cluster.local:9090}
+  authorization-maximum-concurrent-checks: ${CONVERSATION_AUTHORIZATION_MAXIMUM_CONCURRENT_CHECKS:4}
+  identity-jwt-verifier-bundle-path: ${CONVERSATION_IDENTITY_JWT_VERIFIER_BUNDLE_PATH:/run/config/conversation-identity-jwt/verifier.properties}
+  identity-jwt-issuer: ${CONVERSATION_IDENTITY_JWT_ISSUER:https://identity.sajtech.internal}
+  jwt-verifier-refresh-interval: 30s
+  jwt-verifier-maximum-staleness: 5m
 
 server:
   port: -1

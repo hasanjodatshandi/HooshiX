@@ -12,17 +12,58 @@ class ConversationPropertiesTest {
     assertThatThrownBy(
             () ->
                 new ConversationProperties(
-                    false, null, Duration.ofSeconds(30), Duration.ofMinutes(1)))
+                    false,
+                    null,
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(
             () ->
                 new ConversationProperties(
-                    false, Path.of("keys"), Duration.ofSeconds(30), Duration.ZERO))
+                    false,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ZERO,
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(
             () ->
                 new ConversationProperties(
-                    false, Path.of("keys"), Duration.ofMinutes(1), Duration.ofMinutes(1)))
+                    false,
+                    Path.of("keys"),
+                    Duration.ofMinutes(1),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new ConversationProperties(
+                    false,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "",
+                    0,
+                    null,
+                    "",
+                    Duration.ZERO,
+                    Duration.ZERO))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

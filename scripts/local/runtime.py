@@ -691,7 +691,7 @@ def runtime_envs(values: dict[str, str], keys: dict[str, Path], dataset: dict[st
         "QUOTA_REDIS_URI": f"redis://127.0.0.1:{REDIS_PORT}",
         "IDENTITY_JWT_PRIVATE_KEY_RING_PATH": str(keys["identity-jwt-private"]),
         "IDENTITY_JWT_PUBLIC_VERIFIER_BUNDLE_PATH": str(keys["identity-jwt-public"]),
-        "IDENTITY_JWT_ALLOWED_AUDIENCES": "authorization-service",
+        "IDENTITY_JWT_ALLOWED_AUDIENCES": "authorization-service,conversation-service",
         "KAFKA_BOOTSTRAP_SERVERS": f"127.0.0.1:{KAFKA_PORT}",
         "MANAGEMENT_SERVER_PORT": str(SERVICE_PORTS["identity-service"]["management"]),
     })

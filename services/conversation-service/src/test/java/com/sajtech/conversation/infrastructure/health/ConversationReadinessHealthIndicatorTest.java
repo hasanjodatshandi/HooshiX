@@ -3,6 +3,7 @@ package com.sajtech.conversation.infrastructure.health;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
+import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifier;
 import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
 import java.sql.*;
 import javax.sql.DataSource;
@@ -13,6 +14,7 @@ import org.springframework.boot.health.contributor.Status;
 class ConversationReadinessHealthIndicatorTest {
   private DataSource dataSource;
   private FileBackedContentKeyRing keyRing;
+  private IdentityJwtVerifier jwtVerifier;
   private Connection connection;
   private PreparedStatement statement;
   private ResultSet result;
@@ -21,10 +23,12 @@ class ConversationReadinessHealthIndicatorTest {
   void setUp() throws Exception {
     dataSource = mock(DataSource.class);
     keyRing = mock(FileBackedContentKeyRing.class);
+    jwtVerifier = mock(IdentityJwtVerifier.class);
     connection = mock(Connection.class);
     statement = mock(PreparedStatement.class);
     result = mock(ResultSet.class);
     when(keyRing.isFresh()).thenReturn(true);
+    when(jwtVerifier.isFresh()).thenReturn(true);
     when(dataSource.getConnection()).thenReturn(connection);
     when(connection.prepareStatement(anyString())).thenReturn(statement);
     when(statement.executeQuery()).thenReturn(result);
@@ -64,7 +68,18 @@ class ConversationReadinessHealthIndicatorTest {
     assertThat(unavailable.getDetails()).containsEntry("reason", "database_unavailable");
   }
 
+  @Test
+  void reportsDownForStaleJwtVerifierWithoutOpeningDatabaseConnection() {
+    when(jwtVerifier.isFresh()).thenReturn(false);
+
+    var health = indicator().health();
+
+    assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+    assertThat(health.getDetails()).containsEntry("reason", "identity_jwt_verifier_unavailable");
+    verifyNoInteractions(dataSource);
+  }
+
   private ConversationReadinessHealthIndicator indicator() {
-    return new ConversationReadinessHealthIndicator(dataSource, keyRing);
+    return new ConversationReadinessHealthIndicator(dataSource, keyRing, jwtVerifier);
   }
 }

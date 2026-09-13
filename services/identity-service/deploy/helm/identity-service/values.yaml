@@ -71,6 +71,7 @@ jwt:
   issuer: https://identity.sajtech.internal
   allowedAudiences:
     - authorization-service
+    - conversation-service
 webBff:
   namespace: platform-apps
   podLabels:

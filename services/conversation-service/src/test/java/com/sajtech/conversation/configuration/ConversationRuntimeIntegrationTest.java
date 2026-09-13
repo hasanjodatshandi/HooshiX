@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.KeyPairGenerator;
 import java.util.Base64;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
@@ -48,6 +49,15 @@ class ConversationRuntimeIntegrationTest {
     Path keyFile = directory.resolve("content.properties");
     Files.writeString(
         keyFile, "active_key_id=k1\nkey.k1=" + Base64.getEncoder().encodeToString(key) + "\n");
+    var generator = KeyPairGenerator.getInstance("RSA");
+    generator.initialize(3072);
+    var jwtKeys = generator.generateKeyPair();
+    Path jwtVerifier = directory.resolve("verifier.properties");
+    Files.writeString(
+        jwtVerifier,
+        "current_key_id=k1\nkey.k1="
+            + Base64.getEncoder().encodeToString(jwtKeys.getPublic().getEncoded())
+            + "\n");
 
     var context =
         new SpringApplicationBuilder(ConversationApplication.class)
@@ -57,6 +67,7 @@ class ConversationRuntimeIntegrationTest {
                 "--spring.datasource.username=" + POSTGRES.getUsername(),
                 "--spring.datasource.password=" + POSTGRES.getPassword(),
                 "--conversation.content-key-ring-path=" + keyFile,
+                "--conversation.identity-jwt-verifier-bundle-path=" + jwtVerifier,
                 "--management.server.port=0",
                 "--management.otlp.metrics.export.enabled=false");
     try {

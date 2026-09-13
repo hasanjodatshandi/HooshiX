@@ -10,6 +10,9 @@ database:
 secrets:
   contentKeyRingSecretName: conversation-content
 
+identity:
+  jwtVerifierConfigMapName: identity-jwt-public
+
 observability:
   tracing:
     otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces

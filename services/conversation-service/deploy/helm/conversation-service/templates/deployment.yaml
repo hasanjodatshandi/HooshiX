@@ -7,6 +7,9 @@
 {{- $migrationDbSecret := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
 {{- if eq $runtimeDbSecret $migrationDbSecret }}{{ fail "runtime and migration database credentials must use distinct Secrets" }}{{ end -}}
 {{- $contentSecret := required "secrets.contentKeyRingSecretName is required" .Values.secrets.contentKeyRingSecretName -}}
+{{- $jwtVerifierConfigMap := required "identity.jwtVerifierConfigMapName is required" .Values.identity.jwtVerifierConfigMapName -}}
+{{- $authorizationTarget := required "authorization.target is required" .Values.authorization.target -}}
+{{- if lt (int .Values.authorization.maximumConcurrentChecks) 1 }}{{ fail "authorization.maximumConcurrentChecks must be positive" }}{{ end -}}
 {{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
 {{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
 {{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
@@ -82,6 +85,14 @@ spec:
               value: {{ $jdbcUrl | quote }}
             - name: CONVERSATION_PROVIDER_RUNTIME_ENABLED
               value: {{ .Values.runtime.providerRuntimeEnabled | quote }}
+            - name: CONVERSATION_AUTHORIZATION_TARGET
+              value: {{ $authorizationTarget | quote }}
+            - name: CONVERSATION_AUTHORIZATION_MAXIMUM_CONCURRENT_CHECKS
+              value: {{ .Values.authorization.maximumConcurrentChecks | quote }}
+            - name: CONVERSATION_IDENTITY_JWT_VERIFIER_BUNDLE_PATH
+              value: /run/config/conversation-identity-jwt/verifier.properties
+            - name: CONVERSATION_IDENTITY_JWT_ISSUER
+              value: {{ required "identity.jwtIssuer is required" .Values.identity.jwtIssuer | quote }}
             - name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
               value: {{ $traceEndpoint | quote }}
           resources:
@@ -113,6 +124,9 @@ spec:
             - name: content-key-ring
               mountPath: /run/secrets/conversation-content
               readOnly: true
+            - name: identity-jwt-bundle
+              mountPath: /run/config/conversation-identity-jwt
+              readOnly: true
             - name: temporary
               mountPath: /tmp
       volumes:
@@ -131,6 +145,12 @@ spec:
             items:
               - key: content.properties
                 path: content.properties
+        - name: identity-jwt-bundle
+          configMap:
+            name: {{ $jwtVerifierConfigMap | quote }}
+            items:
+              - key: verifier.properties
+                path: verifier.properties
         - name: temporary
           emptyDir:
             sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}
