@@ -1,8 +1,10 @@
 package com.sajtech.conversation.configuration;
 
 import com.sajtech.conversation.application.service.ConversationAuthority;
+import com.sajtech.conversation.application.service.ConversationService;
 import com.sajtech.conversation.infrastructure.client.authorization.GrpcPermissionAuthorizer;
 import com.sajtech.conversation.infrastructure.health.ConversationReadinessHealthIndicator;
+import com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifier;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifierRefresher;
 import com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto;
@@ -77,6 +79,18 @@ public class RuntimeConfiguration {
   ConversationAuthority conversationAuthority(
       IdentityJwtVerifier verifier, GrpcPermissionAuthorizer authorizer) {
     return new ConversationAuthority(verifier, authorizer);
+  }
+
+  @Bean
+  JdbcConversationRepository conversationRepository(
+      DataSource dataSource, AesGcmContentCrypto contentCrypto) {
+    return new JdbcConversationRepository(dataSource, contentCrypto);
+  }
+
+  @Bean
+  ConversationService conversationService(
+      ConversationAuthority authority, JdbcConversationRepository repository, Clock clock) {
+    return new ConversationService(authority, repository, clock);
   }
 
   @Bean("conversationReadiness")
