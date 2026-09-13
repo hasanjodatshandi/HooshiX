@@ -21,6 +21,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -82,7 +85,7 @@ class ConversationRlsIntegrationTest {
     config.setJdbcUrl(POSTGRES.getJdbcUrl());
     config.setUsername(RUNTIME_ROLE);
     config.setPassword(RUNTIME_PASSWORD);
-    config.setMaximumPoolSize(1);
+    config.setMaximumPoolSize(2);
     config.setMinimumIdle(1);
     config.setPoolName("conversation-rls-test");
     runtime = new HikariDataSource(config);
@@ -239,6 +242,32 @@ class ConversationRlsIntegrationTest {
     assertNotFound(() -> repository.getOwned(owner, conversationId));
     assertThat(repository.listOwned(owner, 20, "").conversations()).isEmpty();
     assertThat(countVisibleWithoutContext()).isZero();
+  }
+
+  @Test
+  void concurrentEqualCreateRequestReturnsOneConversation() throws Exception {
+    ConversationActor owner = actor(UUID.randomUUID(), UUID.randomUUID());
+    UUID requestId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    CountDownLatch start = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var first =
+          executor.submit(
+              () -> {
+                start.await();
+                return repository.create(owner, requestId, UUID.randomUUID(), "same title", now);
+              });
+      var second =
+          executor.submit(
+              () -> {
+                start.await();
+                return repository.create(owner, requestId, UUID.randomUUID(), "same title", now);
+              });
+      start.countDown();
+
+      assertThat(first.get(5, TimeUnit.SECONDS).id())
+          .isEqualTo(second.get(5, TimeUnit.SECONDS).id());
+    }
   }
 
   private static ConversationActor actor(UUID tenant, UUID membership) {
