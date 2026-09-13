@@ -28,6 +28,8 @@ def main() -> None:
     require(text, r"conversation-content", "content key-ring Secret missing")
     require(text, r"identity-jwt-public", "Identity JWT verifier ConfigMap missing")
     require(text, r"CONVERSATION_AUTHORIZATION_TARGET", "Authorization target missing")
+    require(text, r"name: grpc[\s\S]*?containerPort: 9090", "bounded private gRPC listener missing")
+    require(text, r"CONVERSATION_GRPC_MAXIMUM_CONCURRENT_CALLS[\s\S]*?32", "gRPC concurrency bound missing")
     require(text, r"authorization-service", "Authorization egress missing")
     require(text, r"CONVERSATION_PROVIDER_RUNTIME_ENABLED[\s\S]*?false", "provider kill switch must default off")
     require(text, r"readOnlyRootFilesystem: true", "read-only root filesystem missing")

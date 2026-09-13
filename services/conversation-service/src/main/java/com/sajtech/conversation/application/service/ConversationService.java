@@ -41,7 +41,7 @@ public final class ConversationService {
   }
 
   public Conversation get(String token, UUID conversationId) {
-    Objects.requireNonNull(conversationId);
+    requireUuidV4(conversationId);
     var actor = authority.authorize(token, ConversationPermission.READ);
     return repository.getOwned(actor, conversationId);
   }
@@ -68,6 +68,7 @@ public final class ConversationService {
     int length = title.codePointCount(0, title.length());
     if (length < 1
         || length > 120
+        || hasInvalidUnicode(title)
         || title.codePoints().anyMatch(codePoint -> Character.isISOControl(codePoint))) {
       throw invalidRequest();
     }
@@ -75,7 +76,21 @@ public final class ConversationService {
   }
 
   private static void requireMutation(UUID conversationId, long expectedVersion) {
-    if (conversationId == null || expectedVersion < 1) throw invalidRequest();
+    requireUuidV4(conversationId);
+    if (expectedVersion < 1) throw invalidRequest();
+  }
+
+  private static boolean hasInvalidUnicode(String value) {
+    for (int index = 0; index < value.length(); index++) {
+      char current = value.charAt(index);
+      if (Character.isHighSurrogate(current)) {
+        if (++index >= value.length() || !Character.isLowSurrogate(value.charAt(index)))
+          return true;
+      } else if (Character.isLowSurrogate(current)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void requireUuidV4(UUID value) {

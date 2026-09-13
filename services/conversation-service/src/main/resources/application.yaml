@@ -35,6 +35,12 @@ server:
   port: -1
   shutdown: graceful
 
+hooshix:
+  conversation:
+    grpc-bind-address: ${CONVERSATION_GRPC_BIND_ADDRESS:0.0.0.0}
+    grpc-port: ${CONVERSATION_GRPC_PORT:9090}
+    grpc-maximum-concurrent-calls: ${CONVERSATION_GRPC_MAXIMUM_CONCURRENT_CALLS:32}
+
 management:
   server:
     port: 9092
@@ -51,6 +57,12 @@ management:
           include: livenessState
         readiness:
           include: readinessState,conversationReadiness
+  metrics:
+    distribution:
+      percentiles-histogram:
+        conversation.grpc.duration: true
+      slo:
+        conversation.grpc.duration: 100ms,500ms,900ms
   otlp:
     metrics:
       export:

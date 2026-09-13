@@ -10,6 +10,7 @@
 {{- $jwtVerifierConfigMap := required "identity.jwtVerifierConfigMapName is required" .Values.identity.jwtVerifierConfigMapName -}}
 {{- $authorizationTarget := required "authorization.target is required" .Values.authorization.target -}}
 {{- if lt (int .Values.authorization.maximumConcurrentChecks) 1 }}{{ fail "authorization.maximumConcurrentChecks must be positive" }}{{ end -}}
+{{- if lt (int .Values.runtime.grpcMaximumConcurrentCalls) 1 }}{{ fail "runtime.grpcMaximumConcurrentCalls must be positive" }}{{ end -}}
 {{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
 {{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
 {{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
@@ -77,6 +78,9 @@ spec:
             capabilities:
               drop: ["ALL"]
           ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+              protocol: TCP
             - name: management
               containerPort: {{ .Values.service.managementPort }}
               protocol: TCP
@@ -85,6 +89,10 @@ spec:
               value: {{ $jdbcUrl | quote }}
             - name: CONVERSATION_PROVIDER_RUNTIME_ENABLED
               value: {{ .Values.runtime.providerRuntimeEnabled | quote }}
+            - name: CONVERSATION_GRPC_PORT
+              value: {{ .Values.service.grpcPort | quote }}
+            - name: CONVERSATION_GRPC_MAXIMUM_CONCURRENT_CALLS
+              value: {{ .Values.runtime.grpcMaximumConcurrentCalls | quote }}
             - name: CONVERSATION_AUTHORIZATION_TARGET
               value: {{ $authorizationTarget | quote }}
             - name: CONVERSATION_AUTHORIZATION_MAXIMUM_CONCURRENT_CHECKS

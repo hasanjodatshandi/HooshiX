@@ -117,7 +117,12 @@ class ConversationRlsIntegrationTest {
         for (int column = 1; column <= 5; column++) assertThat(result.getBoolean(column)).isFalse();
       }
       for (String table :
-          new String[] {"conversation", "conversation_message", "conversation_model_run"}) {
+          new String[] {
+            "conversation",
+            "conversation_message",
+            "conversation_model_run",
+            "conversation_mutation_request"
+          }) {
         try (PreparedStatement security =
             connection.prepareStatement(
                 "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = CAST(? AS regclass)")) {
@@ -174,18 +179,63 @@ class ConversationRlsIntegrationTest {
 
     assertThat(created.id()).isEqualTo(conversationId);
     assertThat(replay.id()).isEqualTo(conversationId);
+    assertThatThrownBy(
+            () ->
+                repository.create(
+                    owner,
+                    requestId,
+                    UUID.randomUUID(),
+                    "different title",
+                    createdAt.plusSeconds(1)))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(ConversationError.CONVERSATION_CONFLICT));
     assertThat(repository.getOwned(owner, conversationId).title()).isEqualTo("private title");
     assertThat(repository.listOwned(owner, 20, "").conversations()).containsExactly(created);
     assertNotFound(() -> repository.getOwned(otherMember, conversationId));
     assertNotFound(() -> repository.getOwned(otherTenant, conversationId));
 
+    UUID archiveRequestId = UUID.randomUUID();
     var archived =
         repository.archiveOwned(
-            owner, UUID.randomUUID(), conversationId, 1, createdAt.plusSeconds(2));
+            owner, archiveRequestId, conversationId, 1, createdAt.plusSeconds(2));
     assertThat(archived.lifecycle()).isEqualTo(ConversationLifecycle.ARCHIVED);
     assertThat(archived.version()).isEqualTo(2);
+    assertThat(
+            repository.archiveOwned(
+                owner, archiveRequestId, conversationId, 1, createdAt.plusSeconds(9)))
+        .isEqualTo(archived);
+    assertThatThrownBy(
+            () ->
+                repository.archiveOwned(
+                    owner, archiveRequestId, UUID.randomUUID(), 1, createdAt.plusSeconds(9)))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(ConversationError.CONVERSATION_CONFLICT));
+    assertThatThrownBy(
+            () ->
+                repository.archiveOwned(
+                    owner, UUID.randomUUID(), conversationId, 2, createdAt.plusSeconds(9)))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error())
+                    .isEqualTo(ConversationError.CONVERSATION_INVALID_STATE));
 
-    repository.deleteOwned(owner, UUID.randomUUID(), conversationId, 2, createdAt.plusSeconds(3));
+    UUID deleteRequestId = UUID.randomUUID();
+    repository.deleteOwned(owner, deleteRequestId, conversationId, 2, createdAt.plusSeconds(3));
+    repository.deleteOwned(owner, deleteRequestId, conversationId, 2, createdAt.plusSeconds(10));
+    assertThatThrownBy(
+            () ->
+                repository.deleteOwned(
+                    owner, UUID.randomUUID(), conversationId, 3, createdAt.plusSeconds(11)))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error())
+                    .isEqualTo(ConversationError.CONVERSATION_INVALID_STATE));
     assertNotFound(() -> repository.getOwned(owner, conversationId));
     assertThat(repository.listOwned(owner, 20, "").conversations()).isEmpty();
     assertThat(countVisibleWithoutContext()).isZero();

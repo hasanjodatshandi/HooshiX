@@ -69,6 +69,16 @@ class ConversationServiceTest {
   }
 
   @Test
+  void rejectsNonV4IdsAndMalformedUnicodeBeforeAuthority() {
+    UUID versionOne = UUID.fromString("12345678-1234-1234-9234-123456789abc");
+    assertThatThrownBy(() -> service.get("token", versionOne))
+        .isInstanceOf(ConversationException.class);
+    assertThatThrownBy(() -> service.create("token", UUID.randomUUID(), "broken\ud800"))
+        .isInstanceOf(ConversationException.class);
+    verifyNoInteractions(tokens, permissions, repository);
+  }
+
+  @Test
   void readAndMutationOperationsUseTheirExactPermissionAndActor() {
     UUID id = UUID.randomUUID();
     UUID requestId = UUID.randomUUID();

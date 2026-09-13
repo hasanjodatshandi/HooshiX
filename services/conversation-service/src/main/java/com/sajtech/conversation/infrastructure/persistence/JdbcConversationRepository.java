@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.UUID;
 import javax.sql.DataSource;
 
@@ -23,8 +24,8 @@ public final class JdbcConversationRepository implements ConversationRepository 
   private final AesGcmContentCrypto crypto;
 
   public JdbcConversationRepository(DataSource dataSource, AesGcmContentCrypto crypto) {
-    this.dataSource = dataSource;
-    this.crypto = crypto;
+    this.dataSource = Objects.requireNonNull(dataSource);
+    this.crypto = Objects.requireNonNull(crypto);
   }
 
   @Override
@@ -33,6 +34,7 @@ public final class JdbcConversationRepository implements ConversationRepository 
     return transaction(
         actor,
         connection -> {
+          lockIdempotencyKey(connection, actor, requestId);
           Conversation existing = findByCreateRequest(connection, actor, requestId);
           if (existing != null) {
             if (!existing.title().equals(title)) throw conflict();
@@ -70,13 +72,27 @@ public final class JdbcConversationRepository implements ConversationRepository 
         });
   }
 
+  private void lockIdempotencyKey(Connection connection, ConversationActor actor, UUID requestId)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+      statement.setString(1, actor.tenantId() + ":" + actor.membershipId() + ":" + requestId);
+      statement.executeQuery().close();
+    }
+  }
+
   @Override
   public ConversationPage listOwned(ConversationActor actor, int pageSize, String pageToken) {
+    final ConversationPageToken.Cursor cursor;
+    try {
+      cursor = pageToken.isEmpty() ? null : ConversationPageToken.decode(pageToken);
+    } catch (IllegalArgumentException exception) {
+      throw new ConversationException(
+          ConversationError.INVALID_REQUEST, "Conversation page token is invalid");
+    }
     return transaction(
         actor,
         connection -> {
-          ConversationPageToken.Cursor cursor =
-              pageToken.isEmpty() ? null : ConversationPageToken.decode(pageToken);
           String cursorSql =
               cursor == null ? "" : " AND (last_activity_at, conversation_id) < (?, ?)";
           try (PreparedStatement statement =
@@ -124,10 +140,13 @@ public final class JdbcConversationRepository implements ConversationRepository 
     return transaction(
         actor,
         connection -> {
+          if (mutationReplay(
+              connection, actor, requestId, conversationId, "ARCHIVE", expectedVersion)) {
+            return requireOwned(connection, actor, conversationId, false);
+          }
           Conversation current = requireOwned(connection, actor, conversationId, false);
-          if (current.lifecycle() == ConversationLifecycle.ARCHIVED) return current;
-          if (current.lifecycle() != ConversationLifecycle.ACTIVE
-              || current.version() != expectedVersion) {
+          if (current.lifecycle() != ConversationLifecycle.ACTIVE) throw invalidState();
+          if (current.version() != expectedVersion) {
             throw conflict();
           }
           try (PreparedStatement statement =
@@ -141,6 +160,8 @@ public final class JdbcConversationRepository implements ConversationRepository 
             statement.setLong(4, expectedVersion);
             if (statement.executeUpdate() != 1) throw conflict();
           }
+          recordMutation(
+              connection, actor, requestId, conversationId, "ARCHIVE", expectedVersion, now);
           return new Conversation(
               current.id(),
               current.tenantId(),
@@ -163,8 +184,12 @@ public final class JdbcConversationRepository implements ConversationRepository 
     transaction(
         actor,
         connection -> {
+          if (mutationReplay(
+              connection, actor, requestId, conversationId, "DELETE", expectedVersion)) {
+            return null;
+          }
           Conversation current = requireOwned(connection, actor, conversationId, true);
-          if (current.lifecycle() == ConversationLifecycle.DELETED) return null;
+          if (current.lifecycle() == ConversationLifecycle.DELETED) throw invalidState();
           if (current.version() != expectedVersion) throw conflict();
           try (PreparedStatement statement =
               connection.prepareStatement(
@@ -178,8 +203,62 @@ public final class JdbcConversationRepository implements ConversationRepository 
             statement.setLong(4, expectedVersion);
             if (statement.executeUpdate() != 1) throw conflict();
           }
+          recordMutation(
+              connection, actor, requestId, conversationId, "DELETE", expectedVersion, now);
           return null;
         });
+  }
+
+  private boolean mutationReplay(
+      Connection connection,
+      ConversationActor actor,
+      UUID requestId,
+      UUID conversationId,
+      String operation,
+      long expectedVersion)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT conversation_id, operation, expected_version FROM conversation_mutation_request "
+                + "WHERE owner_membership_id = ? AND request_id = ?")) {
+      statement.setObject(1, actor.membershipId());
+      statement.setObject(2, requestId);
+      try (ResultSet row = statement.executeQuery()) {
+        if (!row.next()) return false;
+        if (!conversationId.equals(row.getObject("conversation_id", UUID.class))
+            || !operation.equals(row.getString("operation"))
+            || expectedVersion != row.getLong("expected_version")) {
+          throw conflict();
+        }
+        return true;
+      }
+    }
+  }
+
+  private void recordMutation(
+      Connection connection,
+      ConversationActor actor,
+      UUID requestId,
+      UUID conversationId,
+      String operation,
+      long expectedVersion,
+      Instant now)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "INSERT INTO conversation_mutation_request (tenant_id, owner_membership_id, request_id, "
+                + "conversation_id, operation, expected_version, resulting_version, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+      statement.setObject(1, actor.tenantId());
+      statement.setObject(2, actor.membershipId());
+      statement.setObject(3, requestId);
+      statement.setObject(4, conversationId);
+      statement.setString(5, operation);
+      statement.setLong(6, expectedVersion);
+      statement.setLong(7, expectedVersion + 1);
+      statement.setObject(8, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+      statement.executeUpdate();
+    }
   }
 
   private Conversation findByCreateRequest(
@@ -267,11 +346,13 @@ public final class JdbcConversationRepository implements ConversationRepository 
       }
     } catch (ConversationException exception) {
       throw exception;
-    } catch (IllegalArgumentException exception) {
-      throw new ConversationException(
-          ConversationError.INVALID_REQUEST, "Conversation request is invalid", exception);
     } catch (SQLException exception) {
       if ("23505".equals(exception.getSQLState())) throw conflict();
+      throw new ConversationException(
+          ConversationError.PERSISTENCE_UNAVAILABLE,
+          "Conversation persistence is unavailable",
+          exception);
+    } catch (RuntimeException exception) {
       throw new ConversationException(
           ConversationError.PERSISTENCE_UNAVAILABLE,
           "Conversation persistence is unavailable",
@@ -282,6 +363,12 @@ public final class JdbcConversationRepository implements ConversationRepository 
   private static ConversationException conflict() {
     return new ConversationException(
         ConversationError.CONVERSATION_CONFLICT, "Conversation state conflicts with the request");
+  }
+
+  private static ConversationException invalidState() {
+    return new ConversationException(
+        ConversationError.CONVERSATION_INVALID_STATE,
+        "Conversation lifecycle does not allow the operation");
   }
 
   @FunctionalInterface
