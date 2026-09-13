@@ -3,7 +3,7 @@
 - **Reviewed:** 2026-08-29
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, the current Identity registration/authentication/session/JWT/Tenant/Profile/Contact/MFA/ExternalIdentity/erasure surface, Authorization, and Web BFF slices; service-specific Semgrep/OSV/Gitleaks gates are present for all five implemented Java services. Protected repository baseline run `33105936814` passed every service security suite and the final aggregator on `main@68cf66c`; protected frontend run `33105936555` also passed at that commit. The repository-owned local production-fidelity kind/staging lane has passed its composite runtime verification, while production deployed-runtime/staging/release evidence remains `NOT VERIFIED`; real Production Syft/Grype/Cosign/Kyverno final-artifact/release-admission execution also remains `NOT VERIFIED`; see `implementation-status.md`
+- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, the current Identity registration/authentication/session/JWT/Tenant/Profile/Contact/MFA/ExternalIdentity/erasure surface, Authorization, Web BFF, and the security/data/deployment foundation of Conversation; service-specific Semgrep/OSV/Gitleaks gates are present for all six Java services. Protected run `33105936814` is historical five-service evidence; protected Conversation and six-service aggregate evidence remain pending the current PR. The repository-owned five-service local production-fidelity lane has passed its composite runtime verification, while Conversation is not yet integrated there and all production deployed-runtime/staging/release evidence remains `NOT VERIFIED`; see `implementation-status.md`.
 
 ## 1. Selected single-server topology
 
@@ -147,10 +147,11 @@ Trivy and OWASP Dependency-Check are not selected current default tools because 
 A real committed secret requires revoke/rotate handling when exposure is plausible; deleting the latest line is not sufficient. Scanner output must stay redacted.
 
 The selected ADR-0045 repository controls are now implemented for the current code/release boundary:
-all five implemented Java services have Gitleaks current-tree/Git-history gates; the frontend has
+all six implemented Java services have Gitleaks current-tree/Git-history gates; the frontend has
 dedicated Semgrep and OSV gates; and exact-digest Syft/Grype/Cosign release automation, scheduled
 deployed-digest rescanning, and stable Kyverno production release-admission generation cover all
-six application release components. Real production final-artifact scanning/signing/attestation/
+the existing six application release components. Conversation joins that release boundary only
+after its Stage 9 vertical slice and activation gates are complete. Real production final-artifact scanning/signing/attestation/
 rescanning and production-cluster admission enforcement remain `NOT VERIFIED`.
 
 ## 8. Kyverno

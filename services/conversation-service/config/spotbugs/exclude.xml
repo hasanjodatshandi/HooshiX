@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <Match>
+        <Or>
+            <Class name="com.sajtech.conversation.infrastructure.health.ConversationReadinessHealthIndicator"/>
+            <Class name="com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.sajtech.conversation.infrastructure.health.ConversationReadinessHealthIndicatorTest"/>
+        <Bug pattern="OBL_UNSATISFIED_OBLIGATION"/>
+    </Match>
+</FindBugsFilter>

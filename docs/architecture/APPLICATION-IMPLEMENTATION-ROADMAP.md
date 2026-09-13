@@ -115,7 +115,7 @@ from base `9f0a811f78006f76c25d95b4499d4dfc868ba5aa`.
 The implementation target remains:
 
 ```text
-service foundation                  -> one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, key ring, and Day-One telemetry
+service foundation                  -> COMPLETED in Stage 9 foundation PR: one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, AES-256-GCM key ring, and Day-One telemetry; deployed runtime remains unverified
 contracts                           -> versioned validated example-backed gRPC plus BFF OpenAPI/generated frontend types
 authority                           -> exact JWT audience, four permission keys, one online CheckPermission, final private-resource ownership
 conversation/run state              -> encrypted Conversation/Message, idempotent run acceptance, bounded durable worker, deterministic cancellation

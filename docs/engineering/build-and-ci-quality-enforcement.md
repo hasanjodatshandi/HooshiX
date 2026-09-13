@@ -70,11 +70,11 @@ The selected boundary is intentionally high-signal and blocking:
   invalid comparison/control-flow, and undefined-name defects block CI without
   introducing a broad style-only rewrite.
 
-The five Java service workflows retain their separate Gitleaks fixture, Gitleaks
+The six Java service workflows retain their separate Gitleaks fixture, Gitleaks
 tree/history scan, OSV installation, and OSV lockfile scan steps, but their identical
 implementations are owned by `scripts/ci/security/service_security.sh`. Baseline
 verification requires every workflow to invoke every mode exactly once. Changing the
-shared script therefore requires reviewing all five security jobs and preserving
+shared script therefore requires reviewing all six security jobs and preserving
 redaction, positive/negative fixtures, immutable tool identity, and scan failure
 semantics.
 

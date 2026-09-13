@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: conversation-service
+
+service:
+  managementPort: 9092
+
+runtime:
+  providerRuntimeEnabled: false
+  temporaryStorageLimit: 256Mi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 64Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+    ephemeral-storage: 512Mi
+
+database:
+  jdbcUrl: ""
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: conversation-postgresql
+  port: 5432
+  runtimeSecretName: ""
+  migrationSecretName: ""
+
+secrets:
+  contentKeyRingSecretName: ""
+
+observability:
+  tracing:
+    enabled: true
+    otlpEndpoint: ""
+    collector:
+      namespace: ""
+      podLabels: {}
+      port: 4318
+  metrics:
+    enabled: true
+    prometheus:
+      namespace: ""
+      podLabels: {}
+      principal: ""

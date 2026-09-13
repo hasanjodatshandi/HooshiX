@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This runbook operates the repository-owned local production-fidelity integration lane in the canonical WSL checkout `/home/coder/workspace/Hooshix`. It verifies Kubernetes, Calico, Istio Ambient, Kyverno admission, Traefik/WAF, local staging PostgreSQL/Redis/Kafka, all five current application services, and the local observability stack together.
+This runbook operates the repository-owned local production-fidelity integration lane in the canonical WSL checkout `/home/coder/workspace/Hooshix`. It verifies Kubernetes, Calico, Istio Ambient, Kyverno admission, Traefik/WAF, local staging PostgreSQL/Redis/Kafka, the five fully integrated pre-Conversation application services, and the local observability stack together. The Stage 9 Conversation foundation is not added to this lane until its protected API/lifecycle activation requirements exist.
 
 This lane is **integration fidelity only**. It is not the selected `production-single-server` K3s runtime and does not prove production readiness, production HA, complete-stack capacity, backup/DR, external host-down monitoring, production secret delivery, production provider delivery, or the final Syft/Grype/Cosign release chain.
 

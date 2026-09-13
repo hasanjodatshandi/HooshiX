@@ -1,0 +1,25 @@
+{
+  "title": "Conversation Service Foundation",
+  "uid": "conversation-service",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Readiness",
+      "targets": [
+        {"expr": "up{job=\"conversation-service\"}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Database pool pending",
+      "targets": [
+        {"expr": "hikaricp_connections_pending{pool=~\".*conversation.*\"}", "refId": "A"}
+      ]
+    }
+  ]
+}

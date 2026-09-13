@@ -107,9 +107,16 @@ REPORTING_PROTOCOL_PATHS = (
 SERVICE_SECURITY_WORKFLOWS = (
     ".github/workflows/authorization-service.yml",
     ".github/workflows/compromised-password-service.yml",
+    ".github/workflows/conversation-service.yml",
     ".github/workflows/identity-service.yml",
     ".github/workflows/notification-service.yml",
     ".github/workflows/web-bff.yml",
+)
+BASELINE_CONVERSATION_MARKERS = (
+    "conversation-security:\n    name: Conversation security suite\n    uses: ./.github/workflows/conversation-service.yml",
+    "      - conversation-security",
+    "CONVERSATION_RESULT: ${{ needs.conversation-security.result }}",
+    'if [ "${CONVERSATION_RESULT}" != \'success\' ]; then',
 )
 SERVICE_SECURITY_MODES = (
     "gitleaks-fixtures",
@@ -521,6 +528,11 @@ def validate_ci_source_quality(root: Path) -> list[str]:
         if not workflow.is_file():
             errors.append(f"missing service security workflow: {relative}")
             continue
+        wrapper = root / "services" / Path(relative).stem / "gradlew"
+        if not wrapper.is_file():
+            errors.append(f"missing service Gradle wrapper: {wrapper.relative_to(root)}")
+        elif not os.access(wrapper, os.X_OK):
+            errors.append(f"service Gradle wrapper is not executable: {wrapper.relative_to(root)}")
         workflow_text = read_text(workflow)
         for mode in SERVICE_SECURITY_MODES:
             invocation = invocation_prefix + mode
@@ -531,8 +543,15 @@ def validate_ci_source_quality(root: Path) -> list[str]:
 
     if not baseline_workflow.is_file():
         errors.append("missing repository baseline workflow")
-    elif "run: make script-static-verify" not in read_text(baseline_workflow):
-        errors.append("repository baseline workflow does not enforce script-static-verify")
+    else:
+        baseline_text = read_text(baseline_workflow)
+        if "run: make script-static-verify" not in baseline_text:
+            errors.append("repository baseline workflow does not enforce script-static-verify")
+        for marker in BASELINE_CONVERSATION_MARKERS:
+            if marker not in baseline_text:
+                errors.append(
+                    "repository baseline workflow does not fail closed on Conversation: " + marker
+                )
 
     return errors
 
