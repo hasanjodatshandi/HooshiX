@@ -103,6 +103,10 @@ jobs:
         working-directory: contracts/protobuf-contracts
         run: |
           set -euo pipefail
+          ../../services/conversation-service/gradlew prepareBufDependencies \
+            --dependency-verification strict \
+            --no-daemon \
+            --no-configuration-cache
           /tmp/buf lint
           /tmp/buf build -o /tmp/conversation-contract.binpb
           ../../scripts/contracts/verify_protobuf_compatibility.sh \
