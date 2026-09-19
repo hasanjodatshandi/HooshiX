@@ -3,6 +3,10 @@ package com.sajtech.conversation.infrastructure.health;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
+import com.sajtech.conversation.application.ConversationError;
+import com.sajtech.conversation.application.ConversationException;
+import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
+import com.sajtech.conversation.infrastructure.provider.openai.FileBackedOpenAiModelProvider;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifier;
 import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
 import java.sql.*;
@@ -18,6 +22,8 @@ class ConversationReadinessHealthIndicatorTest {
   private Connection connection;
   private PreparedStatement statement;
   private ResultSet result;
+  private ModelPolicyProvider modelPolicy;
+  private FileBackedOpenAiModelProvider modelProvider;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -27,6 +33,8 @@ class ConversationReadinessHealthIndicatorTest {
     connection = mock(Connection.class);
     statement = mock(PreparedStatement.class);
     result = mock(ResultSet.class);
+    modelPolicy = mock(ModelPolicyProvider.class);
+    modelProvider = mock(FileBackedOpenAiModelProvider.class);
     when(keyRing.isFresh()).thenReturn(true);
     when(jwtVerifier.isFresh()).thenReturn(true);
     when(dataSource.getConnection()).thenReturn(connection);
@@ -79,7 +87,35 @@ class ConversationReadinessHealthIndicatorTest {
     verifyNoInteractions(dataSource);
   }
 
+  @Test
+  void enabledProviderRequiresApprovedPolicyAndCredentialWithoutContactingProvider()
+      throws Exception {
+    when(modelPolicy.requireApprovedPolicy())
+        .thenThrow(
+            new ConversationException(
+                ConversationError.MODEL_EXECUTION_DISABLED, "Model execution is disabled"));
+
+    var policyUnavailable = indicator(true).health();
+    assertThat(policyUnavailable.getStatus()).isEqualTo(Status.DOWN);
+    assertThat(policyUnavailable.getDetails()).containsEntry("reason", "model_policy_unavailable");
+    verifyNoInteractions(dataSource, modelProvider);
+
+    reset(modelPolicy);
+    when(modelPolicy.requireApprovedPolicy()).thenReturn(mock());
+    when(modelProvider.isConfigured()).thenReturn(false);
+    var credentialUnavailable = indicator(true).health();
+    assertThat(credentialUnavailable.getStatus()).isEqualTo(Status.DOWN);
+    assertThat(credentialUnavailable.getDetails())
+        .containsEntry("reason", "provider_credential_unavailable");
+    verifyNoInteractions(dataSource);
+  }
+
   private ConversationReadinessHealthIndicator indicator() {
-    return new ConversationReadinessHealthIndicator(dataSource, keyRing, jwtVerifier);
+    return indicator(false);
+  }
+
+  private ConversationReadinessHealthIndicator indicator(boolean providerEnabled) {
+    return new ConversationReadinessHealthIndicator(
+        dataSource, keyRing, jwtVerifier, providerEnabled, modelPolicy, modelProvider);
   }
 }

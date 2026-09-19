@@ -115,7 +115,7 @@ class ConversationServiceTest {
   void createRunCanonicalizesAuthorizesAndUsesApprovedPolicy() {
     UUID requestId = UUID.randomUUID();
     UUID conversationId = UUID.randomUUID();
-    var policy = new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000);
+    var policy = policy();
     when(modelPolicy.requireApprovedPolicy()).thenReturn(policy);
     when(modelRuns.findAcceptedReplay(ACTOR, requestId, conversationId, "  Café  "))
         .thenReturn(null);
@@ -218,5 +218,19 @@ class ConversationServiceTest {
         NOW,
         null,
         completedAt);
+  }
+
+  private static ModelExecutionPolicy policy() {
+    return new ModelExecutionPolicy(
+        "conversation-primary",
+        "gpt-5.4-2026-03-05",
+        "1.0.0",
+        "2026-09-12",
+        16_000,
+        2_000,
+        2_500_000,
+        250_000,
+        15_000_000,
+        70_000);
   }
 }

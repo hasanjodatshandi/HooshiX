@@ -33,8 +33,12 @@ class GitGovernedModelPolicyProviderTest {
         .satisfies(
             policy -> {
               assertThat(policy.modelAlias()).isEqualTo("conversation-primary");
+              assertThat(policy.providerModelId()).isEqualTo("gpt-5.4-2026-03-05");
               assertThat(policy.promptVersion()).isEqualTo("1.0.0");
               assertThat(policy.priceVersion()).isEqualTo("2026-09-12");
+              assertThat(policy.maximumInputTokens()).isEqualTo(16_000);
+              assertThat(policy.maximumOutputTokens()).isEqualTo(2_000);
+              assertThat(policy.actualCostMicroUsd(1_000, 100, 100)).isEqualTo(3_775);
               assertThat(policy.maximumReservationMicroUsd()).isEqualTo(70_000);
             });
   }
@@ -70,10 +74,14 @@ class GitGovernedModelPolicyProviderTest {
             "lifecycle":"APPROVED_100",
             "execution_enabled":true,
             "provider":"openai",
+            "provider_model_id":"gpt-5.4-2026-03-05",
             "endpoint":"responses",
+            "reasoning_effort":"none",
             "store":false,
             "background":false,
             "tools_enabled":false,
+            "max_input_tokens":16000,
+            "max_output_tokens":2000,
             "prompt_id":"conversation-system",
             "prompt_version":"1.0.0",
             "price_id":"price",
@@ -89,6 +97,11 @@ class GitGovernedModelPolicyProviderTest {
           "price_catalog":[{
             "price_id":"price",
             "price_version":"2026-09-12",
+            "currency":"USD",
+            "unit":"MICRO_USD_PER_MILLION_TOKENS",
+            "input":2500000,
+            "cached_input":250000,
+            "output":15000000,
             "maximum_request_reservation_micro_usd":70000
           }]
         }

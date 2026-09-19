@@ -16,6 +16,8 @@ runtime:
   grpcMaximumConcurrentCalls: 32
   providerRuntimeEnabled: false
   temporaryStorageLimit: 256Mi
+  providerMaximumConcurrentCalls: 4
+  providerMaximumConcurrentPerTenant: 1
 
 authorization:
   target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
@@ -50,6 +52,7 @@ database:
 
 secrets:
   contentKeyRingSecretName: ""
+  providerApiKeySecretName: ""
 
 observability:
   tracing:

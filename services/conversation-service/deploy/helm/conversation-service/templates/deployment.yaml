@@ -7,10 +7,15 @@
 {{- $migrationDbSecret := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
 {{- if eq $runtimeDbSecret $migrationDbSecret }}{{ fail "runtime and migration database credentials must use distinct Secrets" }}{{ end -}}
 {{- $contentSecret := required "secrets.contentKeyRingSecretName is required" .Values.secrets.contentKeyRingSecretName -}}
+{{- if .Values.runtime.providerRuntimeEnabled }}
+{{- required "secrets.providerApiKeySecretName is required when provider runtime is enabled" .Values.secrets.providerApiKeySecretName -}}
+{{- end }}
 {{- $jwtVerifierConfigMap := required "identity.jwtVerifierConfigMapName is required" .Values.identity.jwtVerifierConfigMapName -}}
 {{- $authorizationTarget := required "authorization.target is required" .Values.authorization.target -}}
 {{- if lt (int .Values.authorization.maximumConcurrentChecks) 1 }}{{ fail "authorization.maximumConcurrentChecks must be positive" }}{{ end -}}
 {{- if lt (int .Values.runtime.grpcMaximumConcurrentCalls) 1 }}{{ fail "runtime.grpcMaximumConcurrentCalls must be positive" }}{{ end -}}
+{{- if lt (int .Values.runtime.providerMaximumConcurrentCalls) 1 }}{{ fail "runtime.providerMaximumConcurrentCalls must be positive" }}{{ end -}}
+{{- if or (lt (int .Values.runtime.providerMaximumConcurrentPerTenant) 1) (gt (int .Values.runtime.providerMaximumConcurrentPerTenant) (int .Values.runtime.providerMaximumConcurrentCalls)) }}{{ fail "runtime provider per-tenant concurrency must be positive and not exceed global concurrency" }}{{ end -}}
 {{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
 {{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
 {{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
@@ -89,6 +94,10 @@ spec:
               value: {{ $jdbcUrl | quote }}
             - name: CONVERSATION_PROVIDER_RUNTIME_ENABLED
               value: {{ .Values.runtime.providerRuntimeEnabled | quote }}
+            - name: CONVERSATION_PROVIDER_MAXIMUM_CONCURRENT_CALLS
+              value: {{ .Values.runtime.providerMaximumConcurrentCalls | quote }}
+            - name: CONVERSATION_PROVIDER_MAXIMUM_CONCURRENT_PER_TENANT
+              value: {{ .Values.runtime.providerMaximumConcurrentPerTenant | quote }}
             - name: CONVERSATION_GRPC_PORT
               value: {{ .Values.service.grpcPort | quote }}
             - name: CONVERSATION_GRPC_MAXIMUM_CONCURRENT_CALLS
@@ -132,6 +141,11 @@ spec:
             - name: content-key-ring
               mountPath: /run/secrets/conversation-content
               readOnly: true
+            {{- if .Values.runtime.providerRuntimeEnabled }}
+            - name: provider-api-key
+              mountPath: /run/secrets/conversation-provider
+              readOnly: true
+            {{- end }}
             - name: identity-jwt-bundle
               mountPath: /run/config/conversation-identity-jwt
               readOnly: true
@@ -153,6 +167,15 @@ spec:
             items:
               - key: content.properties
                 path: content.properties
+        {{- if .Values.runtime.providerRuntimeEnabled }}
+        - name: provider-api-key
+          secret:
+            secretName: {{ .Values.secrets.providerApiKeySecretName | quote }}
+            defaultMode: 0440
+            items:
+              - key: api-key
+                path: api-key
+        {{- end }}
         - name: identity-jwt-bundle
           configMap:
             name: {{ $jwtVerifierConfigMap | quote }}

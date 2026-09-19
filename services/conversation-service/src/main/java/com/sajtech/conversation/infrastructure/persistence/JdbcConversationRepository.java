@@ -219,6 +219,16 @@ public final class JdbcConversationRepository implements ConversationRepository 
       releaseBudget(connection, actor, "TENANT", actor.tenantId(), queuedReservation, now);
       releaseBudget(connection, actor, "MEMBERSHIP", actor.membershipId(), queuedReservation, now);
     }
+    try (PreparedStatement removeQueuedWork =
+        connection.prepareStatement(
+            "DELETE FROM conversation_model_run_queue WHERE conversation_id = ? "
+                + "AND run_id IN (SELECT run_id FROM conversation_model_run "
+                + "WHERE conversation_id = ? AND requester_membership_id = ? AND state = 'QUEUED')")) {
+      removeQueuedWork.setObject(1, conversationId);
+      removeQueuedWork.setObject(2, conversationId);
+      removeQueuedWork.setObject(3, actor.membershipId());
+      removeQueuedWork.executeUpdate();
+    }
     try (PreparedStatement cancel =
         connection.prepareStatement(
             "UPDATE conversation_model_run SET state = 'CANCELED', cancellation_requested = true, "

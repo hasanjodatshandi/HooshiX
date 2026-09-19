@@ -42,10 +42,14 @@ approval. The neutral Conversation transport contract and permission catalog are
 executable `services/conversation-service/` foundation now owns a Java 25/Spring Boot build and CI
 boundary, a distinct Flyway history with encrypted Conversation/Message/ModelRun columns and forced
 tenant RLS, a versioned AES-256-GCM content key ring with authenticated tenant/conversation/content/
-purpose binding, private readiness/Prometheus/OTLP configuration, and hardened Helm packaging. It
-does not yet expose a Conversation RPC/public route, call Authorization, consume lifecycle/erasure
-events, run a worker, hold provider credentials, or enable provider/model execution; those remain
-Stage 9 work and no deployed runtime evidence is claimed.
+purpose binding, authoritative Authorization checks, private Conversation CRUD/history and
+ModelRun RPCs, atomic reservation/acceptance/cancellation, a lease-backed bounded worker, fixed
+OpenAI Responses adapter, conditional secret-file boundary, integer usage/cost reconciliation,
+private readiness/Prometheus/OTLP configuration, and hardened Helm packaging. The global worker
+queue contains technical identifiers/timestamps only; provider I/O occurs after claim commit.
+Current governance and Kubernetes egress keep provider execution disabled. Tenant lifecycle and
+ADR-0028 erasure, provider safety/evaluation/telemetry and cancellation propagation, BFF/UI route,
+release integration, activation egress, and deployed runtime evidence remain Stage 9 work.
 
 Implemented repository-governance artifacts are:
 
