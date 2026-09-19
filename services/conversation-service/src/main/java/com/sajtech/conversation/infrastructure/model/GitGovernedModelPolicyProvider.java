@@ -38,7 +38,8 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
 
   private static ModelExecutionPolicy approvedPolicy(JsonNode root) {
     try {
-      if (root.path("schema_version").asInt() != 1
+      if (!root.path("schema_version").isInt()
+          || root.path("schema_version").intValue() != 1
           || !EXPECTED_DECISION_STATUS.equals(text(root, "decision_status"))
           || !EXPECTED_DATA_CONTROL.equals(
               text(root.path("provider_data_controls"), "approval_status"))) {
@@ -65,7 +66,9 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
         }
       }
       if (price == null) return null;
-      long reservation = price.path("maximum_request_reservation_micro_usd").asLong(-1);
+      JsonNode reservationNode = price.path("maximum_request_reservation_micro_usd");
+      if (!reservationNode.isIntegralNumber()) return null;
+      long reservation = reservationNode.longValue();
       return new ModelExecutionPolicy(
           text(model, "logical_id"), text(model, "prompt_version"), priceVersion, reservation);
     } catch (IllegalArgumentException exception) {
