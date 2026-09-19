@@ -10,6 +10,7 @@ import com.sajtech.conversation.domain.ConversationLifecycle;
 import com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto;
 import com.sajtech.conversation.infrastructure.security.content.ContentPurpose;
 import com.sajtech.conversation.infrastructure.security.content.EncryptedContent;
+import java.math.BigDecimal;
 import java.sql.*;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -191,6 +192,7 @@ public final class JdbcConversationRepository implements ConversationRepository 
           Conversation current = requireOwned(connection, actor, conversationId, true);
           if (current.lifecycle() == ConversationLifecycle.DELETED) throw invalidState();
           if (current.version() != expectedVersion) throw conflict();
+          releaseQueuedRunBudgetAndEraseMessages(connection, actor, conversationId, now);
           try (PreparedStatement statement =
               connection.prepareStatement(
                   "UPDATE conversation SET lifecycle = 'DELETED', aggregate_version = aggregate_version + 1, "
@@ -207,6 +209,89 @@ public final class JdbcConversationRepository implements ConversationRepository 
               connection, actor, requestId, conversationId, "DELETE", expectedVersion, now);
           return null;
         });
+  }
+
+  private static void releaseQueuedRunBudgetAndEraseMessages(
+      Connection connection, ConversationActor actor, UUID conversationId, Instant now)
+      throws SQLException {
+    long queuedReservation = queuedReservation(connection, actor, conversationId);
+    if (queuedReservation > 0) {
+      releaseBudget(connection, actor, "TENANT", actor.tenantId(), queuedReservation, now);
+      releaseBudget(connection, actor, "MEMBERSHIP", actor.membershipId(), queuedReservation, now);
+    }
+    try (PreparedStatement cancel =
+        connection.prepareStatement(
+            "UPDATE conversation_model_run SET state = 'CANCELED', cancellation_requested = true, "
+                + "completed_at = ? WHERE conversation_id = ? AND requester_membership_id = ? "
+                + "AND state = 'QUEUED'")) {
+      cancel.setObject(1, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+      cancel.setObject(2, conversationId);
+      cancel.setObject(3, actor.membershipId());
+      cancel.executeUpdate();
+    }
+    try (PreparedStatement detach =
+        connection.prepareStatement(
+            "UPDATE conversation_model_run SET user_message_id = NULL, "
+                + "cancellation_requested = CASE WHEN state = 'RUNNING' THEN true "
+                + "ELSE cancellation_requested END WHERE conversation_id = ? "
+                + "AND requester_membership_id = ?")) {
+      detach.setObject(1, conversationId);
+      detach.setObject(2, actor.membershipId());
+      detach.executeUpdate();
+    }
+    try (PreparedStatement erase =
+        connection.prepareStatement("DELETE FROM conversation_message WHERE conversation_id = ?")) {
+      erase.setObject(1, conversationId);
+      erase.executeUpdate();
+    }
+  }
+
+  private static long queuedReservation(
+      Connection connection, ConversationActor actor, UUID conversationId) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT COALESCE(SUM(reserved_cost_microunits), 0) FROM conversation_model_run "
+                + "WHERE conversation_id = ? AND requester_membership_id = ? AND state = 'QUEUED'")) {
+      statement.setObject(1, conversationId);
+      statement.setObject(2, actor.membershipId());
+      try (ResultSet row = statement.executeQuery()) {
+        row.next();
+        try {
+          return row.getObject(1, BigDecimal.class).longValueExact();
+        } catch (ArithmeticException exception) {
+          throw new ConversationException(
+              ConversationError.PERSISTENCE_UNAVAILABLE,
+              "Conversation persistence is unavailable",
+              exception);
+        }
+      }
+    }
+  }
+
+  private static void releaseBudget(
+      Connection connection,
+      ConversationActor actor,
+      String scope,
+      UUID scopeId,
+      long amount,
+      Instant now)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "UPDATE conversation_budget_account SET reserved_micro_usd = reserved_micro_usd - ?, "
+                + "version = version + 1, updated_at = ? WHERE tenant_id = ? AND scope_type = ? "
+                + "AND scope_id = ? AND reserved_micro_usd >= ?")) {
+      statement.setLong(1, amount);
+      statement.setObject(2, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+      statement.setObject(3, actor.tenantId());
+      statement.setString(4, scope);
+      statement.setObject(5, scopeId);
+      statement.setLong(6, amount);
+      if (statement.executeUpdate() != 1) {
+        throw new ConversationException(
+            ConversationError.PERSISTENCE_UNAVAILABLE, "Conversation persistence is unavailable");
+      }
+    }
   }
 
   private boolean mutationReplay(

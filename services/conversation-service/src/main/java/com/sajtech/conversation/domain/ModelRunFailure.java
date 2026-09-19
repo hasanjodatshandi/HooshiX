@@ -1,0 +1,12 @@
+package com.sajtech.conversation.domain;
+
+public enum ModelRunFailure {
+  NONE,
+  PROVIDER_UNAVAILABLE,
+  PROVIDER_REJECTED,
+  PROVIDER_RESPONSE_INVALID,
+  SAFETY_REJECTED,
+  BUDGET_UNAVAILABLE,
+  EXECUTION_DISABLED,
+  TENANT_INACTIVE
+}

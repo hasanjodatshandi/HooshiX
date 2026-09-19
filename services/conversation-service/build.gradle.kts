@@ -91,6 +91,15 @@ configure<SpotBugsExtension> {
 
 dependencyLocking { lockAllConfigurations() }
 
+tasks.processResources {
+    from(rootProject.file("../../mlops/governance/v1/governance.json")) {
+        into("mlops/governance/v1")
+    }
+    from(rootProject.file("../../mlops/prompts/conversation-system-v1.txt")) {
+        into("mlops/prompts")
+    }
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     testLogging {

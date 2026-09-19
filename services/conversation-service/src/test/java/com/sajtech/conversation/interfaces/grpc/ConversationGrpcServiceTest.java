@@ -9,6 +9,8 @@ import com.sajtech.conversation.application.service.ConversationService;
 import com.sajtech.conversation.contract.v1.*;
 import com.sajtech.conversation.domain.Conversation;
 import com.sajtech.conversation.domain.ConversationLifecycle;
+import com.sajtech.conversation.domain.ModelRun;
+import com.sajtech.conversation.domain.ModelRunFailure;
 import com.sajtech.conversation.interfaces.observability.grpc.ConversationTracingInterceptor;
 import com.sajtech.hooshix.contract.validation.ContractValidationServerInterceptor;
 import io.grpc.*;
@@ -163,6 +165,68 @@ class ConversationGrpcServiceTest {
               assertThat(exception.getStatus().getCode()).isEqualTo(Status.Code.NOT_FOUND);
               assertThat(exception.getStatus().getDescription())
                   .isEqualTo("CONVERSATION_NOT_FOUND");
+            });
+  }
+
+  @Test
+  void createModelRunMapsAcceptedStateWithoutExposingInternalIdentity() {
+    UUID requestId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    when(application.createRun("token", requestId, conversationId, "hello"))
+        .thenReturn(
+            new ModelRun(
+                runId,
+                conversationId,
+                com.sajtech.conversation.domain.ModelRunState.QUEUED,
+                "conversation-primary",
+                "1.0.0",
+                "2026-09-12",
+                70_000,
+                0,
+                ModelRunFailure.NONE,
+                false,
+                now,
+                null,
+                null));
+
+    var response =
+        authorized()
+            .createModelRun(
+                CreateModelRunRequest.newBuilder()
+                    .setRequestId(requestId.toString())
+                    .setConversationId(conversationId.toString())
+                    .setUserMessage("hello")
+                    .build());
+
+    assertThat(response.getRun().getRunId()).isEqualTo(runId.toString());
+    assertThat(response.getRun().getState()).isEqualTo(ModelRunState.MODEL_RUN_STATE_QUEUED);
+    assertThat(response.getRun().getReservedCostMicroUsd()).isEqualTo(70_000);
+  }
+
+  @Test
+  void budgetDenialMapsToResourceExhaustedWithStableDescription() {
+    UUID requestId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    when(application.createRun("token", requestId, conversationId, "hello"))
+        .thenThrow(
+            new ConversationException(ConversationError.BUDGET_UNAVAILABLE, "sensitive amount"));
+
+    assertThatThrownBy(
+            () ->
+                authorized()
+                    .createModelRun(
+                        CreateModelRunRequest.newBuilder()
+                            .setRequestId(requestId.toString())
+                            .setConversationId(conversationId.toString())
+                            .setUserMessage("hello")
+                            .build()))
+        .isInstanceOfSatisfying(
+            StatusRuntimeException.class,
+            exception -> {
+              assertThat(exception.getStatus().getCode()).isEqualTo(Status.Code.RESOURCE_EXHAUSTED);
+              assertThat(exception.getStatus().getDescription()).isEqualTo("BUDGET_UNAVAILABLE");
             });
   }
 
