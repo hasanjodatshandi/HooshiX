@@ -21,6 +21,15 @@ spring:
 
 conversation:
   provider-runtime-enabled: ${CONVERSATION_PROVIDER_RUNTIME_ENABLED:false}
+  model-worker:
+    provider-api-key-path: ${CONVERSATION_PROVIDER_API_KEY_PATH:/run/secrets/conversation-provider/api-key}
+    poll-interval: 250ms
+    lease-duration: 65s
+    circuit-open-duration: 30s
+    maximum-concurrent-calls: ${CONVERSATION_PROVIDER_MAXIMUM_CONCURRENT_CALLS:4}
+    maximum-concurrent-per-tenant: ${CONVERSATION_PROVIDER_MAXIMUM_CONCURRENT_PER_TENANT:1}
+    expiry-batch-size: 20
+    circuit-failure-threshold: 3
   content-key-ring-path: ${CONVERSATION_CONTENT_KEY_RING_PATH:/run/secrets/conversation-content/content.properties}
   key-ring-refresh-interval: 30s
   key-ring-maximum-staleness: 2m

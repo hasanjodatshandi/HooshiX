@@ -1,5 +1,8 @@
 package com.sajtech.conversation.infrastructure.health;
 
+import com.sajtech.conversation.application.ConversationException;
+import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
+import com.sajtech.conversation.infrastructure.provider.openai.FileBackedOpenAiModelProvider;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifier;
 import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
 import java.sql.SQLException;
@@ -12,12 +15,23 @@ public final class ConversationReadinessHealthIndicator implements HealthIndicat
   private final DataSource dataSource;
   private final FileBackedContentKeyRing keyRing;
   private final IdentityJwtVerifier jwtVerifier;
+  private final boolean providerRuntimeEnabled;
+  private final ModelPolicyProvider modelPolicy;
+  private final FileBackedOpenAiModelProvider modelProvider;
 
   public ConversationReadinessHealthIndicator(
-      DataSource dataSource, FileBackedContentKeyRing keyRing, IdentityJwtVerifier jwtVerifier) {
+      DataSource dataSource,
+      FileBackedContentKeyRing keyRing,
+      IdentityJwtVerifier jwtVerifier,
+      boolean providerRuntimeEnabled,
+      ModelPolicyProvider modelPolicy,
+      FileBackedOpenAiModelProvider modelProvider) {
     this.dataSource = Objects.requireNonNull(dataSource);
     this.keyRing = Objects.requireNonNull(keyRing);
     this.jwtVerifier = Objects.requireNonNull(jwtVerifier);
+    this.providerRuntimeEnabled = providerRuntimeEnabled;
+    this.modelPolicy = Objects.requireNonNull(modelPolicy);
+    this.modelProvider = Objects.requireNonNull(modelProvider);
   }
 
   @Override
@@ -27,6 +41,16 @@ public final class ConversationReadinessHealthIndicator implements HealthIndicat
     }
     if (!jwtVerifier.isFresh()) {
       return down("identity_jwt_verifier_unavailable");
+    }
+    if (providerRuntimeEnabled) {
+      try {
+        modelPolicy.requireApprovedPolicy();
+      } catch (ConversationException exception) {
+        return down("model_policy_unavailable");
+      }
+      if (!modelProvider.isConfigured()) {
+        return down("provider_credential_unavailable");
+      }
     }
     try (var connection = dataSource.getConnection();
         var statement =

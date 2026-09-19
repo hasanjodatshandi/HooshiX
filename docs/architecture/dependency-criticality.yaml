@@ -36,6 +36,20 @@ edges:
       - docs/adr/0054-define-core-conversation-and-model-execution-v1.md
       - docs/architecture/services/conversation-service.md
 
+  - operation_id: conversation.model-provider-execution
+    caller_owner: Conversation
+    dependency_id: openai.responses
+    class: EXTERNAL_SIDE_EFFECT
+    failure_action: "preserve definitive rejection/unavailability or OUTCOME_UNKNOWN; reconcile reserved cost"
+    retry_owner: none
+    fallback: "none; no retry, alternate model, or alternate provider"
+    owner: Conversation
+    policy_refs:
+      - docs/adr/0054-define-core-conversation-and-model-execution-v1.md
+      - docs/adr/0057-govern-model-evaluation-safety-and-promotion-v1.md
+      - docs/architecture/services/conversation-service.md
+      - docs/architecture/mlops-evaluation-and-safety.md
+
   - operation_id: identity.security-semantic-quota
     caller_owner: Identity
     dependency_id: security-redis.semantic-quota

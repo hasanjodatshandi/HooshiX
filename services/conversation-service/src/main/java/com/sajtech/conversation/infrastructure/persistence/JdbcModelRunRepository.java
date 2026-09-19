@@ -67,6 +67,7 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
                   userMessage);
           insertMessage(connection, actor, conversationId, messageId, encrypted, ordinal, now);
           insertRun(connection, actor, requestId, conversationId, messageId, runId, policy, now);
+          enqueueRun(connection, actor, conversationId, runId, now);
           touchConversation(connection, actor, conversationId, now);
           return new ModelRun(
               runId,
@@ -143,6 +144,7 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
           lockCancellationIdempotencyKey(connection, actor, requestId);
           ModelRun replay = findCancelReplay(connection, actor, requestId, conversationId, runId);
           if (replay != null) return replay;
+          lockQueueEntry(connection, runId);
           ModelRun current = lockOwnedRun(connection, actor, conversationId, runId);
           if (current.state() == ModelRunState.QUEUED) {
             releaseBudget(connection, actor, current.reservedCostMicroUsd(), now);
@@ -210,6 +212,15 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
         connection.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
       statement.setString(
           1, actor.tenantId() + ":run-cancel:" + actor.membershipId() + ":" + requestId);
+      statement.executeQuery().close();
+    }
+  }
+
+  private static void lockQueueEntry(Connection connection, UUID runId) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT run_id FROM conversation_model_run_queue WHERE run_id = ? FOR UPDATE")) {
+      statement.setObject(1, runId);
       statement.executeQuery().close();
     }
   }
@@ -359,6 +370,21 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
     }
   }
 
+  private static void enqueueRun(
+      Connection connection, ConversationActor actor, UUID conversationId, UUID runId, Instant now)
+      throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "INSERT INTO conversation_model_run_queue "
+                + "(run_id, tenant_id, conversation_id, available_at) VALUES (?, ?, ?, ?)")) {
+      statement.setObject(1, runId);
+      statement.setObject(2, actor.tenantId());
+      statement.setObject(3, conversationId);
+      statement.setObject(4, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+      statement.executeUpdate();
+    }
+  }
+
   private static void touchConversation(
       Connection connection, ConversationActor actor, UUID conversationId, Instant now)
       throws SQLException {
@@ -457,6 +483,14 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
         statement.setObject(1, runId);
       }
       if (statement.executeUpdate() != 1) throw conflict();
+    }
+    if (queued) {
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "DELETE FROM conversation_model_run_queue WHERE run_id = ?")) {
+        statement.setObject(1, runId);
+        statement.executeUpdate();
+      }
     }
   }
 

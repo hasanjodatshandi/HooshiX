@@ -7,6 +7,7 @@
             <Class name="com.sajtech.conversation.application.service.ConversationService"/>
             <Class name="com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository"/>
             <Class name="com.sajtech.conversation.infrastructure.persistence.JdbcModelRunRepository"/>
+            <Class name="com.sajtech.conversation.infrastructure.persistence.JdbcModelRunWorkerRepository"/>
             <Class name="com.sajtech.conversation.interfaces.grpc.ConversationGrpcService"/>
             <Class name="com.sajtech.conversation.interfaces.observability.grpc.ConversationTracingInterceptor"/>
         </Or>

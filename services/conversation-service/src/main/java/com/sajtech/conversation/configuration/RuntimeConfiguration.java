@@ -2,11 +2,15 @@ package com.sajtech.conversation.configuration;
 
 import com.sajtech.conversation.application.service.ConversationAuthority;
 import com.sajtech.conversation.application.service.ConversationService;
+import com.sajtech.conversation.application.service.ModelRunWorker;
 import com.sajtech.conversation.infrastructure.client.authorization.GrpcPermissionAuthorizer;
 import com.sajtech.conversation.infrastructure.health.ConversationReadinessHealthIndicator;
 import com.sajtech.conversation.infrastructure.model.GitGovernedModelPolicyProvider;
 import com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository;
 import com.sajtech.conversation.infrastructure.persistence.JdbcModelRunRepository;
+import com.sajtech.conversation.infrastructure.persistence.JdbcModelRunWorkerRepository;
+import com.sajtech.conversation.infrastructure.provider.openai.FileBackedOpenAiModelProvider;
+import com.sajtech.conversation.infrastructure.runtime.ModelRunWorkerLifecycle;
 import com.sajtech.conversation.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifier;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifierRefresher;
@@ -26,6 +30,7 @@ import java.time.Clock;
 import java.util.List;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,7 +38,7 @@ import org.springframework.context.annotation.Profile;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("!migration")
-@EnableConfigurationProperties(ConversationProperties.class)
+@EnableConfigurationProperties({ConversationProperties.class, ModelWorkerProperties.class})
 public class RuntimeConfiguration {
   @Bean
   Clock clock() {
@@ -105,8 +110,49 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  JdbcModelRunWorkerRepository modelRunWorkerRepository(
+      DataSource dataSource, AesGcmContentCrypto contentCrypto) {
+    return new JdbcModelRunWorkerRepository(dataSource, contentCrypto);
+  }
+
+  @Bean
   GitGovernedModelPolicyProvider modelPolicyProvider(ConversationProperties properties) {
     return new GitGovernedModelPolicyProvider(properties.providerRuntimeEnabled());
+  }
+
+  @Bean
+  FileBackedOpenAiModelProvider modelProvider(ModelWorkerProperties properties) {
+    return new FileBackedOpenAiModelProvider(properties.providerApiKeyPath());
+  }
+
+  @Bean
+  ModelRunWorker modelRunWorker(
+      GitGovernedModelPolicyProvider policies,
+      JdbcModelRunWorkerRepository runs,
+      FileBackedOpenAiModelProvider provider,
+      Clock clock,
+      ModelWorkerProperties properties) {
+    return new ModelRunWorker(
+        policies,
+        runs,
+        provider,
+        clock,
+        properties.leaseDuration(),
+        properties.maximumConcurrentPerTenant(),
+        properties.expiryBatchSize(),
+        properties.circuitFailureThreshold(),
+        properties.circuitOpenDuration());
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "provider-runtime-enabled",
+      havingValue = "true")
+  ModelRunWorkerLifecycle modelRunWorkerLifecycle(
+      ModelRunWorker worker, ModelWorkerProperties properties) {
+    return new ModelRunWorkerLifecycle(
+        worker, properties.pollInterval(), properties.maximumConcurrentCalls());
   }
 
   @Bean
@@ -156,7 +202,18 @@ public class RuntimeConfiguration {
 
   @Bean("conversationReadiness")
   ConversationReadinessHealthIndicator conversationReadiness(
-      DataSource dataSource, FileBackedContentKeyRing keyRing, IdentityJwtVerifier jwtVerifier) {
-    return new ConversationReadinessHealthIndicator(dataSource, keyRing, jwtVerifier);
+      DataSource dataSource,
+      FileBackedContentKeyRing keyRing,
+      IdentityJwtVerifier jwtVerifier,
+      ConversationProperties properties,
+      GitGovernedModelPolicyProvider modelPolicy,
+      FileBackedOpenAiModelProvider modelProvider) {
+    return new ConversationReadinessHealthIndicator(
+        dataSource,
+        keyRing,
+        jwtVerifier,
+        properties.providerRuntimeEnabled(),
+        modelPolicy,
+        modelProvider);
   }
 }

@@ -62,6 +62,7 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
           || bool(model, "tools_enabled")) {
         return null;
       }
+      if (!"none".equals(text(model, "reasoning_effort"))) return null;
       String promptId = text(model, "prompt_id");
       String promptVersion = text(model, "prompt_version");
       if (!promptMatches(root.path("prompt_catalog"), promptId, promptVersion, prompt)) return null;
@@ -75,11 +76,22 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
         }
       }
       if (price == null) return null;
+      if (!"USD".equals(text(price, "currency"))
+          || !"MICRO_USD_PER_MILLION_TOKENS".equals(text(price, "unit"))) return null;
       JsonNode reservationNode = price.path("maximum_request_reservation_micro_usd");
       if (!reservationNode.isIntegralNumber()) return null;
       long reservation = reservationNode.longValue();
       return new ModelExecutionPolicy(
-          text(model, "logical_id"), promptVersion, priceVersion, reservation);
+          text(model, "logical_id"),
+          text(model, "provider_model_id"),
+          promptVersion,
+          priceVersion,
+          positiveInt(model, "max_input_tokens"),
+          positiveInt(model, "max_output_tokens"),
+          nonNegativeLong(price, "input", false),
+          nonNegativeLong(price, "cached_input", true),
+          nonNegativeLong(price, "output", false),
+          reservation);
     } catch (IllegalArgumentException exception) {
       return null;
     }
@@ -141,5 +153,28 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
       throw new IllegalArgumentException("Model governance field is invalid");
     }
     return value.booleanValue();
+  }
+
+  private static int positiveInt(JsonNode node, String field) {
+    JsonNode value = Objects.requireNonNull(node).get(field);
+    if (value == null
+        || !value.isIntegralNumber()
+        || !value.canConvertToInt()
+        || value.intValue() <= 0) {
+      throw new IllegalArgumentException("Model governance field is invalid");
+    }
+    return value.intValue();
+  }
+
+  private static long nonNegativeLong(JsonNode node, String field, boolean zeroAllowed) {
+    JsonNode value = Objects.requireNonNull(node).get(field);
+    if (value == null || !value.isIntegralNumber() || !value.canConvertToLong()) {
+      throw new IllegalArgumentException("Model governance field is invalid");
+    }
+    long result = value.longValue();
+    if (result < 0 || (!zeroAllowed && result == 0)) {
+      throw new IllegalArgumentException("Model governance field is invalid");
+    }
+    return result;
   }
 }

@@ -3,9 +3,10 @@
 ## 1. Responsibility and implementation state
 
 `conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle,
-encrypted Message history, and budgeted ModelRun acceptance/cancellation slice of the ADR-0054
-bounded context. Provider execution and run completion remain incomplete. Its current repository
-boundary is:
+encrypted Message history, budgeted ModelRun acceptance/cancellation, and the bounded provider
+worker/completion slice of the ADR-0054 bounded context. Provider activation, safety evaluation,
+tenant lifecycle/erasure, telemetry, and the BFF/UI journey remain incomplete. Its current
+repository boundary is:
 
 ```text
 services/conversation-service
@@ -57,9 +58,10 @@ encrypted-at-rest titles and Message content, bounded opaque pagination, optimis
 durable UUIDv4 request replay/conflict behavior, and fail-closed exact model/prompt/price governance.
 Run acceptance atomically reserves both tenant and Membership worst-case budgets, appends the USER
 Message, and queues the run. Queued cancellation releases both reservations; running cancellation
-records durable intent without prematurely releasing cost. The BFF-owned REST surface, worker,
-provider adapter, completion/reconciliation path, and ASSISTANT Message creation remain pending;
-public errors will use RFC 9457 and never proxy provider JSON.
+records durable intent without prematurely releasing cost. The bounded worker, fixed provider
+adapter, completion/reconciliation path, and ASSISTANT Message creation are implemented behind the
+disabled execution gate. The BFF-owned REST surface and UI journey remain pending; public errors
+will use RFC 9457 and never proxy provider JSON.
 
 Initial validation authority is:
 
@@ -116,10 +118,10 @@ Client/BFF/mesh must not add a retry layer. Cancellation propagates where safe b
 provider cancellation.
 
 The canonical registry now includes `conversation.authorization-permission-check`
-(`AUTHORITATIVE_SECURITY`) because the fail-closed JWT/Authorization boundary exists. Before the
-remaining implementation becomes production-eligible, it must also add
-`web-bff.conversation-api-dispatch` (`AUTHORITATIVE_STATE`) and
-`conversation.model-provider-execution` (`EXTERNAL_SIDE_EFFECT`) when those runtime edges exist.
+(`AUTHORITATIVE_SECURITY`) and `conversation.model-provider-execution`
+(`EXTERNAL_SIDE_EFFECT`) because those runtime boundaries exist. Before the remaining BFF
+implementation becomes production-eligible, it must add `web-bff.conversation-api-dispatch`
+(`AUTHORITATIVE_STATE`) when that runtime edge exists.
 
 ## 6. Persistence and transaction boundaries
 
@@ -131,9 +133,12 @@ Critical transactions are:
 
 1. accept run (implemented): lock Conversation/version, verify local state, reserve cost, append USER
    Message, insert QUEUED ModelRun and dedup evidence atomically;
-2. claim (pending): bounded `SKIP LOCKED` transition to RUNNING and release locks before provider
-   I/O;
-3. complete (pending): re-lock run, reconcile usage/cost and append one ASSISTANT Message atomically;
+2. claim (implemented): select bounded global control-plane metadata with deterministic
+   `SKIP LOCKED`, set transaction-local tenant context, transition to RUNNING, decrypt bounded
+   same-Conversation context, and release the transaction/locks before provider I/O;
+3. complete (implemented): re-lock the tenant run, reconcile integer usage/cost and append at most
+   one encrypted ASSISTANT Message atomically; ambiguous/malformed usage publishes no output and
+   conservatively charges the reservation;
 4. cancel (implemented for QUEUED/RUNNING): serialize with the run, durably deduplicate the request,
    release queued reservations, and retain running reservations until reconciliation;
 5. Conversation delete (implemented for current owned state): cancel queued work, release its
@@ -143,6 +148,11 @@ Critical transactions are:
 No Authorization, provider, Kafka, Redis, OpenBao, telemetry, or other remote I/O runs in a database
 transaction or while a database lock is held. Failed transactions are not retried inside the same
 transaction context.
+
+The worker queue is the explicitly classified global metadata exception: it stores only Run,
+Tenant, and Conversation UUIDs plus availability/lease timestamps. It contains no title, prompt,
+message, output, User/contact, credential, or provider payload data. An expired in-flight lease is
+never re-sent; it becomes `OUTCOME_UNKNOWN` and charges the existing reservation once.
 
 ## 7. Provider adapter
 
@@ -168,6 +178,14 @@ No caller/model-selected URL or provider option is accepted. Responses, errors, 
 text are allow-listed before persistence; raw provider payloads are not logged or returned to the
 browser. Circuit-open/overload/provider failure maps to stable availability/failure states and does
 not choose another model.
+
+The adapter, worker, file-backed credential boundary, exact governance tuple loader, 60-second
+one-attempt deadline, lease expiry, global/per-tenant concurrency, and circuit suppression are now
+implemented. Kubernetes still blocks external provider egress and the committed governance tuple
+remains execution-disabled pending provider-account controls and real evaluation. Transport-level
+interruption after a durable running-cancellation request, provider safety mapping/evaluation,
+provider-specific telemetry and the reviewed activation egress profile remain pending Stage 9
+gates; no live provider execution is claimed.
 
 ## 8. Cost and abuse safety
 

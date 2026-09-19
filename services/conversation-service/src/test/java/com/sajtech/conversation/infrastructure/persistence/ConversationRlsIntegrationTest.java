@@ -6,7 +6,10 @@ import com.sajtech.conversation.application.ConversationError;
 import com.sajtech.conversation.application.ConversationException;
 import com.sajtech.conversation.application.model.ConversationActor;
 import com.sajtech.conversation.application.model.ModelExecutionPolicy;
+import com.sajtech.conversation.application.model.ModelProviderOutcome;
+import com.sajtech.conversation.application.model.ModelProviderResult;
 import com.sajtech.conversation.domain.ConversationLifecycle;
+import com.sajtech.conversation.domain.ModelRunFailure;
 import com.sajtech.conversation.domain.ModelRunState;
 import com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto;
 import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
@@ -22,6 +25,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -48,6 +52,7 @@ class ConversationRlsIntegrationTest {
   private HikariDataSource runtime;
   private JdbcConversationRepository repository;
   private JdbcModelRunRepository modelRuns;
+  private JdbcModelRunWorkerRepository runWorker;
 
   @BeforeAll
   static void start() {
@@ -103,6 +108,7 @@ class ConversationRlsIntegrationTest {
             new SecureRandom());
     repository = new JdbcConversationRepository(runtime, crypto);
     modelRuns = new JdbcModelRunRepository(runtime, crypto);
+    runWorker = new JdbcModelRunWorkerRepository(runtime, crypto);
   }
 
   @AfterEach
@@ -142,6 +148,297 @@ class ConversationRlsIntegrationTest {
           }
         }
       }
+      try (PreparedStatement queueMetadata =
+          connection.prepareStatement(
+              "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                  + "WHERE oid = 'conversation_model_run_queue'::regclass")) {
+        try (ResultSet result = queueMetadata.executeQuery()) {
+          assertThat(result.next()).isTrue();
+          assertThat(result.getBoolean(1)).isFalse();
+          assertThat(result.getBoolean(2)).isFalse();
+        }
+      }
+      try (PreparedStatement queueColumns =
+          connection.prepareStatement(
+              "SELECT column_name FROM information_schema.columns "
+                  + "WHERE table_schema = 'public' AND table_name = 'conversation_model_run_queue' "
+                  + "ORDER BY column_name")) {
+        try (ResultSet rows = queueColumns.executeQuery()) {
+          var columns = new java.util.ArrayList<String>();
+          while (rows.next()) columns.add(rows.getString(1));
+          assertThat(columns)
+              .containsExactly(
+                  "available_at", "claimed_until", "conversation_id", "run_id", "tenant_id");
+        }
+      }
+    }
+  }
+
+  @Test
+  void workerClaimsWithoutHoldingTransactionAndAtomicallyPublishesOneEncryptedAnswer()
+      throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "private question",
+        policy(),
+        now.plusSeconds(1));
+
+    var claim =
+        runWorker.claim(policy(), now.plusSeconds(2), Duration.ofSeconds(65), 1).orElseThrow();
+
+    assertThat(claim.runId()).isEqualTo(runId);
+    assertThat(claim.messages())
+        .singleElement()
+        .satisfies(message -> assertThat(message.content()).isEqualTo("private question"));
+    assertThat(modelRuns.getOwned(owner, conversationId, runId).state())
+        .isEqualTo(ModelRunState.RUNNING);
+
+    runWorker.complete(
+        claim,
+        policy(),
+        new ModelProviderResult(ModelProviderOutcome.SUCCEEDED, "private answer", 1_000, 100, 100),
+        now.plusSeconds(3));
+
+    var completed = modelRuns.getOwned(owner, conversationId, runId);
+    assertThat(completed.state()).isEqualTo(ModelRunState.SUCCEEDED);
+    assertThat(completed.chargedCostMicroUsd()).isEqualTo(3_775);
+    assertThat(modelRuns.listMessagesOwned(owner, conversationId, 20, "").messages())
+        .hasSize(2)
+        .anySatisfy(message -> assertThat(message.content()).isEqualTo("private answer"));
+    assertThat(budgetAmounts(tenant, membership)).containsExactly(0L, 3_775L, 0L, 3_775L);
+    assertConversationCiphertextDoesNotContain(conversationId, "private answer");
+  }
+
+  @Test
+  void ambiguousProviderOutcomePublishesNothingAndChargesReservation() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "question",
+        policy(),
+        now.plusSeconds(1));
+    var claim =
+        runWorker.claim(policy(), now.plusSeconds(2), Duration.ofSeconds(65), 1).orElseThrow();
+
+    runWorker.complete(
+        claim,
+        policy(),
+        ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS),
+        now.plusSeconds(65));
+
+    var completed = modelRuns.getOwned(owner, conversationId, runId);
+    assertThat(completed.state()).isEqualTo(ModelRunState.OUTCOME_UNKNOWN);
+    assertThat(completed.chargedCostMicroUsd()).isEqualTo(70_000);
+    assertThat(modelRuns.listMessagesOwned(owner, conversationId, 20, "").messages()).hasSize(1);
+    assertThat(budgetAmounts(tenant, membership)).containsExactly(0L, 70_000L, 0L, 70_000L);
+  }
+
+  @Test
+  void acceptedInFlightCancellationSuppressesAnswerButReconcilesReportedUsage() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "question",
+        policy(),
+        now.plusSeconds(1));
+    var claim =
+        runWorker.claim(policy(), now.plusSeconds(2), Duration.ofSeconds(65), 1).orElseThrow();
+
+    modelRuns.cancelOwned(owner, UUID.randomUUID(), conversationId, runId, now.plusSeconds(3));
+    runWorker.complete(
+        claim,
+        policy(),
+        new ModelProviderResult(ModelProviderOutcome.SUCCEEDED, "discarded", 1_000, 100, 100),
+        now.plusSeconds(4));
+
+    var completed = modelRuns.getOwned(owner, conversationId, runId);
+    assertThat(completed.state()).isEqualTo(ModelRunState.CANCELED);
+    assertThat(completed.cancellationRequested()).isTrue();
+    assertThat(completed.chargedCostMicroUsd()).isEqualTo(3_775);
+    assertThat(modelRuns.listMessagesOwned(owner, conversationId, 20, "").messages()).hasSize(1);
+  }
+
+  @Test
+  void expiredClaimBecomesUnknownWithoutRetryAndChargesReservation() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "question",
+        policy(),
+        now.plusSeconds(1));
+    runWorker.claim(policy(), now.plusSeconds(2), Duration.ofSeconds(65), 1).orElseThrow();
+
+    assertThat(runWorker.expireUnknown(policy(), now.plusSeconds(68), 20)).isEqualTo(1);
+    assertThat(runWorker.expireUnknown(policy(), now.plusSeconds(69), 20)).isZero();
+
+    var completed = modelRuns.getOwned(owner, conversationId, runId);
+    assertThat(completed.state()).isEqualTo(ModelRunState.OUTCOME_UNKNOWN);
+    assertThat(completed.chargedCostMicroUsd()).isEqualTo(70_000);
+    assertThat(modelRuns.listMessagesOwned(owner, conversationId, 20, "").messages()).hasSize(1);
+  }
+
+  @Test
+  void queuedRunWithNoLongerApprovedTupleFailsClosedAndReleasesReservation() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "question",
+        policy(),
+        now.plusSeconds(1));
+    var replacementPolicy =
+        new ModelExecutionPolicy(
+            "conversation-primary",
+            "gpt-5.4-2026-03-05",
+            "2.0.0",
+            "2026-09-12",
+            16_000,
+            2_000,
+            2_500_000,
+            250_000,
+            15_000_000,
+            70_000);
+
+    assertThat(runWorker.claim(replacementPolicy, now.plusSeconds(2), Duration.ofSeconds(65), 1))
+        .isEmpty();
+
+    var failed = modelRuns.getOwned(owner, conversationId, runId);
+    assertThat(failed.state()).isEqualTo(ModelRunState.FAILED);
+    assertThat(failed.failure()).isEqualTo(ModelRunFailure.EXECUTION_DISABLED);
+    assertThat(budgetAmounts(tenant, membership)).containsExactly(0L, 0L, 0L, 0L);
+  }
+
+  @Test
+  void claimContextStopsAtItsOwnUserMessageAndExcludesLaterQueuedInput() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID firstRun = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 200_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        firstRun,
+        "first question",
+        policy(),
+        now.plusSeconds(1));
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "later question",
+        policy(),
+        now.plusSeconds(2));
+
+    var claim =
+        runWorker.claim(policy(), now.plusSeconds(3), Duration.ofSeconds(65), 1).orElseThrow();
+
+    assertThat(claim.runId()).isEqualTo(firstRun);
+    assertThat(claim.messages())
+        .extracting(message -> message.content())
+        .containsExactly("first question");
+  }
+
+  @Test
+  void concurrentClaimsCannotExceedPerTenantProviderCapacity() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 200_000, now);
+    for (int index = 0; index < 2; index++) {
+      modelRuns.accept(
+          owner,
+          UUID.randomUUID(),
+          conversationId,
+          UUID.randomUUID(),
+          UUID.randomUUID(),
+          "question " + index,
+          policy(),
+          now.plusSeconds(index + 1L));
+    }
+    CountDownLatch start = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var first =
+          executor.submit(
+              () -> {
+                start.await();
+                return runWorker.claim(policy(), now.plusSeconds(3), Duration.ofSeconds(65), 1);
+              });
+      var second =
+          executor.submit(
+              () -> {
+                start.await();
+                return runWorker.claim(policy(), now.plusSeconds(3), Duration.ofSeconds(65), 1);
+              });
+      start.countDown();
+
+      assertThat(java.util.stream.Stream.of(first.get(), second.get()).filter(Optional::isPresent))
+          .hasSize(1);
     }
   }
 
@@ -286,7 +583,7 @@ class ConversationRlsIntegrationTest {
     Instant now = Instant.parse("2026-09-13T08:00:00Z");
     repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
     seedBudget(tenant, membership, 70_000, now);
-    var policy = new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000);
+    var policy = policy();
     UUID requestId = UUID.randomUUID();
     UUID messageId = UUID.randomUUID();
     UUID runId = UUID.randomUUID();
@@ -370,7 +667,7 @@ class ConversationRlsIntegrationTest {
     Instant now = Instant.parse("2026-09-13T08:00:00Z");
     repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
     seedBudget(tenant, membership, 70_000, now);
-    var policy = new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000);
+    var policy = policy();
     CountDownLatch start = new CountDownLatch(1);
     try (var executor = Executors.newFixedThreadPool(2)) {
       var first =
@@ -427,7 +724,7 @@ class ConversationRlsIntegrationTest {
         UUID.randomUUID(),
         runId,
         "erase me",
-        new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000),
+        policy(),
         now.plusSeconds(1));
 
     repository.deleteOwned(owner, UUID.randomUUID(), conversationId, 2, now.plusSeconds(2));
@@ -491,6 +788,20 @@ class ConversationRlsIntegrationTest {
 
   private static ConversationActor actor(UUID tenant, UUID membership) {
     return new ConversationActor(UUID.randomUUID(), tenant, membership, "s".repeat(43));
+  }
+
+  private static ModelExecutionPolicy policy() {
+    return new ModelExecutionPolicy(
+        "conversation-primary",
+        "gpt-5.4-2026-03-05",
+        "1.0.0",
+        "2026-09-12",
+        16_000,
+        2_000,
+        2_500_000,
+        250_000,
+        15_000_000,
+        70_000);
   }
 
   private static void assertNotFound(Runnable query) {
@@ -559,6 +870,25 @@ class ConversationRlsIntegrationTest {
         assertThat(row.next()).isTrue();
         assertThat(new String(row.getBytes(1), java.nio.charset.StandardCharsets.UTF_8))
             .doesNotContain(plaintext);
+      }
+    }
+  }
+
+  private void assertConversationCiphertextDoesNotContain(UUID conversationId, String plaintext)
+      throws Exception {
+    try (Connection connection = adminConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT content_ciphertext FROM conversation_message WHERE conversation_id = ?")) {
+      statement.setObject(1, conversationId);
+      try (ResultSet rows = statement.executeQuery()) {
+        int count = 0;
+        while (rows.next()) {
+          count++;
+          assertThat(new String(rows.getBytes(1), java.nio.charset.StandardCharsets.UTF_8))
+              .doesNotContain(plaintext);
+        }
+        assertThat(count).isPositive();
       }
     }
   }
