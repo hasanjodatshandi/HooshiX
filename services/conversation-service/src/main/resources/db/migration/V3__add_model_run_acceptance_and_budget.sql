@@ -1,7 +1,6 @@
 ALTER TABLE conversation_model_run
     ADD COLUMN user_message_id uuid,
-    ADD COLUMN cancellation_requested boolean NOT NULL DEFAULT false,
-    ADD COLUMN cancel_request_id uuid;
+    ADD COLUMN cancellation_requested boolean NOT NULL DEFAULT false;
 
 ALTER TABLE conversation_model_run
     ALTER COLUMN actual_cost_microunits SET DEFAULT 0;
@@ -10,21 +9,37 @@ UPDATE conversation_model_run
 SET actual_cost_microunits = 0
 WHERE actual_cost_microunits IS NULL;
 
+ALTER TABLE conversation_message
+    ADD CONSTRAINT uq_conversation_message_run_reference
+        UNIQUE (message_id, conversation_id, tenant_id);
+
 ALTER TABLE conversation_model_run
     ALTER COLUMN actual_cost_microunits SET NOT NULL,
+    ADD CONSTRAINT uq_conversation_model_run_reference
+        UNIQUE (run_id, conversation_id, tenant_id),
     ADD CONSTRAINT fk_conversation_model_run_user_message
-        FOREIGN KEY (user_message_id) REFERENCES conversation_message (message_id),
-    ADD CONSTRAINT ck_conversation_model_run_cancel_request_uuid_v4 CHECK (
-        cancel_request_id IS NULL
-        OR (
-            (get_byte(uuid_send(cancel_request_id), 6) >> 4) = 4
-            AND (get_byte(uuid_send(cancel_request_id), 8) & 192) = 128
-        )
-    );
+        FOREIGN KEY (user_message_id, conversation_id, tenant_id)
+        REFERENCES conversation_message (message_id, conversation_id, tenant_id);
 
-CREATE UNIQUE INDEX uq_conversation_model_run_cancel_request
-    ON conversation_model_run (tenant_id, requester_membership_id, cancel_request_id)
-    WHERE cancel_request_id IS NOT NULL;
+CREATE TABLE conversation_run_mutation_request (
+    tenant_id uuid NOT NULL,
+    requester_membership_id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    conversation_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    operation varchar(16) NOT NULL,
+    created_at timestamptz NOT NULL,
+    PRIMARY KEY (tenant_id, requester_membership_id, request_id),
+    CONSTRAINT fk_conversation_run_mutation_request_run
+        FOREIGN KEY (run_id, conversation_id, tenant_id)
+        REFERENCES conversation_model_run (run_id, conversation_id, tenant_id)
+        ON DELETE CASCADE,
+    CONSTRAINT ck_conversation_run_mutation_request_uuid_v4 CHECK (
+        (get_byte(uuid_send(request_id), 6) >> 4) = 4
+        AND (get_byte(uuid_send(request_id), 8) & 192) = 128
+    ),
+    CONSTRAINT ck_conversation_run_mutation_request_operation CHECK (operation = 'CANCEL')
+);
 
 CREATE TABLE conversation_budget_account (
     tenant_id uuid NOT NULL,
@@ -53,8 +68,16 @@ CREATE TABLE conversation_budget_account (
 
 ALTER TABLE conversation_budget_account ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversation_budget_account FORCE ROW LEVEL SECURITY;
+ALTER TABLE conversation_run_mutation_request ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversation_run_mutation_request FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY conversation_budget_account_tenant_isolation ON conversation_budget_account
+    FOR ALL
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
+
+CREATE POLICY conversation_run_mutation_request_tenant_isolation
+    ON conversation_run_mutation_request
     FOR ALL
     USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
     WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);

@@ -2,9 +2,10 @@
 
 ## 1. Responsibility and implementation state
 
-`conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle
-slice of the ADR-0054 bounded context. ModelRun execution remains incomplete. Its current
-repository boundary is:
+`conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle,
+encrypted Message history, and budgeted ModelRun acceptance/cancellation slice of the ADR-0054
+bounded context. Provider execution and run completion remain incomplete. Its current repository
+boundary is:
 
 ```text
 services/conversation-service
@@ -50,11 +51,15 @@ reuse fails with a stable conflict error.
 
 ## 3. First public journey and validation
 
-The service now exposes validated private gRPC create/list/get/archive/delete Conversation methods.
-They enforce Membership ownership, encrypted-at-rest titles, bounded opaque pagination, optimistic
-versions, and durable UUIDv4 request replay/conflict behavior. The BFF-owned REST surface, ModelRun
-methods, and bounded Message history remain pending; public errors will use RFC 9457 and never proxy
-provider JSON.
+The service now exposes validated private gRPC create/list/get/archive/delete Conversation,
+list-Message, and create/get/cancel ModelRun methods. They enforce Membership ownership,
+encrypted-at-rest titles and Message content, bounded opaque pagination, optimistic versions,
+durable UUIDv4 request replay/conflict behavior, and fail-closed exact model/prompt/price governance.
+Run acceptance atomically reserves both tenant and Membership worst-case budgets, appends the USER
+Message, and queues the run. Queued cancellation releases both reservations; running cancellation
+records durable intent without prematurely releasing cost. The BFF-owned REST surface, worker,
+provider adapter, completion/reconciliation path, and ASSISTANT Message creation remain pending;
+public errors will use RFC 9457 and never proxy provider JSON.
 
 Initial validation authority is:
 
@@ -124,13 +129,16 @@ be explicitly classified and cannot contain plaintext tenant content.
 
 Critical transactions are:
 
-1. accept run: lock Conversation/version, verify local state, reserve cost, append USER Message,
-   insert QUEUED ModelRun and dedup evidence atomically;
-2. claim: bounded `SKIP LOCKED` transition to RUNNING and release locks before provider I/O;
-3. complete: re-lock run, reconcile usage/cost and append one ASSISTANT Message atomically;
-4. cancel: serialize with claim/completion and apply deterministic terminal-state precedence;
-5. delete/erasure: block new claims first, then remove owned content/evidence atomically in bounded
-   batches.
+1. accept run (implemented): lock Conversation/version, verify local state, reserve cost, append USER
+   Message, insert QUEUED ModelRun and dedup evidence atomically;
+2. claim (pending): bounded `SKIP LOCKED` transition to RUNNING and release locks before provider
+   I/O;
+3. complete (pending): re-lock run, reconcile usage/cost and append one ASSISTANT Message atomically;
+4. cancel (implemented for QUEUED/RUNNING): serialize with the run, durably deduplicate the request,
+   release queued reservations, and retain running reservations until reconciliation;
+5. Conversation delete (implemented for current owned state): cancel queued work, release its
+   reservations, request cancellation for running work, detach and erase Message ciphertext, and
+   erase title ciphertext atomically. Tenant lifecycle/ADR-0028 erasure remains pending.
 
 No Authorization, provider, Kafka, Redis, OpenBao, telemetry, or other remote I/O runs in a database
 transaction or while a database lock is held. Failed transactions are not retried inside the same

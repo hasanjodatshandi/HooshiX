@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.sajtech.conversation.application.ConversationError;
 import com.sajtech.conversation.application.ConversationException;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -24,7 +25,9 @@ class GitGovernedModelPolicyProviderTest {
 
   @Test
   void exactApprovedStatelessTupleCanBeSelected() throws Exception {
-    var provider = new GitGovernedModelPolicyProvider(true, JSON.readTree(approvedGovernance()));
+    var provider =
+        new GitGovernedModelPolicyProvider(
+            true, JSON.readTree(approvedGovernance()), "prompt".getBytes(StandardCharsets.UTF_8));
 
     assertThat(provider.requireApprovedPolicy())
         .satisfies(
@@ -40,7 +43,18 @@ class GitGovernedModelPolicyProviderTest {
   void toolOrStorageEnablementFailsClosed() throws Exception {
     String unsafe =
         approvedGovernance().replace("\"tools_enabled\":false", "\"tools_enabled\":true");
-    var provider = new GitGovernedModelPolicyProvider(true, JSON.readTree(unsafe));
+    var provider =
+        new GitGovernedModelPolicyProvider(
+            true, JSON.readTree(unsafe), "prompt".getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(provider::requireApprovedPolicy).isInstanceOf(ConversationException.class);
+  }
+
+  @Test
+  void promptDigestMismatchFailsClosed() throws Exception {
+    var provider =
+        new GitGovernedModelPolicyProvider(
+            true, JSON.readTree(approvedGovernance()), "tampered".getBytes(StandardCharsets.UTF_8));
 
     assertThatThrownBy(provider::requireApprovedPolicy).isInstanceOf(ConversationException.class);
   }
@@ -53,14 +67,24 @@ class GitGovernedModelPolicyProviderTest {
           "provider_data_controls":{"approval_status":"APPROVED"},
           "model_catalog":[{
             "logical_id":"conversation-primary",
-            "lifecycle":"APPROVED",
+            "lifecycle":"APPROVED_100",
             "execution_enabled":true,
+            "provider":"openai",
+            "endpoint":"responses",
             "store":false,
             "background":false,
             "tools_enabled":false,
+            "prompt_id":"conversation-system",
             "prompt_version":"1.0.0",
             "price_id":"price",
             "price_version":"2026-09-12"
+          }],
+          "prompt_catalog":[{
+            "prompt_id":"conversation-system",
+            "prompt_version":"1.0.0",
+            "status":"APPROVED_100",
+            "path":"mlops/prompts/conversation-system-v1.txt",
+            "sha256":"cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2"
           }],
           "price_catalog":[{
             "price_id":"price",

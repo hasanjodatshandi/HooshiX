@@ -7,6 +7,7 @@ import com.sajtech.conversation.application.ConversationError;
 import com.sajtech.conversation.application.ConversationException;
 import com.sajtech.conversation.application.model.ConversationActor;
 import com.sajtech.conversation.application.model.ConversationPage;
+import com.sajtech.conversation.application.model.MessagePage;
 import com.sajtech.conversation.application.model.ModelExecutionPolicy;
 import com.sajtech.conversation.application.port.out.AccessTokenVerifier;
 import com.sajtech.conversation.application.port.out.ConversationRepository;
@@ -15,6 +16,8 @@ import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.application.port.out.PermissionAuthorizer;
 import com.sajtech.conversation.domain.Conversation;
 import com.sajtech.conversation.domain.ConversationLifecycle;
+import com.sajtech.conversation.domain.ConversationMessage;
+import com.sajtech.conversation.domain.MessageRole;
 import com.sajtech.conversation.domain.ModelRun;
 import com.sajtech.conversation.domain.ModelRunFailure;
 import com.sajtech.conversation.domain.ModelRunState;
@@ -114,14 +117,15 @@ class ConversationServiceTest {
     UUID conversationId = UUID.randomUUID();
     var policy = new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000);
     when(modelPolicy.requireApprovedPolicy()).thenReturn(policy);
-    when(modelRuns.findAcceptedReplay(ACTOR, requestId, conversationId, "Café")).thenReturn(null);
+    when(modelRuns.findAcceptedReplay(ACTOR, requestId, conversationId, "  Café  "))
+        .thenReturn(null);
     when(modelRuns.accept(
             eq(ACTOR),
             eq(requestId),
             eq(conversationId),
             any(UUID.class),
             any(UUID.class),
-            eq("Café"),
+            eq("  Café  "),
             eq(policy),
             eq(NOW)))
         .thenAnswer(
@@ -156,6 +160,39 @@ class ConversationServiceTest {
             ConversationException.class,
             exception ->
                 assertThat(exception.error()).isEqualTo(ConversationError.INVALID_REQUEST));
+    verifyNoInteractions(tokens, permissions, repository, modelRuns, modelPolicy);
+  }
+
+  @Test
+  void messageAndRunReadsAndCancellationUseBoundedInputsAndGenerateAuthority() {
+    UUID requestId = UUID.randomUUID();
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    ConversationMessage message =
+        new ConversationMessage(
+            UUID.randomUUID(), conversationId, MessageRole.USER, "hello", 1, NOW);
+    MessagePage page = new MessagePage(List.of(message), "");
+    ModelRun queued = run(runId, conversationId, ModelRunState.QUEUED, null);
+    when(modelRuns.listMessagesOwned(ACTOR, conversationId, 20, "")).thenReturn(page);
+    when(modelRuns.getOwned(ACTOR, conversationId, runId)).thenReturn(queued);
+    when(modelRuns.cancelOwned(ACTOR, requestId, conversationId, runId, NOW)).thenReturn(queued);
+
+    assertThat(service.listMessages("token", conversationId, 0, "")).isSameAs(page);
+    assertThat(service.getRun("token", conversationId, runId)).isSameAs(queued);
+    assertThat(service.cancelRun("token", requestId, conversationId, runId)).isSameAs(queued);
+
+    verify(permissions).check(ACTOR, "conversation.read");
+    verify(permissions, times(2)).check(ACTOR, "conversation.generate");
+  }
+
+  @Test
+  void messageHistoryRejectsOversizedPageBeforeAuthority() {
+    assertThatThrownBy(() -> service.listMessages("token", UUID.randomUUID(), 101, ""))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(ConversationError.INVALID_REQUEST));
+
     verifyNoInteractions(tokens, permissions, repository, modelRuns, modelPolicy);
   }
 

@@ -135,7 +135,7 @@ public final class ConversationService {
 
   private static String canonicalMessage(String value) {
     if (value == null) throw invalidRequest();
-    String message = Normalizer.normalize(value, Normalizer.Form.NFC).strip();
+    String message = Normalizer.normalize(value, Normalizer.Form.NFC);
     int length = message.codePointCount(0, message.length());
     if (length < 1 || length > 16_000 || hasInvalidUnicode(message) || message.indexOf('\0') >= 0) {
       throw invalidRequest();

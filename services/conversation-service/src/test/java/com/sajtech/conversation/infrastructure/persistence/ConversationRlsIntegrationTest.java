@@ -128,6 +128,7 @@ class ConversationRlsIntegrationTest {
             "conversation_message",
             "conversation_model_run",
             "conversation_mutation_request",
+            "conversation_run_mutation_request",
             "conversation_budget_account"
           }) {
         try (PreparedStatement security =
@@ -348,7 +349,97 @@ class ConversationRlsIntegrationTest {
     assertThat(
             modelRuns.cancelOwned(owner, cancelRequest, conversationId, runId, now.plusSeconds(4)))
         .isEqualTo(canceled);
+    assertThatThrownBy(
+            () ->
+                modelRuns.cancelOwned(
+                    owner, cancelRequest, conversationId, UUID.randomUUID(), now.plusSeconds(5)))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(ConversationError.CONVERSATION_CONFLICT));
     assertThat(budgetAmounts(tenant, membership)).containsExactly(0L, 0L, 0L, 0L);
+  }
+
+  @Test
+  void concurrentEqualRunRequestCreatesOneMessageRunAndReservation() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID requestId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 70_000, now);
+    var policy = new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000);
+    CountDownLatch start = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var first =
+          executor.submit(
+              () -> {
+                start.await();
+                return modelRuns.accept(
+                    owner,
+                    requestId,
+                    conversationId,
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    "same",
+                    policy,
+                    now.plusSeconds(1));
+              });
+      var second =
+          executor.submit(
+              () -> {
+                start.await();
+                return modelRuns.accept(
+                    owner,
+                    requestId,
+                    conversationId,
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    "same",
+                    policy,
+                    now.plusSeconds(1));
+              });
+      start.countDown();
+
+      assertThat(first.get(5, TimeUnit.SECONDS).id())
+          .isEqualTo(second.get(5, TimeUnit.SECONDS).id());
+    }
+    assertThat(modelRuns.listMessagesOwned(owner, conversationId, 20, "").messages()).hasSize(1);
+    assertThat(budgetAmounts(tenant, membership)).containsExactly(70_000L, 0L, 70_000L, 0L);
+  }
+
+  @Test
+  void logicalConversationDeleteErasesMessagesCancelsQueuedRunAndReleasesBudget() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 70_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "erase me",
+        new ModelExecutionPolicy("conversation-primary", "1.0.0", "2026-09-12", 70_000),
+        now.plusSeconds(1));
+
+    repository.deleteOwned(owner, UUID.randomUUID(), conversationId, 2, now.plusSeconds(2));
+
+    assertNotFoundRun(() -> modelRuns.getOwned(owner, conversationId, runId));
+    assertThatThrownBy(() -> modelRuns.listMessagesOwned(owner, conversationId, 20, ""))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            exception ->
+                assertThat(exception.error()).isEqualTo(ConversationError.CONVERSATION_NOT_FOUND));
+    assertThat(budgetAmounts(tenant, membership)).containsExactly(0L, 0L, 0L, 0L);
+    assertThat(messageCount(conversationId)).isZero();
   }
 
   @Test
@@ -468,6 +559,19 @@ class ConversationRlsIntegrationTest {
         assertThat(row.next()).isTrue();
         assertThat(new String(row.getBytes(1), java.nio.charset.StandardCharsets.UTF_8))
             .doesNotContain(plaintext);
+      }
+    }
+  }
+
+  private int messageCount(UUID conversationId) throws Exception {
+    try (Connection connection = adminConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT count(*) FROM conversation_message WHERE conversation_id = ?")) {
+      statement.setObject(1, conversationId);
+      try (ResultSet row = statement.executeQuery()) {
+        row.next();
+        return row.getInt(1);
       }
     }
   }

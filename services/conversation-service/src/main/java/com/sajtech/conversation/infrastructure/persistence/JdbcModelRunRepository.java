@@ -140,17 +140,17 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
     return transaction(
         actor,
         connection -> {
+          lockCancellationIdempotencyKey(connection, actor, requestId);
           ModelRun replay = findCancelReplay(connection, actor, requestId, conversationId, runId);
           if (replay != null) return replay;
           ModelRun current = lockOwnedRun(connection, actor, conversationId, runId);
           if (current.state() == ModelRunState.QUEUED) {
             releaseBudget(connection, actor, current.reservedCostMicroUsd(), now);
-            updateCancellation(connection, runId, requestId, true, now);
+            updateCancellation(connection, runId, true, now);
           } else if (current.state() == ModelRunState.RUNNING) {
-            updateCancellation(connection, runId, requestId, false, now);
-          } else {
-            recordTerminalCancellationRequest(connection, runId, requestId);
+            updateCancellation(connection, runId, false, now);
           }
+          recordCancellationRequest(connection, actor, requestId, conversationId, runId, now);
           return requireOwnedRun(connection, actor, conversationId, runId);
         });
   }
@@ -200,6 +200,16 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
     try (PreparedStatement statement =
         connection.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
       statement.setString(1, actor.tenantId() + ":run:" + actor.membershipId() + ":" + requestId);
+      statement.executeQuery().close();
+    }
+  }
+
+  private static void lockCancellationIdempotencyKey(
+      Connection connection, ConversationActor actor, UUID requestId) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+      statement.setString(
+          1, actor.tenantId() + ":run-cancel:" + actor.membershipId() + ":" + requestId);
       statement.executeQuery().close();
     }
   }
@@ -256,18 +266,18 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
       Instant now,
       boolean reserve)
       throws SQLException {
-    String amountSql = reserve ? "+ ?" : "- ?";
-    String guard =
-        reserve
-            ? "limit_micro_usd - charged_micro_usd - reserved_micro_usd >= ?"
-            : "reserved_micro_usd >= ?";
     try (PreparedStatement statement =
-        connection.prepareStatement(
-            "UPDATE conversation_budget_account SET reserved_micro_usd = reserved_micro_usd "
-                + amountSql
-                + ", version = version + 1, updated_at = ? WHERE tenant_id = ? AND scope_type = ? "
-                + "AND scope_id = ? AND "
-                + guard)) {
+        reserve
+            ? connection.prepareStatement(
+                "UPDATE conversation_budget_account SET reserved_micro_usd = "
+                    + "reserved_micro_usd + ?, version = version + 1, updated_at = ? "
+                    + "WHERE tenant_id = ? AND scope_type = ? AND scope_id = ? AND "
+                    + "limit_micro_usd - charged_micro_usd - reserved_micro_usd >= ?")
+            : connection.prepareStatement(
+                "UPDATE conversation_budget_account SET reserved_micro_usd = "
+                    + "reserved_micro_usd - ?, version = version + 1, updated_at = ? "
+                    + "WHERE tenant_id = ? AND scope_type = ? AND scope_id = ? "
+                    + "AND reserved_micro_usd >= ?")) {
       statement.setLong(1, amount);
       statement.setObject(2, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
       statement.setObject(3, actor.tenantId());
@@ -372,7 +382,10 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
       throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
-            runSelect() + " WHERE r.requester_membership_id = ? AND r.cancel_request_id = ?")) {
+            runSelect()
+                + " JOIN conversation_run_mutation_request m ON m.run_id = r.run_id "
+                + "WHERE m.requester_membership_id = ? AND m.request_id = ? "
+                + "AND c.lifecycle <> 'DELETED'")) {
       statement.setObject(1, actor.membershipId());
       statement.setObject(2, requestId);
       try (ResultSet row = statement.executeQuery()) {
@@ -390,7 +403,8 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
     try (PreparedStatement statement =
         connection.prepareStatement(
             runSelect()
-                + " WHERE r.run_id = ? AND r.conversation_id = ? AND r.requester_membership_id = ? FOR UPDATE")) {
+                + " WHERE r.run_id = ? AND r.conversation_id = ? AND r.requester_membership_id = ? "
+                + "AND c.lifecycle <> 'DELETED' FOR UPDATE OF r")) {
       statement.setObject(1, runId);
       statement.setObject(2, conversationId);
       statement.setObject(3, actor.membershipId());
@@ -407,7 +421,8 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
     try (PreparedStatement statement =
         connection.prepareStatement(
             runSelect()
-                + " WHERE r.run_id = ? AND r.conversation_id = ? AND r.requester_membership_id = ?")) {
+                + " WHERE r.run_id = ? AND r.conversation_id = ? AND r.requester_membership_id = ? "
+                + "AND c.lifecycle <> 'DELETED'")) {
       statement.setObject(1, runId);
       statement.setObject(2, conversationId);
       statement.setObject(3, actor.membershipId());
@@ -422,39 +437,49 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
     return "SELECT r.run_id, r.conversation_id, r.state, r.model_alias, r.prompt_version, "
         + "r.price_version, r.reserved_cost_microunits, r.actual_cost_microunits, "
         + "r.failure_category, r.cancellation_requested, r.created_at, r.claimed_at, r.completed_at "
-        + "FROM conversation_model_run r";
+        + "FROM conversation_model_run r JOIN conversation c "
+        + "ON c.conversation_id = r.conversation_id AND c.tenant_id = r.tenant_id";
   }
 
   private static void updateCancellation(
-      Connection connection, UUID runId, UUID requestId, boolean queued, Instant now)
-      throws SQLException {
+      Connection connection, UUID runId, boolean queued, Instant now) throws SQLException {
     String sql =
         queued
             ? "UPDATE conversation_model_run SET state = 'CANCELED', cancellation_requested = true, "
-                + "cancel_request_id = ?, completed_at = ? WHERE run_id = ? AND state = 'QUEUED'"
-            : "UPDATE conversation_model_run SET cancellation_requested = true, cancel_request_id = ? "
+                + "completed_at = ? WHERE run_id = ? AND state = 'QUEUED'"
+            : "UPDATE conversation_model_run SET cancellation_requested = true "
                 + "WHERE run_id = ? AND state = 'RUNNING'";
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setObject(1, requestId);
       if (queued) {
-        statement.setObject(2, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
-        statement.setObject(3, runId);
-      } else {
+        statement.setObject(1, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
         statement.setObject(2, runId);
+      } else {
+        statement.setObject(1, runId);
       }
       if (statement.executeUpdate() != 1) throw conflict();
     }
   }
 
-  private static void recordTerminalCancellationRequest(
-      Connection connection, UUID runId, UUID requestId) throws SQLException {
+  private static void recordCancellationRequest(
+      Connection connection,
+      ConversationActor actor,
+      UUID requestId,
+      UUID conversationId,
+      UUID runId,
+      Instant now)
+      throws SQLException {
     try (PreparedStatement statement =
         connection.prepareStatement(
-            "UPDATE conversation_model_run SET cancel_request_id = COALESCE(cancel_request_id, ?) "
-                + "WHERE run_id = ?")) {
-      statement.setObject(1, requestId);
-      statement.setObject(2, runId);
-      if (statement.executeUpdate() != 1) throw conflict();
+            "INSERT INTO conversation_run_mutation_request (tenant_id, requester_membership_id, "
+                + "request_id, conversation_id, run_id, operation, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, 'CANCEL', ?)")) {
+      statement.setObject(1, actor.tenantId());
+      statement.setObject(2, actor.membershipId());
+      statement.setObject(3, requestId);
+      statement.setObject(4, conversationId);
+      statement.setObject(5, runId);
+      statement.setObject(6, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+      statement.executeUpdate();
     }
   }
 

@@ -657,8 +657,12 @@ services/conversation-service/src/main/java/com/sajtech/conversation/application
 services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ConversationActor.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ConversationPage.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ConversationPermission.java
+services/conversation-service/src/main/java/com/sajtech/conversation/application/model/MessagePage.java
+services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ModelExecutionPolicy.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/AccessTokenVerifier.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/ConversationRepository.java
+services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/ModelPolicyProvider.java
+services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/ModelRunRepository.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/PermissionAuthorizer.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/service/ConversationAuthority.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/service/ConversationService.java
@@ -667,10 +671,18 @@ services/conversation-service/src/main/java/com/sajtech/conversation/configurati
 services/conversation-service/src/main/java/com/sajtech/conversation/configuration/RuntimeConfiguration.java
 services/conversation-service/src/main/java/com/sajtech/conversation/domain/Conversation.java
 services/conversation-service/src/main/java/com/sajtech/conversation/domain/ConversationLifecycle.java
+services/conversation-service/src/main/java/com/sajtech/conversation/domain/ConversationMessage.java
+services/conversation-service/src/main/java/com/sajtech/conversation/domain/MessageRole.java
+services/conversation-service/src/main/java/com/sajtech/conversation/domain/ModelRun.java
+services/conversation-service/src/main/java/com/sajtech/conversation/domain/ModelRunFailure.java
+services/conversation-service/src/main/java/com/sajtech/conversation/domain/ModelRunState.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/client/authorization/GrpcPermissionAuthorizer.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/health/ConversationReadinessHealthIndicator.java
+services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/model/GitGovernedModelPolicyProvider.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/ConversationPageToken.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/JdbcConversationRepository.java
+services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/JdbcModelRunRepository.java
+services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/MessagePageToken.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/runtime/grpc/GrpcServerLifecycle.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/security/IdentityJwtVerifier.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/security/IdentityJwtVerifierRefresher.java
@@ -687,6 +699,7 @@ services/conversation-service/src/main/resources/application-migration.yaml
 services/conversation-service/src/main/resources/application.yaml
 services/conversation-service/src/main/resources/db/migration/V1__create_conversation_foundation.sql
 services/conversation-service/src/main/resources/db/migration/V2__add_conversation_create_idempotency.sql
+services/conversation-service/src/main/resources/db/migration/V3__add_model_run_acceptance_and_budget.sql
 services/conversation-service/src/test/java/com/sajtech/conversation/application/service/ConversationAuthorityTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/application/service/ConversationServiceTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/architecture/ArchitectureRulesTest.java
@@ -695,6 +708,7 @@ services/conversation-service/src/test/java/com/sajtech/conversation/configurati
 services/conversation-service/src/test/java/com/sajtech/conversation/configuration/ConversationRuntimeIntegrationTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/client/authorization/GrpcPermissionAuthorizerTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/health/ConversationReadinessHealthIndicatorTest.java
+services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/model/GitGovernedModelPolicyProviderTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/persistence/ConversationPageTokenTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/persistence/ConversationRlsIntegrationTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/security/IdentityJwtVerifierTest.java
