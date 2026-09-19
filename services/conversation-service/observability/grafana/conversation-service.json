@@ -1,5 +1,5 @@
 {
-  "title": "Conversation Service Foundation",
+  "title": "Conversation Service",
   "uid": "conversation-service",
   "schemaVersion": 39,
   "version": 1,
@@ -19,6 +19,22 @@
       "title": "Database pool pending",
       "targets": [
         {"expr": "hikaricp_connections_pending{pool=~\".*conversation.*\"}", "refId": "A"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "gRPC p95 latency",
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (le, operation) (rate(conversation_grpc_duration_seconds_bucket[5m])))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "gRPC outcomes",
+      "targets": [
+        {"expr": "sum by (operation, outcome) (rate(conversation_grpc_duration_seconds_count[5m]))", "refId": "A"}
       ]
     }
   ]

@@ -117,8 +117,8 @@ The implementation target remains:
 ```text
 service foundation                  -> COMPLETED in Stage 9 foundation PR: one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, AES-256-GCM key ring, and Day-One telemetry; deployed runtime remains unverified
 contracts                           -> versioned validated example-backed gRPC plus BFF OpenAPI/generated frontend types
-authority                           -> COMPLETED for the service boundary: exact JWT audience, four fixed permission keys, one online 300ms CheckPermission, fail-closed key rotation/readiness, bounded concurrency, and mesh/network policy; resource-ownership enforcement remains with the state-use-case slice
-conversation/run state              -> encrypted Conversation/Message, idempotent run acceptance, bounded durable worker, deterministic cancellation
+authority                           -> COMPLETED for the service boundary and Conversation CRUD: exact JWT audience, four fixed permission keys, one online 300ms CheckPermission, fail-closed key rotation/readiness, bounded concurrency, and private Membership ownership enforcement
+conversation/run state              -> Conversation CRUD/lifecycle, encrypted title, forced-RLS repository, bounded pagination, optimistic versioning, and durable request replay are implemented in the active slice; encrypted Message plus idempotent run acceptance/worker/cancellation remain next
 provider                            -> provider-neutral port plus fixed-egress OpenAI Responses adapter with store=false/background=false/tools=[]
 quota and cost                      -> atomic worst-case reservation, integer-micro-unit price snapshot, usage reconciliation, fail-closed ambiguity
 lifecycle                           -> tenant lifecycle gating plus ADR-0028 Inbox/effect/receipt before content is enabled

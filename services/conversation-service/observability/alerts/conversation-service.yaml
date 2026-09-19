@@ -17,3 +17,11 @@ groups:
           service: conversation-service
         annotations:
           summary: Conversation database pool has pending acquisition work
+      - alert: ConversationGrpcAvailabilityFailures
+        expr: sum(increase(conversation_grpc_duration_seconds_count{outcome=~"INTERNAL|UNAVAILABLE"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: Conversation gRPC has repeated internal or dependency availability failures

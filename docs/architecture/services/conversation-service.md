@@ -2,8 +2,9 @@
 
 ## 1. Responsibility and implementation state
 
-`conversation-service` is the implemented foundation of the ADR-0054 bounded context for private
-tenant conversations and model execution. Its current repository boundary is:
+`conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle
+slice of the ADR-0054 bounded context. ModelRun execution remains incomplete. Its current
+repository boundary is:
 
 ```text
 services/conversation-service
@@ -49,8 +50,11 @@ reuse fails with a stable conflict error.
 
 ## 3. First public journey and validation
 
-The BFF-owned REST surface will expose create/list/get/archive/delete Conversation, create/get/cancel
-ModelRun, and bounded Message history. It returns RFC 9457 errors and never proxies provider JSON.
+The service now exposes validated private gRPC create/list/get/archive/delete Conversation methods.
+They enforce Membership ownership, encrypted-at-rest titles, bounded opaque pagination, optimistic
+versions, and durable UUIDv4 request replay/conflict behavior. The BFF-owned REST surface, ModelRun
+methods, and bounded Message history remain pending; public errors will use RFC 9457 and never proxy
+provider JSON.
 
 Initial validation authority is:
 
