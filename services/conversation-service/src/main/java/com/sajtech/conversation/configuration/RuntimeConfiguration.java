@@ -4,7 +4,9 @@ import com.sajtech.conversation.application.service.ConversationAuthority;
 import com.sajtech.conversation.application.service.ConversationService;
 import com.sajtech.conversation.infrastructure.client.authorization.GrpcPermissionAuthorizer;
 import com.sajtech.conversation.infrastructure.health.ConversationReadinessHealthIndicator;
+import com.sajtech.conversation.infrastructure.model.GitGovernedModelPolicyProvider;
 import com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository;
+import com.sajtech.conversation.infrastructure.persistence.JdbcModelRunRepository;
 import com.sajtech.conversation.infrastructure.runtime.grpc.GrpcServerLifecycle;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifier;
 import com.sajtech.conversation.infrastructure.security.IdentityJwtVerifierRefresher;
@@ -97,9 +99,24 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  JdbcModelRunRepository modelRunRepository(
+      DataSource dataSource, AesGcmContentCrypto contentCrypto) {
+    return new JdbcModelRunRepository(dataSource, contentCrypto);
+  }
+
+  @Bean
+  GitGovernedModelPolicyProvider modelPolicyProvider(ConversationProperties properties) {
+    return new GitGovernedModelPolicyProvider(properties.providerRuntimeEnabled());
+  }
+
+  @Bean
   ConversationService conversationService(
-      ConversationAuthority authority, JdbcConversationRepository repository, Clock clock) {
-    return new ConversationService(authority, repository, clock);
+      ConversationAuthority authority,
+      JdbcConversationRepository repository,
+      JdbcModelRunRepository modelRuns,
+      GitGovernedModelPolicyProvider modelPolicy,
+      Clock clock) {
+    return new ConversationService(authority, repository, modelRuns, modelPolicy, clock);
   }
 
   @Bean

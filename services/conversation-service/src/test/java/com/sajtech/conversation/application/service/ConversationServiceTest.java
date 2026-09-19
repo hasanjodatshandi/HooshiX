@@ -9,6 +9,8 @@ import com.sajtech.conversation.application.model.ConversationActor;
 import com.sajtech.conversation.application.model.ConversationPage;
 import com.sajtech.conversation.application.port.out.AccessTokenVerifier;
 import com.sajtech.conversation.application.port.out.ConversationRepository;
+import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
+import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.application.port.out.PermissionAuthorizer;
 import com.sajtech.conversation.domain.Conversation;
 import com.sajtech.conversation.domain.ConversationLifecycle;
@@ -29,10 +31,14 @@ class ConversationServiceTest {
   private final AccessTokenVerifier tokens = mock(AccessTokenVerifier.class);
   private final PermissionAuthorizer permissions = mock(PermissionAuthorizer.class);
   private final ConversationRepository repository = mock(ConversationRepository.class);
+  private final ModelRunRepository modelRuns = mock(ModelRunRepository.class);
+  private final ModelPolicyProvider modelPolicy = mock(ModelPolicyProvider.class);
   private final ConversationService service =
       new ConversationService(
           new ConversationAuthority(tokens, permissions),
           repository,
+          modelRuns,
+          modelPolicy,
           Clock.fixed(NOW, ZoneOffset.UTC));
 
   @BeforeEach
@@ -65,7 +71,7 @@ class ConversationServiceTest {
             exception ->
                 assertThat(exception.error()).isEqualTo(ConversationError.INVALID_REQUEST));
 
-    verifyNoInteractions(tokens, permissions, repository);
+    verifyNoInteractions(tokens, permissions, repository, modelRuns, modelPolicy);
   }
 
   @Test
@@ -75,7 +81,7 @@ class ConversationServiceTest {
         .isInstanceOf(ConversationException.class);
     assertThatThrownBy(() -> service.create("token", UUID.randomUUID(), "broken\ud800"))
         .isInstanceOf(ConversationException.class);
-    verifyNoInteractions(tokens, permissions, repository);
+    verifyNoInteractions(tokens, permissions, repository, modelRuns, modelPolicy);
   }
 
   @Test
