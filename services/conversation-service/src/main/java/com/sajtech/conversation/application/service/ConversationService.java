@@ -8,6 +8,7 @@ import com.sajtech.conversation.application.model.MessagePage;
 import com.sajtech.conversation.application.port.out.ConversationRepository;
 import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
 import com.sajtech.conversation.application.port.out.ModelRunRepository;
+import com.sajtech.conversation.application.port.out.ModelProvider;
 import com.sajtech.conversation.domain.Conversation;
 import com.sajtech.conversation.domain.ModelRun;
 import java.text.Normalizer;
@@ -21,6 +22,7 @@ public final class ConversationService {
   private final ConversationRepository repository;
   private final ModelRunRepository modelRuns;
   private final ModelPolicyProvider modelPolicy;
+  private final ModelProvider provider;
   private final Clock clock;
 
   public ConversationService(
@@ -28,11 +30,13 @@ public final class ConversationService {
       ConversationRepository repository,
       ModelRunRepository modelRuns,
       ModelPolicyProvider modelPolicy,
+      ModelProvider provider,
       Clock clock) {
     this.authority = Objects.requireNonNull(authority);
     this.repository = Objects.requireNonNull(repository);
     this.modelRuns = Objects.requireNonNull(modelRuns);
     this.modelPolicy = Objects.requireNonNull(modelPolicy);
+    this.provider = Objects.requireNonNull(provider);
     this.clock = Objects.requireNonNull(clock);
   }
 
@@ -117,7 +121,13 @@ public final class ConversationService {
     requireUuidV4(conversationId);
     requireUuidV4(runId);
     var actor = authority.authorize(token, ConversationPermission.GENERATE);
-    return modelRuns.cancelOwned(actor, requestId, conversationId, runId, clock.instant());
+    ModelRun canceled =
+        modelRuns.cancelOwned(actor, requestId, conversationId, runId, clock.instant());
+    if (canceled.state() == com.sajtech.conversation.domain.ModelRunState.RUNNING
+        && canceled.cancellationRequested()) {
+      provider.cancel(runId);
+    }
+    return canceled;
   }
 
   private static String canonicalTitle(String value) {

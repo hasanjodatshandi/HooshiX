@@ -12,7 +12,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -20,6 +19,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import javax.net.ssl.SSLParameters;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -34,6 +38,9 @@ public final class OpenAiResponsesAdapter implements ModelProvider {
   private final String apiKey;
   private final String systemPrompt;
   private final HttpClient client;
+  private final ConcurrentMap<UUID, CompletableFuture<HttpResponse<InputStream>>> activeCalls =
+      new ConcurrentHashMap<>();
+  private final java.util.Set<UUID> cancellationRequested = ConcurrentHashMap.newKeySet();
 
   public OpenAiResponsesAdapter(String apiKey, String systemPrompt) {
     this(apiKey, systemPrompt, SHARED_CLIENT);
@@ -48,18 +55,40 @@ public final class OpenAiResponsesAdapter implements ModelProvider {
   @Override
   public ModelProviderResult execute(ModelProviderRequest request) {
     Objects.requireNonNull(request);
-    try {
-      HttpResponse<InputStream> response =
-          client.send(buildRequest(request), HttpResponse.BodyHandlers.ofInputStream());
-      return classify(response.statusCode(), boundedBody(response));
-    } catch (HttpTimeoutException exception) {
-      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
-    } catch (InterruptedException exception) {
-      Thread.currentThread().interrupt();
-      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
-    } catch (IOException | RuntimeException exception) {
+    if (cancellationRequested.remove(request.runId())) {
       return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
     }
+    CompletableFuture<HttpResponse<InputStream>> call =
+        client.sendAsync(buildRequest(request), HttpResponse.BodyHandlers.ofInputStream());
+    if (activeCalls.putIfAbsent(request.runId(), call) != null) {
+      call.cancel(true);
+      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
+    }
+    try {
+      if (cancellationRequested.remove(request.runId())) {
+        call.cancel(true);
+        return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
+      }
+      HttpResponse<InputStream> response = call.get();
+      return classify(response.statusCode(), boundedBody(response));
+    } catch (InterruptedException exception) {
+      call.cancel(true);
+      Thread.currentThread().interrupt();
+      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
+    } catch (ExecutionException | IOException | RuntimeException exception) {
+      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
+    } finally {
+      activeCalls.remove(request.runId(), call);
+      cancellationRequested.remove(request.runId());
+    }
+  }
+
+  @Override
+  public boolean cancel(UUID runId) {
+    Objects.requireNonNull(runId);
+    cancellationRequested.add(runId);
+    CompletableFuture<HttpResponse<InputStream>> call = activeCalls.get(runId);
+    return call != null && call.cancel(true);
   }
 
   HttpRequest buildRequest(ModelProviderRequest request) {
@@ -116,6 +145,9 @@ public final class OpenAiResponsesAdapter implements ModelProvider {
       if (!"completed".equals(requiredText(root, "status"))) {
         return ModelProviderResult.failure(ModelProviderOutcome.INVALID_RESPONSE);
       }
+      if (containsSafetyRejection(root)) {
+        return ModelProviderResult.failure(ModelProviderOutcome.SAFETY_REJECTED);
+      }
       String output = extractOutput(root.path("output"));
       JsonNode usage = root.path("usage");
       int inputTokens = requiredNonNegativeInt(usage, "input_tokens");
@@ -131,6 +163,24 @@ public final class OpenAiResponsesAdapter implements ModelProvider {
     } catch (RuntimeException exception) {
       return ModelProviderResult.failure(ModelProviderOutcome.INVALID_RESPONSE);
     }
+  }
+
+  private static boolean containsSafetyRejection(JsonNode root) {
+    JsonNode moderation = root.path("moderation");
+    if (moderation.path("input").path("flagged").asBoolean(false)
+        || moderation.path("output").path("flagged").asBoolean(false)) {
+      return true;
+    }
+    JsonNode output = root.path("output");
+    if (!output.isArray()) return false;
+    for (JsonNode item : output) {
+      JsonNode content = item.path("content");
+      if (!content.isArray()) continue;
+      for (JsonNode part : content) {
+        if ("refusal".equals(optionalText(part, "type"))) return true;
+      }
+    }
+    return false;
   }
 
   private static String extractOutput(JsonNode outputItems) {

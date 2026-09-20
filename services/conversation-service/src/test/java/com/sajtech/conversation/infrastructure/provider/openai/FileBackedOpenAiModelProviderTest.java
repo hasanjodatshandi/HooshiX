@@ -9,6 +9,7 @@ import com.sajtech.conversation.application.model.ModelProviderRequest;
 import com.sajtech.conversation.domain.MessageRole;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -38,6 +39,6 @@ class FileBackedOpenAiModelProviderTest {
             15_000_000,
             70_000);
     return new ModelProviderRequest(
-        policy, List.of(new ModelProviderMessage(MessageRole.USER, "question")));
+        UUID.randomUUID(), policy, List.of(new ModelProviderMessage(MessageRole.USER, "question")));
   }
 }

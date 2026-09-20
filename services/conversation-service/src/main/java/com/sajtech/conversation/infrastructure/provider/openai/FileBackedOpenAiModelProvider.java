@@ -10,11 +10,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public final class FileBackedOpenAiModelProvider implements ModelProvider {
   private static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v1.txt";
   private final Path apiKeyPath;
   private final String systemPrompt;
+  private final ConcurrentMap<UUID, OpenAiResponsesAdapter> activeCalls = new ConcurrentHashMap<>();
+  private final java.util.Set<UUID> cancellationRequested = ConcurrentHashMap.newKeySet();
 
   public FileBackedOpenAiModelProvider(Path apiKeyPath) {
     this.apiKeyPath = Objects.requireNonNull(apiKeyPath);
@@ -24,11 +29,33 @@ public final class FileBackedOpenAiModelProvider implements ModelProvider {
   @Override
   public ModelProviderResult execute(ModelProviderRequest request) {
     Objects.requireNonNull(request);
+    if (cancellationRequested.remove(request.runId())) {
+      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
+    }
+    OpenAiResponsesAdapter adapter;
     try {
-      return new OpenAiResponsesAdapter(loadApiKey(), systemPrompt).execute(request);
+      adapter = new OpenAiResponsesAdapter(loadApiKey(), systemPrompt);
     } catch (RuntimeException exception) {
       return ModelProviderResult.failure(ModelProviderOutcome.DEFINITIVE_UNAVAILABLE);
     }
+    if (activeCalls.putIfAbsent(request.runId(), adapter) != null) {
+      return ModelProviderResult.failure(ModelProviderOutcome.AMBIGUOUS);
+    }
+    try {
+      if (cancellationRequested.remove(request.runId())) adapter.cancel(request.runId());
+      return adapter.execute(request);
+    } finally {
+      activeCalls.remove(request.runId(), adapter);
+      cancellationRequested.remove(request.runId());
+    }
+  }
+
+  @Override
+  public boolean cancel(UUID runId) {
+    Objects.requireNonNull(runId);
+    cancellationRequested.add(runId);
+    OpenAiResponsesAdapter adapter = activeCalls.get(runId);
+    return adapter != null && adapter.cancel(runId);
   }
 
   public boolean isConfigured() {

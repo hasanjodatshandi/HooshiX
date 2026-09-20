@@ -572,6 +572,8 @@ public final class JdbcModelRunWorkerRepository implements ModelRunWorkerReposit
               false);
         }
       }
+      case SAFETY_REJECTED ->
+          new Completion(ModelRunState.FAILED, ModelRunFailure.SAFETY_REJECTED, 0, false);
       case DEFINITIVE_REJECTION ->
           new Completion(ModelRunState.FAILED, ModelRunFailure.PROVIDER_REJECTED, 0, false);
       case DEFINITIVE_UNAVAILABLE ->

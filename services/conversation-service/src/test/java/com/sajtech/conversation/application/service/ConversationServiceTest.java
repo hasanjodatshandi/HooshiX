@@ -12,6 +12,7 @@ import com.sajtech.conversation.application.model.ModelExecutionPolicy;
 import com.sajtech.conversation.application.port.out.AccessTokenVerifier;
 import com.sajtech.conversation.application.port.out.ConversationRepository;
 import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
+import com.sajtech.conversation.application.port.out.ModelProvider;
 import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.application.port.out.PermissionAuthorizer;
 import com.sajtech.conversation.domain.Conversation;
@@ -40,12 +41,14 @@ class ConversationServiceTest {
   private final ConversationRepository repository = mock(ConversationRepository.class);
   private final ModelRunRepository modelRuns = mock(ModelRunRepository.class);
   private final ModelPolicyProvider modelPolicy = mock(ModelPolicyProvider.class);
+  private final ModelProvider provider = mock(ModelProvider.class);
   private final ConversationService service =
       new ConversationService(
           new ConversationAuthority(tokens, permissions),
           repository,
           modelRuns,
           modelPolicy,
+          provider,
           Clock.fixed(NOW, ZoneOffset.UTC));
 
   @BeforeEach
@@ -78,7 +81,7 @@ class ConversationServiceTest {
             exception ->
                 assertThat(exception.error()).isEqualTo(ConversationError.INVALID_REQUEST));
 
-    verifyNoInteractions(tokens, permissions, repository, modelRuns, modelPolicy);
+    verifyNoInteractions(tokens, permissions, repository, modelRuns, modelPolicy, provider);
   }
 
   @Test

@@ -264,8 +264,9 @@ public class RuntimeConfiguration {
       JdbcConversationRepository repository,
       JdbcModelRunRepository modelRuns,
       GitGovernedModelPolicyProvider modelPolicy,
+      FileBackedOpenAiModelProvider provider,
       Clock clock) {
-    return new ConversationService(authority, repository, modelRuns, modelPolicy, clock);
+    return new ConversationService(authority, repository, modelRuns, modelPolicy, provider, clock);
   }
 
   @Bean
