@@ -10,6 +10,13 @@ database:
 secrets:
   contentKeyRingSecretName: conversation-content
 
+runtime:
+  eventRuntimeEnabled: true
+
+kafka:
+  bootstrapServers: kafka.platform-data.svc:9092
+  connectionSecretName: conversation-kafka
+
 identity:
   jwtVerifierConfigMapName: identity-jwt-public
 

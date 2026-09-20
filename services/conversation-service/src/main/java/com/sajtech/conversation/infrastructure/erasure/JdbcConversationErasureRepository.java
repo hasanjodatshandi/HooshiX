@@ -136,6 +136,14 @@ public final class JdbcConversationErasureRepository {
           }
           try (PreparedStatement statement =
               connection.prepareStatement(
+                  "UPDATE conversation_model_run SET user_message_id=NULL WHERE tenant_id=? AND conversation_id IN (SELECT conversation_id FROM conversation_subject_index WHERE user_id=? AND tenant_id=?)")) {
+            statement.setObject(1, tenantId);
+            statement.setObject(2, userId);
+            statement.setObject(3, tenantId);
+            statement.executeUpdate();
+          }
+          try (PreparedStatement statement =
+              connection.prepareStatement(
                   "DELETE FROM conversation_model_run_queue WHERE tenant_id=? AND conversation_id IN (SELECT conversation_id FROM conversation_subject_index WHERE user_id=? AND tenant_id=?) AND run_id IN (SELECT run_id FROM conversation_model_run WHERE tenant_id=? AND state='FAILED')")) {
             statement.setObject(1, tenantId);
             statement.setObject(2, userId);

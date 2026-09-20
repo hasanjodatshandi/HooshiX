@@ -198,8 +198,11 @@ class IdentityCoreRuntimeConfiguration {
   }
 
   @Bean
-  ErasureStore erasureStore(DSLContext dsl) {
-    return new JooqErasureStore(dsl);
+  ErasureStore erasureStore(
+      DSLContext dsl,
+      @Value("${identity.conversation-erasure-participant-enabled:false}")
+          boolean conversationParticipantEnabled) {
+    return new JooqErasureStore(dsl, conversationParticipantEnabled);
   }
 
   @Bean

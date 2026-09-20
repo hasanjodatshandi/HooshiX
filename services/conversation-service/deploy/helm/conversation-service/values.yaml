@@ -14,6 +14,7 @@ service:
 
 runtime:
   grpcMaximumConcurrentCalls: 32
+  eventRuntimeEnabled: false
   providerRuntimeEnabled: false
   temporaryStorageLimit: 256Mi
   providerMaximumConcurrentCalls: 4
@@ -30,6 +31,19 @@ authorization:
 identity:
   jwtVerifierConfigMapName: ""
   jwtIssuer: https://identity.sajtech.internal
+  erasureTarget: dns:///identity-service.platform-apps.svc.cluster.local:9090
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: identity-service
+  port: 9090
+
+kafka:
+  bootstrapServers: ""
+  namespace: platform-data
+  podLabels:
+    app.kubernetes.io/name: kafka
+  port: 9092
+  connectionSecretName: ""
 
 resources:
   requests:

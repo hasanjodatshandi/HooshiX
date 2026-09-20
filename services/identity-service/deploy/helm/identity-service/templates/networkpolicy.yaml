@@ -36,6 +36,12 @@ spec:
           podSelector:
             matchLabels:
               {{- toYaml .Values.notification.podLabels | nindent 14 }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.conversation.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.conversation.podLabels | nindent 14 }}
       ports:
         - protocol: TCP
           port: {{ .Values.service.notificationResultGrpcPort }}

@@ -7,8 +7,14 @@
 {{- $migrationDbSecret := required "database.migrationSecretName is required" .Values.database.migrationSecretName -}}
 {{- if eq $runtimeDbSecret $migrationDbSecret }}{{ fail "runtime and migration database credentials must use distinct Secrets" }}{{ end -}}
 {{- $contentSecret := required "secrets.contentKeyRingSecretName is required" .Values.secrets.contentKeyRingSecretName -}}
+{{- if .Values.runtime.eventRuntimeEnabled }}
+{{- required "kafka.bootstrapServers is required when event runtime is enabled" .Values.kafka.bootstrapServers -}}
+{{- required "kafka.connectionSecretName is required when event runtime is enabled" .Values.kafka.connectionSecretName -}}
+{{- required "identity.erasureTarget is required when event runtime is enabled" .Values.identity.erasureTarget -}}
+{{- end }}
 {{- if .Values.runtime.providerRuntimeEnabled }}
 {{- required "secrets.providerApiKeySecretName is required when provider runtime is enabled" .Values.secrets.providerApiKeySecretName -}}
+{{- if not .Values.runtime.eventRuntimeEnabled }}{{ fail "provider runtime requires tenant lifecycle and erasure event runtime" }}{{ end -}}
 {{- end }}
 {{- $jwtVerifierConfigMap := required "identity.jwtVerifierConfigMapName is required" .Values.identity.jwtVerifierConfigMapName -}}
 {{- $authorizationTarget := required "authorization.target is required" .Values.authorization.target -}}
@@ -94,6 +100,14 @@ spec:
               value: {{ $jdbcUrl | quote }}
             - name: CONVERSATION_PROVIDER_RUNTIME_ENABLED
               value: {{ .Values.runtime.providerRuntimeEnabled | quote }}
+            - name: CONVERSATION_EVENT_RUNTIME_ENABLED
+              value: {{ .Values.runtime.eventRuntimeEnabled | quote }}
+            {{- if .Values.runtime.eventRuntimeEnabled }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.kafka.bootstrapServers | quote }}
+            - name: CONVERSATION_IDENTITY_ERASURE_TARGET
+              value: {{ .Values.identity.erasureTarget | quote }}
+            {{- end }}
             - name: CONVERSATION_PROVIDER_MAXIMUM_CONCURRENT_CALLS
               value: {{ .Values.runtime.providerMaximumConcurrentCalls | quote }}
             - name: CONVERSATION_PROVIDER_MAXIMUM_CONCURRENT_PER_TENANT
@@ -141,6 +155,11 @@ spec:
             - name: content-key-ring
               mountPath: /run/secrets/conversation-content
               readOnly: true
+            {{- if .Values.runtime.eventRuntimeEnabled }}
+            - name: kafka-connection
+              mountPath: /run/secrets/conversation-kafka
+              readOnly: true
+            {{- end }}
             {{- if .Values.runtime.providerRuntimeEnabled }}
             - name: provider-api-key
               mountPath: /run/secrets/conversation-provider
@@ -167,6 +186,12 @@ spec:
             items:
               - key: content.properties
                 path: content.properties
+        {{- if .Values.runtime.eventRuntimeEnabled }}
+        - name: kafka-connection
+          secret:
+            secretName: {{ .Values.kafka.connectionSecretName | quote }}
+            defaultMode: 0440
+        {{- end }}
         {{- if .Values.runtime.providerRuntimeEnabled }}
         - name: provider-api-key
           secret:

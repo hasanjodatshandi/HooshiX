@@ -230,6 +230,12 @@ public final class JdbcTenantLifecycleRepository {
   private static void purgeContent(Connection connection, UUID tenantId, Instant now)
       throws SQLException {
     try (PreparedStatement statement =
+        connection.prepareStatement(
+            "UPDATE conversation_model_run SET user_message_id=NULL WHERE tenant_id=?")) {
+      statement.setObject(1, tenantId);
+      statement.executeUpdate();
+    }
+    try (PreparedStatement statement =
         connection.prepareStatement("DELETE FROM conversation_message WHERE tenant_id=?")) {
       statement.setObject(1, tenantId);
       statement.executeUpdate();

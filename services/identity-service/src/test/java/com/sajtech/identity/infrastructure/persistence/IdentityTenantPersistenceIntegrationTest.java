@@ -196,6 +196,38 @@ class IdentityTenantPersistenceIntegrationTest {
   }
 
   @Test
+  void newErasurePolicyRegistersConversationAndReturnsItsOwnedUserTarget() {
+    UUID requestId = UUID.randomUUID();
+    UUID eventId = UUID.randomUUID();
+    JooqErasureStore erasureStore = new JooqErasureStore(dsl);
+
+    var accepted = tx.required(() -> erasureStore.accept(requestId, targetUser, NOW));
+    assertThat(accepted.participantPolicyVersion()).isEqualTo("2");
+    assertThat(
+            dsl.fetchValue(
+                "SELECT count(*)::integer FROM identity_erasure_participant WHERE erasure_request_id=?",
+                requestId))
+        .isEqualTo(5);
+
+    var target =
+        tx.required(
+            () ->
+                erasureStore.beginParticipant(
+                    eventId,
+                    requestId,
+                    com.sajtech.identity.application.erasure.model.ErasureParticipant
+                        .CONVERSATION_SERVICE,
+                    "2",
+                    "",
+                    NOW.plusSeconds(1)));
+
+    assertThat(target.userId()).isEqualTo(targetUser);
+    assertThat(target.notificationIds()).isEmpty();
+    assertThat(target.nextPageToken()).isEmpty();
+    assertThat(target.completePage()).isTrue();
+  }
+
+  @Test
   void tenantActivationSelectionInvitationAndRemovalUseDurableProjectionAndOutboxState() {
     UUID createRequest = UUID.randomUUID();
     TenantCreation created =

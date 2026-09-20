@@ -7,7 +7,9 @@ spring:
     virtual:
       enabled: true
   config:
-    import: optional:configtree:/run/secrets/conversation-db-runtime/
+    import:
+      - optional:configtree:/run/secrets/conversation-db-runtime/
+      - optional:configtree:/run/secrets/conversation-kafka/
   datasource:
     url: ${CONVERSATION_DATABASE_URL:jdbc:postgresql://localhost:5432/conversation}
     hikari:

@@ -11,8 +11,12 @@ import com.sajtech.conversation.application.model.ModelProviderResult;
 import com.sajtech.conversation.domain.ConversationLifecycle;
 import com.sajtech.conversation.domain.ModelRunFailure;
 import com.sajtech.conversation.domain.ModelRunState;
+import com.sajtech.conversation.infrastructure.erasure.JdbcConversationErasureRepository;
+import com.sajtech.conversation.infrastructure.lifecycle.JdbcTenantLifecycleRepository;
 import com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto;
 import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
+import com.sajtech.identity.contract.v1.TenantLifecycleEvent;
+import com.sajtech.identity.contract.v1.TenantLifecycleEventState;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.nio.file.Files;
@@ -172,6 +176,200 @@ class ConversationRlsIntegrationTest {
         }
       }
     }
+  }
+
+  @Test
+  void tenantLifecycleSuspensionStopsQueuedWorkAndFailsClosedOnOrderingGap() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    Instant now = Instant.parse("2026-09-20T08:00:00Z");
+    UUID conversationId = UUID.randomUUID();
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    var run =
+        modelRuns.accept(
+            owner,
+            UUID.randomUUID(),
+            conversationId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "erase this",
+            policy(),
+            now.plusSeconds(1));
+
+    var lifecycle = new JdbcTenantLifecycleRepository(runtime);
+    lifecycle.receive(
+        lifecycleEvent(tenant, 2, TenantLifecycleEventState.TENANT_LIFECYCLE_EVENT_STATE_SUSPENDED),
+        now.plusSeconds(2));
+
+    assertThat(runState(run.id())).isEqualTo("FAILED");
+    assertThatThrownBy(
+            () ->
+                repository.create(
+                    owner, UUID.randomUUID(), UUID.randomUUID(), "blocked", now.plusSeconds(3)))
+        .isInstanceOfSatisfying(
+            ConversationException.class,
+            error -> assertThat(error.error()).isEqualTo(ConversationError.TENANT_INACTIVE));
+
+    lifecycle.receive(
+        lifecycleEvent(tenant, 4, TenantLifecycleEventState.TENANT_LIFECYCLE_EVENT_STATE_ACTIVE),
+        now.plusSeconds(4));
+    assertThat(
+            scalar(
+                "SELECT ordered FROM conversation_tenant_lifecycle WHERE tenant_id=?",
+                tenant,
+                Boolean.class))
+        .isFalse();
+    assertThat(
+            scalar(
+                "SELECT outcome FROM conversation_tenant_lifecycle_inbox WHERE tenant_id=? AND lifecycle_version=4",
+                tenant,
+                String.class))
+        .isEqualTo("GAP");
+  }
+
+  @Test
+  void subjectErasureScrubsContentIndexAndQueuedReservationAtomically() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    Instant now = Instant.parse("2026-09-20T09:00:00Z");
+    UUID conversationId = UUID.randomUUID();
+    repository.create(owner, UUID.randomUUID(), conversationId, "sensitive", now);
+    seedBudget(tenant, membership, 100_000, now);
+    var run =
+        modelRuns.accept(
+            owner,
+            UUID.randomUUID(),
+            conversationId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "private prompt",
+            policy(),
+            now.plusSeconds(1));
+
+    new JdbcConversationErasureRepository(runtime).eraseSubject(owner.userId(), now.plusSeconds(2));
+
+    assertThat(messageCount(conversationId)).isZero();
+    assertThat(runState(run.id())).isEqualTo("FAILED");
+    assertThat(
+            scalar(
+                "SELECT lifecycle FROM conversation WHERE conversation_id=?",
+                conversationId,
+                String.class))
+        .isEqualTo("DELETED");
+    assertThat(
+            scalar(
+                "SELECT owner_user_id IS NULL FROM conversation WHERE conversation_id=?",
+                conversationId,
+                Boolean.class))
+        .isTrue();
+    assertThat(
+            scalar(
+                "SELECT count(*)::integer FROM conversation_subject_index WHERE user_id=?",
+                owner.userId(),
+                Integer.class))
+        .isZero();
+    assertThat(
+            scalar(
+                "SELECT reserved_micro_usd FROM conversation_budget_account WHERE tenant_id=? AND scope_type='TENANT'",
+                tenant,
+                Long.class))
+        .isZero();
+  }
+
+  @Test
+  void lifecycleDuplicateConflictDeleteAndForbiddenRestoreRemainFailClosed() throws Exception {
+    Instant now = Instant.parse("2026-09-20T10:00:00Z");
+    var lifecycle = new JdbcTenantLifecycleRepository(runtime);
+
+    UUID duplicateTenant = UUID.randomUUID();
+    actor(duplicateTenant, UUID.randomUUID());
+    lifecycle.receive(
+        lifecycleEvent(
+            duplicateTenant, 1, TenantLifecycleEventState.TENANT_LIFECYCLE_EVENT_STATE_ACTIVE),
+        now);
+    assertThat(
+            scalar(
+                "SELECT outcome FROM conversation_tenant_lifecycle_inbox WHERE tenant_id=? AND lifecycle_version=1",
+                duplicateTenant,
+                String.class))
+        .isEqualTo("DUPLICATE");
+
+    UUID conflictTenant = UUID.randomUUID();
+    actor(conflictTenant, UUID.randomUUID());
+    lifecycle.receive(
+        lifecycleEvent(
+            conflictTenant, 1, TenantLifecycleEventState.TENANT_LIFECYCLE_EVENT_STATE_SUSPENDED),
+        now.plusSeconds(1));
+    assertThat(
+            scalar(
+                "SELECT outcome FROM conversation_tenant_lifecycle_inbox WHERE tenant_id=? AND lifecycle_version=1",
+                conflictTenant,
+                String.class))
+        .isEqualTo("CONFLICT");
+    assertThat(
+            scalar(
+                "SELECT ordered FROM conversation_tenant_lifecycle WHERE tenant_id=?",
+                conflictTenant,
+                Boolean.class))
+        .isFalse();
+
+    UUID deletedTenant = UUID.randomUUID();
+    UUID deletedMembership = UUID.randomUUID();
+    ConversationActor owner = actor(deletedTenant, deletedMembership);
+    UUID conversationId = UUID.randomUUID();
+    repository.create(owner, UUID.randomUUID(), conversationId, "purge", now);
+    lifecycle.receive(
+        lifecycleEvent(
+            deletedTenant, 2, TenantLifecycleEventState.TENANT_LIFECYCLE_EVENT_STATE_DELETED),
+        now.plusSeconds(2));
+    lifecycle.receive(
+        lifecycleEvent(
+            deletedTenant, 3, TenantLifecycleEventState.TENANT_LIFECYCLE_EVENT_STATE_ACTIVE),
+        now.plusSeconds(3));
+
+    assertThat(
+            scalar(
+                "SELECT outcome FROM conversation_tenant_lifecycle_inbox WHERE tenant_id=? AND lifecycle_version=3",
+                deletedTenant,
+                String.class))
+        .isEqualTo("RESTORE_FORBIDDEN");
+    assertThat(
+            scalar(
+                "SELECT lifecycle FROM conversation WHERE conversation_id=?",
+                conversationId,
+                String.class))
+        .isEqualTo("DELETED");
+  }
+
+  @Test
+  void erasureInboxIsIdempotentAndCompletesWithDurableReceipt() throws Exception {
+    Instant now = Instant.parse("2026-09-20T11:00:00Z");
+    var erasure = new JdbcConversationErasureRepository(runtime);
+    UUID requestId = UUID.randomUUID();
+    var event = erasureEvent(UUID.randomUUID(), requestId, "2");
+
+    erasure.receive(event, now);
+    erasure.receive(event, now.plusMillis(1));
+    var item = erasure.claim(now.plusSeconds(1), Duration.ofSeconds(30)).orElseThrow();
+    erasure.eraseSubject(UUID.randomUUID(), now.plusSeconds(2));
+    erasure.complete(item, now.plusSeconds(3));
+
+    assertThat(erasure.claim(now.plusSeconds(4), Duration.ofSeconds(30))).isEmpty();
+    assertThat(
+            scalar(
+                "SELECT state FROM conversation_erasure_inbox WHERE erasure_request_id=?",
+                requestId,
+                String.class))
+        .isEqualTo("COMPLETED");
+    assertThat(
+            scalar(
+                "SELECT count(*)::integer FROM conversation_erasure_receipt_outbox WHERE erasure_request_id=?",
+                requestId,
+                Integer.class))
+        .isEqualTo(1);
   }
 
   @Test
@@ -913,6 +1111,52 @@ class ConversationRlsIntegrationTest {
         return row.getInt(1);
       }
     }
+  }
+
+  private String runState(UUID runId) throws Exception {
+    return scalar("SELECT state FROM conversation_model_run WHERE run_id=?", runId, String.class);
+  }
+
+  private <T> T scalar(String sql, UUID value, Class<T> type) throws Exception {
+    try (Connection connection = adminConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setObject(1, value);
+      try (ResultSet row = statement.executeQuery()) {
+        assertThat(row.next()).isTrue();
+        return row.getObject(1, type);
+      }
+    }
+  }
+
+  private static TenantLifecycleEvent lifecycleEvent(
+      UUID tenantId, long version, TenantLifecycleEventState state) {
+    Instant occurredAt = Instant.parse("2026-09-20T08:00:00Z").plusSeconds(version);
+    return TenantLifecycleEvent.newBuilder()
+        .setEventId(UUID.randomUUID().toString())
+        .setTenantId(tenantId.toString())
+        .setLifecycleVersion(version)
+        .setState(state)
+        .setOccurredAt(
+            com.google.protobuf.Timestamp.newBuilder()
+                .setSeconds(occurredAt.getEpochSecond())
+                .setNanos(occurredAt.getNano())
+                .build())
+        .build();
+  }
+
+  private static com.sajtech.identity.contract.v1.ErasureCommandEvent erasureEvent(
+      UUID eventId, UUID requestId, String policyVersion) {
+    Instant occurredAt = Instant.parse("2026-09-20T11:00:00Z");
+    return com.sajtech.identity.contract.v1.ErasureCommandEvent.newBuilder()
+        .setEventId(eventId.toString())
+        .setErasureRequestId(requestId.toString())
+        .setParticipantPolicyVersion(policyVersion)
+        .setOccurredAt(
+            com.google.protobuf.Timestamp.newBuilder()
+                .setSeconds(occurredAt.getEpochSecond())
+                .setNanos(occurredAt.getNano())
+                .build())
+        .build();
   }
 
   private void insertConversation(UUID tenant) throws Exception {
