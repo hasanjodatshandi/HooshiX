@@ -10,12 +10,14 @@ Maven coordinates:
 
 Example:
 
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.1")
 
 The JAR contains generated Protobuf and gRPC transport classes, Protovalidate rules, and the
 `ContractValidationServerInterceptor` used to enforce those rules at a server boundary.
 
-The current 1.9.0 release adds the backward-compatible `hooshix.conversation.v1` private
+The current 1.9.1 release corrects the backward-compatible Conversation erasure target validation
+so the registered Conversation participant receives the same Identity-owned user target shape as
+Authorization and Web BFF. The 1.9.0 release added the `hooshix.conversation.v1` private
 Conversation and asynchronous ModelRun service contract, the Identity-owned non-PII tenant
 lifecycle event, and the Conversation erasure-participant identity. Every Conversation request has
 Protovalidate rules and a tested protobuf-JSON consumer example. Browser-controlled messages do not

@@ -198,8 +198,11 @@ class IdentityCoreRuntimeConfiguration {
   }
 
   @Bean
-  ErasureStore erasureStore(DSLContext dsl) {
-    return new JooqErasureStore(dsl);
+  ErasureStore erasureStore(
+      DSLContext dsl,
+      @Value("${identity.conversation-erasure-participant-enabled:false}")
+          boolean conversationParticipantEnabled) {
+    return new JooqErasureStore(dsl, conversationParticipantEnabled);
   }
 
   @Bean
@@ -228,6 +231,24 @@ class IdentityCoreRuntimeConfiguration {
           MeterRegistry meters) {
     return new com.sajtech.identity.infrastructure.worker.ErasureCommandOutboxDispatcher(
         outbox, kafka, transactions, clock, topic, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "identity",
+      name = "erasure-runtime-enabled",
+      havingValue = "true")
+  com.sajtech.identity.infrastructure.worker.TenantLifecycleEventDispatcher
+      tenantLifecycleEventDispatcher(
+          DSLContext dsl,
+          org.springframework.kafka.core.KafkaTemplate<String, byte[]> kafka,
+          TransactionRunner transactions,
+          Clock clock,
+          @Value("${identity.tenant-lifecycle-topic:hooshix.identity.tenant.lifecycle.v1}")
+              String topic,
+          MeterRegistry meters) {
+    return new com.sajtech.identity.infrastructure.worker.TenantLifecycleEventDispatcher(
+        dsl, kafka, transactions, clock, topic, meters);
   }
 
   @Bean

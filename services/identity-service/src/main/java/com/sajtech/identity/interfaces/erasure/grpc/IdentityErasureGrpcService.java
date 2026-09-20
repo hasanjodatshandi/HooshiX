@@ -91,6 +91,8 @@ public final class IdentityErasureGrpcService
             case ERASURE_PARTICIPANT_NOTIFICATION_SERVICE ->
                 ErasureParticipant.NOTIFICATION_SERVICE;
             case ERASURE_PARTICIPANT_WEB_BFF -> ErasureParticipant.WEB_BFF;
+            case ERASURE_PARTICIPANT_CONVERSATION_SERVICE ->
+                ErasureParticipant.CONVERSATION_SERVICE;
             default -> throw new IllegalArgumentException("Unsupported erasure participant");
           };
       ParticipantErasureTarget target =

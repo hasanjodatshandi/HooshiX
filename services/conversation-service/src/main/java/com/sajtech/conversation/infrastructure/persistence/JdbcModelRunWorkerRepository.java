@@ -76,12 +76,13 @@ public final class JdbcModelRunWorkerRepository implements ModelRunWorkerReposit
           connection.commit();
           return Optional.empty();
         }
-        if (!"ACTIVE".equals(run.lifecycle()) || !run.matches(policy)) {
+        boolean tenantActive = TenantLifecycleProjection.isActive(connection, entry.tenantId());
+        if (!tenantActive || !"ACTIVE".equals(run.lifecycle()) || !run.matches(policy)) {
           failQueuedRun(
               connection,
               entry,
               run,
-              "ACTIVE".equals(run.lifecycle())
+              tenantActive && "ACTIVE".equals(run.lifecycle())
                   ? ModelRunFailure.EXECUTION_DISABLED
                   : ModelRunFailure.TENANT_INACTIVE,
               now);

@@ -576,6 +576,7 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
           limits.execute("SET LOCAL lock_timeout = '100ms'");
           limits.execute("SET LOCAL statement_timeout = '500ms'");
         }
+        TenantLifecycleProjection.requireActive(connection, actor.tenantId());
         T result = work.execute(connection);
         connection.commit();
         return result;

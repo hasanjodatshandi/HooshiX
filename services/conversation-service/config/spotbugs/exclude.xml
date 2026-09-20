@@ -8,7 +8,12 @@
             <Class name="com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository"/>
             <Class name="com.sajtech.conversation.infrastructure.persistence.JdbcModelRunRepository"/>
             <Class name="com.sajtech.conversation.infrastructure.persistence.JdbcModelRunWorkerRepository"/>
+            <Class name="com.sajtech.conversation.infrastructure.erasure.ConversationErasureReceiptDispatcher"/>
+            <Class name="com.sajtech.conversation.infrastructure.erasure.ConversationErasureWorker"/>
+            <Class name="com.sajtech.conversation.infrastructure.erasure.JdbcConversationErasureRepository"/>
+            <Class name="com.sajtech.conversation.infrastructure.lifecycle.JdbcTenantLifecycleRepository"/>
             <Class name="com.sajtech.conversation.interfaces.grpc.ConversationGrpcService"/>
+            <Class name="com.sajtech.conversation.interfaces.kafka.ConversationErasureListener"/>
             <Class name="com.sajtech.conversation.interfaces.observability.grpc.ConversationTracingInterceptor"/>
         </Or>
         <Bug pattern="EI_EXPOSE_REP2"/>

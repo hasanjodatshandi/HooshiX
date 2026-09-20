@@ -58,10 +58,12 @@ identity:
   authorization-target: ${IDENTITY_AUTHORIZATION_TARGET:dns:///authorization-service.platform-apps.svc.cluster.local:9090}
   notification-dispatch-enabled: ${IDENTITY_NOTIFICATION_DISPATCH_ENABLED:true}
   erasure-runtime-enabled: ${IDENTITY_ERASURE_RUNTIME_ENABLED:false}
+  conversation-erasure-participant-enabled: ${IDENTITY_CONVERSATION_ERASURE_PARTICIPANT_ENABLED:false}
   erasure-command-topic: ${IDENTITY_ERASURE_COMMAND_TOPIC:hooshix.identity.erasure.command.v1}
   erasure-consumer-group: ${IDENTITY_ERASURE_CONSUMER_GROUP:hooshix-identity-erasure-v1}
   erasure-receipt-topic: ${IDENTITY_ERASURE_RECEIPT_TOPIC:hooshix.identity.erasure.receipt.v1}
   erasure-receipt-consumer-group: ${IDENTITY_ERASURE_RECEIPT_CONSUMER_GROUP:hooshix-identity-erasure-receipt-v1}
+  tenant-lifecycle-topic: ${IDENTITY_TENANT_LIFECYCLE_TOPIC:hooshix.identity.tenant.lifecycle.v1}
   fingerprint-key-ring-path: ${IDENTITY_FINGERPRINT_KEY_RING_PATH:/run/secrets/identity-fingerprint/fingerprint.properties}
   challenge-key-ring-path: ${IDENTITY_CHALLENGE_KEY_RING_PATH:/run/secrets/identity-challenge/challenge.properties}
   handoff-key-ring-path: ${IDENTITY_HANDOFF_KEY_RING_PATH:/run/secrets/identity-handoff/handoff.properties}

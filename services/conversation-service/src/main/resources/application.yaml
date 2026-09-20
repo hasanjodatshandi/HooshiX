@@ -7,7 +7,9 @@ spring:
     virtual:
       enabled: true
   config:
-    import: optional:configtree:/run/secrets/conversation-db-runtime/
+    import:
+      - optional:configtree:/run/secrets/conversation-db-runtime/
+      - optional:configtree:/run/secrets/conversation-kafka/
   datasource:
     url: ${CONVERSATION_DATABASE_URL:jdbc:postgresql://localhost:5432/conversation}
     hikari:
@@ -18,8 +20,32 @@ spring:
       max-lifetime: 1800000
   flyway:
     enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
 
 conversation:
+  event-runtime-enabled: ${CONVERSATION_EVENT_RUNTIME_ENABLED:false}
+  erasure-command-topic: ${CONVERSATION_ERASURE_COMMAND_TOPIC:hooshix.identity.erasure.command.v1}
+  erasure-consumer-group: ${CONVERSATION_ERASURE_CONSUMER_GROUP:hooshix-conversation-erasure-v1}
+  erasure-receipt-topic: ${CONVERSATION_ERASURE_RECEIPT_TOPIC:hooshix.identity.erasure.receipt.v1}
+  tenant-lifecycle-topic: ${CONVERSATION_TENANT_LIFECYCLE_TOPIC:hooshix.identity.tenant.lifecycle.v1}
+  tenant-lifecycle-consumer-group: ${CONVERSATION_TENANT_LIFECYCLE_CONSUMER_GROUP:hooshix-conversation-tenant-lifecycle-v1}
+  identity-erasure-target: ${CONVERSATION_IDENTITY_ERASURE_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9090}
   provider-runtime-enabled: ${CONVERSATION_PROVIDER_RUNTIME_ENABLED:false}
   model-worker:
     provider-api-key-path: ${CONVERSATION_PROVIDER_API_KEY_PATH:/run/secrets/conversation-provider/api-key}

@@ -4,7 +4,12 @@ import com.sajtech.conversation.application.service.ConversationAuthority;
 import com.sajtech.conversation.application.service.ConversationService;
 import com.sajtech.conversation.application.service.ModelRunWorker;
 import com.sajtech.conversation.infrastructure.client.authorization.GrpcPermissionAuthorizer;
+import com.sajtech.conversation.infrastructure.erasure.ConversationErasureReceiptDispatcher;
+import com.sajtech.conversation.infrastructure.erasure.ConversationErasureWorker;
+import com.sajtech.conversation.infrastructure.erasure.IdentityErasureTargetClient;
+import com.sajtech.conversation.infrastructure.erasure.JdbcConversationErasureRepository;
 import com.sajtech.conversation.infrastructure.health.ConversationReadinessHealthIndicator;
+import com.sajtech.conversation.infrastructure.lifecycle.JdbcTenantLifecycleRepository;
 import com.sajtech.conversation.infrastructure.model.GitGovernedModelPolicyProvider;
 import com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository;
 import com.sajtech.conversation.infrastructure.persistence.JdbcModelRunRepository;
@@ -19,6 +24,8 @@ import com.sajtech.conversation.infrastructure.security.keyring.ContentKeyRingRe
 import com.sajtech.conversation.infrastructure.security.keyring.FileBackedContentKeyRing;
 import com.sajtech.conversation.interfaces.grpc.BearerTokenServerInterceptor;
 import com.sajtech.conversation.interfaces.grpc.ConversationGrpcService;
+import com.sajtech.conversation.interfaces.kafka.ConversationErasureListener;
+import com.sajtech.conversation.interfaces.kafka.TenantLifecycleListener;
 import com.sajtech.conversation.interfaces.observability.grpc.ConversationTracingInterceptor;
 import com.sajtech.hooshix.contract.validation.ContractValidationServerInterceptor;
 import io.grpc.ManagedChannel;
@@ -29,12 +36,16 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.List;
 import javax.sql.DataSource;
+import org.jooq.DSLContext;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("!migration")
@@ -75,7 +86,7 @@ public class RuntimeConfiguration {
     return new IdentityJwtVerifierRefresher(verifier);
   }
 
-  @Bean(destroyMethod = "shutdownNow")
+  @Bean(name = "conversationAuthorizationChannel", destroyMethod = "shutdownNow")
   ManagedChannel conversationAuthorizationChannel(ConversationProperties properties) {
     return NettyChannelBuilder.forTarget(properties.authorizationTarget())
         .usePlaintext()
@@ -86,9 +97,101 @@ public class RuntimeConfiguration {
 
   @Bean
   GrpcPermissionAuthorizer permissionAuthorizer(
-      ManagedChannel conversationAuthorizationChannel, ConversationProperties properties) {
+      @Qualifier("conversationAuthorizationChannel")
+          ManagedChannel conversationAuthorizationChannel,
+      ConversationProperties properties) {
     return new GrpcPermissionAuthorizer(
         conversationAuthorizationChannel, properties.authorizationMaximumConcurrentChecks());
+  }
+
+  @Bean(name = "conversationIdentityErasureChannel", destroyMethod = "shutdownNow")
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  ManagedChannel conversationIdentityErasureChannel(
+      @Value("${conversation.identity-erasure-target}") String target) {
+    return NettyChannelBuilder.forTarget(target)
+        .usePlaintext()
+        .disableRetry()
+        .maxInboundMessageSize(32 * 1024)
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  IdentityErasureTargetClient identityErasureTargetClient(
+      @Qualifier("conversationIdentityErasureChannel") ManagedChannel channel) {
+    return new IdentityErasureTargetClient(channel);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  JdbcConversationErasureRepository conversationErasureRepository(DataSource dataSource) {
+    return new JdbcConversationErasureRepository(dataSource);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  ConversationErasureListener conversationErasureListener(
+      JdbcConversationErasureRepository repository, Clock clock) {
+    return new ConversationErasureListener(repository, clock);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  ConversationErasureWorker conversationErasureWorker(
+      IdentityErasureTargetClient identity,
+      JdbcConversationErasureRepository repository,
+      Clock clock,
+      MeterRegistry meters) {
+    return new ConversationErasureWorker(identity, repository, clock, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  ConversationErasureReceiptDispatcher conversationErasureReceiptDispatcher(
+      DSLContext dsl,
+      KafkaTemplate<String, byte[]> kafka,
+      TransactionTemplate transactions,
+      Clock clock,
+      @Value("${conversation.erasure-receipt-topic}") String topic,
+      MeterRegistry meters) {
+    return new ConversationErasureReceiptDispatcher(dsl, kafka, transactions, clock, topic, meters);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  JdbcTenantLifecycleRepository tenantLifecycleRepository(DataSource dataSource) {
+    return new JdbcTenantLifecycleRepository(dataSource);
+  }
+
+  @Bean
+  @ConditionalOnProperty(
+      prefix = "conversation",
+      name = "event-runtime-enabled",
+      havingValue = "true")
+  TenantLifecycleListener tenantLifecycleListener(
+      JdbcTenantLifecycleRepository repository, Clock clock) {
+    return new TenantLifecycleListener(repository, clock);
   }
 
   @Bean

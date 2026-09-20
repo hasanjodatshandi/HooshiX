@@ -50,7 +50,7 @@ pitest {
 
 
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.1")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation(platform("io.netty:netty-bom:4.2.17.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")

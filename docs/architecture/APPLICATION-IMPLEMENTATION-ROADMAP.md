@@ -118,10 +118,10 @@ The implementation target remains:
 service foundation                  -> COMPLETED in Stage 9 foundation PR: one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, AES-256-GCM key ring, and Day-One telemetry; deployed runtime remains unverified
 contracts                           -> versioned validated example-backed gRPC plus BFF OpenAPI/generated frontend types
 authority                           -> COMPLETED for the service boundary and Conversation CRUD: exact JWT audience, four fixed permission keys, one online 300ms CheckPermission, fail-closed key rotation/readiness, bounded concurrency, and private Membership ownership enforcement
-conversation/run state              -> Conversation CRUD/lifecycle, encrypted title and USER Message history, forced-RLS repositories, bounded opaque pagination, optimistic versioning, idempotent budgeted run acceptance/get, and durable queued/running cancellation are implemented; worker claim/provider completion and ASSISTANT Message append remain next
-provider                            -> provider-neutral port plus fixed-egress OpenAI Responses adapter with store=false/background=false/tools=[]
-quota and cost                      -> atomic tenant/Membership worst-case reservation and integer-micro-unit price snapshot are implemented for acceptance/cancel; completion usage reconciliation and fail-closed ambiguity remain next
-lifecycle                           -> tenant lifecycle gating plus ADR-0028 Inbox/effect/receipt before content is enabled
+conversation/run state              -> COMPLETED for the private service boundary: Conversation CRUD/lifecycle, encrypted Message history, idempotent budgeted run acceptance/get/cancel, durable bounded worker claim, ASSISTANT append, and terminal reconciliation
+provider                            -> fixed one-attempt stateless OpenAI Responses adapter with store=false/background=false/tools=[] is implemented; safety/evaluation/telemetry and transport cancellation remain
+quota and cost                      -> COMPLETED for the private service boundary: atomic worst-case reservation, immutable integer price snapshot, cancellation release, actual-usage reconciliation, and conservative unknown-outcome charging
+lifecycle                           -> COMPLETED for the service boundary: ordered fail-closed tenant projection plus ADR-0028 Inbox, service-owned encrypted-content purge, non-PII durable receipt, retry/exhaustion, and rollout-gated fifth-participant activation
 evidence                            -> migration/RLS, provider/failure/race/security/privacy/load, browser, Helm and repository gates
 ```
 

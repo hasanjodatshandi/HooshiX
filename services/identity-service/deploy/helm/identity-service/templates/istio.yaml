@@ -42,6 +42,7 @@ spec:
             principals:
               - {{ required "authorization.principal is required" .Values.authorization.principal | quote }}
               - {{ required "notification.principal is required" .Values.notification.principal | quote }}
+              - {{ required "conversation.principal is required" .Values.conversation.principal | quote }}
       to:
         - operation:
             ports: [{{ .Values.service.grpcPort | quote }}]

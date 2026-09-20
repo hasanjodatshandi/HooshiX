@@ -102,6 +102,7 @@ spec:
             - {name: IDENTITY_AUTHENTICATION_RUNTIME_ENABLED, value: {{ .Values.runtime.authenticationRuntimeEnabled | quote }}}
             - {name: IDENTITY_TENANT_RUNTIME_ENABLED, value: {{ .Values.runtime.tenantRuntimeEnabled | quote }}}
             - {name: IDENTITY_ERASURE_RUNTIME_ENABLED, value: {{ .Values.runtime.erasureRuntimeEnabled | quote }}}
+            - {name: IDENTITY_CONVERSATION_ERASURE_PARTICIPANT_ENABLED, value: {{ .Values.runtime.conversationErasureParticipantEnabled | quote }}}
             {{- if .Values.runtime.authenticationRuntimeEnabled }}
             - {name: IDENTITY_JWT_ISSUER, value: {{ .Values.jwt.issuer | quote }}}
             - {name: IDENTITY_JWT_ALLOWED_AUDIENCES, value: {{ join "," .Values.jwt.allowedAudiences | quote }}}

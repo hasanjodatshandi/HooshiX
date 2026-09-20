@@ -17,13 +17,27 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 
 public final class JooqErasureStore implements ErasureStore {
-  private static final String POLICY_VERSION = "1";
-  private static final List<String> PARTICIPANTS =
-      List.of("IDENTITY_SERVICE", "AUTHORIZATION_SERVICE", "NOTIFICATION_SERVICE", "WEB_BFF");
   private final DSLContext dsl;
+  private final String policyVersion;
+  private final List<String> participants;
 
   public JooqErasureStore(DSLContext dsl) {
+    this(dsl, true);
+  }
+
+  public JooqErasureStore(DSLContext dsl, boolean conversationParticipantEnabled) {
     this.dsl = dsl;
+    this.policyVersion = conversationParticipantEnabled ? "2" : "1";
+    this.participants =
+        conversationParticipantEnabled
+            ? List.of(
+                "IDENTITY_SERVICE",
+                "AUTHORIZATION_SERVICE",
+                "NOTIFICATION_SERVICE",
+                "WEB_BFF",
+                "CONVERSATION_SERVICE")
+            : List.of(
+                "IDENTITY_SERVICE", "AUTHORIZATION_SERVICE", "NOTIFICATION_SERVICE", "WEB_BFF");
   }
 
   @Override
@@ -62,10 +76,10 @@ public final class JooqErasureStore implements ErasureStore {
         """,
         erasureRequestId,
         userId,
-        POLICY_VERSION,
+        policyVersion,
         ts(now),
         ts(now));
-    for (String participant : PARTICIPANTS) {
+    for (String participant : participants) {
       dsl.execute(
           """
           INSERT INTO identity_erasure_participant(
@@ -96,7 +110,7 @@ public final class JooqErasureStore implements ErasureStore {
         """,
         eventId,
         erasureRequestId,
-        POLICY_VERSION,
+        policyVersion,
         ts(now),
         ts(now),
         ts(now.plus(java.time.Duration.ofDays(35))),
@@ -205,6 +219,7 @@ public final class JooqErasureStore implements ErasureStore {
     UUID target =
         participant == ErasureParticipant.AUTHORIZATION_SERVICE
                 || participant == ErasureParticipant.WEB_BFF
+                || participant == ErasureParticipant.CONVERSATION_SERVICE
             ? userId
             : null;
     return new ParticipantErasureTarget(participant, target, List.of(), "", true);
@@ -423,7 +438,7 @@ public final class JooqErasureStore implements ErasureStore {
         """,
         UUID.randomUUID(),
         erasureRequestId,
-        POLICY_VERSION,
+        policyVersion,
         eventCode,
         actionCategory,
         ts(now));

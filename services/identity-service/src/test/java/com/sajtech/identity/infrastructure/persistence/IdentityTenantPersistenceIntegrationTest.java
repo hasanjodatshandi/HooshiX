@@ -107,7 +107,7 @@ class IdentityTenantPersistenceIntegrationTest {
         ErasureCommandEvent.newBuilder()
             .setEventId(blockedEventId.toString())
             .setErasureRequestId(requestId.toString())
-            .setParticipantPolicyVersion("1")
+            .setParticipantPolicyVersion("2")
             .build();
     tx.required(
         () -> {
@@ -138,7 +138,7 @@ class IdentityTenantPersistenceIntegrationTest {
         ErasureCommandEvent.newBuilder()
             .setEventId(revivalEventId.toString())
             .setErasureRequestId(requestId.toString())
-            .setParticipantPolicyVersion("1")
+            .setParticipantPolicyVersion("2")
             .build();
     tx.required(
         () -> {
@@ -193,6 +193,38 @@ class IdentityTenantPersistenceIntegrationTest {
                 DSL.field("erasure_request_id").eq(requestId),
                 DSL.field("event_type").eq("RECEIPT")))
         .isOne();
+  }
+
+  @Test
+  void newErasurePolicyRegistersConversationAndReturnsItsOwnedUserTarget() {
+    UUID requestId = UUID.randomUUID();
+    UUID eventId = UUID.randomUUID();
+    JooqErasureStore erasureStore = new JooqErasureStore(dsl);
+
+    var accepted = tx.required(() -> erasureStore.accept(requestId, targetUser, NOW));
+    assertThat(accepted.participantPolicyVersion()).isEqualTo("2");
+    assertThat(
+            dsl.fetchValue(
+                "SELECT count(*)::integer FROM identity_erasure_participant WHERE erasure_request_id=?",
+                requestId))
+        .isEqualTo(5);
+
+    var target =
+        tx.required(
+            () ->
+                erasureStore.beginParticipant(
+                    eventId,
+                    requestId,
+                    com.sajtech.identity.application.erasure.model.ErasureParticipant
+                        .CONVERSATION_SERVICE,
+                    "2",
+                    "",
+                    NOW.plusSeconds(1)));
+
+    assertThat(target.userId()).isEqualTo(targetUser);
+    assertThat(target.notificationIds()).isEmpty();
+    assertThat(target.nextPageToken()).isEmpty();
+    assertThat(target.completePage()).isTrue();
   }
 
   @Test
