@@ -882,10 +882,245 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List private conversations owned by the selected membership */
+        get: operations["listConversations"];
+        put?: never;
+        /** Create a private conversation */
+        post: operations["createConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one owned private conversation */
+        get: operations["getConversation"];
+        put?: never;
+        post?: never;
+        /** Delete one owned private conversation */
+        delete: operations["deleteConversation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversationId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive one owned private conversation */
+        post: operations["archiveConversation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversationId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List encrypted-at-rest messages for one owned conversation */
+        get: operations["listConversationMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversationId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept one asynchronous model run */
+        post: operations["createConversationRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversationId}/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read asynchronous model-run state */
+        get: operations["getConversationRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversationId}/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request cancellation of an accepted model run */
+        post: operations["cancelConversationRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @example {
+         *       "title": "Planning notes"
+         *     } */
+        CreateConversationRequest: {
+            title: string;
+        };
+        /** @example {
+         *       "expectedVersion": 1
+         *     } */
+        VersionedConversationMutation: {
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        /** @example {
+         *       "userMessage": "Explain this safely and concisely."
+         *     } */
+        CreateConversationRunRequest: {
+            userMessage: string;
+        };
+        /** @example {
+         *       "conversationId": "11111111-1111-4111-8111-111111111111",
+         *       "title": "Planning notes",
+         *       "lifecycle": "ACTIVE",
+         *       "version": 1,
+         *       "createdAt": "2026-09-20T12:00:00Z",
+         *       "lastActivityAt": "2026-09-20T12:00:00Z"
+         *     } */
+        Conversation: {
+            conversationId: components["schemas"]["UuidV4"];
+            title: string;
+            /** @enum {string} */
+            lifecycle: "ACTIVE" | "ARCHIVED" | "DELETED";
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastActivityAt: string;
+        };
+        /** @example {
+         *       "conversations": [
+         *         {
+         *           "conversationId": "11111111-1111-4111-8111-111111111111",
+         *           "title": "Planning notes",
+         *           "lifecycle": "ACTIVE",
+         *           "version": 1,
+         *           "createdAt": "2026-09-20T12:00:00Z",
+         *           "lastActivityAt": "2026-09-20T12:00:00Z"
+         *         }
+         *       ],
+         *       "nextPageToken": ""
+         *     } */
+        ConversationPage: {
+            conversations: components["schemas"]["Conversation"][];
+            nextPageToken: string;
+        };
+        /** @example {
+         *       "messageId": "22222222-2222-4222-8222-222222222222",
+         *       "conversationId": "11111111-1111-4111-8111-111111111111",
+         *       "role": "USER",
+         *       "content": "Explain this safely and concisely.",
+         *       "ordinal": 1,
+         *       "createdAt": "2026-09-20T12:01:00Z"
+         *     } */
+        ConversationMessage: {
+            messageId: components["schemas"]["UuidV4"];
+            conversationId: components["schemas"]["UuidV4"];
+            /** @enum {string} */
+            role: "USER" | "ASSISTANT";
+            content: string;
+            /** Format: int64 */
+            ordinal: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @example {
+         *       "messages": [
+         *         {
+         *           "messageId": "22222222-2222-4222-8222-222222222222",
+         *           "conversationId": "11111111-1111-4111-8111-111111111111",
+         *           "role": "USER",
+         *           "content": "Explain this safely and concisely.",
+         *           "ordinal": 1,
+         *           "createdAt": "2026-09-20T12:01:00Z"
+         *         }
+         *       ],
+         *       "nextPageToken": ""
+         *     } */
+        ConversationMessagePage: {
+            messages: components["schemas"]["ConversationMessage"][];
+            nextPageToken: string;
+        };
+        /** @example {
+         *       "runId": "22222222-2222-4222-8222-222222222222",
+         *       "conversationId": "11111111-1111-4111-8111-111111111111",
+         *       "state": "QUEUED",
+         *       "failureCode": null,
+         *       "cancellationRequested": false,
+         *       "createdAt": "2026-09-20T12:01:00Z",
+         *       "startedAt": null,
+         *       "completedAt": null
+         *     } */
+        ConversationRun: {
+            runId: components["schemas"]["UuidV4"];
+            conversationId: components["schemas"]["UuidV4"];
+            /** @enum {string} */
+            state: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "OUTCOME_UNKNOWN";
+            failureCode?: ("PROVIDER_UNAVAILABLE" | "PROVIDER_REJECTED" | "PROVIDER_RESPONSE_INVALID" | "SAFETY_REJECTED" | "BUDGET_UNAVAILABLE" | "EXECUTION_DISABLED" | "TENANT_INACTIVE") | null;
+            cancellationRequested: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            startedAt?: string | null;
+            completedAt?: string | null;
+        };
         /** @example {
          *       "returnTarget": "/welcome"
          *     } */
@@ -1606,6 +1841,24 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description The selected private resource does not exist or is not visible to this membership. */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description The request conflicts with the current resource, tenant, or budget state. */
+        ResourceConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Registration precondition was not satisfied. Response is non-enumerating. */
         RegistrationRejected: {
             headers: {
@@ -1692,6 +1945,8 @@ export interface components {
         RoleId: components["schemas"]["UuidV4"];
         InvitationId: components["schemas"]["UuidV4"];
         PermissionKey: string;
+        ConversationId: components["schemas"]["UuidV4"];
+        RunId: components["schemas"]["UuidV4"];
         ExpectedVersion: number;
         PageSize: number;
         PageToken: string;
@@ -3533,6 +3788,297 @@ export interface operations {
             401: components["responses"]["InvalidSession"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["RegistrationRejected"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listConversations: {
+        parameters: {
+            query?: {
+                pageSize?: number;
+                pageToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Private conversation page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPage"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    createConversation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Private conversation created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["ResourceConflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    getConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Private conversation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    deleteConversation: {
+        parameters: {
+            query: {
+                expectedVersion: components["parameters"]["ExpectedVersion"];
+            };
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conversation deletion accepted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceConflict"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    archiveConversation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionedConversationMutation"];
+            };
+        };
+        responses: {
+            /** @description Archived conversation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceConflict"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    listConversationMessages: {
+        parameters: {
+            query?: {
+                pageSize?: number;
+                pageToken?: string;
+            };
+            header?: never;
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Message page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationMessagePage"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    createConversationRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Model run accepted for asynchronous execution. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationRun"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceConflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    getConversationRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Model-run state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationRun"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    cancelConversationRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current model-run state after cancellation request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationRun"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceConflict"];
             503: components["responses"]["DependencyUnavailable"];
         };
     };

@@ -20,6 +20,9 @@ kafka:
 identity:
   jwtVerifierConfigMapName: identity-jwt-public
 
+webBff:
+  principal: prod.sajtech.internal/ns/platform-apps/sa/web-bff
+
 observability:
   tracing:
     otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces

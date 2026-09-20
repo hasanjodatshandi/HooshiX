@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HooshiX Web BFF Public API
-  version: 2.0.0
+  version: 2.1.0
   description: Canonical browser-facing REST contract owned by Web BFF. All examples use synthetic .test identities and non-production placeholder credentials.
 servers:
   - url: /
@@ -1014,6 +1014,140 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/RegistrationRejected' }
         '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations:
+    get:
+      operationId: listConversations
+      summary: List private conversations owned by the selected membership
+      x-hooshix-consumer-example: { method: GET, path: '/api/v1/conversations?pageSize=20' }
+      parameters:
+        - { name: pageSize, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: pageToken, in: query, required: false, schema: { type: string, minLength: 1, maxLength: 256 } }
+      responses:
+        '200': { description: Private conversation page., content: { application/json: { schema: { $ref: '#/components/schemas/ConversationPage' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+    post:
+      operationId: createConversation
+      summary: Create a private conversation
+      x-hooshix-consumer-example: { method: POST, path: /api/v1/conversations, body: { title: Planning notes } }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateConversationRequest' } } } }
+      responses:
+        '201': { description: Private conversation created., content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ResourceConflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}:
+    get:
+      operationId: getConversation
+      summary: Read one owned private conversation
+      x-hooshix-consumer-example: { method: GET, path: /api/v1/conversations/11111111-1111-4111-8111-111111111111 }
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }]
+      responses:
+        '200': { description: Private conversation., content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+    delete:
+      operationId: deleteConversation
+      summary: Delete one owned private conversation
+      x-hooshix-consumer-example: { method: DELETE, path: '/api/v1/conversations/11111111-1111-4111-8111-111111111111?expectedVersion=1' }
+      parameters:
+        - { $ref: '#/components/parameters/ConversationId' }
+        - { $ref: '#/components/parameters/ExpectedVersion' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      responses:
+        '204': { description: Conversation deletion accepted. }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ResourceConflict' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}/archive:
+    post:
+      operationId: archiveConversation
+      summary: Archive one owned private conversation
+      x-hooshix-consumer-example: { method: POST, path: /api/v1/conversations/11111111-1111-4111-8111-111111111111/archive, body: { expectedVersion: 1 } }
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedConversationMutation' } } } }
+      responses:
+        '200': { description: Archived conversation., content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ResourceConflict' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}/messages:
+    get:
+      operationId: listConversationMessages
+      summary: List encrypted-at-rest messages for one owned conversation
+      x-hooshix-consumer-example: { method: GET, path: '/api/v1/conversations/11111111-1111-4111-8111-111111111111/messages?pageSize=20' }
+      parameters:
+        - { $ref: '#/components/parameters/ConversationId' }
+        - { name: pageSize, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: pageToken, in: query, required: false, schema: { type: string, minLength: 1, maxLength: 256 } }
+      responses:
+        '200': { description: Message page., content: { application/json: { schema: { $ref: '#/components/schemas/ConversationMessagePage' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}/runs:
+    post:
+      operationId: createConversationRun
+      summary: Accept one asynchronous model run
+      x-hooshix-consumer-example: { method: POST, path: /api/v1/conversations/11111111-1111-4111-8111-111111111111/runs, body: { userMessage: Explain this safely and concisely. } }
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateConversationRunRequest' } } } }
+      responses:
+        '202': { description: Model run accepted for asynchronous execution., content: { application/json: { schema: { $ref: '#/components/schemas/ConversationRun' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ResourceConflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}/runs/{runId}:
+    get:
+      operationId: getConversationRun
+      summary: Read asynchronous model-run state
+      x-hooshix-consumer-example: { method: GET, path: /api/v1/conversations/11111111-1111-4111-8111-111111111111/runs/22222222-2222-4222-8222-222222222222 }
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }, { $ref: '#/components/parameters/RunId' }]
+      responses:
+        '200': { description: Model-run state., content: { application/json: { schema: { $ref: '#/components/schemas/ConversationRun' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}/runs/{runId}/cancel:
+    post:
+      operationId: cancelConversationRun
+      summary: Request cancellation of an accepted model run
+      x-hooshix-consumer-example: { method: POST, path: /api/v1/conversations/11111111-1111-4111-8111-111111111111/runs/22222222-2222-4222-8222-222222222222/cancel }
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }, { $ref: '#/components/parameters/RunId' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200': { description: Current model-run state after cancellation request., content: { application/json: { schema: { $ref: '#/components/schemas/ConversationRun' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ResourceConflict' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
 components:
   securitySchemes:
     BrowserSession:
@@ -1056,10 +1190,87 @@ components:
     RoleId: { name: roleId, in: path, required: true, schema: { $ref: '#/components/schemas/UuidV4' } }
     InvitationId: { name: invitationId, in: path, required: true, schema: { $ref: '#/components/schemas/UuidV4' } }
     PermissionKey: { name: permissionKey, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+    ConversationId: { name: conversationId, in: path, required: true, schema: { $ref: '#/components/schemas/UuidV4' } }
+    RunId: { name: runId, in: path, required: true, schema: { $ref: '#/components/schemas/UuidV4' } }
     ExpectedVersion: { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1, format: int64 } }
     PageSize: { name: pageSize, in: query, required: false, schema: { type: integer, default: 50, minimum: 1, maximum: 200 } }
     PageToken: { name: pageToken, in: query, required: false, schema: { type: string, minLength: 1, maxLength: 2048 } }
   schemas:
+    CreateConversationRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties: { title: { type: string, minLength: 1, maxLength: 120, pattern: '^[^\x00-\x1F\x7F]+$' } }
+      example: { title: Planning notes }
+    VersionedConversationMutation:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties: { expectedVersion: { type: integer, format: int64, minimum: 1 } }
+      example: { expectedVersion: 1 }
+    CreateConversationRunRequest:
+      type: object
+      additionalProperties: false
+      required: [userMessage]
+      properties: { userMessage: { type: string, minLength: 1, maxLength: 16000, pattern: '^[^\x00]+$' } }
+      example: { userMessage: Explain this safely and concisely. }
+    Conversation:
+      type: object
+      additionalProperties: false
+      required: [conversationId, title, lifecycle, version, createdAt, lastActivityAt]
+      properties:
+        conversationId: { $ref: '#/components/schemas/UuidV4' }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        lifecycle: { type: string, enum: [ACTIVE, ARCHIVED, DELETED] }
+        version: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        lastActivityAt: { type: string, format: date-time }
+      example: { conversationId: 11111111-1111-4111-8111-111111111111, title: Planning notes, lifecycle: ACTIVE, version: 1, createdAt: '2026-09-20T12:00:00Z', lastActivityAt: '2026-09-20T12:00:00Z' }
+    ConversationPage:
+      type: object
+      additionalProperties: false
+      required: [conversations, nextPageToken]
+      properties:
+        conversations: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/Conversation' } }
+        nextPageToken: { type: string, maxLength: 256 }
+      example: { conversations: [{ conversationId: 11111111-1111-4111-8111-111111111111, title: Planning notes, lifecycle: ACTIVE, version: 1, createdAt: '2026-09-20T12:00:00Z', lastActivityAt: '2026-09-20T12:00:00Z' }], nextPageToken: '' }
+    ConversationMessage:
+      type: object
+      additionalProperties: false
+      required: [messageId, conversationId, role, content, ordinal, createdAt]
+      properties:
+        messageId: { $ref: '#/components/schemas/UuidV4' }
+        conversationId: { $ref: '#/components/schemas/UuidV4' }
+        role: { type: string, enum: [USER, ASSISTANT] }
+        content: { type: string, minLength: 1, maxLength: 16000 }
+        ordinal: { type: integer, format: int64, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+      example: { messageId: 22222222-2222-4222-8222-222222222222, conversationId: 11111111-1111-4111-8111-111111111111, role: USER, content: Explain this safely and concisely., ordinal: 1, createdAt: '2026-09-20T12:01:00Z' }
+    ConversationMessagePage:
+      type: object
+      additionalProperties: false
+      required: [messages, nextPageToken]
+      properties:
+        messages: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ConversationMessage' } }
+        nextPageToken: { type: string, maxLength: 256 }
+      example: { messages: [{ messageId: 22222222-2222-4222-8222-222222222222, conversationId: 11111111-1111-4111-8111-111111111111, role: USER, content: Explain this safely and concisely., ordinal: 1, createdAt: '2026-09-20T12:01:00Z' }], nextPageToken: '' }
+    ConversationRun:
+      type: object
+      additionalProperties: false
+      required: [runId, conversationId, state, cancellationRequested, createdAt]
+      properties:
+        runId: { $ref: '#/components/schemas/UuidV4' }
+        conversationId: { $ref: '#/components/schemas/UuidV4' }
+        state: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELED, OUTCOME_UNKNOWN] }
+        failureCode:
+          anyOf:
+            - { type: string, enum: [PROVIDER_UNAVAILABLE, PROVIDER_REJECTED, PROVIDER_RESPONSE_INVALID, SAFETY_REJECTED, BUDGET_UNAVAILABLE, EXECUTION_DISABLED, TENANT_INACTIVE] }
+            - { type: 'null' }
+        cancellationRequested: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        startedAt: { anyOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        completedAt: { anyOf: [{ type: string, format: date-time }, { type: 'null' }] }
+      example: { runId: 22222222-2222-4222-8222-222222222222, conversationId: 11111111-1111-4111-8111-111111111111, state: QUEUED, failureCode: null, cancellationRequested: false, createdAt: '2026-09-20T12:01:00Z', startedAt: null, completedAt: null }
     OidcStartRequest:
       type: object
       additionalProperties: false
@@ -1689,6 +1900,16 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
     Forbidden:
       description: Browser-origin or session-bound request protection rejected the request.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: The selected private resource does not exist or is not visible to this membership.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ResourceConflict:
+      description: The request conflicts with the current resource, tenant, or budget state.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }

@@ -6,6 +6,7 @@ export const routes = {
   tenantSelection: '/tenant-select',
   tenantManagement: '/tenants/manage',
   application: '/application',
+  conversations: '/conversations',
   profile: '/profile',
   passwordRecovery: '/password/recovery',
   passwordChange: '/password/change',

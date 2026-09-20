@@ -397,6 +397,19 @@ edges:
       - docs/architecture/services/authorization-service.md
       - docs/architecture/services/web-bff.md
 
+  - operation_id: web-bff.conversation-api-dispatch
+    caller_owner: Web BFF
+    dependency_id: conversation.ConversationService
+    class: AUTHORITATIVE_STATE
+    failure_action: "abort request; private Conversation and ModelRun state unavailable; no fabricated result"
+    retry_owner: none
+    fallback: none
+    owner: Web BFF
+    policy_refs:
+      - docs/adr/0054-define-core-conversation-and-model-execution-v1.md
+      - docs/architecture/services/conversation-service.md
+      - docs/architecture/services/web-bff.md
+
   - operation_id: web-bff.resource-api-dispatch
     caller_owner: Web BFF
     dependency_id: registered-resource-service

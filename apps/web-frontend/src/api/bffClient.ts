@@ -34,6 +34,11 @@ export type InvitationState = Schemas['InvitationStateResponse'];
 export type InvitationCreated = Schemas['InvitationCreatedResponse'];
 export type AcceptedInvitation = Schemas['AcceptedInvitationResponse'];
 export type SelfErasureAccepted = Schemas['SelfErasureAcceptedResponse'];
+export type Conversation = Schemas['Conversation'];
+export type ConversationPage = Schemas['ConversationPage'];
+export type ConversationMessage = Schemas['ConversationMessage'];
+export type ConversationMessagePage = Schemas['ConversationMessagePage'];
+export type ConversationRun = Schemas['ConversationRun'];
 
 type LocalLoginRequest = Schemas['LocalLoginRequest'];
 type SelectTenantRequest = Schemas['SelectTenantRequest'];
@@ -47,6 +52,8 @@ type StartTotpEnrollmentRequest = Schemas['StartTotpEnrollmentRequest'];
 type ConfirmTotpEnrollmentRequest = Schemas['ConfirmTotpEnrollmentRequest'];
 type OidcStartRequest = Schemas['OidcStartRequest'];
 type SelfErasureRequest = Schemas['SelfErasureRequest'];
+type CreateConversationRequest = Schemas['CreateConversationRequest'];
+type CreateConversationRunRequest = Schemas['CreateConversationRunRequest'];
 
 export type BffRequestOptions = {
   signal?: AbortSignal;
@@ -395,6 +402,85 @@ export async function requestSelfErasure(
   return response;
 }
 
+export async function listConversations(
+  options: BffRequestOptions = {},
+): Promise<ConversationPage> {
+  return request<ConversationPage>('/api/v1/conversations?pageSize=100', {}, options);
+}
+
+export async function createConversation(
+  body: CreateConversationRequest,
+): Promise<Conversation> {
+  await ensureCsrf();
+  return post<Conversation>('/api/v1/conversations', body);
+}
+
+export async function archiveConversation(
+  conversationId: string,
+  expectedVersion: number,
+): Promise<Conversation> {
+  await ensureCsrf();
+  return post<Conversation>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}/archive`,
+    { expectedVersion },
+  );
+}
+
+export async function deleteConversation(
+  conversationId: string,
+  expectedVersion: number,
+): Promise<void> {
+  await ensureCsrf();
+  await requestWithoutResponse(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}?expectedVersion=${expectedVersion}`,
+    { method: 'DELETE', headers: csrfHeaders() },
+  );
+}
+
+export async function listConversationMessages(
+  conversationId: string,
+  options: BffRequestOptions = {},
+): Promise<ConversationMessagePage> {
+  return request<ConversationMessagePage>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}/messages?pageSize=100`,
+    {},
+    options,
+  );
+}
+
+export async function createConversationRun(
+  conversationId: string,
+  body: CreateConversationRunRequest,
+): Promise<ConversationRun> {
+  await ensureCsrf();
+  return post<ConversationRun>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}/runs`,
+    body,
+  );
+}
+
+export async function getConversationRun(
+  conversationId: string,
+  runId: string,
+  options: BffRequestOptions = {},
+): Promise<ConversationRun> {
+  return request<ConversationRun>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}`,
+    {},
+    options,
+  );
+}
+
+export async function cancelConversationRun(
+  conversationId: string,
+  runId: string,
+): Promise<ConversationRun> {
+  await ensureCsrf();
+  return postWithoutBody<ConversationRun>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/cancel`,
+  );
+}
+
 export const bffClient = {
   login,
   completeMfaAuthentication,
@@ -415,6 +501,14 @@ export const bffClient = {
   requestPasswordRecovery,
   confirmPasswordRecovery,
   requestSelfErasure,
+  listConversations,
+  createConversation,
+  archiveConversation,
+  deleteConversation,
+  listConversationMessages,
+  createConversationRun,
+  getConversationRun,
+  cancelConversationRun,
   getMfaStatus,
   startTotpEnrollment,
   confirmTotpEnrollment,

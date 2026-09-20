@@ -19,6 +19,10 @@
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
   <Match>
+    <Class name="com.sajtech.webbff.interfaces.http.ConversationController" />
+    <Bug pattern="EI_EXPOSE_REP2" />
+  </Match>
+  <Match>
     <Class name="com.sajtech.webbff.interfaces.http.BffExceptionHandler" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>

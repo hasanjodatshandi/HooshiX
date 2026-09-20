@@ -212,6 +212,17 @@ public class RuntimeConfiguration {
         meters);
   }
 
+  @Bean(destroyMethod = "shutdownNow", name = "webBffConversationChannel")
+  ManagedChannel conversationChannel(
+      WebBffProperties p, OpenTelemetry telemetry, MeterRegistry meters) {
+    return channel(
+        p.conversationTarget(),
+        "conversation",
+        p.conversationMaximumConcurrentCalls(),
+        telemetry,
+        meters);
+  }
+
   @Bean
   IdentityBffClient identityBffClient(@Qualifier("webBffIdentityChannel") ManagedChannel c) {
     return new IdentityBffClient(c);
@@ -221,6 +232,12 @@ public class RuntimeConfiguration {
   AuthorizationBffClient authorizationBffClient(
       @Qualifier("webBffAuthorizationChannel") ManagedChannel c) {
     return new AuthorizationBffClient(c);
+  }
+
+  @Bean
+  ConversationBffClient conversationBffClient(
+      @Qualifier("webBffConversationChannel") ManagedChannel channel) {
+    return new ConversationBffClient(channel);
   }
 
   @Bean

@@ -12,6 +12,12 @@ service:
   grpcPort: 9090
   managementPort: 9092
 
+webBff:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: web-bff
+  principal: ""
+
 runtime:
   grpcMaximumConcurrentCalls: 32
   eventRuntimeEnabled: false

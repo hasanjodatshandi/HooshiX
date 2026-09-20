@@ -41,6 +41,12 @@ def main() -> None:
     require(text, r"allowPrivilegeEscalation: false", "privilege escalation hardening missing")
     require(text, r"drop:\s*\[\"ALL\"\]", "capability drop missing")
     require(text, r"mode: STRICT", "STRICT mTLS missing")
+    require(text, r"app\.kubernetes\.io/name: web-bff", "Web BFF ingress selector missing")
+    require(
+        text,
+        r"prod\.sajtech\.internal/ns/platform-apps/sa/web-bff",
+        "exact Web BFF workload principal missing",
+    )
     require(text, r"conversation-postgresql", "database egress missing")
     require(text, r"otel-collector", "telemetry egress missing")
     forbid(text, r"api\.openai\.com", "provider egress must remain absent from foundation")

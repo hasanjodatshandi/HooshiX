@@ -33,6 +33,8 @@ class WebBffApplicationPropertiesTest {
             .bind("web-bff.route-audiences", Bindable.mapOf(String.class, String.class))
             .orElseThrow(() -> new IllegalStateException("route audiences are unavailable"));
 
-    assertThat(routeAudiences).containsEntry("/api/v1/authorization", "authorization-service");
+    assertThat(routeAudiences)
+        .containsEntry("/api/v1/authorization", "authorization-service")
+        .containsEntry("/api/v1/conversations", "conversation-service");
   }
 }

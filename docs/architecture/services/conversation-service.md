@@ -4,8 +4,9 @@
 
 `conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle,
 encrypted Message history, budgeted ModelRun acceptance/cancellation, and the bounded provider
-worker/completion slice of the ADR-0054 bounded context. Provider activation, safety evaluation,
-tenant lifecycle/erasure, telemetry, and the BFF/UI journey remain incomplete. Its current
+worker/completion slice of the ADR-0054 bounded context. Ordered tenant lifecycle, erasure, and the
+BFF/UI journey are implemented. Provider activation, safety evaluation, provider telemetry, and
+transport-level cancellation remain incomplete. Its current
 repository boundary is:
 
 ```text
@@ -60,8 +61,9 @@ Run acceptance atomically reserves both tenant and Membership worst-case budgets
 Message, and queues the run. Queued cancellation releases both reservations; running cancellation
 records durable intent without prematurely releasing cost. The bounded worker, fixed provider
 adapter, completion/reconciliation path, and ASSISTANT Message creation are implemented behind the
-disabled execution gate. The BFF-owned REST surface and UI journey remain pending; public errors
-will use RFC 9457 and never proxy provider JSON.
+disabled execution gate. The BFF-owned REST surface and accessible bilingual UI journey are
+implemented with bounded, abortable polling; public errors use RFC 9457 and never proxy provider
+JSON or execution internals.
 
 Initial validation authority is:
 
@@ -117,11 +119,9 @@ queues:                       zero for RPC; finite durable DB worker queue
 Client/BFF/mesh must not add a retry layer. Cancellation propagates where safe but never fabricates
 provider cancellation.
 
-The canonical registry now includes `conversation.authorization-permission-check`
-(`AUTHORITATIVE_SECURITY`) and `conversation.model-provider-execution`
-(`EXTERNAL_SIDE_EFFECT`) because those runtime boundaries exist. Before the remaining BFF
-implementation becomes production-eligible, it must add `web-bff.conversation-api-dispatch`
-(`AUTHORITATIVE_STATE`) when that runtime edge exists.
+The canonical registry includes `conversation.authorization-permission-check`
+(`AUTHORITATIVE_SECURITY`), `conversation.model-provider-execution` (`EXTERNAL_SIDE_EFFECT`), and
+`web-bff.conversation-api-dispatch` (`AUTHORITATIVE_STATE`) for the implemented runtime edges.
 
 ## 6. Persistence and transaction boundaries
 

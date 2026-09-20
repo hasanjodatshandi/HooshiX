@@ -16,6 +16,7 @@ runtime:
   temporaryStorageLimit: 128Mi
   identityMaximumConcurrentCalls: 128
   authorizationMaximumConcurrentCalls: 128
+  conversationMaximumConcurrentCalls: 64
 resources:
   requests:
     cpu: 200m
@@ -51,6 +52,12 @@ authorization:
     app.kubernetes.io/name: authorization-service
   port: 9090
   target: dns:///authorization-service.platform-apps.svc.cluster.local:9090
+conversation:
+  namespace: platform-apps
+  podLabels:
+    app.kubernetes.io/name: conversation-service
+  port: 9090
+  target: dns:///conversation-service.platform-apps.svc.cluster.local:9090
 redis:
   namespace: platform-data
   podLabels:
@@ -74,6 +81,7 @@ googleOidc:
   maximumConcurrentCalls: 16
 routeAudiences:
   authorizationPrefix: authorization-service
+  conversationPrefix: conversation-service
 edge:
   namespace: ""
   podLabels: {}

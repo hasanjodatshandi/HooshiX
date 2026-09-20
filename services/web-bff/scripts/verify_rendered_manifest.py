@@ -33,6 +33,17 @@ def main():
     require(text, r"WEB_BFF_PUBLIC_ORIGIN", "exact public origin missing")
     require(text, r"WEB_BFF_IDENTITY_TARGET", "Identity target missing")
     require(text, r"WEB_BFF_AUTHORIZATION_TARGET", "Authorization target missing")
+    require(text, r"WEB_BFF_CONVERSATION_TARGET", "Conversation target missing")
+    require(
+        text,
+        r"WEB_BFF_CONVERSATION_MAXIMUM_CONCURRENT_CALLS[\s\S]*?64",
+        "Conversation concurrency bound missing",
+    )
+    require(
+        text,
+        r"WEB_BFF_ROUTE_AUDIENCES_CONVERSATION_PREFIX[\s\S]*?conversation-service",
+        "Conversation audience route missing",
+    )
     require(text, r"WEB_BFF_LOCATOR_KEY_RING_PATH", "session locator key ring missing")
     require(text, r"WEB_BFF_CSRF_KEY_RING_PATH", "CSRF key ring missing")
     require(text, r"WEB_BFF_REFRESH_ENCRYPTION_KEY_RING_PATH", "refresh encryption key ring missing")
@@ -42,6 +53,7 @@ def main():
     require(text, r"prod\.sajtech\.internal/ns/platform-edge/sa/caddy-coraza", "edge-only application principal missing")
     require(text, r"identity-service", "Identity egress missing")
     require(text, r"authorization-service", "Authorization egress missing")
+    require(text, r"conversation-service", "Conversation egress missing")
     require(text, r"security-redis", "Redis egress missing")
     require(text, r"otel-collector", "telemetry egress missing")
     forbid(text, r"principals:\s*\[[^\]]*\*", "wildcard Istio principal is prohibited")

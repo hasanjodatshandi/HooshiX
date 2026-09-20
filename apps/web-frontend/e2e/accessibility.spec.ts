@@ -60,9 +60,13 @@ test('@a11y authenticated account and tenant routes are accessible', async ({ pa
   await page.route('**/api/v1/identity/external-identities', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '{"googleLinked":false}' });
   });
+  await page.route('**/api/v1/conversations?pageSize=100', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"conversations":[],"nextPageToken":""}' });
+  });
 
   for (const [path, heading] of [
     ['/application', 'Application'],
+    ['/conversations', 'Conversations'],
     ['/profile', 'Profile'],
     ['/password/change', 'Change password'],
     ['/security/mfa', 'Two-factor authentication settings'],

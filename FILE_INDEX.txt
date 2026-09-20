@@ -37,6 +37,7 @@ apps/web-frontend/Dockerfile
 apps/web-frontend/README.md
 apps/web-frontend/e2e/accessibility-audit.md
 apps/web-frontend/e2e/accessibility.spec.ts
+apps/web-frontend/e2e/conversation.spec.ts
 apps/web-frontend/e2e/erasure.spec.ts
 apps/web-frontend/e2e/frontend-quality.spec.ts
 apps/web-frontend/e2e/mfa.spec.ts
@@ -61,6 +62,8 @@ apps/web-frontend/src/errors/ApplicationErrorBoundary.tsx
 apps/web-frontend/src/errors/getErrorMessage.ts
 apps/web-frontend/src/errors/problem.test.ts
 apps/web-frontend/src/errors/problem.ts
+apps/web-frontend/src/features/conversation/ConversationFlow.test.tsx
+apps/web-frontend/src/features/conversation/ConversationFlow.tsx
 apps/web-frontend/src/features/erasure/AccountErasureFlow.tsx
 apps/web-frontend/src/features/externalIdentity/ExternalIdentitySettingsFlow.tsx
 apps/web-frontend/src/features/login/LoginFlow.tsx
@@ -1332,6 +1335,7 @@ services/web-bff/src/main/java/com/sajtech/webbff/application/model/OidcPurpose.
 services/web-bff/src/main/java/com/sajtech/webbff/application/model/VerifiedGoogleIdentity.java
 services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/AuthorizationGateway.java
 services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/BrowserSessionPort.java
+services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/ConversationGateway.java
 services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/GoogleOidcProvider.java
 services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/IdentityGateway.java
 services/web-bff/src/main/java/com/sajtech/webbff/application/port/out/OidcPreauthPort.java
@@ -1344,6 +1348,7 @@ services/web-bff/src/main/java/com/sajtech/webbff/configuration/SecurityMaterial
 services/web-bff/src/main/java/com/sajtech/webbff/configuration/WebBffApplication.java
 services/web-bff/src/main/java/com/sajtech/webbff/configuration/WebBffProperties.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/AuthorizationBffClient.java
+services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/ConversationBffClient.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/GoogleOidcClient.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/IdentityBffClient.java
 services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/client/IdentityGrpcClientSupport.java
@@ -1374,6 +1379,7 @@ services/web-bff/src/main/java/com/sajtech/webbff/infrastructure/session/RedisOi
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/AuthorizationController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BffExceptionHandler.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/BrowserAuthController.java
+services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/ConversationController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/ErasureController.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/HttpSupport.java
 services/web-bff/src/main/java/com/sajtech/webbff/interfaces/http/IdentityProfileController.java
@@ -1391,6 +1397,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/architecture/ArchitectureRules
 services/web-bff/src/test/java/com/sajtech/webbff/configuration/StrictJsonConfigurationTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/configuration/WebBffApplicationPropertiesTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/configuration/WebBffMigrationProfileIntegrationTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/ConversationBffClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/GoogleOidcClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityBffRegistrationClientTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGatewaySurfaceCharacterizationTest.java
@@ -1408,6 +1415,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/session/RedisOi
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BffExceptionHandlerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserAuthControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/BrowserResponseContractTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/ConversationControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/ErasureControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/IdentityTenantControllerTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/interfaces/http/MfaControllerTest.java
