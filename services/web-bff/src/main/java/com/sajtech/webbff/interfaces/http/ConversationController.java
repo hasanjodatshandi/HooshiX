@@ -122,6 +122,22 @@ public final class ConversationController {
         HttpSupport.id(runId));
   }
 
+  @PostMapping("/{conversationId}/runs/{runId}/feedback")
+  public ResponseEntity<Void> submitFeedback(
+      @RequestHeader("Idempotency-Key") String requestId,
+      @PathVariable String conversationId,
+      @PathVariable String runId,
+      @Valid @RequestBody RunFeedback body,
+      HttpServletRequest request) {
+    conversations.submitFeedback(
+        token(HttpSupport.tenant(request)),
+        HttpSupport.idempotencyKey(requestId),
+        HttpSupport.id(conversationId),
+        HttpSupport.id(runId),
+        body.value());
+    return ResponseEntity.noContent().build();
+  }
+
   private String token(BrowserSession session) {
     return identity.issueAudienceToken(
         UUID.randomUUID(), session.refreshCredential(), "conversation-service");
@@ -138,4 +154,6 @@ public final class ConversationController {
   public record CreateRun(
       @NotBlank @UnicodeCodePointSize(min = 1, max = 16000) @Pattern(regexp = "^[^\\x00]+$")
           String userMessage) {}
+
+  public record RunFeedback(@NotNull ConversationGateway.RunFeedbackValue value) {}
 }

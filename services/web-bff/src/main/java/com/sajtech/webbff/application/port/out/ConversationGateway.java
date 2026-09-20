@@ -23,6 +23,16 @@ public interface ConversationGateway {
 
   RunDto cancelRun(String token, UUID requestId, UUID conversationId, UUID runId);
 
+  void submitFeedback(
+      String token, UUID requestId, UUID conversationId, UUID runId, RunFeedbackValue value);
+
+  enum RunFeedbackValue {
+    HELPFUL,
+    NOT_HELPFUL,
+    UNSAFE,
+    FACTUALLY_WRONG
+  }
+
   record ConversationDto(
       UUID conversationId,
       String title,

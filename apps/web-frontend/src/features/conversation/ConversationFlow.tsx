@@ -17,6 +17,7 @@ export function ConversationFlow() {
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [run, setRun] = useState<ConversationRun | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [title, setTitle] = useState('');
   const [userMessage, setUserMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,6 +54,7 @@ export function ConversationFlow() {
     if (!selected) {
       setMessages([]);
       setRun(null);
+      setFeedbackSubmitted(false);
       return;
     }
     const controller = new AbortController();
@@ -118,6 +120,7 @@ export function ConversationFlow() {
         userMessage: content,
       });
       setRun(createdRun);
+      setFeedbackSubmitted(false);
       setUserMessage('');
       await loadMessages(selected.conversationId);
     });
@@ -155,6 +158,14 @@ export function ConversationFlow() {
     if (!run) return;
     await perform(async () => {
       setRun(await bffClient.cancelConversationRun(run.conversationId, run.runId));
+    });
+  }
+
+  async function submitFeedback(value: 'HELPFUL' | 'NOT_HELPFUL' | 'UNSAFE' | 'FACTUALLY_WRONG') {
+    if (!run || run.state !== 'SUCCEEDED' || feedbackSubmitted) return;
+    await perform(async () => {
+      await bffClient.submitConversationRunFeedback(run.conversationId, run.runId, { value });
+      setFeedbackSubmitted(true);
     });
   }
 
@@ -196,6 +207,13 @@ export function ConversationFlow() {
         <p>{t('runState', { state: run.state })}</p>
         {run.failureCode && <p>{t('runFailure', { code: run.failureCode })}</p>}
         {ACTIVE_RUN_STATES.has(run.state) && <button type="button" disabled={busy || run.cancellationRequested} onClick={() => void cancel()}>{t('cancelRun')}</button>}
+        {run.state === 'SUCCEEDED' && <fieldset disabled={busy || feedbackSubmitted}>
+          <legend>{feedbackSubmitted ? t('feedbackSubmitted') : t('rateResponse')}</legend>
+          <button type="button" onClick={() => void submitFeedback('HELPFUL')}>{t('feedbackHelpful')}</button>
+          <button type="button" onClick={() => void submitFeedback('NOT_HELPFUL')}>{t('feedbackNotHelpful')}</button>
+          <button type="button" onClick={() => void submitFeedback('UNSAFE')}>{t('feedbackUnsafe')}</button>
+          <button type="button" onClick={() => void submitFeedback('FACTUALLY_WRONG')}>{t('feedbackFactuallyWrong')}</button>
+        </fieldset>}
       </div>}
     </section>}
     <p role="alert">{error}</p>

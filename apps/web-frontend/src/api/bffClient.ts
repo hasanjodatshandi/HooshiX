@@ -54,6 +54,7 @@ type OidcStartRequest = Schemas['OidcStartRequest'];
 type SelfErasureRequest = Schemas['SelfErasureRequest'];
 type CreateConversationRequest = Schemas['CreateConversationRequest'];
 type CreateConversationRunRequest = Schemas['CreateConversationRunRequest'];
+type ConversationRunFeedbackRequest = Schemas['ConversationRunFeedbackRequest'];
 
 export type BffRequestOptions = {
   signal?: AbortSignal;
@@ -481,6 +482,18 @@ export async function cancelConversationRun(
   );
 }
 
+export async function submitConversationRunFeedback(
+  conversationId: string,
+  runId: string,
+  body: ConversationRunFeedbackRequest,
+): Promise<void> {
+  await ensureCsrf();
+  await post<void>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/feedback`,
+    body,
+  );
+}
+
 export const bffClient = {
   login,
   completeMfaAuthentication,
@@ -509,6 +522,7 @@ export const bffClient = {
   createConversationRun,
   getConversationRun,
   cancelConversationRun,
+  submitConversationRunFeedback,
   getMfaStatus,
   startTotpEnrollment,
   confirmTotpEnrollment,
