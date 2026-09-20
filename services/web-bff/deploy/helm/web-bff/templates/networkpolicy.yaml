@@ -66,6 +66,14 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.conversation.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.conversation.podLabels | nindent 14 }}
+      ports: [{protocol: TCP, port: {{ .Values.conversation.port }}}, {protocol: TCP, port: 15008}]
+    - to:
+        - namespaceSelector:
+            matchLabels:
               kubernetes.io/metadata.name: {{ .Values.redis.namespace | quote }}
           podSelector:
             matchLabels:

@@ -14,6 +14,7 @@ public record WebBffProperties(
     URI publicOrigin,
     String identityTarget,
     String authorizationTarget,
+    String conversationTarget,
     String redisUri,
     Path locatorKeyRingPath,
     Path csrfKeyRingPath,
@@ -22,6 +23,7 @@ public record WebBffProperties(
     Duration encryptionKeyMaximumStaleness,
     int identityMaximumConcurrentCalls,
     int authorizationMaximumConcurrentCalls,
+    int conversationMaximumConcurrentCalls,
     Map<String, String> routeAudiences,
     Path quotaKeyRingPath,
     OidcQuota oidcQuota,
@@ -53,6 +55,7 @@ public record WebBffProperties(
         publicOrigin,
         identityTarget,
         authorizationTarget,
+        "dns:///conversation-service:9095",
         redisUri,
         locatorKeyRingPath,
         csrfKeyRingPath,
@@ -61,6 +64,7 @@ public record WebBffProperties(
         encryptionKeyMaximumStaleness,
         identityMaximumConcurrentCalls,
         authorizationMaximumConcurrentCalls,
+        64,
         routeAudiences,
         locatorKeyRingPath,
         new OidcQuota(10000, 1000, 30, locatorKeyRingPath),
@@ -89,6 +93,8 @@ public record WebBffProperties(
         || identityTarget.isBlank()
         || authorizationTarget == null
         || authorizationTarget.isBlank()
+        || conversationTarget == null
+        || conversationTarget.isBlank()
         || redisUri == null
         || redisUri.isBlank())
       throw new IllegalArgumentException("Web BFF dependency targets are required");
@@ -107,7 +113,9 @@ public record WebBffProperties(
     if (publicOrigin.getPort() != -1
         && (publicOrigin.getPort() < 1 || publicOrigin.getPort() > 65535))
       throw new IllegalArgumentException("Web BFF public origin port is invalid");
-    if (identityMaximumConcurrentCalls < 1 || authorizationMaximumConcurrentCalls < 1)
+    if (identityMaximumConcurrentCalls < 1
+        || authorizationMaximumConcurrentCalls < 1
+        || conversationMaximumConcurrentCalls < 1)
       throw new IllegalArgumentException("Web BFF dependency concurrency limits must be positive");
     routeAudiences = Map.copyOf(routeAudiences == null ? Map.of() : routeAudiences);
     if (routeAudiences.entrySet().stream()

@@ -39,6 +39,7 @@ public final class BffExceptionHandler {
               401;
           case INVALID_ORIGIN, FETCH_METADATA_REQUIRED, CSRF_INVALID, AUTHORIZATION_DENIED -> 403;
           case RATE_LIMITED -> 429;
+          case RESOURCE_NOT_FOUND -> 404;
           case DEPENDENCY_UNAVAILABLE,
               RUNTIME_DISABLED,
               OIDC_UNAVAILABLE,
@@ -49,7 +50,8 @@ public final class BffExceptionHandler {
               REGISTRATION_REJECTED,
               PASSWORD_REJECTED,
               ACCOUNT_LINK_REQUIRED,
-              EXTERNAL_IDENTITY_REJECTED ->
+              EXTERNAL_IDENTITY_REJECTED,
+              RESOURCE_CONFLICT ->
               409;
           case INVALID_REQUEST -> 400;
         };

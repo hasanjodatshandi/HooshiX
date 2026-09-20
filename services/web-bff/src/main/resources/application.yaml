@@ -92,6 +92,8 @@ web-bff:
   encryption-key-maximum-staleness: ${WEB_BFF_ENCRYPTION_KEY_MAXIMUM_STALENESS:PT1H}
   identity-maximum-concurrent-calls: ${WEB_BFF_IDENTITY_MAXIMUM_CONCURRENT_CALLS:128}
   authorization-maximum-concurrent-calls: ${WEB_BFF_AUTHORIZATION_MAXIMUM_CONCURRENT_CALLS:128}
+  conversation-target: ${WEB_BFF_CONVERSATION_TARGET:dns:///conversation-service:9095}
+  conversation-maximum-concurrent-calls: ${WEB_BFF_CONVERSATION_MAXIMUM_CONCURRENT_CALLS:64}
   google-oidc-enabled: ${WEB_BFF_GOOGLE_OIDC_ENABLED:false}
   google-authorization-endpoint: https://accounts.google.com/o/oauth2/v2/auth
   google-token-endpoint: https://oauth2.googleapis.com/token
@@ -107,6 +109,7 @@ web-bff:
     host-time-status-path: ${WEB_BFF_OIDC_QUOTA_HOST_TIME_STATUS_PATH:/run/status/web-bff/host-time-synchronized}
   route-audiences:
     "[/api/v1/authorization]": authorization-service
+    "[/api/v1/conversations]": conversation-service
 logging:
   structured:
     format:

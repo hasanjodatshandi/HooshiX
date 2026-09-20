@@ -22,6 +22,14 @@ spec:
     - from:
         - source:
             principals:
+              - {{ required "webBff.principal is required" .Values.webBff.principal | quote }}
+      to:
+        - operation:
+            ports:
+              - {{ .Values.service.grpcPort | quote }}
+    - from:
+        - source:
+            principals:
               - {{ required "observability metrics Prometheus principal is required" .Values.observability.metrics.prometheus.principal | quote }}
       to:
         - operation:
