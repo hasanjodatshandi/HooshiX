@@ -37,6 +37,7 @@ apps/web-frontend/Dockerfile
 apps/web-frontend/README.md
 apps/web-frontend/e2e/accessibility-audit.md
 apps/web-frontend/e2e/accessibility.spec.ts
+apps/web-frontend/e2e/conversation.spec.ts
 apps/web-frontend/e2e/erasure.spec.ts
 apps/web-frontend/e2e/frontend-quality.spec.ts
 apps/web-frontend/e2e/mfa.spec.ts
@@ -61,6 +62,8 @@ apps/web-frontend/src/errors/ApplicationErrorBoundary.tsx
 apps/web-frontend/src/errors/getErrorMessage.ts
 apps/web-frontend/src/errors/problem.test.ts
 apps/web-frontend/src/errors/problem.ts
+apps/web-frontend/src/features/conversation/ConversationFlow.test.tsx
+apps/web-frontend/src/features/conversation/ConversationFlow.tsx
 apps/web-frontend/src/features/erasure/AccountErasureFlow.tsx
 apps/web-frontend/src/features/externalIdentity/ExternalIdentitySettingsFlow.tsx
 apps/web-frontend/src/features/login/LoginFlow.tsx

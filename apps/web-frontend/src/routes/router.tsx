@@ -11,6 +11,7 @@ import { MfaLoginFlow } from '../features/mfa/MfaLoginFlow';
 import { MfaSettingsFlow } from '../features/mfa/MfaSettingsFlow';
 import { ExternalIdentitySettingsFlow } from '../features/externalIdentity/ExternalIdentitySettingsFlow';
 import { AccountErasureFlow } from '../features/erasure/AccountErasureFlow';
+import { ConversationFlow } from '../features/conversation/ConversationFlow';
 import { OidcCompletionPage } from '../pages/OidcCompletionPage';
 import { VerificationGuard, AuthenticatedGuard } from './guards';
 import { routes } from './routes';
@@ -82,6 +83,10 @@ export function Router() {
 
   if (path === routes.application) {
     return <AuthenticatedGuard><ApplicationPage /></AuthenticatedGuard>;
+  }
+
+  if (path === routes.conversations) {
+    return <AuthenticatedGuard><ConversationFlow /></AuthenticatedGuard>;
   }
 
   return <ApplicationShell />;
