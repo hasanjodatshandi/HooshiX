@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "conversation")
 public record ConversationProperties(
     boolean providerRuntimeEnabled,
+    int providerCanaryPercent,
     Path contentKeyRingPath,
     Duration keyRingRefreshInterval,
     Duration keyRingMaximumStaleness,
@@ -17,7 +18,9 @@ public record ConversationProperties(
     Duration jwtVerifierRefreshInterval,
     Duration jwtVerifierMaximumStaleness) {
   public ConversationProperties {
-    if (contentKeyRingPath == null
+    if ((providerRuntimeEnabled && !java.util.Set.of(1, 5, 25, 100).contains(providerCanaryPercent))
+        || (!providerRuntimeEnabled && providerCanaryPercent != 0)
+        || contentKeyRingPath == null
         || keyRingRefreshInterval == null
         || keyRingRefreshInterval.isZero()
         || keyRingRefreshInterval.isNegative()

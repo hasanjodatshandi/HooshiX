@@ -119,7 +119,7 @@ class ConversationServiceTest {
     UUID requestId = UUID.randomUUID();
     UUID conversationId = UUID.randomUUID();
     var policy = policy();
-    when(modelPolicy.requireApprovedPolicy()).thenReturn(policy);
+    when(modelPolicy.requireApprovedPolicy(ACTOR.tenantId())).thenReturn(policy);
     when(modelRuns.findAcceptedReplay(ACTOR, requestId, conversationId, "  Café  "))
         .thenReturn(null);
     when(modelRuns.accept(
@@ -139,7 +139,7 @@ class ConversationServiceTest {
 
     assertThat(accepted.state()).isEqualTo(ModelRunState.QUEUED);
     verify(permissions).check(ACTOR, "conversation.generate");
-    verify(modelPolicy).requireApprovedPolicy();
+    verify(modelPolicy).requireApprovedPolicy(ACTOR.tenantId());
   }
 
   @Test

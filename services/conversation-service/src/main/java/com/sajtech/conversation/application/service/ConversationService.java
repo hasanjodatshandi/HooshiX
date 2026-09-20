@@ -98,7 +98,7 @@ public final class ConversationService {
     ModelRun replay =
         modelRuns.findAcceptedReplay(actor, requestId, conversationId, canonicalMessage);
     if (replay != null) return replay;
-    var policy = modelPolicy.requireApprovedPolicy();
+    var policy = modelPolicy.requireApprovedPolicy(actor.tenantId());
     return modelRuns.accept(
         actor,
         requestId,

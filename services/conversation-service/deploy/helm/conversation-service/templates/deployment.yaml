@@ -15,6 +15,9 @@
 {{- if .Values.runtime.providerRuntimeEnabled }}
 {{- required "secrets.providerApiKeySecretName is required when provider runtime is enabled" .Values.secrets.providerApiKeySecretName -}}
 {{- if not .Values.runtime.eventRuntimeEnabled }}{{ fail "provider runtime requires tenant lifecycle and erasure event runtime" }}{{ end -}}
+{{- if not (has (int .Values.runtime.providerCanaryPercent) (list 1 5 25 100)) }}{{ fail "runtime.providerCanaryPercent must be one approved canary step" }}{{ end -}}
+{{- if ne .Values.runtime.providerHost "api.openai.com" }}{{ fail "runtime.providerHost must remain the reviewed OpenAI endpoint" }}{{ end -}}
+{{- else if ne (int .Values.runtime.providerCanaryPercent) 0 }}{{ fail "runtime.providerCanaryPercent must be zero while provider runtime is disabled" }}
 {{- end }}
 {{- $jwtVerifierConfigMap := required "identity.jwtVerifierConfigMapName is required" .Values.identity.jwtVerifierConfigMapName -}}
 {{- $authorizationTarget := required "authorization.target is required" .Values.authorization.target -}}
@@ -100,6 +103,8 @@ spec:
               value: {{ $jdbcUrl | quote }}
             - name: CONVERSATION_PROVIDER_RUNTIME_ENABLED
               value: {{ .Values.runtime.providerRuntimeEnabled | quote }}
+            - name: CONVERSATION_PROVIDER_CANARY_PERCENT
+              value: {{ .Values.runtime.providerCanaryPercent | quote }}
             - name: CONVERSATION_EVENT_RUNTIME_ENABLED
               value: {{ .Values.runtime.eventRuntimeEnabled | quote }}
             {{- if .Values.runtime.eventRuntimeEnabled }}

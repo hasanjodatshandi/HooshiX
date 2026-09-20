@@ -13,6 +13,7 @@ class ConversationPropertiesTest {
             () ->
                 new ConversationProperties(
                     false,
+                    0,
                     null,
                     Duration.ofSeconds(30),
                     Duration.ofMinutes(1),
@@ -27,6 +28,7 @@ class ConversationPropertiesTest {
             () ->
                 new ConversationProperties(
                     false,
+                    0,
                     Path.of("keys"),
                     Duration.ofSeconds(30),
                     Duration.ZERO,
@@ -41,6 +43,7 @@ class ConversationPropertiesTest {
             () ->
                 new ConversationProperties(
                     false,
+                    0,
                     Path.of("keys"),
                     Duration.ofMinutes(1),
                     Duration.ofMinutes(1),
@@ -55,6 +58,7 @@ class ConversationPropertiesTest {
             () ->
                 new ConversationProperties(
                     false,
+                    0,
                     Path.of("keys"),
                     Duration.ofSeconds(30),
                     Duration.ofMinutes(1),

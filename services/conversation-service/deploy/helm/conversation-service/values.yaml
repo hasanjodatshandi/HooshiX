@@ -22,9 +22,11 @@ runtime:
   grpcMaximumConcurrentCalls: 32
   eventRuntimeEnabled: false
   providerRuntimeEnabled: false
+  providerCanaryPercent: 0
   temporaryStorageLimit: 256Mi
   providerMaximumConcurrentCalls: 4
   providerMaximumConcurrentPerTenant: 1
+  providerHost: api.openai.com
 
 authorization:
   target: dns:///authorization-service.platform-apps.svc.cluster.local:9090

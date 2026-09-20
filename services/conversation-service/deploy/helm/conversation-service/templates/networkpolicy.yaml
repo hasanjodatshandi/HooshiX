@@ -54,6 +54,12 @@ spec:
           port: {{ .Values.database.port }}
         - protocol: TCP
           port: 15008
+    {{- if .Values.runtime.providerRuntimeEnabled }}
+    # DNS identity is restricted to api.openai.com by the registry-only Istio ServiceEntry.
+    - ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
     {{- if .Values.runtime.eventRuntimeEnabled }}
     - to:
         - namespaceSelector:

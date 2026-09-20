@@ -35,3 +35,20 @@ spec:
         - operation:
             ports:
               - {{ .Values.service.managementPort | quote }}
+{{- if .Values.runtime.providerRuntimeEnabled }}
+---
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: {{ include "conversation-service.name" . }}-model-provider
+spec:
+  hosts:
+    - {{ .Values.runtime.providerHost | quote }}
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - number: 443
+      name: tls
+      protocol: TLS
+  exportTo: ["."]
+{{- end }}

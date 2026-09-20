@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,15 +21,30 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
   private static final String EXPECTED_LIFECYCLE = "APPROVED_100";
   private static final String EXPECTED_DATA_CONTROL = "APPROVED";
   private final boolean runtimeEnabled;
+  private final int canaryPercent;
   private final ModelExecutionPolicy approvedPolicy;
 
   public GitGovernedModelPolicyProvider(boolean runtimeEnabled) {
-    this(runtimeEnabled, loadJson(GOVERNANCE_RESOURCE), loadBytes(PROMPT_RESOURCE));
+    this(runtimeEnabled, runtimeEnabled ? 100 : 0);
+  }
+
+  public GitGovernedModelPolicyProvider(boolean runtimeEnabled, int canaryPercent) {
+    this(runtimeEnabled, canaryPercent, loadJson(GOVERNANCE_RESOURCE), loadBytes(PROMPT_RESOURCE));
+  }
+
+  GitGovernedModelPolicyProvider(
+      boolean runtimeEnabled, int canaryPercent, JsonNode governance, byte[] prompt) {
+    this.runtimeEnabled = runtimeEnabled;
+    if ((runtimeEnabled && !java.util.Set.of(1, 5, 25, 100).contains(canaryPercent))
+        || (!runtimeEnabled && canaryPercent != 0)) {
+      throw new IllegalArgumentException("Model canary configuration is invalid");
+    }
+    this.canaryPercent = canaryPercent;
+    this.approvedPolicy = approvedPolicy(governance, prompt);
   }
 
   GitGovernedModelPolicyProvider(boolean runtimeEnabled, JsonNode governance, byte[] prompt) {
-    this.runtimeEnabled = runtimeEnabled;
-    this.approvedPolicy = approvedPolicy(governance, prompt);
+    this(runtimeEnabled, runtimeEnabled ? 100 : 0, governance, prompt);
   }
 
   @Override
@@ -38,6 +54,31 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
           ConversationError.MODEL_EXECUTION_DISABLED, "Model execution is disabled");
     }
     return approvedPolicy;
+  }
+
+  @Override
+  public ModelExecutionPolicy requireApprovedPolicy(UUID tenantId) {
+    Objects.requireNonNull(tenantId);
+    ModelExecutionPolicy policy = requireApprovedPolicy();
+    byte[] digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256").digest(uuidBytes(tenantId));
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is unavailable", exception);
+    }
+    int cohort = Math.floorMod(java.nio.ByteBuffer.wrap(digest, 0, 4).getInt(), 100);
+    if (cohort >= canaryPercent) {
+      throw new ConversationException(
+          ConversationError.MODEL_EXECUTION_DISABLED, "Model execution is disabled");
+    }
+    return policy;
+  }
+
+  private static byte[] uuidBytes(UUID value) {
+    return java.nio.ByteBuffer.allocate(16)
+        .putLong(value.getMostSignificantBits())
+        .putLong(value.getLeastSignificantBits())
+        .array();
   }
 
   private static ModelExecutionPolicy approvedPolicy(JsonNode root, byte[] prompt) {

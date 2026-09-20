@@ -1,5 +1,6 @@
 package com.sajtech.conversation.configuration;
 
+import com.sajtech.conversation.application.port.out.ModelProvider;
 import com.sajtech.conversation.application.service.ConversationAuthority;
 import com.sajtech.conversation.application.service.ConversationService;
 import com.sajtech.conversation.application.service.ModelRunWorker;
@@ -14,6 +15,7 @@ import com.sajtech.conversation.infrastructure.model.GitGovernedModelPolicyProvi
 import com.sajtech.conversation.infrastructure.persistence.JdbcConversationRepository;
 import com.sajtech.conversation.infrastructure.persistence.JdbcModelRunRepository;
 import com.sajtech.conversation.infrastructure.persistence.JdbcModelRunWorkerRepository;
+import com.sajtech.conversation.infrastructure.provider.ObservedModelProvider;
 import com.sajtech.conversation.infrastructure.provider.openai.FileBackedOpenAiModelProvider;
 import com.sajtech.conversation.infrastructure.runtime.ModelRunWorkerLifecycle;
 import com.sajtech.conversation.infrastructure.runtime.grpc.GrpcServerLifecycle;
@@ -43,6 +45,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -220,7 +223,8 @@ public class RuntimeConfiguration {
 
   @Bean
   GitGovernedModelPolicyProvider modelPolicyProvider(ConversationProperties properties) {
-    return new GitGovernedModelPolicyProvider(properties.providerRuntimeEnabled());
+    return new GitGovernedModelPolicyProvider(
+        properties.providerRuntimeEnabled(), properties.providerCanaryPercent());
   }
 
   @Bean
@@ -229,10 +233,17 @@ public class RuntimeConfiguration {
   }
 
   @Bean
+  @Primary
+  ModelProvider observedModelProvider(
+      FileBackedOpenAiModelProvider provider, MeterRegistry meters) {
+    return new ObservedModelProvider(provider, meters);
+  }
+
+  @Bean
   ModelRunWorker modelRunWorker(
       GitGovernedModelPolicyProvider policies,
       JdbcModelRunWorkerRepository runs,
-      FileBackedOpenAiModelProvider provider,
+      ModelProvider provider,
       Clock clock,
       ModelWorkerProperties properties) {
     return new ModelRunWorker(
@@ -264,7 +275,7 @@ public class RuntimeConfiguration {
       JdbcConversationRepository repository,
       JdbcModelRunRepository modelRuns,
       GitGovernedModelPolicyProvider modelPolicy,
-      FileBackedOpenAiModelProvider provider,
+      ModelProvider provider,
       Clock clock) {
     return new ConversationService(authority, repository, modelRuns, modelPolicy, provider, clock);
   }
