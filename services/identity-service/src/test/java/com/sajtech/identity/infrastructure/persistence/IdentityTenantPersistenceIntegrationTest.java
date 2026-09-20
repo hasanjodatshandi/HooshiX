@@ -107,7 +107,7 @@ class IdentityTenantPersistenceIntegrationTest {
         ErasureCommandEvent.newBuilder()
             .setEventId(blockedEventId.toString())
             .setErasureRequestId(requestId.toString())
-            .setParticipantPolicyVersion("1")
+            .setParticipantPolicyVersion("2")
             .build();
     tx.required(
         () -> {
@@ -138,7 +138,7 @@ class IdentityTenantPersistenceIntegrationTest {
         ErasureCommandEvent.newBuilder()
             .setEventId(revivalEventId.toString())
             .setErasureRequestId(requestId.toString())
-            .setParticipantPolicyVersion("1")
+            .setParticipantPolicyVersion("2")
             .build();
     tx.required(
         () -> {

@@ -126,8 +126,8 @@ message BeginParticipantErasureRequest {
 message BeginParticipantErasureResponse {
   option (buf.validate.message).cel = {
     id: "begin_participant_erasure_response.target_shape"
-    message: "authorization and web participants receive a user target; notification receives notification targets; identity receives neither"
-    expression: "(this.participant == 1 && this.user_id == '' && size(this.notification_ids) == 0) || ((this.participant == 2 || this.participant == 4) && this.user_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && size(this.notification_ids) == 0) || (this.participant == 3 && this.user_id == '')"
+    message: "authorization, web, and conversation participants receive a user target; notification receives notification targets; identity receives neither"
+    expression: "(this.participant == 1 && this.user_id == '' && size(this.notification_ids) == 0) || ((this.participant == 2 || this.participant == 4 || this.participant == 5) && this.user_id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') && size(this.notification_ids) == 0) || (this.participant == 3 && this.user_id == '')"
   };
 
   ErasureParticipant participant = 1 [(buf.validate.field).enum = {

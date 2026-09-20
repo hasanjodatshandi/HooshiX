@@ -46,19 +46,28 @@ public final class JdbcConversationRepository implements ConversationRepository 
                   actor.tenantId(), conversationId, conversationId, ContentPurpose.TITLE, title);
           try (PreparedStatement statement =
               connection.prepareStatement(
-                  "INSERT INTO conversation (conversation_id, tenant_id, owner_membership_id, "
+                  "INSERT INTO conversation (conversation_id, tenant_id, owner_membership_id, owner_user_id, "
                       + "create_request_id, title_key_id, title_nonce, title_ciphertext, lifecycle, "
                       + "aggregate_version, created_at, last_activity_at) "
-                      + "VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 1, ?, ?)")) {
+                      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 1, ?, ?)")) {
             statement.setObject(1, conversationId);
             statement.setObject(2, actor.tenantId());
             statement.setObject(3, actor.membershipId());
-            statement.setObject(4, requestId);
-            statement.setString(5, encrypted.keyId());
-            statement.setBytes(6, encrypted.nonce());
-            statement.setBytes(7, encrypted.ciphertext());
-            statement.setObject(8, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+            statement.setObject(4, actor.userId());
+            statement.setObject(5, requestId);
+            statement.setString(6, encrypted.keyId());
+            statement.setBytes(7, encrypted.nonce());
+            statement.setBytes(8, encrypted.ciphertext());
             statement.setObject(9, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+            statement.setObject(10, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+            statement.executeUpdate();
+          }
+          try (PreparedStatement statement =
+              connection.prepareStatement(
+                  "INSERT INTO conversation_subject_index(user_id,tenant_id,conversation_id) VALUES (?,?,?)")) {
+            statement.setObject(1, actor.userId());
+            statement.setObject(2, actor.tenantId());
+            statement.setObject(3, conversationId);
             statement.executeUpdate();
           }
           return new Conversation(
@@ -432,6 +441,7 @@ public final class JdbcConversationRepository implements ConversationRepository 
           limits.execute("SET LOCAL lock_timeout = '100ms'");
           limits.execute("SET LOCAL statement_timeout = '500ms'");
         }
+        TenantLifecycleProjection.requireActive(connection, actor.tenantId());
         T result = work.execute(connection);
         connection.commit();
         return result;

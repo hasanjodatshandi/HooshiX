@@ -80,11 +80,13 @@ final class TenantAuthorizationOutboxPersistence extends TenantPersistenceSuppor
               "UPDATE identity_tenant SET lifecycle='ACTIVE',version=version+1,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=? AND lifecycle='PROVISIONING'",
               ts(now),
               tenant);
-      if (changed > 0)
+      if (changed > 0) {
         dsl.execute(
             "UPDATE identity_user_membership_query SET tenant_lifecycle='ACTIVE',updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE tenant_id=?",
             ts(now),
             tenant);
+        enqueueTenantLifecycle(tenant, now);
+      }
     }
     if ("APPLY_TENANT_LIFECYCLE".equals(op)) {
       String target = r.get("lifecycle", String.class);
@@ -152,6 +154,7 @@ final class TenantAuthorizationOutboxPersistence extends TenantPersistenceSuppor
           target,
           ts(now),
           tenantId);
+      enqueueTenantLifecycle(tenantId, now);
     }
     if ("DELETING".equals(target)) {
       setTenant(tenantId);
@@ -169,5 +172,27 @@ final class TenantAuthorizationOutboxPersistence extends TenantPersistenceSuppor
     } else {
       audit("IDENTITY_TENANT_" + target + "_ACKNOWLEDGED", actorUserId, now);
     }
+  }
+
+  private void enqueueTenantLifecycle(UUID tenantId, Instant now) {
+    var tenant =
+        dsl.fetchOne("SELECT version,lifecycle FROM identity_tenant WHERE tenant_id=?", tenantId);
+    if (tenant == null) throw error(TenantError.TENANT_NOT_SELECTABLE, "Tenant is not found");
+    dsl.execute(
+        """
+        INSERT INTO identity_tenant_lifecycle_event_outbox(
+          event_id,tenant_id,lifecycle_version,lifecycle_state,state,attempt_count,
+          next_attempt_at,occurred_at,updated_at)
+        VALUES (?,?,?,?,'PENDING',0,CAST(? AS TIMESTAMP WITH TIME ZONE),
+                CAST(? AS TIMESTAMP WITH TIME ZONE),CAST(? AS TIMESTAMP WITH TIME ZONE))
+        ON CONFLICT(tenant_id,lifecycle_version) DO NOTHING
+        """,
+        UUID.randomUUID(),
+        tenantId,
+        tenant.get("version", Long.class),
+        tenant.get("lifecycle", String.class),
+        ts(now),
+        ts(now),
+        ts(now));
   }
 }

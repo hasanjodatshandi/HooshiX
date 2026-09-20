@@ -19,15 +19,17 @@ java {
 jacoco { toolVersion = "0.8.15" }
 
 dependencies {
-    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.0")
+    implementation("com.sajtech.hooshix:protobuf-contracts:1.9.1")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
     implementation(platform("io.netty:netty-bom:4.2.17.Final"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    implementation("org.springframework.boot:spring-boot-starter-jooq")
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.springframework.kafka:spring-kafka:4.1.0")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("io.grpc:grpc-netty-shaded:1.83.1")
     implementation("io.grpc:grpc-protobuf:1.83.1")

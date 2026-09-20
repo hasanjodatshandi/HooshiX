@@ -48,7 +48,7 @@ class ConversationMigrationProfileIntegrationTest {
           var result =
               statement.executeQuery("SELECT count(*) FROM flyway_schema_history WHERE success")) {
         assertThat(result.next()).isTrue();
-        assertThat(result.getInt(1)).isEqualTo(4);
+        assertThat(result.getInt(1)).isEqualTo(5);
       }
     } finally {
       context.close();

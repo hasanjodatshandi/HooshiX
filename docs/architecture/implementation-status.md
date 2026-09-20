@@ -16,7 +16,7 @@ all five Java service security suites, and the final baseline aggregator. Protec
 `Web frontend E2E` run `33105936555` also passed at that exact commit. These are
 repository/CI results, not Production runtime evidence.
 
-The neutral Protobuf contract artifact is version 1.9.0. It includes versioned Protovalidate
+The neutral Protobuf contract artifact is version 1.9.1. It includes versioned Protovalidate
 request rules, generic fail-closed gRPC server enforcement, tested protobuf-JSON consumer examples
 for every published service contract, the typed Identity ExternalIdentity and data-subject-erasure
 surfaces, versioned non-PII Kafka command/receipt and tenant-lifecycle events, the private

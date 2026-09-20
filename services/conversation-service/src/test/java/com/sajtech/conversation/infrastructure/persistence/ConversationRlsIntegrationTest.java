@@ -786,7 +786,16 @@ class ConversationRlsIntegrationTest {
     }
   }
 
-  private static ConversationActor actor(UUID tenant, UUID membership) {
+  private ConversationActor actor(UUID tenant, UUID membership) {
+    try (Connection connection = adminConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "INSERT INTO conversation_tenant_lifecycle(tenant_id,lifecycle_version,lifecycle_state,ordered,occurred_at,updated_at) VALUES (?,1,'ACTIVE',TRUE,now(),now()) ON CONFLICT(tenant_id) DO NOTHING")) {
+      statement.setObject(1, tenant);
+      statement.executeUpdate();
+    } catch (Exception exception) {
+      throw new AssertionError("Could not seed active tenant lifecycle", exception);
+    }
     return new ConversationActor(UUID.randomUUID(), tenant, membership, "s".repeat(43));
   }
 
@@ -913,17 +922,18 @@ class ConversationRlsIntegrationTest {
       try (PreparedStatement insert =
           connection.prepareStatement(
               "INSERT INTO conversation "
-                  + "(conversation_id, tenant_id, owner_membership_id, title_key_id, title_nonce, "
+                  + "(conversation_id, tenant_id, owner_membership_id, owner_user_id, title_key_id, title_nonce, "
                   + "title_ciphertext, lifecycle, aggregate_version, created_at, last_activity_at) "
-                  + "VALUES (?, ?, ?, 'k1', ?, ?, 'ACTIVE', 1, ?, ?)")) {
+                  + "VALUES (?, ?, ?, ?, 'k1', ?, ?, 'ACTIVE', 1, ?, ?)")) {
         insert.setObject(1, UUID.randomUUID());
         insert.setObject(2, tenant);
         insert.setObject(3, UUID.randomUUID());
-        insert.setBytes(4, new byte[12]);
-        insert.setBytes(5, new byte[16]);
+        insert.setObject(4, UUID.randomUUID());
+        insert.setBytes(5, new byte[12]);
+        insert.setBytes(6, new byte[16]);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        insert.setObject(6, now);
         insert.setObject(7, now);
+        insert.setObject(8, now);
         assertThat(insert.executeUpdate()).isEqualTo(1);
       }
       connection.commit();

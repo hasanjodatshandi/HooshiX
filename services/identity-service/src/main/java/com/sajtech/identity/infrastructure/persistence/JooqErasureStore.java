@@ -17,9 +17,14 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 
 public final class JooqErasureStore implements ErasureStore {
-  private static final String POLICY_VERSION = "1";
+  private static final String POLICY_VERSION = "2";
   private static final List<String> PARTICIPANTS =
-      List.of("IDENTITY_SERVICE", "AUTHORIZATION_SERVICE", "NOTIFICATION_SERVICE", "WEB_BFF");
+      List.of(
+          "IDENTITY_SERVICE",
+          "AUTHORIZATION_SERVICE",
+          "NOTIFICATION_SERVICE",
+          "WEB_BFF",
+          "CONVERSATION_SERVICE");
   private final DSLContext dsl;
 
   public JooqErasureStore(DSLContext dsl) {
@@ -205,6 +210,7 @@ public final class JooqErasureStore implements ErasureStore {
     UUID target =
         participant == ErasureParticipant.AUTHORIZATION_SERVICE
                 || participant == ErasureParticipant.WEB_BFF
+                || participant == ErasureParticipant.CONVERSATION_SERVICE
             ? userId
             : null;
     return new ParticipantErasureTarget(participant, target, List.of(), "", true);
