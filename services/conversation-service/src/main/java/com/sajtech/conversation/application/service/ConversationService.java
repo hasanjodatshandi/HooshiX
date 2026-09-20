@@ -5,10 +5,11 @@ import com.sajtech.conversation.application.ConversationException;
 import com.sajtech.conversation.application.model.ConversationPage;
 import com.sajtech.conversation.application.model.ConversationPermission;
 import com.sajtech.conversation.application.model.MessagePage;
+import com.sajtech.conversation.application.model.RunFeedbackValue;
 import com.sajtech.conversation.application.port.out.ConversationRepository;
 import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
-import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.application.port.out.ModelProvider;
+import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.domain.Conversation;
 import com.sajtech.conversation.domain.ModelRun;
 import java.text.Normalizer;
@@ -128,6 +129,16 @@ public final class ConversationService {
       provider.cancel(runId);
     }
     return canceled;
+  }
+
+  public void submitRunFeedback(
+      String token, UUID requestId, UUID conversationId, UUID runId, RunFeedbackValue value) {
+    requireUuidV4(requestId);
+    requireUuidV4(conversationId);
+    requireUuidV4(runId);
+    Objects.requireNonNull(value);
+    var actor = authority.authorize(token, ConversationPermission.GENERATE);
+    modelRuns.submitFeedback(actor, requestId, conversationId, runId, value, clock.instant());
   }
 
   private static String canonicalTitle(String value) {

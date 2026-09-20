@@ -5,6 +5,7 @@ import com.sajtech.conversation.application.ConversationException;
 import com.sajtech.conversation.application.model.ConversationActor;
 import com.sajtech.conversation.application.model.MessagePage;
 import com.sajtech.conversation.application.model.ModelExecutionPolicy;
+import com.sajtech.conversation.application.model.RunFeedbackValue;
 import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.domain.ConversationMessage;
 import com.sajtech.conversation.domain.MessageRole;
@@ -154,6 +155,71 @@ public final class JdbcModelRunRepository implements ModelRunRepository {
           }
           recordCancellationRequest(connection, actor, requestId, conversationId, runId, now);
           return requireOwnedRun(connection, actor, conversationId, runId);
+        });
+  }
+
+  @Override
+  public void submitFeedback(
+      ConversationActor actor,
+      UUID requestId,
+      UUID conversationId,
+      UUID runId,
+      RunFeedbackValue value,
+      Instant now) {
+    transaction(
+        actor,
+        connection -> {
+          lockIdempotencyKey(connection, actor, requestId);
+          try (PreparedStatement replay =
+              connection.prepareStatement(
+                  "SELECT conversation_id,run_id,value FROM conversation_run_feedback WHERE requester_membership_id=? AND request_id=?")) {
+            replay.setObject(1, actor.membershipId());
+            replay.setObject(2, requestId);
+            try (ResultSet row = replay.executeQuery()) {
+              if (row.next()) {
+                if (conversationId.equals(row.getObject(1, UUID.class))
+                    && runId.equals(row.getObject(2, UUID.class))
+                    && value.name().equals(row.getString(3))) return null;
+                throw conflict();
+              }
+            }
+          }
+          try (PreparedStatement run =
+              connection.prepareStatement(
+                  "SELECT state FROM conversation_model_run WHERE run_id=? AND conversation_id=? AND requester_membership_id=? FOR UPDATE")) {
+            run.setObject(1, runId);
+            run.setObject(2, conversationId);
+            run.setObject(3, actor.membershipId());
+            try (ResultSet row = run.executeQuery()) {
+              if (!row.next()) throw runNotFound();
+              if (!"SUCCEEDED".equals(row.getString(1))) throw invalidState();
+            }
+          }
+          try (PreparedStatement previous =
+              connection.prepareStatement(
+                  "SELECT value FROM conversation_run_feedback WHERE run_id=? AND requester_membership_id=?")) {
+            previous.setObject(1, runId);
+            previous.setObject(2, actor.membershipId());
+            try (ResultSet row = previous.executeQuery()) {
+              if (row.next()) {
+                if (value.name().equals(row.getString(1))) return null;
+                throw conflict();
+              }
+            }
+          }
+          try (PreparedStatement insert =
+              connection.prepareStatement(
+                  "INSERT INTO conversation_run_feedback(tenant_id,conversation_id,run_id,requester_membership_id,request_id,value,created_at) VALUES (?,?,?,?,?,?,?)")) {
+            insert.setObject(1, actor.tenantId());
+            insert.setObject(2, conversationId);
+            insert.setObject(3, runId);
+            insert.setObject(4, actor.membershipId());
+            insert.setObject(5, requestId);
+            insert.setString(6, value.name());
+            insert.setObject(7, OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+            insert.executeUpdate();
+          }
+          return null;
         });
   }
 

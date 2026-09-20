@@ -59,7 +59,8 @@ public final class ModelRunWorker {
         .map(
             claim -> {
               ModelProviderResult result =
-                  provider.execute(new ModelProviderRequest(claim.runId(), policy, claim.messages()));
+                  provider.execute(
+                      new ModelProviderRequest(claim.runId(), policy, claim.messages()));
               breaker.record(result.outcome(), clock.instant());
               runs.complete(claim, policy, result, clock.instant());
               return true;

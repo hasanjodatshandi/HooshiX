@@ -8,6 +8,7 @@ import com.sajtech.conversation.application.model.ConversationActor;
 import com.sajtech.conversation.application.model.ModelExecutionPolicy;
 import com.sajtech.conversation.application.model.ModelProviderOutcome;
 import com.sajtech.conversation.application.model.ModelProviderResult;
+import com.sajtech.conversation.application.model.RunFeedbackValue;
 import com.sajtech.conversation.domain.ConversationLifecycle;
 import com.sajtech.conversation.domain.ModelRunFailure;
 import com.sajtech.conversation.domain.ModelRunState;
@@ -137,6 +138,7 @@ class ConversationRlsIntegrationTest {
             "conversation",
             "conversation_message",
             "conversation_model_run",
+            "conversation_run_feedback",
             "conversation_mutation_request",
             "conversation_run_mutation_request",
             "conversation_budget_account"
@@ -417,6 +419,63 @@ class ConversationRlsIntegrationTest {
         .anySatisfy(message -> assertThat(message.content()).isEqualTo("private answer"));
     assertThat(budgetAmounts(tenant, membership)).containsExactly(0L, 3_775L, 0L, 3_775L);
     assertConversationCiphertextDoesNotContain(conversationId, "private answer");
+  }
+
+  @Test
+  void feedbackIsEnumOnlyOwnedIdempotentAndTenantIsolated() throws Exception {
+    UUID tenant = UUID.randomUUID();
+    UUID membership = UUID.randomUUID();
+    ConversationActor owner = actor(tenant, membership);
+    UUID conversationId = UUID.randomUUID();
+    UUID runId = UUID.randomUUID();
+    UUID requestId = UUID.randomUUID();
+    Instant now = Instant.parse("2026-09-13T08:00:00Z");
+    repository.create(owner, UUID.randomUUID(), conversationId, "private", now);
+    seedBudget(tenant, membership, 100_000, now);
+    modelRuns.accept(
+        owner,
+        UUID.randomUUID(),
+        conversationId,
+        UUID.randomUUID(),
+        runId,
+        "question",
+        policy(),
+        now.plusSeconds(1));
+    var claim =
+        runWorker.claim(policy(), now.plusSeconds(2), Duration.ofSeconds(65), 1).orElseThrow();
+    runWorker.complete(
+        claim,
+        policy(),
+        new ModelProviderResult(ModelProviderOutcome.SUCCEEDED, "answer", 1, 0, 1),
+        now.plusSeconds(3));
+
+    modelRuns.submitFeedback(
+        owner, requestId, conversationId, runId, RunFeedbackValue.HELPFUL, now.plusSeconds(4));
+    modelRuns.submitFeedback(
+        owner, requestId, conversationId, runId, RunFeedbackValue.HELPFUL, now.plusSeconds(5));
+
+    assertThat(countVisibleRows("conversation_run_feedback", tenant)).isEqualTo(1);
+    assertThatThrownBy(
+            () ->
+                modelRuns.submitFeedback(
+                    owner,
+                    requestId,
+                    conversationId,
+                    runId,
+                    RunFeedbackValue.UNSAFE,
+                    now.plusSeconds(6)))
+        .isInstanceOf(ConversationException.class);
+    assertThatThrownBy(
+            () ->
+                modelRuns.submitFeedback(
+                    actor(tenant, UUID.randomUUID()),
+                    UUID.randomUUID(),
+                    conversationId,
+                    runId,
+                    RunFeedbackValue.HELPFUL,
+                    now.plusSeconds(7)))
+        .isInstanceOf(ConversationException.class);
+    assertThat(countVisibleRows("conversation_run_feedback", UUID.randomUUID())).isZero();
   }
 
   @Test
@@ -1191,6 +1250,21 @@ class ConversationRlsIntegrationTest {
       int count = count(connection);
       connection.commit();
       return count;
+    }
+  }
+
+  private int countVisibleRows(String table, UUID tenant) throws Exception {
+    if (!"conversation_run_feedback".equals(table)) throw new IllegalArgumentException();
+    try (Connection connection = runtime.getConnection()) {
+      connection.setAutoCommit(false);
+      setTenant(connection, tenant.toString());
+      try (PreparedStatement query = connection.prepareStatement("SELECT count(*) FROM " + table);
+          ResultSet result = query.executeQuery()) {
+        assertThat(result.next()).isTrue();
+        int count = result.getInt(1);
+        connection.commit();
+        return count;
+      }
     }
   }
 
