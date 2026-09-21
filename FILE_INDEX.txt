@@ -301,6 +301,7 @@ docs/operations/incident-response-runbook.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
 docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
+docs/runbooks/conversation-model-operations.md
 docs/runbooks/local-integrated-runtime.md
 docs/runbooks/local-istio-ambient.md
 docs/runbooks/local-production-fidelity-staging.md
@@ -374,6 +375,7 @@ infrastructure/waf/vendor/4.25.1/coreruleset-4.25.1.tar.gz
 mlops/evaluations/conversation-v1.json
 mlops/governance/v1/governance.json
 mlops/prompts/conversation-system-v1.txt
+mlops/schemas/evaluation-receipt.schema.json
 mlops/schemas/evaluation-suite.schema.json
 mlops/schemas/governance.schema.json
 scripts/baseline/tests/test_verify_repository.py
@@ -387,6 +389,8 @@ scripts/context/tests/test_post_merge_checkpoint.py
 scripts/contracts/verify_protobuf_compatibility.sh
 scripts/local/runtime.py
 scripts/local/tests/test_runtime.py
+scripts/mlops/run_evaluation.py
+scripts/mlops/tests/test_run_evaluation.py
 scripts/mlops/tests/test_verify_governance.py
 scripts/mlops/verify_governance.py
 scripts/performance/external_runtime_evidence.py
@@ -667,6 +671,7 @@ services/conversation-service/src/main/java/com/sajtech/conversation/application
 services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ModelProviderOutcome.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ModelProviderRequest.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/model/ModelProviderResult.java
+services/conversation-service/src/main/java/com/sajtech/conversation/application/model/RunFeedbackValue.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/AccessTokenVerifier.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/ConversationRepository.java
 services/conversation-service/src/main/java/com/sajtech/conversation/application/port/out/ModelPolicyProvider.java
@@ -703,6 +708,7 @@ services/conversation-service/src/main/java/com/sajtech/conversation/infrastruct
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/JdbcModelRunWorkerRepository.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/MessagePageToken.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/persistence/TenantLifecycleProjection.java
+services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/provider/ObservedModelProvider.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/provider/openai/FileBackedOpenAiModelProvider.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/provider/openai/OpenAiResponsesAdapter.java
 services/conversation-service/src/main/java/com/sajtech/conversation/infrastructure/runtime/ModelRunWorkerLifecycle.java
@@ -727,6 +733,7 @@ services/conversation-service/src/main/resources/db/migration/V2__add_conversati
 services/conversation-service/src/main/resources/db/migration/V3__add_model_run_acceptance_and_budget.sql
 services/conversation-service/src/main/resources/db/migration/V4__add_bounded_model_run_worker.sql
 services/conversation-service/src/main/resources/db/migration/V5__add_tenant_lifecycle_and_erasure.sql
+services/conversation-service/src/main/resources/db/migration/V6__add_model_run_feedback.sql
 services/conversation-service/src/test/java/com/sajtech/conversation/application/model/ModelExecutionPolicyTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/application/service/ConversationAuthorityTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/application/service/ConversationServiceTest.java
