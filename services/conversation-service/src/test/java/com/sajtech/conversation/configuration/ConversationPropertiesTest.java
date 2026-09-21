@@ -1,5 +1,6 @@
 package com.sajtech.conversation.configuration;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
@@ -7,6 +8,40 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class ConversationPropertiesTest {
+  @Test
+  void acceptsCompleteDisabledAndApprovedCanaryConfiguration() {
+    assertThatCode(
+            () ->
+                new ConversationProperties(
+                    false,
+                    0,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .doesNotThrowAnyException();
+    assertThatCode(
+            () ->
+                new ConversationProperties(
+                    true,
+                    1,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .doesNotThrowAnyException();
+  }
+
   @Test
   void rejectsMissingOrNonPositiveSecurityConfiguration() {
     assertThatThrownBy(
@@ -22,6 +57,81 @@ class ConversationPropertiesTest {
                     Path.of("jwt"),
                     "https://identity.internal",
                     Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new ConversationProperties(
+                    false,
+                    0,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    0,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new ConversationProperties(
+                    false,
+                    0,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    null,
+                    "https://identity.internal",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new ConversationProperties(
+                    false,
+                    0,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "bad\nissuer",
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new ConversationProperties(
+                    false,
+                    0,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ZERO,
+                    Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new ConversationProperties(
+                    false,
+                    0,
+                    Path.of("keys"),
+                    Duration.ofSeconds(30),
+                    Duration.ofMinutes(1),
+                    "dns:///authorization:9090",
+                    4,
+                    Path.of("jwt"),
+                    "https://identity.internal",
+                    Duration.ofMinutes(5),
                     Duration.ofMinutes(5)))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(

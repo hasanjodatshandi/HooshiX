@@ -750,6 +750,7 @@ services/conversation-service/src/test/java/com/sajtech/conversation/infrastruct
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/model/GitGovernedModelPolicyProviderTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/persistence/ConversationPageTokenTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/persistence/ConversationRlsIntegrationTest.java
+services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/provider/ObservedModelProviderTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/provider/openai/FileBackedOpenAiModelProviderTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/provider/openai/OpenAiResponsesAdapterTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/security/IdentityJwtVerifierTest.java
