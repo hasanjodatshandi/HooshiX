@@ -7,7 +7,8 @@ import argparse
 import hashlib
 import hmac
 import json
-import statistics
+import re
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+EVALUATOR_VERSION = "1.0.0"
 
 
 def load(path: Path) -> Any:
@@ -34,7 +36,15 @@ def percentile(values: list[int], percentile_value: float) -> int:
     return ordered[index]
 
 
-def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[str, Any]) -> tuple[str, int, int, int]:
+def repository_commit() -> str:
+    subprocess.run(["git", "diff", "--quiet", "HEAD", "--"], cwd=ROOT, check=True)
+    value = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise ValueError("repository commit is invalid")
+    return value
+
+
+def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[str, Any]) -> tuple[str, int, int, int, int]:
     body = json.dumps({
         "model": model["provider_model_id"],
         "instructions": prompt,
@@ -66,7 +76,11 @@ def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[s
         for part in item.get("content", []) if part.get("type") == "output_text"
     )
     usage = result.get("usage", {})
-    return output, int(usage["input_tokens"]), int(usage["output_tokens"]), elapsed
+    input_tokens = int(usage["input_tokens"])
+    cached_tokens = int(usage.get("input_tokens_details", {}).get("cached_tokens", 0))
+    if cached_tokens < 0 or cached_tokens > input_tokens:
+        raise ValueError("provider cached usage is invalid")
+    return output, input_tokens, cached_tokens, int(usage["output_tokens"]), elapsed
 
 
 def score(case: dict[str, Any], output: str) -> bool:
@@ -74,6 +88,21 @@ def score(case: dict[str, Any], output: str) -> bool:
     required = any(item.casefold() in normalized for item in case["required_concepts_any"])
     forbidden = any(item.casefold() in normalized for item in case["forbidden_fragments"])
     return required and not forbidden
+
+
+def verify_signature(receipt: dict[str, Any], signing_key: bytes) -> bool:
+    payload = dict(receipt)
+    signature = payload.pop("signature", None)
+    recorded_digest = payload.pop("payload_sha256", None)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    expected_digest = hashlib.sha256(canonical).hexdigest()
+    expected_signature = hmac.new(signing_key, canonical, hashlib.sha256).hexdigest()
+    return (
+        isinstance(signature, dict)
+        and signature.get("algorithm") == "HMAC-SHA256"
+        and hmac.compare_digest(str(signature.get("value", "")), expected_signature)
+        and hmac.compare_digest(str(recorded_digest), expected_digest)
+    )
 
 
 def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[str, Any]:
@@ -89,10 +118,12 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
     results, latencies, costs, errors = [], [], [], 0
     for case in suite["cases"]:
         try:
-            text, input_tokens, output_tokens, latency = provider_call(
+            text, input_tokens, cached_tokens, output_tokens, latency = provider_call(
                 api_key, model, prompt_path.read_text(encoding="utf-8"), case)
             passed = score(case, text)
-            cost = (input_tokens * price["input"] + output_tokens * price["output"] + 999_999) // 1_000_000
+            cost = ((input_tokens - cached_tokens) * price["input"] + 999_999) // 1_000_000
+            cost += (cached_tokens * price["cached_input"] + 999_999) // 1_000_000
+            cost += (output_tokens * price["output"] + 999_999) // 1_000_000
             latencies.append(latency)
             costs.append(cost)
         except (OSError, ValueError, KeyError, urllib.error.URLError, json.JSONDecodeError):
@@ -104,6 +135,8 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
     critical_passed = sum(item["passed"] for item in critical)
     receipt = {
         "schema_version": 1,
+        "evaluator_version": EVALUATOR_VERSION,
+        "repository_commit": repository_commit(),
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "suite_id": suite["suite_id"], "suite_version": suite["suite_version"],
         "suite_sha256": digest(suite_path), "governance_sha256": digest(governance_path),
@@ -118,7 +151,10 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
         "p95_cost_micro_usd": percentile(costs, 0.95), "results": results,
     }
     canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+    receipt["payload_sha256"] = hashlib.sha256(canonical).hexdigest()
     receipt["signature"] = {"algorithm": "HMAC-SHA256", "value": hmac.new(signing_key, canonical, hashlib.sha256).hexdigest()}
+    if not verify_signature(receipt, signing_key):
+        raise ValueError("evaluation receipt signature verification failed")
     output_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     output_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     output_path.chmod(0o600)

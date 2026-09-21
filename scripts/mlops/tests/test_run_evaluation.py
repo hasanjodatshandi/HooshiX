@@ -21,15 +21,22 @@ class EvaluationRunnerTest(unittest.TestCase):
             signing_key.write_bytes(b"s" * 32)
 
             def fixture(_api_key, _model, _prompt, case):
-                return case["required_concepts_any"][0], 10, 5, 25
+                return case["required_concepts_any"][0], 10, 2, 5, 25
 
-            with patch.object(runner, "provider_call", fixture):
+            with patch.object(runner, "provider_call", fixture), patch.object(
+                runner, "repository_commit", return_value="a" * 40
+            ):
                 result = runner.run(api_key, signing_key, receipt)
 
             serialized = receipt.read_text()
             suite = json.loads((runner.ROOT / "mlops/evaluations/conversation-v1.json").read_text())
             self.assertEqual(result["case_count"], len(suite["cases"]))
             self.assertEqual(result["critical_pass_rate_basis_points"], 10000)
+            self.assertEqual(result["repository_commit"], "a" * 40)
+            self.assertEqual(result["evaluator_version"], "1.0.0")
+            self.assertTrue(runner.verify_signature(result, b"s" * 32))
+            result["passed_count"] -= 1
+            self.assertFalse(runner.verify_signature(result, b"s" * 32))
             self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
             self.assertNotIn("fixture-api-key", serialized)
             for case in suite["cases"]:
