@@ -1,3 +1,7 @@
+ALTER TABLE conversation_model_run
+    ADD CONSTRAINT uq_conversation_model_run_feedback_scope
+    UNIQUE (run_id, tenant_id, conversation_id);
+
 CREATE TABLE conversation_run_feedback (
     tenant_id UUID NOT NULL,
     conversation_id UUID NOT NULL,
@@ -12,7 +16,8 @@ CREATE TABLE conversation_run_feedback (
         FOREIGN KEY (conversation_id, tenant_id)
         REFERENCES conversation(conversation_id, tenant_id) ON DELETE CASCADE,
     CONSTRAINT fk_conversation_run_feedback_run
-        FOREIGN KEY (run_id) REFERENCES conversation_model_run(run_id) ON DELETE CASCADE,
+        FOREIGN KEY (run_id, tenant_id, conversation_id)
+        REFERENCES conversation_model_run(run_id, tenant_id, conversation_id) ON DELETE CASCADE,
     CONSTRAINT ck_conversation_run_feedback_request_uuid_v4 CHECK (
         (get_byte(uuid_send(request_id), 6) >> 4) = 4
         AND (get_byte(uuid_send(request_id), 8) & 192) = 128
