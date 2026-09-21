@@ -116,14 +116,14 @@ The implementation target remains:
 
 ```text
 service foundation                  -> COMPLETED in Stage 9 foundation PR: one conversation-service build/image/Helm boundary, private DB/Flyway/RLS, AES-256-GCM key ring, and Day-One telemetry; deployed runtime remains unverified
-contracts                           -> COMPLETED: versioned validated example-backed gRPC plus BFF OpenAPI 2.1.0/generated frontend types
+contracts                           -> COMPLETED: versioned validated example-backed gRPC plus BFF OpenAPI 2.2.0/generated frontend types
 authority                           -> COMPLETED for the service boundary and Conversation CRUD: exact JWT audience, four fixed permission keys, one online 300ms CheckPermission, fail-closed key rotation/readiness, bounded concurrency, and private Membership ownership enforcement
 conversation/run state              -> COMPLETED for the private service boundary: Conversation CRUD/lifecycle, encrypted Message history, idempotent budgeted run acceptance/get/cancel, durable bounded worker claim, ASSISTANT append, and terminal reconciliation
-provider                            -> fixed one-attempt stateless OpenAI Responses adapter with store=false/background=false/tools=[] is implemented; safety/evaluation/telemetry and transport cancellation remain
+provider                            -> IMPLEMENTED: fixed one-attempt stateless OpenAI Responses adapter, safety/refusal mapping, local transport cancellation, low-cardinality telemetry, signed content-free evaluation runner, fixed egress, and tenant-stable 1/5/25/100 canary; real evaluation and provider-account approval evidence remain REQUIRED
 quota and cost                      -> COMPLETED for the private service boundary: atomic worst-case reservation, immutable integer price snapshot, cancellation release, actual-usage reconciliation, and conservative unknown-outcome charging
 lifecycle                           -> COMPLETED for the service boundary: ordered fail-closed tenant projection plus ADR-0028 Inbox, service-owned encrypted-content purge, non-PII durable receipt, retry/exhaustion, and rollout-gated fifth-participant activation
-BFF and browser journey             -> COMPLETED: fixed-audience/deadline/concurrency facade, exact workload policy, accessible bilingual CRUD/history/run/cancel UI, bounded abortable polling, and text-only output rendering
-evidence                            -> migration/RLS, provider/failure/race/security/privacy/load, browser, Helm and repository gates
+BFF and browser journey             -> COMPLETED: fixed-audience/deadline/concurrency facade, exact workload policy, accessible bilingual CRUD/history/run/cancel/enum-feedback UI, bounded abortable polling, and text-only output rendering
+evidence                            -> repository gates cover migration/RLS, provider/failure/race/security/privacy/load, browser, Helm, canary and content-free receipts; real provider evaluation, provider-account data-control approval and deployed canary/rollback evidence remain REQUIRED
 ```
 
 ADR-0054 §9 and `services/conversation-service.md` §12 are the acceptance authority. The browser

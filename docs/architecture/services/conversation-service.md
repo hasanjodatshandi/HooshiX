@@ -180,12 +180,12 @@ browser. Circuit-open/overload/provider failure maps to stable availability/fail
 not choose another model.
 
 The adapter, worker, file-backed credential boundary, exact governance tuple loader, 60-second
-one-attempt deadline, lease expiry, global/per-tenant concurrency, and circuit suppression are now
-implemented. Kubernetes still blocks external provider egress and the committed governance tuple
-remains execution-disabled pending provider-account controls and real evaluation. Transport-level
-interruption after a durable running-cancellation request, provider safety mapping/evaluation,
-provider-specific telemetry and the reviewed activation egress profile remain pending Stage 9
-gates; no live provider execution is claimed.
+one-attempt deadline, lease expiry, global/per-tenant concurrency, circuit suppression, provider
+refusal/safety mapping, local foreground HTTP cancellation, bounded telemetry, signed content-free
+evaluation runner, exact conditional egress, and deterministic tenant canary are implemented.
+Transport cancellation does not claim remote provider compute or cost stopped. The committed
+governance tuple remains execution-disabled pending real provider evaluation and reviewed
+provider-account data-control evidence. No live provider execution or canary observation is claimed.
 
 ## 8. Cost and abuse safety
 
