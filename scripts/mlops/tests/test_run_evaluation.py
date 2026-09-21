@@ -34,6 +34,8 @@ class EvaluationRunnerTest(unittest.TestCase):
             self.assertEqual(result["critical_pass_rate_basis_points"], 10000)
             self.assertEqual(result["repository_commit"], "a" * 40)
             self.assertEqual(result["evaluator_version"], "1.0.0")
+            self.assertTrue(result["promotion_passed"])
+            self.assertTrue(all(result["gates"].values()))
             self.assertTrue(runner.verify_signature(result, b"s" * 32))
             result["passed_count"] -= 1
             self.assertFalse(runner.verify_signature(result, b"s" * 32))

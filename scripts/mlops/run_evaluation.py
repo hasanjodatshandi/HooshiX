@@ -133,6 +133,20 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
     critical = [item for item in results if item["severity"] == "CRITICAL"]
     passed_count = sum(item["passed"] for item in results)
     critical_passed = sum(item["passed"] for item in critical)
+    pass_rate = passed_count * 10_000 // len(results)
+    critical_pass_rate = critical_passed * 10_000 // len(critical)
+    p95_latency = percentile(latencies, 0.95)
+    p99_latency = percentile(latencies, 0.99)
+    p95_cost = percentile(costs, 0.95)
+    promotion = governance["promotion_policy"]
+    gates = {
+        "total_pass_rate": pass_rate >= promotion["minimum_total_eval_pass_rate_basis_points"],
+        "critical_pass_rate": critical_pass_rate >= promotion["minimum_critical_eval_pass_rate_basis_points"],
+        "error_count": errors <= promotion["maximum_eval_error_count"],
+        "p95_latency": p95_latency <= promotion["maximum_p95_latency_ms"],
+        "p99_latency": p99_latency <= promotion["maximum_p99_latency_ms"],
+        "p95_cost": p95_cost <= promotion["maximum_p95_cost_micro_usd"],
+    }
     receipt = {
         "schema_version": 1,
         "evaluator_version": EVALUATOR_VERSION,
@@ -145,10 +159,11 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
         "price_version": model["price_version"], "case_count": len(results),
         "passed_count": passed_count, "critical_count": len(critical),
         "critical_passed_count": critical_passed, "error_count": errors,
-        "pass_rate_basis_points": passed_count * 10_000 // len(results),
-        "critical_pass_rate_basis_points": critical_passed * 10_000 // len(critical),
-        "p95_latency_ms": percentile(latencies, 0.95), "p99_latency_ms": percentile(latencies, 0.99),
-        "p95_cost_micro_usd": percentile(costs, 0.95), "results": results,
+        "pass_rate_basis_points": pass_rate,
+        "critical_pass_rate_basis_points": critical_pass_rate,
+        "p95_latency_ms": p95_latency, "p99_latency_ms": p99_latency,
+        "p95_cost_micro_usd": p95_cost, "gates": gates,
+        "promotion_passed": all(gates.values()), "results": results,
     }
     canonical = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
     receipt["payload_sha256"] = hashlib.sha256(canonical).hexdigest()
@@ -168,8 +183,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     receipt = run(args.api_key_file, args.signing_key_file, args.output)
-    print(json.dumps({key: receipt[key] for key in ("case_count", "passed_count", "critical_count", "critical_passed_count", "error_count", "pass_rate_basis_points", "critical_pass_rate_basis_points", "p95_latency_ms", "p99_latency_ms", "p95_cost_micro_usd")}))
-    return 0 if receipt["error_count"] == 0 and receipt["critical_pass_rate_basis_points"] == 10_000 else 1
+    print(json.dumps({key: receipt[key] for key in ("case_count", "passed_count", "critical_count", "critical_passed_count", "error_count", "pass_rate_basis_points", "critical_pass_rate_basis_points", "p95_latency_ms", "p99_latency_ms", "p95_cost_micro_usd", "promotion_passed")}))
+    return 0 if receipt["promotion_passed"] else 1
 
 
 if __name__ == "__main__":
