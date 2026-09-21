@@ -8,6 +8,7 @@ import com.sajtech.conversation.application.model.ModelProviderOutcome;
 import com.sajtech.conversation.application.model.ModelProviderRequest;
 import com.sajtech.conversation.domain.MessageRole;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -20,6 +21,7 @@ class OpenAiResponsesAdapterTest {
     var adapter = new OpenAiResponsesAdapter("fixture-key", "fixed system prompt");
     var providerRequest =
         new ModelProviderRequest(
+            UUID.randomUUID(),
             policy(),
             List.of(
                 new ModelProviderMessage(MessageRole.USER, "hello"),
@@ -93,6 +95,23 @@ class OpenAiResponsesAdapterTest {
                     "{\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"ok\"}]}],\"usage\":{\"input_tokens\":1,\"input_tokens_details\":{\"cached_tokens\":2},\"output_tokens\":1}}")
                 .outcome())
         .isEqualTo(ModelProviderOutcome.INVALID_RESPONSE);
+  }
+
+  @Test
+  void mapsProviderRefusalAndModerationFlagsToSafetyRejection() {
+    String refusal =
+        """
+        {"status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"refusal","refusal":"not allowed"}]}],"usage":{"input_tokens":1,"output_tokens":0}}
+        """;
+    String moderated =
+        """
+        {"status":"completed","moderation":{"input":{"flagged":true}},"output":[],"usage":{"input_tokens":1,"output_tokens":0}}
+        """;
+
+    assertThat(OpenAiResponsesAdapter.classify(200, refusal).outcome())
+        .isEqualTo(ModelProviderOutcome.SAFETY_REJECTED);
+    assertThat(OpenAiResponsesAdapter.classify(200, moderated).outcome())
+        .isEqualTo(ModelProviderOutcome.SAFETY_REJECTED);
   }
 
   private static ModelExecutionPolicy policy() {

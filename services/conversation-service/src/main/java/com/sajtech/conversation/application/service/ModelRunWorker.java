@@ -59,7 +59,8 @@ public final class ModelRunWorker {
         .map(
             claim -> {
               ModelProviderResult result =
-                  provider.execute(new ModelProviderRequest(policy, claim.messages()));
+                  provider.execute(
+                      new ModelProviderRequest(claim.runId(), policy, claim.messages()));
               breaker.record(result.outcome(), clock.instant());
               runs.complete(claim, policy, result, clock.instant());
               return true;
@@ -94,6 +95,7 @@ public final class ModelRunWorker {
 
     private synchronized void record(ModelProviderOutcome outcome, Instant now) {
       if (outcome == ModelProviderOutcome.SUCCEEDED
+          || outcome == ModelProviderOutcome.SAFETY_REJECTED
           || outcome == ModelProviderOutcome.DEFINITIVE_REJECTION) {
         consecutiveFailures = 0;
         openUntil = null;

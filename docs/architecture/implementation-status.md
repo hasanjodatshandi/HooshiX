@@ -51,9 +51,12 @@ Current governance and Kubernetes egress keep provider execution disabled. Order
 tenant lifecycle projection and rollout-gated ADR-0028 erasure participation are implemented.
 The validated OpenAPI Web BFF facade and bilingual browser Conversation journey are implemented,
 including fixed audience brokerage, one-attempt deadlines, bounded concurrency, workload policy,
-abortable polling, cancellation, and text-only model-output rendering. Provider safety/evaluation/
-telemetry and transport cancellation, release integration, activation egress, and deployed runtime
-evidence remain Stage 9 work.
+abortable polling, cancellation, enum-only feedback, and text-only model-output rendering. Provider
+refusal/safety mapping, local transport cancellation, low-cardinality provider telemetry and alerts,
+the signed content-free evaluation runner, exact activation egress, and tenant-stable
+`CANARY_1/5/25/APPROVED_100` mechanics are implemented. Real provider evaluation,
+provider-account data-control approval, retained approval references, deployed canary observation and
+rollback-rehearsal evidence remain Stage 9 gates; runtime stays fail-closed.
 
 Implemented repository-governance artifacts are:
 

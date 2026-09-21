@@ -5,8 +5,10 @@ import com.sajtech.conversation.application.ConversationException;
 import com.sajtech.conversation.application.model.ConversationPage;
 import com.sajtech.conversation.application.model.ConversationPermission;
 import com.sajtech.conversation.application.model.MessagePage;
+import com.sajtech.conversation.application.model.RunFeedbackValue;
 import com.sajtech.conversation.application.port.out.ConversationRepository;
 import com.sajtech.conversation.application.port.out.ModelPolicyProvider;
+import com.sajtech.conversation.application.port.out.ModelProvider;
 import com.sajtech.conversation.application.port.out.ModelRunRepository;
 import com.sajtech.conversation.domain.Conversation;
 import com.sajtech.conversation.domain.ModelRun;
@@ -21,6 +23,7 @@ public final class ConversationService {
   private final ConversationRepository repository;
   private final ModelRunRepository modelRuns;
   private final ModelPolicyProvider modelPolicy;
+  private final ModelProvider provider;
   private final Clock clock;
 
   public ConversationService(
@@ -28,11 +31,13 @@ public final class ConversationService {
       ConversationRepository repository,
       ModelRunRepository modelRuns,
       ModelPolicyProvider modelPolicy,
+      ModelProvider provider,
       Clock clock) {
     this.authority = Objects.requireNonNull(authority);
     this.repository = Objects.requireNonNull(repository);
     this.modelRuns = Objects.requireNonNull(modelRuns);
     this.modelPolicy = Objects.requireNonNull(modelPolicy);
+    this.provider = Objects.requireNonNull(provider);
     this.clock = Objects.requireNonNull(clock);
   }
 
@@ -93,7 +98,7 @@ public final class ConversationService {
     ModelRun replay =
         modelRuns.findAcceptedReplay(actor, requestId, conversationId, canonicalMessage);
     if (replay != null) return replay;
-    var policy = modelPolicy.requireApprovedPolicy();
+    var policy = modelPolicy.requireApprovedPolicy(actor.tenantId());
     return modelRuns.accept(
         actor,
         requestId,
@@ -117,7 +122,23 @@ public final class ConversationService {
     requireUuidV4(conversationId);
     requireUuidV4(runId);
     var actor = authority.authorize(token, ConversationPermission.GENERATE);
-    return modelRuns.cancelOwned(actor, requestId, conversationId, runId, clock.instant());
+    ModelRun canceled =
+        modelRuns.cancelOwned(actor, requestId, conversationId, runId, clock.instant());
+    if (canceled.state() == com.sajtech.conversation.domain.ModelRunState.RUNNING
+        && canceled.cancellationRequested()) {
+      provider.cancel(runId);
+    }
+    return canceled;
+  }
+
+  public void submitRunFeedback(
+      String token, UUID requestId, UUID conversationId, UUID runId, RunFeedbackValue value) {
+    requireUuidV4(requestId);
+    requireUuidV4(conversationId);
+    requireUuidV4(runId);
+    Objects.requireNonNull(value);
+    var actor = authority.authorize(token, ConversationPermission.GENERATE);
+    modelRuns.submitFeedback(actor, requestId, conversationId, runId, value, clock.instant());
   }
 
   private static String canonicalTitle(String value) {

@@ -47,6 +47,7 @@ conversation:
   tenant-lifecycle-consumer-group: ${CONVERSATION_TENANT_LIFECYCLE_CONSUMER_GROUP:hooshix-conversation-tenant-lifecycle-v1}
   identity-erasure-target: ${CONVERSATION_IDENTITY_ERASURE_TARGET:dns:///identity-service.platform-apps.svc.cluster.local:9090}
   provider-runtime-enabled: ${CONVERSATION_PROVIDER_RUNTIME_ENABLED:false}
+  provider-canary-percent: ${CONVERSATION_PROVIDER_CANARY_PERCENT:0}
   model-worker:
     provider-api-key-path: ${CONVERSATION_PROVIDER_API_KEY_PATH:/run/secrets/conversation-provider/api-key}
     poll-interval: 250ms

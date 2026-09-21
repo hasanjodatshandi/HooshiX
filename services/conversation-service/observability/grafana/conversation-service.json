@@ -36,6 +36,30 @@
       "targets": [
         {"expr": "sum by (operation, outcome) (rate(conversation_grpc_duration_seconds_count[5m]))", "refId": "A"}
       ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Provider outcomes",
+      "targets": [
+        {"expr": "sum by (outcome) (rate(hooshix_conversation_provider_calls_total[5m]))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Provider p95 latency",
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (le, outcome) (rate(hooshix_conversation_provider_duration_seconds_bucket[5m])))", "refId": "A"}
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Provider cancellation signals",
+      "targets": [
+        {"expr": "sum by (result) (rate(hooshix_conversation_provider_cancellations_total[5m]))", "refId": "A"}
+      ]
     }
   ]
 }

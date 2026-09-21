@@ -1003,6 +1003,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversationId}/runs/{runId}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit one bounded enum-only rating for a successful model run */
+        post: operations["submitConversationRunFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1025,6 +1042,13 @@ export interface components {
          *     } */
         CreateConversationRunRequest: {
             userMessage: string;
+        };
+        /** @example {
+         *       "value": "HELPFUL"
+         *     } */
+        ConversationRunFeedbackRequest: {
+            /** @enum {string} */
+            value: "HELPFUL" | "NOT_HELPFUL" | "UNSAFE" | "FACTUALLY_WRONG";
         };
         /** @example {
          *       "conversationId": "11111111-1111-4111-8111-111111111111",
@@ -4079,6 +4103,44 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["ResourceConflict"];
+            503: components["responses"]["DependencyUnavailable"];
+        };
+    };
+    submitConversationRunFeedback: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Caller-generated UUIDv4 idempotency identity. Replays use the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Current session-bound synchronizer token returned by a reviewed BFF response; do not persist it. */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                conversationId: components["parameters"]["ConversationId"];
+                runId: components["parameters"]["RunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationRunFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Feedback accepted or idempotently replayed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidRequest"];
+            401: components["responses"]["InvalidSession"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceConflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             503: components["responses"]["DependencyUnavailable"];
         };
     };

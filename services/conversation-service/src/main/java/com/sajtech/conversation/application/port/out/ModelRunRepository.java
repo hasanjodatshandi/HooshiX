@@ -28,4 +28,12 @@ public interface ModelRunRepository {
 
   ModelRun cancelOwned(
       ConversationActor actor, UUID requestId, UUID conversationId, UUID runId, Instant now);
+
+  void submitFeedback(
+      ConversationActor actor,
+      UUID requestId,
+      UUID conversationId,
+      UUID runId,
+      com.sajtech.conversation.application.model.RunFeedbackValue value,
+      Instant now);
 }

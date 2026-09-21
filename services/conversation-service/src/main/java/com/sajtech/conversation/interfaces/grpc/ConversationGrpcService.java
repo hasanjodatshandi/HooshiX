@@ -162,6 +162,34 @@ public final class ConversationGrpcService
                 .build());
   }
 
+  @Override
+  public void submitRunFeedback(
+      SubmitRunFeedbackRequest request, StreamObserver<SubmitRunFeedbackResponse> observer) {
+    respond(
+        observer,
+        () -> {
+          conversations.submitRunFeedback(
+              token(),
+              UUID.fromString(request.getRequestId()),
+              UUID.fromString(request.getConversationId()),
+              UUID.fromString(request.getRunId()),
+              switch (request.getValue()) {
+                case RUN_FEEDBACK_VALUE_HELPFUL ->
+                    com.sajtech.conversation.application.model.RunFeedbackValue.HELPFUL;
+                case RUN_FEEDBACK_VALUE_NOT_HELPFUL ->
+                    com.sajtech.conversation.application.model.RunFeedbackValue.NOT_HELPFUL;
+                case RUN_FEEDBACK_VALUE_UNSAFE ->
+                    com.sajtech.conversation.application.model.RunFeedbackValue.UNSAFE;
+                case RUN_FEEDBACK_VALUE_FACTUALLY_WRONG ->
+                    com.sajtech.conversation.application.model.RunFeedbackValue.FACTUALLY_WRONG;
+                default ->
+                    throw new ConversationException(
+                        ConversationError.INVALID_REQUEST, "Feedback value is invalid");
+              });
+          return SubmitRunFeedbackResponse.newBuilder().setAccepted(true).build();
+        });
+  }
+
   private static String token() {
     String value = BearerTokenServerInterceptor.ACCESS_TOKEN.get();
     if (value == null) {

@@ -25,3 +25,26 @@ groups:
           service: conversation-service
         annotations:
           summary: Conversation gRPC has repeated internal or dependency availability failures
+      - alert: ConversationProviderFailureRateHigh
+        expr: sum(rate(hooshix_conversation_provider_calls_total{outcome!~"SUCCEEDED|SAFETY_REJECTED"}[10m])) / clamp_min(sum(rate(hooshix_conversation_provider_calls_total[10m])), 0.001) > 0.01
+        for: 10m
+        labels:
+          severity: page
+          service: conversation-service
+        annotations:
+          summary: Conversation provider failure rate exceeded the one-percent rollback threshold
+      - alert: ConversationProviderLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(hooshix_conversation_provider_duration_seconds_bucket[10m]))) > 30
+        for: 10m
+        labels:
+          severity: page
+          service: conversation-service
+        annotations:
+          summary: Conversation provider p95 latency exceeded the rollback threshold
+      - alert: ConversationSafetyRejectionsDetected
+        expr: sum(increase(hooshix_conversation_provider_calls_total{outcome="SAFETY_REJECTED"}[15m])) > 0
+        labels:
+          severity: warning
+          service: conversation-service
+        annotations:
+          summary: Conversation provider safety rejection requires bounded aggregate review

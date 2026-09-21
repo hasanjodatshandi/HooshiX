@@ -153,6 +153,14 @@ public final class JdbcConversationErasureRepository {
           }
           try (PreparedStatement statement =
               connection.prepareStatement(
+                  "DELETE FROM conversation_run_feedback WHERE tenant_id=? AND conversation_id IN (SELECT conversation_id FROM conversation_subject_index WHERE user_id=? AND tenant_id=?)")) {
+            statement.setObject(1, tenantId);
+            statement.setObject(2, userId);
+            statement.setObject(3, tenantId);
+            statement.executeUpdate();
+          }
+          try (PreparedStatement statement =
+              connection.prepareStatement(
                   "DELETE FROM conversation_message WHERE tenant_id=? AND conversation_id IN (SELECT conversation_id FROM conversation_subject_index WHERE user_id=? AND tenant_id=?)")) {
             statement.setObject(1, tenantId);
             statement.setObject(2, userId);

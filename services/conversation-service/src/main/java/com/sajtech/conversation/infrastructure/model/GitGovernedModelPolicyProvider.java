@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -17,18 +18,33 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
   static final String GOVERNANCE_RESOURCE = "mlops/governance/v1/governance.json";
   static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v1.txt";
   private static final String EXPECTED_DECISION_STATUS = "APPROVED_RUNTIME_ENABLED";
-  private static final String EXPECTED_LIFECYCLE = "APPROVED_100";
   private static final String EXPECTED_DATA_CONTROL = "APPROVED";
   private final boolean runtimeEnabled;
+  private final int canaryPercent;
   private final ModelExecutionPolicy approvedPolicy;
 
   public GitGovernedModelPolicyProvider(boolean runtimeEnabled) {
-    this(runtimeEnabled, loadJson(GOVERNANCE_RESOURCE), loadBytes(PROMPT_RESOURCE));
+    this(runtimeEnabled, runtimeEnabled ? 100 : 0);
+  }
+
+  public GitGovernedModelPolicyProvider(boolean runtimeEnabled, int canaryPercent) {
+    this(runtimeEnabled, canaryPercent, loadJson(GOVERNANCE_RESOURCE), loadBytes(PROMPT_RESOURCE));
+  }
+
+  GitGovernedModelPolicyProvider(
+      boolean runtimeEnabled, int canaryPercent, JsonNode governance, byte[] prompt) {
+    this.runtimeEnabled = runtimeEnabled;
+    if ((runtimeEnabled && !java.util.Set.of(1, 5, 25, 100).contains(canaryPercent))
+        || (!runtimeEnabled && canaryPercent != 0)) {
+      throw new IllegalArgumentException("Model canary configuration is invalid");
+    }
+    this.canaryPercent = canaryPercent;
+    String lifecycle = canaryPercent == 100 ? "APPROVED_100" : "CANARY_" + canaryPercent;
+    this.approvedPolicy = approvedPolicy(governance, prompt, lifecycle);
   }
 
   GitGovernedModelPolicyProvider(boolean runtimeEnabled, JsonNode governance, byte[] prompt) {
-    this.runtimeEnabled = runtimeEnabled;
-    this.approvedPolicy = approvedPolicy(governance, prompt);
+    this(runtimeEnabled, runtimeEnabled ? 100 : 0, governance, prompt);
   }
 
   @Override
@@ -40,7 +56,33 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
     return approvedPolicy;
   }
 
-  private static ModelExecutionPolicy approvedPolicy(JsonNode root, byte[] prompt) {
+  @Override
+  public ModelExecutionPolicy requireApprovedPolicy(UUID tenantId) {
+    Objects.requireNonNull(tenantId);
+    ModelExecutionPolicy policy = requireApprovedPolicy();
+    byte[] digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256").digest(uuidBytes(tenantId));
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is unavailable", exception);
+    }
+    int cohort = Math.floorMod(java.nio.ByteBuffer.wrap(digest, 0, 4).getInt(), 100);
+    if (cohort >= canaryPercent) {
+      throw new ConversationException(
+          ConversationError.MODEL_EXECUTION_DISABLED, "Model execution is disabled");
+    }
+    return policy;
+  }
+
+  private static byte[] uuidBytes(UUID value) {
+    return java.nio.ByteBuffer.allocate(16)
+        .putLong(value.getMostSignificantBits())
+        .putLong(value.getLeastSignificantBits())
+        .array();
+  }
+
+  private static ModelExecutionPolicy approvedPolicy(
+      JsonNode root, byte[] prompt, String expectedLifecycle) {
     try {
       if (!root.path("schema_version").isInt()
           || root.path("schema_version").intValue() != 1
@@ -54,7 +96,7 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
       if (!models.isArray() || models.size() != 1 || !prices.isArray()) return null;
       JsonNode model = models.get(0);
       if (!bool(model, "execution_enabled")
-          || !EXPECTED_LIFECYCLE.equals(text(model, "lifecycle"))
+          || !expectedLifecycle.equals(text(model, "lifecycle"))
           || !"openai".equals(text(model, "provider"))
           || !"responses".equals(text(model, "endpoint"))
           || bool(model, "store")
@@ -65,7 +107,10 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
       if (!"none".equals(text(model, "reasoning_effort"))) return null;
       String promptId = text(model, "prompt_id");
       String promptVersion = text(model, "prompt_version");
-      if (!promptMatches(root.path("prompt_catalog"), promptId, promptVersion, prompt)) return null;
+      if (!promptMatches(
+          root.path("prompt_catalog"), promptId, promptVersion, prompt, expectedLifecycle)) {
+        return null;
+      }
       String priceId = text(model, "price_id");
       String priceVersion = text(model, "price_version");
       JsonNode price = null;
@@ -98,13 +143,17 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
   }
 
   private static boolean promptMatches(
-      JsonNode prompts, String promptId, String promptVersion, byte[] prompt) {
+      JsonNode prompts,
+      String promptId,
+      String promptVersion,
+      byte[] prompt,
+      String expectedLifecycle) {
     if (!prompts.isArray() || prompt == null || prompt.length == 0) return false;
     String digest = sha256(prompt);
     for (JsonNode candidate : prompts) {
       if (promptId.equals(text(candidate, "prompt_id"))
           && promptVersion.equals(text(candidate, "prompt_version"))
-          && EXPECTED_LIFECYCLE.equals(text(candidate, "status"))
+          && expectedLifecycle.equals(text(candidate, "status"))
           && PROMPT_RESOURCE.equals(text(candidate, "path"))
           && digest.equals(text(candidate, "sha256"))) {
         return true;

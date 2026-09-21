@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import com.sajtech.conversation.application.ConversationError;
 import com.sajtech.conversation.application.ConversationException;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,6 +42,50 @@ class GitGovernedModelPolicyProviderTest {
               assertThat(policy.actualCostMicroUsd(1_000, 100, 100)).isEqualTo(3_775);
               assertThat(policy.maximumReservationMicroUsd()).isEqualTo(70_000);
             });
+    assertThat(provider.requireApprovedPolicy(UUID.randomUUID())).isNotNull();
+  }
+
+  @Test
+  void rejectsCanaryPercentThatDoesNotMatchRuntimeStateMachine() throws Exception {
+    var governance = JSON.readTree(approvedGovernance());
+    byte[] prompt = "prompt".getBytes(StandardCharsets.UTF_8);
+
+    assertThatThrownBy(() -> new GitGovernedModelPolicyProvider(false, 1, governance, prompt))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new GitGovernedModelPolicyProvider(true, 0, governance, prompt))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new GitGovernedModelPolicyProvider(true, 2, governance, prompt))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void canaryLifecycleMustMatchPercentageAndTenantCohortIsStable() throws Exception {
+    String canaryGovernance = approvedGovernance().replace("APPROVED_100", "CANARY_1");
+    var provider =
+        new GitGovernedModelPolicyProvider(
+            true, 1, JSON.readTree(canaryGovernance), "prompt".getBytes(StandardCharsets.UTF_8));
+    UUID included = null;
+    UUID excluded = null;
+    for (int index = 0; index < 10_000 && (included == null || excluded == null); index++) {
+      UUID candidate = UUID.nameUUIDFromBytes(("tenant-" + index).getBytes(StandardCharsets.UTF_8));
+      try {
+        provider.requireApprovedPolicy(candidate);
+        included = candidate;
+      } catch (ConversationException exception) {
+        excluded = candidate;
+      }
+    }
+
+    assertThat(included).isNotNull();
+    assertThat(excluded).isNotNull();
+    assertThat(provider.requireApprovedPolicy(included)).isNotNull();
+    UUID rejected = excluded;
+    assertThatThrownBy(() -> provider.requireApprovedPolicy(rejected))
+        .isInstanceOf(ConversationException.class);
+    var mismatch =
+        new GitGovernedModelPolicyProvider(
+            true, 5, JSON.readTree(canaryGovernance), "prompt".getBytes(StandardCharsets.UTF_8));
+    assertThatThrownBy(mismatch::requireApprovedPolicy).isInstanceOf(ConversationException.class);
   }
 
   @Test

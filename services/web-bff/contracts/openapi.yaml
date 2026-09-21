@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HooshiX Web BFF Public API
-  version: 2.1.0
+  version: 2.2.0
   description: Canonical browser-facing REST contract owned by Web BFF. All examples use synthetic .test identities and non-production placeholder credentials.
 servers:
   - url: /
@@ -1148,6 +1148,23 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/ResourceConflict' }
         '503': { $ref: '#/components/responses/DependencyUnavailable' }
+  /api/v1/conversations/{conversationId}/runs/{runId}/feedback:
+    post:
+      operationId: submitConversationRunFeedback
+      summary: Submit one bounded enum-only rating for a successful model run
+      x-hooshix-consumer-example: { method: POST, path: /api/v1/conversations/11111111-1111-4111-8111-111111111111/runs/22222222-2222-4222-8222-222222222222/feedback, body: { value: HELPFUL } }
+      parameters: [{ $ref: '#/components/parameters/ConversationId' }, { $ref: '#/components/parameters/RunId' }, { $ref: '#/components/parameters/IdempotencyKey' }, { $ref: '#/components/parameters/CsrfToken' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ConversationRunFeedbackRequest' } } } }
+      responses:
+        '204': { description: Feedback accepted or idempotently replayed. }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidSession' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ResourceConflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '503': { $ref: '#/components/responses/DependencyUnavailable' }
 components:
   securitySchemes:
     BrowserSession:
@@ -1214,6 +1231,13 @@ components:
       required: [userMessage]
       properties: { userMessage: { type: string, minLength: 1, maxLength: 16000, pattern: '^[^\x00]+$' } }
       example: { userMessage: Explain this safely and concisely. }
+    ConversationRunFeedbackRequest:
+      type: object
+      additionalProperties: false
+      required: [value]
+      properties:
+        value: { type: string, enum: [HELPFUL, NOT_HELPFUL, UNSAFE, FACTUALLY_WRONG] }
+      example: { value: HELPFUL }
     Conversation:
       type: object
       additionalProperties: false

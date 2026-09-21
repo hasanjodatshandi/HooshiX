@@ -169,6 +169,40 @@ public final class ConversationBffClient implements ConversationGateway {
     }
   }
 
+  public void submitFeedback(
+      String token, UUID requestId, UUID conversationId, UUID runId, RunFeedbackValue value) {
+    try {
+      var response =
+          stub(token)
+              .submitRunFeedback(
+                  SubmitRunFeedbackRequest.newBuilder()
+                      .setRequestId(requestId.toString())
+                      .setConversationId(conversationId.toString())
+                      .setRunId(runId.toString())
+                      .setValue(
+                          switch (value) {
+                            case HELPFUL ->
+                                com.sajtech.conversation.contract.v1.RunFeedbackValue
+                                    .RUN_FEEDBACK_VALUE_HELPFUL;
+                            case NOT_HELPFUL ->
+                                com.sajtech.conversation.contract.v1.RunFeedbackValue
+                                    .RUN_FEEDBACK_VALUE_NOT_HELPFUL;
+                            case UNSAFE ->
+                                com.sajtech.conversation.contract.v1.RunFeedbackValue
+                                    .RUN_FEEDBACK_VALUE_UNSAFE;
+                            case FACTUALLY_WRONG ->
+                                com.sajtech.conversation.contract.v1.RunFeedbackValue
+                                    .RUN_FEEDBACK_VALUE_FACTUALLY_WRONG;
+                          })
+                      .build());
+      if (!response.getAccepted())
+        throw new BffException(
+            BffError.DEPENDENCY_UNAVAILABLE, "Conversation returned an invalid feedback response");
+    } catch (StatusRuntimeException exception) {
+      throw map(exception);
+    }
+  }
+
   private ConversationServiceGrpc.ConversationServiceBlockingStub stub(String token) {
     if (token == null || token.isBlank())
       throw new BffException(BffError.DEPENDENCY_UNAVAILABLE, "Conversation token is missing");
