@@ -23,6 +23,10 @@ identity:
 webBff:
   principal: prod.sajtech.internal/ns/platform-apps/sa/web-bff
 
+ambient:
+  waypointName: platform-apps-waypoint
+  waypointPrincipal: prod.sajtech.internal/ns/platform-apps/sa/platform-apps-waypoint
+
 observability:
   tracing:
     otlpEndpoint: http://otel-collector.platform-observability.svc:4318/v1/traces

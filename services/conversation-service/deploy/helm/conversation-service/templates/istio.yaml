@@ -12,11 +12,12 @@ spec:
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: {{ include "conversation-service.name" . }}
+  name: {{ include "conversation-service.name" . }}-waypoint
 spec:
-  selector:
-    matchLabels:
-      {{- include "conversation-service.selectorLabels" . | nindent 6 }}
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: {{ include "conversation-service.name" . }}
   action: ALLOW
   rules:
     - from:
@@ -25,16 +26,48 @@ spec:
               - {{ required "webBff.principal is required" .Values.webBff.principal | quote }}
       to:
         - operation:
-            ports:
-              - {{ .Values.service.grpcPort | quote }}
+            ports: [{{ .Values.service.grpcPort | quote }}]
+            paths:
+              - /hooshix.conversation.v1.ConversationService/CreateConversation
+              - /hooshix.conversation.v1.ConversationService/ListConversations
+              - /hooshix.conversation.v1.ConversationService/GetConversation
+              - /hooshix.conversation.v1.ConversationService/ArchiveConversation
+              - /hooshix.conversation.v1.ConversationService/DeleteConversation
+              - /hooshix.conversation.v1.ConversationService/ListMessages
+              - /hooshix.conversation.v1.ConversationService/CreateModelRun
+              - /hooshix.conversation.v1.ConversationService/GetModelRun
+              - /hooshix.conversation.v1.ConversationService/CancelModelRun
+              - /hooshix.conversation.v1.ConversationService/SubmitRunFeedback
+    {{- if .Values.observability.metrics.enabled }}
     - from:
         - source:
             principals:
               - {{ required "observability metrics Prometheus principal is required" .Values.observability.metrics.prometheus.principal | quote }}
       to:
         - operation:
+            ports: [{{ .Values.service.managementPort | quote }}]
+    {{- end }}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "conversation-service.name" . }}-ztunnel
+spec:
+  selector:
+    matchLabels:
+      {{- include "conversation-service.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: [{{ required "ambient.waypointPrincipal is required" .Values.ambient.waypointPrincipal | quote }}]
+      to:
+        - operation:
             ports:
+              - {{ .Values.service.grpcPort | quote }}
+              {{- if .Values.observability.metrics.enabled }}
               - {{ .Values.service.managementPort | quote }}
+              {{- end }}
 {{- if .Values.runtime.providerRuntimeEnabled }}
 ---
 apiVersion: networking.istio.io/v1

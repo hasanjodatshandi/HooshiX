@@ -45,6 +45,34 @@ def main() -> None:
     require(text, r"allowPrivilegeEscalation: false", "privilege escalation hardening missing")
     require(text, r"drop:\s*\[\"ALL\"\]", "capability drop missing")
     require(text, r"mode: STRICT", "STRICT mTLS missing")
+    require(text, r"istio\.io/use-waypoint: \"platform-apps-waypoint\"", "Conversation Service waypoint binding missing")
+    require(
+        text,
+        r"kind: AuthorizationPolicy[\s\S]*?name: conversation-service-waypoint[\s\S]*?targetRefs:[\s\S]*?kind: Service[\s\S]*?name: conversation-service",
+        "Conversation waypoint policy missing",
+    )
+    require(
+        text,
+        r"name: conversation-service-ztunnel[\s\S]*?principals: \[\"prod\.sajtech\.internal/ns/platform-apps/sa/platform-apps-waypoint\"\]",
+        "ztunnel waypoint principal binding missing",
+    )
+    for method in (
+        "CreateConversation",
+        "ListConversations",
+        "GetConversation",
+        "ArchiveConversation",
+        "DeleteConversation",
+        "ListMessages",
+        "CreateModelRun",
+        "GetModelRun",
+        "CancelModelRun",
+        "SubmitRunFeedback",
+    ):
+        require(
+            text,
+            rf"/hooshix\.conversation\.v1\.ConversationService/{method}",
+            f"Conversation waypoint path missing: {method}",
+        )
     require(text, r"app\.kubernetes\.io/name: web-bff", "Web BFF ingress selector missing")
     require(
         text,
