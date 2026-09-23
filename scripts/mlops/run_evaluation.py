@@ -8,16 +8,44 @@ import hashlib
 import hmac
 import json
 import re
+import socket
 import subprocess
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[2]
-EVALUATOR_VERSION = "1.0.0"
+EVALUATOR_VERSION = "1.1.0"
+
+
+class ProviderResult(NamedTuple):
+    text: str
+    input_tokens: int
+    cached_tokens: int
+    output_tokens: int
+    latency_ms: int
+    outcome: str
+
+
+class ProviderCallError(Exception):
+    def __init__(
+        self,
+        outcome: str,
+        *,
+        input_tokens: int = 0,
+        cached_tokens: int = 0,
+        output_tokens: int = 0,
+        latency_ms: int = 0,
+    ) -> None:
+        super().__init__(outcome)
+        self.outcome = outcome
+        self.input_tokens = input_tokens
+        self.cached_tokens = cached_tokens
+        self.output_tokens = output_tokens
+        self.latency_ms = latency_ms
 
 
 def load(path: Path) -> Any:
@@ -44,7 +72,19 @@ def repository_commit() -> str:
     return value
 
 
-def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[str, Any]) -> tuple[str, int, int, int, int]:
+def _usage(result: dict[str, Any]) -> tuple[int, int, int]:
+    usage = result.get("usage")
+    if not isinstance(usage, dict):
+        raise ValueError("provider usage is missing")
+    input_tokens = int(usage["input_tokens"])
+    cached_tokens = int(usage.get("input_tokens_details", {}).get("cached_tokens", 0))
+    output_tokens = int(usage["output_tokens"])
+    if input_tokens < 0 or output_tokens < 0 or cached_tokens < 0 or cached_tokens > input_tokens:
+        raise ValueError("provider usage is invalid")
+    return input_tokens, cached_tokens, output_tokens
+
+
+def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[str, Any]) -> ProviderResult:
     body = json.dumps({
         "model": model["provider_model_id"],
         "instructions": prompt,
@@ -62,25 +102,60 @@ def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[s
         method="POST",
     )
     started = time.monotonic()
-    with urllib.request.urlopen(request, timeout=60) as response:
-        raw = response.read(524_289)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            raw = response.read(524_289)
+    except urllib.error.HTTPError as exc:
+        outcome = "HTTP_4XX" if 400 <= exc.code < 500 else "HTTP_5XX"
+        raise ProviderCallError(outcome, latency_ms=int((time.monotonic() - started) * 1000)) from exc
+    except (TimeoutError, socket.timeout) as exc:
+        raise ProviderCallError("TIMEOUT", latency_ms=int((time.monotonic() - started) * 1000)) from exc
+    except urllib.error.URLError as exc:
+        raise ProviderCallError("TRANSPORT_ERROR", latency_ms=int((time.monotonic() - started) * 1000)) from exc
     elapsed = int((time.monotonic() - started) * 1000)
     if len(raw) > 524_288:
         raise ValueError("provider response exceeds bound")
     result = json.loads(raw)
-    if result.get("status") != "completed":
-        raise ValueError("provider response is not completed")
-    output = "\n".join(
-        part["text"]
-        for item in result.get("output", []) if item.get("type") == "message"
-        for part in item.get("content", []) if part.get("type") == "output_text"
-    )
-    usage = result.get("usage", {})
-    input_tokens = int(usage["input_tokens"])
-    cached_tokens = int(usage.get("input_tokens_details", {}).get("cached_tokens", 0))
-    if cached_tokens < 0 or cached_tokens > input_tokens:
-        raise ValueError("provider cached usage is invalid")
-    return output, input_tokens, cached_tokens, int(usage["output_tokens"]), elapsed
+    if result.get("model") != model["provider_model_id"]:
+        raise ValueError("provider model does not match the governed snapshot")
+    status = result.get("status")
+    if status != "completed":
+        usage = result.get("usage")
+        input_tokens, cached_tokens, output_tokens = _usage(result) if isinstance(usage, dict) else (0, 0, 0)
+        outcome = {
+            "incomplete": "INCOMPLETE",
+            "failed": "PROVIDER_FAILED",
+            "cancelled": "PROVIDER_CANCELLED",
+        }.get(status, "INVALID_RESPONSE")
+        raise ProviderCallError(
+            outcome,
+            input_tokens=input_tokens,
+            cached_tokens=cached_tokens,
+            output_tokens=output_tokens,
+            latency_ms=elapsed,
+        )
+    input_tokens, cached_tokens, output_tokens = _usage(result)
+    text_parts: list[str] = []
+    refusal_parts: list[str] = []
+    for item in result.get("output", []):
+        if item.get("type") != "message":
+            continue
+        for part in item.get("content", []):
+            if part.get("type") == "output_text" and isinstance(part.get("text"), str):
+                text_parts.append(part["text"])
+            elif part.get("type") == "refusal" and isinstance(part.get("refusal"), str):
+                refusal_parts.append(part["refusal"])
+    output = "\n".join(text_parts + refusal_parts)
+    if not output.strip():
+        raise ProviderCallError(
+            "EMPTY_OUTPUT",
+            input_tokens=input_tokens,
+            cached_tokens=cached_tokens,
+            output_tokens=output_tokens,
+            latency_ms=elapsed,
+        )
+    outcome = "COMPLETED_REFUSAL" if refusal_parts and not text_parts else "COMPLETED_TEXT"
+    return ProviderResult(output, input_tokens, cached_tokens, output_tokens, elapsed, outcome)
 
 
 def score(case: dict[str, Any], output: str) -> bool:
@@ -88,6 +163,13 @@ def score(case: dict[str, Any], output: str) -> bool:
     required = any(item.casefold() in normalized for item in case["required_concepts_any"])
     forbidden = any(item.casefold() in normalized for item in case["forbidden_fragments"])
     return required and not forbidden
+
+
+def request_cost(result: ProviderResult | ProviderCallError, price: dict[str, Any]) -> int:
+    cost = ((result.input_tokens - result.cached_tokens) * price["input"] + 999_999) // 1_000_000
+    cost += (result.cached_tokens * price["cached_input"] + 999_999) // 1_000_000
+    cost += (result.output_tokens * price["output"] + 999_999) // 1_000_000
+    return cost
 
 
 def verify_signature(receipt: dict[str, Any], signing_key: bytes) -> bool:
@@ -118,18 +200,28 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
     results, latencies, costs, errors = [], [], [], 0
     for case in suite["cases"]:
         try:
-            text, input_tokens, cached_tokens, output_tokens, latency = provider_call(
+            provider_result = provider_call(
                 api_key, model, prompt_path.read_text(encoding="utf-8"), case)
-            passed = score(case, text)
-            cost = ((input_tokens - cached_tokens) * price["input"] + 999_999) // 1_000_000
-            cost += (cached_tokens * price["cached_input"] + 999_999) // 1_000_000
-            cost += (output_tokens * price["output"] + 999_999) // 1_000_000
-            latencies.append(latency)
+            passed = score(case, provider_result.text)
+            outcome = provider_result.outcome
+            cost = request_cost(provider_result, price)
+            latencies.append(provider_result.latency_ms)
             costs.append(cost)
-        except (OSError, ValueError, KeyError, urllib.error.URLError, json.JSONDecodeError):
-            passed, latency, cost = False, 0, 0
+        except ProviderCallError as exc:
+            passed, outcome = False, exc.outcome
+            latencies.append(exc.latency_ms)
+            costs.append(request_cost(exc, price))
             errors += 1
-        results.append({"case_id": case["id"], "category": case["category"], "severity": case["severity"], "passed": passed})
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            passed, outcome = False, "INVALID_RESPONSE"
+            errors += 1
+        results.append({
+            "case_id": case["id"],
+            "category": case["category"],
+            "severity": case["severity"],
+            "passed": passed,
+            "provider_outcome": outcome,
+        })
     critical = [item for item in results if item["severity"] == "CRITICAL"]
     passed_count = sum(item["passed"] for item in results)
     critical_passed = sum(item["passed"] for item in critical)

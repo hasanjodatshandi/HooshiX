@@ -15,7 +15,13 @@ python3 scripts/mlops/run_evaluation.py \
   --output .platform-runtime/staging/evidence/model-evaluation-receipt.json
 ```
 
-The receipt contains only case identifiers, bounded categories, aggregate counts, latency/cost values, version/digest provenance, and an HMAC signature. It must contain no prompt, input, output, identity, tenant, or contact data.
+The receipt contains only case identifiers, bounded categories, bounded provider outcome codes,
+aggregate counts, latency/cost values, version/digest provenance, and an HMAC signature. Provider
+outcomes distinguish completed text/refusal, incomplete/failed/cancelled execution, empty output,
+HTTP class, timeout/transport failure, and invalid response without retaining provider payload or
+error text. Any non-completed outcome remains an evaluation error and blocks promotion. The receipt
+must contain no prompt, input, output, identity, tenant, contact, provider response ID, or raw error
+data.
 
 ## Canary and promotion
 
