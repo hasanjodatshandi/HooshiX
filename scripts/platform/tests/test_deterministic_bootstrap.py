@@ -92,6 +92,17 @@ class DeterministicBootstrapTest(unittest.TestCase):
         self.assertIn("${{ needs.edge-waf-security.result }}", workflow)
         self.assertIn('if [ "${EDGE_WAF_RESULT}" != \'success\' ]', workflow)
 
+    def test_waf_build_normalizes_layer_timestamps(self) -> None:
+        dockerfile = (ROOT / "infrastructure/waf/Dockerfile").read_text(encoding="utf-8")
+        builder = (ROOT / "scripts/platform/waf_build.sh").read_text(encoding="utf-8")
+        pins = (ROOT / "infrastructure/waf/pins.env").read_text(encoding="utf-8")
+        self.assertIn("ARG SOURCE_DATE_EPOCH", dockerfile)
+        self.assertIn('touch -h -d "@${SOURCE_DATE_EPOCH}" /usr/bin/caddy', dockerfile)
+        self.assertIn('find /tmp/crs -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +', dockerfile)
+        self.assertRegex(pins, r"(?m)^WAF_SOURCE_DATE_EPOCH=[1-9][0-9]*$")
+        self.assertIn('--build-arg "SOURCE_DATE_EPOCH=$WAF_SOURCE_DATE_EPOCH"', builder)
+        self.assertIn("rewrite-timestamp=true,unpack=false", builder)
+
     def test_traefik_access_log_uses_chart_41_allowlist(self) -> None:
         values = (ROOT / "infrastructure/traefik/values-local.yaml").read_text(encoding="utf-8")
         verifier = (ROOT / "scripts/platform/edge_foundation_verify.sh").read_text(encoding="utf-8")
