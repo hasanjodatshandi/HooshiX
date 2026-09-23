@@ -11,7 +11,7 @@ worktree_sha=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["worktree
 state="$state_dir/images.env"
 printf 'BUILD_GIT_REVISION=%s\nBUILD_SOURCE_STATE=%s\nBUILD_WORKTREE_SHA256=%s\n' "$revision" "$source_state" "$worktree_sha" > "$state"
 chmod 600 "$state"
-for service in compromised-password-service notification-service authorization-service identity-service web-bff; do
+for service in compromised-password-service notification-service authorization-service identity-service conversation-service web-bff; do
   "$ROOT/scripts/platform/staging_build_image.sh" "$service"
 done
 python3 "$ROOT/scripts/platform/git_provenance.py" --root "$ROOT" verify --revision "$revision" --source-state "$source_state" --worktree-sha256 "$worktree_sha" >/dev/null

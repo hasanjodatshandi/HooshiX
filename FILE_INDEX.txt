@@ -192,6 +192,7 @@ deploy/clusters/production/README.md
 deploy/releases/production/README.md
 deploy/staging/authorization-service.yaml
 deploy/staging/compromised-password-service.yaml
+deploy/staging/conversation-service.yaml
 deploy/staging/identity-service.yaml
 deploy/staging/notification-service.yaml
 deploy/staging/web-bff.yaml

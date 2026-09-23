@@ -6,7 +6,7 @@ state="$ROOT/.platform-runtime/staging/images.env"
 source "$state"
 python3 "$ROOT/scripts/platform/git_provenance.py" --root "$ROOT" verify --revision "$BUILD_GIT_REVISION" --source-state "$BUILD_SOURCE_STATE" --worktree-sha256 "$BUILD_WORKTREE_SHA256" >/dev/null
 service=${1:?service required}
-case "$service" in authorization-service|compromised-password-service|identity-service|notification-service|web-bff) ;; *) fail "unsupported service: $service";; esac
+case "$service" in authorization-service|compromised-password-service|conversation-service|identity-service|notification-service|web-bff) ;; *) fail "unsupported service: $service";; esac
 key=$(echo "$service" | tr '[:lower:]-' '[:upper:]_')
 repo_var="${key}_REPOSITORY"; digest_var="${key}_DIGEST"; repo=${!repo_var}; digest=${!digest_var}
 chart="$ROOT/services/$service/deploy/helm/$service"
@@ -20,6 +20,15 @@ if [[ "$service" == web-bff ]]; then
     [[ "$(stat -c '%u' "$google_values")" == "$(id -u)" && "$(stat -c '%a' "$google_values")" == 600 ]] || fail "staging Google OIDC values must be user-owned mode 0600"
     extra+=(-f "$google_values")
   fi
+fi
+if [[ "$service" == conversation-service ]]; then
+  python3 "$ROOT/scripts/mlops/provider_approval.py" verify \
+    --evaluation-receipt "$ROOT/.platform-runtime/staging/evidence/model-evaluation-receipt-v3.1.json" \
+    --signing-key-file "$ROOT/.platform-runtime/staging/private/model-evaluation-signing-key" \
+    --receipt "$ROOT/.platform-runtime/staging/evidence/provider-control-approval-v1.json" >/dev/null
+  provider_key="$ROOT/.platform-runtime/staging/private/openai-api-key"
+  [[ -f "$provider_key" && ! -L "$provider_key" ]] || fail "staging Conversation provider key is missing or unsafe"
+  [[ "$(stat -c '%u' "$provider_key")" == "$(id -u)" && "$(stat -c '%a' "$provider_key")" == 600 ]] || fail "staging Conversation provider key must be user-owned mode 0600"
 fi
 if [[ "$service" == compromised-password-service ]]; then
   dataset_state="$ROOT/.platform-runtime/staging/dataset.env"

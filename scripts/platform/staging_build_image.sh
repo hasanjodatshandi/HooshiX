@@ -2,7 +2,7 @@
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 service=${1:?service name required}
-case "$service" in authorization-service|compromised-password-service|identity-service|notification-service|web-bff) ;; *) fail "unsupported service: $service";; esac
+case "$service" in authorization-service|compromised-password-service|conversation-service|identity-service|notification-service|web-bff) ;; *) fail "unsupported service: $service";; esac
 svc="$ROOT/services/$service"
 state="$ROOT/.platform-runtime/staging/images.env"
 [[ -f "$state" ]] || fail "staging image provenance state is missing; run staging-build"

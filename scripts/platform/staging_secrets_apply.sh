@@ -19,8 +19,16 @@ verify_private_file() {
 }
 for n in postgres-admin redis-health redis-verify redis-acl; do secret_dir platform-data "$n" "$F/$n"; done
 secret_dir platform-observability grafana-admin "$F/grafana-admin"
-for n in authorization-db-migration authorization-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime; do secret_dir platform-data "$n" "$F/$n"; done
-for n in authorization-db-migration authorization-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime authorization-quota-redis identity-quota-redis web-bff-redis authorization-kafka identity-kafka notification-kafka web-bff-kafka authorization-fingerprint authorization-quota-key identity-fingerprint identity-challenge identity-handoff identity-mfa identity-quota identity-refresh identity-jwt-private notification-fingerprint notification-delivery web-bff-locator web-bff-csrf web-bff-refresh web-bff-quota; do secret_dir platform-apps "$n" "$F/$n"; done
+for n in authorization-db-migration authorization-db-runtime conversation-db-migration conversation-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime; do secret_dir platform-data "$n" "$F/$n"; done
+for n in authorization-db-migration authorization-db-runtime conversation-db-migration conversation-db-runtime identity-db-migration identity-db-runtime notification-db-migration notification-db-runtime web-bff-db-migration web-bff-db-runtime authorization-quota-redis identity-quota-redis web-bff-redis authorization-kafka conversation-kafka identity-kafka notification-kafka web-bff-kafka authorization-fingerprint authorization-quota-key conversation-content identity-fingerprint identity-challenge identity-handoff identity-mfa identity-quota identity-refresh identity-jwt-private notification-fingerprint notification-delivery web-bff-locator web-bff-csrf web-bff-refresh web-bff-quota; do secret_dir platform-apps "$n" "$F/$n"; done
+conversation_provider="$ROOT/.platform-runtime/staging/private/openai-api-key"
+if [[ -e "$conversation_provider" || -L "$conversation_provider" ]]; then
+  verify_private_file "$conversation_provider" "staging Conversation provider key"
+  k -n platform-apps create secret generic conversation-provider --from-file="api-key=$conversation_provider" --dry-run=client -o yaml | k apply -f - >/dev/null
+  echo 'staging Conversation provider secret created without printing its value'
+else
+  echo 'staging Conversation provider secret skipped because no local credential file is present'
+fi
 provider_file="$ROOT/.platform-runtime/staging/private/notification-providers.properties"
 if [[ -e "$provider_file" || -L "$provider_file" ]]; then
   verify_private_file "$provider_file" "staging provider configuration"

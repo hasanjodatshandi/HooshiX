@@ -30,7 +30,7 @@ secrets:
 jwt:
   publicVerifierConfigMapName: identity-jwt-public
   issuer: https://identity.sajtech.internal
-  allowedAudiences: [authorization-service]
+  allowedAudiences: [authorization-service, conversation-service]
 observability:
   tracing: {enabled: true, otlpEndpoint: http://otel-collector.platform-observability-node.svc.cluster.local:4318/v1/traces, collector: {namespace: platform-observability-node, podLabels: {app.kubernetes.io/name: otel-collector}, port: 4318}}
   metrics: {enabled: true, prometheus: {namespace: platform-observability, podLabels: {app.kubernetes.io/name: prometheus}, principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus}}
