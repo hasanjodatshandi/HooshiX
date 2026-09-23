@@ -18,7 +18,11 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: verify_rendered_manifest.py <rendered.yaml>")
     text = Path(sys.argv[1]).read_text(encoding="utf-8")
-    require(text, r"kind: Deployment\nmetadata:\n  name: conversation-service", "Conversation Deployment missing")
+    require(
+        text,
+        r"apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: conversation-service",
+        "valid Conversation Deployment missing",
+    )
     require(text, r"replicas: 1", "single-server replica count missing")
     forbid(text, r"kind: (HorizontalPodAutoscaler|PodDisruptionBudget)", "single-server must not render HPA/PDB")
     require(text, r"registry\.invalid/hooshix/conversation-service@sha256:[a-f0-9]{64}", "immutable digest missing")
