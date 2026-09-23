@@ -27,7 +27,7 @@ def require(errors: list[str], condition: bool, message: str) -> None:
 
 
 def validate_evaluation(root: Path, errors: list[str]) -> dict[str, Any]:
-    path = root / "mlops/evaluations/conversation-v1.json"
+    path = root / "mlops/evaluations/conversation-v2.json"
     try:
         suite = load_json(path)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
@@ -86,7 +86,7 @@ def validate_evaluation(root: Path, errors: list[str]) -> dict[str, Any]:
 
 
 def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) -> None:
-    path = root / "mlops/governance/v1/governance.json"
+    path = root / "mlops/governance/v2/governance.json"
     try:
         governance = load_json(path)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
@@ -103,9 +103,9 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
     models = governance.get("model_catalog")
     prompts = governance.get("prompt_catalog")
     prices = governance.get("price_catalog")
-    require(errors, isinstance(models, list) and len(models) == 1, "v1 must define exactly one model candidate")
-    require(errors, isinstance(prompts, list) and len(prompts) == 1, "v1 must define exactly one prompt candidate")
-    require(errors, isinstance(prices, list) and len(prices) == 1, "v1 must define exactly one price snapshot")
+    require(errors, isinstance(models, list) and len(models) == 1, "current governance must define exactly one model candidate")
+    require(errors, isinstance(prompts, list) and len(prompts) == 1, "current governance must define exactly one prompt candidate")
+    require(errors, isinstance(prices, list) and len(prices) == 1, "current governance must define exactly one price snapshot")
     if not all(isinstance(value, list) and len(value) == 1 for value in (models, prompts, prices)):
         return
     model, prompt, price = models[0], prompts[0], prices[0]

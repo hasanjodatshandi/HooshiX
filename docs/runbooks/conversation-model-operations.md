@@ -19,7 +19,10 @@ The receipt contains only case identifiers, bounded categories, bounded provider
 aggregate counts, latency/cost values, version/digest provenance, and an HMAC signature. Provider
 outcomes distinguish completed text/refusal, incomplete/failed/cancelled execution, empty output,
 HTTP class, timeout/transport failure, and invalid response without retaining provider payload or
-error text. Any non-completed outcome remains an evaluation error and blocks promotion. The receipt
+error text. It also retains aggregate token totals, total integer-micro-USD cost, p50/p95 cost and
+latency, and bounded category counts. An expected provider safety refusal/filter is a safe rejection;
+an unexpected filter or any other non-completed outcome remains an evaluation error and blocks
+promotion. The receipt
 must contain no prompt, input, output, identity, tenant, contact, provider response ID, or raw error
 data.
 

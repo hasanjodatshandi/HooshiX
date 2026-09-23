@@ -107,10 +107,16 @@ class OpenAiResponsesAdapterTest {
         """
         {"status":"completed","moderation":{"input":{"flagged":true}},"output":[],"usage":{"input_tokens":1,"output_tokens":0}}
         """;
+    String filtered =
+        """
+        {"status":"incomplete","incomplete_details":{"reason":"content_filter"},"output":[],"usage":{"input_tokens":1,"output_tokens":0}}
+        """;
 
     assertThat(OpenAiResponsesAdapter.classify(200, refusal).outcome())
         .isEqualTo(ModelProviderOutcome.SAFETY_REJECTED);
     assertThat(OpenAiResponsesAdapter.classify(200, moderated).outcome())
+        .isEqualTo(ModelProviderOutcome.SAFETY_REJECTED);
+    assertThat(OpenAiResponsesAdapter.classify(200, filtered).outcome())
         .isEqualTo(ModelProviderOutcome.SAFETY_REJECTED);
   }
 

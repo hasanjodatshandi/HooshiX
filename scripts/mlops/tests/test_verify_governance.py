@@ -19,7 +19,7 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
         shutil.copytree(self.repository_root / "mlops", destination / "mlops")
 
     def update_governance(self, root: Path, mutate) -> None:
-        path = root / "mlops/governance/v1/governance.json"
+        path = root / "mlops/governance/v2/governance.json"
         value = json.loads(path.read_text(encoding="utf-8"))
         mutate(value)
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -39,7 +39,7 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_bundle(root)
-            prompt = root / "mlops/prompts/conversation-system-v1.txt"
+            prompt = root / "mlops/prompts/conversation-system-v2.txt"
             prompt.write_text(prompt.read_text(encoding="utf-8") + "tampered\n", encoding="utf-8")
             self.assertTrue(any("prompt sha256" in error for error in verifier.validate(root)))
 
@@ -80,7 +80,7 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_bundle(root)
-            path = root / "mlops/evaluations/conversation-v1.json"
+            path = root / "mlops/evaluations/conversation-v2.json"
             value = json.loads(path.read_text(encoding="utf-8"))
             value["cases"][0]["input"] = "Contact alice@example.com"
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

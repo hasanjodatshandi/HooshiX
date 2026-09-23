@@ -35,7 +35,7 @@ class GitGovernedModelPolicyProviderTest {
             policy -> {
               assertThat(policy.modelAlias()).isEqualTo("conversation-primary");
               assertThat(policy.providerModelId()).isEqualTo("gpt-5.4-2026-03-05");
-              assertThat(policy.promptVersion()).isEqualTo("1.0.0");
+              assertThat(policy.promptVersion()).isEqualTo("2.0.0");
               assertThat(policy.priceVersion()).isEqualTo("2026-09-12");
               assertThat(policy.maximumInputTokens()).isEqualTo(16_000);
               assertThat(policy.maximumOutputTokens()).isEqualTo(2_000);
@@ -128,15 +128,15 @@ class GitGovernedModelPolicyProviderTest {
             "max_input_tokens":16000,
             "max_output_tokens":2000,
             "prompt_id":"conversation-system",
-            "prompt_version":"1.0.0",
+            "prompt_version":"2.0.0",
             "price_id":"price",
             "price_version":"2026-09-12"
           }],
           "prompt_catalog":[{
             "prompt_id":"conversation-system",
-            "prompt_version":"1.0.0",
+            "prompt_version":"2.0.0",
             "status":"APPROVED_100",
-            "path":"mlops/prompts/conversation-system-v1.txt",
+            "path":"mlops/prompts/conversation-system-v2.txt",
             "sha256":"cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2"
           }],
           "price_catalog":[{
