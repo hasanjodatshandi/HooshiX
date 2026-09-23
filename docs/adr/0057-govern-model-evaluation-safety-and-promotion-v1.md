@@ -21,8 +21,10 @@ unreviewed evaluation or training dataset.
 
 ### Git-owned governance boundary
 
-The current authority is `mlops/governance/v1/governance.json`, with its referenced prompt, price
-snapshot, and synthetic evaluation suite. JSON schemas document the consumer shape and
+The current candidate authority is `mlops/governance/v2/governance.json`, with its referenced prompt,
+price snapshot, and synthetic evaluation suite. The original v1 candidate remains an immutable
+historical definition; its content-free failed-run receipt is retained only in the bounded private
+environment and v1 is not runtime authority. JSON schemas document the consumer shape and
 `scripts/mlops/verify_governance.py` enforces semantic and cross-file invariants in
 `make baseline-verify`.
 

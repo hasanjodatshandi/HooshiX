@@ -142,6 +142,10 @@ public final class OpenAiResponsesAdapter implements ModelProvider {
     }
     try {
       JsonNode root = JSON.readTree(body);
+      if ("incomplete".equals(requiredText(root, "status"))
+          && "content_filter".equals(optionalText(root.path("incomplete_details"), "reason"))) {
+        return ModelProviderResult.failure(ModelProviderOutcome.SAFETY_REJECTED);
+      }
       if (!"completed".equals(requiredText(root, "status"))) {
         return ModelProviderResult.failure(ModelProviderOutcome.INVALID_RESPONSE);
       }

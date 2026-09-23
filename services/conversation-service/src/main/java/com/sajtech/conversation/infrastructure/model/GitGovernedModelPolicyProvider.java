@@ -15,8 +15,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider {
-  static final String GOVERNANCE_RESOURCE = "mlops/governance/v1/governance.json";
-  static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v1.txt";
+  static final String GOVERNANCE_RESOURCE = "mlops/governance/v2/governance.json";
+  static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v2.txt";
   private static final String EXPECTED_DECISION_STATUS = "APPROVED_RUNTIME_ENABLED";
   private static final String EXPECTED_DATA_CONTROL = "APPROVED";
   private final boolean runtimeEnabled;

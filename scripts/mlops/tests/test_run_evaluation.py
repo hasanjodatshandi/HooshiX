@@ -65,6 +65,34 @@ class EvaluationRunnerTest(unittest.TestCase):
         self.assertEqual(raised.exception.outcome, "INCOMPLETE_MAX_OUTPUT_TOKENS")
         self.assertEqual(raised.exception.input_tokens, 0)
 
+    def test_provider_call_returns_bounded_content_filter_outcome(self):
+        response = self.ResponseFixture({
+            "status": "incomplete",
+            "model": "gpt-test-2026-01-01",
+            "output": [],
+            "usage": {"input_tokens": 10, "output_tokens": 0},
+            "incomplete_details": {"reason": "content_filter"},
+        })
+        with patch.object(runner.urllib.request, "urlopen", return_value=response):
+            result = runner.provider_call(
+                "fixture-api-key",
+                {"provider_model_id": "gpt-test-2026-01-01"},
+                "fixture prompt",
+                {"input": "fixture input", "max_output_tokens": 10},
+            )
+
+        self.assertEqual(result.outcome, "INCOMPLETE_CONTENT_FILTER")
+        self.assertEqual(result.text, "")
+        self.assertEqual(result.input_tokens, 10)
+
+    def test_expected_provider_safety_outcomes_pass_only_refusal_cases(self):
+        refusal = {"expected_behavior": "REFUSE_HARM"}
+        helpful = {"expected_behavior": "HELPFUL"}
+
+        self.assertTrue(runner.score(refusal, "", "INCOMPLETE_CONTENT_FILTER"))
+        self.assertTrue(runner.score(refusal, "provider refusal", "COMPLETED_REFUSAL"))
+        self.assertFalse(runner.score(helpful, "", "INCOMPLETE_CONTENT_FILTER"))
+
     def test_receipt_is_signed_and_contains_no_prompt_input_or_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -73,7 +101,8 @@ class EvaluationRunnerTest(unittest.TestCase):
             signing_key.write_bytes(b"s" * 32)
 
             def fixture(_api_key, _model, _prompt, case):
-                return runner.ProviderResult(case["required_concepts_any"][0], 10, 2, 5, 25, "COMPLETED_TEXT")
+                return runner.ProviderResult(
+                    case["required_concepts_any"][0], 10, 2, 5, 1, 25, "COMPLETED_TEXT")
 
             with patch.object(runner, "provider_call", fixture), patch.object(
                 runner, "repository_commit", return_value="a" * 40
@@ -81,15 +110,20 @@ class EvaluationRunnerTest(unittest.TestCase):
                 result = runner.run(api_key, signing_key, receipt)
 
             serialized = receipt.read_text()
-            suite = json.loads((runner.ROOT / "mlops/evaluations/conversation-v1.json").read_text())
+            suite = json.loads((runner.ROOT / "mlops/evaluations/conversation-v2.json").read_text())
             self.assertEqual(result["case_count"], len(suite["cases"]))
             self.assertEqual(result["schema_version"], 2)
             self.assertEqual(result["critical_pass_rate_basis_points"], 10000)
             self.assertEqual(result["repository_commit"], "a" * 40)
-            self.assertEqual(result["evaluator_version"], "1.1.0")
+            self.assertEqual(result["evaluator_version"], "2.0.0")
             self.assertTrue(result["promotion_passed"])
             self.assertTrue(all(result["gates"].values()))
             self.assertTrue(all(item["provider_outcome"] == "COMPLETED_TEXT" for item in result["results"]))
+            self.assertEqual(result["total_input_tokens"], result["case_count"] * 10)
+            self.assertEqual(result["total_cached_input_tokens"], result["case_count"] * 2)
+            self.assertEqual(result["total_output_tokens"], result["case_count"] * 5)
+            self.assertEqual(result["total_reasoning_tokens"], result["case_count"])
+            self.assertEqual(sum(item["case_count"] for item in result["category_results"]), result["case_count"])
             self.assertTrue(runner.verify_signature(result, b"s" * 32))
             result["passed_count"] -= 1
             self.assertFalse(runner.verify_signature(result, b"s" * 32))

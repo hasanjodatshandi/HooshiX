@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "governance_version": "2.0.0",
+  "decision_status": "APPROVED_ARCHITECTURE_RUNTIME_DISABLED",
+  "model_catalog": [
+    {
+      "logical_id": "conversation-primary",
+      "catalog_version": "2.0.0",
+      "provider": "openai",
+      "provider_model_id": "gpt-5.4-2026-03-05",
+      "endpoint": "responses",
+      "lifecycle": "CANDIDATE",
+      "execution_enabled": false,
+      "input_modalities": ["text"],
+      "output_modalities": ["text"],
+      "reasoning_effort": "none",
+      "max_input_tokens": 16000,
+      "max_output_tokens": 2000,
+      "tools_enabled": false,
+      "store": false,
+      "background": false,
+      "prompt_id": "conversation-system",
+      "prompt_version": "2.0.0",
+      "price_id": "openai-gpt-5.4-standard",
+      "price_version": "2026-09-12",
+      "evaluation_suite_id": "conversation-v2",
+      "evaluation_suite_version": "2.0.0",
+      "previous_approved_model": null
+    }
+  ],
+  "prompt_catalog": [
+    {
+      "prompt_id": "conversation-system",
+      "prompt_version": "2.0.0",
+      "path": "mlops/prompts/conversation-system-v2.txt",
+      "sha256": "08d780fe808f817f63590261406c8ced363bf56d8ff63fac256756af678583e3",
+      "status": "CANDIDATE",
+      "previous_approved_version": null
+    }
+  ],
+  "price_catalog": [
+    {
+      "price_id": "openai-gpt-5.4-standard",
+      "price_version": "2026-09-12",
+      "currency": "USD",
+      "unit": "MICRO_USD_PER_MILLION_TOKENS",
+      "input": 2500000,
+      "cached_input": 250000,
+      "output": 15000000,
+      "source": "https://developers.openai.com/api/docs/models/gpt-5.4",
+      "captured_on": "2026-09-12",
+      "maximum_request_reservation_micro_usd": 70000
+    }
+  ],
+  "promotion_policy": {
+    "required_approvals": ["product-owner", "security-owner", "privacy-owner", "platform-owner"],
+    "required_gates": [
+      "provider-data-control-approved",
+      "all-critical-evals-pass",
+      "quality-thresholds-pass",
+      "cost-thresholds-pass",
+      "latency-thresholds-pass",
+      "privacy-canary-pass",
+      "rollback-rehearsal-pass"
+    ],
+    "minimum_total_eval_pass_rate_basis_points": 9000,
+    "minimum_critical_eval_pass_rate_basis_points": 10000,
+    "maximum_eval_error_count": 0,
+    "maximum_quality_regression_basis_points": 200,
+    "maximum_p95_latency_ms": 20000,
+    "maximum_p99_latency_ms": 45000,
+    "hard_provider_deadline_ms": 60000,
+    "maximum_p95_cost_micro_usd": 25000,
+    "canary_steps_percent": [1, 5, 25, 100],
+    "minimum_canary_observation_minutes": [60, 120, 240, 1440],
+    "rollback_triggers": {
+      "confirmed_critical_safety_or_privacy_incidents": 1,
+      "maximum_error_rate_basis_points": 100,
+      "maximum_cost_overrun_basis_points": 500,
+      "maximum_p95_latency_ms": 30000
+    }
+  },
+  "safety_policy": {
+    "owner": "conversation-service",
+    "provider_controls_are_defense_in_depth": true,
+    "model_output_is_untrusted": true,
+    "model_output_can_grant_authority": false,
+    "model_output_can_execute_side_effects": false,
+    "blocked_capabilities": ["tools", "mcp", "web-search", "code-execution", "external-actions"],
+    "critical_categories": [
+      "credential-theft",
+      "malware",
+      "privacy-invasion",
+      "sexual-content-involving-minors",
+      "serious-physical-harm",
+      "system-prompt-or-secret-exfiltration"
+    ],
+    "high_stakes_behavior": "QUALIFY_LIMITATIONS_AND_ESCALATE_WHEN_MATERIAL",
+    "acceptable_use_enforcement": "FAIL_CLOSED_BEFORE_OUTPUT_PUBLICATION_FOR_CRITICAL_POLICY_FAILURE"
+  },
+  "provider_data_controls": {
+    "owner": "privacy-owner",
+    "approval_status": "PENDING_ORGANIZATION_VERIFICATION",
+    "runtime_must_remain_disabled_while_pending": true,
+    "required_request_settings": {
+      "store": false,
+      "background": false,
+      "tools": []
+    },
+    "provider_state_references_allowed": false,
+    "required_organization_controls": [
+      "approved-retention-mode-recorded",
+      "project-level-control-recorded",
+      "abuse-monitoring-retention-reviewed",
+      "data-region-and-subprocessor-review-recorded"
+    ],
+    "prohibited_telemetry": ["conversation-content", "prompt-content", "model-output-content", "provider-payload", "user-or-tenant-identifiers"]
+  },
+  "feedback_policy": {
+    "owner": "conversation-service",
+    "first_slice_values": ["HELPFUL", "NOT_HELPFUL", "UNSAFE", "FACTUALLY_WRONG"],
+    "free_text_enabled": false,
+    "training_use_enabled": false,
+    "tenant_and_erasure_scope_required": true,
+    "telemetry_labels_allowed": ["feedback-value", "model-catalog-version", "prompt-version"]
+  },
+  "drift_policy": {
+    "owner": "ml-quality-owner",
+    "offline_suite_frequency_days": 7,
+    "mandatory_rerun_triggers": [
+      "model-change",
+      "prompt-change",
+      "price-change",
+      "provider-policy-change",
+      "safety-incident",
+      "quality-regression",
+      "material-traffic-language-or-length-shift"
+    ],
+    "production_signals": ["quality-feedback-rate", "safety-refusal-rate", "provider-error-rate", "latency", "cost"],
+    "automatic_model_training_from_production_content": false
+  }
+}

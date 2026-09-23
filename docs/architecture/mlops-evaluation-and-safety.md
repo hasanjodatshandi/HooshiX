@@ -14,17 +14,17 @@ reviewed Git catalogs + prompt + synthetic suite
         -> approved runtime tuple or fail-closed rollback
 ```
 
-Stage 8 implements the first two boxes. It does not invoke OpenAI, enable Conversation runtime,
-create service/database/deployment artifacts, or claim any model-quality result.
+Stage 8 established the first two boxes. Stage 9 now owns the real-provider runner and Conversation
+runtime boundary, while runtime activation remains fail-closed until every later box is evidenced.
 
 ## 2. Canonical assets
 
 | Asset | Authority |
 | --- | --- |
-| Governance/catalog bundle | `mlops/governance/v1/governance.json` |
-| System prompt | `mlops/prompts/conversation-system-v1.txt` |
-| Offline suite | `mlops/evaluations/conversation-v1.json` |
-| Consumer schemas | `mlops/schemas/*.schema.json` |
+| Governance/catalog bundle | `mlops/governance/v2/governance.json` |
+| System prompt | `mlops/prompts/conversation-system-v2.txt` |
+| Offline suite | `mlops/evaluations/conversation-v2.json` |
+| Consumer schemas | `mlops/schemas/*.schema.json`; receipts currently emit v2 while v1 remains immutable |
 | Semantic validator | `scripts/mlops/verify_governance.py` |
 | Executable gate | `make mlops-verify`, included in `make baseline-verify` |
 
@@ -35,10 +35,12 @@ must exactly match the catalog.
 
 ## 3. Initial candidate and runtime state
 
-The first catalog candidate is the exact OpenAI snapshot `gpt-5.4-2026-03-05`, foreground Responses
-API, text-only, no tools, `store=false`, `background=false`, and bounded to 16,000 input plus 2,000
-output tokens by HooshiX. The captured standard price snapshot is review input, not a guarantee that
-the provider price remains unchanged.
+The current v2 catalog candidate retains the exact OpenAI snapshot `gpt-5.4-2026-03-05`, foreground
+Responses API, text-only, no tools, `store=false`, `background=false`, and bounds of 16,000 input plus
+2,000 output tokens. It replaces the unpromoted v1 candidate with an immutable v2 prompt/suite after
+the first real evaluation exposed brittle refusal phrasing and unclassified incomplete outcomes.
+The captured standard price snapshot is review input, not a guarantee that provider price remains
+unchanged.
 
 The candidate is deliberately:
 
@@ -48,17 +50,18 @@ execution_enabled: false
 data control:      PENDING_ORGANIZATION_VERIFICATION
 ```
 
-Stage 9 may replace it with a newly versioned candidate if real evaluation, account availability,
-price, or provider policy makes another exact snapshot preferable. It cannot mutate this record or
-promote an alias implicitly.
+Any further change must create another versioned candidate if real evaluation, account availability,
+price, or provider policy makes another exact snapshot preferable. It cannot mutate an existing
+record or promote an alias implicitly.
 
 ## 4. Evaluation protocol
 
 Each case declares an expected behavior, at least one acceptable concept, forbidden fragments, a
-locale, category, severity, and output-token bound. The future runner normalizes output only for
-reviewed deterministic comparison; it never logs case input/output. Critical cases are additionally
-reviewed by a versioned deterministic policy evaluator. Human/model graders may supplement quality
-assessment, but cannot override a critical deterministic failure.
+locale, category, severity, and output-token bound. The runner normalizes output only for reviewed
+deterministic comparison; it never logs case input/output. A provider refusal or content-filter
+outcome passes only an explicit refusal expectation; an unexpected filter remains an error. Critical
+cases are additionally reviewed by a versioned deterministic policy evaluator. Human/model graders
+may supplement quality assessment, but cannot override a critical deterministic failure.
 
 Required result dimensions:
 

@@ -97,10 +97,10 @@ configure<SpotBugsExtension> {
 dependencyLocking { lockAllConfigurations() }
 
 tasks.processResources {
-    from(rootProject.file("../../mlops/governance/v1/governance.json")) {
-        into("mlops/governance/v1")
+    from(rootProject.file("../../mlops/governance/v2/governance.json")) {
+        into("mlops/governance/v2")
     }
-    from(rootProject.file("../../mlops/prompts/conversation-system-v1.txt")) {
+    from(rootProject.file("../../mlops/prompts/conversation-system-v2.txt")) {
         into("mlops/prompts")
     }
 }

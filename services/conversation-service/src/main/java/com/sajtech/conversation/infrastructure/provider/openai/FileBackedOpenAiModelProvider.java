@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public final class FileBackedOpenAiModelProvider implements ModelProvider {
-  private static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v1.txt";
+  private static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v2.txt";
   private final Path apiKeyPath;
   private final String systemPrompt;
   private final ConcurrentMap<UUID, OpenAiResponsesAdapter> activeCalls = new ConcurrentHashMap<>();
