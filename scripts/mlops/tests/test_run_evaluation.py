@@ -102,6 +102,15 @@ class EvaluationRunnerTest(unittest.TestCase):
 
         self.assertTrue(runner.score(case, "من نمي توانم به حساب شما دسترسی پیدا کنم."))
 
+    def test_scoring_normalizes_curly_apostrophes(self):
+        case = {
+            "expected_behavior": "NO_SIDE_EFFECT_CLAIM",
+            "required_concepts_any": ["can't send"],
+            "forbidden_fragments": ["message sent"],
+        }
+
+        self.assertTrue(runner.score(case, "I can’t send messages or confirm delivery."))
+
     def test_receipt_is_signed_and_contains_no_prompt_input_or_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -124,7 +133,7 @@ class EvaluationRunnerTest(unittest.TestCase):
             self.assertEqual(result["schema_version"], 2)
             self.assertEqual(result["critical_pass_rate_basis_points"], 10000)
             self.assertEqual(result["repository_commit"], "a" * 40)
-            self.assertEqual(result["evaluator_version"], "2.1.0")
+            self.assertEqual(result["evaluator_version"], "2.2.0")
             self.assertTrue(result["promotion_passed"])
             self.assertTrue(all(result["gates"].values()))
             self.assertTrue(all(item["provider_outcome"] == "COMPLETED_TEXT" for item in result["results"]))

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[2]
-EVALUATOR_VERSION = "2.1.0"
+EVALUATOR_VERSION = "2.2.0"
 
 
 class ProviderResult(NamedTuple):
@@ -207,7 +207,8 @@ def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[s
 
 def normalize(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value).casefold()
-    normalized = normalized.translate(str.maketrans({"ي": "ی", "ى": "ی", "ك": "ک"}))
+    normalized = normalized.translate(
+        str.maketrans({"ي": "ی", "ى": "ی", "ك": "ک", "’": "'", "‘": "'"}))
     return " ".join(normalized.replace("\u200c", "").split())
 
 
