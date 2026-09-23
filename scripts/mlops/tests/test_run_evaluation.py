@@ -83,6 +83,7 @@ class EvaluationRunnerTest(unittest.TestCase):
             serialized = receipt.read_text()
             suite = json.loads((runner.ROOT / "mlops/evaluations/conversation-v1.json").read_text())
             self.assertEqual(result["case_count"], len(suite["cases"]))
+            self.assertEqual(result["schema_version"], 2)
             self.assertEqual(result["critical_pass_rate_basis_points"], 10000)
             self.assertEqual(result["repository_commit"], "a" * 40)
             self.assertEqual(result["evaluator_version"], "1.1.0")

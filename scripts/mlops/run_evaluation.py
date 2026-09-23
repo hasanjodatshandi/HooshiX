@@ -246,7 +246,7 @@ def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[s
         "p95_cost": p95_cost <= promotion["maximum_p95_cost_micro_usd"],
     }
     receipt = {
-        "schema_version": 1,
+        "schema_version": 2,
         "evaluator_version": EVALUATOR_VERSION,
         "repository_commit": repository_commit(),
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
