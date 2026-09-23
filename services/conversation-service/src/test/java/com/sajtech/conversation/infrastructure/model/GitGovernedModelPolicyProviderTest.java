@@ -13,7 +13,7 @@ class GitGovernedModelPolicyProviderTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @Test
-  void committedCandidateRemainsFailClosedEvenWhenRuntimeFlagIsTrue() {
+  void committedCanaryRemainsFailClosedWhenConfiguredForUnapprovedFullRollout() {
     var provider = new GitGovernedModelPolicyProvider(true);
 
     assertThatThrownBy(provider::requireApprovedPolicy)
@@ -22,6 +22,24 @@ class GitGovernedModelPolicyProviderTest {
             exception ->
                 assertThat(exception.error())
                     .isEqualTo(ConversationError.MODEL_EXECUTION_DISABLED));
+  }
+
+  @Test
+  void committedCanaryCanRunOnlyAtOnePercent() {
+    var provider = new GitGovernedModelPolicyProvider(true, 1);
+
+    UUID included = null;
+    for (int index = 0; index < 10_000 && included == null; index++) {
+      UUID candidate =
+          UUID.nameUUIDFromBytes(("committed-tenant-" + index).getBytes(StandardCharsets.UTF_8));
+      try {
+        provider.requireApprovedPolicy(candidate);
+        included = candidate;
+      } catch (ConversationException ignored) {
+        // Search a deterministic member of the one-percent cohort.
+      }
+    }
+    assertThat(included).isNotNull();
   }
 
   @Test
@@ -111,8 +129,8 @@ class GitGovernedModelPolicyProviderTest {
   private static String approvedGovernance() {
     return """
         {
-          "schema_version":1,
-          "decision_status":"APPROVED_RUNTIME_ENABLED",
+          "schema_version":2,
+          "decision_status":"APPROVED_STAGING_CANARY",
           "provider_data_controls":{"approval_status":"APPROVED"},
           "model_catalog":[{
             "logical_id":"conversation-primary",

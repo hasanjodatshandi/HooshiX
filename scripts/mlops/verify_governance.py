@@ -86,7 +86,7 @@ def validate_evaluation(root: Path, errors: list[str]) -> dict[str, Any]:
 
 
 def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) -> None:
-    path = root / "mlops/governance/v2/governance.json"
+    path = root / "mlops/governance/v3/governance.json"
     try:
         governance = load_json(path)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
@@ -97,9 +97,9 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
     if not isinstance(governance, dict):
         return
 
-    require(errors, governance.get("schema_version") == 1, "governance schema_version must be 1")
+    require(errors, governance.get("schema_version") == 2, "current governance schema_version must be 2")
     require(errors, SEMVER.fullmatch(str(governance.get("governance_version", ""))) is not None, "governance_version must be SemVer")
-    require(errors, governance.get("decision_status") == "APPROVED_ARCHITECTURE_RUNTIME_DISABLED", "Stage 8 decision status must keep runtime disabled")
+    require(errors, governance.get("decision_status") == "APPROVED_STAGING_CANARY", "current governance must be limited to the approved staging canary")
     models = governance.get("model_catalog")
     prompts = governance.get("prompt_catalog")
     prices = governance.get("price_catalog")
@@ -118,12 +118,15 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
     if not isinstance(approval, dict):
         approval = {}
     pending = approval.get("approval_status") != "APPROVED"
-    require(errors, approval.get("approval_status") == "PENDING_ORGANIZATION_VERIFICATION", "Stage 8 provider approval must remain pending verification")
+    require(errors, not pending, "provider approval must be recorded for the staging canary")
+    require(errors, approval.get("approval_scope") == "STAGING_SYNTHETIC_NON_SENSITIVE_ONLY", "provider approval scope must prohibit real-user and Production use")
+    require(errors, re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", str(approval.get("approval_receipt_id", ""))) is not None, "provider approval receipt id is invalid")
+    require(errors, re.fullmatch(r"[0-9a-f]{64}", str(approval.get("approval_receipt_payload_sha256", ""))) is not None, "provider approval receipt digest is invalid")
     require(errors, model.get("provider") == "openai" and model.get("endpoint") == "responses", "model must use the reviewed OpenAI Responses boundary")
     require(errors, SEMVER.fullmatch(str(model.get("catalog_version", ""))) is not None, "model catalog_version must be SemVer")
     require(errors, re.fullmatch(r"gpt-[a-z0-9.-]+-20[0-9]{2}-[0-9]{2}-[0-9]{2}", str(model.get("provider_model_id", ""))) is not None, "provider model must be an exact dated snapshot")
-    require(errors, model.get("lifecycle") == "CANDIDATE", "initial model must remain CANDIDATE")
-    require(errors, model.get("execution_enabled") is False, "Stage 8 model execution must remain disabled")
+    require(errors, model.get("lifecycle") == "CANARY_1", "current model must start at CANARY_1")
+    require(errors, model.get("execution_enabled") is True, "approved staging model must be executable only behind runtime and canary gates")
     require(errors, not pending or approval.get("runtime_must_remain_disabled_while_pending") is True, "pending provider approval must fail closed")
     require(errors, model.get("store") is False and model.get("background") is False and model.get("tools_enabled") is False, "model requests must be stateless, foreground, and tool-free")
     require(errors, model.get("input_modalities") == ["text"] and model.get("output_modalities") == ["text"], "v1 model must remain text-only")
@@ -141,7 +144,7 @@ def validate_governance(root: Path, suite: dict[str, Any], errors: list[str]) ->
         digest = hashlib.sha256(prompt_path.read_bytes()).hexdigest()
         require(errors, digest == prompt.get("sha256"), "prompt sha256 does not match prompt content")
     require(errors, SEMVER.fullmatch(str(prompt.get("prompt_version", ""))) is not None, "prompt_version must be SemVer")
-    require(errors, prompt.get("status") == "CANDIDATE", "initial prompt must remain CANDIDATE")
+    require(errors, prompt.get("status") == "CANARY_1", "current prompt must start at CANARY_1")
 
     require(errors, model.get("prompt_id") == prompt.get("prompt_id") and model.get("prompt_version") == prompt.get("prompt_version"), "model prompt reference is inconsistent")
     require(errors, model.get("price_id") == price.get("price_id") and model.get("price_version") == price.get("price_version"), "model price reference is inconsistent")
@@ -227,7 +230,9 @@ def validate(root: Path = ROOT) -> list[str]:
         ("mlops/schemas/evaluation-suite.schema.json", "https://hooshix.internal/schemas/mlops/evaluation-suite-v1.json"),
         ("mlops/schemas/evaluation-receipt.schema.json", "https://hooshix.internal/schemas/mlops/evaluation-receipt-v1.json"),
         ("mlops/schemas/evaluation-receipt-v2.schema.json", "https://hooshix.internal/schemas/mlops/evaluation-receipt-v2.json"),
+        ("mlops/schemas/governance-v2.schema.json", "https://hooshix.internal/schemas/mlops/governance-v2.json"),
         ("mlops/schemas/governance.schema.json", "https://hooshix.internal/schemas/mlops/governance-v1.json"),
+        ("mlops/schemas/provider-approval-receipt-v1.schema.json", "https://hooshix.internal/schemas/mlops/provider-approval-receipt-v1.json"),
     ):
         try:
             schema = load_json(root / relative)

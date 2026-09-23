@@ -376,11 +376,13 @@ mlops/evaluations/conversation-v1.json
 mlops/evaluations/conversation-v2.json
 mlops/governance/v1/governance.json
 mlops/governance/v2/governance.json
+mlops/governance/v3/governance.json
 mlops/prompts/conversation-system-v1.txt
 mlops/prompts/conversation-system-v2.txt
 mlops/schemas/evaluation-receipt-v2.schema.json
 mlops/schemas/evaluation-receipt.schema.json
 mlops/schemas/evaluation-suite.schema.json
+mlops/schemas/governance-v2.schema.json
 mlops/schemas/governance.schema.json
 mlops/schemas/provider-approval-receipt-v1.schema.json
 scripts/baseline/tests/test_verify_repository.py
