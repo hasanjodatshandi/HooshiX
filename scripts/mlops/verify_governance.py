@@ -226,6 +226,7 @@ def validate(root: Path = ROOT) -> list[str]:
     for relative, expected_id in (
         ("mlops/schemas/evaluation-suite.schema.json", "https://hooshix.internal/schemas/mlops/evaluation-suite-v1.json"),
         ("mlops/schemas/evaluation-receipt.schema.json", "https://hooshix.internal/schemas/mlops/evaluation-receipt-v1.json"),
+        ("mlops/schemas/evaluation-receipt-v2.schema.json", "https://hooshix.internal/schemas/mlops/evaluation-receipt-v2.json"),
         ("mlops/schemas/governance.schema.json", "https://hooshix.internal/schemas/mlops/governance-v1.json"),
     ):
         try:

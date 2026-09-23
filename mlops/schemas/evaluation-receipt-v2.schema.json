@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hooshix.internal/schemas/mlops/evaluation-receipt-v2.json",
+  "title": "HooshiX content-free model evaluation receipt v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evaluator_version", "repository_commit", "generated_at", "suite_id", "suite_version", "suite_sha256", "governance_sha256", "prompt_sha256", "model_alias", "provider_model_id", "prompt_version", "price_version", "case_count", "passed_count", "critical_count", "critical_passed_count", "error_count", "pass_rate_basis_points", "critical_pass_rate_basis_points", "p95_latency_ms", "p99_latency_ms", "p95_cost_micro_usd", "gates", "promotion_passed", "results", "payload_sha256", "signature"],
+  "properties": {
+    "schema_version": {"const": 2}, "evaluator_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}, "repository_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "generated_at": {"type": "string", "format": "date-time"},
+    "suite_id": {"type": "string"}, "suite_version": {"type": "string"},
+    "suite_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "governance_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "prompt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "model_alias": {"type": "string"}, "provider_model_id": {"type": "string"}, "prompt_version": {"type": "string"}, "price_version": {"type": "string"},
+    "case_count": {"type": "integer", "minimum": 1}, "passed_count": {"type": "integer", "minimum": 0}, "critical_count": {"type": "integer", "minimum": 1}, "critical_passed_count": {"type": "integer", "minimum": 0}, "error_count": {"type": "integer", "minimum": 0},
+    "pass_rate_basis_points": {"type": "integer", "minimum": 0, "maximum": 10000}, "critical_pass_rate_basis_points": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "p95_latency_ms": {"type": "integer", "minimum": 0}, "p99_latency_ms": {"type": "integer", "minimum": 0}, "p95_cost_micro_usd": {"type": "integer", "minimum": 0},
+    "gates": {"type": "object", "additionalProperties": false, "required": ["total_pass_rate", "critical_pass_rate", "error_count", "p95_latency", "p99_latency", "p95_cost"], "properties": {"total_pass_rate": {"type": "boolean"}, "critical_pass_rate": {"type": "boolean"}, "error_count": {"type": "boolean"}, "p95_latency": {"type": "boolean"}, "p99_latency": {"type": "boolean"}, "p95_cost": {"type": "boolean"}}},
+    "promotion_passed": {"type": "boolean"},
+    "results": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["case_id", "category", "severity", "passed", "provider_outcome"], "properties": {"case_id": {"type": "string"}, "category": {"type": "string"}, "severity": {"enum": ["HIGH", "CRITICAL"]}, "passed": {"type": "boolean"}, "provider_outcome": {"enum": ["COMPLETED_TEXT", "COMPLETED_REFUSAL", "INCOMPLETE_MAX_OUTPUT_TOKENS", "INCOMPLETE_CONTENT_FILTER", "INCOMPLETE_OTHER", "PROVIDER_FAILED", "PROVIDER_CANCELLED", "EMPTY_OUTPUT", "HTTP_4XX", "HTTP_5XX", "TIMEOUT", "TRANSPORT_ERROR", "INVALID_RESPONSE"]}}}},
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signature": {"type": "object", "additionalProperties": false, "required": ["algorithm", "value"], "properties": {"algorithm": {"const": "HMAC-SHA256"}, "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
+  }
+}

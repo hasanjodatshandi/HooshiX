@@ -41,6 +41,7 @@ REQUIRED_BASELINE_PATHS = (
     "mlops/governance/v1/governance.json",
     "mlops/prompts/conversation-system-v1.txt",
     "mlops/schemas/evaluation-suite.schema.json",
+    "mlops/schemas/evaluation-receipt-v2.schema.json",
     "mlops/schemas/governance.schema.json",
     "README.md",
     "context/bootstrap.json",
