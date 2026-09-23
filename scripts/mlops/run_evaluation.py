@@ -122,11 +122,17 @@ def provider_call(api_key: str, model: dict[str, Any], prompt: str, case: dict[s
     if status != "completed":
         usage = result.get("usage")
         input_tokens, cached_tokens, output_tokens = _usage(result) if isinstance(usage, dict) else (0, 0, 0)
-        outcome = {
-            "incomplete": "INCOMPLETE",
-            "failed": "PROVIDER_FAILED",
-            "cancelled": "PROVIDER_CANCELLED",
-        }.get(status, "INVALID_RESPONSE")
+        if status == "incomplete":
+            reason = result.get("incomplete_details", {}).get("reason")
+            outcome = {
+                "max_output_tokens": "INCOMPLETE_MAX_OUTPUT_TOKENS",
+                "content_filter": "INCOMPLETE_CONTENT_FILTER",
+            }.get(reason, "INCOMPLETE_OTHER")
+        else:
+            outcome = {
+                "failed": "PROVIDER_FAILED",
+                "cancelled": "PROVIDER_CANCELLED",
+            }.get(status, "INVALID_RESPONSE")
         raise ProviderCallError(
             outcome,
             input_tokens=input_tokens,

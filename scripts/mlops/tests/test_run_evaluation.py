@@ -51,6 +51,7 @@ class EvaluationRunnerTest(unittest.TestCase):
             "model": "gpt-test-2026-01-01",
             "output": [],
             "usage": None,
+            "incomplete_details": {"reason": "max_output_tokens"},
         })
         with patch.object(runner.urllib.request, "urlopen", return_value=response):
             with self.assertRaises(runner.ProviderCallError) as raised:
@@ -61,7 +62,7 @@ class EvaluationRunnerTest(unittest.TestCase):
                     {"input": "fixture input", "max_output_tokens": 10},
                 )
 
-        self.assertEqual(raised.exception.outcome, "INCOMPLETE")
+        self.assertEqual(raised.exception.outcome, "INCOMPLETE_MAX_OUTPUT_TOKENS")
         self.assertEqual(raised.exception.input_tokens, 0)
 
     def test_receipt_is_signed_and_contains_no_prompt_input_or_output(self):
@@ -106,7 +107,12 @@ class EvaluationRunnerTest(unittest.TestCase):
 
             def fixture(_api_key, _model, _prompt, _case):
                 raise runner.ProviderCallError(
-                    "INCOMPLETE", input_tokens=10, cached_tokens=2, output_tokens=5, latency_ms=25)
+                    "INCOMPLETE_MAX_OUTPUT_TOKENS",
+                    input_tokens=10,
+                    cached_tokens=2,
+                    output_tokens=5,
+                    latency_ms=25,
+                )
 
             with patch.object(runner, "provider_call", fixture), patch.object(
                 runner, "repository_commit", return_value="a" * 40
@@ -115,7 +121,8 @@ class EvaluationRunnerTest(unittest.TestCase):
 
             self.assertEqual(result["error_count"], result["case_count"])
             self.assertFalse(result["promotion_passed"])
-            self.assertTrue(all(item["provider_outcome"] == "INCOMPLETE" for item in result["results"]))
+            self.assertTrue(
+                all(item["provider_outcome"] == "INCOMPLETE_MAX_OUTPUT_TOKENS" for item in result["results"]))
             self.assertGreater(result["p95_cost_micro_usd"], 0)
             self.assertNotIn("fixture-api-key", receipt.read_text())
 
