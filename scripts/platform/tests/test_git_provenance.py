@@ -44,6 +44,12 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   authorization=(REPO_ROOT/"infrastructure/staging/authorizationpolicy.yaml").read_text()
   self.assertIn("name: kafka",authorization)
   self.assertIn("sa/notification-service",authorization)
+  for text,needle in ((policy,"app.kubernetes.io/name: conversation-service"),(authorization,"sa/conversation-service")):
+   documents=text.split("\n---\n")
+   by_name={next(line for line in document.splitlines() if line.startswith("metadata: {name:")): document for document in documents}
+   self.assertIn(needle,by_name["metadata: {name: postgresql, namespace: platform-data}"])
+   self.assertIn(needle,by_name["metadata: {name: kafka, namespace: platform-data}"])
+   self.assertNotIn(needle,by_name["metadata: {name: security-redis, namespace: platform-data}"])
  def test_identity_staging_binds_every_required_key_ring(self):
   values=(REPO_ROOT/"deploy/staging/identity-service.yaml").read_text()
   for secret in ("identity-fingerprint","identity-challenge","identity-handoff","identity-mfa","identity-quota","identity-refresh","identity-jwt-private"):
