@@ -382,6 +382,7 @@ mlops/schemas/evaluation-receipt-v2.schema.json
 mlops/schemas/evaluation-receipt.schema.json
 mlops/schemas/evaluation-suite.schema.json
 mlops/schemas/governance.schema.json
+mlops/schemas/provider-approval-receipt-v1.schema.json
 scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
 scripts/ci/quality/verify_repository_sources.sh
@@ -393,7 +394,9 @@ scripts/context/tests/test_post_merge_checkpoint.py
 scripts/contracts/verify_protobuf_compatibility.sh
 scripts/local/runtime.py
 scripts/local/tests/test_runtime.py
+scripts/mlops/provider_approval.py
 scripts/mlops/run_evaluation.py
+scripts/mlops/tests/test_provider_approval.py
 scripts/mlops/tests/test_run_evaluation.py
 scripts/mlops/tests/test_verify_governance.py
 scripts/mlops/verify_governance.py

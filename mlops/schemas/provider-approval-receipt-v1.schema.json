@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hooshix.internal/schemas/mlops/provider-approval-receipt-v1.json",
+  "title": "HooshiX private provider-control approval receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_type", "receipt_id", "issued_at", "expires_at", "environment", "data_classification", "provider", "provider_account", "approval", "approved_tuple", "payload_sha256", "signature"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "receipt_type": {"const": "HOOSHIX_PROVIDER_CONTROL_APPROVAL"},
+    "receipt_id": {"type": "string", "format": "uuid"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "environment": {"const": "STAGING"},
+    "data_classification": {"const": "SYNTHETIC_NON_SENSITIVE_ONLY"},
+    "provider": {"const": "OPENAI"},
+    "provider_account": {
+      "type": "object", "additionalProperties": false,
+      "required": ["organization_id", "project_id", "project_residency", "project_data_retention", "api_call_logging"],
+      "properties": {
+        "organization_id": {"type": "string", "pattern": "^org-[A-Za-z0-9]{8,128}$"},
+        "project_id": {"type": "string", "pattern": "^proj_[A-Za-z0-9]{8,128}$"},
+        "project_residency": {"const": "GLOBAL"},
+        "project_data_retention": {"const": "NONE_STANDARD_ABUSE_MONITORING_UP_TO_30_DAYS"},
+        "api_call_logging": {"const": "DISABLED"}
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["approver_reference", "roles", "subprocessor_and_region_review", "real_user_data_authorized", "production_authorized"],
+      "properties": {
+        "approver_reference": {"type": "string", "pattern": "^github:[A-Za-z0-9-]{1,39}$"},
+        "roles": {"const": ["platform-owner", "privacy-owner", "product-owner", "security-owner"]},
+        "subprocessor_and_region_review": {"const": "ACKNOWLEDGED_FOR_STAGING"},
+        "real_user_data_authorized": {"const": false},
+        "production_authorized": {"const": false}
+      }
+    },
+    "approved_tuple": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_id", "prompt_sha256", "prompt_version", "price_version", "suite_id", "suite_version", "evaluation_payload_sha256", "evaluated_repository_commit"],
+      "properties": {
+        "model_id": {"type": "string"}, "prompt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "prompt_version": {"type": "string"}, "price_version": {"type": "string"}, "suite_id": {"type": "string"}, "suite_version": {"type": "string"},
+        "evaluation_payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "evaluated_repository_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signature": {"type": "object", "additionalProperties": false, "required": ["algorithm", "value"], "properties": {"algorithm": {"const": "HMAC-SHA256"}, "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
+  }
+}
