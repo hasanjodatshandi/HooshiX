@@ -187,7 +187,7 @@ evaluation runner, exact conditional egress, and deterministic tenant canary are
 Transport cancellation does not claim remote provider compute or cost stopped. The committed
 governance tuple remains execution-disabled pending reviewed provider-account data-control evidence,
 owner approval references, and deployed canary/rollback observation. The v2 offline provider suite
-passed 12/12 with all eight critical cases and zero provider errors at evaluator `2.1.0`; this is
+passed 12/12 with all eight critical cases and zero provider errors at evaluator `3.1.0`; this is
 evaluation evidence only, not live product runtime or canary evidence.
 
 ## 8. Cost and abuse safety

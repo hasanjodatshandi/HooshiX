@@ -123,7 +123,7 @@ provider                            -> IMPLEMENTED: fixed one-attempt stateless 
 quota and cost                      -> COMPLETED for the private service boundary: atomic worst-case reservation, immutable integer price snapshot, cancellation release, actual-usage reconciliation, and conservative unknown-outcome charging
 lifecycle                           -> COMPLETED for the service boundary: ordered fail-closed tenant projection plus ADR-0028 Inbox, service-owned encrypted-content purge, non-PII durable receipt, retry/exhaustion, and rollout-gated fifth-participant activation
 BFF and browser journey             -> COMPLETED: fixed-audience/deadline/concurrency facade, exact workload policy, accessible bilingual CRUD/history/run/cancel/enum-feedback UI, bounded abortable polling, and text-only output rendering
-evidence                            -> repository gates cover migration/RLS, provider/failure/race/security/privacy/load, browser, Helm, canary and content-free receipts; signed v2 provider evaluation PASSED 12/12, 8/8 critical, zero errors, $0.033958 total at evaluated commit bc5af2853ed08d5d4f4bbd39f77bda3feac49f2c; provider-account data-control approval and deployed canary/rollback evidence remain REQUIRED
+evidence                            -> repository gates cover migration/RLS, provider/failure/race/security/privacy/load, browser, Helm, canary and content-free receipts; signed v2 provider evaluation PASSED 12/12, 8/8 critical, zero errors, $0.034753 total at evaluated commit cec70c392abf9b5907e73f01a26a1a243a111e02; provider-account data-control approval and deployed canary/rollback evidence remain REQUIRED
 ```
 
 ADR-0054 §9 and `services/conversation-service.md` §12 are the acceptance authority. The browser
