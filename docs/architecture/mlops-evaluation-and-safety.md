@@ -151,4 +151,5 @@ Stage 9 must consume these assets rather than re-encode them in configuration. I
 - metrics/alerts/dashboard/runbook evidence without content or high-cardinality labels.
 
 Stage 9 cannot mark a candidate approved merely because `make mlops-verify` passes. That gate proves
-governance consistency only; real provider evaluation and environment approvals remain required.
+governance consistency only. The current v2 real-provider receipt is separate evaluation evidence;
+provider-account approval plus deployed canary/rollback evidence remain required.

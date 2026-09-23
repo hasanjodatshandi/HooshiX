@@ -5,8 +5,9 @@
 `conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle,
 encrypted Message history, budgeted ModelRun acceptance/cancellation, and the bounded provider
 worker/completion slice of the ADR-0054 bounded context. Ordered tenant lifecycle, erasure, and the
-BFF/UI journey are implemented. Provider activation, safety evaluation, provider telemetry, and
-transport-level cancellation remain incomplete. Its current
+BFF/UI journey are implemented. Provider telemetry, transport cancellation, and the real-provider
+offline safety evaluation are implemented and verified. Provider-account approval plus deployed
+canary/rollback evidence remain incomplete, so product runtime activation stays disabled. Its current
 repository boundary is:
 
 ```text
@@ -184,8 +185,10 @@ one-attempt deadline, lease expiry, global/per-tenant concurrency, circuit suppr
 refusal/safety mapping, local foreground HTTP cancellation, bounded telemetry, signed content-free
 evaluation runner, exact conditional egress, and deterministic tenant canary are implemented.
 Transport cancellation does not claim remote provider compute or cost stopped. The committed
-governance tuple remains execution-disabled pending real provider evaluation and reviewed
-provider-account data-control evidence. No live provider execution or canary observation is claimed.
+governance tuple remains execution-disabled pending reviewed provider-account data-control evidence,
+owner approval references, and deployed canary/rollback observation. The v2 offline provider suite
+passed 12/12 with all eight critical cases and zero provider errors at evaluator `2.1.0`; this is
+evaluation evidence only, not live product runtime or canary evidence.
 
 ## 8. Cost and abuse safety
 
