@@ -65,6 +65,26 @@ class DeterministicBootstrapTest(unittest.TestCase):
         self.assertIn("hostPath: /dev/shm/hooshix-kind/etcd", cluster)
         self.assertIn("/dev/shm/hooshix-kind/etcd", staging)
 
+    def test_staging_flyway_counts_match_owned_migrations(self) -> None:
+        verifier = (ROOT / "scripts/platform/staging_verify.sh").read_text(encoding="utf-8")
+        match = re.search(r"for spec in (.*?); do set -- \$spec", verifier)
+        self.assertIsNotNone(match)
+        declared = {
+            database: int(count)
+            for database, count, _owner in re.findall(r"'([a-z_]+) ([0-9]+) ([a-z_]+)'", match.group(1))
+        }
+        service_for_database = {
+            "authorization": "authorization-service",
+            "conversation": "conversation-service",
+            "identity": "identity-service",
+            "notification": "notification-service",
+            "web_bff": "web-bff",
+        }
+        self.assertEqual(set(declared), set(service_for_database))
+        for database, service in service_for_database.items():
+            migrations = (ROOT / "services" / service / "src/main/resources/db/migration").glob("V*.sql")
+            self.assertEqual(declared[database], sum(1 for _migration in migrations), database)
+
     def test_pre_edge_istio_verify_is_foundation_only(self) -> None:
         istio = (ROOT / "scripts/platform/istio_verify.sh").read_text(encoding="utf-8")
         edge = (ROOT / "scripts/platform/edge_verify.sh").read_text(encoding="utf-8")
