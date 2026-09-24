@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hooshix.internal/schemas/mlops/canary-receipt-v1.json",
+  "title": "HooshiX private staging model canary receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_type", "issued_at", "environment", "data_classification", "runtime_repository_commit", "runtime_image_digest", "canary_percent", "observation_started_at", "observation_completed_at", "observation_minutes", "approved_tuple", "evidence_bindings", "aggregates", "checks", "payload_sha256", "signature"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "receipt_type": {"const": "HOOSHIX_STAGING_MODEL_CANARY"},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "environment": {"const": "STAGING"},
+    "data_classification": {"const": "SYNTHETIC_NON_SENSITIVE_ONLY"},
+    "runtime_repository_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "runtime_image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "canary_percent": {"const": 1},
+    "observation_started_at": {"type": "string", "format": "date-time"},
+    "observation_completed_at": {"type": "string", "format": "date-time"},
+    "observation_minutes": {"type": "integer", "minimum": 60},
+    "approved_tuple": {
+      "type": "object", "additionalProperties": false,
+      "required": ["governance_version", "model_alias", "provider_model_id", "prompt_version", "price_version", "governance_sha256"],
+      "properties": {
+        "governance_version": {"type": "string"}, "model_alias": {"type": "string"},
+        "provider_model_id": {"type": "string"}, "prompt_version": {"type": "string"},
+        "price_version": {"type": "string"}, "governance_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "evidence_bindings": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evaluation_payload_sha256", "provider_approval_payload_sha256"],
+      "properties": {
+        "evaluation_payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "provider_approval_payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "aggregates": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_count", "succeeded_count", "failed_count", "outcome_unknown_count", "critical_incident_count", "total_actual_cost_micro_usd", "p95_latency_ms", "error_rate_basis_points", "cost_overrun_basis_points"],
+      "properties": {
+        "run_count": {"type": "integer", "minimum": 1}, "succeeded_count": {"type": "integer", "minimum": 0},
+        "failed_count": {"type": "integer", "minimum": 0}, "outcome_unknown_count": {"type": "integer", "minimum": 0},
+        "critical_incident_count": {"type": "integer", "minimum": 0}, "total_actual_cost_micro_usd": {"type": "integer", "minimum": 0},
+        "p95_latency_ms": {"type": "integer", "minimum": 0}, "error_rate_basis_points": {"type": "integer", "minimum": 0},
+        "cost_overrun_basis_points": {"type": "integer", "minimum": 0}
+      }
+    },
+    "checks": {
+      "type": "object", "additionalProperties": false,
+      "required": ["assistant_output_verified_without_retaining_content", "privacy_canary_passed", "log_leak_scan_passed", "rollback_rehearsal_passed", "runtime_disabled_after"],
+      "properties": {
+        "assistant_output_verified_without_retaining_content": {"const": true}, "privacy_canary_passed": {"const": true},
+        "log_leak_scan_passed": {"const": true}, "rollback_rehearsal_passed": {"const": true},
+        "runtime_disabled_after": {"const": true}
+      }
+    },
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signature": {"type": "object", "additionalProperties": false, "required": ["algorithm", "value"], "properties": {"algorithm": {"const": "HMAC-SHA256"}, "value": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
+  }
+}

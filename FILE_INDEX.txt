@@ -380,6 +380,7 @@ mlops/governance/v2/governance.json
 mlops/governance/v3/governance.json
 mlops/prompts/conversation-system-v1.txt
 mlops/prompts/conversation-system-v2.txt
+mlops/schemas/canary-receipt-v1.schema.json
 mlops/schemas/evaluation-receipt-v2.schema.json
 mlops/schemas/evaluation-receipt.schema.json
 mlops/schemas/evaluation-suite.schema.json
@@ -397,8 +398,10 @@ scripts/context/tests/test_post_merge_checkpoint.py
 scripts/contracts/verify_protobuf_compatibility.sh
 scripts/local/runtime.py
 scripts/local/tests/test_runtime.py
+scripts/mlops/canary_receipt.py
 scripts/mlops/provider_approval.py
 scripts/mlops/run_evaluation.py
+scripts/mlops/tests/test_canary_receipt.py
 scripts/mlops/tests/test_provider_approval.py
 scripts/mlops/tests/test_run_evaluation.py
 scripts/mlops/tests/test_verify_governance.py

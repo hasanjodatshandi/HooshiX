@@ -233,6 +233,7 @@ def validate(root: Path = ROOT) -> list[str]:
         ("mlops/schemas/governance-v2.schema.json", "https://hooshix.internal/schemas/mlops/governance-v2.json"),
         ("mlops/schemas/governance.schema.json", "https://hooshix.internal/schemas/mlops/governance-v1.json"),
         ("mlops/schemas/provider-approval-receipt-v1.schema.json", "https://hooshix.internal/schemas/mlops/provider-approval-receipt-v1.json"),
+        ("mlops/schemas/canary-receipt-v1.schema.json", "https://hooshix.internal/schemas/mlops/canary-receipt-v1.json"),
     ):
         try:
             schema = load_json(root / relative)
