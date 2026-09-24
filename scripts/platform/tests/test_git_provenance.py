@@ -88,4 +88,9 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   authorization=(REPO_ROOT/"deploy/staging/authorization-service.yaml").read_text()
   for value in ("resourceCallers:","app.kubernetes.io/name: conversation-service","sa/conversation-service","callerId: conversation-service"):
    self.assertIn(value,authorization)
+  conversation_values=(REPO_ROOT/"deploy/staging/conversation-service.yaml").read_text()
+  self.assertIn("providerRuntimeEnabled: false",conversation_values)
+  self.assertIn("providerCanaryPercent: 0",conversation_values)
+  verifier=(REPO_ROOT/"scripts/platform/staging_verify.sh").read_text()
+  self.assertIn('false/0 ]] || fail "Conversation safe-disabled runtime mismatch',verifier)
 if __name__=="__main__": unittest.main()

@@ -47,7 +47,7 @@ expected_matrix=$'authorization_runtime:true:false:false:false:false\nconversati
 [[ "$matrix" == "$expected_matrix" ]] || fail "runtime database CONNECT isolation mismatch"
 provider_enabled=$(k get deployment conversation-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CONVERSATION_PROVIDER_RUNTIME_ENABLED")].value}')
 provider_canary=$(k get deployment conversation-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CONVERSATION_PROVIDER_CANARY_PERCENT")].value}')
-[[ "$provider_enabled/$provider_canary" == true/1 ]] || fail "Conversation staging canary mismatch: $provider_enabled/$provider_canary"
+[[ "$provider_enabled/$provider_canary" == false/0 ]] || fail "Conversation safe-disabled runtime mismatch: $provider_enabled/$provider_canary"
 k get secret conversation-provider -n platform-apps >/dev/null
 authorization_tenant_rls=$(k exec -n platform-data "$pg" -- psql -U postgres -d authorization -Atc "SELECT relrowsecurity||':'||relforcerowsecurity FROM pg_class WHERE oid='authorization_tenant_projection'::regclass")
 [[ "$authorization_tenant_rls" == true:true ]] || fail "authorization tenant projection forced RLS mismatch: $authorization_tenant_rls"
