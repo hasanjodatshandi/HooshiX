@@ -1,6 +1,8 @@
 package com.sajtech.conversation.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.sajtech.conversation.application.ConversationError;
 import com.sajtech.conversation.application.ConversationException;
@@ -12,6 +14,7 @@ import com.sajtech.conversation.application.model.RunFeedbackValue;
 import com.sajtech.conversation.domain.ConversationLifecycle;
 import com.sajtech.conversation.domain.ModelRunFailure;
 import com.sajtech.conversation.domain.ModelRunState;
+import com.sajtech.conversation.infrastructure.erasure.ConversationErasureReceiptDispatcher;
 import com.sajtech.conversation.infrastructure.erasure.JdbcConversationErasureRepository;
 import com.sajtech.conversation.infrastructure.lifecycle.JdbcTenantLifecycleRepository;
 import com.sajtech.conversation.infrastructure.security.content.AesGcmContentCrypto;
@@ -20,6 +23,7 @@ import com.sajtech.identity.contract.v1.TenantLifecycleEvent;
 import com.sajtech.identity.contract.v1.TenantLifecycleEventState;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -32,12 +36,19 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -372,6 +383,42 @@ class ConversationRlsIntegrationTest {
                 requestId,
                 Integer.class))
         .isEqualTo(1);
+  }
+
+  @Test
+  void erasureReceiptDispatcherClaimsTimestampedWorkAndPublishesIt() throws Exception {
+    Instant now = Instant.parse("2026-09-20T11:00:00Z");
+    var erasure = new JdbcConversationErasureRepository(runtime);
+    UUID requestId = UUID.randomUUID();
+    var event = erasureEvent(UUID.randomUUID(), requestId, "2");
+    erasure.receive(event, now);
+    var item = erasure.claim(now.plusSeconds(1), Duration.ofSeconds(30)).orElseThrow();
+    erasure.complete(item, now.plusSeconds(2));
+
+    @SuppressWarnings("unchecked")
+    KafkaTemplate<String, byte[]> kafka = mock(KafkaTemplate.class);
+    when(kafka.send(anyString(), anyString(), any(byte[].class)))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    var transactions = new TransactionTemplate(new DataSourceTransactionManager(runtime));
+    var dsl = DSL.using(new TransactionAwareDataSourceProxy(runtime), SQLDialect.POSTGRES);
+    var dispatcher =
+        new ConversationErasureReceiptDispatcher(
+            dsl,
+            kafka,
+            transactions,
+            Clock.fixed(now.plusSeconds(3), ZoneOffset.UTC),
+            "hooshix.identity.erasure.receipt.v1",
+            new SimpleMeterRegistry());
+
+    dispatcher.dispatch();
+
+    assertThat(
+            scalar(
+                "SELECT state FROM conversation_erasure_receipt_outbox WHERE erasure_request_id=?",
+                requestId,
+                String.class))
+        .isEqualTo("PUBLISHED");
+    verify(kafka).send(eq("hooshix.identity.erasure.receipt.v1"), eq(requestId.toString()), any());
   }
 
   @Test

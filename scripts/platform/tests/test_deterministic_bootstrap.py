@@ -85,6 +85,12 @@ class DeterministicBootstrapTest(unittest.TestCase):
             migrations = (ROOT / "services" / service / "src/main/resources/db/migration").glob("V*.sql")
             self.assertEqual(declared[database], sum(1 for _migration in migrations), database)
 
+    def test_staging_kafka_provisions_conversation_lifecycle_topics(self) -> None:
+        for script_name in ("staging_data_install.sh", "staging_data_verify.sh"):
+            script = (ROOT / "scripts/platform" / script_name).read_text(encoding="utf-8")
+            self.assertIn("hooshix.identity.tenant.lifecycle.v1 3024000000", script)
+            self.assertIn("hooshix.identity.tenant.lifecycle.v1.DLT 1209600000", script)
+
     def test_pre_edge_istio_verify_is_foundation_only(self) -> None:
         istio = (ROOT / "scripts/platform/istio_verify.sh").read_text(encoding="utf-8")
         edge = (ROOT / "scripts/platform/edge_verify.sh").read_text(encoding="utf-8")

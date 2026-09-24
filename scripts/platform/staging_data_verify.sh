@@ -13,8 +13,10 @@ k exec -n platform-data "$kafka_pod" -- /opt/kafka/bin/kafka-broker-api-versions
 for spec in \
   'hooshix.identity.erasure.command.v1 3024000000' \
   'hooshix.identity.erasure.receipt.v1 3024000000' \
+  'hooshix.identity.tenant.lifecycle.v1 3024000000' \
   'hooshix.identity.erasure.command.v1.DLT 1209600000' \
-  'hooshix.identity.erasure.receipt.v1.DLT 1209600000'; do
+  'hooshix.identity.erasure.receipt.v1.DLT 1209600000' \
+  'hooshix.identity.tenant.lifecycle.v1.DLT 1209600000'; do
   read -r topic retention <<<"$spec"
   description=$(k exec -n platform-data "$kafka_pod" -- /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9093 --describe --topic "$topic")
   [[ "$description" == *"PartitionCount: 1"* && "$description" == *"ReplicationFactor: 1"* && "$description" == *"cleanup.policy=delete"* && "$description" == *"retention.ms=$retention"* ]] || fail "Kafka topic configuration mismatch: $topic"
