@@ -186,8 +186,9 @@ The adapter, worker, file-backed credential boundary, exact governance tuple loa
 one-attempt deadline, lease expiry, global/per-tenant concurrency, circuit suppression, provider
 refusal/safety mapping, local foreground HTTP cancellation, bounded telemetry, signed content-free
 evaluation runner, exact conditional egress, and deterministic tenant canary are implemented.
-Transport cancellation does not claim remote provider compute or cost stopped. The committed
-governance tuple remains execution-disabled by default. A private signed staging receipt records the
+Transport cancellation does not claim remote provider compute or cost stopped. The committed v3
+governance tuple is eligible only for staging `CANARY_1`; Helm defaults and the post-canary deployed
+runtime remain disabled/zero. A private signed staging receipt records the
 reviewed provider-account data controls and named owner approvals without exposing organization or
 project identifiers. The v3.1 offline provider receipt passed 12/12 with all eight critical cases and
 zero provider errors at evaluator `3.1.0`. Exactly one synthetic one-percent canary then succeeded on

@@ -24,7 +24,7 @@ automatic promotion to a later canary step.
 
 | Asset | Authority |
 | --- | --- |
-| Governance/catalog bundle | `mlops/governance/v2/governance.json` |
+| Current governance/catalog bundle | `mlops/governance/v3/governance.json`; v1/v2 remain immutable predecessor evidence |
 | System prompt | `mlops/prompts/conversation-system-v2.txt` |
 | Offline suite | `mlops/evaluations/conversation-v2.json` |
 | Consumer schemas | `mlops/schemas/*.schema.json`; evaluation receipts emit v2, provider approvals emit v1, and staging canary receipts emit v1 while older schemas remain immutable |
@@ -37,29 +37,30 @@ the catalog. Price values use integer micro-USD per million tokens; floating-poi
 prohibited. The maximum request reservation is recomputed from configured input/output maxima and
 must exactly match the catalog.
 
-## 3. Initial candidate and runtime state
+## 3. Approved staging canary and deployed runtime state
 
-The current v2 catalog candidate retains the exact OpenAI snapshot `gpt-5.4-2026-03-05`, foreground
-Responses API, text-only, no tools, `store=false`, `background=false`, and bounds of 16,000 input plus
-2,000 output tokens. It replaces the unpromoted v1 candidate with an immutable v2 prompt/suite after
-the first real evaluation exposed brittle refusal phrasing and unclassified incomplete outcomes.
-The captured standard price snapshot is review input, not a guarantee that provider price remains
-unchanged.
+The current v3 governance retains the exact OpenAI snapshot `gpt-5.4-2026-03-05`, immutable v2
+prompt/suite, foreground Responses API, text-only, no tools, `store=false`, `background=false`, and
+bounds of 16,000 input plus 2,000 output tokens. It limits approval to synthetic non-sensitive
+staging `CANARY_1`; v2 remains immutable pre-approval evidence. The captured standard price snapshot
+is review input, not a guarantee that provider price remains unchanged.
 
-The Git catalog is deliberately safe-disabled:
+The Git governance decision is deliberately narrow:
 
 ```text
-lifecycle:         CANDIDATE
-execution_enabled: false
-data control:      PENDING_ORGANIZATION_VERIFICATION in the public catalog
+lifecycle:         CANARY_1
+execution_enabled: true only within the separate runtime gate
+data control:      APPROVED / STAGING_SYNTHETIC_NON_SENSITIVE_ONLY
 ```
 
-The environment-specific, mode-0600 provider-control receipt separately proves the approved staging
-organization/project controls without putting private identifiers in Git. The signed v3.1 evaluation
-receipt and signed staging canary receipt bind that approval to the exact tuple and runtime digest.
-Any further catalog change must create another versioned candidate if real evaluation, account
-availability, price, or provider policy makes another exact snapshot preferable. It cannot mutate an
-existing record or promote an alias implicitly.
+The environment-specific, mode-0600 provider-control receipt proves the approved staging
+organization/project controls without putting those identifiers in Git. The tracked v3 decision
+binds only the non-sensitive receipt identity/digest; the signed v3.1 evaluation and signed staging
+canary receipts bind that approval to the exact tuple and runtime digest. Helm defaults and the
+post-canary deployed runtime remain `false/0`, so catalog eligibility alone cannot execute a request.
+Any further catalog change must create another versioned decision if evaluation, account availability,
+price, provider policy, or promotion state changes. It cannot mutate an existing record or promote an
+alias implicitly.
 
 ## 4. Evaluation protocol
 

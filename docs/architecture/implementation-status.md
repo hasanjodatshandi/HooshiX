@@ -53,7 +53,8 @@ ModelRun RPCs, atomic reservation/acceptance/cancellation, a lease-backed bounde
 OpenAI Responses adapter, conditional secret-file boundary, integer usage/cost reconciliation,
 private readiness/Prometheus/OTLP configuration, and hardened Helm packaging. The global worker
 queue contains technical identifiers/timestamps only; provider I/O occurs after claim commit.
-Current governance and Kubernetes egress keep provider execution disabled. Ordered fail-closed
+Current v3 governance permits only staging `CANARY_1`; the post-canary deployment flags and conditional
+Kubernetes egress keep provider execution disabled. Ordered fail-closed
 tenant lifecycle projection and rollout-gated ADR-0028 erasure participation are implemented.
 The validated OpenAPI Web BFF facade and bilingual browser Conversation journey are implemented,
 including fixed audience brokerage, one-attempt deadlines, bounded concurrency, workload policy,
