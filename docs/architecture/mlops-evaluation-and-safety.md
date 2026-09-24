@@ -14,8 +14,11 @@ reviewed Git catalogs + prompt + synthetic suite
         -> approved runtime tuple or fail-closed rollback
 ```
 
-Stage 8 established the first two boxes. Stage 9 now owns the real-provider runner and Conversation
-runtime boundary, while runtime activation remains fail-closed until every later box is evidenced.
+Stage 8 established the first two boxes. Stage 9 implemented the real-provider runner and
+Conversation runtime boundary, retained signed provider-control/evaluation/canary receipts, exercised
+the one-percent synthetic staging canary, and proved rollback. The deployed runtime is deliberately
+back at the fail-closed disabled state; this completion does not authorize Production activation or
+automatic promotion to a later canary step.
 
 ## 2. Canonical assets
 
@@ -24,8 +27,9 @@ runtime boundary, while runtime activation remains fail-closed until every later
 | Governance/catalog bundle | `mlops/governance/v2/governance.json` |
 | System prompt | `mlops/prompts/conversation-system-v2.txt` |
 | Offline suite | `mlops/evaluations/conversation-v2.json` |
-| Consumer schemas | `mlops/schemas/*.schema.json`; receipts currently emit v2 while v1 remains immutable |
+| Consumer schemas | `mlops/schemas/*.schema.json`; evaluation receipts emit v2, provider approvals emit v1, and staging canary receipts emit v1 while older schemas remain immutable |
 | Semantic validator | `scripts/mlops/verify_governance.py` |
+| Private evidence issuers/verifiers | `scripts/mlops/run_evaluation.py`, `scripts/mlops/provider_approval.py`, and `scripts/mlops/canary_receipt.py` |
 | Executable gate | `make mlops-verify`, included in `make baseline-verify` |
 
 Catalog versions are immutable evidence identities. The prompt SHA-256 binds the reviewed file to
@@ -42,17 +46,20 @@ the first real evaluation exposed brittle refusal phrasing and unclassified inco
 The captured standard price snapshot is review input, not a guarantee that provider price remains
 unchanged.
 
-The candidate is deliberately:
+The Git catalog is deliberately safe-disabled:
 
 ```text
 lifecycle:         CANDIDATE
 execution_enabled: false
-data control:      PENDING_ORGANIZATION_VERIFICATION
+data control:      PENDING_ORGANIZATION_VERIFICATION in the public catalog
 ```
 
-Any further change must create another versioned candidate if real evaluation, account availability,
-price, or provider policy makes another exact snapshot preferable. It cannot mutate an existing
-record or promote an alias implicitly.
+The environment-specific, mode-0600 provider-control receipt separately proves the approved staging
+organization/project controls without putting private identifiers in Git. The signed v3.1 evaluation
+receipt and signed staging canary receipt bind that approval to the exact tuple and runtime digest.
+Any further catalog change must create another versioned candidate if real evaluation, account
+availability, price, or provider policy makes another exact snapshot preferable. It cannot mutate an
+existing record or promote an alias implicitly.
 
 ## 4. Evaluation protocol
 
@@ -141,7 +148,7 @@ breach creates an investigation/disable decision, not automatic training.
 
 ## 9. Stage 9 acceptance handoff
 
-Stage 9 must consume these assets rather than re-encode them in configuration. It adds:
+Stage 9 consumed these assets rather than re-encoding them in configuration. It added:
 
 - catalog loader/readiness checks and immutable approved-tuple selection;
 - provider adapter fixtures and an offline runner that generates redacted signed/retained receipts;
@@ -150,6 +157,12 @@ Stage 9 must consume these assets rather than re-encode them in configuration. I
 - canary cohort, promotion, disable and rollback mechanics;
 - metrics/alerts/dashboard/runbook evidence without content or high-cardinality labels.
 
-Stage 9 cannot mark a candidate approved merely because `make mlops-verify` passes. That gate proves
-governance consistency only. The current v2 real-provider receipt is separate evaluation evidence;
-provider-account approval plus deployed canary/rollback evidence remain required.
+`make mlops-verify` proves governance consistency only; it never approves a candidate by itself. The
+current signed v3.1 real-provider evaluation, provider-control approval, and content-free canary
+receipts are separate private evidence. Exactly one synthetic `CANARY_1` run succeeded for
+1210 micro-USD with 430 input tokens, 9 output tokens, and 3717ms latency; the 206-minute observation
+had zero failed/unknown runs, critical incidents, error-rate breach, cost overrun, or telemetry leak.
+Rollback restored `CONVERSATION_PROVIDER_RUNTIME_ENABLED=false` and canary percent `0`, and a fresh
+request then failed before run creation/provider I/O. Stage 9 is complete; `CANARY_5`, `CANARY_25`,
+`APPROVED_100`, real-user data, and Production activation each require their own future authorization
+and evidence.

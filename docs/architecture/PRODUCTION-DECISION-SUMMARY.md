@@ -1,9 +1,9 @@
 # Production Decision Summary — Current State
 
-- **Reviewed:** 2026-08-29
+- **Reviewed:** 2026-09-24
 - **Selected profile:** `production-single-server`
 - **Expansion profile:** `production-ha`
-- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, the current Identity registration/authentication/session/JWT/Tenant/Profile/Contact/MFA/ExternalIdentity/erasure surface, Authorization, Web BFF, and Conversation; service-specific Semgrep/OSV/Gitleaks gates are present for all six Java services. Protected run `33105936814` is historical five-service evidence; protected Conversation and six-service aggregate evidence remain pending the current PR. Conversation is integrated into the repository-owned six-service local production-fidelity lane, including exact-digest deployment, Ambient waypoint routing, service-owned persistence, Kafka lifecycle/erasure runtime, and observability. All Production deployed-runtime/release evidence remains `NOT VERIFIED`; see `implementation-status.md`.
+- **Implementation evidence:** PARTIAL - repository source/build/deployment-package evidence exists for executable Compromised Password, Notification, the current Identity registration/authentication/session/JWT/Tenant/Profile/Contact/MFA/ExternalIdentity/erasure surface, Authorization, Web BFF, and Conversation; service-specific Semgrep/OSV/Gitleaks gates are present for all six Java services. Conversation is integrated into the repository-owned six-service local production-fidelity lane, including exact-digest deployment, Ambient waypoint routing, service-owned persistence, Kafka lifecycle/erasure runtime, observability, a synthetic one-percent staging provider canary, and verified safe-disable rollback. Protected run `33105936814` remains historical five-service evidence; current Stage 9 protected evidence is recorded in the hardening roadmap. All Production deployed-runtime/release evidence remains `NOT VERIFIED`; see `implementation-status.md`.
 
 ## 1. Selected single-server topology
 
@@ -150,8 +150,8 @@ The selected ADR-0045 repository controls are now implemented for the current co
 all six implemented Java services have Gitleaks current-tree/Git-history gates; the frontend has
 dedicated Semgrep and OSV gates; and exact-digest Syft/Grype/Cosign release automation, scheduled
 deployed-digest rescanning, and stable Kyverno production release-admission generation cover all
-the existing six application release components. Conversation joins that release boundary only
-after its Stage 9 vertical slice and activation gates are complete. Real production final-artifact scanning/signing/attestation/
+the existing six application release components. Conversation is now part of that six-component
+release boundary after completion of its Stage 9 vertical slice and staging activation/rollback gates. Real production final-artifact scanning/signing/attestation/
 rescanning and production-cluster admission enforcement remain `NOT VERIFIED`.
 
 ## 8. Kyverno
