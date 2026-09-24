@@ -14,6 +14,13 @@ SPEC.loader.exec_module(rehearsal)
 
 
 class StagingErasureRecoveryTest(unittest.TestCase):
+    def test_make_target_uses_python_interpreter(self):
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn(
+            "staging-erasure-recovery:\n\tpython3 scripts/platform/staging_erasure_recovery.py",
+            makefile,
+        )
+
     @mock.patch.object(rehearsal, "_kubectl")
     def test_scale_uses_complete_corpus_timeout_only_for_compromised_password(self, kubectl):
         rehearsal._scale(1)
