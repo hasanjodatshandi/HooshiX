@@ -3,7 +3,7 @@
 - **Status:** Active implementation-sequencing authority
 - **Last full application review:** 2026-09-24
 - **Scope:** HooshiX application implementation order and continuation across chats/agents
-- **Production Commissioning & Readiness:** DEFERRED until explicitly reactivated by the owner
+- **Production Commissioning & Readiness:** IN PROGRESS — owner reactivated 2026-09-24
 
 ## 1. Purpose
 
@@ -94,7 +94,7 @@ The following is the one ordered application-completion sequence. Do not start a
 | 6 | Core AI Product Architecture | `COMPLETED` | ADR-0054 and `services/conversation-service.md` define the private text Conversation journey, aggregates, ownership, OpenAI `store=false` no-tool adapter boundary, authorization, encrypted persistence, durable worker, quotas/cost, retention/erasure, audit, reliability, observability, deployment evidence, and explicit non-goals. |
 | 6A | Engineering hardening audit remediation | `COMPLETED` | Stages 1-9 in `ENGINEERING-HARDENING-ROADMAP.md` are complete with recorded diff review and protected repository/staging evidence. Production-only gates remain separate in deferred step 8. |
 | 7 | Core AI Product vertical slices | `COMPLETED` | The accepted first private Conversation + asynchronous ModelRun slice, provider-account approval, signed evaluation/canary evidence, one-percent synthetic staging canary, observation, rollback proof, and safe-disabled post-canary state satisfy the ADR-0054/0057 Stage 9 boundary. Workflow/Agent/tool/RAG/streaming/BYOK/shared-conversation boundaries remain excluded. |
-| 8 | Production Commissioning & Readiness | `DEFERRED` | Do not execute this track as the next application step. Re-enter only when the owner explicitly reactivates it; use the production-readiness authorities and executed environment evidence at that time. |
+| 8 | Production Commissioning & Readiness | `IN PROGRESS` | The owner explicitly reactivated this track on 2026-09-24. Close repository release/deployment gaps first, then execute every current Production readiness, environment, release, recovery, capacity, provider and traffic gate against the real environment. Documentation or local kind evidence cannot complete this step. |
 
 Reference Data is a separate conditional track, not part of the numbered completion sequence:
 
@@ -104,11 +104,11 @@ Reference Data is a separate conditional track, not part of the numbered complet
 
 ## 6. Immediate next completion-step contract
 
-At the current state there is no active non-deferred application milestone. Stage 9 is complete;
-the next track is intentionally not executable until the owner explicitly reactivates it:
+Stage 9 is complete. The owner explicitly reactivated the final application milestone on
+2026-09-24:
 
 ```text
-Production Commissioning & Readiness (Engineering Hardening Stage 10, DEFERRED)
+Production Commissioning & Readiness (Engineering Hardening Stage 10, IN PROGRESS)
 ```
 
 Stage 9's completion boundary and interruption-safe evidence are owned by ADR-0054, ADR-0057,
@@ -149,6 +149,10 @@ A completion-step implementation PR must:
 
 Checkpoint records remain append-only historical evidence. They may help resume work but do not replace this current roadmap or current Git.
 
-## 8. Deferred production track
+## 8. Active production track
 
-Production Commissioning & Readiness remains intentionally separate from the application-build sequence. Existing production architecture, automation, release controls, and readiness documents remain valid current authorities, but missing real production environment evidence does not block continuing the application completion steps above unless a specific application change itself requires that evidence.
+Production Commissioning & Readiness remains separate from the completed application-build
+sequence and is now active. Existing production architecture, automation, release controls, and
+readiness documents remain current authorities. Completion requires real environment evidence;
+repository implementation or local production-fidelity evidence alone cannot authorize traffic or
+change this step to `COMPLETED`.

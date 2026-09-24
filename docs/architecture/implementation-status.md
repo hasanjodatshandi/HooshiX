@@ -9,7 +9,9 @@ Architecture documents describe approved targets. A target path named in documen
 At this revision the repository contains architecture documentation, the repository-governance baseline, the ADR-0046 Git-native Agent Context Engine and project context metadata, and executable service implementations. Under ADR-0051, Context/Ops/Desktop MCP runtime source is independently versioned on Windows and is not part of HooshiX. The canonical application checkout is `/home/coder/workspace/Hooshix` on native WSL storage. Executable services are under:
 
 The repository-wide engineering audit remediation sequence completed Stages 1-9 in
-`ENGINEERING-HARDENING-ROADMAP.md`; Stage 10 remains owner-deferred. Its audit baseline is
+`ENGINEERING-HARDENING-ROADMAP.md`; the owner reactivated Stage 10 on 2026-09-24 and it is
+`IN PROGRESS`. Production remains `NOT VERIFIED` until the real environment, release, recovery,
+capacity, provider, and traffic gates pass. Its audit baseline is
 `main@68cf66cf24c07dd6fca010ddae2789f42608aa31`. Protected `Repository baseline`
 run `33105936814` passed at that exact commit, including neutral contract validation,
 all five Java service security suites, and the final baseline aggregator. Protected
