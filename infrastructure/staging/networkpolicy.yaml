@@ -9,6 +9,8 @@ spec:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: authorization-service}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: conversation-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: notification-service}}
@@ -62,6 +64,8 @@ spec:
     - from:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: authorization-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: conversation-service}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}

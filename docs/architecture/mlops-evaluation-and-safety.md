@@ -14,18 +14,22 @@ reviewed Git catalogs + prompt + synthetic suite
         -> approved runtime tuple or fail-closed rollback
 ```
 
-Stage 8 established the first two boxes. Stage 9 now owns the real-provider runner and Conversation
-runtime boundary, while runtime activation remains fail-closed until every later box is evidenced.
+Stage 8 established the first two boxes. Stage 9 implemented the real-provider runner and
+Conversation runtime boundary, retained signed provider-control/evaluation/canary receipts, exercised
+the one-percent synthetic staging canary, and proved rollback. The deployed runtime is deliberately
+back at the fail-closed disabled state; this completion does not authorize Production activation or
+automatic promotion to a later canary step.
 
 ## 2. Canonical assets
 
 | Asset | Authority |
 | --- | --- |
-| Governance/catalog bundle | `mlops/governance/v2/governance.json` |
+| Current governance/catalog bundle | `mlops/governance/v3/governance.json`; v1/v2 remain immutable predecessor evidence |
 | System prompt | `mlops/prompts/conversation-system-v2.txt` |
 | Offline suite | `mlops/evaluations/conversation-v2.json` |
-| Consumer schemas | `mlops/schemas/*.schema.json`; receipts currently emit v2 while v1 remains immutable |
+| Consumer schemas | `mlops/schemas/*.schema.json`; evaluation receipts emit v2, provider approvals emit v1, and staging canary receipts emit v1 while older schemas remain immutable |
 | Semantic validator | `scripts/mlops/verify_governance.py` |
+| Private evidence issuers/verifiers | `scripts/mlops/run_evaluation.py`, `scripts/mlops/provider_approval.py`, and `scripts/mlops/canary_receipt.py` |
 | Executable gate | `make mlops-verify`, included in `make baseline-verify` |
 
 Catalog versions are immutable evidence identities. The prompt SHA-256 binds the reviewed file to
@@ -33,26 +37,30 @@ the catalog. Price values use integer micro-USD per million tokens; floating-poi
 prohibited. The maximum request reservation is recomputed from configured input/output maxima and
 must exactly match the catalog.
 
-## 3. Initial candidate and runtime state
+## 3. Approved staging canary and deployed runtime state
 
-The current v2 catalog candidate retains the exact OpenAI snapshot `gpt-5.4-2026-03-05`, foreground
-Responses API, text-only, no tools, `store=false`, `background=false`, and bounds of 16,000 input plus
-2,000 output tokens. It replaces the unpromoted v1 candidate with an immutable v2 prompt/suite after
-the first real evaluation exposed brittle refusal phrasing and unclassified incomplete outcomes.
-The captured standard price snapshot is review input, not a guarantee that provider price remains
-unchanged.
+The current v3 governance retains the exact OpenAI snapshot `gpt-5.4-2026-03-05`, immutable v2
+prompt/suite, foreground Responses API, text-only, no tools, `store=false`, `background=false`, and
+bounds of 16,000 input plus 2,000 output tokens. It limits approval to synthetic non-sensitive
+staging `CANARY_1`; v2 remains immutable pre-approval evidence. The captured standard price snapshot
+is review input, not a guarantee that provider price remains unchanged.
 
-The candidate is deliberately:
+The Git governance decision is deliberately narrow:
 
 ```text
-lifecycle:         CANDIDATE
-execution_enabled: false
-data control:      PENDING_ORGANIZATION_VERIFICATION
+lifecycle:         CANARY_1
+execution_enabled: true only within the separate runtime gate
+data control:      APPROVED / STAGING_SYNTHETIC_NON_SENSITIVE_ONLY
 ```
 
-Any further change must create another versioned candidate if real evaluation, account availability,
-price, or provider policy makes another exact snapshot preferable. It cannot mutate an existing
-record or promote an alias implicitly.
+The environment-specific, mode-0600 provider-control receipt proves the approved staging
+organization/project controls without putting those identifiers in Git. The tracked v3 decision
+binds only the non-sensitive receipt identity/digest; the signed v3.1 evaluation and signed staging
+canary receipts bind that approval to the exact tuple and runtime digest. Helm defaults and the
+post-canary deployed runtime remain `false/0`, so catalog eligibility alone cannot execute a request.
+Any further catalog change must create another versioned decision if evaluation, account availability,
+price, provider policy, or promotion state changes. It cannot mutate an existing record or promote an
+alias implicitly.
 
 ## 4. Evaluation protocol
 
@@ -141,7 +149,7 @@ breach creates an investigation/disable decision, not automatic training.
 
 ## 9. Stage 9 acceptance handoff
 
-Stage 9 must consume these assets rather than re-encode them in configuration. It adds:
+Stage 9 consumed these assets rather than re-encoding them in configuration. It added:
 
 - catalog loader/readiness checks and immutable approved-tuple selection;
 - provider adapter fixtures and an offline runner that generates redacted signed/retained receipts;
@@ -150,6 +158,12 @@ Stage 9 must consume these assets rather than re-encode them in configuration. I
 - canary cohort, promotion, disable and rollback mechanics;
 - metrics/alerts/dashboard/runbook evidence without content or high-cardinality labels.
 
-Stage 9 cannot mark a candidate approved merely because `make mlops-verify` passes. That gate proves
-governance consistency only. The current v2 real-provider receipt is separate evaluation evidence;
-provider-account approval plus deployed canary/rollback evidence remain required.
+`make mlops-verify` proves governance consistency only; it never approves a candidate by itself. The
+current signed v3.1 real-provider evaluation, provider-control approval, and content-free canary
+receipts are separate private evidence. Exactly one synthetic `CANARY_1` run succeeded for
+1210 micro-USD with 430 input tokens, 9 output tokens, and 3717ms latency; the 206-minute observation
+had zero failed/unknown runs, critical incidents, error-rate breach, cost overrun, or telemetry leak.
+Rollback restored `CONVERSATION_PROVIDER_RUNTIME_ENABLED=false` and canary percent `0`, and a fresh
+request then failed before run creation/provider I/O. Stage 9 is complete; `CANARY_5`, `CANARY_25`,
+`APPROVED_100`, real-user data, and Production activation each require their own future authorization
+and evidence.

@@ -16,6 +16,11 @@ quota:
   hostTimeStatus: {configMapName: authorization-host-time}
 secrets: {fingerprintSecretName: authorization-fingerprint, quotaKeySecretName: authorization-quota-key}
 identity: {jwtVerifierConfigMapName: authorization-identity-jwt}
+resourceCallers:
+  - namespace: platform-apps
+    podLabels: {app.kubernetes.io/name: conversation-service}
+    principal: prod.sajtech.internal/ns/platform-apps/sa/conversation-service
+    callerId: conversation-service
 observability:
   tracing: {enabled: true, otlpEndpoint: http://otel-collector.platform-observability-node.svc.cluster.local:4318/v1/traces, collector: {namespace: platform-observability-node, podLabels: {app.kubernetes.io/name: otel-collector}, port: 4318}}
   metrics: {enabled: true, prometheus: {namespace: platform-observability, podLabels: {app.kubernetes.io/name: prometheus}, principal: prod.sajtech.internal/ns/platform-observability/sa/prometheus}}

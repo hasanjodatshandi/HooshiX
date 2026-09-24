@@ -15,9 +15,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider {
-  static final String GOVERNANCE_RESOURCE = "mlops/governance/v2/governance.json";
+  static final String GOVERNANCE_RESOURCE = "mlops/governance/v3/governance.json";
   static final String PROMPT_RESOURCE = "mlops/prompts/conversation-system-v2.txt";
-  private static final String EXPECTED_DECISION_STATUS = "APPROVED_RUNTIME_ENABLED";
+  private static final String EXPECTED_DECISION_STATUS = "APPROVED_STAGING_CANARY";
   private static final String EXPECTED_DATA_CONTROL = "APPROVED";
   private final boolean runtimeEnabled;
   private final int canaryPercent;
@@ -85,7 +85,7 @@ public final class GitGovernedModelPolicyProvider implements ModelPolicyProvider
       JsonNode root, byte[] prompt, String expectedLifecycle) {
     try {
       if (!root.path("schema_version").isInt()
-          || root.path("schema_version").intValue() != 1
+          || root.path("schema_version").intValue() != 2
           || !EXPECTED_DECISION_STATUS.equals(text(root, "decision_status"))
           || !EXPECTED_DATA_CONTROL.equals(
               text(root.path("provider_data_controls"), "approval_status"))) {

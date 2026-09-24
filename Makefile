@@ -139,7 +139,7 @@ staging-verify:
 	scripts/platform/staging_verify.sh
 
 staging-erasure-recovery:
-	scripts/platform/staging_erasure_recovery.py
+	python3 scripts/platform/staging_erasure_recovery.py
 
 production-fidelity-up:
 	scripts/platform/platform_up.sh

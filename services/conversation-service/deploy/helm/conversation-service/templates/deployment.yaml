@@ -8,12 +8,12 @@
 {{- if eq $runtimeDbSecret $migrationDbSecret }}{{ fail "runtime and migration database credentials must use distinct Secrets" }}{{ end -}}
 {{- $contentSecret := required "secrets.contentKeyRingSecretName is required" .Values.secrets.contentKeyRingSecretName -}}
 {{- if .Values.runtime.eventRuntimeEnabled }}
-{{- required "kafka.bootstrapServers is required when event runtime is enabled" .Values.kafka.bootstrapServers -}}
-{{- required "kafka.connectionSecretName is required when event runtime is enabled" .Values.kafka.connectionSecretName -}}
-{{- required "identity.erasureTarget is required when event runtime is enabled" .Values.identity.erasureTarget -}}
+{{- if empty .Values.kafka.bootstrapServers }}{{ fail "kafka.bootstrapServers is required when event runtime is enabled" }}{{ end -}}
+{{- if empty .Values.kafka.connectionSecretName }}{{ fail "kafka.connectionSecretName is required when event runtime is enabled" }}{{ end -}}
+{{- if empty .Values.identity.erasureTarget }}{{ fail "identity.erasureTarget is required when event runtime is enabled" }}{{ end -}}
 {{- end }}
 {{- if .Values.runtime.providerRuntimeEnabled }}
-{{- required "secrets.providerApiKeySecretName is required when provider runtime is enabled" .Values.secrets.providerApiKeySecretName -}}
+{{- if empty .Values.secrets.providerApiKeySecretName }}{{ fail "secrets.providerApiKeySecretName is required when provider runtime is enabled" }}{{ end -}}
 {{- if not .Values.runtime.eventRuntimeEnabled }}{{ fail "provider runtime requires tenant lifecycle and erasure event runtime" }}{{ end -}}
 {{- if not (has (int .Values.runtime.providerCanaryPercent) (list 1 5 25 100)) }}{{ fail "runtime.providerCanaryPercent must be one approved canary step" }}{{ end -}}
 {{- if ne .Values.runtime.providerHost "api.openai.com" }}{{ fail "runtime.providerHost must remain the reviewed OpenAI endpoint" }}{{ end -}}
@@ -28,7 +28,7 @@
 {{- if not .Values.observability.tracing.enabled }}{{ fail "Day-One tracing must remain enabled" }}{{ end -}}
 {{- if not .Values.observability.metrics.enabled }}{{ fail "Day-One metrics must remain enabled" }}{{ end -}}
 {{- $traceEndpoint := required "observability.tracing.otlpEndpoint is required" .Values.observability.tracing.otlpEndpoint -}}
-{{- if not (regexMatch "^https?://[^[:space:]]+/v1/traces$" $traceEndpoint) }}{{ fail "observability tracing endpoint must be an explicit /v1/traces endpoint" }}{{ end -}}
+{{- if not (regexMatch "^https?://[^[:space:]]+/v1/traces$" $traceEndpoint) }}{{ fail "observability tracing endpoint must be an explicit /v1/traces endpoint" }}{{ end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

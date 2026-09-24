@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the destructive-to-test-state four-participant staging erasure recovery rehearsal."""
+"""Run the destructive-to-test-state five-participant staging erasure recovery rehearsal."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ DATA_NAMESPACE = "platform-data"
 APPLICATIONS = (
     "authorization-service",
     "compromised-password-service",
+    "conversation-service",
     "identity-service",
     "notification-service",
     "web-bff",
@@ -31,6 +32,7 @@ IMAGE_REPOSITORIES = {
 }
 PARTICIPANT_DATABASES = {
     "authorization": ("authorization_erasure_inbox", "authorization_erasure_evidence"),
+    "conversation": ("conversation_erasure_inbox", "conversation_erasure_evidence"),
     "identity": ("identity_erasure_command_inbox", "identity_erasure_evidence"),
     "notification": ("notification_erasure_inbox", "notification_erasure_evidence"),
     "web_bff": ("web_bff_erasure_inbox", "web_bff_erasure_evidence"),
@@ -113,7 +115,7 @@ VALUES ('{request_id}','{user_id}','IN_PROGRESS','1',CURRENT_TIMESTAMP,CURRENT_T
 INSERT INTO identity_erasure_participant(erasure_request_id,participant,state,updated_at)
 SELECT '{request_id}',participant,'PENDING',CURRENT_TIMESTAMP
 FROM unnest(ARRAY[
-  'IDENTITY_SERVICE','AUTHORIZATION_SERVICE','NOTIFICATION_SERVICE','WEB_BFF'
+  'IDENTITY_SERVICE','AUTHORIZATION_SERVICE','CONVERSATION_SERVICE','NOTIFICATION_SERVICE','WEB_BFF'
 ]::text[]) AS participant;
 INSERT INTO identity_erasure_event_outbox(
   event_id,erasure_request_id,event_type,participant_policy_version,state,attempt_count,
@@ -252,7 +254,8 @@ def _scale(replicas: int) -> None:
 
 def _wait_complete(user_id: uuid.UUID, request_id: uuid.UUID, timeout_seconds: int) -> None:
     expected = (
-        "COMPLETED|DELETED|AUTHORIZATION_SERVICE:COMPLETED,IDENTITY_SERVICE:COMPLETED,"
+        "COMPLETED|DELETED|AUTHORIZATION_SERVICE:COMPLETED,CONVERSATION_SERVICE:COMPLETED,"
+        "IDENTITY_SERVICE:COMPLETED,"
         "NOTIFICATION_SERVICE:COMPLETED,WEB_BFF:COMPLETED"
     )
     query = f"""
@@ -269,7 +272,7 @@ GROUP BY r.state,u.status;
         if _psql(query, "identity", capture=True) == expected:
             return
         time.sleep(1)
-    raise RehearsalError("four-participant erasure did not complete within the bound")
+    raise RehearsalError("five-participant erasure did not complete within the bound")
 
 
 def _verify_participants(request_id: uuid.UUID) -> None:
@@ -300,7 +303,7 @@ def staging_evidence(revision: str) -> dict[str, object]:
         "executed": True,
         "redeploy_completed": True,
         "restore_completed": True,
-        "participant_count": 4,
+        "participant_count": 5,
         "identity_deleted": True,
         "no_reappearance": True,
         "passed": True,

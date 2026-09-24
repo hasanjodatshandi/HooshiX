@@ -69,7 +69,7 @@ public final class ConversationErasureReceiptDispatcher {
       transactions.executeWithoutResult(
           ignored ->
               dsl.execute(
-                  "UPDATE conversation_erasure_receipt_outbox SET state='PUBLISHED',published_at=?,lease_until=NULL,last_error_class=NULL,updated_at=? WHERE event_id=? AND state='DISPATCHING'",
+                  "UPDATE conversation_erasure_receipt_outbox SET state='PUBLISHED',published_at=CAST(? AS TIMESTAMP WITH TIME ZONE),lease_until=NULL,last_error_class=NULL,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE event_id=? AND state='DISPATCHING'",
                   ts(done),
                   ts(done),
                   item.eventId()));
@@ -84,14 +84,14 @@ public final class ConversationErasureReceiptDispatcher {
 
   private Optional<Item> claim(Instant now) {
     return dsl.fetchOptional(
-            "SELECT event_id,erasure_request_id,participant_policy_version,action_categories,attempt_count,occurred_at FROM conversation_erasure_receipt_outbox WHERE state IN ('PENDING','DISPATCHING') AND next_attempt_at<=? AND (lease_until IS NULL OR lease_until<=?) ORDER BY next_attempt_at,event_id LIMIT 1 FOR UPDATE SKIP LOCKED",
+            "SELECT event_id,erasure_request_id,participant_policy_version,action_categories,attempt_count,occurred_at FROM conversation_erasure_receipt_outbox WHERE state IN ('PENDING','DISPATCHING') AND next_attempt_at<=CAST(? AS TIMESTAMP WITH TIME ZONE) AND (lease_until IS NULL OR lease_until<=CAST(? AS TIMESTAMP WITH TIME ZONE)) ORDER BY next_attempt_at,event_id LIMIT 1 FOR UPDATE SKIP LOCKED",
             ts(now),
             ts(now))
         .map(
             row -> {
               UUID id = row.get("event_id", UUID.class);
               dsl.execute(
-                  "UPDATE conversation_erasure_receipt_outbox SET state='DISPATCHING',lease_until=?,updated_at=? WHERE event_id=?",
+                  "UPDATE conversation_erasure_receipt_outbox SET state='DISPATCHING',lease_until=CAST(? AS TIMESTAMP WITH TIME ZONE),updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE event_id=?",
                   ts(now.plus(LEASE)),
                   ts(now),
                   id);
@@ -113,14 +113,14 @@ public final class ConversationErasureReceiptDispatcher {
         ignored -> {
           if (attempt >= MAX_ATTEMPTS) {
             dsl.execute(
-                "UPDATE conversation_erasure_receipt_outbox SET state='EXHAUSTED',attempt_count=?,lease_until=NULL,last_error_class=?,updated_at=? WHERE event_id=? AND state='DISPATCHING'",
+                "UPDATE conversation_erasure_receipt_outbox SET state='EXHAUSTED',attempt_count=?,lease_until=NULL,last_error_class=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE event_id=? AND state='DISPATCHING'",
                 attempt,
                 error,
                 ts(now),
                 item.eventId());
           } else {
             dsl.execute(
-                "UPDATE conversation_erasure_receipt_outbox SET state='PENDING',attempt_count=?,next_attempt_at=?,lease_until=NULL,last_error_class=?,updated_at=? WHERE event_id=? AND state='DISPATCHING'",
+                "UPDATE conversation_erasure_receipt_outbox SET state='PENDING',attempt_count=?,next_attempt_at=CAST(? AS TIMESTAMP WITH TIME ZONE),lease_until=NULL,last_error_class=?,updated_at=CAST(? AS TIMESTAMP WITH TIME ZONE) WHERE event_id=? AND state='DISPATCHING'",
                 attempt,
                 ts(now.plusSeconds(Math.min(300, 1L << Math.min(attempt - 1, 8)))),
                 error,

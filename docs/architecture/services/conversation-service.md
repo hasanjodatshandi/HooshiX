@@ -5,9 +5,10 @@
 `conversation-service` is the implemented foundation plus private Conversation CRUD/lifecycle,
 encrypted Message history, budgeted ModelRun acceptance/cancellation, and the bounded provider
 worker/completion slice of the ADR-0054 bounded context. Ordered tenant lifecycle, erasure, and the
-BFF/UI journey are implemented. Provider telemetry, transport cancellation, and the real-provider
-offline safety evaluation are implemented and verified. Provider-account approval plus deployed
-canary/rollback evidence remain incomplete, so product runtime activation stays disabled. Its current
+BFF/UI journey are implemented. Provider telemetry, transport cancellation, real-provider offline
+safety evaluation, staging-only provider-account approval, one-percent synthetic canary observation,
+and rollback evidence are implemented and verified. Stage 9 is complete and the product runtime is
+intentionally safe-disabled after the canary; Production activation remains unauthorized. Its current
 repository boundary is:
 
 ```text
@@ -144,7 +145,8 @@ Critical transactions are:
    release queued reservations, and retain running reservations until reconciliation;
 5. Conversation delete (implemented for current owned state): cancel queued work, release its
    reservations, request cancellation for running work, detach and erase Message ciphertext, and
-   erase title ciphertext atomically. Tenant lifecycle/ADR-0028 erasure remains pending.
+   erase title ciphertext atomically. Tenant lifecycle/ADR-0028 Inbox, purge, receipt, retry, and
+   restore/replay behavior are also implemented and exercised in the five-participant staging lane.
 
 No Authorization, provider, Kafka, Redis, OpenBao, telemetry, or other remote I/O runs in a database
 transaction or while a database lock is held. Failed transactions are not retried inside the same
@@ -184,11 +186,15 @@ The adapter, worker, file-backed credential boundary, exact governance tuple loa
 one-attempt deadline, lease expiry, global/per-tenant concurrency, circuit suppression, provider
 refusal/safety mapping, local foreground HTTP cancellation, bounded telemetry, signed content-free
 evaluation runner, exact conditional egress, and deterministic tenant canary are implemented.
-Transport cancellation does not claim remote provider compute or cost stopped. The committed
-governance tuple remains execution-disabled pending reviewed provider-account data-control evidence,
-owner approval references, and deployed canary/rollback observation. The v2 offline provider suite
-passed 12/12 with all eight critical cases and zero provider errors at evaluator `3.1.0`; this is
-evaluation evidence only, not live product runtime or canary evidence.
+Transport cancellation does not claim remote provider compute or cost stopped. The committed v3
+governance tuple is eligible only for staging `CANARY_1`; Helm defaults and the post-canary deployed
+runtime remain disabled/zero. A private signed staging receipt records the
+reviewed provider-account data controls and named owner approvals without exposing organization or
+project identifiers. The v3.1 offline provider receipt passed 12/12 with all eight critical cases and
+zero provider errors at evaluator `3.1.0`. Exactly one synthetic one-percent canary then succeeded on
+runtime commit `afb738d6623316e876ed938e0869bba39b8a21a7`, followed by a 206-minute incident/error/leak-free
+observation and a verified rollback to disabled/zero. The post-rollback negative request failed before
+run creation or provider I/O. This is staging Stage 9 evidence, not Production activation evidence.
 
 ## 8. Cost and abuse safety
 
@@ -254,10 +260,11 @@ ServiceAccount, immutable digest, restricted non-root security context, finite r
 Ambient mTLS, deny-by-default NetworkPolicy, exact BFF/Authorization/Kafka/PostgreSQL/OpenBao/
 Collector/DNS/OpenAI egress, and no public Service.
 
-Worker/API toggles may provide rollback inside the same deployment, but they do not create a second
-deployable. Provider execution stays disabled until credentials, the exact model/prompt/price/eval
-tuple passes ADR-0057 promotion and provider-data-control approval, and egress, privacy, quota/cost,
-load, erasure, provider-fixture, canary, and rollback evidence pass.
+Worker/API toggles provide rollback inside the same deployment, but they do not create a second
+deployable. The Stage 9 staging tuple passed credentials, evaluation, provider-data-control, egress,
+privacy, quota/cost, load, erasure, provider-fixture, one-percent canary, and rollback gates. Provider
+execution nevertheless stays disabled after the exercise. Any later canary step or Production enablement
+requires a fresh environment-specific authorization and current evidence for the exact tuple/digest.
 
 ## 12. First vertical-slice Definition of Done
 

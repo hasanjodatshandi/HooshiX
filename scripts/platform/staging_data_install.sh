@@ -12,8 +12,10 @@ kafka_pod=$(k get pod -n platform-data -l app.kubernetes.io/name=kafka -o jsonpa
 for spec in \
   'hooshix.identity.erasure.command.v1 3024000000' \
   'hooshix.identity.erasure.receipt.v1 3024000000' \
+  'hooshix.identity.tenant.lifecycle.v1 3024000000' \
   'hooshix.identity.erasure.command.v1.DLT 1209600000' \
-  'hooshix.identity.erasure.receipt.v1.DLT 1209600000'; do
+  'hooshix.identity.erasure.receipt.v1.DLT 1209600000' \
+  'hooshix.identity.tenant.lifecycle.v1.DLT 1209600000'; do
   read -r topic retention <<<"$spec"
   k exec -n platform-data "$kafka_pod" -- /opt/kafka/bin/kafka-topics.sh \
     --bootstrap-server localhost:9093 --create --if-not-exists --topic "$topic" \

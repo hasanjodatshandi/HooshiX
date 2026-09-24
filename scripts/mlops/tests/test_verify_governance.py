@@ -19,7 +19,7 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
         shutil.copytree(self.repository_root / "mlops", destination / "mlops")
 
     def update_governance(self, root: Path, mutate) -> None:
-        path = root / "mlops/governance/v2/governance.json"
+        path = root / "mlops/governance/v3/governance.json"
         value = json.loads(path.read_text(encoding="utf-8"))
         mutate(value)
         path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -31,9 +31,16 @@ class MlopsGovernanceVerifierTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_bundle(root)
-            self.update_governance(root, lambda value: value["model_catalog"][0].update(execution_enabled=True))
+            self.update_governance(root, lambda value: value["provider_data_controls"].update(approval_status="PENDING_ORGANIZATION_VERIFICATION"))
             errors = verifier.validate(root)
-            self.assertTrue(any("execution must remain disabled" in error for error in errors))
+            self.assertTrue(any("provider approval must be recorded" in error for error in errors))
+
+    def test_production_or_real_user_scope_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.copy_bundle(root)
+            self.update_governance(root, lambda value: value["provider_data_controls"].update(approval_scope="PRODUCTION"))
+            self.assertTrue(any("scope must prohibit" in error for error in verifier.validate(root)))
 
     def test_prompt_tamper_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

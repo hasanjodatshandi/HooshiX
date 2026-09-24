@@ -124,7 +124,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify pinned WAF build and embedded regression tests
-        run: docker build --provenance=false --pull=false -t hooshix-waf-verification infrastructure/waf
+        run: |
+          source infrastructure/waf/pins.env
+          docker build --provenance=false --pull=false \
+            --build-arg "SOURCE_DATE_EPOCH=${WAF_SOURCE_DATE_EPOCH}" \
+            -t hooshix-waf-verification infrastructure/waf
       - name: Validate packaged Caddy and Coraza configuration
         run: >-
           docker run --rm --network none --read-only --cap-drop ALL

@@ -16,6 +16,8 @@ spec:
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: notification-service}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: conversation-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-observability}}
           podSelector: {matchLabels: {app.kubernetes.io/name: prometheus}}
@@ -35,4 +37,6 @@ spec:
           podSelector: {matchLabels: {app.kubernetes.io/name: web-bff}}
         - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
           podSelector: {matchLabels: {app.kubernetes.io/name: identity-service}}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: platform-apps}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: conversation-service}}
       ports: [{protocol: TCP, port: 15008}]

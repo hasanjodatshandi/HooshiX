@@ -20,7 +20,7 @@ Stop the lane with:
 make production-fidelity-down
 ```
 
-`production-fidelity-up` stops the fast host-JVM lane before creating the cluster, verifies the required inotify limits, creates the pinned kind/Calico/Gateway API foundation and local registry, builds the pinned WAF image, installs Istio Ambient and Kyverno, installs the edge, creates the generated Compromised Password staging fixture, installs local staging PostgreSQL/Redis/Kafka, installs observability, builds the five application images, deploys the five Helm releases, and runs the composite verifier.
+`production-fidelity-up` stops the fast host-JVM lane before creating the cluster, verifies the required inotify limits, creates the pinned kind/Calico/Gateway API foundation and local registry, builds the pinned WAF image, installs Istio Ambient and Kyverno, installs the edge, creates the generated Compromised Password staging fixture, installs local staging PostgreSQL/Redis/Kafka, installs observability, builds the six application images, deploys the six Helm releases, and runs the composite verifier.
 
 ## Implemented local stack
 
@@ -207,9 +207,9 @@ It verifies at least:
 - Istio control plane/CNI/ztunnel and non-blocking `istioctl analyze`;
 - Kyverno CEL policy positives/negatives;
 - PostgreSQL/Redis/Kafka images, runtime policy, Kafka topic retention, roles, and the complete runtime-role/database `CONNECT` isolation matrix;
-- all five application Helm releases, exact image digests, ServiceAccounts, waypoint readiness, Flyway counts, browser bootstrap, and BFF-to-Identity non-enumerating negative authentication;
+- all six application Helm releases, exact image digests, ServiceAccounts, waypoint readiness, Flyway counts, browser bootstrap, and BFF-to-Identity non-enumerating negative authentication;
 - public Traefik -> WAF -> BFF traversal, direct-bypass denial, STRICT mTLS, workload-identity positives/negatives, and edge secret-canary log absence;
-- Prometheus targets for all five services and all Collector instances;
+- Prometheus targets for all six services and all Collector instances;
 - Collector -> Tempo trace canary;
 - Collector -> Loki safe-log canary and privacy-canary rejection;
 - Grafana hardened datasource health;
@@ -220,7 +220,7 @@ Info-level `istioctl analyze` diagnostics are reported but are not equivalent to
 
 ## Staging erasure recovery rehearsal
 
-After all five images have been built and deployed from a clean current commit and the composite
+After all six images have been built and deployed from a clean current commit and the composite
 verifier passes, run the destructive-to-test-state rehearsal:
 
 ```bash
@@ -228,15 +228,15 @@ make staging-erasure-recovery
 ```
 
 The runner refuses a dirty worktree, a non-`kind-platform-local` current context, stale/dirty image
-provenance, missing one-replica readiness, or any database outside the four participant-owned
-databases. It scales the five applications to zero, inserts one synthetic identifier-only Identity
-request, snapshots Authorization/Identity/Notification/Web BFF with PostgreSQL custom-format dumps,
+provenance, missing one-replica readiness, or any database outside the five participant-owned
+databases. It scales the six applications to zero, inserts one synthetic identifier-only Identity
+request, snapshots Authorization/Conversation/Identity/Notification/Web BFF with PostgreSQL custom-format dumps,
 and then:
 
-1. starts the exact deployed images and requires all four durable participant receipts plus Identity
+1. starts the exact deployed images and requires all five durable participant receipts plus Identity
    `COMPLETED/DELETED` state;
 2. restarts every application deployment and rechecks the immutable terminal evidence;
-3. stops applications, restores all four pre-completion snapshots in bounded single transactions,
+3. stops applications, restores all five pre-completion snapshots in bounded single transactions,
    starts the same images, and requires normal Outbox/Kafka/Inbox replay to reach the same terminal
    state without reappearance.
 

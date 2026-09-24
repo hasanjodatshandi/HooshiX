@@ -5,7 +5,7 @@ state="$ROOT/.platform-runtime/staging/images.env"
 [[ -f "$state" ]] || fail "staging image provenance state is missing; run staging-build"
 source "$state"
 python3 "$ROOT/scripts/platform/git_provenance.py" --root "$ROOT" verify --revision "$BUILD_GIT_REVISION" --source-state "$BUILD_SOURCE_STATE" --worktree-sha256 "$BUILD_WORKTREE_SHA256" >/dev/null
-for service in compromised-password-service notification-service authorization-service identity-service web-bff; do
+for service in compromised-password-service notification-service authorization-service identity-service conversation-service web-bff; do
   status=$(h status "$service" -n platform-apps -o json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["status"])')
   [[ "$status" == deployed ]] || fail "$service Helm release is not deployed: $status"
   k rollout status deployment/$service -n platform-apps --timeout=30s >/dev/null
@@ -16,7 +16,7 @@ for service in compromised-password-service notification-service authorization-s
   expected_image="${!repo_var}@${!digest_var}"
   [[ "$img" == "$expected_image" ]] || fail "$service exact image mismatch: $img"
 done
-for policy in authorization-service-waypoint authorization-service-ztunnel identity-service-waypoint identity-service-ztunnel web-bff-waypoint web-bff-ztunnel; do
+for policy in authorization-service-waypoint authorization-service-ztunnel conversation-service-waypoint conversation-service-ztunnel identity-service-waypoint identity-service-ztunnel web-bff-waypoint web-bff-ztunnel; do
   if [[ "$policy" == *-waypoint ]]; then condition=WaypointAccepted; else condition=ZtunnelAccepted; fi
   accepted=$(k get authorizationpolicy "$policy" -n platform-apps -o "jsonpath={.status.conditions[?(@.type==\"$condition\")].status}:{.status.conditions[?(@.type==\"$condition\")].reason}" 2>/dev/null || true)
   [[ "$accepted" == True:Accepted ]] || fail "$policy is not accepted: $accepted"
@@ -41,10 +41,14 @@ login=$(curl -skS --resolve localhost:8443:127.0.0.1 -b "$tmp/cookies" -o "$tmp/
 login_code=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("code","MISSING"))' "$tmp/login")
 [[ "$login/$login_code" == 401/AUTHENTICATION_FAILED ]] || fail "BFF -> Identity negative smoke mismatch: $login/$login_code"
 pg=$(k get pod -n platform-data -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].metadata.name}')
-for spec in 'authorization 4 authorization_migration' 'identity 13 identity_migration' 'notification 7 notification_migration' 'web_bff 1 web_bff_migration'; do set -- $spec; db=$1; expected=$2; owner=$3; n=$(k exec -n platform-data "$pg" -- psql -U postgres -d "$db" -Atc 'select count(*) from flyway_schema_history where success'); [[ "$n" == "$expected" ]] || fail "$db Flyway count mismatch: $n"; actual=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select pg_get_userbyid(datdba) from pg_database where datname='$db'"); [[ "$actual" == "$owner" ]] || fail "$db owner mismatch: $actual"; done
-matrix=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select rolname||':'||has_database_privilege(rolname,'authorization','CONNECT')||':'||has_database_privilege(rolname,'identity','CONNECT')||':'||has_database_privilege(rolname,'notification','CONNECT')||':'||has_database_privilege(rolname,'web_bff','CONNECT') from pg_roles where rolname in ('authorization_runtime','identity_runtime','notification_runtime','web_bff_runtime') order by rolname")
-expected_matrix=$'authorization_runtime:true:false:false:false\nidentity_runtime:false:true:false:false\nnotification_runtime:false:false:true:false\nweb_bff_runtime:false:false:false:true'
+for spec in 'authorization 4 authorization_migration' 'conversation 6 conversation_migration' 'identity 14 identity_migration' 'notification 7 notification_migration' 'web_bff 1 web_bff_migration'; do set -- $spec; db=$1; expected=$2; owner=$3; n=$(k exec -n platform-data "$pg" -- psql -U postgres -d "$db" -Atc 'select count(*) from flyway_schema_history where success'); [[ "$n" == "$expected" ]] || fail "$db Flyway count mismatch: $n"; actual=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select pg_get_userbyid(datdba) from pg_database where datname='$db'"); [[ "$actual" == "$owner" ]] || fail "$db owner mismatch: $actual"; done
+matrix=$(k exec -n platform-data "$pg" -- psql -U postgres -d postgres -Atc "select rolname||':'||has_database_privilege(rolname,'authorization','CONNECT')||':'||has_database_privilege(rolname,'conversation','CONNECT')||':'||has_database_privilege(rolname,'identity','CONNECT')||':'||has_database_privilege(rolname,'notification','CONNECT')||':'||has_database_privilege(rolname,'web_bff','CONNECT') from pg_roles where rolname in ('authorization_runtime','conversation_runtime','identity_runtime','notification_runtime','web_bff_runtime') order by rolname")
+expected_matrix=$'authorization_runtime:true:false:false:false:false\nconversation_runtime:false:true:false:false:false\nidentity_runtime:false:false:true:false:false\nnotification_runtime:false:false:false:true:false\nweb_bff_runtime:false:false:false:false:true'
 [[ "$matrix" == "$expected_matrix" ]] || fail "runtime database CONNECT isolation mismatch"
+provider_enabled=$(k get deployment conversation-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CONVERSATION_PROVIDER_RUNTIME_ENABLED")].value}')
+provider_canary=$(k get deployment conversation-service -n platform-apps -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CONVERSATION_PROVIDER_CANARY_PERCENT")].value}')
+[[ "$provider_enabled/$provider_canary" == false/0 ]] || fail "Conversation safe-disabled runtime mismatch: $provider_enabled/$provider_canary"
+k get secret conversation-provider -n platform-apps >/dev/null
 authorization_tenant_rls=$(k exec -n platform-data "$pg" -- psql -U postgres -d authorization -Atc "SELECT relrowsecurity||':'||relforcerowsecurity FROM pg_class WHERE oid='authorization_tenant_projection'::regclass")
 [[ "$authorization_tenant_rls" == true:true ]] || fail "authorization tenant projection forced RLS mismatch: $authorization_tenant_rls"
 template_privileges=$(k exec -n platform-data "$pg" -- psql -U postgres -d notification -Atc "SELECT table_name||':'||has_table_privilege('notification_runtime','public.'||table_name,'SELECT')||':'||has_table_privilege('notification_runtime','public.'||table_name,'INSERT')||':'||has_table_privilege('notification_runtime','public.'||table_name,'UPDATE')||':'||has_table_privilege('notification_runtime','public.'||table_name,'DELETE') FROM (VALUES ('notification_template_activation'),('notification_template_audit'),('notification_template_definition'),('notification_template_version')) AS t(table_name) ORDER BY table_name")
@@ -70,4 +74,4 @@ ready=$(k get --raw='/readyz' | tail -1); [[ "$ready" == ok ]] || fail "Kubernet
 mount_source=$(docker inspect platform-local-control-plane --format '{{range .Mounts}}{{if eq .Destination "/var/lib/etcd"}}{{.Source}}{{end}}{{end}}')
 [[ "$mount_source" == '/dev/shm/hooshix-kind/etcd' ]] || fail "kind etcd is not bind-mounted from the reviewed WSL tmpfs path: $mount_source"
 [[ "$(findmnt -n -o FSTYPE /dev/shm)" == tmpfs ]] || fail "/dev/shm is not tmpfs on the WSL host"
-echo "Five-service staging and persistence verification PASSED"
+echo "Six-service staging and persistence verification PASSED"

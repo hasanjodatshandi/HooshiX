@@ -303,7 +303,7 @@ def verify_signature(receipt: dict[str, Any], signing_key: bytes) -> bool:
 
 def run(api_key_path: Path, signing_key_path: Path, output_path: Path) -> dict[str, Any]:
     suite_path = ROOT / "mlops/evaluations/conversation-v2.json"
-    governance_path = ROOT / "mlops/governance/v2/governance.json"
+    governance_path = ROOT / "mlops/governance/v3/governance.json"
     prompt_path = ROOT / "mlops/prompts/conversation-system-v2.txt"
     suite, governance = load(suite_path), load(governance_path)
     model, price = governance["model_catalog"][0], governance["price_catalog"][0]

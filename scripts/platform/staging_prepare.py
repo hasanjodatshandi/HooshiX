@@ -31,7 +31,7 @@ def ring(rel: str):
 def main():
     os.umask(0o077)
     FILES.mkdir(parents=True,exist_ok=True)
-    names=['postgres_admin','authorization_migration','authorization_runtime','identity_migration','identity_runtime','notification_migration','notification_runtime','web_bff_migration','web_bff_runtime','redis_health','redis_verify','grafana_admin','redis_authorization','redis_identity','redis_webbff']
+    names=['postgres_admin','authorization_migration','authorization_runtime','conversation_migration','conversation_runtime','identity_migration','identity_runtime','notification_migration','notification_runtime','web_bff_migration','web_bff_runtime','redis_health','redis_verify','grafana_admin','redis_authorization','redis_identity','redis_webbff']
     if META.exists():
         try: data=json.loads(META.read_text(encoding='utf-8'))
         except (OSError,json.JSONDecodeError) as exc: raise SystemExit('staging metadata is unreadable or invalid JSON') from exc
@@ -41,7 +41,7 @@ def main():
     data=validate_metadata(data,names)
     META.write_text(json.dumps(data,sort_keys=True)+'\n',encoding='utf-8'); META.chmod(0o600)
     write('postgres-admin/password',data['postgres_admin'],False)
-    for service,key in (('authorization','authorization'),('identity','identity'),('notification','notification'),('web-bff','web_bff')):
+    for service,key in (('authorization','authorization'),('conversation','conversation'),('identity','identity'),('notification','notification'),('web-bff','web_bff')):
         for role in ('migration','runtime'):
             d=f'{service}-db-{role}'
             write(f'{d}/spring.datasource.username',f'{key}_{role}',False)
@@ -51,7 +51,7 @@ def main():
     write('identity-quota-redis/quota_redis_uri',f"redis://identity:{data['redis_identity']}@{redis_host}",False)
     write('web-bff-redis/WEB_BFF_REDIS_URI',f"redis://webbff:{data['redis_webbff']}@{redis_host}",False)
     kafka_bootstrap='kafka.platform-data.svc.cluster.local:9093'
-    for service in ('authorization','identity','notification','web-bff'):
+    for service in ('authorization','conversation','identity','notification','web-bff'):
         write(f'{service}-kafka/spring.kafka.bootstrap-servers',kafka_bootstrap,False)
     write('redis-health/password',data['redis_health'],False)
     write('grafana-admin/password',data['grafana_admin'],False)
@@ -65,7 +65,7 @@ def main():
         f"user webbff on >{data['redis_webbff']} ~* +@all",
     ])
     write('redis-acl/users.acl',acl)
-    for rel in ['authorization-fingerprint/fingerprint.properties','authorization-quota-key/quota.properties','identity-fingerprint/fingerprint.properties','identity-challenge/challenge.properties','identity-handoff/handoff.properties','identity-mfa/mfa.properties','identity-quota/quota.properties','identity-refresh/refresh.properties','notification-fingerprint/fingerprint.properties','notification-delivery/delivery.properties','web-bff-locator/locator.properties','web-bff-csrf/csrf.properties','web-bff-refresh/refresh.properties','web-bff-quota/quota.properties']:
+    for rel in ['authorization-fingerprint/fingerprint.properties','authorization-quota-key/quota.properties','conversation-content/content.properties','identity-fingerprint/fingerprint.properties','identity-challenge/challenge.properties','identity-handoff/handoff.properties','identity-mfa/mfa.properties','identity-quota/quota.properties','identity-refresh/refresh.properties','notification-fingerprint/fingerprint.properties','notification-delivery/delivery.properties','web-bff-locator/locator.properties','web-bff-csrf/csrf.properties','web-bff-refresh/refresh.properties','web-bff-quota/quota.properties']:
         ring(rel)
     priv=FILES/'identity-jwt-private'/'signing.properties'; pub=FILES/'identity-jwt-public'/'verifier.properties'
     if priv.exists() != pub.exists(): raise SystemExit('incomplete staging JWT material; remove .platform-runtime/staging/files/identity-jwt-*')

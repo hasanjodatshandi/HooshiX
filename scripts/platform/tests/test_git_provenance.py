@@ -44,6 +44,12 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   authorization=(REPO_ROOT/"infrastructure/staging/authorizationpolicy.yaml").read_text()
   self.assertIn("name: kafka",authorization)
   self.assertIn("sa/notification-service",authorization)
+  for text,needle in ((policy,"app.kubernetes.io/name: conversation-service"),(authorization,"sa/conversation-service")):
+   documents=text.split("\n---\n")
+   by_name={next(line for line in document.splitlines() if line.startswith("metadata: {name:")): document for document in documents}
+   self.assertIn(needle,by_name["metadata: {name: postgresql, namespace: platform-data}"])
+   self.assertIn(needle,by_name["metadata: {name: kafka, namespace: platform-data}"])
+   self.assertNotIn(needle,by_name["metadata: {name: security-redis, namespace: platform-data}"])
  def test_identity_staging_binds_every_required_key_ring(self):
   values=(REPO_ROOT/"deploy/staging/identity-service.yaml").read_text()
   for secret in ("identity-fingerprint","identity-challenge","identity-handoff","identity-mfa","identity-quota","identity-refresh","identity-jwt-private"):
@@ -74,4 +80,17 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   secrets=(REPO_ROOT/"scripts/platform/staging_secrets_apply.sh").read_text()
   for name in ("authorization-kafka","identity-kafka","notification-kafka","web-bff-kafka"):
    self.assertIn(name,secrets)
+ def test_conversation_is_wired_through_waypoint_and_authorization(self):
+  waypoint=(REPO_ROOT/"infrastructure/istio/platform-apps-waypoint-networkpolicy.yaml").read_text()
+  self.assertEqual(2,waypoint.count("app.kubernetes.io/name: conversation-service"))
+  conversation=(REPO_ROOT/"services/conversation-service/deploy/helm/conversation-service/templates/networkpolicy.yaml").read_text()
+  self.assertGreaterEqual(conversation.count("gateway.networking.k8s.io/gateway-name"),2)
+  authorization=(REPO_ROOT/"deploy/staging/authorization-service.yaml").read_text()
+  for value in ("resourceCallers:","app.kubernetes.io/name: conversation-service","sa/conversation-service","callerId: conversation-service"):
+   self.assertIn(value,authorization)
+  conversation_values=(REPO_ROOT/"deploy/staging/conversation-service.yaml").read_text()
+  self.assertIn("providerRuntimeEnabled: false",conversation_values)
+  self.assertIn("providerCanaryPercent: 0",conversation_values)
+  verifier=(REPO_ROOT/"scripts/platform/staging_verify.sh").read_text()
+  self.assertIn('false/0 ]] || fail "Conversation safe-disabled runtime mismatch',verifier)
 if __name__=="__main__": unittest.main()

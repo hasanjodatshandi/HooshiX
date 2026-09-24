@@ -65,6 +65,32 @@ class DeterministicBootstrapTest(unittest.TestCase):
         self.assertIn("hostPath: /dev/shm/hooshix-kind/etcd", cluster)
         self.assertIn("/dev/shm/hooshix-kind/etcd", staging)
 
+    def test_staging_flyway_counts_match_owned_migrations(self) -> None:
+        verifier = (ROOT / "scripts/platform/staging_verify.sh").read_text(encoding="utf-8")
+        match = re.search(r"for spec in (.*?); do set -- \$spec", verifier)
+        self.assertIsNotNone(match)
+        declared = {
+            database: int(count)
+            for database, count, _owner in re.findall(r"'([a-z_]+) ([0-9]+) ([a-z_]+)'", match.group(1))
+        }
+        service_for_database = {
+            "authorization": "authorization-service",
+            "conversation": "conversation-service",
+            "identity": "identity-service",
+            "notification": "notification-service",
+            "web_bff": "web-bff",
+        }
+        self.assertEqual(set(declared), set(service_for_database))
+        for database, service in service_for_database.items():
+            migrations = (ROOT / "services" / service / "src/main/resources/db/migration").glob("V*.sql")
+            self.assertEqual(declared[database], sum(1 for _migration in migrations), database)
+
+    def test_staging_kafka_provisions_conversation_lifecycle_topics(self) -> None:
+        for script_name in ("staging_data_install.sh", "staging_data_verify.sh"):
+            script = (ROOT / "scripts/platform" / script_name).read_text(encoding="utf-8")
+            self.assertIn("hooshix.identity.tenant.lifecycle.v1 3024000000", script)
+            self.assertIn("hooshix.identity.tenant.lifecycle.v1.DLT 1209600000", script)
+
     def test_pre_edge_istio_verify_is_foundation_only(self) -> None:
         istio = (ROOT / "scripts/platform/istio_verify.sh").read_text(encoding="utf-8")
         edge = (ROOT / "scripts/platform/edge_verify.sh").read_text(encoding="utf-8")
@@ -91,6 +117,17 @@ class DeterministicBootstrapTest(unittest.TestCase):
         self.assertIn("- edge-waf-security", workflow)
         self.assertIn("${{ needs.edge-waf-security.result }}", workflow)
         self.assertIn('if [ "${EDGE_WAF_RESULT}" != \'success\' ]', workflow)
+
+    def test_waf_build_normalizes_layer_timestamps(self) -> None:
+        dockerfile = (ROOT / "infrastructure/waf/Dockerfile").read_text(encoding="utf-8")
+        builder = (ROOT / "scripts/platform/waf_build.sh").read_text(encoding="utf-8")
+        pins = (ROOT / "infrastructure/waf/pins.env").read_text(encoding="utf-8")
+        self.assertIn("ARG SOURCE_DATE_EPOCH", dockerfile)
+        self.assertIn('touch -h -d "@${SOURCE_DATE_EPOCH}" /usr/bin/caddy', dockerfile)
+        self.assertIn('find /tmp/crs -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +', dockerfile)
+        self.assertRegex(pins, r"(?m)^WAF_SOURCE_DATE_EPOCH=[1-9][0-9]*$")
+        self.assertIn('--build-arg "SOURCE_DATE_EPOCH=$WAF_SOURCE_DATE_EPOCH"', builder)
+        self.assertIn("rewrite-timestamp=true,unpack=false", builder)
 
     def test_traefik_access_log_uses_chart_41_allowlist(self) -> None:
         values = (ROOT / "infrastructure/traefik/values-local.yaml").read_text(encoding="utf-8")
