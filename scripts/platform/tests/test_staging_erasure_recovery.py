@@ -32,7 +32,7 @@ class StagingErasureRecoveryTest(unittest.TestCase):
             self.assertIn(f"--timeout={expected}s", call.args)
             self.assertEqual(expected + 10, call.kwargs["timeout"])
 
-    def test_image_state_requires_exact_five_service_repositories_and_digests(self):
+    def test_image_state_requires_exact_six_service_repositories_and_digests(self):
         lines = [
             "BUILD_GIT_REVISION=" + "a" * 40,
             "BUILD_SOURCE_STATE=clean",
@@ -47,7 +47,7 @@ class StagingErasureRecoveryTest(unittest.TestCase):
                 ]
             )
         valid = "\n".join(lines) + "\n"
-        self.assertEqual(13, len(rehearsal.parse_image_state(valid)))
+        self.assertEqual(15, len(rehearsal.parse_image_state(valid)))
 
         with self.assertRaisesRegex(rehearsal.RehearsalError, "invalid"):
             rehearsal.parse_image_state(valid + "UNEXPECTED=value\n")
@@ -63,6 +63,7 @@ class StagingErasureRecoveryTest(unittest.TestCase):
         for participant in (
             "IDENTITY_SERVICE",
             "AUTHORIZATION_SERVICE",
+            "CONVERSATION_SERVICE",
             "NOTIFICATION_SERVICE",
             "WEB_BFF",
         ):
@@ -83,7 +84,7 @@ class StagingErasureRecoveryTest(unittest.TestCase):
     def test_evidence_is_identifier_free_commit_bound_staging_aggregate(self):
         evidence = rehearsal.staging_evidence("a" * 40)
         self.assertEqual("staging", evidence["environment"])
-        self.assertEqual(4, evidence["participant_count"])
+        self.assertEqual(5, evidence["participant_count"])
         self.assertTrue(evidence["restore_completed"])
         self.assertTrue(evidence["no_reappearance"])
         self.assertNotIn("user_id", evidence)

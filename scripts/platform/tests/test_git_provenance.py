@@ -80,4 +80,12 @@ class StagingProvenanceWiringTest(unittest.TestCase):
   secrets=(REPO_ROOT/"scripts/platform/staging_secrets_apply.sh").read_text()
   for name in ("authorization-kafka","identity-kafka","notification-kafka","web-bff-kafka"):
    self.assertIn(name,secrets)
+ def test_conversation_is_wired_through_waypoint_and_authorization(self):
+  waypoint=(REPO_ROOT/"infrastructure/istio/platform-apps-waypoint-networkpolicy.yaml").read_text()
+  self.assertEqual(2,waypoint.count("app.kubernetes.io/name: conversation-service"))
+  conversation=(REPO_ROOT/"services/conversation-service/deploy/helm/conversation-service/templates/networkpolicy.yaml").read_text()
+  self.assertGreaterEqual(conversation.count("gateway.networking.k8s.io/gateway-name"),2)
+  authorization=(REPO_ROOT/"deploy/staging/authorization-service.yaml").read_text()
+  for value in ("resourceCallers:","app.kubernetes.io/name: conversation-service","sa/conversation-service","callerId: conversation-service"):
+   self.assertIn(value,authorization)
 if __name__=="__main__": unittest.main()

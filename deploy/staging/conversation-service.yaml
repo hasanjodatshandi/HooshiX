@@ -5,8 +5,8 @@ ambient:
   waypointPrincipal: prod.sajtech.internal/ns/platform-apps/sa/platform-apps-waypoint
 runtime:
   eventRuntimeEnabled: true
-  providerRuntimeEnabled: true
-  providerCanaryPercent: 1
+  providerRuntimeEnabled: false
+  providerCanaryPercent: 0
   providerMaximumConcurrentCalls: 1
   providerMaximumConcurrentPerTenant: 1
 database:
