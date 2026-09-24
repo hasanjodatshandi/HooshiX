@@ -68,6 +68,9 @@ class CanaryReceiptTest(unittest.TestCase):
             "outcome_unknown_count": 0, "critical_incident_count": 0,
             "total_actual_cost_micro_usd": 1210, "p95_latency_ms": 3717,
             "error_rate_basis_points": 0, "cost_overrun_basis_points": 0,
+            "assistant_output_verified": True, "privacy_canary_passed": True,
+            "log_leak_scan_passed": True, "rollback_rehearsal_passed": True,
+            "runtime_disabled_after": True,
             "now": self.completed,
         }
         values.update(changes)
@@ -97,6 +100,11 @@ class CanaryReceiptTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaisesRegex(ValueError, "threshold"):
                 self.issue(Path(temp_dir), failed_count=1, succeeded_count=0, error_rate_basis_points=10000)
+
+    def test_missing_executed_check_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaisesRegex(ValueError, "checks"):
+                self.issue(Path(temp_dir), rollback_rehearsal_passed=False)
 
     def test_tamper_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

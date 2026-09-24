@@ -200,6 +200,11 @@ def issue(
     p95_latency_ms: int,
     error_rate_basis_points: int,
     cost_overrun_basis_points: int,
+    assistant_output_verified: bool,
+    privacy_canary_passed: bool,
+    log_leak_scan_passed: bool,
+    rollback_rehearsal_passed: bool,
+    runtime_disabled_after: bool,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     _private_file(signing_key_path, "signing key")
@@ -247,11 +252,11 @@ def issue(
             "cost_overrun_basis_points": cost_overrun_basis_points,
         },
         "checks": {
-            "assistant_output_verified_without_retaining_content": True,
-            "privacy_canary_passed": True,
-            "log_leak_scan_passed": True,
-            "rollback_rehearsal_passed": True,
-            "runtime_disabled_after": True,
+            "assistant_output_verified_without_retaining_content": assistant_output_verified,
+            "privacy_canary_passed": privacy_canary_passed,
+            "log_leak_scan_passed": log_leak_scan_passed,
+            "rollback_rehearsal_passed": rollback_rehearsal_passed,
+            "runtime_disabled_after": runtime_disabled_after,
         },
     }
     receipt = _sign(payload, signing_key)
@@ -301,6 +306,11 @@ def main() -> int:
         "error-rate-basis-points", "cost-overrun-basis-points",
     ):
         issue_parser.add_argument(f"--{field}", type=int, required=True)
+    for field in (
+        "assistant-output-verified", "privacy-canary-passed", "log-leak-scan-passed",
+        "rollback-rehearsal-passed", "runtime-disabled-after",
+    ):
+        issue_parser.add_argument(f"--{field}", action="store_true", required=True)
     for command in (issue_parser, commands.add_parser("verify")):
         command.add_argument("--evaluation-receipt", type=Path, required=True)
         command.add_argument("--provider-approval-receipt", type=Path, required=True)
@@ -326,6 +336,11 @@ def main() -> int:
             p95_latency_ms=args.p95_latency_ms,
             error_rate_basis_points=args.error_rate_basis_points,
             cost_overrun_basis_points=args.cost_overrun_basis_points,
+            assistant_output_verified=args.assistant_output_verified,
+            privacy_canary_passed=args.privacy_canary_passed,
+            log_leak_scan_passed=args.log_leak_scan_passed,
+            rollback_rehearsal_passed=args.rollback_rehearsal_passed,
+            runtime_disabled_after=args.runtime_disabled_after,
         )
     else:
         receipt = verify(
