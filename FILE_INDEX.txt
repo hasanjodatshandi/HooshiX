@@ -752,6 +752,7 @@ services/conversation-service/src/test/java/com/sajtech/conversation/architectur
 services/conversation-service/src/test/java/com/sajtech/conversation/configuration/ConversationMigrationProfileIntegrationTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/configuration/ConversationPropertiesTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/configuration/ConversationRuntimeIntegrationTest.java
+services/conversation-service/src/test/java/com/sajtech/conversation/configuration/KafkaAutoConfigurationTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/configuration/ModelWorkerPropertiesTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/client/authorization/GrpcPermissionAuthorizerTest.java
 services/conversation-service/src/test/java/com/sajtech/conversation/infrastructure/erasure/ConversationErasureWorkerTest.java
