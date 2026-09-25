@@ -144,11 +144,13 @@ Internet
 -> external L4
 -> Traefik
 -> Caddy/Coraza
--> BFF
+-> /api and /api/* -> BFF
+-> other application paths -> static Web Frontend
 ```
 
 - direct non-L4 Traefik origin denied;
-- direct Internet->BFF and Traefik->BFF denied;
+- direct Internet/Traefik access to BFF and frontend denied;
+- frontend remains static/presentation-only with no API authority or application egress;
 - external L4 preserves source through trusted PROXY v2;
 - insecure proxy/forwarded trust prohibited;
 - Caddy strict proxy parsing and internal header overwrite;

@@ -180,7 +180,7 @@ OpenBao remains unchanged: exact version/topology, snapshot/restore/unseal, Kube
 ## 13. Edge/client-address tests
 
 - upstream mitigation evidence;
-- external L4 -> Traefik -> WAF -> BFF route;
+- external L4 -> Traefik -> WAF route with exact `/api` and `/api/*` BFF and non-API static-frontend branches;
 - Traefik origin restricted to approved L4 sources;
 - forged forwarding/client-IP headers ignored;
 - untrusted PROXY denied;

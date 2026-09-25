@@ -15,7 +15,7 @@ class ProductionReleaseManifestTest(unittest.TestCase):
         self.now = dt.datetime(2026, 8, 22, tzinfo=dt.timezone.utc)
         digest = "a" * 64
         self.manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "profile": "production-single-server",
             "git_revision": "b" * 40,
             "public_hostname": "app.example.test",
@@ -44,6 +44,11 @@ class ProductionReleaseManifestTest(unittest.TestCase):
                     "quota_max_active_buckets": 10000,
                     "quota_max_new_buckets_per_minute": 1000,
                 },
+                "conversation": {
+                    "grpc_maximum_concurrent_calls": 32,
+                    "provider_maximum_concurrent_calls": 4,
+                    "provider_maximum_concurrent_per_tenant": 1,
+                },
                 "identity": {
                     "argon2_max_concurrent_hashes": 2,
                     "compromised_password_max_in_flight": 16,
@@ -67,7 +72,9 @@ class ProductionReleaseManifestTest(unittest.TestCase):
                 "upstream_ddos_provider": "evidence/ddos/2026-08-22",
                 "wireguard_peer_inventory": "evidence/wireguard/2026-08-22",
                 "cold_dr_exercise": "evidence/cold-dr/2026-08-22",
+                "model_provider_production_approval": "evidence/model-provider/2026-08-22",
                 "notification_provider_delivery": "evidence/notification/2026-08-22",
+                "staging_validation": "evidence/staging/2026-08-22",
             },
             "secret_refs": {
                 "production_tls": "production-tls",
@@ -75,6 +82,8 @@ class ProductionReleaseManifestTest(unittest.TestCase):
                 "openbao": "openbao-bootstrap",
                 "redis_tls": "redis-tls",
                 "kafka_tls": "kafka-tls",
+                "conversation_content": "conversation-content",
+                "conversation_provider": "conversation-provider",
                 "notification_providers": "notification-providers",
             },
         }
@@ -93,7 +102,12 @@ class ProductionReleaseManifestTest(unittest.TestCase):
     def test_requires_frontend_release_image(self) -> None:
         data = copy.deepcopy(self.manifest)
         del data["images"]["web-frontend"]
-        self.assertTrue(any("six application release components" in e for e in self.errors(data)))
+        self.assertTrue(any("seven application release components" in e for e in self.errors(data)))
+
+    def test_requires_conversation_release_image(self) -> None:
+        data = copy.deepcopy(self.manifest)
+        del data["images"]["conversation-service"]
+        self.assertTrue(any("seven application release components" in e for e in self.errors(data)))
 
     def test_rejects_wildcard_signer(self) -> None:
         data = copy.deepcopy(self.manifest)
@@ -119,6 +133,11 @@ class ProductionReleaseManifestTest(unittest.TestCase):
         data = copy.deepcopy(self.manifest)
         data["service_capacity"]["identity"]["argon2_max_concurrent_hashes"] = 0
         self.assertTrue(any("argon2_max_concurrent_hashes" in e for e in self.errors(data)))
+
+    def test_rejects_conversation_tenant_concurrency_above_global(self) -> None:
+        data = copy.deepcopy(self.manifest)
+        data["service_capacity"]["conversation"]["provider_maximum_concurrent_per_tenant"] = 5
+        self.assertTrue(any("per-tenant concurrency" in e for e in self.errors(data)))
 
     def test_rejects_placeholder_external_evidence(self) -> None:
         data = copy.deepcopy(self.manifest)

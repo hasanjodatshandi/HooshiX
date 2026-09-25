@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SERVICES = (
     "authorization-service",
     "compromised-password-service",
+    "conversation-service",
     "identity-service",
     "notification-service",
     "web-bff",
@@ -43,7 +44,9 @@ EXTERNAL_EVIDENCE = {
     "upstream_ddos_provider",
     "wireguard_peer_inventory",
     "cold_dr_exercise",
+    "model_provider_production_approval",
     "notification_provider_delivery",
+    "staging_validation",
 }
 SECRET_REFS = {
     "production_tls",
@@ -51,6 +54,8 @@ SECRET_REFS = {
     "openbao",
     "redis_tls",
     "kafka_tls",
+    "conversation_content",
+    "conversation_provider",
     "notification_providers",
 }
 PLACEHOLDER = re.compile(r"(?i)(^|[^a-z])(tbd|todo|unknown|placeholder|example|not verified|none)([^a-z]|$)")
@@ -99,7 +104,7 @@ def validate_manifest(data: object, now: dt.datetime | None = None) -> list[str]
     if not isinstance(data, dict):
         return ["release manifest must be a JSON object"]
     _need(errors, set(data) == TOP_LEVEL, "release manifest top-level keys are invalid")
-    _need(errors, data.get("schema_version") == 1, "schema_version must be 1")
+    _need(errors, data.get("schema_version") == 2, "schema_version must be 2")
     _need(errors, data.get("profile") == "production-single-server",
           "profile must be production-single-server")
     revision = data.get("git_revision")
@@ -116,7 +121,7 @@ def validate_manifest(data: object, now: dt.datetime | None = None) -> list[str]
         errors.append("images must be an object")
     else:
         _need(errors, set(images) == set(RELEASE_COMPONENTS),
-              "images must contain exactly the six application release components")
+              "images must contain exactly the seven application release components")
         for component in RELEASE_COMPONENTS:
             image = images.get(component)
             valid = isinstance(image, str) and bool(IMAGE.fullmatch(image))
@@ -174,13 +179,23 @@ def validate_manifest(data: object, now: dt.datetime | None = None) -> list[str]
                   f"capacity_evidence.{key} must be at least 30")
 
     service_capacity = data.get("service_capacity")
-    if not isinstance(service_capacity, dict) or set(service_capacity) != {"authorization", "identity"}:
-        errors.append("service_capacity must contain exactly authorization and identity")
+    if not isinstance(service_capacity, dict) or set(service_capacity) != {"authorization", "conversation", "identity"}:
+        errors.append("service_capacity must contain exactly authorization, conversation, and identity")
     else:
         _positive_ints(errors, service_capacity["authorization"], (
             "global_concurrency", "per_caller_concurrency", "global_queue_capacity",
             "per_caller_queue_capacity", "max_caller_buckets", "quota_max_active_buckets",
             "quota_max_new_buckets_per_minute"), "service_capacity.authorization")
+        _positive_ints(errors, service_capacity["conversation"], (
+            "grpc_maximum_concurrent_calls", "provider_maximum_concurrent_calls",
+            "provider_maximum_concurrent_per_tenant"), "service_capacity.conversation")
+        if all(isinstance(service_capacity["conversation"].get(key), int)
+               and not isinstance(service_capacity["conversation"].get(key), bool)
+               for key in ("provider_maximum_concurrent_calls", "provider_maximum_concurrent_per_tenant")):
+            _need(errors,
+                  service_capacity["conversation"]["provider_maximum_concurrent_per_tenant"]
+                  <= service_capacity["conversation"]["provider_maximum_concurrent_calls"],
+                  "service_capacity.conversation provider per-tenant concurrency must not exceed global concurrency")
         _positive_ints(errors, service_capacity["identity"], (
             "argon2_max_concurrent_hashes", "compromised_password_max_in_flight",
             "quota_max_active_buckets", "quota_max_new_buckets_per_minute"),

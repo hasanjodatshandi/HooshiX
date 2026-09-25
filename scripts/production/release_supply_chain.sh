@@ -10,7 +10,7 @@ set -euo pipefail
 : "${EVIDENCE_DIR:?EVIDENCE_DIR is required}"
 
 case "$COMPONENT_NAME" in
-  authorization-service|compromised-password-service|identity-service|notification-service|web-bff|web-frontend) ;;
+  authorization-service|compromised-password-service|conversation-service|identity-service|notification-service|web-bff|web-frontend) ;;
   *) echo 'unsupported production application component' >&2; exit 2 ;;
 esac
 [[ "$IMAGE_REF" =~ ^[a-z0-9][a-z0-9._:-]*(/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$ ]] || { echo 'invalid immutable image reference' >&2; exit 2; }

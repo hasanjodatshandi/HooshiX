@@ -16,7 +16,7 @@ class ProductionReadinessEvidenceTest(unittest.TestCase):
         self.now = dt.datetime(2026, 8, 22, tzinfo=dt.timezone.utc)
         profile = __import__("json").loads(readiness.PROFILE.read_text(encoding="utf-8"))
         self.data = {
-            "schema_version": 1,
+            "schema_version": 2,
             "profile": "production-single-server",
             "git_revision": self.revision,
             "external_inputs": {key: f"evidence/{key}/2026-08-22" for key in profile["required_external_inputs"]},
@@ -27,6 +27,14 @@ class ProductionReadinessEvidenceTest(unittest.TestCase):
                     "observed_at": "2026-08-22T00:00:00Z",
                 }
                 for gate in readiness.GATES
+            },
+            "approvals": {
+                role: {
+                    "approved": True,
+                    "evidence_id": f"evidence/approval/{role}/2026-08-22",
+                    "observed_at": "2026-08-22T00:00:00Z",
+                }
+                for role in readiness.APPROVAL_ROLES
             },
             "go_live_approved": True,
         }
@@ -48,6 +56,11 @@ class ProductionReadinessEvidenceTest(unittest.TestCase):
         data = copy.deepcopy(self.data)
         data["go_live_approved"] = False
         self.assertTrue(any("go_live_approved" in e for e in readiness.validate(data, self.revision, now=self.now)))
+
+    def test_each_owner_role_must_approve(self) -> None:
+        data = copy.deepcopy(self.data)
+        data["approvals"]["privacy_owner"]["approved"] = False
+        self.assertTrue(any("privacy_owner is not approved" in e for e in readiness.validate(data, self.revision, now=self.now)))
 
     def test_external_input_placeholder_or_invalid_reference_fails(self) -> None:
         data = copy.deepcopy(self.data)

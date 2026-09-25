@@ -1,0 +1,26 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "web-frontend.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "web-frontend.selectorLabels" . | nindent 6 }}
+  mtls: {mode: STRICT}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "web-frontend.name" . }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "web-frontend.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: [{{ required "edge.principal is required" .Values.edge.principal | quote }}]
+      to:
+        - operation:
+            ports: [{{ .Values.service.applicationPort | quote }}]

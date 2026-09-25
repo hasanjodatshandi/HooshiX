@@ -33,8 +33,21 @@
     header X-HooshiX-WAF-Blocked "true"
     respond "blocked" 403
   }
-  reverse_proxy http://web-bff.platform-apps.svc.cluster.local:8080 {
-    header_up X-HooshiX-Client-IP {http.request.remote.host}
+  @api path /api /api/*
+  handle @api {
+    reverse_proxy http://web-bff.platform-apps.svc.cluster.local:8080 {
+      header_up X-HooshiX-Client-IP {http.request.remote.host}
+    }
+  }
+  handle {
+    reverse_proxy http://web-frontend.platform-apps.svc.cluster.local:8080 {
+      header_up -X-HooshiX-Client-IP
+      header_up -X-Forwarded-For
+      header_up -X-Forwarded-Proto
+      header_up -X-Forwarded-Host
+      header_up -X-Real-IP
+      header_up -Forwarded
+    }
   }
 }
 

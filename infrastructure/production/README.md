@@ -19,7 +19,7 @@ The repository defines and fail-closed verifies:
   provenance, and signed-SBOM release requirements;
 - exact release metadata, external evidence references, and Kubernetes Secret reference names;
 - backup/PITR/cold-DR targets and traffic-enable evidence;
-- deterministic Argo CD/application and Kyverno release rendering from a verified release manifest.
+- deterministic six-service plus frontend Helm rendering and seven-artifact Kyverno release admission from a verified version-2 release manifest.
 
 No production secret value, private key, password, token, unseal material, provider credential, or
 WireGuard private key belongs in Git. A release manifest contains public metadata and references
@@ -55,4 +55,5 @@ Repository conformance is not production readiness. Production traffic remains b
 current Production Readiness Checklist has real environment evidence for provider/firewall CIDRs,
 capacity/headroom, HIBP production corpus, registry and signer identity, OpenBao custody, off-site
 backup/PITR restore, external total-host monitoring, privileged audit, WireGuard/FIDO2/JIT host
-access, provider delivery, final release artifacts, and the required cold-DR exercise.
+access, actual Email/SMS delivery, Production model-provider/privacy approval, final release
+artifacts, deployed browser journey, all named owner approvals, and the required cold-DR exercise.

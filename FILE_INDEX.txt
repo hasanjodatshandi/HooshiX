@@ -35,6 +35,15 @@ apps/web-frontend/.nvmrc
 apps/web-frontend/Caddyfile
 apps/web-frontend/Dockerfile
 apps/web-frontend/README.md
+apps/web-frontend/deploy/helm/web-frontend/Chart.yaml
+apps/web-frontend/deploy/helm/web-frontend/ci/test-values.yaml
+apps/web-frontend/deploy/helm/web-frontend/templates/_helpers.tpl
+apps/web-frontend/deploy/helm/web-frontend/templates/deployment.yaml
+apps/web-frontend/deploy/helm/web-frontend/templates/istio.yaml
+apps/web-frontend/deploy/helm/web-frontend/templates/networkpolicy.yaml
+apps/web-frontend/deploy/helm/web-frontend/templates/service.yaml
+apps/web-frontend/deploy/helm/web-frontend/templates/serviceaccount.yaml
+apps/web-frontend/deploy/helm/web-frontend/values.yaml
 apps/web-frontend/e2e/accessibility-audit.md
 apps/web-frontend/e2e/accessibility.spec.ts
 apps/web-frontend/e2e/conversation.spec.ts

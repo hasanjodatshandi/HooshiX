@@ -1,12 +1,11 @@
 # Engineering Hardening Roadmap and Audit Register
 
-- **Status:** Stages 1-9 completed; Stage 10 deferred
+- **Status:** Stages 1-9 completed; Stage 10 in progress
 - **Audit baseline:** `main@68cf66cf24c07dd6fca010ddae2789f42608aa31`
 - **Audit date:** 2026-08-29; completion review 2026-09-24
 - **Scope:** Architecture alignment, security, reliability, performance, testing,
   infrastructure, DevSecOps, frontend, and MLOps remediation
-- **Production Commissioning & Readiness:** DEFERRED until explicitly reactivated by
-  the owner
+- **Production Commissioning & Readiness:** IN PROGRESS — owner reactivated 2026-09-24
 
 ## 1. Purpose and authority
 
@@ -165,7 +164,7 @@ Remediation must not weaken these verified current properties:
 | 7 | Performance, reliability, and test evidence | `COMPLETED` | Add risk-based coverage thresholds, selective security mutation tests, representative plans, load/soak/fault/lease/pool tests, complete HIBP/provider staging evidence, erasure restore/redeploy checks, and measured headroom evidence. Repository/staging completion explicitly requires provider contract, acceptance, failure, ambiguity, and reconciliation evidence; actual Production delivery remains a Stage 10 commissioning gate. | Final reviewed implementation/evidence head `fb18a087c9704bf7fe79ab8de890cf0cbfe2e5a7`; protected repository baseline run `34674964250` and frontend E2E run `34674964129` passed. Exact-digest/runtime, load/soak/headroom, full-corpus HIBP, erasure restore/redeploy, Gmail acceptance, SMS.ir production acceptance and terminal reconciliation all passed their Stage 7 boundary. SMS `DELIVERED` was not observed and is not claimed. |
 | 8 | MLOps evaluation and safety architecture gate | `COMPLETED` | Approve versioned non-PII eval data, model/prompt/price catalog, promotion/rollback/canary thresholds, safety/acceptable-use/feedback/drift policy, and provider data-control requirements. Do not add an MLOps platform without an evidenced need. | Final reviewed implementation head `b85f112c83f41d06e93151dee300c2d82ab8eece`; protected repository baseline run `34684052338` and frontend E2E run `34684052271` passed |
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `COMPLETED` | Record exact provider-account data-control and named owner approvals, then exercise the reviewed canary and rollback path. | The full service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice is implemented. Signed v3.1 evaluation and staging-only provider-control approval passed. Exact runtime commit `afb738d6623316e876ed938e0869bba39b8a21a7` served exactly one synthetic `CANARY_1` run: success, 430 input/9 output tokens, 1210 micro-USD actual cost, and 3717ms latency. The 206-minute observation had zero failed/unknown runs, critical incidents, threshold breaches, or content/identity/credential log leaks. Rollback restored `false/0`; a fresh request then failed with `FailedPrecondition` before run creation/provider I/O. The signed content-free private receipt verifies these aggregates and exact image digest. Synthetic tenant state and ephemeral client/token/config resources were erased. Runtime remains safely disabled and Production is `NOT VERIFIED`. |
-| 10 | Production Commissioning & Readiness | `DEFERRED` | Execute every current Production readiness/environment/release/recovery/capacity gate only after explicit owner reactivation; repository documentation or local kind evidence alone cannot complete this stage. | Not applicable while deferred |
+| 10 | Production Commissioning & Readiness | `IN PROGRESS` | Execute every current Production readiness/environment/release/recovery/capacity/provider/traffic gate after the owner's 2026-09-24 reactivation. Close the seven-artifact release boundary and deployed frontend/Conversation gaps before promotion; repository documentation or local kind evidence alone cannot complete this stage. | Base `b7d1d4504c4bb8632cad6119fb2d8dc2bc28fd26`; real Production evidence remains pending |
 
 Stage 2 is the first code-changing stage. It precedes Conversation implementation so
 new model-execution load is not added before database, pool, worker lease, and

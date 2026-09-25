@@ -13,7 +13,7 @@ This catalog defines properties that should be continuously verified. A row is n
 | AFF-007 | Browser token custody remains BFF-only | E2E/security tests | PR/release | block |
 | AFF-008 | OIDC/MFA/external identity rules remain current | security regression | PR/release | block |
 | AFF-009 | NetworkPolicy/Istio workload identity least privilege | positive/negative connectivity/authz | PR/release | block |
-| AFF-010 | Public traffic always traverses approved L4->Traefik->WAF->BFF path | edge render/network negatives | PR/release | block |
+| AFF-010 | Public traffic always traverses approved L4->Traefik->WAF and then only the `/api/*` BFF or static-frontend branch | edge render/network/route-split negatives | PR/release | block |
 | AFF-011 | Trusted client address ignores caller forwarding headers | PROXY/header/address-form negatives | PR/release | block public quota paths |
 | AFF-012 | Traefik origin accepts only external-L4 sources | firewall/routing negative | release | block public traffic |
 | AFF-013 | Human privileged access separates network/FIDO2/JIT | access/audit exercise | release/scheduled | block privileged access |

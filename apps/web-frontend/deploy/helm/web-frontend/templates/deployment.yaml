@@ -1,0 +1,57 @@
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $digest := required "image.digest is required" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) }}{{ fail "image.digest must be an immutable sha256 digest" }}{{ end -}}
+{{- if ne (int .Values.replicaCount) 1 }}{{ fail "Web frontend single-server profile must render exactly one replica" }}{{ end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "web-frontend.name" . }}
+  labels:
+    {{- include "web-frontend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  selector:
+    matchLabels:
+      {{- include "web-frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "web-frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | quote }}
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: frontend
+          image: "{{ $repository }}@{{ $digest }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          ports:
+            - {name: http, containerPort: {{ .Values.service.applicationPort }}, protocol: TCP}
+            - {name: health, containerPort: {{ .Values.service.healthPort }}, protocol: TCP}
+          startupProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 2, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 5, timeoutSeconds: 2, failureThreshold: 3}
+          livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15, timeoutSeconds: 2, failureThreshold: 3}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - {name: config, mountPath: /tmp/config}
+            - {name: data, mountPath: /tmp/data}
+            - {name: temporary, mountPath: /tmp/runtime}
+      volumes:
+        - {name: config, emptyDir: {sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}}}
+        - {name: data, emptyDir: {sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}}}
+        - {name: temporary, emptyDir: {sizeLimit: {{ .Values.runtime.temporaryStorageLimit }}}}

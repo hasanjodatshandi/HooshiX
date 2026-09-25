@@ -84,3 +84,6 @@ __pycache__/
 # HooshiX production-fidelity local runtime state
 .platform-runtime/
 services/*/.runtime-jdk/
+
+# Local agent search state
+.memsearch/

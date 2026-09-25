@@ -26,10 +26,10 @@ OBS=f"""observability:
         app.kubernetes.io/name: prometheus
       principal: {PROM}
 """
-SERVICE_ACCOUNTS={"authorization-service":"authorization-service","compromised-password-service":"compromised-password-service","identity-service":"identity-service","notification-service":"notification-service","web-bff":"web-bff","web-frontend":"web-frontend"}
+SERVICE_ACCOUNTS={"authorization-service":"authorization-service","compromised-password-service":"compromised-password-service","conversation-service":"conversation-service","identity-service":"identity-service","notification-service":"notification-service","web-bff":"web-bff","web-frontend":"web-frontend"}
 def split_image(image:str)->tuple[str,str]: return tuple(image.rsplit("@",1))
 def build_values(service:str,m:dict)->str:
-    a=m["service_capacity"]["authorization"]; i=m["service_capacity"]["identity"]; d=m["compromised_password_dataset"]
+    a=m["service_capacity"]["authorization"]; c=m["service_capacity"]["conversation"]; i=m["service_capacity"]["identity"]; d=m["compromised_password_dataset"]
     if service=="authorization-service":
         return f"""runtime:
   enabled: true
@@ -59,6 +59,11 @@ secrets:
   quotaKeySecretName: authorization-quota-key
 identity:
   jwtVerifierConfigMapName: authorization-identity-jwt
+resourceCallers:
+  - namespace: platform-apps
+    podLabels: {{app.kubernetes.io/name: conversation-service}}
+    principal: prod.sajtech.internal/ns/platform-apps/sa/conversation-service
+    callerId: conversation-service
 {OBS}"""
     if service=="compromised-password-service":
         return f"""dataset:
@@ -70,11 +75,40 @@ identity:
   maxPrefixCardinality: {d["max_prefix_cardinality"]}
   maxSerializedResponseBytes: {d["max_serialized_response_bytes"]}
 {OBS}"""
+    if service=="conversation-service":
+        return f"""webBff:
+  namespace: platform-apps
+  podLabels: {{app.kubernetes.io/name: web-bff}}
+  principal: prod.sajtech.internal/ns/platform-apps/sa/web-bff
+runtime:
+  grpcMaximumConcurrentCalls: {c["grpc_maximum_concurrent_calls"]}
+  eventRuntimeEnabled: true
+  providerRuntimeEnabled: false
+  providerCanaryPercent: 0
+  providerMaximumConcurrentCalls: {c["provider_maximum_concurrent_calls"]}
+  providerMaximumConcurrentPerTenant: {c["provider_maximum_concurrent_per_tenant"]}
+database:
+  jdbcUrl: jdbc:postgresql://postgresql-rw.platform-data.svc.cluster.local:5432/conversation
+  podLabels: {{app.kubernetes.io/name: postgresql}}
+  runtimeSecretName: conversation-db-runtime
+  migrationSecretName: conversation-db-migration
+kafka:
+  bootstrapServers: kafka.platform-data.svc.cluster.local:9093
+  connectionSecretName: conversation-kafka
+identity:
+  jwtVerifierConfigMapName: conversation-identity-jwt
+  jwtIssuer: https://identity.sajtech.internal
+  erasureTarget: dns:///identity-service.platform-apps.svc.cluster.local:9090
+secrets:
+  contentKeyRingSecretName: {m["secret_refs"]["conversation_content"]}
+  providerApiKeySecretName: {m["secret_refs"]["conversation_provider"]}
+{OBS}"""
     if service=="identity-service":
         return f"""runtime:
   registrationRuntimeEnabled: true
   authenticationRuntimeEnabled: true
   tenantRuntimeEnabled: true
+  erasureRuntimeEnabled: true
   argon2MaxConcurrentHashes: {i["argon2_max_concurrent_hashes"]}
   compromisedPasswordMaxInFlight: {i["compromised_password_max_in_flight"]}
   phoneRegistrationEnabled: false
@@ -84,6 +118,8 @@ database:
   podLabels: {{app.kubernetes.io/name: postgresql}}
   runtimeSecretName: identity-db-runtime
   migrationSecretName: identity-db-migration
+kafka:
+  connectionSecretName: identity-kafka
 quota:
   redis:
     podLabels: {{app.kubernetes.io/name: security-redis}}
@@ -103,7 +139,7 @@ secrets:
 jwt:
   publicVerifierConfigMapName: identity-jwt-public
   issuer: https://identity.sajtech.internal
-  allowedAudiences: [authorization-service]
+  allowedAudiences: [authorization-service, conversation-service]
 {OBS}"""
     if service=="notification-service":
         return f"""database:
@@ -111,15 +147,32 @@ jwt:
   podLabels: {{app.kubernetes.io/name: postgresql}}
   runtimeSecretName: notification-db-runtime
   migrationSecretName: notification-db-migration
+runtime:
+  erasureRuntimeEnabled: true
+  deliveryRuntimeEnabled: false
+kafka:
+  connectionSecretName: notification-kafka
 secrets:
   fingerprintSecretName: notification-fingerprint
   deliverySecretName: notification-delivery
+  providerSecretName: {m["secret_refs"]["notification_providers"]}
+providers:
+  email: {{host: smtp.gmail.com, port: 587}}
+  sms: {{host: api.sms.ir, port: 443}}
 {OBS}"""
     if service=="web-bff":
         return f"""runtime:
   enabled: true
+  erasureRuntimeEnabled: true
   requireFetchMetadata: true
   publicOrigin: https://{m["public_hostname"]}
+database:
+  jdbcUrl: jdbc:postgresql://postgresql-rw.platform-data.svc.cluster.local:5432/web_bff
+  podLabels: {{app.kubernetes.io/name: postgresql}}
+  runtimeSecretName: web-bff-db-runtime
+  migrationSecretName: web-bff-db-migration
+kafka:
+  connectionSecretName: web-bff-kafka
 redis:
   podLabels: {{app.kubernetes.io/name: security-redis}}
   connectionSecretName: web-bff-redis
@@ -138,6 +191,12 @@ edge:
   podLabels: {{app.kubernetes.io/name: edge-waf}}
   principal: prod.sajtech.internal/ns/platform-edge/sa/edge-waf
 {OBS}"""
+    if service=="web-frontend":
+        return """edge:
+  namespace: platform-edge
+  podLabels: {app.kubernetes.io/name: edge-waf}
+  principal: prod.sajtech.internal/ns/platform-edge/sa/edge-waf
+"""
     raise ValueError(f"unsupported service: {service}")
 def verify_helm()->str:
     helm=shutil.which("helm")
@@ -146,7 +205,8 @@ def verify_helm()->str:
     if not out.startswith(HELM_VERSION): raise RuntimeError(f"Helm must be {HELM_VERSION}; got {out}")
     return helm
 def render_service(helm:str,service:str,m:dict,values:Path)->str:
-    repo,digest=split_image(m["images"][service]); chart=ROOT/"services"/service/"deploy"/"helm"/service
+    repo,digest=split_image(m["images"][service])
+    chart=(ROOT/"apps"/service/"deploy"/"helm"/service) if service=="web-frontend" else (ROOT/"services"/service/"deploy"/"helm"/service)
     cmd=[helm,"template",service,str(chart),"--namespace","platform-apps","--values",str(values),"--set-string",f"image.repository={repo}","--set-string",f"image.digest={digest}"]
     rendered=subprocess.run(cmd,cwd=ROOT,check=True,capture_output=True,text=True).stdout
     if m["images"][service] not in rendered: raise RuntimeError(f"{service} is not bound to exact digest")
@@ -175,7 +235,11 @@ spec:
     - message: application ServiceAccounts must use the exact reviewed production release digest
       expression: >-
         !([{application_service_accounts}].exists(sa, sa == object.spec.serviceAccountName))
-        || (object.spec.containers.size() == 1 && object.spec.containers[0].image == {{{mapping}}}[object.spec.serviceAccountName])
+        || (object.spec.containers.size() == 1
+            && object.spec.containers[0].image == {{{mapping}}}[object.spec.serviceAccountName]
+            && (!has(object.spec.initContainers)
+                || object.spec.initContainers.all(container,
+                    container.image == {{{mapping}}}[object.spec.serviceAccountName])))
 ---
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
@@ -232,7 +296,7 @@ def render(m:dict,output:Path)->None:
     output.mkdir(parents=True,exist_ok=True); helm=verify_helm()
     with tempfile.TemporaryDirectory(prefix="hooshix-production-values-") as tmp:
         tmpdir=Path(tmp)
-        for service in verify_release.SERVICES:
+        for service in verify_release.RELEASE_COMPONENTS:
             vp=tmpdir/f"{service}.yaml"; vp.write_text(build_values(service,m),encoding="utf-8")
             rendered=render_service(helm,service,m,vp)
             header=f"# Generated from reviewed production release metadata. Source revision: {m['git_revision']}\n"

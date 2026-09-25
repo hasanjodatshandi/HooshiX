@@ -1,0 +1,8 @@
+image:
+  repository: registry.example.test/hooshix/web-frontend
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+edge:
+  namespace: platform-edge
+  podLabels:
+    app.kubernetes.io/name: edge-waf
+  principal: prod.sajtech.internal/ns/platform-edge/sa/edge-waf
