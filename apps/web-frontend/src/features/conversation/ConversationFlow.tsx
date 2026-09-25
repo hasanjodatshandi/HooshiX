@@ -7,9 +7,21 @@ import {
 } from '../../api/bffClient';
 import { getErrorMessage } from '../../errors/getErrorMessage';
 import { useI18n } from '../../i18n/I18nProvider';
+import type { MessageKey } from '../../i18n/resources';
+import { InternalLink } from '../../navigation/InternalLink';
+import { routes } from '../../routes/routes';
+import './ConversationFlow.css';
 
 const ACTIVE_RUN_STATES = new Set<ConversationRun['state']>(['QUEUED', 'RUNNING']);
 const POLL_INTERVAL_MS = 1_000;
+const RUN_STATE_LABEL: Record<ConversationRun['state'], MessageKey> = {
+  QUEUED: 'runQueued',
+  RUNNING: 'runRunning',
+  SUCCEEDED: 'runSucceeded',
+  FAILED: 'runFailed',
+  CANCELED: 'runCanceled',
+  OUTCOME_UNKNOWN: 'runUnknown',
+};
 
 export function ConversationFlow() {
   const { t } = useI18n();
@@ -169,53 +181,85 @@ export function ConversationFlow() {
     });
   }
 
-  return <main><section aria-labelledby="conversation-title">
-    <h1 id="conversation-title">{t('conversations')}</h1>
-    <form onSubmit={(event) => void create(event)}>
-      <label htmlFor="new-conversation-title">{t('conversationTitle')}</label>
-      <input id="new-conversation-title" required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} />
-      <button type="submit" disabled={busy || !title.trim()}>{t('createConversation')}</button>
-    </form>
+  return <main className="conversation-workspace" aria-labelledby="conversation-title">
+    <aside className="conversation-sidebar" aria-labelledby="conversation-list-title">
+      <div className="conversation-brand">
+        <span className="conversation-brand-mark" aria-hidden="true">H</span>
+        <span>HooshiX</span>
+      </div>
+      <InternalLink to={routes.application}>{t('backToApplication')}</InternalLink>
+      <div className="conversation-sidebar-heading">
+        <h1 id="conversation-title">{t('conversations')}</h1>
+        <p>{t('conversationIntro')}</p>
+      </div>
+      <form className="conversation-create" onSubmit={(event) => void create(event)}>
+        <label htmlFor="new-conversation-title">{t('conversationTitle')}</label>
+        <input id="new-conversation-title" required maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} />
+        <button className="conversation-primary" type="submit" disabled={busy || !title.trim()}>{t('createConversation')}</button>
+      </form>
 
-    <h2>{t('conversationList')}</h2>
-    {conversations.length === 0 && <p>{t('noConversations')}</p>}
-    <ul>{conversations.map((conversation) => <li key={conversation.conversationId}>
-      <button type="button" disabled={busy} aria-pressed={selected?.conversationId === conversation.conversationId} onClick={() => { setSelected(conversation); setRun(null); }}>
-        {conversation.title} ({conversation.lifecycle})
-      </button>
-    </li>)}</ul>
+      <h2 id="conversation-list-title">{t('conversationList')}</h2>
+      {conversations.length === 0 && <p className="conversation-sidebar-empty">{t('noConversations')}</p>}
+      <ul className="conversation-list">{conversations.map((conversation) => <li key={conversation.conversationId}>
+        <button type="button" disabled={busy} aria-pressed={selected?.conversationId === conversation.conversationId} onClick={() => { setSelected(conversation); setRun(null); }}>
+          <span className="conversation-list-title" dir="auto">{conversation.title}</span>
+          <span className="conversation-list-state">{conversation.lifecycle === 'ACTIVE' ? t('conversationActive') : t('conversationArchived')}</span>
+        </button>
+      </li>)}</ul>
+      <p className="conversation-privacy">{t('conversationPrivate')}</p>
+    </aside>
 
-    {selected && <section aria-labelledby="selected-conversation-title">
-      <h2 id="selected-conversation-title">{selected.title}</h2>
-      <p>{t('conversationLifecycle', { state: selected.lifecycle })}</p>
-      {selected.lifecycle === 'ACTIVE' && <button type="button" disabled={busy || Boolean(run && ACTIVE_RUN_STATES.has(run.state))} onClick={() => void archive()}>{t('archiveConversation')}</button>}
-      <button type="button" disabled={busy || Boolean(run && ACTIVE_RUN_STATES.has(run.state))} onClick={() => void remove()}>{t('deleteConversation')}</button>
+    <section className="conversation-panel">
+      {selected ? <>
+        <header className="conversation-panel-header">
+          <div>
+            <p className="conversation-eyebrow">{t('conversationPrivate')}</p>
+            <h2 id="selected-conversation-title" dir="auto">{selected.title}</h2>
+            <p className="conversation-lifecycle">{t('conversationLifecycle', { state: selected.lifecycle === 'ACTIVE' ? t('conversationActive') : t('conversationArchived') })}</p>
+          </div>
+          <div className="conversation-actions">
+            {selected.lifecycle === 'ACTIVE' && <button type="button" disabled={busy || Boolean(run && ACTIVE_RUN_STATES.has(run.state))} onClick={() => void archive()}>{t('archiveConversation')}</button>}
+            <button type="button" disabled={busy || Boolean(run && ACTIVE_RUN_STATES.has(run.state))} onClick={() => void remove()}>{t('deleteConversation')}</button>
+          </div>
+        </header>
 
-      <h3>{t('messages')}</h3>
-      <ol aria-live="polite">{messages.map((message) => <li key={message.messageId}>
-        <strong>{message.role === 'USER' ? t('you') : t('assistant')}</strong>
-        <p style={{ whiteSpace: 'pre-wrap' }}>{message.content}</p>
-      </li>)}</ol>
+        <div className="conversation-thread">
+          <h3>{t('messages')}</h3>
+          {messages.length === 0 && <p className="conversation-thread-empty">{t('messageEmptyHint')}</p>}
+          <ol aria-live="polite">{messages.map((message) => <li className={`conversation-message conversation-message-${message.role.toLowerCase()}`} key={message.messageId}>
+            <strong>{message.role === 'USER' ? t('you') : t('assistant')}</strong>
+            <p dir="auto">{message.content}</p>
+          </li>)}</ol>
+        </div>
 
-      {selected.lifecycle === 'ACTIVE' && <form onSubmit={(event) => void submitMessage(event)}>
-        <label htmlFor="conversation-message">{t('message')}</label>
-        <textarea id="conversation-message" required maxLength={16000} value={userMessage} onChange={(event) => setUserMessage(event.target.value)} />
-        <button type="submit" disabled={busy || !userMessage.trim() || Boolean(run && ACTIVE_RUN_STATES.has(run.state))}>{t('sendMessage')}</button>
-      </form>}
-
-      {run && <div role="status" aria-live="polite">
-        <p>{t('runState', { state: run.state })}</p>
-        {run.failureCode && <p>{t('runFailure', { code: run.failureCode })}</p>}
-        {ACTIVE_RUN_STATES.has(run.state) && <button type="button" disabled={busy || run.cancellationRequested} onClick={() => void cancel()}>{t('cancelRun')}</button>}
-        {run.state === 'SUCCEEDED' && <fieldset disabled={busy || feedbackSubmitted}>
-          <legend>{feedbackSubmitted ? t('feedbackSubmitted') : t('rateResponse')}</legend>
-          <button type="button" onClick={() => void submitFeedback('HELPFUL')}>{t('feedbackHelpful')}</button>
-          <button type="button" onClick={() => void submitFeedback('NOT_HELPFUL')}>{t('feedbackNotHelpful')}</button>
-          <button type="button" onClick={() => void submitFeedback('UNSAFE')}>{t('feedbackUnsafe')}</button>
-          <button type="button" onClick={() => void submitFeedback('FACTUALLY_WRONG')}>{t('feedbackFactuallyWrong')}</button>
-        </fieldset>}
+        <div className="conversation-panel-footer">
+          {run && <div className="conversation-run" role="status" aria-live="polite">
+            <p>{t('runState', { state: t(RUN_STATE_LABEL[run.state]) })}</p>
+            {run.failureCode && <p>{t('runFailure', { code: run.failureCode })}</p>}
+            {ACTIVE_RUN_STATES.has(run.state) && <button type="button" disabled={busy || run.cancellationRequested} onClick={() => void cancel()}>{t('cancelRun')}</button>}
+            {run.state === 'SUCCEEDED' && <fieldset disabled={busy || feedbackSubmitted}>
+              <legend>{feedbackSubmitted ? t('feedbackSubmitted') : t('rateResponse')}</legend>
+              <button type="button" onClick={() => void submitFeedback('HELPFUL')}>{t('feedbackHelpful')}</button>
+              <button type="button" onClick={() => void submitFeedback('NOT_HELPFUL')}>{t('feedbackNotHelpful')}</button>
+              <button type="button" onClick={() => void submitFeedback('UNSAFE')}>{t('feedbackUnsafe')}</button>
+              <button type="button" onClick={() => void submitFeedback('FACTUALLY_WRONG')}>{t('feedbackFactuallyWrong')}</button>
+            </fieldset>}
+          </div>}
+          {selected.lifecycle === 'ACTIVE' && <form className="conversation-composer" onSubmit={(event) => void submitMessage(event)}>
+            <label htmlFor="conversation-message">{t('message')}</label>
+            <textarea id="conversation-message" required maxLength={16000} value={userMessage} onChange={(event) => setUserMessage(event.target.value)} />
+            <div className="conversation-composer-actions">
+              <span>{t('messageComposerHint')}</span>
+              <button className="conversation-primary" type="submit" disabled={busy || !userMessage.trim() || Boolean(run && ACTIVE_RUN_STATES.has(run.state))}>{t('sendMessage')}</button>
+            </div>
+          </form>}
+        </div>
+      </> : <div className="conversation-welcome">
+        <span className="conversation-welcome-mark" aria-hidden="true">H</span>
+        <h2>{t('noConversations')}</h2>
+        <p>{t('conversationEmptyHint')}</p>
       </div>}
-    </section>}
-    <p role="alert">{error}</p>
-  </section></main>;
+      <p className="conversation-error" role="alert">{error}</p>
+    </section>
+  </main>;
 }

@@ -2,7 +2,8 @@
 
 ## Scope
 
-This frontend contains the completed roadmap foundation plus onboarding, profile/contact, and password-lifecycle repository slices.
+This frontend contains the completed roadmap foundation, onboarding, profile/contact,
+password-lifecycle, and private Conversation repository slices.
 
 ## Boundary rules
 
@@ -53,13 +54,15 @@ Implemented:
 - route-heading focus management and native keyboard semantics
 - Vitest/React Testing Library component coverage for localization, focus, and safe error recovery
 - an executable Chromium/axe WCAG A/AA accessibility gate
+- a responsive bilingual private Conversation workspace with create/select/archive/delete,
+  message history, asynchronous run status/cancel, enum-only feedback, and text-only model output
 - twenty-seven Playwright journeys across accessibility, localization, keyboard/focus,
   privacy/resilience, onboarding, and authenticated account/Tenant behavior
 - exact reviewed npm versions with React/ReactDOM 19.2.7 runtime alignment
 - pinned OSV-Scanner lockfile advisory and immutable-image Semgrep JS/TS policy gates
 - a digest-pinned Caddy runtime image that runs as UID/GID 10001 with a read-only filesystem,
   no Linux capabilities, a separate health port, and SPA-route fallback
-- inclusion in the six-component Production Syft/Grype/Cosign/Kyverno release-evidence contract
+- inclusion in the seven-component Production Syft/Grype/Cosign/Kyverno release-evidence contract
 
 Remaining broader work:
 
@@ -68,5 +71,5 @@ Remaining broader work:
 - deployed staging/production browser journey evidence
 
 Repository image and release-path verification is not deployment evidence. Production frontend
-routing, workload manifests, environment configuration, and executed signing/admission remain
-outside this slice and are `NOT VERIFIED`.
+route and workload source are present; actual staging/Production deployment, environment
+configuration, and executed signing/admission remain `NOT VERIFIED`.
