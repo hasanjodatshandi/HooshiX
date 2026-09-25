@@ -50,4 +50,13 @@ describe('ConversationFlow', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
   });
+
+  it('does not mistake an unavailable conversation list for an empty account', async () => {
+    vi.mocked(bffClient.listConversations).mockRejectedValueOnce(new Error('private backend detail'));
+    render(<I18nProvider><ConversationFlow /></I18nProvider>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('UNKNOWN_ERROR');
+    expect(screen.queryByText('No conversations yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('private backend detail')).not.toBeInTheDocument();
+  });
 });

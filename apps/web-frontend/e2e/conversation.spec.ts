@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -81,7 +82,21 @@ test('creates a conversation, submits a run, polls it, and renders the response 
   await page.getByLabel('Message').fill('Give me a safe answer');
   await page.getByRole('button', { name: 'Send message' }).click();
 
-  await expect(page.getByText('Response state: SUCCEEDED')).toBeVisible();
+  await expect(page.getByText('Response state: Completed')).toBeVisible();
   await expect(page.getByText('<script>alert(1)</script>Safe answer')).toBeVisible();
   await expect(page.locator('script')).toHaveCount(1);
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('heading', { name: 'Project plan' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByLabel('Language').selectOption('fa');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByRole('button', { name: 'ارسال پیام' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
