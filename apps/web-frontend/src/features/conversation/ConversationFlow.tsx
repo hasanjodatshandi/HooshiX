@@ -33,6 +33,7 @@ export function ConversationFlow() {
   const [title, setTitle] = useState('');
   const [userMessage, setUserMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(true);
   const [error, setError] = useState('');
 
   async function loadConversations(signal?: AbortSignal) {
@@ -58,6 +59,8 @@ export function ConversationFlow() {
     const controller = new AbortController();
     void loadConversations(controller.signal).catch((cause) => {
       if (!controller.signal.aborted) setError(getErrorMessage(cause));
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoadingConversations(false);
     });
     return () => controller.abort();
   }, []);
@@ -199,7 +202,7 @@ export function ConversationFlow() {
       </form>
 
       <h2 id="conversation-list-title">{t('conversationList')}</h2>
-      {conversations.length === 0 && <p className="conversation-sidebar-empty">{t('noConversations')}</p>}
+      {!loadingConversations && !error && conversations.length === 0 && <p className="conversation-sidebar-empty">{t('noConversations')}</p>}
       <ul className="conversation-list">{conversations.map((conversation) => <li key={conversation.conversationId}>
         <button type="button" disabled={busy} aria-pressed={selected?.conversationId === conversation.conversationId} onClick={() => { setSelected(conversation); setRun(null); }}>
           <span className="conversation-list-title" dir="auto">{conversation.title}</span>
@@ -256,8 +259,10 @@ export function ConversationFlow() {
         </div>
       </> : <div className="conversation-welcome">
         <span className="conversation-welcome-mark" aria-hidden="true">H</span>
-        <h2>{t('noConversations')}</h2>
-        <p>{t('conversationEmptyHint')}</p>
+        {loadingConversations ? <h2>{t('loadingConversations')}</h2> : !error && <>
+          <h2>{t('noConversations')}</h2>
+          <p>{t('conversationEmptyHint')}</p>
+        </>}
       </div>}
       <p className="conversation-error" role="alert">{error}</p>
     </section>

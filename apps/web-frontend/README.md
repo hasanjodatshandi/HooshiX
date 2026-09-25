@@ -56,7 +56,7 @@ Implemented:
 - an executable Chromium/axe WCAG A/AA accessibility gate
 - a responsive bilingual private Conversation workspace with create/select/archive/delete,
   message history, asynchronous run status/cancel, enum-only feedback, and text-only model output
-- twenty-seven Playwright journeys across accessibility, localization, keyboard/focus,
+- Playwright journeys across accessibility, localization, keyboard/focus,
   privacy/resilience, onboarding, and authenticated account/Tenant behavior
 - exact reviewed npm versions with React/ReactDOM 19.2.7 runtime alignment
 - pinned OSV-Scanner lockfile advisory and immutable-image Semgrep JS/TS policy gates
