@@ -104,6 +104,7 @@
       "review_mode": "targeted",
       "match_terms": ["client address", "client ip", "proxy protocol", "traefik", "waf", "coraza", "caddy", "forwarded header", "آی پی کاربر", "پروکسی", "واف"],
       "minimum_sources": [
+        "docs/adr/0001-select-dedicated-caddy-coraza-edge-waf.md",
         "docs/adr/0043-define-production-network-trust-boundaries-v1.md",
         "docs/architecture/network-architecture.md",
         "docs/architecture/services/web-bff.md",
@@ -114,7 +115,7 @@
         "docs/runbooks/local-traefik-edge.md",
         "docs/technology/production-compatibility-matrix.md"
       ],
-      "summary": "Preserve external-L4 -> Traefik -> WAF -> BFF trust and forged-header negative tests."
+      "summary": "Preserve external-L4 -> Traefik -> WAF trust, exact API-BFF/static-frontend route split, and forged-header/direct-workload negative tests."
     },
     {
       "id": "authorization",

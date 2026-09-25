@@ -10,6 +10,8 @@ permissions:
   contents: read
 
 env:
+  HELM_VERSION: '4.2.4'
+  HELM_SHA256: c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3
   OSV_SCANNER_VERSION: '2.4.0'
   OSV_SCANNER_SHA256: 15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0
   SEMGREP_IMAGE: semgrep/semgrep@sha256:67319956da3dcb58baf5b322899c15458e3963e7018a86aeeb5cd224e69cb77a
@@ -76,6 +78,23 @@ jobs:
         run: npm run test:coverage
       - run: npx playwright install --with-deps
       - run: npm run build
+      - name: Verify production frontend Helm chart
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output /tmp/helm.tar.gz \
+            "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+          printf '%s  %s\n' "${HELM_SHA256}" /tmp/helm.tar.gz | sha256sum --check --strict -
+          tar -xzf /tmp/helm.tar.gz -C /tmp
+          /tmp/linux-amd64/helm version --short | grep -F "v${HELM_VERSION}"
+          chart=deploy/helm/web-frontend
+          /tmp/linux-amd64/helm lint "$chart" -f "$chart/ci/test-values.yaml"
+          /tmp/linux-amd64/helm template web-frontend "$chart" \
+            --namespace platform-apps -f "$chart/ci/test-values.yaml" > /tmp/web-frontend-rendered.yaml
+          grep -Fq 'kind: Deployment' /tmp/web-frontend-rendered.yaml
+          grep -Fq 'kind: NetworkPolicy' /tmp/web-frontend-rendered.yaml
+          grep -Fq 'kind: AuthorizationPolicy' /tmp/web-frontend-rendered.yaml
+          grep -Fq 'image: "registry.example.test/hooshix/web-frontend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' /tmp/web-frontend-rendered.yaml
       - name: Build and smoke-test hardened frontend image
         run: |
           set -euo pipefail

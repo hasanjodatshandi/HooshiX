@@ -10,7 +10,8 @@ Public Internet
   -> external L4
   -> Traefik public edge
   -> Caddy/Coraza inspection
-  -> Web BFF application ingress
+  -> /api and /api/*: Web BFF application ingress
+  -> other paths: static Web Frontend
   -> internal gRPC workloads
   -> owned PostgreSQL / Redis / Kafka / OpenBao paths
 
@@ -34,12 +35,13 @@ Internet
 -> external L4
 -> Traefik
 -> Caddy/Coraza WAF
--> Web BFF
+-> /api and /api/* -> Web BFF
+-> all other application paths -> static Web Frontend
 ```
 
 Traefik application origin accepts public application traffic only from exact approved external-L4 source ranges. Direct Internet/non-approved-source access is denied before application routing by provider/origin firewall, security group, routing, or equivalent network control.
 
-Direct Internet->BFF and Traefik->BFF application routes are prohibited. NetworkPolicy, Istio authorization, routing, and origin controls enforce these paths independently.
+Direct Internet/Traefik routes to BFF or frontend are prohibited. NetworkPolicy, Istio authorization, routing, and origin controls enforce these paths independently. The static frontend has no API authority and no application egress; all browser API requests return through the WAF API route to BFF.
 
 External L4 preserves validated original client source with PROXY protocol v2. Traefik trusts PROXY only from exact reviewed L4 CIDRs. `proxyProtocol.insecure` and `forwardedHeaders.insecure` are prohibited.
 
@@ -50,14 +52,14 @@ external-L4 validated address
 -> Traefik trusted PROXY-v2 result
 -> Traefik-generated forwarding state
 -> Caddy strict trusted-proxy resolution
--> Caddy-generated X-HooshiX-Client-IP
+-> Caddy-generated X-HooshiX-Client-IP on /api and /api/* only
 -> Web BFF exact canonical binary client address
 -> approved backend exact-address context
 ```
 
 Caller `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-HooshiX-Client-IP` are not authority.
 
-BFF accepts exactly one server-derived client IP on the WAF-only ingress path. It does not parse arbitrary public forwarding chains.
+BFF accepts exactly one server-derived client IP on the WAF-only API ingress path. It does not parse arbitrary public forwarding chains. The frontend route receives no trusted client-address header.
 
 When a backend owns a public quota, BFF sends the exact binary IP+family only from the approved BFF workload/operation. BFF does not pre-collapse it to a prefix.
 
@@ -223,7 +225,8 @@ Verify:
 - untrusted/missing PROXY cannot set/replace trusted client identity;
 - exact `/32`/`/128` hard identity and separate `/24`/`/64` pressure behave correctly under NAT/IPv6 cases;
 - direct Internet/non-L4 Traefik origin denied;
-- direct Internet->BFF and Traefik->BFF denied;
+- direct Internet/Traefik access to BFF and frontend denied;
+- non-API traffic reaches only the static frontend, API traffic reaches only BFF, and the frontend cannot receive or manufacture trusted client-address authority;
 - unapproved workload->internal service/data/control-plane denied;
 - arbitrary application Internet egress denied;
 - public OTLP and public management scrape access denied;

@@ -29,9 +29,10 @@ EXPECTED = {
 }
 REQUIRED_INPUTS = {
     "approved_public_hostname", "application_release_digests", "compromised_password_dataset_release",
-    "cosign_oidc_issuer", "cosign_oidc_subject", "external_blackbox_monitor",
+    "conversation_model_provider_production_approval", "cosign_oidc_issuer", "cosign_oidc_subject", "external_blackbox_monitor",
     "external_l4_source_cidrs", "measured_service_capacity_values", "offhost_security_audit_sink",
-    "offsite_postgresql_backup_target", "openbao_unseal_custody", "production_registry",
+    "notification_provider_delivery", "offsite_postgresql_backup_target", "openbao_unseal_custody", "production_registry",
+    "production_single_host_risk_acceptance",
     "production_tls_material", "upstream_ddos_provider_evidence", "wireguard_peer_inventory",
 }
 REQUIRED_FILES = (
@@ -73,7 +74,7 @@ def load_json(path: Path) -> dict:
 
 def validate_profile(data: dict) -> list[str]:
     errors: list[str] = []
-    add(errors, data.get("schema_version") == 1, "profile schema_version must be 1")
+    add(errors, data.get("schema_version") == 2, "profile schema_version must be 2")
     add(errors, data.get("profile") == "production-single-server", "selected profile must be production-single-server")
     add(errors, data.get("availability_claim") == "non-ha-single-host", "single-server must not claim HA")
     for path, value in EXPECTED.items(): add(errors, get(data, path) == value, f"{path} must equal {value}")
@@ -138,15 +139,18 @@ def validate_static_contracts(profile: dict) -> list[str]:
     for profile_path, contract_path in crosswalk.items(): add(errors, get(profile,profile_path) == get(combined,contract_path), f"production contract drift: {profile_path} != {contract_path}")
     add(errors, recovery.get("postgresql",{}).get("rpo_minutes_max") == 5 and recovery.get("platform",{}).get("rto_minutes_max") == 240, "production RPO/RTO recovery contract is invalid")
     add(errors, access.get("management_overlay") == "wireguard" and access.get("public_ssh_denied") is True, "production management access must be WireGuard-only with public SSH denied")
-    add(errors, network.get("public_path") == ["internet","upstream-ddos","external-l4","traefik","edge-waf","web-bff"], "production public edge path is invalid")
+    add(errors, network.get("schema_version") == 2, "production network trust-policy schema must be 2")
+    add(errors, network.get("public_api_path") == ["internet","upstream-ddos","external-l4","traefik","edge-waf","web-bff"], "production public API edge path is invalid")
+    add(errors, network.get("public_frontend_path") == ["internet","upstream-ddos","external-l4","traefik","edge-waf","web-frontend"], "production public frontend edge path is invalid")
+    add(errors, network.get("web_frontend") == {"direct_public_reachability":False,"waf_only":True,"api_authority":False}, "production frontend trust boundary is invalid")
     add(errors, observability.get("external_host_down_monitor_required") is True and observability.get("authoritative_privileged_audit_separate") is True, "production observability failure-domain contract is invalid")
     add(errors, release.get("grype_severities_blocking") == ["Critical","High"] and release.get("signed_sbom_attestation_required") is True, "production final-artifact release policy is invalid")
     required_schema = set(schema.get("required",[]))
     add(errors, {"git_revision","images","cosign","external_l4_source_cidrs","capacity_evidence","service_capacity","compromised_password_dataset","external_evidence","secret_refs"} <= required_schema, "production release manifest schema is missing mandatory evidence fields")
     image_schema = schema.get("properties",{}).get("images",{})
-    expected_release_components = {"authorization-service","compromised-password-service","identity-service","notification-service","web-bff","web-frontend"}
+    expected_release_components = {"authorization-service","compromised-password-service","conversation-service","identity-service","notification-service","web-bff","web-frontend"}
     add(errors, set(image_schema.get("required",[])) == expected_release_components and set(image_schema.get("properties",{})) == expected_release_components,
-        "production release manifest must cover exactly all six application release components")
+        "production release manifest must cover exactly all seven application release components")
     k3s = (PRODUCTION/"k3s/config.yaml").read_text(encoding="utf-8")
     for line in ("secrets-encryption: true","flannel-backend: none","disable-network-policy: true","  - servicelb","  - traefik"): add(errors, line in k3s, f"K3s config missing required setting: {line.strip()}")
     add(errors, "protect-kernel-defaults: true" in k3s, "K3s must protect kernel defaults")

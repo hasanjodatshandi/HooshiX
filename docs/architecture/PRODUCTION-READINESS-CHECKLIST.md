@@ -230,12 +230,13 @@ OpenBao unchanged:
 ## 11. Public edge and client address
 
 - [ ] upstream volumetric protection active.
-- [ ] external L4 -> Traefik -> Caddy/Coraza -> BFF enforced.
+- [ ] external L4 -> Traefik -> Caddy/Coraza enforced, with `/api` and `/api/*` routed only to BFF and all other application paths only to the static frontend.
 - [ ] Traefik origin accepts only exact approved L4 sources; direct Internet/non-approved origin access denied before routing.
 - [ ] external L4 preserves client address through approved PROXY v2.
 - [ ] Traefik trusted CIDRs exact; insecure PROXY/forwarded modes off.
 - [ ] Caddy strict trusted-proxy parsing + internal client-IP overwrite active.
-- [ ] BFF accepts one exact internal IP only on WAF-only path.
+- [ ] BFF accepts one exact internal IP only on the WAF-only API path; frontend receives no trusted client-address header and has no API authority/egress.
+- [ ] direct Internet/Traefik access to both BFF and frontend is denied; route-confusion negatives pass.
 - [ ] forged headers/untrusted PROXY/proxy-address/IPv4/IPv6/mapped-address negatives pass.
 - [ ] no raw client IP in ordinary logs/metrics/traces/Kafka/business state.
 

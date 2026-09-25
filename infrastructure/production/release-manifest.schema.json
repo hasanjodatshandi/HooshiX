@@ -1,5 +1,5 @@
 {
-  "$id": "https://hooshix.invalid/schemas/production-release-manifest-v1.json",
+  "$id": "https://hooshix.invalid/schemas/production-release-manifest-v2.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -98,6 +98,10 @@
           "minLength": 1,
           "type": "string"
         },
+        "model_provider_production_approval": {
+          "minLength": 1,
+          "type": "string"
+        },
         "offhost_security_audit_sink": {
           "minLength": 1,
           "type": "string"
@@ -107,6 +111,10 @@
           "type": "string"
         },
         "openbao_unseal_custody": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "staging_validation": {
           "minLength": 1,
           "type": "string"
         },
@@ -127,7 +135,9 @@
         "upstream_ddos_provider",
         "wireguard_peer_inventory",
         "cold_dr_exercise",
-        "notification_provider_delivery"
+        "model_provider_production_approval",
+        "notification_provider_delivery",
+        "staging_validation"
       ],
       "type": "object"
     },
@@ -155,6 +165,10 @@
           "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
           "type": "string"
         },
+        "conversation-service": {
+          "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
         "identity-service": {
           "pattern": "^[a-z0-9][a-z0-9._:-]*(?:/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$",
           "type": "string"
@@ -175,6 +189,7 @@
       "required": [
         "authorization-service",
         "compromised-password-service",
+        "conversation-service",
         "identity-service",
         "notification-service",
         "web-frontend",
@@ -192,11 +207,21 @@
       "type": "string"
     },
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "secret_refs": {
       "additionalProperties": false,
       "properties": {
+        "conversation_content": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
+        "conversation_provider": {
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "type": "string"
+        },
         "kafka_tls": {
           "maxLength": 253,
           "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
@@ -234,6 +259,8 @@
         "openbao",
         "redis_tls",
         "kafka_tls",
+        "conversation_content",
+        "conversation_provider",
         "notification_providers"
       ],
       "type": "object"
@@ -284,6 +311,29 @@
           ],
           "type": "object"
         },
+        "conversation": {
+          "additionalProperties": false,
+          "properties": {
+            "grpc_maximum_concurrent_calls": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "provider_maximum_concurrent_calls": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "provider_maximum_concurrent_per_tenant": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "grpc_maximum_concurrent_calls",
+            "provider_maximum_concurrent_calls",
+            "provider_maximum_concurrent_per_tenant"
+          ],
+          "type": "object"
+        },
         "identity": {
           "additionalProperties": false,
           "properties": {
@@ -315,6 +365,7 @@
       },
       "required": [
         "authorization",
+        "conversation",
         "identity"
       ],
       "type": "object"

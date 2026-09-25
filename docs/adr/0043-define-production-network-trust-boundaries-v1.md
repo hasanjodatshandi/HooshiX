@@ -30,7 +30,8 @@ Internet
 -> external L4
 -> Traefik
 -> Caddy + Coraza WAF
--> Web BFF
+-> /api and /api/*: Web BFF
+-> other application paths: static Web Frontend
 ```
 
 External L4 is source-address authority. It MUST preserve the validated original client source to Traefik using PROXY protocol v2. A provider that cannot supply an equivalent authenticated source-preservation path is not production-eligible without a revised decision.
@@ -47,9 +48,9 @@ Traefik requirements:
 
 A deployment that cannot restrict the Traefik origin to the approved external-L4 path is not production-eligible. Header checks are not a substitute for that network restriction.
 
-## 2. WAF-to-BFF contract
+## 2. WAF application route contract
 
-Only approved Traefik workload may reach Caddy/Coraza application ingress. Only approved Caddy/Coraza workload may reach Web BFF. NetworkPolicy and Istio authorization enforce these paths independently of header processing.
+Only approved Traefik workload may reach Caddy/Coraza application ingress. Only approved Caddy/Coraza workload may reach Web BFF and the static Web Frontend. NetworkPolicy and Istio authorization enforce these paths independently of header processing. `/api` and `/api/*` are routed only to BFF; other application paths are routed only to the frontend. The frontend is not a client-address or API authority and has no application egress.
 
 Caddy requirements:
 
@@ -57,8 +58,9 @@ Caddy requirements:
 - strict trusted-proxy parsing selects the nearest untrusted address from the trusted chain;
 - use only the reviewed Traefik-produced client-IP source, normally `X-Forwarded-For`;
 - never trust arbitrary public `Forwarded`, `X-Real-IP`, or private client-IP headers;
-- overwrite internal `X-HooshiX-Client-IP` with the server-derived client IP;
+- overwrite internal `X-HooshiX-Client-IP` with the server-derived client IP only on the BFF API route;
 - never pass through caller-supplied `X-HooshiX-Client-IP`.
+- never forward trusted client-address context to the static frontend.
 
 Web BFF requirements:
 

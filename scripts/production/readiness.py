@@ -5,7 +5,8 @@ from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 PROFILE=ROOT/'infrastructure/production/profile.json'
-GATES={'artifact_integrity','host_k3s_network','wireguard_fido_jit_audit','gitops_argocd','postgresql_backup_restore','redis_recovery_capacity_clock','kafka_transport_recovery','openbao_external_secrets','ambient_kyverno_admission','edge_client_address_waf','observability_privacy_faults','external_host_down_monitor','supply_chain_release','complete_stack_capacity','cold_dr','five_service_production_runtime'}
+GATES={'artifact_integrity','host_k3s_network','wireguard_fido_jit_audit','gitops_argocd','postgresql_backup_restore','redis_recovery_capacity_clock','kafka_transport_recovery','openbao_external_secrets','ambient_kyverno_admission','edge_client_address_waf','observability_privacy_faults','external_host_down_monitor','supply_chain_release','complete_stack_capacity','cold_dr','seven_component_production_runtime','deployed_browser_journey','conversation_provider_governance','notification_provider_delivery'}
+APPROVAL_ROLES={'business_owner','platform_owner','privacy_owner','product_owner','security_owner'}
 EVIDENCE_ID=re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/@+-]{2,255}$')
 PLACEHOLDER=re.compile(r'(?i)(^|[^a-z])(tbd|todo|unknown|placeholder|example|not verified|none)([^a-z]|$)')
 def current_revision(): return subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
@@ -16,7 +17,7 @@ def load(path):
 def validate(data,expected_revision,now=None):
     errors=[]; now=now or datetime.now(timezone.utc)
     required=set(json.loads(PROFILE.read_text(encoding='utf-8'))['required_external_inputs'])
-    if data.get('schema_version')!=1: errors.append('schema_version must be 1')
+    if data.get('schema_version')!=2: errors.append('schema_version must be 2')
     if data.get('profile')!='production-single-server': errors.append('profile must be production-single-server')
     if data.get('git_revision')!=expected_revision: errors.append('git_revision must equal the exact promoted repository revision')
     external=data.get('external_inputs')
@@ -38,6 +39,21 @@ def validate(data,expected_revision,now=None):
                 if when is None or when.tzinfo is None: raise ValueError
                 if when>now: errors.append(f'gate {name} observed_at is in the future')
             except ValueError: errors.append(f'gate {name} observed_at must be timezone-aware ISO-8601')
+    approvals=data.get('approvals')
+    if not isinstance(approvals,dict) or set(approvals)!=APPROVAL_ROLES:
+        errors.append('approvals must contain exactly the mandatory production owner roles')
+    else:
+        for role,approval in approvals.items():
+            if not isinstance(approval,dict): errors.append(f'approval {role} must be an object'); continue
+            if approval.get('approved') is not True: errors.append(f'approval {role} is not approved')
+            ref=approval.get('evidence_id')
+            if not isinstance(ref,str) or not EVIDENCE_ID.fullmatch(ref) or PLACEHOLDER.search(ref): errors.append(f'approval {role} needs a bounded non-secret, non-placeholder evidence_id')
+            observed=approval.get('observed_at')
+            try:
+                when=datetime.fromisoformat(observed.replace('Z','+00:00')) if isinstance(observed,str) else None
+                if when is None or when.tzinfo is None: raise ValueError
+                if when>now: errors.append(f'approval {role} observed_at is in the future')
+            except ValueError: errors.append(f'approval {role} observed_at must be timezone-aware ISO-8601')
     if data.get('go_live_approved') is not True: errors.append('go_live_approved must be true only after all external review/approval gates pass')
     return errors
 def main():

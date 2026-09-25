@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-10; normalized to current-only documentation on 2026-08-14
+2026-08-10; normalized to current-only documentation on 2026-08-14; same-origin frontend routing clarified on 2026-09-25
 
 ## Decision
 
@@ -19,12 +19,14 @@ Internet
 -> repository-pinned Traefik
 -> dedicated edge-waf deployment
    Caddy + coraza-caddy + Coraza v3 + OWASP CRS 4.x LTS
--> Web BFF
+-> route split:
+   /api and /api/* -> Web BFF
+   all other application paths -> static Web Frontend
 ```
 
 The upstream volumetric-mitigation/external-L4 requirements are governed in detail by ADR-0029. A CDN is deployment-specific and does not replace either control.
 
-Traefik is the Kubernetes/Gateway edge router and forwards public application traffic to the dedicated WAF service. Caddy/Coraza is the L7 inspection layer. Direct Internet->BFF or Traefik->BFF application routes that bypass the WAF are prohibited by route design plus NetworkPolicy/Istio authorization.
+Traefik is the Kubernetes/Gateway edge router and forwards public application traffic to the dedicated WAF service. Caddy/Coraza is the L7 inspection layer and the sole same-origin route splitter. It forwards only `/api` and `/api/*` to Web BFF and serves all other application paths from the static Web Frontend workload. The frontend is presentation only and receives no API, authentication, authorization, tenant, or client-address authority. Direct Internet/Traefik access to either BFF or frontend that bypasses the WAF is prohibited by route design plus NetworkPolicy/Istio authorization. `X-HooshiX-Client-IP` is overwritten only on the WAF-to-BFF API route and is never sent to the static frontend.
 
 K3s bundled Traefik/ServiceLB is disabled in `production-single-server`; the repository-pinned edge deployment remains authority.
 
@@ -50,7 +52,7 @@ In both profiles, saturation/latency/error telemetry is a release/operations sig
 
 ## Verification requirements
 
-Both profiles verify the exact upstream mitigation/scrubbing -> external L4 -> repository Traefik -> WAF -> BFF route, direct-bypass negatives, pinned CRS/image identities, DetectionOnly evidence, reviewed blocking exceptions, body-limit behavior, PII-safe edge logging, load/latency impact and coexistence with current authentication/authorization/quota controls.
+Both profiles verify the exact upstream mitigation/scrubbing -> external L4 -> repository Traefik -> WAF route followed by the BFF API branch or static-frontend branch, direct-bypass negatives for both workloads, absence of client-address authority on the frontend branch, pinned CRS/image identities, DetectionOnly evidence, reviewed blocking exceptions, body-limit behavior, PII-safe edge logging, load/latency impact and coexistence with current authentication/authorization/quota controls.
 
 `production-single-server` additionally verifies K3s bundled edge components are disabled, the one-host edge/WAF resource cost is included in complete-stack capacity/reboot tests, and WAF unavailability never creates a bypass path.
 

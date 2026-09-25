@@ -82,7 +82,7 @@ REQUIRED_BASELINE_PATHS = (
     "scripts/mlops/verify_governance.py",
 )
 
-IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".vscode", "build", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "dist", "coverage", "test-results"}
+IGNORED_PATH_PARTS = {".git", ".gradle", ".local-runtime", ".platform-runtime", ".memsearch", ".vscode", "build", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "dist", "coverage", "test-results"}
 IGNORED_SUFFIXES = {".pyc", ".pyo", ".tsbuildinfo"}
 
 EXTERNALIZED_MCP_PATHS = (

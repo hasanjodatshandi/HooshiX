@@ -1,0 +1,31 @@
+replicaCount: 1
+
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: web-frontend
+
+service:
+  applicationPort: 8080
+  healthPort: 9090
+
+runtime:
+  temporaryStorageLimit: 64Mi
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+    ephemeral-storage: 16Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+    ephemeral-storage: 128Mi
+
+edge:
+  namespace: ""
+  podLabels: {}
+  principal: ""

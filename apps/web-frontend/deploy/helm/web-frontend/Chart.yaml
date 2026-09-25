@@ -1,0 +1,6 @@
+apiVersion: v2
+name: web-frontend
+description: HooshiX same-origin browser frontend
+version: 0.1.0
+appVersion: "0.1.0"
+type: application
