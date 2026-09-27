@@ -176,7 +176,7 @@ approved device -> WireGuard -> management address -> OpenSSH public-key -> JIT
 - no root/password/shared SSH;
 - per-operator key authentication; FIDO2 presence+verification only when enrolled;
 - network/login alone grants no admin;
-- two-reviewer <=30m write elevation and bounded read-only grant;
+- minimum one-reviewer approval and <=30m single-server write elevation, with bounded read-only grant; the owner accepts the absence of independent separation of duties under ADR-0030;
 - OS/`sudo`/K8s/DB audit exported off-host;
 - shell history is not authoritative audit;
 - provider console is break glass only.

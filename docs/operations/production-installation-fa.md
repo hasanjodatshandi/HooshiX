@@ -199,7 +199,7 @@ RAM/CPU/دیسک با ظرفیت واقعی کامل stack سنجیده می‌�
 4. تغییر firewall/netplan باید backup، زمان rollback خودکار و امکان بازیابی بررسی‌شده داشته باشد.
 5. فقط table/rule متعلق به همین نصب را تغییر دهید؛ `flush ruleset` و حذف fail2ban یا تنظیم ایمیل مجاز نیست.
 6. public SSH را قبل از آزمون مسیر مدیریت و بازیابی نبندید. وضعیت bootstrap موقت تأیید Production نیست.
-7. برای go-live، SSH فقط از WireGuard با کلید مستقل Ed25519 رمزدار (FIDO2 اختیاری)، JIT حداکثر ۳۰ دقیقه و دو reviewer
+7. برای go-live، SSH فقط از WireGuard با کلید مستقل Ed25519 رمزدار (FIDO2 اختیاری)، JIT حداکثر ۳۰ دقیقه و یک reviewer (با پذیرش ریسک تفکیک وظایف)
    برای write، بدون root/password/shared key و audit خارج از host لازم است.
 
 قالب‌های فعلی: `infrastructure/production/host/` و `network/trust-policy.json`.

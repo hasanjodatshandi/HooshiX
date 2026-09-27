@@ -28,11 +28,23 @@ was applied to the VPS by that follow-up. The installed host package is
 `DisableForwarding` as the override for Agent/TCP/X11/StreamLocal forwarding.
 The repository SSH policy now includes that override and explicit StreamLocal
 denial, with inspection and negative policy tests. These are repository controls,
-not live effective-config evidence. Off-host destination access and two independent
-authorized JIT reviewers remain unprovisioned inputs. The Persian prerequisites
+not live effective-config evidence. The owner selected a minimum of one authorized
+JIT reviewer for single-server on 2026-09-27; ADR-0030/0042, the selected profile,
+host access policy, readiness checklist and executable static policy gate now
+reflect that exception. Requester and reviewer may be the same named owner;
+independent separation of duties is not claimed, and HA still requires two reviewers.
+The ParsPack endpoint was provided, but the chat-disclosed credential must be
+rotated before provisioning. Fresh restricted-writer access, destination retention
+and denial of deletion/overwrite remain unverified inputs. The Persian prerequisites
 guide explains these inputs and active-session/child-process expiry tests.
 An unsafe automatic commissioning/JIT draft was withdrawn before any host execution;
 no executable JIT runtime or off-host audit receiver is claimed.
+
+Follow-up read-only SSH on 2026-09-27 confirmed `hooshixadmin`, unavailable
+non-interactive sudo, inactive `auditd`, and active `rsyslog`, K3s and WireGuard.
+No privilege, SSH, firewall or audit configuration was changed in this policy update.
+ParsPack's public connection guide documents S3-compatible clients; its reviewed
+connection guide is not retention/immutability or successful-upload evidence.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 

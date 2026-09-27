@@ -6,7 +6,7 @@ Accepted — current effective decision
 
 ## Date
 
-2026-08-11; single-server hardware requirement revised by explicit owner instruction on 2026-09-27
+2026-08-11; single-server hardware and approval threshold revised by explicit owner instruction on 2026-09-27
 
 ## Decision
 
@@ -23,7 +23,7 @@ Production write/admin access requires:
 - attributable per-human identity;
 - profile-approved public-key authentication; hardware-backed phishing-resistant MFA remains mandatory in HA and optional in single-server;
 - explicit reason/ticket/incident reference;
-- approval by at least two authorized reviewers for production administrator or database-write elevation;
+- approval by one authorized reviewer for `production-single-server` administrator or database-write elevation; `production-ha` retains at least two authorized reviewers and phishing-resistant MFA; this single-server exception is an explicit separation-of-duties risk acceptance and must never be described as two-person approval;
 - time-bounded role/session, maximum 30 minutes for privileged write access;
 - automatic privilege removal at expiry.
 
@@ -106,9 +106,20 @@ Its use requires two-person custody/approval where operationally possible, short
 
 The owner explicitly declined compulsory FIDO2 on 2026-09-27. This is a human-host authentication policy change, not a change to application MFA or the HA profile. Software SSH keys are exportable and are not equivalent to hardware-backed, user-verified authentication. A compromised operator device may steal both WireGuard and SSH material; key passphrases, device protection, independent revocation, JIT, and off-host audit reduce risk but do not restore hardware assurance. Do not claim this path is hardware-backed or phishing-resistant MFA. FIDO-only evidence is `Not applicable` for software-key operators, never a fabricated `Passed` result. JIT, audit, management isolation, and all other production gates remain mandatory.
 
+## Single-server approval threshold
+
+On 2026-09-27 the owner explicitly selected a minimum of one authorized reviewer for
+the non-HA `production-single-server` profile because a second independent approver is not
+available. This is a documented separation-of-duties risk acceptance: one person
+may request and approve a grant, so attribution, reason/ticket, exact scope, a
+maximum 30-minute lifetime, automatic expiry/revocation, fail-closed audit, and
+post-use review remain mandatory compensating controls. The implementation MUST
+reject zero reviewers and MUST NOT count aliases, duplicate keys, or the same
+person twice. `production-ha` remains two-reviewer and hardware-MFA governed.
+
 ## Verification requirements
 
-Both profiles verify no standing production admin roles, two-reviewer elevation, automatic expiry, denial of static/shared privileged credentials, protected audit evidence, and proof that application workloads continue to use Istio/ServiceAccount identity rather than human credentials.
+Both profiles verify no standing production admin roles, profile-scoped approval, automatic expiry, denial of static/shared privileged credentials, protected audit evidence, and proof that application workloads continue to use Istio/ServiceAccount identity rather than human credentials. The single-server profile requires at least one attributable authorized reviewer by owner direction; additional real reviewers are permitted but not required. HA retains two-person approval.
 
 `production-single-server` additionally verifies independent per-device WireGuard peer identity, shared-peer denial, peer revocation, minimal routes, management-address-only SSH, public-interface/Internet denial on every SSH port, proof that WireGuard alone grants no SSH/privilege, root/password/keyboard-interactive/shared/unapproved-key denial, the exact SSH algorithm allow-list, protected per-operator software-key enrollment/revocation, and, only when FIDO is enrolled, presence/verification positives/negatives including attempted `no-touch-required` override. It also verifies `sshd -t`, connection-specific `sshd -T`, forwarding/tunnel denial, automatic JIT expiry, `sudo` I/O/session audit, OS audit, off-host audit integrity, audit-pipeline failure behavior, and break-glass. Shell history MUST NOT satisfy any audit test.
 
@@ -116,4 +127,4 @@ Both profiles verify no standing production admin roles, two-reviewer elevation,
 
 ## Rollback considerations
 
-Rollback MUST preserve zero standing production privilege, profile-approved attributable privileged authentication, bounded elevation, two-reviewer approval, durable protected audit evidence, and denial of static/shared privileged credentials. In single-server it MUST also preserve management-only WireGuard reachability and public SSH denial. It MUST NOT replace real audit with shell history, enable public/password/root/keyboard-interactive/shared/unapproved-key production SSH, share management peer keys, remove presence/verification enforcement for enrolled FIDO keys, replace workload identity with human credentials, or make break-glass access an ordinary administration path.
+Rollback MUST preserve zero standing production privilege, profile-approved attributable privileged authentication, bounded elevation, profile-scoped approval, durable protected audit evidence, and denial of static/shared privileged credentials. In single-server it MUST also preserve management-only WireGuard reachability and public SSH denial. It MUST NOT replace real audit with shell history, enable public/password/root/keyboard-interactive/shared/unapproved-key production SSH, share management peer keys, remove presence/verification enforcement for enrolled FIDO keys, replace workload identity with human credentials, or make break-glass access an ordinary administration path.
