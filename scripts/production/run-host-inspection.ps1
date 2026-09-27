@@ -6,6 +6,8 @@ $digest = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInva
 if ($digest -notmatch '^[a-f0-9]{64}$') { throw 'INSPECTION_HASH_INVALID' }
 if ($ValidateOnly) { Write-Output 'INSPECTION_LAUNCHER=VALIDATED_NO_REMOTE_EXECUTION'; exit 0 }
 $remote = '.cache/hooshix-inspection-' + [guid]::NewGuid().ToString('N') + '.py'
+$report = $remote + '.json'
+$localReport = Join-Path $PSScriptRoot ([System.IO.Path]::GetFileName($report))
 # Public trusted source only. No password, key, environment or raw config is copied.
 try {
     & ssh.exe -o BatchMode=yes -o ConnectTimeout=8 hooshix-server 'umask 077; mkdir -p .cache'
@@ -20,9 +22,12 @@ try {
     # quotes, with no caller-controlled text or secret in the command string.
     $numeric = [string]::Join(',', [System.Text.Encoding]::UTF8.GetBytes($bootstrap))
     $prefix = if ($WithoutSudo) { '' } else { 'sudo ' }
-    Write-Output 'Read-only host inspection. Enter sudo password only in this window; no password storage.'
-    & ssh.exe -t -o ConnectTimeout=8 hooshix-server ($prefix + '/usr/bin/python3 -c ''exec(bytes([' + $numeric + ']))''')
+    if (-not $WithoutSudo) { Write-Output 'Read-only host inspection. Enter sudo password only in this window; no password storage.' }
+    & ssh.exe -t -o ConnectTimeout=8 hooshix-server ($prefix + '/usr/bin/python3 -c ''exec(bytes([' + $numeric + ']))'' > ' + $report + ' && cat ' + $report)
     if ($LASTEXITCODE -ne 0) { throw 'INSPECTION_ROOT_CHECK_FAILED' }
+    & scp.exe -q -o BatchMode=yes -o ConnectTimeout=8 ('hooshix-server:' + $report) $localReport
+    if ($LASTEXITCODE -ne 0) { throw 'INSPECTION_RECEIPT_COPY_FAILED' }
+    Write-Output ('PUBLIC_RECEIPT=' + $localReport)
 } finally {
-    & ssh.exe -o BatchMode=yes -o ConnectTimeout=8 hooshix-server ('rm -f -- ' + $remote)
+    & ssh.exe -o BatchMode=yes -o ConnectTimeout=8 hooshix-server ('rm -f -- ' + $remote + ' ' + $report)
 }
