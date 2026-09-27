@@ -26,7 +26,8 @@ ssh -o BatchMode=yes -o ConnectTimeout=10 hooshix-server hostname
 ```
 
 `Running` و پاسخ نام سرور یعنی سرویس Windows و مسیر SSH کار می‌کنند؛ نه اینکه همه gateها Passed هستند.
-IP مدیریت فعلی `10.77.47.1` است. فایل config محلی و `client.key` خصوصی‌اند؛ محتویاتشان را
+IP مدیریت فعلی `10.77.47.1` است؛ alias فعلی از SSH پورت `22022` استفاده می‌کند.
+این وضعیت bootstrap، مسیر نهایی مدیریت مصوب روی TCP/22 نیست. فایل config محلی و `client.key` خصوصی‌اند؛ محتویاتشان را
 چاپ، screenshot یا در Git کپی نکنید. کلیدهای مشتری جدید باید مستقل باشند.
 اگر اتصال فعلی کار می‌کند، مراحل ساخت زیر را روی آن دوباره اجرا نکنید.
 
@@ -214,6 +215,14 @@ handshake صفر یا قدیمی: endpoint، UDP پنل/host، فعال‌بود
 handshake تازه ولی SSH ناموفق: route `/32`، آدرس peer، SSH listener و firewall مدیریت را بررسی کنید.
 SSH موفق ولی sudo ردشده: مشکل مجوز/احراز هویت مدیریتی است؛ بازنویسی VPN آن را حل نمی‌کند.
 raw log را منتشر نکنید؛ فقط error دسته‌بندی‌شده و فاقد credential منتقل شود.
+
+برای inventory محدود، فایل عمومی [inspect_host.py](../../scripts/production/inspect_host.py)
+را از revision بررسی‌شده روی میزبان قرار دهید و hash آن را مستقل مقایسه کنید.
+آن را با Python سیستم و `-I` اجرا کنید. با کاربر معمول فقط وضعیت سرویس‌ها؛ در نشست مدیریتی
+مجاز، API readiness و تعداد containerهای ready/restart هر pod نیز خوانده می‌شود.
+این ابزار هیچ resource/config/secret را تغییر نمی‌دهد و محتوای Secret، env، annotation یا log
+را چاپ نمی‌کند. timeout هر command بیست ثانیه و retry صفر است؛ موفقیت inventory، Production approval نیست.
+privileged execution همچنان نیازمند مسیر مصوب است؛ برای خودکارشدن آن `NOPASSWD: ALL` نسازید.
 
 ## ۹. دستگاه جدید، لغو و بازیابی
 
