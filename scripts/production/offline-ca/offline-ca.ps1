@@ -269,6 +269,26 @@ function Sign-Intermediate([string]$Csr,[string]$ExpectedCsrHash,[string]$RootKe
     if ($ExpectedCsrHash -notmatch '^[a-fA-F0-9]{64}$' -or $ExpectedCsrHash -ne (Get-FileHash -LiteralPath $Csr -Algorithm SHA256).Hash) { throw 'TRUSTED_CSR_HASH_MISMATCH' }
     if (Test-Path -LiteralPath $Destination) { throw 'EXISTING_SIGNED_OUTPUT_PRESERVED' }
     Assert-NoReparse (Split-Path $Destination)
+    $null=New-Item -ItemType Directory -Path $Destination
+    Protect-StateDirectory $Destination
+    # Snapshot a bounded CSR before parsing/signing, so removing/replacing the
+    # transfer USB cannot change the material after the operator hash check.
+    $snapshot=Join-Path $Destination 'approved-csr.pem'
+    $input=[IO.File]::Open($Csr,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    try {
+        $bytes=New-Object byte[] 32769
+        $count=0
+        while ($count -lt $bytes.Length) {
+            $read=$input.Read($bytes,$count,$bytes.Length-$count)
+            if ($read -eq 0) { break }
+            $count+=$read
+        }
+        if ($count -gt 32768) { throw 'CSR_SIZE_REJECTED' }
+        $output=[IO.File]::Open($snapshot,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        try { $output.Write($bytes,0,$count) } finally { $output.Dispose() }
+    } finally { $input.Dispose() }
+    if ($ExpectedCsrHash -ne (Get-FileHash -LiteralPath $snapshot -Algorithm SHA256).Hash) { throw 'CSR_CHANGED_DURING_SNAPSHOT' }
+    $Csr=$snapshot
     Assert-EncryptedKey $RootKey
     Assert-KeyMatches $RootKey $RootCert $Password
     $null=Invoke-OpenSSL -ArgumentVector @('x509','-in',$RootCert,'-checkend','34128000','-noout')
@@ -279,7 +299,6 @@ function Sign-Intermediate([string]$Csr,[string]$ExpectedCsrHash,[string]$RootKe
     if ($description -notmatch 'Public Key Algorithm: rsaEncryption' -or $description -notmatch 'Public-Key: \(4096 bit\)') { throw 'CSR_KEY_ALGORITHM_REJECTED' }
     $serial=Invoke-OpenSSL -ArgumentVector @('rand','-hex','16')
     if ($serial -notmatch '^[a-f0-9]{32}$' -or $serial -eq ('0'*32)) { throw 'SERIAL_GENERATION_FAILED' }
-    $null=New-Item -ItemType Directory -Path $Destination
     $signed=Join-Path $Destination 'ca-cert.pem'
     # Never copy CSR extensions: the issuer supplies fixed CA/path-length/key-usage controls.
     $null=Invoke-OpenSSL -ArgumentVector @('x509','-req','-in',$Csr,'-CA',$RootCert,'-CAkey',$RootKey,'-passin','stdin','-set_serial',('0x'+$serial),'-days','365','-sha256','-copy_extensions','none','-extfile',(Join-Path $script:PackageRoot 'intermediate.cnf'),'-extensions','intermediate_ca','-out',$signed) -Password $Password
@@ -287,6 +306,7 @@ function Sign-Intermediate([string]$Csr,[string]$ExpectedCsrHash,[string]$RootKe
     $requested=Invoke-OpenSSL -ArgumentVector @('req','-in',$Csr,'-pubkey','-noout')
     $issued=Invoke-OpenSSL -ArgumentVector @('x509','-in',$signed,'-pubkey','-noout')
     if ($requested -ne $issued) { throw 'ISSUED_PUBLIC_KEY_MISMATCH' }
+    Remove-Item -LiteralPath $snapshot
     Copy-Item -LiteralPath $RootCert -Destination (Join-Path $Destination 'root-cert.pem')
     [IO.File]::WriteAllText((Join-Path $Destination 'cert-chain.pem'),([IO.File]::ReadAllText($signed)+[IO.File]::ReadAllText($RootCert)),[Text.UTF8Encoding]::new($false))
     @{ schema_version=1; installation_id=$script:InstallationId; source_revision=$script:SourceRevision; csr_sha256=$ExpectedCsrHash; root_certificate_sha256=(Get-FileHash -LiteralPath $RootCert).Hash; intermediate_certificate_sha256=(Get-FileHash -LiteralPath $signed).Hash; chain_verification='Passed'; production_readiness='Not verified' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Destination 'signing-receipt.json') -Encoding UTF8

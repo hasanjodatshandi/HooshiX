@@ -100,6 +100,9 @@ try {
     $csrHash=(Get-FileHash -LiteralPath $csr).Hash
     $signed=Join-Path $fixture 'signed'
     Expect-Failure { Sign-Intermediate $csr ('0'*64) $key $cert $password $signed } 'TRUSTED_CSR_HASH_MISMATCH'
+    $oversize=Join-Path $fixture 'oversize.csr.pem'
+    [IO.File]::WriteAllBytes($oversize,(New-Object byte[] 32769))
+    Expect-Failure { Sign-Intermediate $oversize (Get-FileHash -LiteralPath $oversize).Hash $key $cert $password (Join-Path $fixture 'oversize-output') } 'CSR_SIZE_REJECTED'
     Sign-Intermediate $csr $csrHash $key $cert $password $signed
     $description=Invoke-OpenSSL -ArgumentVector @('x509','-in',(Join-Path $signed 'ca-cert.pem'),'-text','-noout')
     Check ($description -match 'CA:TRUE, pathlen:0' -and $description -notmatch 'pathlen:5') 'CSR_EXTENSIONS_COPIED'
