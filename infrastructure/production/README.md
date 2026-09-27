@@ -27,6 +27,11 @@ only.
 
 ## Verification
 
+Operator walkthrough (Persian): [independent installation guide](../../docs/operations/production-installation-fa.md).
+Reusable Windows offline CA sources and the pinned public-tool package builder live in
+`scripts/production/offline-ca/`. Each independent installation gets its own identity and new keys;
+the guide explicitly separates executable tooling from uncommissioned platform procedures.
+
 Repository conformance:
 
 ```bash

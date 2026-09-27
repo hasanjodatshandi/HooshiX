@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "openssl": "3.5.7",
+  "source_archive": "PortableGit-2.55.0.3-64-bit.7z.exe",
+  "source_archive_sha256": "ab00566336b5472120f9a52d34f2e79c5406535792acb0548001ffd0bd090e5d",
+  "files": [
+    {
+      "path": "tools/openssl.exe",
+      "sha256": "822034da8a01558c17cbe53f42f33985a6eaf7c89e21273779f9c6560d8c4d78"
+    },
+    {
+      "path": "tools/libcrypto-3-x64.dll",
+      "sha256": "0330b5f558996f297d687e1a2b2fcc2cacf883b16baef74aaef35285d7c1231c"
+    },
+    {
+      "path": "tools/libssl-3-x64.dll",
+      "sha256": "feb5b300e0b3a021fed481178f3d66896426576d4d13b85a304d2a3809b25bfd"
+    },
+    {
+      "path": "tools/openssl.cnf",
+      "sha256": "dc77cf33a5ec8b231e817435bc0f16cf41d92fff249d8851f07d16b5b9454146"
+    },
+    {
+      "path": "licenses/OpenSSL-LICENSE.txt",
+      "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+    }
+  ]
+}

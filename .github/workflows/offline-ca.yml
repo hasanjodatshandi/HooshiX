@@ -1,0 +1,27 @@
+name: Offline CA tooling
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-ca:
+    name: Windows offline CA integrity and cryptography
+    runs-on: windows-2025
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build verified public fixture package
+        shell: powershell
+        run: |
+          .\scripts\production\offline-ca\build-package.ps1 -InstallationId ci-fixture -OutputDirectory "$env:RUNNER_TEMP\HooshiX-public-ca"
+      - name: Execute crypto and integrity negative fixtures on Windows PowerShell
+        shell: powershell
+        run: |
+          .\scripts\production\tests\test_offline_ca.ps1 -PackageDirectory "$env:RUNNER_TEMP\HooshiX-public-ca"
