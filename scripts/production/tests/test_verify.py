@@ -16,6 +16,12 @@ class ProductionProfileTest(unittest.TestCase):
         d=copy.deepcopy(self.profile); d["edge"]["proxy_protocol_insecure"]=True; d["human_access"]["public_ssh_denied"]=False; e=verify.validate_profile(d); self.assertTrue(any("edge trust" in x for x in e)); self.assertTrue(any("human production access" in x for x in e))
     def test_rejects_missing_external_evidence_contract(self):
         d=copy.deepcopy(self.profile); d["required_external_inputs"].remove("external_blackbox_monitor"); self.assertTrue(any("external production evidence" in x for x in verify.validate_profile(d)))
+    def test_software_key_profile_retains_access_controls(self):
+        self.assertFalse(self.profile["human_access"]["fido2_required"])
+        for key, value in (("software_key_passphrase_required", False), ("software_key_algorithm", "ssh-rsa"), ("off_host_audit_required", False), ("jit_reviewers_min", 1), ("jit_write_minutes_max", 31), ("password_authentication", True), ("keyboard_interactive_authentication", True), ("root_login", True), ("shared_keys", True), ("touch_required", False), ("user_verification_required", False)):
+            with self.subTest(key=key):
+                d=copy.deepcopy(self.profile); d["human_access"][key]=value
+                self.assertTrue(any("human production access" in x for x in verify.validate_profile(d)))
     def test_rescan_requires_precommissioning_inventory_guard(self):
         workflow=(verify.ROOT/".github/workflows/production-vulnerability-rescan.yml").read_text(encoding="utf-8")
         self.assertEqual([],verify.validate_rescan_workflow_contract(workflow))

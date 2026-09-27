@@ -213,10 +213,10 @@ Compromised Password:
 ## 10. Human privileged access/OpenBao
 
 - [ ] no standing root/unrestricted K8s/DB superuser privilege.
-- [ ] per-human attributable identity; hardware FIDO2; JIT reason/ticket; two-reviewer write; <=30m expiry.
+- [ ] per-human attributable identity; encrypted per-operator Ed25519 keys (FIDO2 optional); JIT reason/ticket; two-reviewer write; <=30m expiry.
 - [ ] WireGuard-only normal management path; public TCP/22 unreachable.
 - [ ] independent per-device peers; revoked/unapproved peers denied.
-- [ ] password/root/shared SSH denied; FIDO2 alone grants no admin.
+- [ ] password/root/shared SSH denied; SSH authentication alone grants no admin.
 - [ ] `sudo`/OS/Kubernetes/database privileged audit exported off-host.
 - [ ] shell history is not authoritative audit.
 

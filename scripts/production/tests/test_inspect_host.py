@@ -9,6 +9,25 @@ import inspect_host
 
 
 class HostInventoryTest(unittest.TestCase):
+    def test_management_config_allow_list_rejects_secret_values(self):
+        result = inspect_host.summarize_sshd("permitrootlogin no\npasswordauthentication no\nforcecommand private-fixture\nbanner private-fixture\nallowtcpforwarding private-fixture\n")
+        self.assertEqual({"permitrootlogin": "no", "passwordauthentication": "no"}, result)
+        self.assertNotIn("private-fixture", json.dumps(result))
+
+    def test_peer_inventory_contains_fingerprint_and_routes_only(self):
+        import base64
+        key = base64.b64encode(bytes(range(32))).decode()
+        result = inspect_host.summarize_peers(key + "\t10.77.47.2/32\n")
+        self.assertEqual(["10.77.47.2/32"], result[0]["allowed_ips"])
+        self.assertEqual(64, len(result[0]["public_key_sha256"]))
+        self.assertNotIn(key, json.dumps(result))
+
+    def test_malformed_peer_inventory_is_sanitized(self):
+        with patch.object(inspect_host.os, "geteuid", return_value=0), \
+                patch.object(inspect_host, "run", return_value="private-fixture"):
+            result = inspect_host.collect()
+        self.assertIsNone(result["management"]["wireguard_peers"])
+        self.assertNotIn("private-fixture", json.dumps(result))
     def test_allow_list_excludes_credentials_bodies_and_annotations(self):
         raw = json.dumps({"items": [{
             "metadata": {"namespace": "kyverno", "name": "controller-1",

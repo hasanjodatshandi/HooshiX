@@ -189,7 +189,7 @@ Kyverno may run one replica in this non-HA profile. Admission unavailability MUS
 
 ## 9. Human production access without Teleport
 
-`production-single-server` does not deploy Teleport. It uses hardened OpenSSH plus hardware-backed FIDO2 authentication and real system/privilege auditing under ADR-0030.
+`production-single-server` does not deploy Teleport. It uses hardened OpenSSH plus per-operator public-key authentication (FIDO2 optional) and real system/privilege auditing under ADR-0030.
 
 This is not permission to use shell-history or `.bashrc` logging as an audit system. `.bashrc`, shell history, or equivalent user-controlled logging is explicitly insufficient and prohibited as the authoritative production-access audit trail.
 
@@ -198,8 +198,8 @@ Mandatory controls are:
 - SSH is reachable only from the approved management path/network; no general public SSH exposure;
 - direct root login, password authentication, keyboard-interactive authentication, empty passwords, shared accounts, and shared SSH keys are prohibited for privileged human access;
 - each human has an attributable identity;
-- privileged host authentication accepts only the approved hardware-backed OpenSSH FIDO2 security-key algorithms and requires user presence plus user verification;
-- effective OpenSSH configuration enforces `PubkeyAuthOptions touch-required,verify-required` or a strictly equivalent reviewed control so per-key configuration cannot silently remove presence/verification;
+- privileged host authentication accepts attributable encrypted Ed25519 software keys or optional FIDO2 keys under revised ADR-0030; the software-key path does not claim hardware assurance;
+- effective OpenSSH configuration enforces `PubkeyAuthOptions touch-required verify-required` for optional FIDO keys; these options do not apply to software keys;
 - unnecessary SSH agent/TCP/X11/tunnel/gateway-port forwarding is disabled for privileged human access unless a separately reviewed operation requires a narrowly scoped exception;
 - generated/effective `sshd` configuration must pass the pinned host `sshd -t` plus `sshd -T`/equivalent validation before activation;
 - no standing root, unrestricted Kubernetes, or PostgreSQL-superuser access;
@@ -209,7 +209,7 @@ Mandatory controls are:
 - host authentication/exec/privilege events are captured by OS audit (`auditd` or an approved equivalent);
 - required access/audit records are shipped off-host to append-only/tamper-resistant storage inaccessible to the ordinary requester;
 - static shared kubeconfigs/database passwords and permanent `cluster-admin` grants are prohibited;
-- a separately protected hardware-backed break-glass identity is offline by default, audited, incident-linked, and rotated/reviewed after use.
+- a separately protected, independently encrypted offline break-glass identity (hardware optional) is offline by default, audited, incident-linked, and rotated/reviewed after use.
 
 The current zero-standing-privilege/JIT policy is therefore preserved while the Teleport control plane is removed from this profile.
 
@@ -270,7 +270,7 @@ Before `production-single-server` is production-ready, verify at minimum:
 - Kafka combined KRaft/RF1/minISR1/acks-all/idempotence/ACL/TLS/rebuild/replay tests;
 - Ambient full-stack capacity benchmark plus mTLS/workload-identity positive/negative tests and `istioctl analyze`;
 - reduced Kyverno policy render plus signature/provenance/SBOM/security-context negative admission tests;
-- OpenSSH effective-config validation, approved-FIDO-only authentication, `touch-required` + `verify-required`, root/password/keyboard-interactive/shared/non-FIDO-key/forwarding negatives, JIT expiry, two-reviewer flow, key revocation, sudo I/O audit, OS audit, off-host audit integrity, and break-glass exercise;
+- OpenSSH effective-config validation, approved per-operator key authentication, optional FIDO presence/verification tests when enrolled, root/password/keyboard-interactive/shared/unapproved-key/forwarding negatives, JIT expiry, two-reviewer flow, key revocation, sudo I/O audit, OS audit, off-host audit integrity, and break-glass exercise;
 - unchanged OpenBao flows and proof that no profile change introduced a hot-path OpenBao dependency or Git secret;
 - unchanged Identity/MFA downgrade-prevention tests;
 - complete-stack load/soak/reboot/recovery test with >=30% validated resource headroom;
@@ -280,4 +280,4 @@ Before `production-single-server` is production-ready, verify at minimum:
 
 Rollback from `production-single-server` to `production-ha` is a topology expansion, not a semantic rollback. Preserve service database/Flyway ownership, RLS, WAL/PITR evidence, event identities/idempotency, OpenBao secret authority, signed-artifact enforcement, workload identity, MFA rules, and audit evidence.
 
-A rollback or cost reduction MUST NOT replace WAL/PITR with `pg_dump + cron`, disable Kyverno enforcement, replace real access auditing with shell history, permit root/password/keyboard-interactive/shared/non-FIDO-key SSH or missing FIDO presence/verification enforcement, weaken Redis fail-closed semantics, change MFA to a user-selectable downgrade, disable Ambient without a reviewed replacement security design, or remove/change OpenBao.
+A rollback or cost reduction MUST NOT replace WAL/PITR with `pg_dump + cron`, disable Kyverno enforcement, replace real access auditing with shell history, permit root/password/keyboard-interactive/shared/unapproved-key SSH or missing presence/verification enforcement for enrolled FIDO keys, weaken Redis fail-closed semantics, change MFA to a user-selectable downgrade, disable Ambient without a reviewed replacement security design, or remove/change OpenBao.

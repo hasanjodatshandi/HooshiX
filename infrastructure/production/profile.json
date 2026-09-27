@@ -13,7 +13,8 @@
     "waf_required": true
   },
   "human_access": {
-    "fido2_required": true,
+    "authentication": "openssh-publickey",
+    "fido2_required": false,
     "jit_reviewers_min": 2,
     "jit_write_minutes_max": 30,
     "keyboard_interactive_authentication": false,
@@ -23,6 +24,8 @@
     "public_ssh_denied": true,
     "root_login": false,
     "shared_keys": false,
+    "software_key_algorithm": "ssh-ed25519",
+    "software_key_passphrase_required": true,
     "touch_required": true,
     "user_verification_required": true
   },

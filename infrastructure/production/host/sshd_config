@@ -1,11 +1,12 @@
 # Managed production SSH policy. Public TCP/22 remains denied by the host/network perimeter.
-# Authorized user credentials must be hardware-backed OpenSSH FIDO2 security-key credentials.
+# Per-operator encrypted Ed25519 software keys; FIDO2 is optional.
+# PubkeyAuthOptions presence/verification affects enrolled FIDO keys only.
 PermitRootLogin no
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 ChallengeResponseAuthentication no
 PubkeyAuthentication yes
-PubkeyAcceptedAlgorithms sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com
+PubkeyAcceptedAlgorithms ssh-ed25519,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com
 PubkeyAuthOptions touch-required verify-required
 AuthenticationMethods publickey
 PermitEmptyPasswords no

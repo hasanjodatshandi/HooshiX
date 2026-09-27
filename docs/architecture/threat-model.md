@@ -119,7 +119,7 @@ PR/build inputs, current source, Git history, dependency metadata, scanner datab
 
 ### TB-10 Human operator -> management plane
 
-WireGuard network admission, FIDO2 identity, and JIT privilege are separate gates.
+WireGuard network admission, SSH public-key identity, and JIT privilege are separate gates.
 
 ### TB-11 Backup/recovery -> restored production
 
@@ -168,7 +168,7 @@ identity, permission, audit, quota, or side-effect authority.
 - Compromised or misconfigured AI Ops tunnel/client/policy: attempts unauthorized local mutation/execution, path escape, command-alias expansion, credential exposure, audit evasion, or unintended administrator execution.
 - Compromised or misconfigured AI Desktop tunnel/client/policy: attempts wrong-app/password-target credential use, broker-binding substitution, credential-value exfiltration, focus races, or conversion of use-without-disclosure into credential reading/general secret input.
 - Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log/context output.
-- Compromised operator device: may hold WireGuard key or developer tunnel runtime credential but not necessarily FIDO2/JIT/production authority.
+- Compromised operator device: may steal both the WireGuard key and exportable software SSH key. Passphrase/device protection, independent revocation, JIT and off-host audit reduce risk but do not provide FIDO2 hardware assurance. The owner-selected single-server software-key path must not be described as phishing-resistant MFA.
 - Privileged insider: time-bounded legitimate capability with misuse risk.
 - Compromised host/root: broad single-server process/storage visibility.
 - Compromised provider/source/scanner feed: malformed/replayed/delayed/false data within protocol scope.
@@ -200,7 +200,7 @@ identity, permission, audit, quota, or side-effect authority.
 | Information disclosure | Desktop capture/UI text/non-secret typed input is retained in local audit/argv/environment or a general input surface becomes a credential-reader/secret channel | bounded transient PNG cleanup + no clipboard/get-value/credential-reader/general-secret tool + ordinary text only over bounded UTF-8 helper stdin + sanitized helper environment + audit stores only digests/metadata and never raw title/selector/text/screenshot/output | ADR-0049 screenshot/text-helper/audit redaction/fail-closed tests + host evidence |
 | Information disclosure / Elevation | ADR-0050 credential use leaks the secret or becomes a confused deputy that applies it to a caller-selected/wrong target | MCP accepts only opaque ID + protected policy fixes app/executable-path/SHA-256/selector/Generic-Credential target + fresh app + process-image-path/SHA-256 checks before/after focus + focused `IsPassword=true` (or exactly-one `@unique-password`) plus same-PID/focus/foreground checks before/during local `CredReadW`/`SendInput` + fixed helper never returns value/length and audit stores only hashes + no credential list/read/write/export tool | ADR-0050 schema/policy/wrong-app/executable-identity/helper/focus/redaction tests + disposable host credential negative/positive evidence |
 | Elevation of privilege | Desktop automation is used to bypass UAC/Secure Desktop or silently becomes elevated administration | interactive non-elevated requirement by default + no UAC/Winlogon/SAS tool + Windows/WinApp integrity/security boundaries remain fail-closed + Ops remains separate admin boundary | ADR-0049 runtime/session/tool negatives + operator token/session evidence |
-| Repudiation | operator denies privileged action | FIDO2/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
+| Repudiation | operator denies privileged action | SSH-key/JIT + OS/sudo/K8s/DB audit off-host | audit exercise |
 | Information disclosure | real secret is committed then deleted but remains in Git history/clones | Gitleaks tree+history + revoke/rotate + incident/history remediation | commit-delete fixture + rotation evidence |
 | Information disclosure | scanner/log output republishes discovered secret | Gitleaks redaction + CI output policy | redaction fixture |
 | Information disclosure | context retrieval/checkpoint exposes sensitive repository material | sensitive-name exclusion + bounded tracked-file retrieval + no secret fields/private-key material in checkpoints + Gitleaks remains authoritative | retrieval/checkpoint negatives + Gitleaks evidence |
@@ -221,7 +221,7 @@ identity, permission, audit, quota, or side-effect authority.
 | DoS | scanner/feed outage is used to bypass release policy | fail-closed freshness/promotion gates under ADR-0035/0038/0045 | stale/unavailable scanner/feed negatives |
 | DoS | tunnel/control-plane/PC failure removes AI context access | explicit tooling-unavailable fallback to current repository authority; no stale-memory promotion | operator failure/fallback check |
 | Elevation | tenant admin grants stronger authority | Authorization privilege-escalation/owner safety | admin concurrency negatives |
-| Elevation | network access becomes root | WireGuard != FIDO2 != JIT | separation tests |
+| Elevation | network access becomes root | WireGuard != SSH authentication != JIT | separation tests |
 | Elevation | read-only AI context channel is treated as repository/production mutation authority | no write MCP tools/no HooshiX network listener + normal Git/PR/production access controls remain separate | MCP tool-list/unknown-write negatives |
 | Information disclosure | prompt/output/context crosses tenant, telemetry, event, error, browser, or provider-retention boundary | private ownership + forced RLS + application encryption + telemetry/event exclusions + `store=false` stateless adapter | cross-tenant/RLS/encryption/PII-canary/provider-request negatives |
 | Elevation / Tampering | model output or prompt injection invokes a tool, URL, permission, or side effect | first slice exposes no tools and treats output as sanitized untrusted data; fixed egress/options | tool/provider-option/URL/render negatives |
@@ -314,7 +314,8 @@ A vulnerability exception cannot authorize missing signature/provenance/SBOM evi
 
 ### TM-15 Privileged access compromise
 
-Required: independent WireGuard/FIDO2/JIT factors, expiry/revocation, protected audit.
+Required: separate WireGuard/SSH-key/JIT controls, expiry/revocation, protected audit.
+FIDO2 is optional in single-server; HA retains its hardware-backed MFA requirement.
 
 ### TM-16 Backup/restore rollback
 

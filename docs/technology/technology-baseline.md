@@ -95,7 +95,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Dashboards | Grafana 13.1.3 | Prometheus/Loki/Tempo data sources |
 | External host-down monitoring | provider TBD before production | must be outside single-host failure domain; environment/provider decision, not guessed here |
 | `production-single-server` management network | host-supported WireGuard | exact host package/kernel pinned; public TCP/22 denied |
-| `production-single-server` human access | supported OpenSSH + hardware FIDO2 + JIT + `sudo`/system audit | ADR-0030/0043 |
+| `production-single-server` human access | supported OpenSSH + encrypted per-operator Ed25519 keys (FIDO2 optional) + JIT + `sudo`/system audit | ADR-0030/0043 |
 | `production-ha` human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session evidence |
 | Email | Provider-neutral authenticated SMTP + required STARTTLS; Google Gmail profile for bounded staging only | Production provider deferred under ADR-0055 |
 | SMS | SMS.ir exact-text bulk send for Iran; SMS.ir Verify Sandbox for simulated contract validation only | local logging adapter local-only |
@@ -158,7 +158,7 @@ external black-box host-down signal required before production
 
 All observability components share the host failure/capacity domain and do not create HA. Their CPU/RAM/IO/disk/cardinality is included in the complete-stack benchmark. Required privileged/security audit remains separately durable/off-host.
 
-Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, FIDO2/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.1, unchanged end-user MFA, and ADR-0045 pre-runtime DevSecOps gates.
+Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, SSH-key/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.1, unchanged end-user MFA, and ADR-0045 pre-runtime DevSecOps gates.
 
 A `2 vCPU / 3-4 GiB RAM` host is not an approved capacity claim. Sizing requires complete-stack evidence with >=30% validated resource headroom.
 

@@ -18,7 +18,7 @@ This matrix maps material security properties to executable evidence. A document
 | SEC-009 | Workload identity/mTLS/NetworkPolicy least privilege | wrong-SA/plaintext/unapproved-edge negatives |
 | SEC-010 | Edge/WAF path cannot be bypassed | direct origin/BFF/Traefik->BFF negatives |
 | SEC-011 | Trusted client address cannot be forged | external-L4 PROXY v2 + exact trusted CIDRs + forged header/untrusted PROXY/proxy-address negatives |
-| SEC-012 | Human privileged access is attributable/JIT/phishing resistant | WireGuard/FIDO2/JIT/audit/break-glass tests |
+| SEC-012 | Human privileged access is attributable/JIT; optional hardware assurance in single-server | WireGuard/SSH-key/JIT/audit/break-glass tests |
 | SEC-013 | Supply chain admits only reviewed signed/provenanced/SBOM artifacts | Syft final-image CycloneDX + Grype final-artifact decision + Cosign wrong digest/signer/provenance/SBOM negatives + Kyverno admission negatives |
 | SEC-014 | OpenBao remains secret authority | snapshot/restore/unseal/ESO/local-key tests; no plaintext/Git fallback |
 | SEC-015 | Notification ambiguity does not create blind duplicate send | provider ambiguity/reconciliation/idempotency tests |

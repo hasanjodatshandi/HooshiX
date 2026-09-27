@@ -18,7 +18,7 @@
 - one combined KRaft Kafka broker/controller, RF1/minISR1/acks-all/idempotence, explicitly non-HA;
 - Istio Ambient and blocking Kyverno retained subject to complete-stack capacity evidence;
 - OpenBao 2.6.1 remains secret authority; end-user MFA semantics unchanged;
-- WireGuard-only normal management reachability + FIDO2 + JIT + off-host audit.
+- WireGuard-only normal management reachability + per-operator SSH key (FIDO2 optional in single-server) + JIT + off-host audit.
 
 ## 2. Public network/client identity
 

@@ -171,7 +171,7 @@ Still rejected:
 - insecure Traefik PROXY/forwarded trust;
 - proxy address fallback for missing client identity;
 - aggregate `/24`/`/64` as sole hard v1 user quota identity;
-- public SSH or WireGuard as substitute for FIDO2/JIT;
+- public SSH or WireGuard as substitute for SSH-key/JIT;
 - shell history as privileged audit;
 - runtime HIBP fallback or SHA-1 password storage;
 - observability headers/baggage as business/security authority;
