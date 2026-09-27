@@ -128,7 +128,7 @@ approved operator device
 -> authenticated WireGuard peer
 -> host management address
 -> OpenSSH TCP/22
--> FIDO2 human authentication
+-> attributable SSH public-key authentication (FIDO2 optional)
 -> separate JIT privilege elevation
 ```
 
@@ -142,8 +142,8 @@ Mandatory controls:
 - independent per-device WireGuard peer keys; shared peer keys prohibited;
 - minimal `AllowedIPs`; no broad workload/cluster reachability by default;
 - attributable peer enrollment/ownership/review/revocation;
-- lost/retired device key revoked independently from FIDO2 credential;
-- WireGuard possession never bypasses OpenSSH FIDO2 presence/verification or JIT privilege;
+- lost/retired device key revoked independently from SSH credential;
+- WireGuard possession never bypasses SSH public-key authentication or JIT privilege;
 - exact host WireGuard package/kernel/config pinned in provisioning before production;
 - configuration reviewed as code and included in host recovery evidence;
 - normal management does not depend on a workload-cluster component operators may need to recover.
@@ -157,9 +157,9 @@ Before production prove:
 - Internet/public-interface TCP/22 unreachable;
 - only approved WireGuard peers reach management address;
 - revoked/unapproved peers denied;
-- SSH still rejects root/password/keyboard-interactive/shared/non-FIDO credentials;
-- valid WireGuard peer without FIDO2 gains no SSH session;
-- valid FIDO2 session without approved JIT gains no privileged write authority;
+- SSH still rejects root/password/keyboard-interactive/shared/unapproved SSH credentials;
+- valid WireGuard peer without an enrolled SSH key gains no SSH session;
+- valid public-key session without approved JIT gains no privileged write authority;
 - effective host/provider firewall state matches management-only rule;
 - management overlay can be restored without private keys in Git;
 - provider-console break glass does not silently bypass incident/audit policy.
@@ -180,4 +180,4 @@ Production Readiness, security verification, edge tests, quota tests, and threat
 
 ## Rollback considerations
 
-Rollback MUST NOT restore ambiguous client-IP authority, trust caller forwarding headers, collapse all hard network quotas back to aggregate `/24`/`/64`, use untrusted proxy chains, expose public SSH, share management peer keys, or substitute network reachability for FIDO2/JIT privilege.
+Rollback MUST NOT restore ambiguous client-IP authority, trust caller forwarding headers, collapse all hard network quotas back to aggregate `/24`/`/64`, use untrusted proxy chains, expose public SSH, share management peer keys, or substitute network reachability for SSH authentication/JIT privilege.

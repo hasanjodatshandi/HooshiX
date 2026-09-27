@@ -5,6 +5,9 @@ from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 PROFILE=ROOT/'infrastructure/production/profile.json'
+# wireguard_fido_jit_audit is a stable evidence-bundle identifier. Under ADR-0030,
+# FIDO2 subtests are applicable only to enrolled FIDO keys; software-key operators
+# still require SSH identity, WireGuard isolation, JIT expiry, and off-host audit.
 GATES={'artifact_integrity','host_k3s_network','wireguard_fido_jit_audit','gitops_argocd','postgresql_backup_restore','redis_recovery_capacity_clock','kafka_transport_recovery','openbao_external_secrets','ambient_kyverno_admission','edge_client_address_waf','observability_privacy_faults','external_host_down_monitor','supply_chain_release','complete_stack_capacity','cold_dr','seven_component_production_runtime','deployed_browser_journey','conversation_provider_governance','notification_provider_delivery'}
 APPROVAL_ROLES={'business_owner','platform_owner','privacy_owner','product_owner','security_owner'}
 EVIDENCE_ID=re.compile(r'^[A-Za-z0-9][A-Za-z0-9._:/@+-]{2,255}$')

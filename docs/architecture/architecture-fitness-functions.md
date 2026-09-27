@@ -16,7 +16,7 @@ This catalog defines properties that should be continuously verified. A row is n
 | AFF-010 | Public traffic always traverses approved L4->Traefik->WAF and then only the `/api/*` BFF or static-frontend branch | edge render/network/route-split negatives | PR/release | block |
 | AFF-011 | Trusted client address ignores caller forwarding headers | PROXY/header/address-form negatives | PR/release | block public quota paths |
 | AFF-012 | Traefik origin accepts only external-L4 sources | firewall/routing negative | release | block public traffic |
-| AFF-013 | Human privileged access separates network/FIDO2/JIT | access/audit exercise | release/scheduled | block privileged access |
+| AFF-013 | Human privileged access separates network/SSH-key/JIT | access/audit exercise | release/scheduled | block privileged access |
 | AFF-014 | OpenBao remains secret authority | diff/render/recovery tests | PR/release | block |
 | AFF-015 | Supply-chain artifact is signed/provenanced/SBOM verified | CI/admission | PR/release | block |
 | AFF-016 | Kyverno new production policies are CEL v1 only | manifest scan/schema/CLI tests; legacy fixture rejection | PR | block |

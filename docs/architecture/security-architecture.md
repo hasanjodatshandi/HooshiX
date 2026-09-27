@@ -168,13 +168,13 @@ Single-server may use one Kyverno replica but cannot switch critical admission t
 Single-server normal path:
 
 ```text
-approved device -> WireGuard -> management address -> OpenSSH/FIDO2 -> JIT
+approved device -> WireGuard -> management address -> OpenSSH public-key -> JIT
 ```
 
 - public SSH denied;
 - independent per-device peer keys/minimal routes;
 - no root/password/shared SSH;
-- FIDO2 presence+verification;
+- per-operator key authentication; FIDO2 presence+verification only when enrolled;
 - network/login alone grants no admin;
 - two-reviewer <=30m write elevation and bounded read-only grant;
 - OS/`sudo`/K8s/DB audit exported off-host;
@@ -303,6 +303,6 @@ Visible UI/screenshot content can itself contain PII or confidential data. Deskt
 
 ## 16. Verification
 
-Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/FIDO/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049/0050 Desktop policy/app/HWND/capture/input/isolated-text-helper/credential-broker/process-identity/password-target/environment/audit/UTF-8 tests.
+Security evidence includes authentication/MFA, RLS/tenant isolation, Authorization failures, quota exact/aggregate/common-clock/cardinality tests, client-address/WAF bypass negatives, workload mTLS/NetworkPolicy, OpenBao/secret scans, Gitleaks current-tree/history secret fixtures with redacted output, Semgrep source-security fixtures, OSV declared/locked dependency advisory scanning, final-image Syft/Grype/Cosign evidence, Kyverno CEL/supply-chain negatives, WireGuard/SSH-key/JIT/audit, HIBP corpus/freshness/source evidence, telemetry PII/cardinality/context/Collector/back-end outage tests, independent host-loss detection, complete-stack capacity/DR, ADR-0048 Ops policy/path/process/environment/audit/UTF-8 tests, and ADR-0049/0050 Desktop policy/app/HWND/capture/input/isolated-text-helper/credential-broker/process-identity/password-target/environment/audit/UTF-8 tests.
 
 Documentation alone remains `NOT VERIFIED`.

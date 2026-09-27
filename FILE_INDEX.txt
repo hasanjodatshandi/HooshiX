@@ -310,6 +310,7 @@ docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
+docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/wireguard-management-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
@@ -497,6 +498,7 @@ scripts/production/offline-ca/tools.lock.json
 scripts/production/readiness.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
+scripts/production/run-host-inspection.ps1
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_readiness.py

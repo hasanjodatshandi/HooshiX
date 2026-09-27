@@ -125,7 +125,7 @@ Expected: protected create/update does not pass through a bypass.
 
 OpenBao remains unchanged. Continue snapshot/restore/unseal/External Secrets/key-rotation/stale-source exercises. Host/capacity fault never justifies replacing/bypassing OpenBao.
 
-Human access exercises public-SSH denial, WireGuard peer revocation, FIDO2 presence/verification, no root/password/shared keys, JIT grant/expiry, `sudo`/OS/boundary audit, off-host audit, and break glass.
+Human access exercises public-SSH denial, WireGuard peer revocation, per-operator software-key protection and optional FIDO2 presence/verification, no root/password/shared keys, JIT grant/expiry, `sudo`/OS/boundary audit, off-host audit, and break glass.
 
 ## 10. Edge/client-address exercises
 

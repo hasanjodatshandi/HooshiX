@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import base64
+import hashlib
 import os
 import re
 import subprocess
@@ -56,7 +58,7 @@ def summarize_pods(raw: str) -> list[dict]:
 
 def collect() -> dict:
     services = {}
-    for service in ["wg-quick@wg-hooshix", "k3s", "caddy", "nginx", "postfix", "dovecot"]:
+    for service in ["wg-quick@wg-hooshix", "k3s", "caddy", "nginx", "postfix", "dovecot", "auditd", "rsyslog"]:
         status = run(["/usr/bin/systemctl", "is-active", service])
         services[service] = "active" if status and status.strip() == "active" else "Not verified"
     result = {
@@ -69,8 +71,17 @@ def collect() -> dict:
         "api_ready": "Not verified",
         "pods": None,
         "pod_inventory": "Not verified",
+        "management": {"scope": "global SSH config only; connection-specific Match, firewall, JIT and off-host audit not verified"},
     }
     if result["privileged"]:
+        result["management"]["sshd_syntax"] = "Passed" if run(["/usr/sbin/sshd", "-t"]) is not None else "Not verified"
+        raw_config = run(["/usr/sbin/sshd", "-T"])
+        result["management"]["sshd_global"] = summarize_sshd(raw_config or "")
+        raw_peers = run(["/usr/bin/wg", "show", "wg-hooshix", "allowed-ips"])
+        try:
+            result["management"]["wireguard_peers"] = summarize_peers(raw_peers) if raw_peers is not None else None
+        except ValueError:
+            result["management"]["wireguard_peers"] = None
         ready = run(KUBECTL + ["get", "--raw=/readyz"])
         result["api_ready"] = "Passed" if ready and ready.strip() == "ok" else "Not verified"
         raw = run(KUBECTL + ["get", "pods", "--all-namespaces", "-o", "json"])
@@ -81,6 +92,34 @@ def collect() -> dict:
             except (ValueError, KeyError, TypeError, AttributeError):
                 result["pod_inventory"] = "Failed: malformed API response"
     return result
+
+
+def summarize_sshd(raw: str) -> dict:
+    """Never export arbitrary config values, paths, commands or banners."""
+    flags = {"permitrootlogin", "passwordauthentication", "kbdinteractiveauthentication",
+             "pubkeyauthentication", "allowagentforwarding", "allowtcpforwarding",
+             "x11forwarding", "permittunnel", "gatewayports", "disableforwarding", "allowstreamlocalforwarding"}
+    result = {}
+    for line in raw.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] in flags and parts[1] in {"yes", "no", "prohibit-password", "forced-commands-only"}:
+            result[parts[0]] = parts[1]
+    return result
+
+
+def summarize_peers(raw: str) -> list[dict]:
+    """Use allowed-ips, never dump/showconf: those commands contain private keys."""
+    import ipaddress
+    peers = []
+    for line in raw.splitlines():
+        key, addresses = line.split(maxsplit=1)
+        decoded = base64.b64decode(key, validate=True)
+        if len(decoded) != 32:
+            raise ValueError("invalid public key")
+        networks = [] if addresses == "(none)" else addresses.replace(",", " ").split()
+        peers.append({"public_key_sha256": hashlib.sha256(decoded).hexdigest(),
+                      "allowed_ips": [str(ipaddress.ip_network(item, strict=True)) for item in networks]})
+    return peers
 
 
 if __name__ == "__main__":

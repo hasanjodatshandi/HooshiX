@@ -10,12 +10,20 @@
     ]
   },
   "human_authentication": {
-    "hardware_fido2_required": true,
+    "accepted_algorithms": [
+      "ssh-ed25519",
+      "sk-ssh-ed25519@openssh.com",
+      "sk-ecdsa-sha2-nistp256@openssh.com"
+    ],
+    "hardware_fido2_required": false,
     "keyboard_interactive_authentication": false,
-    "mechanism": "openssh-fido2",
+    "mechanism": "openssh-publickey",
     "password_authentication": false,
+    "presence_and_verification_scope": "fido-keys-only",
     "root_login": false,
     "shared_keys": false,
+    "software_key_algorithm": "ssh-ed25519",
+    "software_key_passphrase_required": true,
     "user_presence_required": true,
     "user_verification_required": true
   },

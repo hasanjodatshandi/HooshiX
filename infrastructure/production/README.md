@@ -14,7 +14,7 @@ The repository defines and fail-closed verifies:
 - the one-node K3s/Calico/Istio/Kyverno topology and disabled bundled components;
 - the non-HA one-replica/no-HPA/no-availability-PDB workload contract;
 - PostgreSQL, Redis, Kafka, OpenBao/External Secrets, edge, observability, and GitOps invariants;
-- WireGuard-only management reachability and OpenSSH/FIDO2/JIT/off-host-audit requirements;
+- WireGuard-only management reachability and OpenSSH public-key/JIT/off-host-audit requirements;
 - immutable image digest, Syft CycloneDX, Grype High/Critical blocking, Cosign signature,
   provenance, and signed-SBOM release requirements;
 - exact release metadata, external evidence references, and Kubernetes Secret reference names;
@@ -59,6 +59,6 @@ The renderer never reads secret values and never mutates a cluster.
 Repository conformance is not production readiness. Production traffic remains blocked until the
 current Production Readiness Checklist has real environment evidence for provider/firewall CIDRs,
 capacity/headroom, HIBP production corpus, registry and signer identity, OpenBao custody, off-site
-backup/PITR restore, external total-host monitoring, privileged audit, WireGuard/FIDO2/JIT host
+backup/PITR restore, external total-host monitoring, privileged audit, WireGuard/SSH-key/JIT host
 access, actual Email/SMS delivery, Production model-provider/privacy approval, final release
 artifacts, deployed browser journey, all named owner approvals, and the required cold-DR exercise.

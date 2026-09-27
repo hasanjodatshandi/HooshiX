@@ -49,11 +49,11 @@ Prove:
 
 ```text
 WireGuard = network reachability only
-FIDO2     = attributable human authentication
+SSH key   = attributable human authentication (FIDO2 optional)
 JIT       = bounded privilege
 ```
 
-Root/password/shared/non-FIDO SSH remains denied. Public SSH is never a DR shortcut.
+Root/password/shared/unapproved-key SSH remains denied. Public SSH is never a DR shortcut.
 
 ## 3. Rebuild K3s/base network
 

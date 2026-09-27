@@ -71,7 +71,7 @@ Prometheus/Loki/Tempo -> Grafana
 external black-box monitor -> public edge from outside host failure domain
 
 Management:
-approved device -> WireGuard -> OpenSSH/FIDO2 -> JIT privilege
+approved device -> WireGuard -> OpenSSH public-key -> JIT privilege
 ```
 
 Only approved public BFF/edge surfaces are Internet reachable. Internal services are ClusterIP-only/deny-by-default.
@@ -221,7 +221,7 @@ This chain is implementation/release infrastructure. It does not create a new bo
 
 ## 11. Technology families
 
-Architecture families include Java 25/Spring Boot 4.1/Spring MVC/Virtual Threads, Gradle Kotlin DSL, PostgreSQL/CNPG/Flyway, Xerial SQLite only for ADR-0040, Kafka, Redis, Resilience4j, Micrometer/OpenTelemetry, Prometheus/Loki/Tempo/Grafana/Alertmanager/Collector, Gitleaks/Semgrep/OSV-Scanner/Syft/Grype/Cosign DevSecOps controls, Kubernetes/K3s/Calico/Helm/Argo CD, Kyverno CEL policies, Traefik/Caddy/Coraza, Istio Ambient, ESO/OpenBao, WireGuard/OpenSSH/FIDO2, and current Notification providers/testing stack.
+Architecture families include Java 25/Spring Boot 4.1/Spring MVC/Virtual Threads, Gradle Kotlin DSL, PostgreSQL/CNPG/Flyway, Xerial SQLite only for ADR-0040, Kafka, Redis, Resilience4j, Micrometer/OpenTelemetry, Prometheus/Loki/Tempo/Grafana/Alertmanager/Collector, Gitleaks/Semgrep/OSV-Scanner/Syft/Grype/Cosign DevSecOps controls, Kubernetes/K3s/Calico/Helm/Argo CD, Kyverno CEL policies, Traefik/Caddy/Coraza, Istio Ambient, ESO/OpenBao, WireGuard/OpenSSH public-key, and current Notification providers/testing stack.
 
 Exact pins live only in Technology Baseline and deployment/build/dependency/security-tool locks.
 

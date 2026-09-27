@@ -163,7 +163,7 @@ Internet
 Single-server:
 
 ```text
-approved device -> WireGuard -> management address -> OpenSSH/FIDO2 -> JIT privilege
+approved device -> WireGuard -> management address -> OpenSSH public-key -> JIT privilege
 ```
 
 Public SSH denied. Per-device peer keys, no root/password/shared keys, <=30m write elevation/two reviewers, bounded read-only elevation, OS/`sudo`/K8s/DB audit exported off-host. Network reachability never substitutes for human identity/privilege.
@@ -224,6 +224,6 @@ Pass requires >=30% validated CPU/RAM headroom, no OOM/sustained swap/MemoryPres
 
 ## 16. Verification
 
-Production evidence covers exact artifacts/compatibility, profile render, DB/Redis/Kafka recovery, quota clock/cardinality/network tests, Kyverno CEL/admission tests, edge/client-address negatives, WireGuard/FIDO/JIT/audit, OpenBao/MFA invariance, Day-One observability/privacy/fault tests, external total-host detection, and cold DR.
+Production evidence covers exact artifacts/compatibility, profile render, DB/Redis/Kafka recovery, quota clock/cardinality/network tests, Kyverno CEL/admission tests, edge/client-address negatives, WireGuard/SSH-key/JIT/audit, OpenBao/MFA invariance, Day-One observability/privacy/fault tests, external total-host detection, and cold DR.
 
 Documentation alone remains `NOT VERIFIED`.

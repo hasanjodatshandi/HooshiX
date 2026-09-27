@@ -2,6 +2,38 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+On 2026-09-27 the owner made FIDO2 optional for single-server human SSH access under
+revised ADR-0030/0042/0043. Encrypted per-operator Ed25519 software keys are allowed;
+this does not claim hardware assurance, change HA/end-user MFA, or waive JIT,
+management isolation or off-host audit. Live non-privileged inspection found an
+active Windows WireGuard tunnel, successful Ed25519 SSH to `10.77.47.1:22022`, and
+rejection of the same connection without SSH public-key authentication. The local
+client has `10.77.47.2/32` and only `10.77.47.1/32` in AllowedIPs. Manually
+authenticated root inspection at `12:13:22Z` matched its public-key fingerprint
+and exact route to the sole server peer, and `sshd -t` passed. Global `sshd -T`
+reported root/password/keyboard-interactive disabled but agent/TCP/X11 forwarding
+enabled; this is not connection-specific Match evidence. The host has wildcard
+SSH socket listeners on 22/22022; public primary TCP/22022 was reachable from the
+operator device. Host `auditd` was not installed. `sudo -n` rejects root inspection;
+the tested Windows launcher obtains interactive sudo authentication, verifies
+the exact source hash and returns a filtered receipt without storing passwords.
+Management-only SSH, connection-specific effective configuration, JIT expiry,
+revocation and off-host audit evidence remain NOT VERIFIED. These findings are
+not permission to open production traffic.
+
+Follow-up read-only inspection on 2026-09-27 again reported `auditd` inactive,
+`rsyslog` active and non-interactive sudo unavailable. No audit/JIT/SSH hardening
+was applied to the VPS by that follow-up. The installed host package is
+`openssh-server 1:10.2p1-2ubuntu3.6`; its installed project manual documents
+`DisableForwarding` as the override for Agent/TCP/X11/StreamLocal forwarding.
+The repository SSH policy now includes that override and explicit StreamLocal
+denial, with inspection and negative policy tests. These are repository controls,
+not live effective-config evidence. Off-host destination access and two independent
+authorized JIT reviewers remain unprovisioned inputs. The Persian prerequisites
+guide explains these inputs and active-session/child-process expiry tests.
+An unsafe automatic commissioning/JIT draft was withdrawn before any host execution;
+no executable JIT runtime or off-host audit receiver is claimed.
+
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
 ## Current repository state
@@ -163,7 +195,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
 | Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
-| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-27 Windows tunnel service and server interface were active; SSH through management address passed. Current alias uses bootstrap port 22022, which was also reachable on the primary public IP from the operator host; final management-only SSH/FIDO2/JIT/off-host audit and recovery evidence remain NOT VERIFIED |
+| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-27 Windows tunnel service and server interface were active; SSH through management address passed. Current alias uses bootstrap port 22022, which was also reachable on the primary public IP from the operator host; final management-only SSH/SSH-key/JIT/off-host audit and recovery evidence remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |

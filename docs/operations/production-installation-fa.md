@@ -199,13 +199,15 @@ RAM/CPU/دیسک با ظرفیت واقعی کامل stack سنجیده می‌�
 4. تغییر firewall/netplan باید backup، زمان rollback خودکار و امکان بازیابی بررسی‌شده داشته باشد.
 5. فقط table/rule متعلق به همین نصب را تغییر دهید؛ `flush ruleset` و حذف fail2ban یا تنظیم ایمیل مجاز نیست.
 6. public SSH را قبل از آزمون مسیر مدیریت و بازیابی نبندید. وضعیت bootstrap موقت تأیید Production نیست.
-7. برای go-live، SSH فقط از WireGuard، FIDO2 حضور/verification، JIT حداکثر ۳۰ دقیقه و دو reviewer
+7. برای go-live، SSH فقط از WireGuard با کلید مستقل Ed25519 رمزدار (FIDO2 اختیاری)، JIT حداکثر ۳۰ دقیقه و دو reviewer
    برای write، بدون root/password/shared key و audit خارج از host لازم است.
 
 قالب‌های فعلی: `infrastructure/production/host/` و `network/trust-policy.json`.
 این قالب‌ها را مستقیم روی میزبان فعال overwrite نکنید. برای WireGuard، package/kernel واقعی را
 pin و config هر host را بازبینی کنید. تولید کلید را با ابزار رسمی `wg` و مجوز فایل `0600` انجام دهید؛
-کلید هرگز در argv، history یا stdout ظاهر نشود. hardware FIDO2 را نرم‌افزار جایگزین نمی‌کند.
+کلید هرگز در argv، history یا stdout ظاهر نشود. روش نرم‌افزاری حفاظت سخت‌افزاری FIDO2 ندارد؛
+این کاهش اطمینان در ADR-0030 ثبت شده و فقط به ورود انسانی profile تک‌سرور مربوط است.
+توضیح ساده JIT و peer و مراحل اجرایی در [راهنمای دسترسی انسانی](production-human-access-prerequisites-fa.md) آمده است.
 
 ## ۹. IP دوم، DNS، TLS و ایمیل موجود
 

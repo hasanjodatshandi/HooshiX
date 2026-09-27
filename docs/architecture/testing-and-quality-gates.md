@@ -173,7 +173,7 @@ Single-server one-replica Kyverno outage must not create bypass.
 
 ## 12. Human access/OpenBao
 
-Single-server proves WireGuard management-only reachability, public SSH denial, FIDO2 presence/verification, no root/password/shared keys, JIT grant/expiry, OS/`sudo`/Kubernetes/DB audit, and off-host audit integrity.
+Single-server proves WireGuard management-only reachability, public SSH denial, per-operator software-key protection and optional FIDO2 presence/verification, no root/password/shared keys, JIT grant/expiry, OS/`sudo`/Kubernetes/DB audit, and off-host audit integrity.
 
 OpenBao remains unchanged: exact version/topology, snapshot/restore/unseal, Kubernetes Auth/External Secrets, mounted/local key rotation/reload, stale-source fail-close, no request-path OpenBao regression, and no secret leakage.
 

@@ -20,7 +20,7 @@ workloads -> internal OTLP Collector -> Loki / Tempo
 Prometheus -> private management scrape targets
 
 Management:
-approved device -> WireGuard -> host management address -> OpenSSH -> FIDO2 -> JIT
+approved device -> WireGuard -> host management address -> OpenSSH public-key -> JIT
 ```
 
 Public, workload, data/control-plane, telemetry, and management paths are not interchangeable.
@@ -166,7 +166,7 @@ approved operator device
 -> WireGuard
 -> host management address
 -> OpenSSH:22
--> FIDO2
+-> SSH public-key authentication (FIDO2 optional)
 -> JIT privilege
 ```
 
@@ -175,7 +175,7 @@ approved operator device
 - independent per-device peer keys;
 - minimal routes;
 - network admission grants no human/privileged identity;
-- FIDO2/JIT remain mandatory;
+- SSH-key/JIT remain mandatory;
 - provider console is incident-linked break glass only.
 
 Management remains usable when workload-cluster services need recovery; normal management does not depend on a cluster workload.
@@ -232,7 +232,7 @@ Verify:
 - public OTLP and public management scrape access denied;
 - wrong workload->Collector OTLP denied;
 - Collector cannot read outside exact approved log paths;
-- public SSH denied; revoked WireGuard peer denied; WireGuard without FIDO2/JIT grants no privilege;
+- public SSH denied; revoked WireGuard peer denied; WireGuard without SSH-key/JIT grants no privilege;
 - external black-box monitoring uses only approved public edge path;
 - IPv6 follows equivalent controls when enabled.
 

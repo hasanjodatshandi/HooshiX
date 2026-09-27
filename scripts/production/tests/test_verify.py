@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy,json,sys,unittest
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import verify
 class ProductionProfileTest(unittest.TestCase):
@@ -16,9 +17,26 @@ class ProductionProfileTest(unittest.TestCase):
         d=copy.deepcopy(self.profile); d["edge"]["proxy_protocol_insecure"]=True; d["human_access"]["public_ssh_denied"]=False; e=verify.validate_profile(d); self.assertTrue(any("edge trust" in x for x in e)); self.assertTrue(any("human production access" in x for x in e))
     def test_rejects_missing_external_evidence_contract(self):
         d=copy.deepcopy(self.profile); d["required_external_inputs"].remove("external_blackbox_monitor"); self.assertTrue(any("external production evidence" in x for x in verify.validate_profile(d)))
+    def test_software_key_profile_retains_access_controls(self):
+        self.assertFalse(self.profile["human_access"]["fido2_required"])
+        for key, value in (("software_key_passphrase_required", False), ("software_key_algorithm", "ssh-rsa"), ("off_host_audit_required", False), ("jit_reviewers_min", 1), ("jit_write_minutes_max", 31), ("password_authentication", True), ("keyboard_interactive_authentication", True), ("root_login", True), ("shared_keys", True), ("touch_required", False), ("user_verification_required", False)):
+            with self.subTest(key=key):
+                d=copy.deepcopy(self.profile); d["human_access"][key]=value
+                self.assertTrue(any("human production access" in x for x in verify.validate_profile(d)))
     def test_rescan_requires_precommissioning_inventory_guard(self):
         workflow=(verify.ROOT/".github/workflows/production-vulnerability-rescan.yml").read_text(encoding="utf-8")
         self.assertEqual([],verify.validate_rescan_workflow_contract(workflow))
         weakened=workflow.replace("if: steps.production_inventory.outputs.present == 'true'", "if: always()", 1)
         self.assertTrue(any("conditional on tracked inventory" in x for x in verify.validate_rescan_workflow_contract(weakened)))
+    def test_forwarding_policy_cannot_omit_global_override_or_streamlocal_denial(self):
+        original_read = Path.read_text
+        sshd_path = verify.PRODUCTION / "host/sshd_config"
+        for required in ("DisableForwarding yes", "AllowStreamLocalForwarding no", "X11Forwarding no"):
+            with self.subTest(required=required):
+                def changed_read(path, *args, **kwargs):
+                    content = original_read(path, *args, **kwargs)
+                    return content.replace(required + "\n", "") if path == sshd_path else content
+                with patch.object(Path, "read_text", changed_read):
+                    errors = verify.validate_static_contracts(self.profile)
+                self.assertIn("sshd hardening missing: " + required, errors)
 if __name__=="__main__":unittest.main()

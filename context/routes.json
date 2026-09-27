@@ -402,7 +402,7 @@
         "docs/operations/chaos-engineering-program.md",
         "docs/runbooks/production-cold-dr.md"
       ],
-      "summary": "Keep WireGuard reachability, FIDO2 identity, JIT privilege, and off-host audit as independent controls."
+      "summary": "Keep WireGuard reachability, SSH public-key identity, JIT privilege, and off-host audit as independent controls."
     },
     {
       "id": "documentation-governance",

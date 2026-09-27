@@ -10,7 +10,8 @@ WireGuard یک مسیر شبکه رمزدار بین رایانه مدیر و س
 این VPN برای مدیریت است؛ اینترنت کاربران سایت از آن عبور نمی‌کند و مدل AI روی آن اجرا نمی‌شود.
 کلید WireGuard فقط ورود به شبکه را ممکن می‌کند؛ مجوز SSH یا sudo یا Kubernetes نمی‌دهد.
 
-مسیر مصوب: دستگاه مدیر → WireGuard → SSH/FIDO2 → دسترسی JIT محدود و audit خارج از میزبان.
+مسیر مصوب: دستگاه مدیر → WireGuard → کلید SSH مستقل → دسترسی JIT محدود و audit خارج از میزبان.
+در profile تک‌سرور، FIDO2 اختیاری است؛ کلید نرم‌افزاری Ed25519 با رمز و مجوز فایل محدود مجاز است.
 قواعد کامل در [سیاست دسترسی](../../infrastructure/production/host/access-policy.json) و
 [ADR-0043](../adr/0043-define-production-network-trust-boundaries-v1.md) هستند.
 این راهنما جای آن سیاست‌ها یا installer خودکار firewall نیست.
@@ -176,7 +177,7 @@ Host customer-alpha-server
 ```
 
 بعداً `ssh customer-alpha-server` کافی است. این کلید SSH با کلید WireGuard فرق دارد؛
-برای privileged Production باید مطابق ADR-0030 از FIDO2/JIT استفاده شود.
+برای privileged Production باید مطابق ADR-0030 از کلید SSH مستقل و JIT استفاده شود؛ FIDO2 اختیاری است.
 
 ## ۷. firewall و جلوگیری از قطع دسترسی
 
@@ -193,7 +194,7 @@ IPv4 و IPv6 و پورت‌های جایگزین SSH هم باید پوشش دا
 این bootstrap موقت را مدیریت Production تأییدشده اعلام نکنید.
 
 آزمون نهایی مدیریت: public SSH خارج VPN رد شود؛ peer نامعتبر/revoked رد شود؛ peer معتبر بدون
-FIDO2 مجوز SSH نگیرد؛ SSH بدون JIT مجوز نوشتن نگیرد؛ expiry و audit خارج host کار کنند.
+کلید SSH مجوز ورود نگیرد؛ SSH بدون JIT مجوز نوشتن نگیرد؛ expiry و audit خارج host کار کنند.
 reboot فقط پس از آزمون rollback انجام شود و persistence دوباره بررسی شود.
 
 ## ۸. استفاده روزمره و عیب‌یابی
@@ -239,7 +240,7 @@ sudo wg set wg-hooshix peer REPLACE_WITH_REVOKED_PUBLIC_KEY remove
 
 `wg show wg-hooshix peers` باید نبود کلید را نشان دهد؛ از دستگاه revoked عدم اتصال و از
 دستگاه باقی‌مانده اتصال را آزمون کنید. اگر فقط runtime عوض شود، reboot ممکن است peer را برگرداند.
-SSH/FIDO2 آن دستگاه جداگانه revoke می‌شود. کلید گم‌شده را از مشتری/دستگاه دیگر کپی نکنید.
+کلید SSH آن دستگاه جداگانه revoke می‌شود. کلید گم‌شده را از مشتری/دستگاه دیگر کپی نکنید.
 
 برای بازیابی host، version/kernel/package، config عمومی و موجودی peer را از منبع بررسی‌شده و
 private key سرور را فقط از backup رمزدار مجاز بازیابی کنید؛ owner/mode و firewall را قبل از activation بررسی کنید.

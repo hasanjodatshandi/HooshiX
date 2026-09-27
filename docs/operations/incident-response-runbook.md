@@ -52,7 +52,7 @@ Single-server host/node/kernel/storage failure may stop the complete platform **
 Use `production-cold-dr.md`. Required properties include:
 
 - external black-box monitor detects the host/public-path outage while local monitoring is unavailable;
-- clean host + WireGuard/FIDO2/JIT management path; no public SSH fallback;
+- clean host + WireGuard/SSH-key/JIT management path; no public SSH fallback;
 - K3s/Calico/security/observability reconstruction;
 - unchanged OpenBao recovery;
 - PostgreSQL PITR + DB/RLS/role validation;
@@ -215,7 +215,7 @@ If corpus source/provenance/freshness/integrity/schema/cardinality compatibility
 Single-server normal path remains:
 
 ```text
-approved device -> WireGuard -> management address -> OpenSSH/FIDO2 -> JIT
+approved device -> WireGuard -> management address -> OpenSSH public-key -> JIT
 ```
 
 Public SSH remains denied. No shared peer/password/root/shared SSH fallback. Emergency elevation is attributable/incident-linked/time-bounded; provider console is break glass only. OS/`sudo`/Kubernetes/database privileged actions remain audited off-host. Shell history is not authoritative evidence.
@@ -289,7 +289,7 @@ Verify applicable:
 - Kyverno admission + edge/WAF/client-address anti-spoofing;
 - OpenBao/secret delivery;
 - HIBP corpus freshness/integrity;
-- WireGuard/FIDO2/JIT + off-host audit;
+- WireGuard/SSH-key/JIT + off-host audit;
 - Day-One logs/metrics/traces privacy/correlation/backend-failure behavior;
 - external host monitor health and evidence it detected total-host loss;
 - erasure/legal-hold when restored state involved;

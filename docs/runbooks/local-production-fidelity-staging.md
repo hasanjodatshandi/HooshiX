@@ -270,7 +270,7 @@ A passing local composite verifier proves that this repository slice can run tog
 - Production Kafka native TLS/per-service authentication/ACL/quota/durable-disk/rebuild evidence;
 - OpenBao/External Secrets production delivery;
 - Argo CD production reconciliation;
-- WireGuard/FIDO2/JIT host access;
+- WireGuard/SSH-key/JIT host access;
 - production HIBP corpus provenance/freshness/full-corpus bounds;
 - Google Gmail delivery, production SMS.ir acceptance/delivery, or optional Google OIDC execution;
 - external host-down detection;
