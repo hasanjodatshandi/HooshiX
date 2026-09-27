@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy,json,sys,unittest
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import verify
 class ProductionProfileTest(unittest.TestCase):
@@ -27,4 +28,15 @@ class ProductionProfileTest(unittest.TestCase):
         self.assertEqual([],verify.validate_rescan_workflow_contract(workflow))
         weakened=workflow.replace("if: steps.production_inventory.outputs.present == 'true'", "if: always()", 1)
         self.assertTrue(any("conditional on tracked inventory" in x for x in verify.validate_rescan_workflow_contract(weakened)))
+    def test_forwarding_policy_cannot_omit_global_override_or_streamlocal_denial(self):
+        original_read = Path.read_text
+        sshd_path = verify.PRODUCTION / "host/sshd_config"
+        for required in ("DisableForwarding yes", "AllowStreamLocalForwarding no", "X11Forwarding no"):
+            with self.subTest(required=required):
+                def changed_read(path, *args, **kwargs):
+                    content = original_read(path, *args, **kwargs)
+                    return content.replace(required + "\n", "") if path == sshd_path else content
+                with patch.object(Path, "read_text", changed_read):
+                    errors = verify.validate_static_contracts(self.profile)
+                self.assertIn("sshd hardening missing: " + required, errors)
 if __name__=="__main__":unittest.main()

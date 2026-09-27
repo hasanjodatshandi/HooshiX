@@ -9,6 +9,12 @@ import inspect_host
 
 
 class HostInventoryTest(unittest.TestCase):
+    def test_forwarding_flags_include_unix_sockets_and_override(self):
+        self.assertEqual(
+            {"disableforwarding": "yes", "allowstreamlocalforwarding": "no"},
+            inspect_host.summarize_sshd("disableforwarding yes\nallowstreamlocalforwarding no\n"),
+        )
+
     def test_management_config_allow_list_rejects_secret_values(self):
         result = inspect_host.summarize_sshd("permitrootlogin no\npasswordauthentication no\nforcecommand private-fixture\nbanner private-fixture\nallowtcpforwarding private-fixture\n")
         self.assertEqual({"permitrootlogin": "no", "passwordauthentication": "no"}, result)

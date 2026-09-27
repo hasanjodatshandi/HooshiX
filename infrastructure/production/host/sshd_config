@@ -11,6 +11,8 @@ PubkeyAuthOptions touch-required verify-required
 AuthenticationMethods publickey
 PermitEmptyPasswords no
 X11Forwarding no
+DisableForwarding yes
+AllowStreamLocalForwarding no
 AllowAgentForwarding no
 AllowTcpForwarding no
 PermitTunnel no

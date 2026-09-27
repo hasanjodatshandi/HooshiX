@@ -21,6 +21,19 @@ Management-only SSH, connection-specific effective configuration, JIT expiry,
 revocation and off-host audit evidence remain NOT VERIFIED. These findings are
 not permission to open production traffic.
 
+Follow-up read-only inspection on 2026-09-27 again reported `auditd` inactive,
+`rsyslog` active and non-interactive sudo unavailable. No audit/JIT/SSH hardening
+was applied to the VPS by that follow-up. The installed host package is
+`openssh-server 1:10.2p1-2ubuntu3.6`; its installed project manual documents
+`DisableForwarding` as the override for Agent/TCP/X11/StreamLocal forwarding.
+The repository SSH policy now includes that override and explicit StreamLocal
+denial, with inspection and negative policy tests. These are repository controls,
+not live effective-config evidence. Off-host destination access and two independent
+authorized JIT reviewers remain unprovisioned inputs. The Persian prerequisites
+guide explains these inputs and active-session/child-process expiry tests.
+An unsafe automatic commissioning/JIT draft was withdrawn before any host execution;
+no executable JIT runtime or off-host audit receiver is claimed.
+
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
 ## Current repository state

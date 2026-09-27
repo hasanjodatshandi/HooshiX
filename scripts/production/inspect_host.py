@@ -98,7 +98,7 @@ def summarize_sshd(raw: str) -> dict:
     """Never export arbitrary config values, paths, commands or banners."""
     flags = {"permitrootlogin", "passwordauthentication", "kbdinteractiveauthentication",
              "pubkeyauthentication", "allowagentforwarding", "allowtcpforwarding",
-             "x11forwarding", "permittunnel", "gatewayports"}
+             "x11forwarding", "permittunnel", "gatewayports", "disableforwarding", "allowstreamlocalforwarding"}
     result = {}
     for line in raw.splitlines():
         parts = line.split()
