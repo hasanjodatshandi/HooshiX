@@ -83,7 +83,8 @@ git checkout <REVIEWED_GIT_SHA>
 
 والد `D:\HooshiX` باید موجود باشد. مسیر خروجی تازه و خارج از repository انتخاب کنید.
 اسکریپت archive رسمی و pin‌شده PortableGit را دانلود، SHA256 آن را بررسی، فقط OpenSSL و license
-لازم را استخراج و hash تک‌تک فایل‌ها را بررسی می‌کند. سپس بسته را با `ValidateOnly` کنترل می‌کند.
+لازم را استخراج و hash تک‌تک فایل‌ها را بررسی می‌کند. config محدود OpenSSL از سورس خود ابزار
+می‌آید و از config نمونه vendor استفاده نمی‌شود. سپس بسته را با `ValidateOnly` کنترل می‌کند.
 هیچ برنامه‌ای از archive پیش از بررسی SHA256 اجرا نمی‌شود.
 
 برای اینترنت قطع/دانلود قبلی، `-ArchivePath D:\Downloads\PortableGit-2.55.0.3-64-bit.7z.exe`

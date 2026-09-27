@@ -47,8 +47,15 @@ try {
         }
         Assert-PlainPath $ArchivePath
         if ((Get-Sha $ArchivePath) -ne $lock.source_archive_sha256) { throw 'VENDOR_ARCHIVE_HASH_MISMATCH' }
+        # Execute a verified local copy; a UNC executable may wait indefinitely in
+        # Windows' network-file confirmation before a process/timeout exists.
+        $localArchive=Join-Path $work $lock.source_archive
+        if (-not [IO.Path]::GetFullPath($ArchivePath).Equals($localArchive,[StringComparison]::OrdinalIgnoreCase)) {
+            Copy-Item -LiteralPath $ArchivePath -Destination $localArchive
+            if ((Get-Sha $localArchive) -ne $lock.source_archive_sha256) { throw 'COPIED_VENDOR_ARCHIVE_HASH_MISMATCH' }
+        }
         $vendor=Join-Path $work 'vendor'
-        $process=Start-Process -FilePath $ArchivePath -ArgumentList @('-y',('-o"'+$vendor+'"')) -WindowStyle Hidden -PassThru
+        $process=Start-Process -FilePath $localArchive -ArgumentList @('-y',('-o"'+$vendor+'"')) -WindowStyle Hidden -PassThru
         try {
             if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'VENDOR_EXTRACTION_DEADLINE' }
             if ($process.ExitCode -ne 0) { throw 'VENDOR_EXTRACTION_FAILED' }
@@ -59,7 +66,9 @@ try {
         foreach ($name in @('openssl.exe','libcrypto-3-x64.dll','libssl-3-x64.dll')) {
             Copy-Item -LiteralPath (Join-Path $vendor ('mingw64\bin\'+$name)) -Destination (Join-Path $ToolBundleDirectory ('tools\'+$name))
         }
-        Copy-Item -LiteralPath (Join-Path $vendor 'mingw64\etc\ssl\openssl.cnf') -Destination (Join-Path $ToolBundleDirectory 'tools\openssl.cnf')
+        # Do not inherit vendor/example includes, modules or host configuration.
+        $fixedConfig=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'openssl.cnf'),[Text.UTF8Encoding]::new($false,$true)).Replace("`r`n","`n").Replace("`r","`n")
+        [IO.File]::WriteAllText((Join-Path $ToolBundleDirectory 'tools\openssl.cnf'),$fixedConfig,[Text.UTF8Encoding]::new($false))
         Copy-Item -LiteralPath (Join-Path $vendor 'mingw64\share\licenses\openssl\LICENSE') -Destination (Join-Path $ToolBundleDirectory 'licenses\OpenSSL-LICENSE.txt')
     }
     foreach ($entry in $lock.files) {
