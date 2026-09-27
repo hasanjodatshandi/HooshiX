@@ -109,7 +109,7 @@ try {
     Check (@(Get-ChildItem -LiteralPath $signed).Count -eq 4) 'SIGNED_PUBLIC_FILE_SET_WRONG'
     Expect-Failure { Sign-Intermediate $csr $csrHash $key $cert $password $signed } 'EXISTING_SIGNED_OUTPUT_PRESERVED'
     $script:InstallationId='another-customer'
-    Expect-Failure { Sign-Intermediate $csr $csrHash $key $cert $password (Join-Path $fixture 'wrong-install') } 'CSR_SUBJECT_REJECTED'
+    Expect-Failure { Sign-Intermediate $csr $csrHash $key $cert $password (Join-Path $fixture 'wrong-install') } 'ROOT_INSTALLATION_IDENTITY_REJECTED'
     Assert-Package
     # The manifest catches tampering and tolerates text transfer's CRLF conversion.
     $scriptFile=Join-Path $script:PackageRoot 'offline-ca.ps1'

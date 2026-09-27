@@ -191,6 +191,8 @@ function Read-KeyPassword {
 
 
 function Assert-KeyMatches([string]$Key,[string]$Certificate,[Security.SecureString]$Password) {
+    $subject=Invoke-OpenSSL -ArgumentVector @('x509','-in',$Certificate,'-subject','-nameopt','RFC2253','-noout')
+    if ($subject -cne ('subject=CN='+$script:InstallationId+' Offline Root CA,O=HooshiX')) { throw 'ROOT_INSTALLATION_IDENTITY_REJECTED' }
     $keyPublic=Invoke-OpenSSL -ArgumentVector @('pkey','-in',$Key,'-passin','stdin','-pubout') -Password $Password
     $certPublic=Invoke-OpenSSL -ArgumentVector @('x509','-in',$Certificate,'-pubkey','-noout')
     if ($keyPublic -ne $certPublic) { throw 'KEY_CERTIFICATE_MISMATCH' }
