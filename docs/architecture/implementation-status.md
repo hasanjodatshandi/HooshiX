@@ -8,10 +8,15 @@ this does not claim hardware assurance, change HA/end-user MFA, or waive JIT,
 management isolation or off-host audit. Live non-privileged inspection found an
 active Windows WireGuard tunnel, successful Ed25519 SSH to `10.77.47.1:22022`, and
 rejection of the same connection without SSH public-key authentication. The local
-client has `10.77.47.2/32` and only `10.77.47.1/32` in AllowedIPs; server-side peer
-matching remains NOT VERIFIED without root inventory. The host has wildcard SSH
-listeners on 22/22022; public primary TCP/22022 was reachable from the operator
-device. Host `auditd` was inactive, and `sudo -n` rejected the root inspection.
+client has `10.77.47.2/32` and only `10.77.47.1/32` in AllowedIPs. Manually
+authenticated root inspection at `12:13:22Z` matched its public-key fingerprint
+and exact route to the sole server peer, and `sshd -t` passed. Global `sshd -T`
+reported root/password/keyboard-interactive disabled but agent/TCP/X11 forwarding
+enabled; this is not connection-specific Match evidence. The host has wildcard
+SSH socket listeners on 22/22022; public primary TCP/22022 was reachable from the
+operator device. Host `auditd` was not installed. `sudo -n` rejects root inspection;
+the tested Windows launcher obtains interactive sudo authentication, verifies
+the exact source hash and returns a filtered receipt without storing passwords.
 Management-only SSH, connection-specific effective configuration, JIT expiry,
 revocation and off-host audit evidence remain NOT VERIFIED. These findings are
 not permission to open production traffic.
