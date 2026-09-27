@@ -19,10 +19,34 @@ class ProductionProfileTest(unittest.TestCase):
         d=copy.deepcopy(self.profile); d["required_external_inputs"].remove("external_blackbox_monitor"); self.assertTrue(any("external production evidence" in x for x in verify.validate_profile(d)))
     def test_software_key_profile_retains_access_controls(self):
         self.assertFalse(self.profile["human_access"]["fido2_required"])
-        for key, value in (("software_key_passphrase_required", False), ("software_key_algorithm", "ssh-rsa"), ("off_host_audit_required", False), ("jit_reviewers_min", 1), ("jit_write_minutes_max", 31), ("password_authentication", True), ("keyboard_interactive_authentication", True), ("root_login", True), ("shared_keys", True), ("touch_required", False), ("user_verification_required", False)):
+        for key, value in (("software_key_passphrase_required", False), ("software_key_algorithm", "ssh-rsa"), ("off_host_audit_required", False), ("jit_reviewers_min", 0), ("jit_reviewers_min", True), ("jit_write_minutes_max", 31), ("password_authentication", True), ("keyboard_interactive_authentication", True), ("root_login", True), ("shared_keys", True), ("touch_required", False), ("user_verification_required", False)):
             with self.subTest(key=key):
                 d=copy.deepcopy(self.profile); d["human_access"][key]=value
                 self.assertTrue(any("human production access" in x for x in verify.validate_profile(d)))
+    def test_single_reviewer_policy_cannot_drift_from_host_contract(self):
+        original_load = verify.load_json
+        access_path = verify.PRODUCTION / "host/access-policy.json"
+        for key, value in (("write_reviewers_min", 0), ("write_reviewers_min", 2), ("write_reviewers_min", True), ("write_minutes_max", 31), ("reason_or_ticket_required", False), ("standing_admin", True)):
+            with self.subTest(key=key, value=value):
+                def changed_load(path):
+                    data = original_load(path)
+                    if path == access_path:
+                        data["jit"][key] = value
+                    return data
+                with patch.object(verify, "load_json", changed_load):
+                    self.assertIn("production JIT host policy drifted", verify.validate_static_contracts(self.profile))
+    def test_single_reviewer_exception_cannot_disable_audit(self):
+        original_load = verify.load_json
+        access_path = verify.PRODUCTION / "host/access-policy.json"
+        for key, value in (("off_host_required", False), ("shell_history_authoritative", True), ("surfaces", ["sudo"])):
+            with self.subTest(key=key):
+                def changed_load(path):
+                    data = original_load(path)
+                    if path == access_path:
+                        data["audit"][key] = value
+                    return data
+                with patch.object(verify, "load_json", changed_load):
+                    self.assertIn("production privileged audit policy drifted", verify.validate_static_contracts(self.profile))
     def test_rescan_requires_precommissioning_inventory_guard(self):
         workflow=(verify.ROOT/".github/workflows/production-vulnerability-rescan.yml").read_text(encoding="utf-8")
         self.assertEqual([],verify.validate_rescan_workflow_contract(workflow))

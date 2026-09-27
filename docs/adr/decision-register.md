@@ -34,7 +34,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR-0027 | PostgreSQL service isolation/tenant RLS |
 | ADR-0028 | data-subject erasure execution/evidence |
 | ADR-0029 | upstream volumetric DDoS protection |
-| ADR-0030 | production human JIT access |
+| ADR-0030 | production human JIT access; single-server minimum one reviewer and optional FIDO2; HA retains two reviewers and hardware MFA |
 | ADR-0031 | PII-safe logging detection pipeline |
 | ADR-0032 | Authorization SLO alerting/breaker recovery |
 | ADR-0033 | operation-level dependency criticality/degradation |

@@ -31,7 +31,7 @@
     "reason_or_ticket_required": true,
     "standing_admin": false,
     "write_minutes_max": 30,
-    "write_reviewers_min": 2
+    "write_reviewers_min": 1
   },
   "management_overlay": "wireguard",
   "profile": "production-single-server",

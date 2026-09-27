@@ -166,7 +166,7 @@ Single-server:
 approved device -> WireGuard -> management address -> OpenSSH public-key -> JIT privilege
 ```
 
-Public SSH denied. Per-device peer keys, no root/password/shared keys, <=30m write elevation/two reviewers, bounded read-only elevation, OS/`sudo`/K8s/DB audit exported off-host. Network reachability never substitutes for human identity/privilege.
+Public SSH denied. Per-device peer keys, no root/password/shared keys, <=30m write elevation/one reviewer for single-server, bounded read-only elevation, OS/`sudo`/K8s/DB audit exported off-host. Network reachability never substitutes for human identity/privilege.
 
 HA retains current Teleport path.
 

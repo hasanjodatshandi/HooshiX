@@ -203,7 +203,7 @@ Mandatory controls are:
 - unnecessary SSH agent/TCP/X11/tunnel/gateway-port forwarding is disabled for privileged human access unless a separately reviewed operation requires a narrowly scoped exception;
 - generated/effective `sshd` configuration must pass the pinned host `sshd -t` plus `sshd -T`/equivalent validation before activation;
 - no standing root, unrestricted Kubernetes, or PostgreSQL-superuser access;
-- production write/admin elevation has explicit reason/ticket, at least two authorized reviewers, maximum 30-minute lifetime, and automatic expiry;
+- production write/admin elevation has explicit reason/ticket, one authorized reviewer selected by the owner, maximum 30-minute lifetime, and automatic expiry;
 - read-only elevation is separately scoped and maximum one hour;
 - `sudo` privilege use has protected I/O/session audit where applicable;
 - host authentication/exec/privilege events are captured by OS audit (`auditd` or an approved equivalent);
@@ -270,7 +270,7 @@ Before `production-single-server` is production-ready, verify at minimum:
 - Kafka combined KRaft/RF1/minISR1/acks-all/idempotence/ACL/TLS/rebuild/replay tests;
 - Ambient full-stack capacity benchmark plus mTLS/workload-identity positive/negative tests and `istioctl analyze`;
 - reduced Kyverno policy render plus signature/provenance/SBOM/security-context negative admission tests;
-- OpenSSH effective-config validation, approved per-operator key authentication, optional FIDO presence/verification tests when enrolled, root/password/keyboard-interactive/shared/unapproved-key/forwarding negatives, JIT expiry, two-reviewer flow, key revocation, sudo I/O audit, OS audit, off-host audit integrity, and break-glass exercise;
+- OpenSSH effective-config validation, approved per-operator key authentication, optional FIDO presence/verification tests when enrolled, root/password/keyboard-interactive/shared/unapproved-key/forwarding negatives, JIT expiry, single-reviewer flow with explicit separation-of-duties risk acceptance, key revocation, sudo I/O audit, OS audit, off-host audit integrity, and break-glass exercise;
 - unchanged OpenBao flows and proof that no profile change introduced a hot-path OpenBao dependency or Git secret;
 - unchanged Identity/MFA downgrade-prevention tests;
 - complete-stack load/soak/reboot/recovery test with >=30% validated resource headroom;

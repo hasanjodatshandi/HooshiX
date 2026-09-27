@@ -169,6 +169,7 @@ identity, permission, audit, quota, or side-effect authority.
 - Compromised or misconfigured AI Desktop tunnel/client/policy: attempts wrong-app/password-target credential use, broker-binding substitution, credential-value exfiltration, focus races, or conversion of use-without-disclosure into credential reading/general secret input.
 - Developer or automation mistake: commits a real credential, removes it from the latest tree, or publishes it through scanner/log/context output.
 - Compromised operator device: may steal both the WireGuard key and exportable software SSH key. Passphrase/device protection, independent revocation, JIT and off-host audit reduce risk but do not provide FIDO2 hardware assurance. The owner-selected single-server software-key path must not be described as phishing-resistant MFA.
+- Single-server requester self-approval: one authorized reviewer is sufficient by owner instruction under ADR-0030 and may be the requester. A compromised or malicious sole operator can approve their own action; independent separation of duties is absent. Attributable signed approval, reason/ticket, minimum scope, <=30-minute write expiry/revocation and protected off-host audit remain mandatory. HA retains two-reviewer approval.
 - Privileged insider: time-bounded legitimate capability with misuse risk.
 - Compromised host/root: broad single-server process/storage visibility.
 - Compromised provider/source/scanner feed: malformed/replayed/delayed/false data within protocol scope.

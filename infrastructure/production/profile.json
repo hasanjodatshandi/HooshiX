@@ -15,7 +15,7 @@
   "human_access": {
     "authentication": "openssh-publickey",
     "fido2_required": false,
-    "jit_reviewers_min": 2,
+    "jit_reviewers_min": 1,
     "jit_write_minutes_max": 30,
     "keyboard_interactive_authentication": false,
     "management_overlay": "wireguard",
