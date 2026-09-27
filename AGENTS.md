@@ -195,7 +195,8 @@ Security invariants:
 - use least privilege, dedicated ServiceAccounts, deny-by-default NetworkPolicy, strict Ambient mTLS;
 - production artifacts follow current signing/provenance/SBOM/admission rules;
 - OpenBao remains secret authority unless a current reviewed decision changes it;
-- MFA and audited JIT human production access are not weakened by infrastructure profile;
+- end-user MFA and audited JIT human production access are not weakened by infrastructure profile;
+- human host authentication follows current ADR-0030: FIDO2 is optional in `production-single-server`, encrypted per-operator Ed25519 software keys are allowed, and JIT/off-host audit/management isolation remain mandatory; do not require hardware acquisition or claim software keys provide hardware/phishing-resistant assurance;
 - quota security remains governed by ADR-0024 and current supporting decisions, including fail-closed time/capacity behavior and required headroom.
 
 ADR-0044 Day-One observability is mandatory from the first executable service commit.
