@@ -5,6 +5,7 @@
 .github/workflows/conversation-service.yml
 .github/workflows/identity-service.yml
 .github/workflows/notification-service.yml
+.github/workflows/offline-ca.yml
 .github/workflows/production-release.yml
 .github/workflows/production-vulnerability-rescan.yml
 .github/workflows/repository-baseline.yml
@@ -309,6 +310,7 @@ docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
+docs/operations/production-installation-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
 docs/runbooks/chatgpt-web-secure-mcp-tunnel.md
@@ -480,9 +482,19 @@ scripts/platform/waf_build.sh
 scripts/platform/waf_image_smoke.py
 scripts/production/build_provenance.py
 scripts/production/install_release_tools.sh
+scripts/production/offline-ca/README-fa.txt
+scripts/production/offline-ca/build-package.ps1
+scripts/production/offline-ca/intermediate.cnf
+scripts/production/offline-ca/offline-ca.ps1
+scripts/production/offline-ca/run-backup.cmd
+scripts/production/offline-ca/run-root.cmd
+scripts/production/offline-ca/run-sign.cmd
+scripts/production/offline-ca/run-verify.cmd
+scripts/production/offline-ca/tools.lock.json
 scripts/production/readiness.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
+scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py

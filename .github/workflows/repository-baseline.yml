@@ -114,6 +114,10 @@ jobs:
     name: Web BFF security suite
     uses: ./.github/workflows/web-bff.yml
 
+  offline-ca-security:
+    name: Offline CA tooling security suite
+    uses: ./.github/workflows/offline-ca.yml
+
   edge-waf-security:
     name: WAF privacy and cookie boundary
     runs-on: ubuntu-24.04
@@ -151,6 +155,7 @@ jobs:
       - authorization-security
       - conversation-security
       - web-bff-security
+      - offline-ca-security
       - edge-waf-security
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -165,6 +170,7 @@ jobs:
           AUTHORIZATION_RESULT: ${{ needs.authorization-security.result }}
           CONVERSATION_RESULT: ${{ needs.conversation-security.result }}
           WEB_BFF_RESULT: ${{ needs.web-bff-security.result }}
+          OFFLINE_CA_RESULT: ${{ needs.offline-ca-security.result }}
           EDGE_WAF_RESULT: ${{ needs.edge-waf-security.result }}
         run: |
           set -euo pipefail
@@ -202,6 +208,10 @@ jobs:
           fi
           if [ "${EDGE_WAF_RESULT}" != 'success' ]; then
             echo "WAF privacy/cookie verification result: ${EDGE_WAF_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${OFFLINE_CA_RESULT}" != 'success' ]; then
+            echo "Offline CA tooling security result: ${OFFLINE_CA_RESULT}" >&2
             exit 1
           fi
           echo 'Required repository and service security verification passed.'

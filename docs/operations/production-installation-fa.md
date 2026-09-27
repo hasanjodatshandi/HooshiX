@@ -62,6 +62,19 @@ Windows PowerShell 5.1 و Git for Windows لازم است. سورس ابزار �
 
 در PowerShell، از ریشه سورس پروژه:
 
+اگر checkout اصلی در WSL است، برای **ساخت بسته عمومی ابزار** یک checkout محلی Windows
+از revision بررسی‌شده داشته باشید؛ checkout اصلی اپلیکیشن همچنان WSL است. مثال برای نصب جدید:
+
+```powershell
+git clone https://github.com/hasanjodatshandi/HooshiX.git D:\HooshiX\PublicToolSource
+cd D:\HooshiX\PublicToolSource
+git checkout <REVIEWED_GIT_SHA>
+```
+
+از داخل مسیر `\\wsl.localhost\...` اجرا نکنید؛ Windows ممکن است آن را مسیر شبکه‌ای حساب کند و
+طبق `RemoteSigned` رد کند. checkout محلی باید از منبع مورد اعتماد باشد؛ policy را bypass نکنید.
+در دستور زیر مسیر و شناسه نمونه را با نصب خودتان عوض کنید:
+
 ```powershell
 .\scripts\production\offline-ca\build-package.ps1 `
   -InstallationId customer-alpha `

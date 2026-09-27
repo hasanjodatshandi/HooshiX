@@ -1,9 +1,7 @@
 name: Offline CA tooling
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_call:
   workflow_dispatch:
 
 permissions:

@@ -7,6 +7,7 @@
    رمز را جدا از فلش‌ها نگه دارید؛ فراموش شدن آن یعنی از دست رفتن کلید.
 ۴. run-backup.cmd را اجرا کنید؛ دو فلش فیزیکی متفاوت معرفی کنید.
 ۵. برای هر فلش جداگانه، پوشه پشتیبان را روی رایانه آفلاین کپی کنید؛ run-verify.cmd را اجرا و مسیر آن را وارد کنید.
+   root_certificate_sha256 از رسید ToOnline را که جدا نگه داشته‌اید وارد کنید؛ fingerprint گواهی نیست.
    باید OFFLINE_RECOVERY_TEST=PASSED بگیرید. هر دو نسخه را در دو محل امن متفاوت نگه دارید.
 ۶. فقط فایل‌های عمومی پوشه ToOnline و رسیدهای عمومی را به رایانه متصل برگردانید.
 
@@ -21,4 +22,5 @@ EXISTING_ROOT_STATE_PRESERVED: کلید قبلی را پاک یا دوباره �
 NETWORK_ADAPTER_UP: همه آداپتورهای شبکه، از جمله VPN/WSL/Hyper-V را خاموش کنید.
 
 این ابزار گواهی Root را می‌سازد؛ به‌تنهایی تأیید Production یا نصب mesh نیست.
+run-sign.cmd فقط CSR عمومی intermediate همان نصب را با Root آفلاین امضا می‌کند؛ import/rotation در cluster جداگانه بررسی می‌شود.
 راهنمای کامل و محدودیت‌های جاری: docs/operations/production-installation-fa.md در سورس پروژه.
