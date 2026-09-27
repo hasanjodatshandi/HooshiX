@@ -310,7 +310,6 @@ docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
-docs/operations/production-commissioning-fa.md
 docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/wireguard-management-fa.md
@@ -356,10 +355,6 @@ infrastructure/production/README.md
 infrastructure/production/data/data-policy.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json
-infrastructure/production/host/audit.rules
-infrastructure/production/host/hooshix-jit-expire@.service
-infrastructure/production/host/jit-policy.json
-infrastructure/production/host/rsyslog-audit-tls.conf.example
 infrastructure/production/host/sshd_config
 infrastructure/production/k3s/config.yaml
 infrastructure/production/network/trust-policy.json
@@ -488,12 +483,8 @@ scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
 scripts/platform/waf_image_smoke.py
 scripts/production/build_provenance.py
-scripts/production/commission_host.sh
 scripts/production/inspect_host.py
 scripts/production/install_release_tools.sh
-scripts/production/jit_activate.sh
-scripts/production/jit_grant.py
-scripts/production/jit_revoke.sh
 scripts/production/offline-ca/README-fa.txt
 scripts/production/offline-ca/build-package.ps1
 scripts/production/offline-ca/intermediate.cnf
@@ -509,7 +500,6 @@ scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/run-host-inspection.ps1
 scripts/production/tests/test_inspect_host.py
-scripts/production/tests/test_jit_grant.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_release.py

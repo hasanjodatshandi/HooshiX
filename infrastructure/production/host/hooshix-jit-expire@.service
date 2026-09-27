@@ -1,7 +1,0 @@
-[Unit]
-Description=HooshiX JIT grant expiry (%i)
-After=local-fs.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/libexec/hooshix-jit-revoke.sh %i
