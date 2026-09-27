@@ -1,0 +1,23 @@
+# Copy to /etc/rsyslog.d/60-hooshix-audit-tls.conf only after replacing every
+# value from the approved external sink record. Do not commit credentials.
+# The configuration intentionally refuses to be useful with placeholders.
+module(load="imfile")
+module(load="omfwd")
+
+input(type="imfile" File="/var/log/audit/audit.log" Tag="hooshix-audit" Facility="local6" Severity="info" ReadMode="2")
+
+global(
+  DefaultNetstreamDriver="gtls"
+  DefaultNetstreamDriverCAFile="/etc/hooshix/audit/ca.pem"
+  DefaultNetstreamDriverCertFile="/etc/hooshix/audit/client.crt"
+  DefaultNetstreamDriverKeyFile="/etc/hooshix/audit/client.key"
+)
+
+if $programname == 'hooshix-audit' then {
+  action(type="omfwd" Target="AUDIT_SINK_HOST_REQUIRED" Port="AUDIT_SINK_PORT_REQUIRED" Protocol="tcp"
+         StreamDriver="gtls" StreamDriverMode="1" StreamDriverAuthMode="x509/name"
+         StreamDriverPermittedPeers="AUDIT_SINK_NAME_REQUIRED" queue.type="LinkedList"
+         queue.filename="hooshix-audit" queue.maxdiskspace="1g" queue.saveonshutdown="on"
+         action.resumeRetryCount="-1" action.reportSuspension="on" action.reportSuspensionContinuation="on")
+  stop
+}

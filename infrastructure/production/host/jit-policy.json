@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "approval": {
+    "mechanism": "openssh-signature",
+    "reviewers_min": 2,
+    "distinct_identities_required": true,
+    "max_write_minutes": 30,
+    "expiry_action": "remove-runtime-sudo-policy"
+  },
+  "audit": {
+    "grant_and_revoke_events_required": true,
+    "off_host_export_required": true
+  },
+  "scope_names": [
+    "audit.inspect",
+    "database.read",
+    "database.write",
+    "k3s.read",
+    "k3s.write",
+    "host.read",
+    "host.write"
+  ]
+}
