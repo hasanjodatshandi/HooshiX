@@ -25,7 +25,6 @@
 .semgrep/web-bff.yml
 .semgrep/web-frontend.yml
 .shellcheckrc
-.vscode/settings.json
 AGENTS.md
 FILE_INDEX.txt
 Makefile
