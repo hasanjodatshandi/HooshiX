@@ -6,6 +6,7 @@ This matrix records production technology combinations that must remain compatib
 | --- | --- | --- |
 | Java | 25 LTS | Spring Boot/application libraries support Java 25 |
 | Spring Boot | 4.1.0 | Java 25; Gradle 9.x; Spring MVC/Virtual Threads; Micrometer Observation/Tracing |
+| Jackson databind | 3.1.6 | Security-fixed patch override across all six Java services; keep Jackson core/BOM aligned and verify locked dependencies and runtime compatibility before promotion |
 | Embedded Tomcat | 11.0.25 | Spring Boot 4.1.0 / Jakarta Servlet 6.1; aligned core/el/websocket constraints and verified artifacts across all six Java services; strict checks, advisory rescan, and refreshed HTTP/staging evidence required for the security override |
 | Gradle | 9.6.1 | selected Spring Boot build plugin/toolchain |
 | JaCoCo / PIT | 0.8.15 / 1.22.1 | Java 25/Gradle 9.6.1; Gradle PIT plugin 1.19.0 and PIT JUnit 5 plugin 1.2.3; combined unit/integration coverage and selective mutation thresholds remain blocking |
