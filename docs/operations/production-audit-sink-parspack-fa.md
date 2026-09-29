@@ -48,8 +48,14 @@ Versioning، مالک می‌تواند در ترمینال شخصی WSL، از 
 
 ```bash
 python3 scripts/production/probe_parspack_audit_bucket.py \
-  --endpoint https://c426797.parspack.net
+  --endpoint https://c426797.parspack.net --bucket c426797
 ```
+
+در ۳۰ سپتامبر ۲۰۲۶ آزمون اولیهٔ ریشهٔ endpoint برای هر دو query پاسخ HTML عمومی
+`HTTP 200` داد؛ این اتصال S3 مدیریتی را ثابت نمی‌کند. پروفایل رسمی Cyberduck
+پارس‌پک `s3-path-style` و غیرفعال‌بودن virtual-host را مشخص می‌کند؛ بنابراین نسخهٔ
+اصلاح‌شده، درخواست‌ها را به مسیر `/<bucket>?...` می‌فرستد. ابزار باید در ترمینال
+WSL/Linux اجرا شود، نه از PowerShell روی مسیر UNC مخزن.
 
 ابزار، دو کلید را بی‌صدا می‌پرسد و فقط درخواست‌های GET امضاشده می‌فرستد؛ آنها را
 در chat، argv، environment، تاریخچه shell یا فایل ذخیره نمی‌کند. خروجی متنی آن
@@ -83,5 +89,6 @@ bucket policy، receiver، retention و تست‌های مثبت/منفی روی
 در ۲۷ سپتامبر ۲۰۲۶ این صفحات عمومی بررسی شدند؛ credential برای این بررسی استفاده نشد:
 
 - [نحوه اتصال به فضای ابری](https://docs.parspack.com/cloud-storage/how-to-connect-to-the-cloud/)
+- [پروفایل رسمی Cyberduck با S3 path-style](https://repo.parspack.net/s3/cyberduck/s3-profile.cyberduckprofile)
 - [مدیریت کاربران و سطوح دسترسی](https://docs.parspack.com/cloud-storage/managing-users-in-the-cloud/)
 - [خصوصی و عمومی‌بودن باکت](https://docs.parspack.com/cloud-storage/access-level-management-of-buckets/)

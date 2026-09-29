@@ -27,6 +27,12 @@ def validate_endpoint(value: str) -> str:
     return f"https://{parsed.hostname}"
 
 
+def validate_bucket(value: str) -> str:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{2,62}", value):
+        raise ValueError("expected a simple lowercase ParsPack bucket name")
+    return value
+
+
 def curl_quoted(value: str) -> str:
     if not value or any(ord(character) < 33 or ord(character) > 126 for character in value):
         raise ValueError("keys must be non-empty printable ASCII without spaces")
@@ -40,7 +46,7 @@ def xml_value(root: ET.Element, name: str) -> str | None:
     return None
 
 
-def probe(endpoint: str, access_key: str, secret_key: str, query: str) -> str:
+def probe(endpoint: str, bucket: str, access_key: str, secret_key: str, query: str) -> str:
     if ":" in access_key:
         raise ValueError("access key cannot contain a colon")
     config = f"user = {curl_quoted(access_key + ':' + secret_key)}\n"
@@ -48,7 +54,7 @@ def probe(endpoint: str, access_key: str, secret_key: str, query: str) -> str:
         "curl", "-q", "--config", "-", "--aws-sigv4", "aws:amz:us-east-1:s3",
         "--silent", "--show-error", "--connect-timeout", "5", "--max-time", "15",
         "--max-filesize", "65536", "--write-out", "\nHTTP_STATUS:%{http_code}",
-        "--url", f"{endpoint}/?{query}",
+        "--url", f"{endpoint}/{bucket}?{query}",
     ]
     try:
         result = subprocess.run(
@@ -66,12 +72,15 @@ def probe(endpoint: str, access_key: str, secret_key: str, query: str) -> str:
         root = ET.fromstring(body)
     except ET.ParseError:
         return f"HTTP {status.decode('ascii')}; non-XML response"
+    root_name = root.tag.rsplit("}", 1)[-1]
     if status != b"200":
         code = xml_value(root, "Code") or "unknown"
         if not re.fullmatch(r"[A-Za-z0-9]{1,80}", code):
             code = "unknown"
         return f"HTTP {status.decode('ascii')}; {code}"
     if query == "object-lock":
+        if root_name != "ObjectLockConfiguration":
+            return "HTTP 200; unexpected XML response"
         enabled = xml_value(root, "ObjectLockEnabled")
         mode = xml_value(root, "Mode")
         days = xml_value(root, "Days")
@@ -81,6 +90,8 @@ def probe(endpoint: str, access_key: str, secret_key: str, query: str) -> str:
         retention = f"{days} days" if days and days.isdecimal() else None
         retention = retention or (f"{years} years" if years and years.isdecimal() else "none")
         return f"HTTP 200; Object Lock enabled; default retention {mode or 'none'} / {retention}"
+    if root_name != "VersioningConfiguration":
+        return "HTTP 200; unexpected XML response"
     versioning = xml_value(root, "Status") or "not configured"
     if versioning not in ("Enabled", "Suspended", "not configured"):
         versioning = "unexpected response"
@@ -90,18 +101,24 @@ def probe(endpoint: str, access_key: str, secret_key: str, query: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--endpoint", required=True, help="HTTPS endpoint from ParsPack panel")
+    parser.add_argument("--bucket", required=True, help="private audit bucket name")
     args = parser.parse_args()
     try:
         endpoint = validate_endpoint(args.endpoint)
+        bucket = validate_bucket(args.bucket)
     except ValueError as error:
         parser.error(str(error))
+    if endpoint != f"https://{bucket}.parspack.net":
+        parser.error("this probe requires the endpoint and bucket name to match")
+    if not sys.platform.startswith("linux"):
+        parser.error("run this probe from WSL/Linux, not Windows PowerShell")
     if not sys.stdin.isatty() or not sys.stderr.isatty():
         parser.error("run this probe in your own interactive terminal")
     access_key = getpass.getpass("ParsPack Access Key (hidden): ")
     secret_key = getpass.getpass("ParsPack Secret Key (hidden): ")
     try:
-        print("Object Lock:", probe(endpoint, access_key, secret_key, "object-lock"))
-        print("Versioning:", probe(endpoint, access_key, secret_key, "versioning"))
+        print("Object Lock:", probe(endpoint, bucket, access_key, secret_key, "object-lock"))
+        print("Versioning:", probe(endpoint, bucket, access_key, secret_key, "versioning"))
     except ValueError as error:
         print(f"Invalid credential format: {error}", file=sys.stderr)
         return 2
