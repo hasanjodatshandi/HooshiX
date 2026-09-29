@@ -79,8 +79,38 @@ jobs:
         run: ./gradlew spotlessCheck --write-locks --dependency-verification strict --no-daemon
 
       - name: Verify unit tests
+        id: unit_tests
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew test --write-locks --dependency-verification strict --no-daemon
+
+      - name: Report bounded unit-test failure identities
+        if: ${{ failure() && steps.unit_tests.outcome == 'failure' }}
+        working-directory: ${{ env.SERVICE_DIR }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import xml.etree.ElementTree as ET
+
+          def safe(value):
+              return re.sub(r"[^A-Za-z0-9_.#$-]", "_", value or "unknown")[:160]
+
+          count = 0
+          for path in sorted(Path("build/test-results/test").glob("TEST-*.xml")):
+              for case in ET.parse(path).iter("testcase"):
+                  issue = case.find("failure")
+                  if issue is None:
+                      issue = case.find("error")
+                  if issue is not None:
+                      print(f"::error title=Unit test failure::{safe(case.get('classname'))}#{safe(case.get('name'))} [{safe(issue.get('type'))}]")
+                      count += 1
+                      if count >= 5:
+                          break
+              if count >= 5:
+                  break
+          if count == 0:
+              print("::error title=Gradle test failure::No failed JUnit case was emitted; the task failed before or outside test execution")
+          PY
 
       - name: Verify PostgreSQL migrations and integration tests
         working-directory: ${{ env.SERVICE_DIR }}
