@@ -194,6 +194,9 @@ services to `4.2.17.Final`. The frontend root override pins transitive `js-yaml`
 owning OpenAPI toolchain resolves at least that fixed version directly.
 Jackson databind is constrained to security-fixed `3.1.6` across all six Java services; Gradle locks and
 verification metadata must reflect the aligned Jackson core/BOM set before promotion.
+The frontend development lock resolves transitive `undici` to `8.11.2` within jsdom's
+declared `^8.9.0` range to clear the current OSV advisories; this is not a new
+production runtime dependency.
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
 - Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
