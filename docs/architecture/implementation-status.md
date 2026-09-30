@@ -77,10 +77,31 @@ WireGuard and nftables services remained active. The timer then removed only
 the dedicated guard table (`Result=success`, exit zero). Private SSH still
 passed and public TCP/22022 became reachable again, proving rollback. The
 trial did **not** modify `/etc/nftables.conf`, change the SSH socket bind,
-install persistent firewall policy, or satisfy JIT/off-host audit. Public
-bootstrap SSH remains exposed on 22022 and Production readiness remains
-`NOT VERIFIED`; the repository candidate from PR #154 is not a deployed
-control.
+install persistent firewall policy, or satisfy JIT/off-host audit. It was
+rolled back before the subsequent persistent installation.
+
+After PR #154 merged at `main@53ca35030a8a543a4be0917e9dc9b0eea8b3eb29`,
+the owner installed the SHA-256-matched guard
+(`d6b8829854a0ef74aaaf30951262e56fc6b1e2371af59ce6e88747888dd231fd`)
+at `/etc/nftables.d/hooshix-management-ssh.nft` and included it from
+`/etc/nftables.conf`. The installed full configuration passed `nft -c -f`
+(SHA-256 `9eaaa0a2fef3b6088da179d01a8070787bbf12af07743ddab95132fb8c96ee63`).
+An independent 30-minute rollback timer was active before the live apply.
+Fresh private SSH over WireGuard passed and public TCP/22 and TCP/22022 were
+denied from the operator device. After the owner-approved reboot on
+2026-09-30 at `19:04:01Z`, `nftables.service` successfully loaded
+`/etc/nftables.conf` at `19:04:07Z`, before the SSH socket and separate tunnel
+daemon became active at `19:04:09Z`. The rollback timer was inactive; the
+dedicated guard table and its reviewed rules remained loaded; fresh private
+SSH passed; public TCP/22 and TCP/22022 remained denied from the operator
+device. TCP/2222 is excluded from the guard and its separate daemon remained
+active/listening; public TCP/2222 remained unreachable as it was before the
+change. The relevant host services were active after reboot, but external
+web/mail reachability was not baselined and is not inferred from service state.
+This is `Passed` evidence for the scoped guard's reboot persistence on this
+one VPS, not proof of all management paths. Provider firewall, SSH bind and
+forwarding policy, peer revocation, JIT, off-host audit, recovery, and
+Production readiness remain `NOT VERIFIED`.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
@@ -243,7 +264,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
 | Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
-| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-30 authenticated read-only inspection confirmed the existing peer route and active tunnel; global SSH still permits forwarding and `auditd` is absent. Current alias uses bootstrap port 22022, previously reachable on the primary public IP from the operator host; final management-only SSH/SSH-key/JIT/off-host audit and recovery evidence remain NOT VERIFIED |
+| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap and persistent SSH ingress guard | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. Separate tunnel port 2222 was not changed. Global SSH still permits forwarding and `auditd` is absent; SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
