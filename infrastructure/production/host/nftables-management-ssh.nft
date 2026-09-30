@@ -1,0 +1,16 @@
+# Host-specific Stage 10 guard for the existing wg-hooshix management interface.
+# The separate TCP/2222 tunnel listener is intentionally outside this change.
+# Load this as one nft transaction; do not flush the shared ruleset.
+destroy table inet hooshix_management_ssh_guard
+
+table inet hooshix_management_ssh_guard {
+    chain input {
+        type filter hook input priority -10; policy accept;
+
+        # Preserve host-local SSH, then deny every non-WireGuard ingress path
+        # to both current human SSH listeners. The existing later filter chain
+        # remains responsible for accepting approved traffic.
+        iifname "lo" tcp dport { 22, 22022 } accept
+        iifname != "wg-hooshix" tcp dport { 22, 22022 } drop
+    }
+}

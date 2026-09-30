@@ -63,4 +63,21 @@ class ProductionProfileTest(unittest.TestCase):
                 with patch.object(Path, "read_text", changed_read):
                     errors = verify.validate_static_contracts(self.profile)
                 self.assertIn("sshd hardening missing: " + required, errors)
+    def test_management_ssh_guard_rejects_scope_or_verdict_drift(self):
+        original_read = Path.read_text
+        guard_path = verify.PRODUCTION / "host/nftables-management-ssh.nft"
+        for old, new in (
+            ('iifname != "wg-hooshix"', 'iifname "wg-hooshix"'),
+            (" } drop", " } accept"),
+            ("priority -10", "priority 10"),
+            ("22, 22022", "22, 2222"),
+            ("destroy table inet hooshix_management_ssh_guard", "flush ruleset"),
+        ):
+            with self.subTest(old=old, new=new):
+                def changed_read(path, *args, **kwargs):
+                    content = original_read(path, *args, **kwargs)
+                    return content.replace(old, new) if path == guard_path else content
+                with patch.object(Path, "read_text", changed_read):
+                    errors = verify.validate_static_contracts(self.profile)
+                self.assertIn("management SSH guard must be the reviewed dedicated, scoped nftables transaction", errors)
 if __name__=="__main__":unittest.main()

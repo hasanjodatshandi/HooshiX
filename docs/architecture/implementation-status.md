@@ -67,6 +67,21 @@ package query found it not installed; `rsyslog` and WireGuard were active.
 No host configuration was changed. Management-only SSH, JIT, off-host audit,
 deployment, recovery and Production readiness remain `NOT VERIFIED`.
 
+On 2026-09-30 a scoped, transient `inet hooshix_management_ssh_guard` trial was
+syntax-checked on the host (`nft -c -f`, exit zero) against a SHA-256-matched
+repository candidate, then installed only after an independent 15-minute
+systemd rollback timer was confirmed active. A new SSH connection through
+WireGuard to `10.77.47.1:22022` passed; public TCP/22 and TCP/22022 from the
+operator device were denied; public TCP/2222 remained denied; K3s, mail, web,
+WireGuard and nftables services remained active. The timer then removed only
+the dedicated guard table (`Result=success`, exit zero). Private SSH still
+passed and public TCP/22022 became reachable again, proving rollback. The
+trial did **not** modify `/etc/nftables.conf`, change the SSH socket bind,
+install persistent firewall policy, or satisfy JIT/off-host audit. Public
+bootstrap SSH remains exposed on 22022 and Production readiness remains
+`NOT VERIFIED`; the repository candidate from PR #154 is not a deployed
+control.
+
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
 ## Current repository state
