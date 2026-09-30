@@ -356,6 +356,7 @@ infrastructure/production/README.md
 infrastructure/production/data/data-policy.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json
+infrastructure/production/host/nftables-management-ssh.nft
 infrastructure/production/host/sshd_config
 infrastructure/production/k3s/config.yaml
 infrastructure/production/network/trust-policy.json
