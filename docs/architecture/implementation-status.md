@@ -54,6 +54,19 @@ test. Object-version immutability, writer least privilege, actual off-host audit
 delivery, and the JIT audit gate remain `NOT VERIFIED`; the exact verification
 boundary is in `../operations/production-audit-sink-parspack-fa.md`.
 
+A fresh owner-authenticated, read-only root inventory on 2026-09-30 at
+`09:02:45Z` passed `sshd -t`, K3s API readiness and a seven-pod
+Calico/CoreDNS/Kyverno inventory (all ready, zero restarts). The restricted
+private receipt is outside Git at
+`.platform-runtime/production/private/evidence/host-inspection-20260930T090245Z.json`
+(SHA-256 `aff9764d5bc016002d69d182c87213df9237ca155edd625ef8667229dd3fe939`).
+The global effective SSH configuration still permits agent/TCP/X11/StreamLocal
+forwarding (`DisableForwarding no`); connection-specific `Match` and firewall
+behavior were not tested. `auditd` remained inactive, and a separate read-only
+package query found it not installed; `rsyslog` and WireGuard were active.
+No host configuration was changed. Management-only SSH, JIT, off-host audit,
+deployment, recovery and Production readiness remain `NOT VERIFIED`.
+
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
 ## Current repository state
@@ -211,11 +224,11 @@ Authorization and Web BFF application services are implemented as current reposi
 | Cosign image signature/provenance/signed-SBOM release automation | DESIGNED under ADR-0017/0045 | IMPLEMENTED with exact protected main workflow identity and GitHub OIDC issuer | repository unit/static verification PASSED; real production signing/verification execution NOT VERIFIED |
 | Kyverno production release admission | DESIGNED under ADR-0017/0045 | IMPLEMENTED as stable CEL release-policy generation | repository render/static verification PASSED; production cluster enforcement NOT VERIFIED |
 | Trivy / OWASP Dependency-Check | NOT SELECTED under ADR-0045 | NOT APPLICABLE | NOT APPLICABLE |
-| Production K3s/Kubernetes/Calico | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-27 read-only host inspection found active K3s `v1.35.6+k3s1`; manually authenticated live inventory at `08:13:19Z` passed API readiness and found all seven Calico/CoreDNS/Kyverno pods ready with zero restarts. Admission/network negative tests, reproducible production provisioning, backup/recovery and complete readiness remain NOT VERIFIED by this inventory. Local kind evidence does not replace them |
+| Production K3s/Kubernetes/Calico | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-30 read-only root inventory again passed API readiness and found all seven Calico/CoreDNS/Kyverno pods ready with zero restarts; the previously observed K3s version was `v1.35.6+k3s1`. Admission/network negative tests, reproducible production provisioning, backup/recovery and complete readiness remain NOT VERIFIED by this inventory. Local kind evidence does not replace them |
 | Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
 | Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
-| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-27 Windows tunnel service and server interface were active; SSH through management address passed. Current alias uses bootstrap port 22022, which was also reachable on the primary public IP from the operator host; final management-only SSH/SSH-key/JIT/off-host audit and recovery evidence remain NOT VERIFIED |
+| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-30 authenticated read-only inspection confirmed the existing peer route and active tunnel; global SSH still permits forwarding and `auditd` is absent. Current alias uses bootstrap port 22022, previously reachable on the primary public IP from the operator host; final management-only SSH/SSH-key/JIT/off-host audit and recovery evidence remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
