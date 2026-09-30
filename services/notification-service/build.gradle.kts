@@ -53,8 +53,8 @@ dependencies {
         implementation("org.apache.logging.log4j:log4j-api:2.25.5") {
             because("CVE-2026-49844 is fixed in Log4j API 2.25.5")
         }
-        implementation("tools.jackson.core:jackson-databind:3.1.6") {
-            because("Jackson 3.1.6 fixes the current databind security advisories")
+        implementation("tools.jackson.core:jackson-databind:3.1.7") {
+            because("Jackson 3.1.7 fixes GHSA-cxp5-3px4-pw24 and GHSA-wv8q-qhhj-9h54")
         }
         implementation("at.yawk.lz4:lz4-java:1.11.1") {
             because("GHSA-xx22-p4ch-683r is fixed in lz4-java 1.11.1")
