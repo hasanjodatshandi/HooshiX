@@ -37,6 +37,7 @@
     "vitest": "4.1.11"
   },
   "overrides": {
+    "brace-expansion": "2.1.7",
     "js-yaml": "4.3.2"
   }
 }
