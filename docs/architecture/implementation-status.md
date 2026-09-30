@@ -79,7 +79,7 @@ passed and public TCP/22022 became reachable again, proving rollback. The
 trial did **not** modify `/etc/nftables.conf`, change the SSH socket bind,
 install persistent firewall policy, or satisfy JIT/off-host audit. Public
 bootstrap SSH remains exposed on 22022 and Production readiness remains
-`NOT VERIFIED`; the draft PR #154 is a reviewed candidate, not a deployed
+`NOT VERIFIED`; the repository candidate from PR #154 is not a deployed
 control.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
