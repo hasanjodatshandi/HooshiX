@@ -192,7 +192,7 @@ checks, advisory rescans, and refreshed staging/runtime evidence are required be
 Netty modules remain aligned through the official BOM; the Stage 7 security refresh moves the affected
 services to `4.2.17.Final`. The frontend root override pins transitive `js-yaml` to `4.3.2` until its
 owning OpenAPI toolchain resolves at least that fixed version directly.
-Jackson databind is constrained to security-fixed `3.1.6` across all six Java services; Gradle locks and
+Jackson databind is constrained to security-fixed `3.1.7` across all six Java services; Gradle locks and
 verification metadata must reflect the aligned Jackson core/BOM set before promotion.
 The frontend development lock resolves transitive `undici` to `8.11.2` within jsdom's
 declared `^8.9.0` range to clear the current OSV advisories; this is not a new
