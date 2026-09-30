@@ -496,12 +496,14 @@ scripts/production/offline-ca/run-root.cmd
 scripts/production/offline-ca/run-sign.cmd
 scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
+scripts/production/probe_parspack_audit_bucket.py
 scripts/production/readiness.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/run-host-inspection.ps1
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
