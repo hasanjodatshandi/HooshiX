@@ -33,8 +33,9 @@ JIT reviewer for single-server on 2026-09-27; ADR-0030/0042, the selected profil
 host access policy, readiness checklist and executable static policy gate now
 reflect that exception. Requester and reviewer may be the same named owner;
 independent separation of duties is not claimed, and HA still requires two reviewers.
-The ParsPack endpoint was provided, but the chat-disclosed credential must be
-rotated before provisioning. Fresh restricted-writer access, destination retention
+The ParsPack endpoint was provided; a previously chat-disclosed credential must
+never be provisioned, and any production writer credential must be fresh and private.
+Restricted-writer access, enforced destination retention
 and denial of deletion/overwrite remain unverified inputs. The Persian prerequisites
 guide explains these inputs and active-session/child-process expiry tests.
 An unsafe automatic commissioning/JIT draft was withdrawn before any host execution;
@@ -45,6 +46,13 @@ non-interactive sudo, inactive `auditd`, and active `rsyslog`, K3s and WireGuard
 No privilege, SSH, firewall or audit configuration was changed in this policy update.
 ParsPack's public connection guide documents S3-compatible clients; its reviewed
 connection guide is not retention/immutability or successful-upload evidence.
+On 2026-09-30 the owner reported that the ParsPack panel shows `Compliance` with
+40-day retention and confirmed the read-only bucket probe shows Object Lock
+enabled with default `COMPLIANCE / 40 days` plus Versioning enabled. This is
+owner-reported configuration evidence, not an independent receipt or a behavior
+test. Object-version immutability, writer least privilege, actual off-host audit
+delivery, and the JIT audit gate remain `NOT VERIFIED`; the exact verification
+boundary is in `../operations/production-audit-sink-parspack-fa.md`.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
