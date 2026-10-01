@@ -61,6 +61,30 @@ class HostInventoryTest(unittest.TestCase):
             result = inspect_host.collect()
         self.assertEqual("Not verified", result["api_ready"])
         self.assertEqual("Not verified", result["pod_inventory"])
+        self.assertEqual("Not verified", result["management"]["sshd_effective_sample"]["status"])
+
+    def test_management_sample_applies_match_without_exposing_raw_config(self):
+        def fake_run(args):
+            if args == ["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE]:
+                return "\n".join(f"{flag} {'yes' if flag == 'pubkeyauthentication' else 'no'}"
+                                 for flag in sorted(inspect_host.SSH_SAMPLE_REQUIRED_FLAGS)) + "\nbanner private-fixture\n"
+            return None
+
+        with patch.object(inspect_host.os, "geteuid", return_value=0), \
+                patch.object(inspect_host, "run", side_effect=fake_run) as run:
+            result = inspect_host.collect()
+        sample = result["management"]["sshd_effective_sample"]
+        self.assertEqual("Passed", sample["status"])
+        self.assertEqual("no", sample["settings"]["allowstreamlocalforwarding"])
+        self.assertEqual("no", sample["settings"]["disableforwarding"])
+        self.assertNotIn("private-fixture", json.dumps(result))
+        run.assert_any_call(["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE])
+
+    def test_empty_successful_sshd_output_does_not_claim_probe_passed(self):
+        with patch.object(inspect_host.os, "geteuid", return_value=0), \
+                patch.object(inspect_host, "run", return_value=""):
+            result = inspect_host.collect()
+        self.assertEqual("Not verified", result["management"]["sshd_effective_sample"]["status"])
 
     def test_malformed_cluster_response_is_sanitized(self):
         with patch.object(inspect_host.os, "geteuid", return_value=0), \

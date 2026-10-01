@@ -280,6 +280,12 @@ raw log را منتشر نکنید؛ فقط error دسته‌بندی‌شده �
 مجاز، API readiness و تعداد containerهای ready/restart هر pod نیز خوانده می‌شود.
 این ابزار هیچ resource/config/secret را تغییر نمی‌دهد و محتوای Secret، env، annotation یا log
 را چاپ نمی‌کند. timeout هر command بیست ثانیه و retry صفر است؛ موفقیت inventory، Production approval نیست.
+در اجرای root، علاوه بر مقدارهای سراسری SSH، نتیجهٔ `sshd -T -C` برای نمونهٔ ثابتِ
+`hooshixadmin` از `10.77.47.2` به `10.77.47.1:22022` نیز به‌شکل allow-list گزارش می‌شود.
+مقدار `host` در این نمونه همان IP عددی مشتری است، نه DNS reverse واقعی؛ بنابراین حتی نتیجهٔ
+`Passed` فقط موفقیت اجرای این probe است، نه تأیید تنظیم مؤثر همهٔ کاربران، peerها،
+نام‌های DNS، پورت‌ها یا daemon جداگانهٔ MCP روی 2222. تنظیم مؤثر اتصال واقعی و تست‌های
+رد forwarding/authentication همچنان برای Production جداگانه لازم‌اند.
 privileged execution همچنان نیازمند مسیر مصوب است؛ برای خودکارشدن آن `NOPASSWD: ALL` نسازید.
 
 ## ۹. دستگاه جدید، لغو و بازیابی
