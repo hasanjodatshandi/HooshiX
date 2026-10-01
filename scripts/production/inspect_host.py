@@ -12,6 +12,12 @@ from datetime import datetime, timezone
 
 KUBECTL = ["/usr/local/bin/k3s", "kubectl", "--request-timeout=15s"]
 ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+# One known bootstrap path, not an inventory of all users, peers, DNS names, or ports.
+# The separate MCP tunnel daemon on TCP/2222 is deliberately outside this probe.
+SSH_MANAGEMENT_SAMPLE = (
+    "user=hooshixadmin,host=10.77.47.2,addr=10.77.47.2,"
+    "laddr=10.77.47.1,lport=22022"
+)
 
 
 def run(args: list[str]) -> str | None:
@@ -71,12 +77,18 @@ def collect() -> dict:
         "api_ready": "Not verified",
         "pods": None,
         "pod_inventory": "Not verified",
-        "management": {"scope": "global SSH config only; connection-specific Match, firewall, JIT and off-host audit not verified"},
+        "management": {"scope": "global SSH config plus one synthetic management connection; actual DNS/other users, peers, ports, firewall, JIT and off-host audit not verified"},
     }
     if result["privileged"]:
         result["management"]["sshd_syntax"] = "Passed" if run(["/usr/sbin/sshd", "-t"]) is not None else "Not verified"
         raw_config = run(["/usr/sbin/sshd", "-T"])
         result["management"]["sshd_global"] = summarize_sshd(raw_config or "")
+        sample_config = run(["/usr/sbin/sshd", "-T", "-C", SSH_MANAGEMENT_SAMPLE])
+        result["management"]["sshd_effective_sample"] = {
+            "connection": SSH_MANAGEMENT_SAMPLE,
+            "status": "Passed" if sample_config is not None else "Not verified",
+            "settings": summarize_sshd(sample_config or ""),
+        }
         raw_peers = run(["/usr/bin/wg", "show", "wg-hooshix", "allowed-ips"])
         try:
             result["management"]["wireguard_peers"] = summarize_peers(raw_peers) if raw_peers is not None else None

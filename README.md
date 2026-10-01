@@ -74,4 +74,4 @@ Architecture documentation or a passing source CI gate does not imply that the p
 
 ## Application continuation
 
-For current application progress and the ordered next implementation milestone, use `docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md` after reconciling current Git and `docs/architecture/implementation-status.md`. Production Commissioning & Readiness is currently deferred from the application sequence until the owner explicitly reactivates it.
+For current application progress and the ordered next implementation milestone, use `docs/architecture/APPLICATION-IMPLEMENTATION-ROADMAP.md` after reconciling current Git and `docs/architecture/implementation-status.md`. Production Commissioning & Readiness is in progress after the owner's 2026-09-24 reactivation; production readiness remains unverified.

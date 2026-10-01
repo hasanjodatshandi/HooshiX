@@ -61,6 +61,22 @@ class HostInventoryTest(unittest.TestCase):
             result = inspect_host.collect()
         self.assertEqual("Not verified", result["api_ready"])
         self.assertEqual("Not verified", result["pod_inventory"])
+        self.assertEqual("Not verified", result["management"]["sshd_effective_sample"]["status"])
+
+    def test_management_sample_applies_match_without_exposing_raw_config(self):
+        def fake_run(args):
+            if args == ["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE]:
+                return "disableforwarding yes\nallowstreamlocalforwarding no\nbanner private-fixture\n"
+            return None
+
+        with patch.object(inspect_host.os, "geteuid", return_value=0), \
+                patch.object(inspect_host, "run", side_effect=fake_run) as run:
+            result = inspect_host.collect()
+        sample = result["management"]["sshd_effective_sample"]
+        self.assertEqual("Passed", sample["status"])
+        self.assertEqual({"disableforwarding": "yes", "allowstreamlocalforwarding": "no"}, sample["settings"])
+        self.assertNotIn("private-fixture", json.dumps(result))
+        run.assert_any_call(["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE])
 
     def test_malformed_cluster_response_is_sanitized(self):
         with patch.object(inspect_host.os, "geteuid", return_value=0), \
