@@ -357,6 +357,7 @@ infrastructure/production/data/data-policy.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json
 infrastructure/production/host/nftables-management-ssh.nft
+infrastructure/production/host/sshd-human-match.tail
 infrastructure/production/host/sshd_config
 infrastructure/production/k3s/config.yaml
 infrastructure/production/network/trust-policy.json
@@ -484,7 +485,9 @@ scripts/platform/tests/test_staging_erasure_recovery.py
 scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
 scripts/platform/waf_image_smoke.py
+scripts/production/apply_human_sshd_candidate.sh
 scripts/production/build_provenance.py
+scripts/production/check_human_sshd_candidate.sh
 scripts/production/inspect_host.py
 scripts/production/install_release_tools.sh
 scripts/production/offline-ca/README-fa.txt
@@ -497,13 +500,16 @@ scripts/production/offline-ca/run-root.cmd
 scripts/production/offline-ca/run-sign.cmd
 scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
+scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/readiness.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
+scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-host-inspection.ps1
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_release.py

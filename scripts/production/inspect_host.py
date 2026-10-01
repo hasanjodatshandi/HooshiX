@@ -18,11 +18,14 @@ SSH_MANAGEMENT_SAMPLE = (
     "user=hooshixadmin,host=10.77.47.2,addr=10.77.47.2,"
     "laddr=10.77.47.1,lport=22022"
 )
-SSH_SAMPLE_REQUIRED_FLAGS = frozenset({
-    "permitrootlogin", "passwordauthentication", "kbdinteractiveauthentication",
-    "pubkeyauthentication", "disableforwarding", "allowagentforwarding",
-    "allowtcpforwarding", "allowstreamlocalforwarding", "x11forwarding", "permittunnel",
-})
+SSH_SAMPLE_EXPECTED = {
+    "permitrootlogin": "no", "passwordauthentication": "no",
+    "kbdinteractiveauthentication": "no", "pubkeyauthentication": "yes",
+    "disableforwarding": "yes", "allowagentforwarding": "no",
+    "allowtcpforwarding": "no", "allowstreamlocalforwarding": "no",
+    "x11forwarding": "no", "permittunnel": "no", "gatewayports": "no",
+}
+SSH_SAMPLE_REQUIRED_FLAGS = frozenset(SSH_SAMPLE_EXPECTED)
 
 
 def run(args: list[str]) -> str | None:
@@ -73,7 +76,7 @@ def collect() -> dict:
         status = run(["/usr/bin/systemctl", "is-active", service])
         services[service] = "active" if status and status.strip() == "active" else "Not verified"
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "production_readiness": "Not verified",
         "scope": "read-only inventory; no admission, recovery, capacity or provider tests",
@@ -92,7 +95,8 @@ def collect() -> dict:
         sample_settings = summarize_sshd(sample_config or "")
         result["management"]["sshd_effective_sample"] = {
             "connection": SSH_MANAGEMENT_SAMPLE,
-            "status": "Passed" if SSH_SAMPLE_REQUIRED_FLAGS <= sample_settings.keys() else "Not verified",
+            "probe_status": "Passed" if sample_config and sample_config.strip() else "Not verified",
+            "status": assess_ssh_sample(sample_settings),
             "settings": sample_settings,
         }
         raw_peers = run(["/usr/bin/wg", "show", "wg-hooshix", "allowed-ips"])
@@ -120,9 +124,22 @@ def summarize_sshd(raw: str) -> dict:
     result = {}
     for line in raw.splitlines():
         parts = line.split()
-        if len(parts) == 2 and parts[0] in flags and parts[1] in {"yes", "no", "prohibit-password", "forced-commands-only"}:
+        if (len(parts) == 2 and parts[0] in flags and
+                parts[1] in {"yes", "no", "all", "local", "remote",
+                             "clientspecified", "point-to-point", "ethernet",
+                             "prohibit-password", "forced-commands-only"}):
             result[parts[0]] = parts[1]
     return result
+
+
+def assess_ssh_sample(settings: dict) -> str:
+    """Assess only the allow-listed baseline for this synthetic human connection."""
+    if any(settings.get(key) != expected for key, expected in SSH_SAMPLE_EXPECTED.items()
+           if key in settings):
+        return "Failed"
+    if not SSH_SAMPLE_REQUIRED_FLAGS <= settings.keys():
+        return "Not verified"
+    return "Passed"
 
 
 def summarize_peers(raw: str) -> list[dict]:

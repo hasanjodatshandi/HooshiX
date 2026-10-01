@@ -282,11 +282,102 @@ raw log را منتشر نکنید؛ فقط error دسته‌بندی‌شده �
 را چاپ نمی‌کند. timeout هر command بیست ثانیه و retry صفر است؛ موفقیت inventory، Production approval نیست.
 در اجرای root، علاوه بر مقدارهای سراسری SSH، نتیجهٔ `sshd -T -C` برای نمونهٔ ثابتِ
 `hooshixadmin` از `10.77.47.2` به `10.77.47.1:22022` نیز به‌شکل allow-list گزارش می‌شود.
-مقدار `host` در این نمونه همان IP عددی مشتری است، نه DNS reverse واقعی؛ بنابراین حتی نتیجهٔ
-`Passed` فقط موفقیت اجرای این probe است، نه تأیید تنظیم مؤثر همهٔ کاربران، peerها،
-نام‌های DNS، پورت‌ها یا daemon جداگانهٔ MCP روی 2222. تنظیم مؤثر اتصال واقعی و تست‌های
+مقدار `host` در این نمونه همان IP عددی مشتری است، نه DNS reverse واقعی. در خروجی نسخهٔ ۲،
+`probe_status` فقط موفقیت اجرای probe و `status` انطباق مقدارهای allow-list همین نمونه
+با حداقل سیاست SSH را نشان می‌دهد. نسخهٔ ۱ فیلد `status` را صرفاً برای اجرای probe
+استفاده می‌کرد و حتی با forwarding مجاز می‌توانست `Passed` نشان دهد. بنابراین حتی
+`status: Passed` در نسخهٔ ۲ تأیید تنظیم مؤثر همهٔ کاربران، peerها،
+نام‌های DNS، پورت‌ها یا daemon جداگانهٔ MCP روی 2222 نیست. تنظیم مؤثر اتصال واقعی و تست‌های
 رد forwarding/authentication همچنان برای Production جداگانه لازم‌اند.
 privileged execution همچنان نیازمند مسیر مصوب است؛ برای خودکارشدن آن `NOPASSWD: ALL` نسازید.
+
+### پیش‌بررسی فقط‌خواندنی برای اصلاح SSH انسانی
+
+پیش از اعمال policy فایل Git به VPS، منشأ واقعی listener را از خود میزبان پیدا کنید.
+در Ubuntu ممکن است `ssh.socket` پورت‌ها را باز کند و `Port`/`ListenAddress` داخل
+`sshd_config` به‌تنهایی listener زنده را جابه‌جا نکند. خروجی فقط‌خواندنی زیر،
+تنظیمات مؤثر socket و جای فایل‌های override را نشان می‌دهد؛ آن را با وضعیت
+`sshd -T -C` و listenerهای زنده مقایسه کنید. پورت tunnel مستقل 2222 فقط برای
+تشخیص و آزمون عدم‌تغییر در فهرست است، نه هدف اصلاح SSH انسانی.
+
+```bash
+sudo systemctl show ssh.socket -p ActiveState -p FragmentPath -p DropInPaths -p Listen --no-pager
+sudo systemctl cat ssh.socket ssh.service
+sudo ss -H -ltnp '( sport = :22 or sport = :22022 or sport = :2222 )'
+```
+
+فایل `sshd_config` این repository را کورکورانه جایگزین فایل اصلی میزبان نکنید:
+`Include`، ترتیب اولین مقدار مؤثر، `Match` و socket activation ابتدا باید روشن شوند.
+روی VPS فعلی، `ssh.socket` از generator برای چهار listener آدرس‌های wildcard
+IPv4/IPv6 در 22/22022 استفاده می‌کند. فایل اصلی در ابتدای کار drop-inها را
+Include می‌کند و در انتها `Match User hooshixtunnel` دارد؛ drop-in مخصوص همان
+کاربر اجازهٔ محدود TCP forwarding می‌دهد. پس `DisableForwarding yes` سراسری
+یا قراردادن یک `Match` جدید در وسط Includeها بدون بررسی، راهکار امنی نیست.
+اصلاح باید فقط به اتصال‌های SSH انسانی محدوده شود و تنظیم مؤثر tunnel و daemon
+مستقل 2222 قبل/بعد یکسان بماند.
+کاندیدای محدود همین میزبان در
+[`sshd-human-match.tail`](../../infrastructure/production/host/sshd-human-match.tail)
+قرار دارد. این فایل به‌تنهایی یک `sshd_config` کامل نیست و فقط باید پس از آخرین
+`Match` فایل اصلی، روی یک نسخهٔ کاندیدا افزوده شود؛ نصب به‌صورت drop-in ابتدای
+فایل مجاز نیست. افزودن حساب انسانی دیگر نیازمند بازبینی جداگانهٔ Match و آزمون
+اتصال همان حساب است.
+ابزار [`prepare_human_sshd_candidate.py`](../../scripts/production/prepare_human_sshd_candidate.py)
+پس از دریافت hash تازهٔ `/etc/ssh/sshd_config`، یک کاندیدای `0600` در پوشهٔ
+خصوصی متعلق به اپراتور می‌سازد و فایل اصلی را تغییر نمی‌دهد. اگر hash، آخرین
+`Match`، محتوای template یا مجوز پوشه عوض شده باشد، متوقف می‌شود.
+اجرای این ابزار نصب یا reload نیست؛ پیش از استفاده باید دو فایل عمومیِ بازبینی‌شده
+با SHA-256 برابر revision PR به میزبان منتقل شوند و کاندیدا روی خود VPS با
+`sshd -t -f` و `sshd -T -f ... -C ...` اعتبارسنجی شود.
+پس از ساخت یک candidate محدود، `sshd -t -f CANDIDATE` و
+`sshd -T -f CANDIDATE -C CONNECTION` باید همهٔ مسیرهای انسانی موردنیاز را
+با مقادیر سخت‌گیرانه نشان دهند. تنها پس از وجود کنسول نجات، نشست خصوصی دوم،
+نسخهٔ پشتیبان امن و timer rollback مستقل، اعمال زنده و آزمون SSH تازه مجاز است.
+روی میزبان فعلی، [`check_human_sshd_candidate.sh`](../../scripts/production/check_human_sshd_candidate.sh)
+پس از انتقال و مقایسهٔ SHA-256 با revision بررسی‌شده، با کاربر عادی اجرا می‌شود.
+این ابزار فقط `sudo -v` و اجرای `sshd -t/-T` را درخواست می‌کند؛ hash و mode
+فایل‌ها، تنظیم مؤثر حساب انسانی روی 22/22022 و برابری کامل تنظیم tunnel
+قبل/بعدِ candidate را بررسی می‌کند. خروجی آن فقط نتیجهٔ allow-list است.
+در Windows PowerShell پس از انتقال بررسی‌شده، فرمان سادهٔ زیر از مشکل
+نقل‌قول‌های اسکریپت چندخطی هنگام عبور از `ssh.exe` جلوگیری می‌کند:
+
+```powershell
+ssh.exe -t hooshix-server 'bash /home/hooshixadmin/.cache/hooshix-ssh-pr158/check_human_sshd_candidate.sh'
+$LASTEXITCODE
+```
+
+`PREFLIGHT=Passed` همراه با exit code صفر فقط اعتبار candidate پیش از نصب است.
+ابزار [`apply_human_sshd_candidate.sh`](../../scripts/production/apply_human_sshd_candidate.sh)
+با همان کاربر عادی، پس از باز نگه‌داشتن کنسول نجات و نشست خصوصی دوم اجرا می‌شود.
+هر سه اسکریپت باید از یک revision بررسی‌شده منتقل و hash آنها تطبیق داده شود.
+ابزار، preflight را تکرار، نسخهٔ قبلی و candidate و اسکریپت rollback را در
+`/root/hooshix-ssh-pr158` با مالکیت root آماده، hash نسخه‌های root را کنترل و
+timer مستقل `hooshix-ssh-pr158-rollback.timer` را برای ده دقیقه فعال می‌کند.
+سپس جایگزینی اتمیک فایل اصلی و reload فقط `ssh.service` انجام می‌شود.
+وجود پوشهٔ rollout قبلی باعث توقف است و نیازمند تطبیق وضعیت واقعی است؛ آن را
+برای تکرار فرمان پاک نکنید. rollback نیز تغییر SSH جدیدتر را بازنویسی نمی‌کند.
+
+```powershell
+ssh.exe -t hooshix-server 'bash /home/hooshixadmin/.cache/hooshix-ssh-pr158/apply_human_sshd_candidate.sh --rescue-and-second-session-ready'
+$LASTEXITCODE
+```
+
+تا تأیید مستقل نشست تازه، رد forwarding و وضعیت واقعی daemon جداگانهٔ 2222،
+timer را لغو نکنید و VPS را reboot نکنید. timer مستقل از قطع SSH/Windows است
+ولی transient است و از reboot سرور عبور نمی‌کند. این ابزار، JIT یا آمادگی
+Production را پیاده‌سازی یا تأیید نمی‌کند.
+پس از موفقیت آزمون‌های مستقل، مالک timer را در ترمینال محلی متوقف می‌کند:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo systemctl stop hooshix-ssh-pr158-rollback.timer'
+$LASTEXITCODE
+```
+
+سپس از اتصال تازه، `ActiveState=inactive` برای timer و برابری hash فایل اصلی
+با candidate بررسی شود. پوشهٔ root حاوی نسخهٔ قبل و rollback را حذف نکنید؛
+اسکریپت apply برای نصب اولیه است و نباید برای این rollout تکمیل‌شده تکرار شود.
+بازگشت نباید guard پایدار nftables را حذف یا TCP/22022 عمومی را باز کند؛ daemon
+مستقل MCP روی TCP/2222 نیز نباید تغییر کند. موفقیت reload به‌تنهایی آزمون
+ورود خصوصی/رد مسیر عمومی/ماندگاری پس از reboot نیست.
 
 ## ۹. دستگاه جدید، لغو و بازیابی
 

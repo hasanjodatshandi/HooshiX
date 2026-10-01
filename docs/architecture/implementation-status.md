@@ -103,6 +103,90 @@ one VPS, not proof of all management paths. Provider firewall, SSH bind and
 forwarding policy, peer revocation, JIT, off-host audit, recovery, and
 Production readiness remain `NOT VERIFIED`.
 
+Owner-run root inventory on 2026-10-01 at `07:18:46Z` added one synthetic
+connection-specific `sshd -T -C` sample for `hooshixadmin` over
+`10.77.47.2 -> 10.77.47.1:22022`. The v1 receipt's `status: Passed` means
+only that the probe returned the expected fields. Its actual effective values
+were `DisableForwarding no`, with agent/TCP/StreamLocal/X11 forwarding enabled;
+this sampled human SSH policy is **Failed**. Root/password/keyboard-interactive
+were disabled, public-key authentication enabled, and syntax passed. K3s API and
+seven-pod inventory passed with each observed pod ready 1/1 and restart count
+1; the restart cause is not established. `auditd` remained `Not verified`.
+No host SSH configuration was changed by this inspection. The updated v2
+inspector separates probe execution from sampled policy status, but it does
+not assert full SSH/JIT/audit or Production readiness.
+Read-only follow-up over the existing private SSH alias found active
+`ssh.socket` with generated listeners on IPv4/IPv6 wildcard addresses at
+22/22022, from `/run/systemd/generator/ssh.socket.d/addresses.conf`.
+The main SSH configuration includes drop-ins before its final
+`Match User hooshixtunnel`; an earlier tunnel-user drop-in also permits
+scoped remote TCP forwarding. A separate tunnel daemon currently listens on
+TCP/2222. Thus copying the repository's global SSH policy onto this shared
+host configuration without connection-specific testing could disrupt the
+tunnel. No listener/configuration was changed by this follow-up.
+The same read-only follow-up found two enabled tunnel SSH units targeting one
+dedicated configuration: `sshd-hooshix-tunnel.service` was active, while
+`hooshix-tunnel-sshd.service` was in auto-restart with `ExecMainStatus=255`
+and 14,480 recorded restarts. A TCP/2222 listener was present, but an
+end-to-end MCP request was not tested. The duplicate/failing unit was not
+stopped; its precise failure cause and ownership need review before any
+change. Non-root disk inventory showed 40 MiB of journald storage and
+129 GiB free on the VPS root filesystem at inspection time; it does not
+prove full storage/retention health.
+For PR #158, the reviewed human-only Match template and candidate preparer
+were copied to an operator-owned `0700` cache directory and both transfer
+hashes matched the local source. The preparer verified the unchanged source
+`sshd_config` SHA-256
+`01c79f1385e2ec9b5b09e4995cfcbd2f6b21e6e05c7906a8a2b1f1b18a5c5fbb`
+and wrote one uninstalled `0600` candidate (SHA-256
+`41076da5cb933c3be885c912a6b26ade7169c9c1f4dcba9a2e048d3cd08b9656`).
+Unprivileged `sshd -t -f` could not read `50-cloud-init.conf` and returned
+`Permission denied`. On 2026-10-01 the owner reran that exact candidate's
+`sudo /usr/sbin/sshd -t -f` in the local Windows SSH terminal and reported
+exit code zero after the second sudo authentication attempt: candidate syntax
+is `Passed` by owner-run evidence. A fresh read-only SSH check independently
+confirmed both hashes above and candidate mode `0600` were unchanged.
+Non-interactive sudo explicitly requires interactive authentication, so a
+successful syntax receipt does not grant subsequent unattended root access.
+The first owner-run multi-line PowerShell/SSH command for `sshd -T` failed
+in the remote shell with a quoting-related Bash syntax error and exit code 2;
+it produced no effective-configuration evidence. A hash-pinned, read-only
+operator-side preflight script now replaces that multi-line command.
+The script was copied to the operator's private VPS cache, set to mode `0600`,
+and its SHA-256 `a967f8fc361ba374116630e81e36382e177e833a18f3316e21b557e1afd8a596`
+matched the reviewed repository source. The owner subsequently ran that exact
+script in the local SSH terminal: hash/mode and syntax checks passed, both
+human-port samples (22 and 22022) passed, the complete tunnel-account renders
+were unchanged on both ports, and `PREFLIGHT=Passed` ended with exit code zero.
+This is owner-run candidate evidence, not a live forwarding or tunnel test.
+The operator-side apply script and root-owned rollback script now prepare an
+atomic, hash-verified replacement with a ten-minute system-manager rollback
+timer. They refuse an existing rollout directory or changed source/candidate
+and preserve the nftables guard, SSH socket listeners and dedicated TCP/2222
+daemon. The timer is rollout recovery only, not JIT access implementation.
+Both scripts were transferred to the private operator cache with mode `0600`;
+the apply SHA-256 `5d15b2c671dc42d12f349b9b7962f7f02864b309319c96bf938e984b5004172f`
+and rollback SHA-256 `6ed728fca74841557f2138aae7748e8f5518d3f387e4bcb06d9a88df3f5ab3e7`
+matched repository source. Host-side Bash syntax and local source/static gates
+passed. On 2026-10-01 the owner executed the reviewed apply script with local
+sudo authentication: preflight passed, the rollback timer became active and
+`SSH_CANDIDATE=Applied` ended with exit code zero. Independent fresh private
+SSH then passed and a remote loopback forwarding request was rejected with
+exit code 255 (`remote port forwarding failed`). The installed main-config
+hash matched the candidate above. Both `ssh.service` and the separate
+`sshd-hooshix-tunnel.service` remained active, with TCP/2222 still listening;
+this is not an end-to-end public MCP connectivity claim.
+After these checks the owner stopped the rollback timer with exit code zero.
+An independent fresh connection confirmed timer `inactive`, rollback service
+`inactive`, the candidate hash still installed, both SSH services active and
+TCP/2222 still listening. The scoped human forwarding rollout is `Passed`.
+Automatic rollback execution was `Not run`; no reboot was performed during
+this trial. Root-owned recovery artifacts remain available. The next access
+work is protected OS/sudo audit with off-host delivery, followed by real JIT
+expiry/revocation; neither is implemented by this rollout.
+Protected baseline run `36883186086` and frontend run `36883185616` passed
+all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
+
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
 ## Current repository state
@@ -264,7 +348,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
 | Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
-| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap and persistent SSH ingress guard | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. Separate tunnel port 2222 was not changed. Global SSH still permits forwarding and `auditd` is absent; SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
+| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |

@@ -63,6 +63,18 @@ class ProductionProfileTest(unittest.TestCase):
                 with patch.object(Path, "read_text", changed_read):
                     errors = verify.validate_static_contracts(self.profile)
                 self.assertIn("sshd hardening missing: " + required, errors)
+    def test_human_ssh_match_rejects_tunnel_scope_or_forwarding(self):
+        original_read = Path.read_text
+        match_path = verify.PRODUCTION / "host/sshd-human-match.tail"
+        for old, new in (("Match User hooshixadmin", "Match User hooshixtunnel"),
+                         ("AllowTcpForwarding no", "AllowTcpForwarding yes")):
+            with self.subTest(old=old):
+                def changed_read(path, *args, **kwargs):
+                    content = original_read(path, *args, **kwargs)
+                    return content.replace(old, new) if path == match_path else content
+                with patch.object(Path, "read_text", changed_read):
+                    errors = verify.validate_static_contracts(self.profile)
+                self.assertIn("human SSH Match candidate must remain scoped and forwarding-denying", errors)
     def test_management_ssh_guard_rejects_scope_or_verdict_drift(self):
         original_read = Path.read_text
         guard_path = verify.PRODUCTION / "host/nftables-management-ssh.nft"

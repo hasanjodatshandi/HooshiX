@@ -11,8 +11,9 @@ import inspect_host
 class HostInventoryTest(unittest.TestCase):
     def test_forwarding_flags_include_unix_sockets_and_override(self):
         self.assertEqual(
-            {"disableforwarding": "yes", "allowstreamlocalforwarding": "no"},
-            inspect_host.summarize_sshd("disableforwarding yes\nallowstreamlocalforwarding no\n"),
+            {"disableforwarding": "yes", "allowstreamlocalforwarding": "no",
+             "allowtcpforwarding": "local"},
+            inspect_host.summarize_sshd("disableforwarding yes\nallowstreamlocalforwarding no\nallowtcpforwarding local\n"),
         )
 
     def test_management_config_allow_list_rejects_secret_values(self):
@@ -66,25 +67,48 @@ class HostInventoryTest(unittest.TestCase):
     def test_management_sample_applies_match_without_exposing_raw_config(self):
         def fake_run(args):
             if args == ["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE]:
-                return "\n".join(f"{flag} {'yes' if flag == 'pubkeyauthentication' else 'no'}"
-                                 for flag in sorted(inspect_host.SSH_SAMPLE_REQUIRED_FLAGS)) + "\nbanner private-fixture\n"
+                return "\n".join(f"{flag} {value}"
+                                 for flag, value in inspect_host.SSH_SAMPLE_EXPECTED.items()) + "\nbanner private-fixture\n"
             return None
 
         with patch.object(inspect_host.os, "geteuid", return_value=0), \
                 patch.object(inspect_host, "run", side_effect=fake_run) as run:
             result = inspect_host.collect()
         sample = result["management"]["sshd_effective_sample"]
+        self.assertEqual(2, result["schema_version"])
         self.assertEqual("Passed", sample["status"])
+        self.assertEqual("Passed", sample["probe_status"])
         self.assertEqual("no", sample["settings"]["allowstreamlocalforwarding"])
-        self.assertEqual("no", sample["settings"]["disableforwarding"])
+        self.assertEqual("yes", sample["settings"]["disableforwarding"])
         self.assertNotIn("private-fixture", json.dumps(result))
         run.assert_any_call(["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE])
+
+    def test_successful_probe_does_not_pass_unsafe_effective_policy(self):
+        observed = dict(inspect_host.SSH_SAMPLE_EXPECTED)
+        observed.update({"disableforwarding": "no", "allowtcpforwarding": "yes",
+                         "allowagentforwarding": "yes", "allowstreamlocalforwarding": "yes",
+                         "x11forwarding": "yes"})
+        def fake_run(args):
+            if args == ["/usr/sbin/sshd", "-T", "-C", inspect_host.SSH_MANAGEMENT_SAMPLE]:
+                return "\n".join(f"{flag} {value}" for flag, value in observed.items())
+            return None
+
+        with patch.object(inspect_host.os, "geteuid", return_value=0), \
+                patch.object(inspect_host, "run", side_effect=fake_run):
+            sample = inspect_host.collect()["management"]["sshd_effective_sample"]
+        self.assertEqual("Passed", sample["probe_status"])
+        self.assertEqual("Failed", sample["status"])
+
+    def test_unknown_or_incomplete_ssh_sample_is_not_verified(self):
+        self.assertEqual("Not verified", inspect_host.assess_ssh_sample({"pubkeyauthentication": "yes"}))
+        self.assertEqual("Failed", inspect_host.assess_ssh_sample({"allowtcpforwarding": "local"}))
 
     def test_empty_successful_sshd_output_does_not_claim_probe_passed(self):
         with patch.object(inspect_host.os, "geteuid", return_value=0), \
                 patch.object(inspect_host, "run", return_value=""):
             result = inspect_host.collect()
         self.assertEqual("Not verified", result["management"]["sshd_effective_sample"]["status"])
+        self.assertEqual("Not verified", result["management"]["sshd_effective_sample"]["probe_status"])
 
     def test_malformed_cluster_response_is_sanitized(self):
         with patch.object(inspect_host.os, "geteuid", return_value=0), \

@@ -1,0 +1,13 @@
+# Host-specific candidate: append after the final Match block in the main
+# /etc/ssh/sshd_config. Do not install as an early sshd_config.d drop-in.
+# Validate the full candidate with the pinned host sshd -t/-T -C before reload.
+# This scopes forwarding denial to the current named human operator, leaving
+# the separately reviewed hooshixtunnel account and TCP/2222 daemon untouched.
+Match User hooshixadmin
+    DisableForwarding yes
+    AllowAgentForwarding no
+    AllowTcpForwarding no
+    AllowStreamLocalForwarding no
+    X11Forwarding no
+    PermitTunnel no
+    GatewayPorts no
