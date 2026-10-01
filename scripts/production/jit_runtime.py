@@ -35,6 +35,7 @@ OPERATIONS = {
     "service-restart": ("/usr/bin/systemctl", "try-restart"),
 }
 TARGETS = frozenset(("caddy.service", "k3s.service"))
+LOCK_ROOT = Path("/run/hooshix/jit/locks")
 
 
 class Denied(ValueError):
@@ -209,17 +210,24 @@ def validate_audit_ack(request: Request, ack: bytes) -> None:
         raise Denied("audit acknowledgement mismatch")
 
 
+def service_unit(request: Request, caller_uid: int) -> str:
+    return f"hooshix-jit-u{caller_uid}-r{uuid.UUID(request.data['request_id']).hex}.service"
+
+
 def service_command(request: Request, caller_uid: int, now_ns: int) -> list[str]:
     if type(caller_uid) is not int or caller_uid < 1:
         raise Denied("invalid caller uid")
     remaining = request.remaining_seconds(now_ns)
-    # A per-operator unit also prevents overlapping jobs, independently of the broker.
+    # Unique unit names make cancellation request-bound. The in-job native lock
+    # prevents overlapping operator jobs even if their submission broker dies.
     argv = ["/usr/bin/systemd-run", "--quiet", "--wait", "--pipe", "--collect",
-            f"--unit=hooshix-jit-u{caller_uid}.service",
+            f"--unit={service_unit(request, caller_uid)}",
             f"--description=hooshix-jit:{request.data['request_id']}"]
-    for prop in (*SERVICE_PROPERTIES, f"RuntimeMaxSec={remaining}s"):
+    for prop in (*SERVICE_PROPERTIES, f"RuntimeMaxSec={remaining}s", f"ReadWritePaths={LOCK_ROOT}"):
         argv.extend(("--property", prop))
-    argv.extend(("--", *OPERATIONS[request.data["action"]], "--", request.data["target"]))
+    argv.extend(("--", "/usr/bin/flock", "--nonblock", "--no-fork", "--",
+                 str(LOCK_ROOT / f"u{caller_uid}.lock"),
+                 *OPERATIONS[request.data["action"]], "--", request.data["target"]))
     return argv
 
 

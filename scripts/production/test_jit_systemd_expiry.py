@@ -39,7 +39,9 @@ def main():
         if args.system:
             # Only this disposable fixture receipt needs a writable filesystem path.
             argv.extend(("--property", f"ReadWritePaths={temp}"))
-        argv.extend(("--", sys.executable, "-c", fixture, str(receipt)))
+        lock = Path(temp) / "operator.lock"
+        argv.extend(("--", "/usr/bin/flock", "--nonblock", "--no-fork", "--", str(lock),
+                     sys.executable, "-c", fixture, str(receipt)))
         started = time.monotonic()
         try:
             subprocess.run(argv, check=True, timeout=5, stdout=subprocess.DEVNULL)
@@ -54,6 +56,10 @@ def main():
                                                "--property=ActiveState", "--value"], timeout=3).strip()
             if initial != b"active":
                 raise RuntimeError("background child was not tracked after parent exit")
+            competing = subprocess.run(["/usr/bin/flock", "--nonblock", "--", str(lock), "/usr/bin/true"],
+                                       timeout=3, check=False)
+            if competing.returncode != 1:
+                raise RuntimeError("background child did not retain operator exclusivity")
             while time.monotonic() < deadline:
                 state = subprocess.check_output(["/usr/bin/systemctl", *manager, "show", unit,
                                                  "--property=ActiveState", "--value"], timeout=3).strip()
@@ -69,7 +75,9 @@ def main():
             process = Path(f"/proc/{child}/stat")
             if process.exists() and process.read_text().split(")", 1)[1].split()[0] != "Z":
                 raise RuntimeError("background child survived expiry")
-            print("NATIVE_JIT_CGROUP_EXPIRY=Passed; parent exit, background child, bounded deadline")
+            subprocess.run(["/usr/bin/flock", "--nonblock", "--", str(lock), "/usr/bin/true"],
+                           timeout=3, check=True)
+            print("NATIVE_JIT_CGROUP_EXPIRY=Passed; child expiry and operator lock release")
         finally:
             subprocess.run(["/usr/bin/systemctl", *manager, "stop", unit], check=False,
                            timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

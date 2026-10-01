@@ -220,6 +220,15 @@ on a disposable runner in addition to unit tests. These are implementation/test
 artifacts, not an installed broker, audit receiver or production grant. Protected
 caller/key enrollment, the real OS/off-host audit adapter, revoke/controller-loss
 integration, zero-standing-admin cutover and live commissioning remain unfinished.
+Broker source now exists in `scripts/production/jit_broker.py`: request generation,
+exact-byte signature bundling, fixed-path root-owned loading, protected sudo
+caller mapping, bounded stdin/helper output/time, execute and operator-only revoke.
+Native jobs have request-unique names and an in-job `flock` for operator exclusivity;
+revoke stops jobs before audit delivery, and outcome/revoke events are durably
+recorded locally. No broker/adapter is installed on the VPS; real audit coverage,
+OpenBao provisioning, pending-event reconciliation, safe sudo cutover and full live
+expiry/recovery evidence remain required. Copyable local commands, expected output,
+limitations and troubleshooting are in `production-jit-usage-fa.md`.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 

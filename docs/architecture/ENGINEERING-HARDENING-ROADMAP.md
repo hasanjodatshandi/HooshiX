@@ -174,6 +174,10 @@ Remediation must not weaken these verified current properties:
 - JIT admission/command core implemented in `scripts/production/jit_runtime.py`;
   the native background-child expiry test is wired into Repository baseline CI.
   This is an uninstalled component, not a production elevation grant.
+- Broker source now includes request/bundle/execute/operator-revoke, protected
+  caller mapping, bounded input/helper I/O, local durable event records and
+  request-unique native jobs with in-job operator exclusivity. User-facing usage
+  is in `../operations/production-jit-usage-fa.md`. This is not a VPS installation.
 - Next: protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe
   zero-standing-admin cutover. SSH/MCP configuration is outside this continuation.

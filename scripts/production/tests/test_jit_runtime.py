@@ -52,7 +52,7 @@ class JitRuntimeTest(unittest.TestCase):
     def test_valid_canonical_request_and_fixed_command(self):
         request = self.request()
         argv = jit.service_command(request, 1000, self.now)
-        self.assertEqual(argv[-8:], ["--", "/usr/bin/systemctl", "show", "--property=ActiveState",
+        self.assertEqual(argv[-7:], ["/usr/bin/systemctl", "show", "--property=ActiveState",
                                     "--property=SubState", "--value", "--", "caddy.service"])
         for prop in ("RuntimeMaxSec=25s", "ExitType=cgroup", "KillMode=control-group",
                      "KillSignal=SIGKILL", "NoNewPrivileges=yes", "Delegate=no"):
@@ -178,7 +178,7 @@ class JitRuntimeTest(unittest.TestCase):
         def audit(payload):
             return jit.canonical({"sha256": hashlib.sha256(payload).hexdigest(), "version_id": "test-v1"})
         argv = jit.prepare_execution(jit.canonical(self.data), signature, audit=audit, **args)
-        self.assertIn("--unit=hooshix-jit-u1000.service", argv)
+        self.assertIn(f"--unit={jit.service_unit(self.request(), 1000)}", argv)
         self.data["request_id"] = str(uuid.uuid4())
         with patch.object(jit, "verify_approval"):
             def unavailable(_):
