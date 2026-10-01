@@ -141,7 +141,22 @@ hashes matched the local source. The preparer verified the unchanged source
 and wrote one uninstalled `0600` candidate (SHA-256
 `41076da5cb933c3be885c912a6b26ade7169c9c1f4dcba9a2e048d3cd08b9656`).
 Unprivileged `sshd -t -f` could not read `50-cloud-init.conf` and returned
-`Permission denied`; root syntax/effective-configuration checks are pending.
+`Permission denied`. On 2026-10-01 the owner reran that exact candidate's
+`sudo /usr/sbin/sshd -t -f` in the local Windows SSH terminal and reported
+exit code zero after the second sudo authentication attempt: candidate syntax
+is `Passed` by owner-run evidence. A fresh read-only SSH check independently
+confirmed both hashes above and candidate mode `0600` were unchanged.
+Root connection-specific effective-configuration checks are still `Not run`;
+non-interactive sudo explicitly requires interactive authentication, so the
+successful syntax receipt does not grant subsequent unattended root access.
+The first owner-run multi-line PowerShell/SSH command for `sshd -T` failed
+in the remote shell with a quoting-related Bash syntax error and exit code 2;
+it produced no effective-configuration evidence. A hash-pinned, read-only
+operator-side preflight script now replaces that multi-line command.
+The script was copied to the operator's private VPS cache, set to mode `0600`,
+and its SHA-256 `a967f8fc361ba374116630e81e36382e177e833a18f3316e21b557e1afd8a596`
+matched the reviewed repository source. Its privileged read-only preflight
+has not yet run because sudo requires the owner to authenticate locally.
 No SSH service reload or live policy change has occurred.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.

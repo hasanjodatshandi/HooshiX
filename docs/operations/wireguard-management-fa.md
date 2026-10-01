@@ -332,6 +332,20 @@ Include می‌کند و در انتها `Match User hooshixtunnel` دارد؛ d
 `sshd -T -f CANDIDATE -C CONNECTION` باید همهٔ مسیرهای انسانی موردنیاز را
 با مقادیر سخت‌گیرانه نشان دهند. تنها پس از وجود کنسول نجات، نشست خصوصی دوم،
 نسخهٔ پشتیبان امن و timer rollback مستقل، اعمال زنده و آزمون SSH تازه مجاز است.
+روی میزبان فعلی، [`check_human_sshd_candidate.sh`](../../scripts/production/check_human_sshd_candidate.sh)
+پس از انتقال و مقایسهٔ SHA-256 با revision بررسی‌شده، با کاربر عادی اجرا می‌شود.
+این ابزار فقط `sudo -v` و اجرای `sshd -t/-T` را درخواست می‌کند؛ hash و mode
+فایل‌ها، تنظیم مؤثر حساب انسانی روی 22/22022 و برابری کامل تنظیم tunnel
+قبل/بعدِ candidate را بررسی می‌کند. خروجی آن فقط نتیجهٔ allow-list است.
+در Windows PowerShell پس از انتقال بررسی‌شده، فرمان سادهٔ زیر از مشکل
+نقل‌قول‌های اسکریپت چندخطی هنگام عبور از `ssh.exe` جلوگیری می‌کند:
+
+```powershell
+ssh.exe -t hooshix-server 'bash /home/hooshixadmin/.cache/hooshix-ssh-pr158/check_human_sshd_candidate.sh'
+$LASTEXITCODE
+```
+
+`PREFLIGHT=Passed` همراه با exit code صفر فقط اعتبار candidate پیش از نصب است.
 بازگشت نباید guard پایدار nftables را حذف یا TCP/22022 عمومی را باز کند؛ daemon
 مستقل MCP روی TCP/2222 نیز نباید تغییر کند. موفقیت reload به‌تنهایی آزمون
 ورود خصوصی/رد مسیر عمومی/ماندگاری پس از reboot نیست.
