@@ -282,11 +282,39 @@ raw log را منتشر نکنید؛ فقط error دسته‌بندی‌شده �
 را چاپ نمی‌کند. timeout هر command بیست ثانیه و retry صفر است؛ موفقیت inventory، Production approval نیست.
 در اجرای root، علاوه بر مقدارهای سراسری SSH، نتیجهٔ `sshd -T -C` برای نمونهٔ ثابتِ
 `hooshixadmin` از `10.77.47.2` به `10.77.47.1:22022` نیز به‌شکل allow-list گزارش می‌شود.
-مقدار `host` در این نمونه همان IP عددی مشتری است، نه DNS reverse واقعی؛ بنابراین حتی نتیجهٔ
-`Passed` فقط موفقیت اجرای این probe است، نه تأیید تنظیم مؤثر همهٔ کاربران، peerها،
-نام‌های DNS، پورت‌ها یا daemon جداگانهٔ MCP روی 2222. تنظیم مؤثر اتصال واقعی و تست‌های
+مقدار `host` در این نمونه همان IP عددی مشتری است، نه DNS reverse واقعی. در خروجی نسخهٔ ۲،
+`probe_status` فقط موفقیت اجرای probe و `status` انطباق مقدارهای allow-list همین نمونه
+با حداقل سیاست SSH را نشان می‌دهد. نسخهٔ ۱ فیلد `status` را صرفاً برای اجرای probe
+استفاده می‌کرد و حتی با forwarding مجاز می‌توانست `Passed` نشان دهد. بنابراین حتی
+`status: Passed` در نسخهٔ ۲ تأیید تنظیم مؤثر همهٔ کاربران، peerها،
+نام‌های DNS، پورت‌ها یا daemon جداگانهٔ MCP روی 2222 نیست. تنظیم مؤثر اتصال واقعی و تست‌های
 رد forwarding/authentication همچنان برای Production جداگانه لازم‌اند.
 privileged execution همچنان نیازمند مسیر مصوب است؛ برای خودکارشدن آن `NOPASSWD: ALL` نسازید.
+
+### پیش‌بررسی فقط‌خواندنی برای اصلاح SSH انسانی
+
+پیش از اعمال policy فایل Git به VPS، منشأ واقعی listener را از خود میزبان پیدا کنید.
+در Ubuntu ممکن است `ssh.socket` پورت‌ها را باز کند و `Port`/`ListenAddress` داخل
+`sshd_config` به‌تنهایی listener زنده را جابه‌جا نکند. خروجی فقط‌خواندنی زیر،
+تنظیمات مؤثر socket و جای فایل‌های override را نشان می‌دهد؛ آن را با وضعیت
+`sshd -T -C` و listenerهای زنده مقایسه کنید. پورت tunnel مستقل 2222 فقط برای
+تشخیص و آزمون عدم‌تغییر در فهرست است، نه هدف اصلاح SSH انسانی.
+
+```bash
+sudo systemctl show ssh.socket -p ActiveState -p FragmentPath -p DropInPaths -p Listen --no-pager
+sudo systemctl cat ssh.socket ssh.service
+sudo ss -H -ltnp '( sport = :22 or sport = :22022 or sport = :2222 )'
+```
+
+فایل `sshd_config` این repository را کورکورانه جایگزین فایل اصلی میزبان نکنید:
+`Include`، ترتیب اولین مقدار مؤثر، `Match` و socket activation ابتدا باید روشن شوند.
+پس از ساخت یک candidate محدود، `sshd -t -f CANDIDATE` و
+`sshd -T -f CANDIDATE -C CONNECTION` باید همهٔ مسیرهای انسانی موردنیاز را
+با مقادیر سخت‌گیرانه نشان دهند. تنها پس از وجود کنسول نجات، نشست خصوصی دوم،
+نسخهٔ پشتیبان امن و timer rollback مستقل، اعمال زنده و آزمون SSH تازه مجاز است.
+بازگشت نباید guard پایدار nftables را حذف یا TCP/22022 عمومی را باز کند؛ daemon
+مستقل MCP روی TCP/2222 نیز نباید تغییر کند. موفقیت reload به‌تنهایی آزمون
+ورود خصوصی/رد مسیر عمومی/ماندگاری پس از reboot نیست.
 
 ## ۹. دستگاه جدید، لغو و بازیابی
 

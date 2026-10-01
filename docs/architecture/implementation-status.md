@@ -103,6 +103,19 @@ one VPS, not proof of all management paths. Provider firewall, SSH bind and
 forwarding policy, peer revocation, JIT, off-host audit, recovery, and
 Production readiness remain `NOT VERIFIED`.
 
+Owner-run root inventory on 2026-10-01 at `07:18:46Z` added one synthetic
+connection-specific `sshd -T -C` sample for `hooshixadmin` over
+`10.77.47.2 -> 10.77.47.1:22022`. The v1 receipt's `status: Passed` means
+only that the probe returned the expected fields. Its actual effective values
+were `DisableForwarding no`, with agent/TCP/StreamLocal/X11 forwarding enabled;
+this sampled human SSH policy is **Failed**. Root/password/keyboard-interactive
+were disabled, public-key authentication enabled, and syntax passed. K3s API and
+seven-pod inventory passed with each observed pod ready 1/1 and restart count
+1; the restart cause is not established. `auditd` remained `Not verified`.
+No host SSH configuration was changed by this inspection. The updated v2
+inspector separates probe execution from sampled policy status, but it does
+not assert full SSH/JIT/audit or Production readiness.
+
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
 ## Current repository state
