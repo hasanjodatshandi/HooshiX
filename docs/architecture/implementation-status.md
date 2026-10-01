@@ -257,6 +257,18 @@ was made for this change. This is not an installed `audit-deliver` entrypoint,
 OS/sudo exporter, health/backlog gate or OpenBao materialization workflow.
 Broker integration and live commissioning remain `Not verified`; standing sudo is
 preserved until those controls and complete recovery/admin workflows are tested.
+On 2026-10-02 the owner confirmed availability of two independent secure custody
+locations; actual share distribution remains `Not verified`. Public OpenBao 2.6.1
+upstream Linux/amd64 image metadata and a native TLS/Raft/declarative non-raw audit
+configuration now exist under `infrastructure/production/secrets/`. The mandatory
+Repository baseline job `OpenBao TLS and Raft recovery` uses disposable secrets to
+exercise real Shamir 3/2 initialization, TLS verification, restart persistence,
+isolated snapshot restore, read-only ACL denial, audit redaction and initial-root
+revocation. This is a CI rehearsal, not a production deployment or final-artifact
+signature/provenance/SBOM promotion receipt. Production Raft/PVC, TLS provisioning,
+hourly encrypted off-host snapshots, recovery custody, OpenBao-to-host audit
+materialization and JIT installation remain `Not verified`. No standing sudo,
+SSH, MCP or bucket configuration is changed by the rehearsal.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 

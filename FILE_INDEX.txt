@@ -369,6 +369,8 @@ infrastructure/production/recovery/recovery-policy.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
 infrastructure/production/release/release-policy.json
+infrastructure/production/secrets/openbao-image.json
+infrastructure/production/secrets/openbao-server.json
 infrastructure/production/secrets/secrets-policy.json
 infrastructure/registry/pins.env
 infrastructure/staging/authorizationpolicy.yaml
@@ -508,6 +510,7 @@ scripts/production/parspack_audit_transport.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/readiness.py
+scripts/production/rehearse_openbao_recovery.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/rollback_human_sshd_candidate.sh
@@ -519,6 +522,7 @@ scripts/production/tests/test_install_audit_prerequisite.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_parspack_audit_transport.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py

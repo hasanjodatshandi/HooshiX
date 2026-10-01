@@ -166,7 +166,7 @@ Remediation must not weaken these verified current properties:
 | 9 | ADR-0054 private Conversation + ModelRun vertical slice | `COMPLETED` | Record exact provider-account data-control and named owner approvals, then exercise the reviewed canary and rollback path. | The full service/contracts/DB/RLS/encryption/worker/provider/cost/lifecycle/telemetry/BFF/UI slice is implemented. Signed v3.1 evaluation and staging-only provider-control approval passed. Exact runtime commit `afb738d6623316e876ed938e0869bba39b8a21a7` served exactly one synthetic `CANARY_1` run: success, 430 input/9 output tokens, 1210 micro-USD actual cost, and 3717ms latency. The 206-minute observation had zero failed/unknown runs, critical incidents, threshold breaches, or content/identity/credential log leaks. Rollback restored `false/0`; a fresh request then failed with `FailedPrecondition` before run creation/provider I/O. The signed content-free private receipt verifies these aggregates and exact image digest. Synthetic tenant state and ephemeral client/token/config resources were erased. Runtime remains safely disabled and Production is `NOT VERIFIED`. |
 | 10 | Production Commissioning & Readiness | `IN PROGRESS` | Execute every current Production readiness/environment/release/recovery/capacity/provider/traffic gate after the owner's 2026-09-24 reactivation. The seven-artifact repository release boundary and frontend workload source are merged; deployed frontend/Conversation evidence remains required before promotion. Repository documentation or local kind evidence alone cannot complete this stage. | PR #142 merged at `main@9d98bb213c6bc53de700969ab644438b97923cd9`; protected head baseline/frontend runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed. Real Production evidence remains pending. |
 
-### Stage 10 continuation — 2026-10-01
+### Stage 10 continuation — 2026-10-02
 
 - Owner-attested correction of the current ParsPack audit destination is accepted;
   the owner explicitly requested no further bucket checks. Prior probe results are
@@ -189,6 +189,16 @@ Remediation must not weaken these verified current properties:
   and no credential argv/environment, redirects, retries or bucket probes.
   Synthetic contract tests run through the existing Production baseline pipeline.
   It is not the OS audit exporter/health adapter or a live VPS installation.
+- Owner confirmed availability of two independent secure recovery-custody
+  locations. This is readiness to arrange custody, not evidence that shares
+  have been generated/distributed or that recovery has passed.
+- OpenBao 2.6.1 Linux/amd64 upstream image metadata is pinned, with a TLS/Raft/
+  non-raw persistent audit configuration. The new mandatory Repository baseline
+  job executes an isolated TLS/Shamir 3-share/2-threshold/restart/snapshot-restore/
+  ACL/audit-leak/initial-root-revocation rehearsal using disposable CI-only secrets.
+  Image metadata/configuration and a CI rehearsal do not commission a production
+  Raft/PVC, signed promotion, hourly off-host snapshots, secret synchronization
+  or custody. No production rollout is enabled by these files.
 - Next: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe
