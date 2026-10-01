@@ -308,6 +308,19 @@ sudo ss -H -ltnp '( sport = :22 or sport = :22022 or sport = :2222 )'
 
 فایل `sshd_config` این repository را کورکورانه جایگزین فایل اصلی میزبان نکنید:
 `Include`، ترتیب اولین مقدار مؤثر، `Match` و socket activation ابتدا باید روشن شوند.
+روی VPS فعلی، `ssh.socket` از generator برای چهار listener آدرس‌های wildcard
+IPv4/IPv6 در 22/22022 استفاده می‌کند. فایل اصلی در ابتدای کار drop-inها را
+Include می‌کند و در انتها `Match User hooshixtunnel` دارد؛ drop-in مخصوص همان
+کاربر اجازهٔ محدود TCP forwarding می‌دهد. پس `DisableForwarding yes` سراسری
+یا قراردادن یک `Match` جدید در وسط Includeها بدون بررسی، راهکار امنی نیست.
+اصلاح باید فقط به اتصال‌های SSH انسانی محدوده شود و تنظیم مؤثر tunnel و daemon
+مستقل 2222 قبل/بعد یکسان بماند.
+کاندیدای محدود همین میزبان در
+[`sshd-human-match.tail`](../../infrastructure/production/host/sshd-human-match.tail)
+قرار دارد. این فایل به‌تنهایی یک `sshd_config` کامل نیست و فقط باید پس از آخرین
+`Match` فایل اصلی، روی یک نسخهٔ کاندیدا افزوده شود؛ نصب به‌صورت drop-in ابتدای
+فایل مجاز نیست. افزودن حساب انسانی دیگر نیازمند بازبینی جداگانهٔ Match و آزمون
+اتصال همان حساب است.
 پس از ساخت یک candidate محدود، `sshd -t -f CANDIDATE` و
 `sshd -T -f CANDIDATE -C CONNECTION` باید همهٔ مسیرهای انسانی موردنیاز را
 با مقادیر سخت‌گیرانه نشان دهند. تنها پس از وجود کنسول نجات، نشست خصوصی دوم،

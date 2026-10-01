@@ -115,6 +115,15 @@ seven-pod inventory passed with each observed pod ready 1/1 and restart count
 No host SSH configuration was changed by this inspection. The updated v2
 inspector separates probe execution from sampled policy status, but it does
 not assert full SSH/JIT/audit or Production readiness.
+Read-only follow-up over the existing private SSH alias found active
+`ssh.socket` with generated listeners on IPv4/IPv6 wildcard addresses at
+22/22022, from `/run/systemd/generator/ssh.socket.d/addresses.conf`.
+The main SSH configuration includes drop-ins before its final
+`Match User hooshixtunnel`; an earlier tunnel-user drop-in also permits
+scoped remote TCP forwarding. A separate tunnel daemon currently listens on
+TCP/2222. Thus copying the repository's global SSH policy onto this shared
+host configuration without connection-specific testing could disrupt the
+tunnel. No listener/configuration was changed by this follow-up.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 

@@ -38,7 +38,7 @@ REQUIRED_INPUTS = {
 REQUIRED_FILES = (
     "README.md", "profile.json", "platform-contracts.json",
     "release-manifest.schema.json", "release-tools.env", "host/access-policy.json",
-    "host/sshd_config", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "network/trust-policy.json",
+    "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "network/trust-policy.json",
     "observability/observability-policy.json", "recovery/recovery-policy.json",
     "release/release-policy.json", "secrets/secrets-policy.json", "gitops/application.yaml",
 )
@@ -161,6 +161,13 @@ def validate_static_contracts(profile: dict) -> list[str]:
     add(errors, "protect-kernel-defaults: true" in k3s, "K3s must protect kernel defaults")
     sshd = (PRODUCTION/"host/sshd_config").read_text(encoding="utf-8")
     for line in ("PermitRootLogin no","PasswordAuthentication no","KbdInteractiveAuthentication no","PubkeyAuthentication yes","PubkeyAcceptedAlgorithms ssh-ed25519,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com","PubkeyAuthOptions touch-required verify-required","AuthenticationMethods publickey","DisableForwarding yes","AllowStreamLocalForwarding no","AllowAgentForwarding no","AllowTcpForwarding no","X11Forwarding no","PermitTunnel no","GatewayPorts no"): add(errors, line in sshd, f"sshd hardening missing: {line}")
+    human_match = (PRODUCTION/"host/sshd-human-match.tail").read_text(encoding="utf-8")
+    active_human_match = [line.strip() for line in human_match.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    add(errors, active_human_match == [
+        "Match User hooshixadmin", "DisableForwarding yes", "AllowAgentForwarding no",
+        "AllowTcpForwarding no", "AllowStreamLocalForwarding no", "X11Forwarding no",
+        "PermitTunnel no", "GatewayPorts no",
+    ], "human SSH Match candidate must remain scoped and forwarding-denying")
     guard = (PRODUCTION/"host/nftables-management-ssh.nft").read_text(encoding="utf-8")
     active_guard = [line.strip() for line in guard.splitlines() if line.strip() and not line.lstrip().startswith("#")]
     expected_guard = [
