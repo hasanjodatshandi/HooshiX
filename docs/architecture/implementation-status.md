@@ -184,6 +184,25 @@ Automatic rollback execution was `Not run`; no reboot was performed during
 this trial. Root-owned recovery artifacts remain available. The next access
 work is protected OS/sudo audit with off-host delivery, followed by real JIT
 expiry/revocation; neither is implemented by this rollout.
+On 2026-10-01 the owner supplied fresh audit credentials in a local Git-ignored
+mode-0600 JSON file and selected `https://c892683.parspack.net`, replacing the
+previous destination for continuation. The parent private directory is mode 0700.
+Signed path-style GET probes returned Object Lock `403; AccessDenied` and
+Versioning `200; not configured`, unchanged after owner-reported activation of
+Compliance/40 days and versioning on the new bucket. The report is accepted as
+owner configuration evidence, not independently verified settings. One unique
+113-byte synthetic object round-trip passed (PUT/GET 200 and matching hash),
+but responses supplied no non-null version ID and retention GET returned 403.
+Unversioned DELETE on that same probe object returned 204 and subsequent GET 404;
+this proves removal from the current view, not deletion of a locked version.
+The object is no longer visible; recoverability of any hidden version is
+`Not verified`. No other objects, host configuration or SSH/MCP settings changed.
+The read-only probe now supports bounded owner-private JSON input and an optional
+fail-closed exact-COMPLIANCE-days/versioning configuration check; this is not a
+runtime JIT audit gate, receiver or OpenBao provisioner. Writer delete permission,
+version/retention evidence and immutable audit behavior remain unresolved, so
+off-host audit/JIT and Production readiness remain `NOT VERIFIED`. The continuation
+and exact preflight command are in `production-audit-sink-parspack-fa.md`.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 

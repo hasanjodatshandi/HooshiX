@@ -44,10 +44,57 @@ private برابر `0700` است. آزمون GET امضاشده روی مسیر 
 Object Lock پاسخ `HTTP 403; AccessDenied` و برای Versioning پاسخ
 `HTTP 200; Versioning not configured` داد. این وضعیت متعلق به باکت جدید است؛
 تأیید قبلی مالک برای Compliance/۴۰ روزِ `c426797` به این مقصد منتقل نمی‌شود.
-هیچ آبجکت آزمایشی ایجاد یا حذف نشده و هیچ تنظیمی روی باکت یا VPS تغییر نکرده است.
-تا فعال‌شدن نسخه‌سازی و اثبات حفاظت مقصد جدید، ممیزی خارجی و grant واقعی JIT
+مالک سپس فعال‌سازی نسخه‌سازی و Compliance/۴۰ روز را برای مقصد جدید اعلام کرد.
+آزمون مجدد همان GETها هنوز همان پاسخ‌ها را داد. این اعلام مالک ثبت می‌شود، اما
+پاسخ API دربارهٔ تنظیمات جدید همچنان `Inconclusive` است.
+یک آبجکت مصنوعی ۱۱۳ بایتی با کلید یکتای
+`hooshix-audit-preflight/50a83b66-5d9e-49f7-a42a-921f012fab94.json`
+ایجاد شد: PUT و GET برابر `HTTP 200` و هش محتوای خوانده‌شده برابر بود؛ اتصال
+امضاشده و round-trip مصنوعی `Passed` است. پاسخ PUT/GET هیچ `x-amz-version-id`
+غیر-null نداشت و GET retention همین آبجکت `403; AccessDenied` داد.
+DELETE بدون versionId روی همین آبجکت ساخته‌شده `204` داد و GET بعدی `404` شد؛
+این فقط حذف از نمای عادی و مجوز حذف بدون versionId را نشان می‌دهد، نه حذف نسخهٔ
+قفل‌شده یا اثبات نبود retention. آبجکت از نمای عادی پاک شد؛ بازیابی نسخهٔ احتمالی
+`Not verified` است. آبجکت دیگری لمس نشد و دادهٔ واقعی کاربر ارسال نشد.
+تنظیمات باکت/VPS تغییر نکرد و credential به VPS یا CI منتقل نشد.
+تا اثبات نسخه‌سازی و حفاظت مقصد جدید، ممیزی خارجی و grant واقعی JIT
 `Not verified` باقی می‌مانند. تغییرات ابزار بررسی و تست‌های آن در یک PR واحد
 ادامه می‌یابد؛ وضعیت SSH/پورت MCP خارج از این تغییر است.
+
+### اجرای امن ابزار با فایل خصوصی
+
+ابزار اکنون می‌تواند ورودی محلی JSON را بدون prompt از همان فایل بخواند. فایل باید
+متعلق به کاربر اجراکننده، regular، بدون symlink/hardlink، با دسترسی دقیق `0600` و
+پوشهٔ والد متعلق به همان کاربر با دسترسی `0700` باشد. ورودی بیش از ۸ KiB، JSON
+نامعتبر/فیلد تکراری، secret خالی یا دارای control character و مقصد مغایر رد می‌شوند.
+فیلدهای ضروری `access_key` و `secret_key` هستند؛ یک فیلد اختیاری endpoint با نام
+`endpoint`، `endpoint_url` یا `end_point_url` پذیرفته می‌شود. مقدار آن باید با
+endpoint صریح فرمان یکسان باشد؛ نشانی بدون scheme به HTTPS تبدیل می‌شود.
+مقادیر واقعی فقط در فایل private می‌مانند؛ نمونهٔ credential در Git لازم نیست.
+
+```bash
+python3 scripts/production/probe_parspack_audit_bucket.py \
+  --endpoint https://c892683.parspack.net --bucket c892683 \
+  --credentials-file .platform-runtime/production/private/parspack-audit-credentials.json \
+  --require-compliance-days 40
+```
+
+فرمان فقط دو GET می‌فرستد؛ مقدار secret در argv، environment یا خروجی چاپ نمی‌شود.
+`--require-compliance-days 40` تنها برای تنظیمات قابل‌خواندن و دقیق
+`COMPLIANCE / 40 days` همراه Versioning Enabled، exit code صفر می‌دهد؛ در صورت
+قطع ارتباط، 403، پاسخ HTML، Governance یا مدت متفاوت exit code یک برمی‌گردد.
+exit code صفر فقط `READ_ONLY_CONFIGURATION=Passed` است و ابزار صریحاً audit readiness
+و منع حذف/بازنویسی را تأیید نمی‌کند. این ورودی private صرفاً ورودی operator برای
+preflight است؛ provision/receiver نیست و جایگزین OpenBao در Production نمی‌شود.
+این مسیر نباید با کلید واقعی روی runnerهای GitHub اجرا شود. تست‌های ساختگی آن از
+همان `make production-verify` در pipeline موجود Repository baseline اجرا می‌شوند.
+
+قدم رفع مانع مقصد جدید: نام باکت/تنظیمات در پنل با مسیر `/c892683` تطبیق داده شود؛
+حساب writer فقط ایجاد/خواندن لازم داشته باشد و مجوز DELETE و تغییر retention نداشته
+باشد. خواندن تنظیمات versioning/Object Lock و retention برای preflight باید مجاز
+باشد یا evidence مستقل از حساب بررسی‌کنندهٔ جداگانه فراهم شود. حساب writer را
+برای دورزدن 403 به مالک/full-access تبدیل نکنید. تا نسخهٔ قابل‌شناسایی، retention
+قابل‌اثبات و آزمون نسخهٔ مشخص فراهم نشده، ارسال ممیزی عملیاتی و JIT نصب/فعال نشوند.
 
 نام endpoint و باکت اطلاعات اتصال هستند؛ Access Key و Secret Key باید در پنجره محلی
 محافظت‌شده وارد شوند. ابزار provision نهایی باید مقدارها را بدون echo و بدون argv،
