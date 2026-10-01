@@ -357,6 +357,7 @@ infrastructure/production/data/data-policy.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json
 infrastructure/production/host/nftables-management-ssh.nft
+infrastructure/production/host/sshd-human-match.tail
 infrastructure/production/host/sshd_config
 infrastructure/production/k3s/config.yaml
 infrastructure/production/network/trust-policy.json
@@ -497,6 +498,7 @@ scripts/production/offline-ca/run-root.cmd
 scripts/production/offline-ca/run-sign.cmd
 scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
+scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/readiness.py
 scripts/production/release_supply_chain.sh
@@ -504,6 +506,7 @@ scripts/production/render_gitops.py
 scripts/production/run-host-inspection.ps1
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_release.py
