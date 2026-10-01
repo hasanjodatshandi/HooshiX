@@ -75,6 +75,9 @@ jobs:
       - name: Verify production
         run: make production-verify
 
+      - name: Verify native JIT expiry on disposable runner
+        run: sudo env GITHUB_ACTIONS=true python3 scripts/production/test_jit_systemd_expiry.py --system
+
       - name: Verify context tests
         run: make context-test
 

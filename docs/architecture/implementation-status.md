@@ -201,8 +201,25 @@ The read-only probe now supports bounded owner-private JSON input and an optiona
 fail-closed exact-COMPLIANCE-days/versioning configuration check; this is not a
 runtime JIT audit gate, receiver or OpenBao provisioner. Writer delete permission,
 version/retention evidence and immutable audit behavior remain unresolved, so
-off-host audit/JIT and Production readiness remain `NOT VERIFIED`. The continuation
-and exact preflight command are in `production-audit-sink-parspack-fa.md`.
+off-host audit/JIT and Production readiness remain `NOT VERIFIED`. Subsequently
+on 2026-10-01 the owner reported fixing the new destination and explicitly directed
+that no further bucket checks be performed. This is accepted owner-attested
+configuration; the preceding observations are historical, not a post-fix assessment.
+No additional bucket calls are made for this continuation. JIT development proceeds
+without re-probing the provider, while real grant-time durable audit acknowledgement
+remains mandatory. The continuation is in `production-audit-sink-parspack-fa.md`.
+
+The same work now includes an **uninstalled JIT core** in
+`scripts/production/jit_runtime.py`: strict versioned/canonical requests, named
+Ed25519 SSHSIG approval with an exact namespace, boot-bound elapsed-time admission,
+durable bounded replay prevention, mandatory audit acknowledgement validation, and
+fixed service-operation command construction. It does not grant a root shell or
+change sudoers/groups/SSH/MCP. `test_jit_systemd_expiry.py` checks native transient
+service lifetime and background-child termination; Repository baseline runs this
+on a disposable runner in addition to unit tests. These are implementation/test
+artifacts, not an installed broker, audit receiver or production grant. Protected
+caller/key enrollment, the real OS/off-host audit adapter, revoke/controller-loss
+integration, zero-standing-admin cutover and live commissioning remain unfinished.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 

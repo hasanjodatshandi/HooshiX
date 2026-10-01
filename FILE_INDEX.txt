@@ -490,6 +490,7 @@ scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
 scripts/production/inspect_host.py
 scripts/production/install_release_tools.sh
+scripts/production/jit_runtime.py
 scripts/production/offline-ca/README-fa.txt
 scripts/production/offline-ca/build-package.ps1
 scripts/production/offline-ca/intermediate.cnf
@@ -507,7 +508,9 @@ scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-host-inspection.ps1
+scripts/production/test_jit_systemd_expiry.py
 scripts/production/tests/test_inspect_host.py
+scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py

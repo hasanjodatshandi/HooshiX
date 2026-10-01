@@ -106,6 +106,39 @@ audit انجام می‌شود؛ خرید سرویس یا واردکردن crede
 
 ## وضعیت اجرای این بخش
 
+### هستهٔ اجرایی JIT — ساخته‌شده، هنوز نصب‌نشده
+
+`scripts/production/jit_runtime.py` بخش پذیرش درخواست و ساخت فرمان محدود را
+پیاده می‌کند. درخواست schema نسخهٔ ۱، UUIDv4، هویت مدیر، ticket، scope، شناسهٔ
+boot و زمان elapsed دارد. تغییر scope پس از امضای Ed25519، approval ناشناس،
+تکرار درخواست، درخواست boot قبلی، زمان آینده/منقضی و مدت بیش از ۳۰ دقیقه رد می‌شود.
+موجودی signer باید فقط یک هویت دقیق و namespace `hooshix-jit-v1` داشته باشد؛
+wildcard یا شمارش صوری reviewer مجوز نمی‌سازد. کلید خصوصی مدیر وارد سرور نمی‌شود.
+
+فعلاً عملیات تعریف‌شده فقط مشاهدهٔ وضعیت و `try-restart` برای `caddy.service` و
+`k3s.service` است. وجود نام در allow-list اجازهٔ اجرای واقعی نیست؛ هر اجرا
+درخواست و approval مستقل می‌خواهد. shell، فرمان/آرگومان دلخواه، SSH، firewall،
+MCP و reboot در این scope نیستند. نصب این فایل یا دادن sudo روی Python عمومی
+ممنوع است؛ هنوز entrypoint محافظت‌شدهٔ Production وجود ندارد.
+
+پیش از ساخت فرمان، replay record با ایجاد انحصاری و fsync ثبت می‌شود؛ ظرفیت
+ledger محدود و پرشدن آن fail-closed است. adapter ممیزی باید سلامت audit محلی
+و تحویل durable خارج از VPS را تأیید کند و receipt هم‌هش با version ID غیر-null
+برگرداند. این adapter هنوز ساخته/نصب نشده؛ caller نمی‌تواند receipt ساختگی
+را به‌عنوان ورودی قابل اعتماد بفرستد. مسیرها و UID/هویت caller باید از broker
+محافظت‌شده با والدهای root-owned گرفته شوند، نه از JSON/environment دلخواه.
+
+فرمان از transient service با `ExitType=cgroup`، `RuntimeMaxSec` و kill همهٔ
+فرایندها استفاده می‌کند؛ نه تغییر موقت گروه sudo که shell فعال را باقی بگذارد.
+آزمون کوچک `test_jit_systemd_expiry.py` خروج والد و پایان فرزند background را
+محلی و در CI می‌سنجد. suspend/resume، revoke، قطع broker و جریان کامل privilege
+روی VPS هنوز شواهد ندارند؛ آزمون expiry محلی اثبات همهٔ این موارد نیست.
+
+مرحلهٔ بعد: اتصال adapter audit واقعی با OpenBao، entrypoint و inventory
+محافظت‌شده، revoke/expiry end-to-end، سپس cutover حساب مدیر بدون standing sudo
+با مسیر recovery برقرار. تا آن موقع هیچ grant واقعی صادر نمی‌شود و
+وضعیت کلی JIT `Partially verified` است، نه `Passed`.
+
 این راهنما و policyها، اجرای JIT یا off-host audit را ثابت نمی‌کنند. برای مقصد ParsPack
 راهنمای provision امن در `production-audit-sink-parspack-fa.md` قرار دارد؛ credential افشاشده
 باید قبل از هر استفاده rotate شود. تا وجود receiver
