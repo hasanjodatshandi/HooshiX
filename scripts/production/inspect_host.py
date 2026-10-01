@@ -18,6 +18,11 @@ SSH_MANAGEMENT_SAMPLE = (
     "user=hooshixadmin,host=10.77.47.2,addr=10.77.47.2,"
     "laddr=10.77.47.1,lport=22022"
 )
+SSH_SAMPLE_REQUIRED_FLAGS = frozenset({
+    "permitrootlogin", "passwordauthentication", "kbdinteractiveauthentication",
+    "pubkeyauthentication", "disableforwarding", "allowagentforwarding",
+    "allowtcpforwarding", "allowstreamlocalforwarding", "x11forwarding", "permittunnel",
+})
 
 
 def run(args: list[str]) -> str | None:
@@ -84,10 +89,11 @@ def collect() -> dict:
         raw_config = run(["/usr/sbin/sshd", "-T"])
         result["management"]["sshd_global"] = summarize_sshd(raw_config or "")
         sample_config = run(["/usr/sbin/sshd", "-T", "-C", SSH_MANAGEMENT_SAMPLE])
+        sample_settings = summarize_sshd(sample_config or "")
         result["management"]["sshd_effective_sample"] = {
             "connection": SSH_MANAGEMENT_SAMPLE,
-            "status": "Passed" if sample_config is not None else "Not verified",
-            "settings": summarize_sshd(sample_config or ""),
+            "status": "Passed" if SSH_SAMPLE_REQUIRED_FLAGS <= sample_settings.keys() else "Not verified",
+            "settings": sample_settings,
         }
         raw_peers = run(["/usr/bin/wg", "show", "wg-hooshix", "allowed-ips"])
         try:
