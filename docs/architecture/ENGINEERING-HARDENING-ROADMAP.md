@@ -183,7 +183,14 @@ Remediation must not weaken these verified current properties:
   kernel/log bounds, without a second install. Auditctl multi-word status parsing
   and duplicate rejection have regression tests; Windows launcher checks run in CI.
   This does not prove audit rule coverage, protected export or JIT readiness.
-- Next: protected broker/caller/signing-key enrollment, real OS/off-host audit
+- Version-specific ParsPack audit transport source is implemented in
+  `scripts/production/parspack_audit_transport.py`: one conditional PUT, one GET
+  of the returned version, exact-byte/hash acknowledgement, finite time/output,
+  and no credential argv/environment, redirects, retries or bucket probes.
+  Synthetic contract tests run through the existing Production baseline pipeline.
+  It is not the OS audit exporter/health adapter or a live VPS installation.
+- Next: commission OpenBao with owner-controlled offline Shamir custody and
+  tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe
   zero-standing-admin cutover. SSH/MCP configuration is outside this continuation.
   Stage 10 remains `IN PROGRESS`; JIT commissioning is not marked completed.

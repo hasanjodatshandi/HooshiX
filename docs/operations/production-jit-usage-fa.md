@@ -222,6 +222,31 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\production\run
 این موارد هنوز روی VPS commissioning نشده‌اند. تأیید مالک دربارهٔ باکت ثبت شده
 و طبق دستور او probe تازه‌ای انجام نمی‌شود؛ این راهنما درخواست بررسی مجدد باکت نیست.
 
+### اتصال ممیزی: کدام قسمت آماده است؟
+
+کد `scripts/production/parspack_audit_transport.py` مسیر ارسال به باکت جاری
+`c892683` را پیاده می‌کند: یک فایل کوچک با نام یکتا می‌فرستد، همان نسخه را
+بازمی‌خواند و فقط با محتوای کاملاً یکسان و version ID معتبر رسید می‌دهد.
+خطا، timeout، نسخهٔ null، redirect یا تفاوت محتوا رسید موفق نمی‌سازند؛ ارسال
+مبهم خودکار تکرار نمی‌شود. این کد تنظیمات باکت را probe یا تغییر نمی‌دهد.
+هر فایل حداکثر ۸ KiB و زمان کل ارسال/بازخوانی ۷ ثانیه است؛ فایل‌های موقت
+خودکار بسته/حذف می‌شوند و خروجی provider یا secret چاپ نمی‌شود.
+
+این یک کتابخانهٔ داخلی است، نه فرمانی برای اجرای دستی شما و نه نصب JIT.
+credential باید از materialization محافظت‌شدهٔ OpenBao برسد؛ فایل خصوصی
+bootstrap شما به fallback runtime تبدیل نشده است. ابتدا باید محل نگهداری
+امن سهم‌های بازیابی OpenBao مشخص و secret authority با snapshot/recovery
+راه‌اندازی شود. بعد از نصب exporter/کنترل سلامت و backlog، نصب‌کننده این
+transport را به broker وصل می‌کند. تا آن زمان sudo و SSH/MCP فعلی تغییر نمی‌کنند.
+
+آزمون‌های این قسمت با `make production-test` اجرا می‌شوند و pipeline موجود
+هم آن‌ها را خودکار کشف می‌کند؛ هیچ کلید واقعی را در GitHub قرار ندهید.
+
+رفتار امضای SigV4/config توسط Context7 از مستندات رسمی curl و رفتار checksum/
+version-specific GET از [PutObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html)
+و [GetObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
+بررسی شده است. این منابع قرارداد مرجع S3 هستند، نه evidence اجرای پارس‌پک.
+
 ## ۷. CI را از کجا ببینم؟
 
 در صفحهٔ PR، تب **Checks** را باز کنید. در **Repository baseline**، job

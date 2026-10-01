@@ -248,6 +248,15 @@ kernel and log-bound checks. Public receipt
 the owner's Windows temporary directory; no package installation was repeated.
 Standing administrative access is unchanged. OS audit coverage, off-host export,
 OpenBao and the complete JIT workflow remain `Not verified`.
+The uninstalled `scripts/production/parspack_audit_transport.py` now implements
+the actual delivery protocol seam: a conditional unique-key PUT and version-specific
+GET, SHA-256 checksum and exact-byte readback, bounded response/time/files, and no
+secret argv/environment or raw diagnostic output. It has synthetic positive/negative
+contract tests, discovered by existing Production CI. No real credential/bucket call
+was made for this change. This is not an installed `audit-deliver` entrypoint,
+OS/sudo exporter, health/backlog gate or OpenBao materialization workflow.
+Broker integration and live commissioning remain `Not verified`; standing sudo is
+preserved until those controls and complete recovery/admin workflows are tested.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 
