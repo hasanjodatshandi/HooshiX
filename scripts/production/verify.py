@@ -44,6 +44,7 @@ REQUIRED_FILES = (
 )
 REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/verify_release.py", ROOT / "scripts/production/readiness.py",
+    ROOT / "scripts/production/prepare_human_sshd_candidate.py",
     ROOT / "scripts/production/render_gitops.py", ROOT / "scripts/production/release_supply_chain.sh",
     ROOT / "scripts/production/build_provenance.py", ROOT / "scripts/production/install_release_tools.sh",
     ROOT / ".github/workflows/production-release.yml",
