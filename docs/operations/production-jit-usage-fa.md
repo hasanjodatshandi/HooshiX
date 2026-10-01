@@ -138,6 +138,74 @@ unit کار مدیریتی را متوقف می‌کند؛ اثر مجاز یک 
 
 ## ۶. چک‌لیست مدیر نصب و کار باقی‌مانده
 
+### پیش‌نیاز ممیزی OS در VPS فعلی
+
+بررسی تازهٔ ۱ اکتبر نشان داد `auditd` نصب نیست. ابزار
+`install_audit_prerequisite.py` فقط برای Ubuntu 26.04 amd64 فعلی، سه بستهٔ
+`auditd`، `libauparse0t64` و `libauplugin1` را با نسخهٔ دقیق
+`1:4.1.2-1ubuntu0.1` نصب می‌کند؛ سیستم، SSH، MCP، sudoers و باکت را تغییر نمی‌دهد.
+قبل از نصب، transaction بدون upgrade/remove و سقف دانلود ۱۶ MiB بررسی می‌شود؛
+حداقل ۲۵۶ MiB فضای خالی لازم است. مخازن و کنترل امضای APT تغییر نمی‌کنند.
+
+در **Windows PowerShell**، از ریشهٔ checkout:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\production\run-audit-prerequisite.ps1
+```
+
+این فرمان فقط preflight است و باید `"preflight": "Passed"` و `"applied": false`
+بدهد. برای نصب همان پیش‌نیاز:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\production\run-audit-prerequisite.ps1 -Install
+```
+
+رمز sudo فقط همان‌جا وارد شود. launcher کد عمومی را موقتاً منتقل، هش آن را روی همان
+بایت‌های اجراشونده بررسی و Python isolated اجرا می‌کند؛ هیچ secret منتقل نمی‌شود.
+فقط فایل موقت یکتای همین launcher پس از پایان پاک می‌شود. هنگام نصب dpkg پنجره را
+نبندید؛ در صورت شکست، نصب ممکن است جزئی باشد و نباید کورکورانه تکرار شود.
+اگر اجرای UNC در سیاست Windows محدود باشد، فقط این دو فایل عمومی را به پوشهٔ موقت
+Windows کپی و همان فرمان را از آن پوشه اجرا کنید؛ سیاست execution عمومی را تغییر ندهید.
+
+خروجی موفق باید `"applied": true` و `daemon`، `kernel` و `log_bounds` برابر `Passed`
+داشته باشد. پیکربندی پیش‌فرض بسته باید log با حدود ۸ MiB و پنج فایل و رفتار
+`SUSPEND` برای خطای دیسک داشته باشد؛ ابزار تنظیمات سفارشی را بازنویسی نمی‌کند.
+این **ممیزی کامل نیست**: rotation ممکن است رویداد قدیمی را حذف کند؛ بدون exporter،
+پوشش ruleها، صف محافظت‌شده و کنترل backlog، JIT همچنان بسته می‌ماند.
+`audit_readiness` و `jit_readiness` حتی پس از نصب `Not verified` می‌مانند.
+
+### اگر نصب تمام شد ولی بررسی خطا داد
+
+بسته‌ها را دوباره نصب نکنید. فقط بررسیِ بدون تغییر را اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\production\run-audit-prerequisite.ps1 -VerifyOnly
+```
+
+این mode هیچ فرمان APT یا تغییر تنظیمات اجرا نمی‌کند و یک receipt عمومی کوچک در
+کنار launcher ذخیره می‌کند؛ مسیر آن با `PUBLIC_RECEIPT=` نمایش داده می‌شود.
+`-Install` و `-VerifyOnly` هم‌زمان مجاز نیستند. اگر بررسی شکست بخورد، نام مرحلهٔ
+`packages`، `log_bounds`، `daemon` یا `kernel` گزارش می‌شود، نه محتوای config/secret.
+در اجرای ۱ اکتبر، خروجی چندکلمه‌ای `loginuid_immutable 0 unlocked` باعث شکست parser
+قدیمی بود؛ parser اصلاح شد و بررسیِ فقط‌خواندنی روی VPS همهٔ این مراحل را پاس کرد.
+دانلود واقعی نصب اولیه ۲۹۸ kB و افزایش فضای نصب ۹۷۵ kB بود؛ نصب تکرار نشد.
+
+### آیا دیگر نمی‌توانم مدیر سرور باشم؟
+
+خودِ برنامهٔ `sudo` حذف نمی‌شود. هدف، جایگزینی مجوز نامحدود و دائمی با اجازهٔ
+موقت برای کار مشخص است. ابزار فعلی فقط inspect/restart سرویس‌های محدود دارد و
+هنوز جایگزین کامل کارهای مدیریتی مالک نیست. پیش از cutover باید تمام کارهای لازم
+مالک نقش/فرمان مناسب، approval، audit و expiry داشته باشند و مسیر recovery واقعاً
+آزموده شود. تا آن موقع sudo دائمی حفظ می‌شود؛ VNC جای مسیر روزمرهٔ مدیریت نیست.
+
+رفتار APT و auditd با Context7 از مستندات رسمی
+[APT](https://github.com/debian/apt/blob/main/doc/apt-get.8.xml) و
+[Linux audit](https://github.com/linux-audit/audit-userspace/blob/master/init.d/auditd.conf)
+بررسی شد؛ نسخهٔ نصب‌شده و پیکربندی میزبان هم جداگانه سنجیده می‌شوند.
+قالب status نسخهٔ ۴.۱.۲ نیز در
+[سورس رسمی auditctl](https://github.com/linux-audit/audit-userspace/blob/v4.1.2/src/auditctl-listing.c)
+بررسی شد؛ `enabled` یا `lost` تکراری/نامعتبر همچنان fail-closed است.
+
 این موارد کار نصب‌کننده است، نه لازم‌کردن نوشتن تنظیمات امنیتی توسط مالک:
 
 - کد در مسیر ثابت root-owned با فایل‌های `0644` و والدهای بدون write عمومی؛

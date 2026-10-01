@@ -137,7 +137,10 @@ def audit_delivery(payload: bytes) -> bytes:
         raise BrokerDenied("OS audit service unavailable")
     raw = bounded_call(["/usr/sbin/auditctl", "-s"])
     try:
-        status = dict(line.split() for line in raw.decode("ascii").splitlines())
+        pairs = [line.split(maxsplit=1) for line in raw.decode("ascii").splitlines()]
+        status = dict(pairs)
+        if len(status) != len(pairs):
+            raise ValueError("duplicate kernel status")
     except (ValueError, UnicodeError):
         raise BrokerDenied("OS audit status unavailable") from None
     if status.get("enabled") not in ("1", "2") or status.get("lost") != "0":

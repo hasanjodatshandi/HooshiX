@@ -155,14 +155,16 @@ class BrokerTest(unittest.TestCase):
                 broker.bounded_call(["fixture"])
 
     def test_os_audit_health_required_before_delivery(self):
-        for status in (b"enabled 0\nlost 0\n", b"enabled 1\nlost 2\n", b"invalid status shape here\n"):
+        for status in (b"enabled 0\nlost 0\n", b"enabled 1\nlost 2\n", b"invalid status shape here\n",
+                       b"enabled 0\nenabled 1\nlost 0\n", b"enabled 1\nlost 4\nlost 0\n"):
             with patch.object(broker, "root_path"), \
                     patch.object(broker, "bounded_call", side_effect=[b"active\n", status]) as call:
                 with self.assertRaises(broker.BrokerDenied):
                     broker.audit_delivery(b"fixture")
                 self.assertEqual(2, call.call_count)
         with patch.object(broker, "root_path"), \
-                patch.object(broker, "bounded_call", side_effect=[b"active\n", b"enabled 2\nlost 0\n", b"receipt"]):
+                patch.object(broker, "bounded_call", side_effect=[
+                    b"active\n", b"enabled 2\nlost 0\nloginuid_immutable 0 unlocked\n", b"receipt"]):
             self.assertEqual(b"receipt", broker.audit_delivery(b"fixture"))
 
     def test_protected_helper_timeout_is_bounded(self):

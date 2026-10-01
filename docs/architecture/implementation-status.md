@@ -229,6 +229,25 @@ recorded locally. No broker/adapter is installed on the VPS; real audit coverage
 OpenBao provisioning, pending-event reconciliation, safe sudo cutover and full live
 expiry/recovery evidence remain required. Copyable local commands, expected output,
 limitations and troubleshooting are in `production-jit-usage-fa.md`.
+The latest owner-executed privileged inspection at 2026-10-01T19:24:39Z reports
+seven ready platform pods and no OpenBao pod; no host OpenBao service was listed.
+Before installation, read-only package inspection confirmed that `auditd` was absent
+on Ubuntu 26.04 amd64.
+A narrowly scoped, version-pinned OS-audit prerequisite installer and Windows
+interactive-sudo launcher now exist, with negative tests and finite download/log
+checks. The live read-only installer preflight passed. Package installation and
+complete OS/off-host audit are separate evidence: this installer does not provision
+OpenBao, change audit coverage, enable JIT, or remove standing administrative access.
+The owner then executed the installer: three packages at `1:4.1.2-1ubuntu0.1`,
+298 kB downloaded and 975 kB additional installed space. The initial post-check
+failed because its two-token parser rejected the multi-word `auditctl` informational
+field. Installer and broker parsers now preserve the value and reject duplicate keys.
+The subsequent privileged `--verify-only` run passed installed-package, daemon,
+kernel and log-bound checks. Public receipt
+`hooshix-audit-prerequisite-fb00b4aefd4b455fbcde512a58d6c7c7.py.json` was read from
+the owner's Windows temporary directory; no package installation was repeated.
+Standing administrative access is unchanged. OS audit coverage, off-host export,
+OpenBao and the complete JIT workflow remain `Not verified`.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 

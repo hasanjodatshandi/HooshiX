@@ -178,6 +178,11 @@ Remediation must not weaken these verified current properties:
   caller mapping, bounded input/helper I/O, local durable event records and
   request-unique native jobs with in-job operator exclusivity. User-facing usage
   is in `../operations/production-jit-usage-fa.md`. This is not a VPS installation.
+- OS-audit prerequisite installed on the VPS: `auditd` and its two libraries at
+  `1:4.1.2-1ubuntu0.1`. The corrected read-only post-check passed package/daemon/
+  kernel/log bounds, without a second install. Auditctl multi-word status parsing
+  and duplicate rejection have regression tests; Windows launcher checks run in CI.
+  This does not prove audit rule coverage, protected export or JIT readiness.
 - Next: protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe
   zero-standing-admin cutover. SSH/MCP configuration is outside this continuation.

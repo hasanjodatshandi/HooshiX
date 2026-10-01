@@ -25,3 +25,15 @@ jobs:
         shell: powershell
         run: |
           .\scripts\production\tests\test_offline_ca.ps1 -PackageDirectory "$env:RUNNER_TEMP\HooshiX-public-ca"
+      - name: Validate production PowerShell launchers without remote execution
+        shell: powershell
+        run: |
+          .\scripts\production\run-host-inspection.ps1 -ValidateOnly
+          .\scripts\production\run-audit-prerequisite.ps1 -ValidateOnly
+          .\scripts\production\run-audit-prerequisite.ps1 -ValidateOnly -VerifyOnly
+          try {
+            .\scripts\production\run-audit-prerequisite.ps1 -ValidateOnly -Install -VerifyOnly
+            throw 'CONFLICTING_MODE_NOT_REJECTED'
+          } catch {
+            if ($_.Exception.Message -ne 'INSTALL_AND_VERIFY_ONLY_ARE_MUTUALLY_EXCLUSIVE') { throw }
+          }
