@@ -62,6 +62,10 @@ def main():
                 time.sleep(0.1)
             else:
                 raise RuntimeError("native expiry deadline exceeded")
+            result = subprocess.check_output(["/usr/bin/systemctl", *manager, "show", unit,
+                                              "--property=Result", "--value"], timeout=3).strip()
+            if result != b"timeout" or not 3 <= time.monotonic() - started <= 10:
+                raise RuntimeError("job ended for a reason other than bounded runtime expiry")
             process = Path(f"/proc/{child}/stat")
             if process.exists() and process.read_text().split(")", 1)[1].split()[0] != "Z":
                 raise RuntimeError("background child survived expiry")
