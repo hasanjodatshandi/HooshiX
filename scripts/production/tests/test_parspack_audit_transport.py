@@ -11,6 +11,12 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import parspack_audit_transport as transport
 
+RECORD_ID = "74f8c0cd-1f8b-4a0f-9561-8f047e7206fb"
+
+
+def deliver(payload, access="fixture", secret="fixture", record_id=RECORD_ID):
+    return transport.deliver(payload, access, secret, record_id=record_id)
+
 
 def response(version=b"fixture+/=", body=b"", status=b"200 OK", extra=b""):
     return (b"HTTP/1.1 " + status + b"\r\nx-amz-version-id: " + version
@@ -21,7 +27,7 @@ class AuditTransportTest(unittest.TestCase):
     def test_exact_version_readback_and_receipt(self):
         payload = b'{"schema_version":1,"event":"synthetic"}'
         with patch.object(transport, "_transfer", side_effect=[response(), response(body=payload)]) as call:
-            receipt = transport.deliver(payload, "synthetic-access", "synthetic-secret")
+            receipt = deliver(payload, "synthetic-access", "synthetic-secret")
         self.assertEqual({"sha256": hashlib.sha256(payload).hexdigest(),
                           "version_id": "fixture+/="}, receipt)
         put, get = [args.args[0].decode() for args in call.call_args_list]
@@ -31,6 +37,7 @@ class AuditTransportTest(unittest.TestCase):
         self.assertEqual(put.split('url = "')[1].split('"')[0],
                          get.split('url = "')[1].split('?')[0])
         self.assertIn('data-binary = "@/proc/self/fd/', put)
+        self.assertIn(f"/jit-v1/{RECORD_ID}.json", put)
         self.assertIn('header = "If-None-Match: *"', put)
         self.assertIn('header = "x-amz-sdk-checksum-algorithm: SHA256"', put)
         self.assertIn(base64.b64encode(hashlib.sha256(payload).digest()).decode(), put)
@@ -45,7 +52,7 @@ class AuditTransportTest(unittest.TestCase):
         for raw in candidates:
             with self.subTest(raw=raw), patch.object(transport, "_transfer", return_value=raw) as call:
                 with self.assertRaises(transport.DeliveryDenied):
-                    transport.deliver(b"fixture", "fixture", "fixture")
+                    deliver(b"fixture")
                 self.assertEqual(1, call.call_count)
 
     def test_redirects_errors_and_non_http_deny_without_retry(self):
@@ -53,34 +60,50 @@ class AuditTransportTest(unittest.TestCase):
                     response(status=b"500 Error"), b"not HTTP", response().replace(b"HTTP/1.1", b"HTTP/2")]:
             with patch.object(transport, "_transfer", return_value=raw) as call:
                 with self.assertRaises(transport.DeliveryDenied):
-                    transport.deliver(b"fixture", "fixture", "fixture")
+                    deliver(b"fixture")
                 self.assertEqual(1, call.call_count)
 
     def test_wrong_bytes_or_wrong_version_deny(self):
         for raw in [response(body=b"wrong"), response(b"different", body=b"fixture")]:
             with patch.object(transport, "_transfer", side_effect=[response(), raw]) as call:
                 with self.assertRaisesRegex(transport.DeliveryDenied, "readback mismatch"):
-                    transport.deliver(b"fixture", "fixture", "fixture")
+                    deliver(b"fixture")
                 self.assertEqual(2, call.call_count)
 
     def test_ambiguous_put_denies_without_get_or_retry(self):
         with patch.object(transport, "_transfer", side_effect=transport.DeliveryDenied("transport")) as call:
             with self.assertRaises(transport.DeliveryDenied):
-                transport.deliver(b"fixture", "fixture", "fixture")
+                deliver(b"fixture")
             self.assertEqual(1, call.call_count)
 
     def test_input_limits_before_network(self):
         for payload in [b"", b"x" * 8193, "text", None]:
             with patch.object(transport, "_transfer") as call:
                 with self.assertRaises(transport.DeliveryDenied):
-                    transport.deliver(payload, "fixture", "fixture")
+                    deliver(payload)
                 call.assert_not_called()
         for access, secret in [("bad:key", "fixture"), ("fixture", "bad\nkey"),
                                ("fixture", ""), (None, "fixture"), ("fixture", "x" * 4097)]:
             with patch.object(transport, "_transfer") as call:
                 with self.assertRaises(transport.DeliveryDenied):
-                    transport.deliver(b"fixture", access, secret)
+                    deliver(b"fixture", access, secret)
                 call.assert_not_called()
+
+    def test_record_identity_validated_before_network(self):
+        for record_id in [None, 1, "../escape", RECORD_ID.upper(), "0" * 36,
+                          "74f8c0cd-1f8b-1a0f-9561-8f047e7206fb"]:
+            with patch.object(transport, "_transfer") as call:
+                with self.assertRaises(transport.DeliveryDenied):
+                    deliver(b"fixture", record_id=record_id)
+                call.assert_not_called()
+
+    def test_same_durable_record_maps_to_same_object_without_internal_retry(self):
+        with patch.object(transport, "_transfer", side_effect=transport.DeliveryDenied("ambiguous")) as call:
+            for _ in range(2):
+                with self.assertRaises(transport.DeliveryDenied):
+                    deliver(b"fixture")
+            self.assertEqual(2, call.call_count)
+            self.assertEqual(call.call_args_list[0].args[0], call.call_args_list[1].args[0])
 
     def test_untrusted_headers_and_oversize_responses_deny(self):
         candidates = [response(extra=b" folded: value\r\n"), response(extra=b"Bad\nName: x\r\n"),
@@ -140,6 +163,12 @@ class AuditTransportTest(unittest.TestCase):
         with patch.object(transport.subprocess, "Popen", side_effect=spawn):
             with self.assertRaisesRegex(transport.DeliveryDenied, "^audit transport failed; do not replay$"):
                 transport._transfer(b"fixture", 7, transport.time.monotonic() + 5)
+
+    def test_native_curl_refuses_non_https_protocol_without_network(self):
+        with transport.tempfile.TemporaryFile() as source:
+            with self.assertRaisesRegex(transport.DeliveryDenied, "^audit transport failed; do not replay$"):
+                transport._transfer(b'url = "file:///dev/null"\n', source.fileno(),
+                                    transport.time.monotonic() + 5)
 
 
 if __name__ == "__main__":

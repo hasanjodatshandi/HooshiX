@@ -99,14 +99,21 @@ def _transfer(config: bytes, payload_fd: int, deadline: float) -> bytes:
     return raw
 
 
-def deliver(payload: bytes, access_key: str, secret_key: str) -> dict[str, str]:
+def deliver(payload: bytes, access_key: str, secret_key: str, *, record_id: str) -> dict[str, str]:
     """One PUT and one version-specific GET; acknowledge exact bytes only.
 
     No retry/delete/overwrite/configuration call. An ambiguous PUT is a denial,
-    not permission to replay an operation. The caller owns durable reconciliation.
+    not permission to replay an operation. The caller supplies the already-durable
+    local record UUID, so an ambiguous object remains identifiable for recovery.
     """
     if not isinstance(payload, bytes) or not 1 <= len(payload) <= MAX_PAYLOAD:
         raise DeliveryDenied("invalid audit payload size")
+    try:
+        identifier = uuid.UUID(record_id)
+        if identifier.version != 4 or str(identifier) != record_id:
+            raise ValueError("invalid UUID")
+    except (ValueError, TypeError, AttributeError):
+        raise DeliveryDenied("invalid durable audit record identity") from None
     _quoted(access_key)
     _quoted(secret_key)
     if ":" in access_key:
@@ -114,7 +121,7 @@ def deliver(payload: bytes, access_key: str, secret_key: str) -> dict[str, str]:
     auth = "user = " + _quoted(access_key + ":" + secret_key) + "\n"
     digest = hashlib.sha256(payload).hexdigest()
     checksum = base64.b64encode(hashlib.sha256(payload).digest()).decode("ascii")
-    url = f"{ENDPOINT}/hooshix-audit/jit-v1/{uuid.uuid4()}.json"
+    url = f"{ENDPOINT}/hooshix-audit/jit-v1/{record_id}.json"
     deadline = time.monotonic() + 7
     # Unlinked, mode-0600 payload file, shared by fd only with the curl child.
     with tempfile.TemporaryFile() as source:
