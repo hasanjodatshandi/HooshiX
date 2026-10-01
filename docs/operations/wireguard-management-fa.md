@@ -365,6 +365,16 @@ $LASTEXITCODE
 timer را لغو نکنید و VPS را reboot نکنید. timer مستقل از قطع SSH/Windows است
 ولی transient است و از reboot سرور عبور نمی‌کند. این ابزار، JIT یا آمادگی
 Production را پیاده‌سازی یا تأیید نمی‌کند.
+پس از موفقیت آزمون‌های مستقل، مالک timer را در ترمینال محلی متوقف می‌کند:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo systemctl stop hooshix-ssh-pr158-rollback.timer'
+$LASTEXITCODE
+```
+
+سپس از اتصال تازه، `ActiveState=inactive` برای timer و برابری hash فایل اصلی
+با candidate بررسی شود. پوشهٔ root حاوی نسخهٔ قبل و rollback را حذف نکنید؛
+اسکریپت apply برای نصب اولیه است و نباید برای این rollout تکمیل‌شده تکرار شود.
 بازگشت نباید guard پایدار nftables را حذف یا TCP/22022 عمومی را باز کند؛ daemon
 مستقل MCP روی TCP/2222 نیز نباید تغییر کند. موفقیت reload به‌تنهایی آزمون
 ورود خصوصی/رد مسیر عمومی/ماندگاری پس از reboot نیست.

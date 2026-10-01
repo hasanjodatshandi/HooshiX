@@ -168,8 +168,24 @@ Both scripts were transferred to the private operator cache with mode `0600`;
 the apply SHA-256 `5d15b2c671dc42d12f349b9b7962f7f02864b309319c96bf938e984b5004172f`
 and rollback SHA-256 `6ed728fca74841557f2138aae7748e8f5518d3f387e4bcb06d9a88df3f5ab3e7`
 matched repository source. Host-side Bash syntax and local source/static gates
-passed. Live application, timer execution and post-reload tests are `Not run`.
-No SSH service reload or live policy change has occurred.
+passed. On 2026-10-01 the owner executed the reviewed apply script with local
+sudo authentication: preflight passed, the rollback timer became active and
+`SSH_CANDIDATE=Applied` ended with exit code zero. Independent fresh private
+SSH then passed and a remote loopback forwarding request was rejected with
+exit code 255 (`remote port forwarding failed`). The installed main-config
+hash matched the candidate above. Both `ssh.service` and the separate
+`sshd-hooshix-tunnel.service` remained active, with TCP/2222 still listening;
+this is not an end-to-end public MCP connectivity claim.
+After these checks the owner stopped the rollback timer with exit code zero.
+An independent fresh connection confirmed timer `inactive`, rollback service
+`inactive`, the candidate hash still installed, both SSH services active and
+TCP/2222 still listening. The scoped human forwarding rollout is `Passed`.
+Automatic rollback execution was `Not run`; no reboot was performed during
+this trial. Root-owned recovery artifacts remain available. The next access
+work is protected OS/sudo audit with off-host delivery, followed by real JIT
+expiry/revocation; neither is implemented by this rollout.
+Protected baseline run `36883186086` and frontend run `36883185616` passed
+all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
@@ -332,7 +348,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
 | Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
-| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap and persistent SSH ingress guard | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. Separate tunnel port 2222 was not changed. Global SSH still permits forwarding and `auditd` is absent; SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
+| WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
