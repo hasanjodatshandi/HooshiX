@@ -486,6 +486,7 @@ scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
 scripts/platform/waf_image_smoke.py
 scripts/production/build_provenance.py
+scripts/production/apply_human_sshd_candidate.sh
 scripts/production/check_human_sshd_candidate.sh
 scripts/production/inspect_host.py
 scripts/production/install_release_tools.sh
@@ -504,6 +505,7 @@ scripts/production/probe_parspack_audit_bucket.py
 scripts/production/readiness.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
+scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-host-inspection.ps1
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_offline_ca.ps1

@@ -346,6 +346,25 @@ $LASTEXITCODE
 ```
 
 `PREFLIGHT=Passed` همراه با exit code صفر فقط اعتبار candidate پیش از نصب است.
+ابزار [`apply_human_sshd_candidate.sh`](../../scripts/production/apply_human_sshd_candidate.sh)
+با همان کاربر عادی، پس از باز نگه‌داشتن کنسول نجات و نشست خصوصی دوم اجرا می‌شود.
+هر سه اسکریپت باید از یک revision بررسی‌شده منتقل و hash آنها تطبیق داده شود.
+ابزار، preflight را تکرار، نسخهٔ قبلی و candidate و اسکریپت rollback را در
+`/root/hooshix-ssh-pr158` با مالکیت root آماده، hash نسخه‌های root را کنترل و
+timer مستقل `hooshix-ssh-pr158-rollback.timer` را برای ده دقیقه فعال می‌کند.
+سپس جایگزینی اتمیک فایل اصلی و reload فقط `ssh.service` انجام می‌شود.
+وجود پوشهٔ rollout قبلی باعث توقف است و نیازمند تطبیق وضعیت واقعی است؛ آن را
+برای تکرار فرمان پاک نکنید. rollback نیز تغییر SSH جدیدتر را بازنویسی نمی‌کند.
+
+```powershell
+ssh.exe -t hooshix-server 'bash /home/hooshixadmin/.cache/hooshix-ssh-pr158/apply_human_sshd_candidate.sh --rescue-and-second-session-ready'
+$LASTEXITCODE
+```
+
+تا تأیید مستقل نشست تازه، رد forwarding و وضعیت واقعی daemon جداگانهٔ 2222،
+timer را لغو نکنید و VPS را reboot نکنید. timer مستقل از قطع SSH/Windows است
+ولی transient است و از reboot سرور عبور نمی‌کند. این ابزار، JIT یا آمادگی
+Production را پیاده‌سازی یا تأیید نمی‌کند.
 بازگشت نباید guard پایدار nftables را حذف یا TCP/22022 عمومی را باز کند؛ daemon
 مستقل MCP روی TCP/2222 نیز نباید تغییر کند. موفقیت reload به‌تنهایی آزمون
 ورود خصوصی/رد مسیر عمومی/ماندگاری پس از reboot نیست.

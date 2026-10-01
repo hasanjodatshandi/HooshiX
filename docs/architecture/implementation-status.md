@@ -146,8 +146,7 @@ Unprivileged `sshd -t -f` could not read `50-cloud-init.conf` and returned
 exit code zero after the second sudo authentication attempt: candidate syntax
 is `Passed` by owner-run evidence. A fresh read-only SSH check independently
 confirmed both hashes above and candidate mode `0600` were unchanged.
-Root connection-specific effective-configuration checks are still `Not run`;
-non-interactive sudo explicitly requires interactive authentication, so the
+Non-interactive sudo explicitly requires interactive authentication, so a
 successful syntax receipt does not grant subsequent unattended root access.
 The first owner-run multi-line PowerShell/SSH command for `sshd -T` failed
 in the remote shell with a quoting-related Bash syntax error and exit code 2;
@@ -155,8 +154,21 @@ it produced no effective-configuration evidence. A hash-pinned, read-only
 operator-side preflight script now replaces that multi-line command.
 The script was copied to the operator's private VPS cache, set to mode `0600`,
 and its SHA-256 `a967f8fc361ba374116630e81e36382e177e833a18f3316e21b557e1afd8a596`
-matched the reviewed repository source. Its privileged read-only preflight
-has not yet run because sudo requires the owner to authenticate locally.
+matched the reviewed repository source. The owner subsequently ran that exact
+script in the local SSH terminal: hash/mode and syntax checks passed, both
+human-port samples (22 and 22022) passed, the complete tunnel-account renders
+were unchanged on both ports, and `PREFLIGHT=Passed` ended with exit code zero.
+This is owner-run candidate evidence, not a live forwarding or tunnel test.
+The operator-side apply script and root-owned rollback script now prepare an
+atomic, hash-verified replacement with a ten-minute system-manager rollback
+timer. They refuse an existing rollout directory or changed source/candidate
+and preserve the nftables guard, SSH socket listeners and dedicated TCP/2222
+daemon. The timer is rollout recovery only, not JIT access implementation.
+Both scripts were transferred to the private operator cache with mode `0600`;
+the apply SHA-256 `5d15b2c671dc42d12f349b9b7962f7f02864b309319c96bf938e984b5004172f`
+and rollback SHA-256 `6ed728fca74841557f2138aae7748e8f5518d3f387e4bcb06d9a88df3f5ab3e7`
+matched repository source. Host-side Bash syntax and local source/static gates
+passed. Live application, timer execution and post-reload tests are `Not run`.
 No SSH service reload or live policy change has occurred.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
