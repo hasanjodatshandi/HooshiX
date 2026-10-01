@@ -124,6 +124,25 @@ scoped remote TCP forwarding. A separate tunnel daemon currently listens on
 TCP/2222. Thus copying the repository's global SSH policy onto this shared
 host configuration without connection-specific testing could disrupt the
 tunnel. No listener/configuration was changed by this follow-up.
+The same read-only follow-up found two enabled tunnel SSH units targeting one
+dedicated configuration: `sshd-hooshix-tunnel.service` was active, while
+`hooshix-tunnel-sshd.service` was in auto-restart with `ExecMainStatus=255`
+and 14,480 recorded restarts. A TCP/2222 listener was present, but an
+end-to-end MCP request was not tested. The duplicate/failing unit was not
+stopped; its precise failure cause and ownership need review before any
+change. Non-root disk inventory showed 40 MiB of journald storage and
+129 GiB free on the VPS root filesystem at inspection time; it does not
+prove full storage/retention health.
+For PR #158, the reviewed human-only Match template and candidate preparer
+were copied to an operator-owned `0700` cache directory and both transfer
+hashes matched the local source. The preparer verified the unchanged source
+`sshd_config` SHA-256
+`01c79f1385e2ec9b5b09e4995cfcbd2f6b21e6e05c7906a8a2b1f1b18a5c5fbb`
+and wrote one uninstalled `0600` candidate (SHA-256
+`41076da5cb933c3be885c912a6b26ade7169c9c1f4dcba9a2e048d3cd08b9656`).
+Unprivileged `sshd -t -f` could not read `50-cloud-init.conf` and returned
+`Permission denied`; root syntax/effective-configuration checks are pending.
+No SSH service reload or live policy change has occurred.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 
