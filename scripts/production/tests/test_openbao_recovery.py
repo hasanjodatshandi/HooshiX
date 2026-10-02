@@ -1,16 +1,73 @@
 import json
+import contextlib
+import io
 import os
 import subprocess
+import ssl
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import rehearse_openbao_recovery as recovery
 
 
 class OpenBaoRecoveryTest(unittest.TestCase):
+    def test_only_fixed_public_step_labels_are_logged(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            recovery.step("image-pull")
+            with self.assertRaises(recovery.RehearsalFailed):
+                recovery.step("private-fixture-token")
+        self.assertEqual("OPENBAO_STEP=image-pull\n", output.getvalue())
+
+    def test_failure_receipt_does_not_print_exception_or_credentials(self):
+        output = io.StringIO()
+        with patch.object(sys, "argv", ["rehearse", "--ci"]), contextlib.redirect_stdout(output), \
+                patch.object(recovery, "rehearse", side_effect=ValueError("private-fixture-token")):
+            self.assertEqual(1, recovery.main())
+        self.assertIn("OPENBAO_RECOVERY=Failed", output.getvalue())
+        self.assertNotIn("private-fixture-token", output.getvalue())
+
+    def test_tls_mount_exposes_no_other_fixture_data_and_failure_cleans_up(self):
+        commands = []
+
+        def run(args, **kwargs):
+            commands.append(args)
+            if args[1:2] == ["req"]:
+                Path(args[args.index("-keyout") + 1]).touch()
+            if args[1:2] == ["port"]:
+                return b"127.0.0.1:18200\n"
+            return b"OpenBao v2.6.1"
+
+        client = Mock()
+        client.base = "https://127.0.0.1:18200/v1/"
+        client.wait_health.return_value = {"version": "2.6.1"}
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.object(os, "getuid", return_value=1000), \
+                patch.object(recovery, "command", side_effect=run), patch.object(recovery, "Client", return_value=client), \
+                patch.object(recovery.urllib.request, "build_opener") as opener, \
+                patch.object(recovery, "initialize", side_effect=recovery.RehearsalFailed("synthetic stop")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            opener.return_value.open.side_effect = urllib.error.URLError(ssl.SSLCertVerificationError("untrusted"))
+            with self.assertRaises(recovery.RehearsalFailed):
+                recovery.rehearse()
+        run_args = next(args for args in commands if "--detach" in args)
+        mounts = [run_args[index + 1] for index, value in enumerate(run_args) if value == "--mount"]
+        tls_mount = next(value for value in mounts if "dst=/openbao/tls," in value)
+        tls_path = Path(tls_mount.split(",src=", 1)[1].split(",dst=", 1)[0])
+        self.assertEqual("tls", tls_path.name)
+        self.assertTrue(tls_mount.endswith(",readonly"))
+        self.assertFalse(tls_path.parent.exists())
+        name = run_args[run_args.index("--name") + 1]
+        self.assertIn("--network", run_args)
+        ip_index = run_args.index("--ip")
+        self.assertEqual("192.0.2.2", run_args[ip_index + 1])
+        self.assertIn(["/usr/bin/docker", "rm", "--force", "--volumes", name], commands)
+        network = run_args[run_args.index("--network") + 1]
+        self.assertIn(["/usr/bin/docker", "network", "rm", network], commands)
+
     def test_config_uses_raft_native_tls_and_protected_nonraw_audit(self):
         config = json.loads((recovery.SECRETS / "openbao-server.json").read_text())
         self.assertEqual({"raft": {"path": "/openbao/data", "node_id": "openbao-0"}}, config["storage"])
