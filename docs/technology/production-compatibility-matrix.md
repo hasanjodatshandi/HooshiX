@@ -47,6 +47,7 @@ This matrix records production technology combinations that must remain compatib
 | External black-box monitoring | provider TBD | must be outside production-host failure domain and exercise approved public edge without creating secret/public-bypass risk |
 | `production-single-server` management overlay | host-supported WireGuard | selected host OS/kernel/firewall; minimal per-device peers; public SSH denied |
 | `production-single-server` human access | host OpenSSH public keys (FIDO2 optional) + JIT + audit | exact package pin; WireGuard separate; no root/password/shared key |
+| Current OS-audit bootstrap | Ubuntu 26.04 amd64; `auditd`/`libauparse0t64`/`libauplugin1` `1:4.1.2-1ubuntu0.1` | verify package state, active daemon, numeric enabled/lost status and finite log bounds; multi-word informational status accepted, duplicate keys denied; full audit/JIT separately gated |
 | `production-ha` human access | Teleport 18.10.0 | JIT/SSO/WebAuthn/session-audit evidence |
 | OpenBao | 2.6.1 | exact secret authority; unchanged by current single-server/network/observability/DevSecOps decisions |
 | Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0 with repository safe-rule-logging patch; combined image/rules, opaque-cookie and log-privacy tests |

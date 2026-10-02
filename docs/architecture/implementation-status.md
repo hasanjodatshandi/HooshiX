@@ -184,6 +184,91 @@ Automatic rollback execution was `Not run`; no reboot was performed during
 this trial. Root-owned recovery artifacts remain available. The next access
 work is protected OS/sudo audit with off-host delivery, followed by real JIT
 expiry/revocation; neither is implemented by this rollout.
+On 2026-10-01 the owner supplied fresh audit credentials in a local Git-ignored
+mode-0600 JSON file and selected `https://c892683.parspack.net`, replacing the
+previous destination for continuation. The parent private directory is mode 0700.
+Signed path-style GET probes returned Object Lock `403; AccessDenied` and
+Versioning `200; not configured`, unchanged after owner-reported activation of
+Compliance/40 days and versioning on the new bucket. The report is accepted as
+owner configuration evidence, not independently verified settings. One unique
+113-byte synthetic object round-trip passed (PUT/GET 200 and matching hash),
+but responses supplied no non-null version ID and retention GET returned 403.
+Unversioned DELETE on that same probe object returned 204 and subsequent GET 404;
+this proves removal from the current view, not deletion of a locked version.
+The object is no longer visible; recoverability of any hidden version is
+`Not verified`. No other objects, host configuration or SSH/MCP settings changed.
+The read-only probe now supports bounded owner-private JSON input and an optional
+fail-closed exact-COMPLIANCE-days/versioning configuration check; this is not a
+runtime JIT audit gate, receiver or OpenBao provisioner. Writer delete permission,
+version/retention evidence and immutable audit behavior remain unresolved, so
+off-host audit/JIT and Production readiness remain `NOT VERIFIED`. Subsequently
+on 2026-10-01 the owner reported fixing the new destination and explicitly directed
+that no further bucket checks be performed. This is accepted owner-attested
+configuration; the preceding observations are historical, not a post-fix assessment.
+No additional bucket calls are made for this continuation. JIT development proceeds
+without re-probing the provider, while real grant-time durable audit acknowledgement
+remains mandatory. The continuation is in `production-audit-sink-parspack-fa.md`.
+
+The same work now includes an **uninstalled JIT core** in
+`scripts/production/jit_runtime.py`: strict versioned/canonical requests, named
+Ed25519 SSHSIG approval with an exact namespace, boot-bound elapsed-time admission,
+durable bounded replay prevention, mandatory audit acknowledgement validation, and
+fixed service-operation command construction. It does not grant a root shell or
+change sudoers/groups/SSH/MCP. `test_jit_systemd_expiry.py` checks native transient
+service lifetime and background-child termination; Repository baseline runs this
+on a disposable runner in addition to unit tests. These are implementation/test
+artifacts, not an installed broker, audit receiver or production grant. Protected
+caller/key enrollment, the real OS/off-host audit adapter, revoke/controller-loss
+integration, zero-standing-admin cutover and live commissioning remain unfinished.
+Broker source now exists in `scripts/production/jit_broker.py`: request generation,
+exact-byte signature bundling, fixed-path root-owned loading, protected sudo
+caller mapping, bounded stdin/helper output/time, execute and operator-only revoke.
+Native jobs have request-unique names and an in-job `flock` for operator exclusivity;
+revoke stops jobs before audit delivery, and outcome/revoke events are durably
+recorded locally. No broker/adapter is installed on the VPS; real audit coverage,
+OpenBao provisioning, pending-event reconciliation, safe sudo cutover and full live
+expiry/recovery evidence remain required. Copyable local commands, expected output,
+limitations and troubleshooting are in `production-jit-usage-fa.md`.
+The latest owner-executed privileged inspection at 2026-10-01T19:24:39Z reports
+seven ready platform pods and no OpenBao pod; no host OpenBao service was listed.
+Before installation, read-only package inspection confirmed that `auditd` was absent
+on Ubuntu 26.04 amd64.
+A narrowly scoped, version-pinned OS-audit prerequisite installer and Windows
+interactive-sudo launcher now exist, with negative tests and finite download/log
+checks. The live read-only installer preflight passed. Package installation and
+complete OS/off-host audit are separate evidence: this installer does not provision
+OpenBao, change audit coverage, enable JIT, or remove standing administrative access.
+The owner then executed the installer: three packages at `1:4.1.2-1ubuntu0.1`,
+298 kB downloaded and 975 kB additional installed space. The initial post-check
+failed because its two-token parser rejected the multi-word `auditctl` informational
+field. Installer and broker parsers now preserve the value and reject duplicate keys.
+The subsequent privileged `--verify-only` run passed installed-package, daemon,
+kernel and log-bound checks. Public receipt
+`hooshix-audit-prerequisite-fb00b4aefd4b455fbcde512a58d6c7c7.py.json` was read from
+the owner's Windows temporary directory; no package installation was repeated.
+Standing administrative access is unchanged. OS audit coverage, off-host export,
+OpenBao and the complete JIT workflow remain `Not verified`.
+The uninstalled `scripts/production/parspack_audit_transport.py` now implements
+the actual delivery protocol seam: a conditional unique-key PUT and version-specific
+GET, SHA-256 checksum and exact-byte readback, bounded response/time/files, and no
+secret argv/environment or raw diagnostic output. It has synthetic positive/negative
+contract tests, discovered by existing Production CI. No real credential/bucket call
+was made for this change. This is not an installed `audit-deliver` entrypoint,
+OS/sudo exporter, health/backlog gate or OpenBao materialization workflow.
+Broker integration and live commissioning remain `Not verified`; standing sudo is
+preserved until those controls and complete recovery/admin workflows are tested.
+On 2026-10-02 the owner confirmed availability of two independent secure custody
+locations; actual share distribution remains `Not verified`. Public OpenBao 2.6.1
+upstream Linux/amd64 image metadata and a native TLS/Raft/declarative non-raw audit
+configuration now exist under `infrastructure/production/secrets/`. The mandatory
+Repository baseline job `OpenBao TLS and Raft recovery` uses disposable secrets to
+exercise real Shamir 3/2 initialization, TLS verification, restart persistence,
+isolated snapshot restore, read-only ACL denial, audit redaction and initial-root
+revocation. This is a CI rehearsal, not a production deployment or final-artifact
+signature/provenance/SBOM promotion receipt. Production Raft/PVC, TLS provisioning,
+hourly encrypted off-host snapshots, recovery custody, OpenBao-to-host audit
+materialization and JIT installation remain `Not verified`. No standing sudo,
+SSH, MCP or bucket configuration is changed by the rehearsal.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
 

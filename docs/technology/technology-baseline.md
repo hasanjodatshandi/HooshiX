@@ -96,6 +96,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | External host-down monitoring | provider TBD before production | must be outside single-host failure domain; environment/provider decision, not guessed here |
 | `production-single-server` management network | host-supported WireGuard | exact host package/kernel pinned; public TCP/22 denied |
 | `production-single-server` human access | supported OpenSSH + encrypted per-operator Ed25519 keys (FIDO2 optional) + JIT + `sudo`/system audit | ADR-0030/0043 |
+| Current Ubuntu 26.04 amd64 OS-audit bootstrap | `auditd`, `libauparse0t64`, `libauplugin1` at `1:4.1.2-1ubuntu0.1` | signed Ubuntu packages; bounded prerequisite only, not complete off-host audit/JIT evidence |
 | `production-ha` human access | Teleport Enterprise Self-Hosted 18.10.0 | JIT/SSO/session evidence |
 | Email | Provider-neutral authenticated SMTP + required STARTTLS; Google Gmail profile for bounded staging only | Production provider deferred under ADR-0055 |
 | SMS | SMS.ir exact-text bulk send for Iran; SMS.ir Verify Sandbox for simulated contract validation only | local logging adapter local-only |

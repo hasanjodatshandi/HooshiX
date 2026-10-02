@@ -75,6 +75,9 @@ jobs:
       - name: Verify production
         run: make production-verify
 
+      - name: Verify native JIT expiry on disposable runner
+        run: sudo env GITHUB_ACTIONS=true python3 scripts/production/test_jit_systemd_expiry.py --system
+
       - name: Verify context tests
         run: make context-test
 
@@ -89,6 +92,18 @@ jobs:
 
       - name: Verify repository baseline index
         run: python3 scripts/baseline/verify_repository.py
+
+  openbao-recovery:
+    name: OpenBao TLS and Raft recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rehearse pinned OpenBao recovery with disposable secrets only
+        run: python3 scripts/production/rehearse_openbao_recovery.py --ci
 
   compromised-password-security:
     name: Compromised Password security suite
@@ -149,6 +164,7 @@ jobs:
     needs:
       - contract-quality
       - repository-structure
+      - openbao-recovery
       - compromised-password-security
       - notification-security
       - identity-security
@@ -164,6 +180,7 @@ jobs:
         env:
           CONTRACT_RESULT: ${{ needs.contract-quality.result }}
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
+          OPENBAO_RESULT: ${{ needs.openbao-recovery.result }}
           COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
           NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
           IDENTITY_RESULT: ${{ needs.identity-security.result }}
@@ -180,6 +197,10 @@ jobs:
           fi
           if [ "${REPOSITORY_RESULT}" != 'success' ]; then
             echo "Repository structure verification result: ${REPOSITORY_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${OPENBAO_RESULT}" != 'success' ]; then
+            echo "OpenBao TLS and Raft recovery result: ${OPENBAO_RESULT}" >&2
             exit 1
           fi
           if [ "${COMPROMISED_PASSWORD_RESULT}" != 'success' ]; then
