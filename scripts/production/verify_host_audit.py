@@ -42,8 +42,13 @@ def protected_rules(path: Path) -> bytes:
         os.close(descriptor)
 
 
-def canonical_rules(raw: str) -> set[tuple]:
-    """Compare kernel output aliases without hiding unknown/extra suppressions."""
+def canonical_rules(raw: str) -> dict[str, tuple]:
+    """Compare aliases while preserving first-match order within each kernel list.
+
+    auditctl can emit filter lists in a different group order from the input file;
+    rules inside each list must still match in order, not just by set/count.
+    """
+    groups: dict[str, list] = {}
     rules = []
     for line in raw.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
@@ -51,6 +56,14 @@ def canonical_rules(raw: str) -> set[tuple]:
         tokens = shlex.split(line)
         if len(tokens) % 2 or tokens[0] not in ("-a", "-w"):
             raise ValueError("unsupported audit rule")
+        if tokens[0] == "-w":
+            group = "exit"
+        else:
+            parts = tokens[1].split(",")
+            lists = set(parts) - {"never", "always"}
+            if len(parts) != 2 or len(lists) != 1:
+                raise ValueError("invalid audit filter")
+            group = lists.pop()
         pairs = []
         for option, value in zip(tokens[::2], tokens[1::2], strict=True):
             if option == "-k":
@@ -62,10 +75,12 @@ def canonical_rules(raw: str) -> set[tuple]:
             if option in ("-a", "-S", "-p"):
                 value = ",".join(sorted(value.split(","))) if option != "-p" else "".join(sorted(value))
             pairs.append((option, value))
-        rules.append(tuple(sorted(pairs)))
+        rule = tuple(sorted(pairs))
+        rules.append(rule)
+        groups.setdefault(group, []).append(rule)
     if not rules or len(rules) > 128 or len(set(rules)) != len(rules):
         raise ValueError("missing, excessive or duplicate audit rules")
-    return set(rules)
+    return {group: tuple(entries) for group, entries in groups.items()}
 
 
 def kernel_health(raw: str) -> dict[str, int]:
@@ -118,7 +133,7 @@ def verify(expected_sha256: str) -> dict:
         raise ValueError("HOST_AUDIT_CHECK_FAILED=" + stage) from None
     return {"schema_version": 1, "observed_at": datetime.now(timezone.utc).isoformat(),
             "local_rule_verification": "Passed", "policy_sha256": digest,
-            "active_rule_count": len(expected), "kernel": health,
+            "active_rule_count": sum(len(entries) for entries in expected.values()), "kernel": health,
             "scope": "rule-file and active-kernel consistency on this boot only",
             "event_coverage": "Not verified", "audit_readiness": "Not verified",
             "jit_readiness": "Not verified", "production_readiness": "Not verified"}

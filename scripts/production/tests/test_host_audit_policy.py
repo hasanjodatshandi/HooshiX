@@ -82,6 +82,14 @@ class HostAuditVerificationTest(unittest.TestCase):
             with self.subTest(raw=raw[:40]), self.assertRaisesRegex(ValueError, "active_rules"):
                 self.run_verification(rules=raw)
 
+    def test_filter_group_dump_order_allowed_but_rule_priority_changes_rejected(self):
+        lines = POLICY.decode().splitlines()
+        regrouped = "\n".join(lines[2:] + lines[:2])
+        self.assertEqual("Passed", self.run_verification(rules=regrouped)["local_rule_verification"])
+        lines[2], lines[3] = lines[3], lines[2]
+        with self.assertRaisesRegex(ValueError, "active_rules"):
+            self.run_verification(rules="\n".join(lines))
+
     def test_lost_disabled_missing_daemon_duplicate_and_backlog_pressure_fail_closed(self):
         for raw in (STATUS.replace("lost 0", "lost 1"), STATUS.replace("enabled 1", "enabled 0"),
                     STATUS.replace("pid 123", "pid 0"), STATUS + "lost 0\n",

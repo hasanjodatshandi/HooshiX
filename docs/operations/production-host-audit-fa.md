@@ -33,7 +33,7 @@ sudo systemctl is-active auditd mariadb k3s wg-quick@wg-hooshix
 
 ابزار [verify_host_audit.py](../../scripts/production/verify_host_audit.py) فقط وضعیت را می‌خواند. تعداد یکسان rule کافی نیست؛ فایل نصب‌شده باید با SHA-256 نسخهٔ بازبینی‌شده برابر باشد و مجموعهٔ ruleهای فعال نیز دقیقاً با آن تطبیق کند. symlink، hardlink، parent قابل‌نوشتن برای دیگران، BOM/CRLF، rule اضافه/کم/تکراری، daemon غیرفعال، lost غیرصفر یا backlog از ۷۵٪ به بالا شکست است. exit صفر فقط سازگاری فایل و kernel همان boot را ثابت می‌کند؛ پوشش event، export، JIT و Production همواره `Not verified` باقی می‌مانند.
 
-هش candidate را روی checkout بازبینی‌شده بخوانید؛ هش فایل نصب‌شدهٔ ناشناخته را صرفاً برای سبزشدن نتیجه جای reference نگذارید:
+ترتیب ruleها داخل هر filter list نیز باید یکسان باشد؛ ترتیب نمایش گروه‌های kernel می‌تواند متفاوت باشد. هش candidate را روی checkout بازبینی‌شده بخوانید؛ هش فایل نصب‌شدهٔ ناشناخته را صرفاً برای سبزشدن نتیجه جای reference نگذارید:
 
 ```bash
 sha256sum infrastructure/production/host/audit.rules
