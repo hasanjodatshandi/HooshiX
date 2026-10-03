@@ -27,6 +27,10 @@ only.
 
 ## Verification
 
+The Stage 10 host-audit continuation reviews the existing local OS/MariaDB audit
+baseline and its reproducible verification. Local rule coverage does not establish
+off-host retention, privileged database/session audit, JIT, or Production readiness.
+
 Operator walkthrough (Persian): [independent installation guide](../../docs/operations/production-installation-fa.md).
 Reusable Windows offline CA sources and the pinned public-tool package builder live in
 `scripts/production/offline-ca/`. Each independent installation gets its own identity and new keys;
