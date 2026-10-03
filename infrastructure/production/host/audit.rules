@@ -1,0 +1,25 @@
+-a never,exclude -F msgtype=EXECVE
+-a never,exclude -F msgtype=PROCTITLE
+-w /etc/ssh/sshd_config -p wa -k ssh_config
+-w /etc/ssh/sshd_config.d -p wa -k ssh_config
+-w /etc/sudoers -p wa -k sudo_config
+-w /etc/sudoers.d -p wa -k sudo_config
+-w /etc/nftables.conf -p wa -k security_config
+-w /etc/nftables.d -p wa -k security_config
+-w /etc/wireguard -p wa -k security_config
+-w /etc/audit -p wa -k audit_config
+-w /etc/systemd/system -p wa -k systemd_config
+-w /etc/hooshix -p wa -k hooshix_config
+-w /etc/rancher/k3s -p wa -k k3s_config
+-w /etc/mysql -p wa -k database_config
+-w /usr/sbin/mariadbd -p x -k database_exec
+-w /usr/bin/mariadb -p x -k database_exec
+-w /usr/bin/mariadb-admin -p x -k database_exec
+-w /usr/lib/mysql/plugin/server_audit.so -p rxa -k database_audit_plugin
+-a always,exit -F arch=b64 -S execve,execveat -F auid>=1000 -F auid!=4294967295 -k process_exec
+-a always,exit -F arch=b64 -S setuid,setgid,setreuid,setregid,setresuid,setresgid,setfsuid,setfsgid,capset -k privilege_change
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k kernel_module
+-a always,exit -F arch=b64 -S mount,umount2 -k mount_change
+-a always,exit -F arch=b64 -S ptrace -k ptrace
+-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time_change
+-w /var/log/auth.log -p wa -k auth_log

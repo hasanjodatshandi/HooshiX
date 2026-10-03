@@ -311,6 +311,7 @@ docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
 docs/operations/production-audit-sink-parspack-fa.md
+docs/operations/production-host-audit-fa.md
 docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/production-jit-usage-fa.md
@@ -357,6 +358,8 @@ infrastructure/production/README.md
 infrastructure/production/data/data-policy.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json
+infrastructure/production/host/audit.rules
+infrastructure/production/host/mariadb-audit.cnf
 infrastructure/production/host/nftables-management-ssh.nft
 infrastructure/production/host/sshd-human-match.tail
 infrastructure/production/host/sshd_config
@@ -517,6 +520,7 @@ scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-host-inspection.ps1
 scripts/production/test_jit_systemd_expiry.py
+scripts/production/tests/test_host_audit_policy.py
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_install_audit_prerequisite.py
 scripts/production/tests/test_jit_broker.py
@@ -531,6 +535,7 @@ scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_verify.py
 scripts/production/verify.py
+scripts/production/verify_host_audit.py
 scripts/production/verify_release.py
 services/authorization-service/.dockerignore
 services/authorization-service/Dockerfile

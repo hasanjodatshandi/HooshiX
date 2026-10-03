@@ -1,0 +1,11 @@
+[mariadb]
+# Connection lifecycle only. Privileged SQL audit remains a separate commissioning gate.
+# SQL text can contain credentials and restricted customer content.
+plugin_load_add = server_audit
+server_audit = FORCE_PLUS_PERMANENT
+server_audit_logging = ON
+server_audit_events = CONNECT
+server_audit_output_type = FILE
+server_audit_file_path = /var/log/mariadb/audit.log
+server_audit_file_rotate_size = 10485760
+server_audit_file_rotations = 5
