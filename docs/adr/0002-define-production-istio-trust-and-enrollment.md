@@ -59,6 +59,16 @@ Retry/fallback semantics remain owned by the application/dependency contract; me
 
 ## Verification requirements
 
+### Owner-approved existing Root continuation (2026-10-04)
+
+The owner has requested reuse of the existing Root for this owner's
+`hooshix-production` / `production-single-server` installation instead of regenerating it.
+This coherent change will bind that approval to the exact public certificate and add
+offline-tool compatibility. It does not approve other roots, remove offline private-key
+custody, or constitute mesh installation/Production-readiness evidence. Historical
+receipts retain their original assertions; owner approval and executed evidence remain
+separate.
+
 Verify CA/key custody, certificate rotation/overlap, Ambient enrollment, dedicated ServiceAccounts, STRICT mTLS positive/negative paths, least-privilege authorization, NetworkPolicy interaction including HBONE/health traffic, waypoint behavior when present, `istioctl analyze`, and absence of root private key material from Kubernetes/OpenBao.
 
 ## Rollback considerations
