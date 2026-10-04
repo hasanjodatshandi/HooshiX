@@ -187,6 +187,9 @@ ConfigMap مشتق از `openbao-server.json`، Service داخلی headless و S
 درخواست هشت GiB برای PVC سقف مصرف filesystem را ثابت نمی‌کند؛ برخی storage classها
 مثل local-path آن را quota نمی‌کنند. پیش از نصب، enforcement واقعی quota/فضای
 رزرو و رفتار پرشدن volume باید آزموده شود؛ storage فاقد کنترل رشد تأیید نمی‌شود.
+برای VPS فعلی، [فضای ext4 محدود و راهنمای اجرای محلی](production-openbao-storage-fa.md)
+بنیاد این حد است؛ نصب filesystem به‌تنهایی PV، guard mount-loss، OpenBao یا
+آمادگی Production را تأیید نمی‌کند.
 حجم audit، rotation/export و reserve دیسک باید قبل از استفادهٔ واقعی اندازه‌گیری
 و محدود شوند؛ PVC پرشده نباید باعث حذف evidence یا ادامهٔ grant جدید شود.
 

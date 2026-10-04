@@ -63,6 +63,41 @@ Sources: [official 2.6.4 release](https://github.com/openbao/openbao/releases/ta
 
 ## Verification Requirements
 
+### Bounded single-server storage foundation
+
+For the owner's current Ubuntu 26.04 amd64 VPS, OpenBao's proposed 8GiB PVC
+is backed by a separately mounted, fully preallocated 8GiB ext4 file filesystem.
+This is a non-HA host provisioning foundation, not a Kubernetes deployment or
+a general storage provisioner. Existing partitions are never resized/formatted.
+The backing file is root-only, protected against replacement and hard links;
+mount flags include nodev/nosuid/noexec, with no discard. A dedicated systemd
+mount unit persists the mount configuration; actual reboot persistence remains
+unverified until observed on the target. The unmounted directory is root-only
+and empty; OpenBao's data subdirectory on the mounted filesystem is mode 0700,
+owned by UID/GID 10001. Existing/partial files are preserved, never reformatted.
+
+Later reviewed GitOps may bind a static **local** PV (not hostPath) with Retain,
+exact node affinity and a no-provisioner WaitForFirstConsumer StorageClass.
+That activation must enforce mount/backing identity before K3s/workload startup
+and runtime mount-loss failure; the host mount unit alone is NOT that guard.
+Until those fail-closed activation, target storage, strict mesh/admission, TLS,
+staging and recovery checks pass, no PV/workload is enabled. A directory-based
+local-path capacity request alone does not satisfy the filesystem limit.
+
+The host installer reserves at most 8GiB and requires at least 30% host-filesystem
+space remaining immediately afterwards. This install safeguard does not prove
+complete-stack headroom, backup durability or disk-I/O SLOs. CI uses only a 64MiB
+disposable filesystem to test non-root ENOSPC, remount persistence and cleanup;
+it never downloads a corpus or allocates 8GiB on the developer machine. Existing
+host tool package versions are explicitly checked; changes require review.
+See the [operator guide](../operations/production-openbao-storage-fa.md).
+
+Native semantics: [systemd mount](https://github.com/systemd/systemd/blob/v259.5/man/systemd.mount.xml),
+[ext4 formatting](https://github.com/tytso/e2fsprogs/blob/v1.47.2/misc/mke2fs.8.in),
+[loop mount](https://github.com/util-linux/util-linux/blob/v2.41.3/sys-utils/mount.8.adoc).
+
+### Existing deployment gates
+
 - render staging and production desired state;
 - run Helm/Kustomize/Kubernetes schema/policy validation;
 - verify immutable image/chart digests and scan rendered output for secrets;

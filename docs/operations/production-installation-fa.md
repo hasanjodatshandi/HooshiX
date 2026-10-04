@@ -315,6 +315,8 @@ cluster state را پاک نکنید و installer یکسان را بی‌تغی�
 | Argo CD | GitOps مصوب، exact digest، prune امن برای داده، بدون secret در values/Git |
 
 نام منطقی secrets و referenceها در Git قابل ثبت است؛ مقدار secrets فقط در مرز مصوب secret management.
+برای فضای ۸GiB VPS فعلی، [راهنمای storage محدود](production-openbao-storage-fa.md)
+را دنبال کنید؛ installer فقط filesystem را می‌سازد، نه Secret/PV/OpenBao.
 unseal shares و recovery credentials را روی همان VPS یا یک حساب مشترک جمع نکنید.
 installer عمومی کامل همه این اجزا هنوز بخشی از کار باقیمانده Stage 10 است؛ از `kind` یا
 developer runtime برای اثبات Production استفاده نکنید.

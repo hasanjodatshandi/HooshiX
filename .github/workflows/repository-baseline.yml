@@ -166,6 +166,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify bounded OpenBao storage on a 64MiB disposable filesystem
+        run: |
+          set -euo pipefail
+          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            python3 scripts/production/rehearse_openbao_storage.py --ci \
+            | tee "$RUNNER_TEMP/openbao-storage-receipt.json"
+      - name: Retain public storage evidence only, never disk images
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: openbao-storage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/openbao-storage-receipt.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Install checksum-pinned fixture tools only on disposable runner
         run: |
           set -euo pipefail
