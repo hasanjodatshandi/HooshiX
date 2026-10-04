@@ -47,8 +47,7 @@ def guard_rehearsal(root, image, volume, mount_name, size):
     missing_bind = root / 'new-bind'
     try:
         for path, text in ((guard_unit, storage.guard_unit(script, mount_name)),
-                           (dummy_unit, f'[Unit]\nBindsTo={guard_name}\nAfter={guard_name}\n'
-                            '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')):
+                           (dummy_unit, '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')):
             storage.create_file(path, text.encode())
             created.append(path)
         storage.run(['/usr/bin/systemd-analyze', 'verify', str(guard_unit), str(dummy_unit)])
@@ -56,8 +55,15 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         # Native kubelet-compatible permissions must not cause a false trip.
         os.chmod(volume / 'data', 0o2770)
         storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
+        storage.run(['/usr/bin/systemctl', 'start', guard_name], timeout=20)
         storage.require(storage.run(['/usr/bin/systemctl', 'is-active', guard_name]) == 'active',
                         'GUARD_STARTUP_FAILED')
+        # Mirror installer integration: attach a healthy guard to an already running service.
+        dummy_unit.write_text(f'[Unit]\nBindsTo={guard_name}\nAfter={guard_name}\n'
+                              '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')
+        storage.run(['/usr/bin/systemctl', 'daemon-reload'])
+        storage.require(guard_name in storage.run(['/usr/bin/systemctl', 'show', dummy_name,
+                         '--property=BindsTo', '--value']).split(), 'LIVE_BIND_NOT_LOADED')
         storage.run(['/usr/bin/mount', '-o', 'remount,ro', str(volume)])
         wait_inactive(dummy_name)
         wait_inactive(guard_name)
@@ -117,7 +123,7 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         _, status = os.waitpid(child, 0)
         storage.require(os.waitstatus_to_exitcode(status) == 0, 'NONROOT_ROOT_FALLBACK_ALLOWED')
         storage.run(['/usr/bin/systemctl', 'start', mount_name])
-        return {label: 'Passed' for label in ('startup_identity', 'fsGroup_permissions',
+        return {label: 'Passed' for label in ('startup_identity', 'live_dependency_binding', 'fsGroup_permissions',
                 'readonly_fault_stop', 'backing_loss_stop', 'unexpected_unmount_stop',
                 'explicit_rearm_only', 'unmounted_nonroot_fallback_denied',
                 'existing_bind_retained', 'absent_source_bind_denied')}

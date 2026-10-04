@@ -176,7 +176,9 @@ CI موجود `OpenBao Kubernetes foundation` نمونهٔ ۶۴MiB را می‌�
 تا ENOSPC می‌نویسد، unmount/remount و marker/hash و cleanup را بررسی می‌کند؛
 محافظ واقعی systemd با یک dependent بی‌ضرر را برای UUID نامعتبر در startup،
 read-only، گم‌شدن backing، unmount ناگهانی، عدم re-arm خودکار، fsGroup و رد
-نوشتن غیرroot روی مسیر unmounted آزمایش می‌کند. API موقت Kubernetes schema
+نوشتن غیرroot روی مسیر unmounted آزمایش می‌کند. اتصال dependency به سرویس
+از قبل روشن بدون restart، حفظ bind موجود و رد bind جدید با source گم‌شده
+نیز بررسی می‌شوند. API موقت Kubernetes schema
 کاندیدای local PV را نیز بررسی می‌کند؛ این schema شاهد bind واقعی PV هدف نیست.
 artifact فقط رسید JSON است، نه image/filesystem یا secret. روی Windows/VPS
 این rehearsal را اجرا نکنید.
@@ -202,6 +204,6 @@ Istio identity and authorization impact: None; no active workload/policy promoti
 Logging and PII impact: finite public diagnostics; worker output discarded; no credentials
 Observability added or changed: systemd health/watchdog and bounded public CI receipt; no production alert claim
 Build/CI/architecture enforcement changed: existing required fixture expanded, no gate removal
-Tests executed: local focused storage tests Passed; protected final-head/main and native fixture results tracked in PR #171
+Tests executed: 228 local production tests and repository/contract/context/diff checks Passed; protected final-head/main and native fixture results tracked in PR #171
 Architecture deviations: None
 Rollback considerations: preserve data, approved maintenance, no blind format/restart/guard bypass
