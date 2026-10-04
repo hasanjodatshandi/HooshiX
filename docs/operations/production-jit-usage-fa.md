@@ -260,6 +260,11 @@ OpenBao دو سهم از سه سهم است. مالک باید مواد بازی
 را آماده می‌کنند. این فایل‌ها installer یا manifest قابل apply نیستند و نباید
 به‌جای بستهٔ نصب، دستی روی production اجرا شوند.
 
+renderer عمومی foundation اکنون در `scripts/production/render_openbao_candidate.py`
+قرار دارد. این خروجی هنوز در ریشهٔ فعال Argo CD نیست و مسیرهای client/ESO/host
+را عمداً باز نمی‌کند. راهنمای استفاده و تفاوت «candidate» با استقرار واقعی در
+[راهنمای OpenBao](production-openbao-fa.md) آمده است؛ sudo دائمی تغییر نمی‌کند.
+
 آزمون **OpenBao TLS and Raft recovery** در GitHub با کلیدهای موقتی و مصنوعی
 اجرا می‌شود: بازشدن با دو سهم، بسته‌ماندن با یک سهم، restart، snapshot و restore
 روی نمونهٔ خالی و جدا، محدودبودن token خواندن، نبود secret در audit و لغو root

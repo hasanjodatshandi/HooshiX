@@ -17,13 +17,15 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from render_openbao_candidate import ALIVE, STATUS
+
 ROOT = Path(__file__).resolve().parents[2]
 SECRETS = ROOT / "infrastructure/production/secrets"
 BOUND = 8 * 1024 * 1024
 STEPS = frozenset({"image-pull", "image-version", "tls-fixture", "source-start", "source-health",
                    "tls-negative", "source-init", "kv-and-acl", "snapshot", "restart", "restart-read",
                    "restore-start", "restore-init", "snapshot-restore", "restore-read",
-                   "root-revoke", "audit-redaction", "cleanup"})
+                   "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed"})
 
 
 class RehearsalFailed(Exception):
@@ -173,6 +175,11 @@ def rehearse():
             health = client.wait_health(501)
             if health["version"] != "2.6.1":
                 raise RehearsalFailed("fixture health version mismatch")
+            step("probe-sealed")
+            for probe in (ALIVE, STATUS + '; code=$?; test "$code" -eq 2'):
+                command(["/usr/bin/docker", "exec", "-e", "BAO_ADDR=https://127.0.0.1:8200",
+                         "-e", "BAO_CACERT=/openbao/tls/tls.crt", "-e", "BAO_CLIENT_TIMEOUT=3s",
+                         "-e", "BAO_MAX_RETRIES=0", source, "/bin/sh", "-c", probe])
             # A client trusting the system roots must reject this disposable, untrusted certificate.
             step("tls-negative")
             try:
@@ -184,6 +191,10 @@ def rehearse():
                 raise RehearsalFailed("fixture TLS verification bypass")
             step("source-init")
             keys, root_token = initialize(client)
+            step("probe-unsealed")
+            command(["/usr/bin/docker", "exec", "-e", "BAO_ADDR=https://127.0.0.1:8200",
+                     "-e", "BAO_CACERT=/openbao/tls/tls.crt", "-e", "BAO_CLIENT_TIMEOUT=3s",
+                     "-e", "BAO_MAX_RETRIES=0", source, "/bin/sh", "-c", STATUS])
             step("kv-and-acl")
             client.call("sys/mounts/fixture", "POST", {"type": "kv", "options": {"version": "2"}}, root_token, 204)
             canary = "ci-only-" + uuid.uuid4().hex

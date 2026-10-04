@@ -199,6 +199,14 @@ Remediation must not weaken these verified current properties:
   Image metadata/configuration and a CI rehearsal do not commission a production
   Raft/PVC, signed promotion, hourly off-host snapshots, secret synchronization
   or custody. No production rollout is enabled by these files.
+- OpenBao continuation on 2026-10-04 prepares a public-only Kubernetes foundation
+  candidate, not an active production overlay. A deterministic renderer retains
+  the existing image/config authority and adds bounded non-root execution,
+  retained Raft PVC, private TLS reference, sealed-safe probes and deny-all
+  network/mesh controls. The existing CI lane additionally exercises the probe
+  commands against the pinned native image. Target-cluster/staging, admission,
+  client identity edges, off-host snapshots and commissioning remain unverified;
+  see `../operations/production-openbao-fa.md` for operator steps and limits.
 - Next: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe

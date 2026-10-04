@@ -75,6 +75,9 @@ jobs:
       - name: Verify production
         run: make production-verify
 
+      - name: Render isolated OpenBao candidate without secrets or cluster access
+        run: python3 scripts/production/render_openbao_candidate.py --candidate --storage-class ci-review-only > /dev/null
+
       - name: Verify native JIT expiry on disposable runner
         run: sudo env GITHUB_ACTIONS=true python3 scripts/production/test_jit_systemd_expiry.py --system
 

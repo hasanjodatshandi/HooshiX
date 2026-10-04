@@ -315,6 +315,7 @@ docs/operations/production-host-audit-fa.md
 docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/production-jit-usage-fa.md
+docs/operations/production-openbao-fa.md
 docs/operations/wireguard-management-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
@@ -516,6 +517,7 @@ scripts/production/readiness.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
+scripts/production/render_openbao_candidate.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-host-inspection.ps1
@@ -526,6 +528,7 @@ scripts/production/tests/test_install_audit_prerequisite.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_openbao_candidate.py
 scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_parspack_audit_transport.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
