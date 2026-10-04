@@ -152,6 +152,29 @@ Tests executed: 18 focused OpenBao tests and 165 production tests Passed locally
 Architecture deviations: None; candidate is deliberately outside active GitOps roots
 Rollback considerations: retain PVC, reviewed prior digest/config, never blind downgrade/delete; live rollback Not verified
 
+Artifact continuation review:
+
+Architecture review mode: full-read
+Architecture document version/commit: main@d8aef05a23103a2f8637730dbc105de94cd8d736
+Architecture sections reviewed: delivery/supply chain, secret authority, readiness, security tool ownership
+Search terms used: OpenBao, SBOM, Grype, Syft, freshness, immutable digest, promotion
+ADRs reviewed or changed: ADR-0011, ADR-0017, ADR-0035, ADR-0038, ADR-0045 reviewed; None changed
+Changed bounded context/module: credential-free CI platform artifact evidence
+Contracts changed: bounded public candidate scan receipt CLI; existing release chain unchanged
+Database migration: Not applicable
+Transaction boundary: Not applicable
+Timeout/deadline behavior: CI 12m; DB update 180s, catalog 300s, scan 180s
+Retry/cancellation/concurrency behavior: single explicit DB update, no layered retry; isolated disposable runner
+Kafka/event and idempotency behavior: Not applicable
+Security impact: exact public digest, nonempty SBOM, freshness and severity fail closed; no Production credentials
+Istio identity and authorization impact: Not applicable; no runtime identity or grants changed
+Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
+Observability added or changed: hash-bound candidate receipt and retained failed scan reports
+Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
+Tests executed: 7 artifact tests and all 172 production tests Passed locally; final-head CI pending
+Architecture deviations: None; no platform promotion or application release trust expansion
+Rollback considerations: source change revert only; no live deployment/data/access changes
+
 منابع: Context7 برای OpenBao فراخوانی شد و رفتار exitهای status، پارامترهای CA،
 timeout و retry با مستندات رسمی tag دقیق 2.6.1 تطبیق داده شد:
 [status](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/status.mdx)،
