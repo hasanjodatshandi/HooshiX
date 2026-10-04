@@ -17,8 +17,11 @@ staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دا
 ### انتشار کاندیدای خصوصی بدون نصب
 
 اجرای اولیهٔ `37218037965` بعد از approval مالک در مرحلهٔ copy شکست خورد؛
-هیچ receipt موفق یا امضایی صادر نشد و auth موقت پاک شد. اصلاح جاری فقط
-انتخاب platform برای digest تک‌معماری و تست regression آن را پوشش می‌دهد؛
+هیچ receipt موفق یا امضایی صادر نشد و auth موقت پاک شد. Cosign 3.0.6 گزینهٔ
+`--platform` را فقط برای multiarch index قبول می‌کند؛ pin فعلی manifest تک‌معماری
+است. فرمان copy بنابراین **بدون `--platform`** همان digest را می‌گیرد؛ Syft و
+validator معماری و digest مقصد را همچنان بررسی می‌کنند. اصلاح جاری فقط
+این سازگاری، تست regression و diagnostics امن آن را پوشش می‌دهد؛
 اجازهٔ نصب یا عبور از approval/scan/signature را تغییر نمی‌دهد.
 
 بعد از merge و موفقیت `Repository baseline` برای **همان SHA روی main**:
@@ -32,6 +35,10 @@ staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دا
 5. فقط اگر job و cleanup `Passed` شدند، artifact عمومی
    `openbao-publication-<run_id>-<attempt>` و `receipt.json` را بررسی کنید.
    نبود receipt یا job ناموفق، موفقیت انتشار/امضا نیست.
+
+فایل عمومی `attempt.json` فقط ثبت شروع تلاش است و حتی هنگام خطای اولیه باقی
+می‌ماند؛ مدرک موفقیت نیست. خطای native فقط با category محدود
+`OPENBAO_TOOL_FAILURE` گزارش می‌شود؛ متن خام پاسخ/error/credential منتشر نمی‌شود.
 
 مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-openbao@sha256:<same-digest>`
 است؛ tag فقط locator کاندیداست، نه authority استقرار. Cosign 3.0.6 از installer
@@ -54,6 +61,7 @@ build نیست. receipt، staging/admission/deployment/promotion را `Not verif
 provenance/receipt عمومی ۳۰ روز نگهداری می‌شوند؛ Root/Shamir/کلید خواندن VPS در آن نیستند.
 
 مراجع نسخهٔ دقیق: [Cosign copy 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/cmd/cosign/cli/copy.go)،
+[platform selection 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/pkg/oci/platform/platform.go)،
 [attestation 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/pkg/cosign/attestation/attestation.go).
 Context7 و سورس رسمی همین tag برای رفتار copy/attestation تطبیق داده شدند.
 

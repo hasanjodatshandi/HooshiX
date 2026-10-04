@@ -22,8 +22,19 @@ BUILD_TYPE = "https://github.com/hasanjodatshandi/HooshiX/openbao-upstream-impor
 
 def run(argv: list[str], timeout: int = 180) -> str:
     # No raw child output/errors: registry authentication and OIDC stay out of logs.
-    return subprocess.run(argv, check=True, capture_output=True, text=True,
-                          timeout=timeout).stdout
+    try:
+        return subprocess.run(argv, check=True, capture_output=True, text=True,
+                              timeout=timeout).stdout
+    except subprocess.CalledProcessError as error:
+        reason = "tool-error"
+        for needle, category in (("specified reference is not a multiarch image", "single-manifest-platform-selection"),
+                                 ("UNAUTHORIZED", "registry-unauthorized"), ("DENIED", "registry-denied"),
+                                 ("already exists. Use `-f`", "destination-conflict")):
+            if needle in (error.stderr or ""):
+                reason = category
+                break
+        print("OPENBAO_TOOL_FAILURE=" + reason, file=sys.stderr)
+        raise  # Never print raw stderr, argv, tokens, response bodies or URLs.
 
 
 def stage(name: str) -> None:
@@ -85,12 +96,18 @@ def publish(directory: Path, env: dict[str, str]) -> dict:
     image = REPOSITORY + "@sha256:" + digest
     tag = REPOSITORY + ":candidate-" + digest
     directory.mkdir(mode=0o700)  # Fresh per-run evidence; no stale success receipt reuse.
+    (directory / "attempt.json").write_text(json.dumps({
+        "schema_version": 1, "repository_revision": revision,
+        "upstream_image": pin["image"], "publication": "Not verified",
+        "purpose": "attempt-only-not-success-receipt"}, sort_keys=True) + "\n")
     versions = {name: run([name, "version"]) for name in ("syft", "grype", "cosign")}
     for name, version in (("syft", "1.51.0"), ("grype", "0.117.0"), ("cosign", "v3.0.6")):
         if not re.search(r"(?<![\w.])" + re.escape(version) + r"(?![\w.])", versions[name]):
             raise ValueError("pinned release tools required")
     stage("copy")
-    run(["cosign", "copy", "--platform=linux/amd64", pin["image"], tag], timeout=300)
+    # The pin is already the single linux/amd64 manifest, not its multiarch index.
+    # Cosign 3.0.6 --platform only accepts indexes; destination scan verifies architecture.
+    run(["cosign", "copy", pin["image"], tag], timeout=300)
     stage("private-package")
     if run(["gh", "api", PACKAGE_API, "--jq", ".visibility"], timeout=20).strip() != "private":
         raise ValueError("owned package must be private before signing")
