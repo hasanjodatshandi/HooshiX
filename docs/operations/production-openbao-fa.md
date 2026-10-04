@@ -9,6 +9,10 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 
 ## ترتیب اجرا و نقطهٔ ادامه
 
+ادامهٔ فعلی: آزمون Kubernetes بنیاد OpenBao روی runner موقت GitHub آماده می‌شود.
+این آزمون از credential واقعی، VPS یا Root مالک استفاده نمی‌کند؛ نتیجهٔ آن فقط
+برای API/PVC/TLS/probe است و به‌تنهایی staging مصوب یا مجوز promotion نیست.
+
 1. آماده‌کردن workload تک‌نمونهٔ Raft، PVC با نگهداری هنگام حذف workload،
    TLS خصوصی، ServiceAccount مستقل، منابع محدود، NetworkPolicy و STRICT mTLS.
 2. آزمون ساختار و کنترل‌های منفی در pipeline موجود؛ آزمون native TLS/Raft
