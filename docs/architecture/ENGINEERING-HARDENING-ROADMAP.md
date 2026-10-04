@@ -211,7 +211,11 @@ Remediation must not weaken these verified current properties:
   evidence with current DB update, 120h maximum DB built age and High/Critical
   blocking, retained public receipts and negative tests. It does not commission
   OpenBao, sign/promote the artifact or change SSH/MCP/sudo.
-- Next: commission OpenBao with owner-controlled offline Shamir custody and
+- Artifact scan `37186602660` at `d1cbce42` failed: 8 High + 2 Critical package
+  matches in OpenSSL `libssl3`/`libcrypto3` 3.5.7-r0 (scanner fix 3.5.8-r0).
+  PR #163 remains draft/unmerged. Immediate next: review and validate a patched
+  immutable artifact, repeat scanner/native recovery checks; no waiver/install.
+- After artifact remediation: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe
   zero-standing-admin cutover. SSH/MCP configuration is outside this continuation.

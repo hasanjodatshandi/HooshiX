@@ -22,6 +22,17 @@ fail closed. Public evidence is retained for 30 days, including failed scans;
 only a successful validation creates a candidate receipt. This is not signature,
 provenance, actual staging, deployed-inventory rescan or production promotion evidence.
 
+Executed artifact scan at `d1cbce42a5fd81ebbf616ca911f8e77f005931d4`, Repository
+baseline run `37186602660`, job `111389727930`: `Failed` (Grype exit 2). The pinned
+upstream image has 10 blocking package matches: 8 High and 2 Critical in
+`libssl3`/`libcrypto3` version `3.5.7-r0`; scanner reports fixes at `3.5.8-r0`.
+Public CI annotations identify CVE-2026-63072, CVE-2026-14457, CVE-2026-63073
+(Critical), CVE-2026-18798 and CVE-2026-63076, each on both packages. Reports were
+retained; no successful candidate receipt or promotion is claimed. PR #163 remains
+draft/unmerged. Next: review a patched immutable artifact without silently changing
+the approved OpenBao version, then rerun exact-artifact scanning and native recovery.
+Do not bypass the gate, install the vulnerable image or mark Stage 10 completed.
+
 On 2026-10-02 a private SSH session inspected and partially commissioned host audit. `auditd` was active but had no rules. The reviewed `infrastructure/production/host/audit.rules` loaded 23 rules through `augenrules --load` on the observed boot; kernel reported `enabled 1`, `lost 0`, `backlog 0`. MariaDB `SERVER_AUDIT` was enabled for `CONNECT` only, writing to a bounded local file owned by `mysql:adm`; real connection and temporary DDL exercise confirmed the plugin path, then SQL-text events were disabled because DDL/DCL can expose secrets. Native `sudo-rs 0.2.13-0ubuntu1.2` rejected the tested sudoers I/O options; the invalid file was moved out of the active directory and `visudo -cf` passed. No sudo I/O/session coverage, Kubernetes API or database privileged-action audit, off-host export, tamper-resistant receipt, OpenBao materialization, JIT cutover, or post-reboot audit validation is claimed. Existing standing sudo remains; Production Readiness is `NOT VERIFIED`. The reproducible partial procedure and limits are in `../operations/production-host-audit-fa.md`. The audit policy is tracked in this repository, while live recovery/export evidence remains outstanding.
 
 On 2026-10-03 the reviewed 25-rule candidate was deployed after preserving the previous 23-rule file. `augenrules --load` succeeded; verifier receipt reported exact policy/kernel consistency, `enabled=1`, `lost=0`, and `backlog=0`. A harmless canary argument produced zero `EXECVE`/`PROCTITLE` matches. This proves the local filter behavior on the current boot only; event coverage, off-host export, audit/JIT and Production readiness remain `Not verified`. Native sudo-rs still lacks the tested I/O settings; upstream sudo is installed alongside it, but neither alternative nor sudoers was changed. OpenBao/JIT, full event coverage, safe session recording and recovery remain commissioning gates.

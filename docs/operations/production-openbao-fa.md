@@ -131,6 +131,14 @@ receipt صریحاً promotion و signature/provenance را `Not verified` ثب�
 [Grype freshness](https://github.com/anchore/grype/blob/v0.117.0/cmd/grype/cli/options/database.go).
 Context7 برای CLI اسکن و DB freshness استفاده شد و schema با tagهای دقیق تطبیق یافت.
 
+نتیجهٔ واقعی run `37186602660` روی commit `d1cbce42`:
+job اسکن `Failed` شد (exit 2)؛ ۸ High و ۲ Critical روی
+`libssl3/libcrypto3=3.5.7-r0`، با fix گزارش‌شدهٔ `3.5.8-r0` وجود دارد.
+PR #163 هنوز draft و merge نشده است. image فعلی را نصب نکنید. ادامهٔ کار باید
+artifact اصلاح‌شده و immutable را بررسی کند، بدون تغییر خاموش نسخهٔ موردتأیید
+OpenBao، سپس اسکن و بازیابی native روی همان artifact تکرار شود. این خطا
+نباید با suppression، `--only-fixed` یا خاموش‌کردن gate دور زده شود.
+
 Architecture review mode: full-read
 Architecture document version/commit: main@58c067ecac27b5fdbab93801c765d59b282b3404
 Architecture sections reviewed: platform, runtime/deployment, security/secrets, readiness, capacity, recovery, delivery
@@ -148,7 +156,7 @@ Istio identity and authorization impact: dedicated SA, Ambient/STRICT, deny-all 
 Logging and PII impact: probe output discarded; existing non-raw audit configuration unchanged
 Observability added or changed: startup/readiness/liveness only; exporter/alert/capacity Not verified
 Build/CI/architecture enforcement changed: existing production unit/render gate and native recovery probe checks
-Tests executed: 18 focused OpenBao tests and 165 production tests Passed locally; native probe/TLS/Raft job Passed on PR #162 at 68bea8aa (run 37183265521); final-head protected CI pending; Kubernetes runtime Not verified
+Tests executed: 18 focused OpenBao tests and 165 production tests Passed locally; PR #162 final-head and post-merge main baseline (37183798133) and frontend E2E (37183797999) Passed; Kubernetes runtime Not verified
 Architecture deviations: None; candidate is deliberately outside active GitOps roots
 Rollback considerations: retain PVC, reviewed prior digest/config, never blind downgrade/delete; live rollback Not verified
 
@@ -171,7 +179,7 @@ Istio identity and authorization impact: Not applicable; no runtime identity or 
 Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
 Observability added or changed: hash-bound candidate receipt and retained failed scan reports
 Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
-Tests executed: 7 artifact tests and all 172 production tests Passed locally; final-head CI pending
+Tests executed: 8 artifact tests and all 173 production tests Passed locally; repository structure and native OpenBao recovery Passed at d1cbce42 in run 37186602660; artifact scan Failed with 10 blocking matches; documentation-only final-head CI pending
 Architecture deviations: None; no platform promotion or application release trust expansion
 Rollback considerations: source change revert only; no live deployment/data/access changes
 
