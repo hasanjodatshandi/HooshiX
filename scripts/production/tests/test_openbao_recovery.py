@@ -86,8 +86,8 @@ class OpenBaoRecoveryTest(unittest.TestCase):
     def test_image_exact_pin_and_recovery_are_required_by_baseline(self):
         pin = json.loads((recovery.SECRETS / "openbao-image.json").read_text())
         self.assertEqual("2.6.4", pin["version"])
-        self.assertRegex(pin["image"], r"^ghcr.io/openbao/openbao-ubi@sha256:[a-f0-9]{64}$")
-        self.assertEqual("ubi10-minimal", pin["runtime_flavor"])
+        self.assertRegex(pin["image"], r"^ghcr.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}$")
+        self.assertEqual("distroless-static-nonroot", pin["runtime_flavor"])
         self.assertEqual("blocked-until-supply-chain-staging-and-recovery-evidence", pin["production_promotion"])
         workflow = (recovery.ROOT / ".github/workflows/repository-baseline.yml").read_text()
         baseline = workflow.split("  baseline:", 1)[1]
@@ -135,6 +135,12 @@ class OpenBaoRecoveryTest(unittest.TestCase):
                     recovery.command(["/usr/bin/docker", "version"])
                 self.assertNotIn("private-fixture", str(error.exception))
                 self.assertEqual(1, run.call_count)
+
+    def test_probe_sealed_exit_is_explicit_not_a_general_failure_bypass(self):
+        with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 2, b"sealed")):
+            self.assertEqual(b"sealed", recovery.command(recovery.STATUS, expected_exit=2))
+            with self.assertRaises(recovery.RehearsalFailed):
+                recovery.command(recovery.STATUS)
 
     def test_insufficient_share_does_not_unseal(self):
         from unittest.mock import Mock

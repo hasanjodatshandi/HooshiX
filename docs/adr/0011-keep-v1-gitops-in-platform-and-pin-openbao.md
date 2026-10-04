@@ -40,19 +40,25 @@ before merge. Current commissioning evidence does not establish a live OpenBao
 store; this change performs no live datastore upgrade. This source
 selection does not approve installation, signing, staging or production promotion.
 
-The selected runtime flavor is official `openbao-ubi` (UBI10 minimal), not a local
-rebuild. The Alpine 2.6.4 candidate passed native recovery but still failed Grype
-on zlib 1.3.2-r0 / CVE-2026-85091. Upstream zlib has a source fix but no newer
-published release at review time. UBI is independently scanned and rehearsed;
-switching flavor is not vulnerability adjudication or an exception. Upstream uses
-the same `/usr/bin/bao` binary layer for all flavors. The existing explicit UID,
-read-only filesystem, shell probes, TLS mounts, resources and no-dev entrypoint
-override are retained. Compressed artifact size is 142,186,491 bytes; target-disk
-and complete-stack resource evidence remain deployment gates. Signature/provenance
-and staging approval are still mandatory; no scanner suppression is added.
+The selected runtime flavor is official `openbao-distroless` (static nonroot),
+not a local rebuild. Alpine and UBI candidates failed the required scan. Upstream
+uses the same `/usr/bin/bao` binary layer across flavors. The explicit UID,
+read-only filesystem, TLS mounts, resources and no-dev entrypoint override remain.
+Shell-free startup/liveness use `bao read -field=sealed sys/seal-status`, an
+unauthenticated read-only endpoint available sealed or uninitialized; readiness
+uses `bao status -format=json` and succeeds only with exit 0 (unsealed). All probes
+use verified loopback TLS, mounted CA, 3s CLI timeout and zero retries. No HTTP/TCP
+probe, TLS bypass, token, shell, custom binary or sidecar is introduced. Native CI
+must verify sealed/unsealed/restart behavior and rejection of wrong TLS hostname
+on both command paths. Only public seal/status metadata can enter probe output.
+Compressed artifact size is 77,272,197 bytes; target-disk and complete-stack
+resource evidence remain deployment gates. Exact-digest scan, signature/provenance
+and staging approval remain mandatory; no scanner suppression is added.
 
 Sources: [official 2.6.4 release](https://github.com/openbao/openbao/releases/tag/v2.6.4),
 [official flavor Dockerfile](https://github.com/openbao/openbao/blob/v2.6.4/Dockerfile),
+[native read command](https://github.com/openbao/openbao/blob/v2.6.4/command/read.go),
+[seal-status API](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/api/system/seal-status.mdx),
 [zlib upstream fix discussion](https://github.com/madler/zlib/issues/1310).
 
 ## Verification Requirements

@@ -219,10 +219,10 @@ Remediation must not weaken these verified current properties:
   in run 37187139233. The candidate now uses official UBI10-minimal 2.6.4 at the
   same source revision, with exact digest/size recorded. Its own run `37187635536`
   at `8ba84ee7` passed native recovery but failed scanning on 10 High package
-  matches across five CVEs, all scanner `not-fixed`. Immediate next: reviewed
-  artifact remediation/adjudication and exact-digest rerun, not installation.
-  Distroless requires a separate compatible sealed-safe probe review because it
-  has no shell; no exception, suppression or probe weakening is authorized.
+  matches across five CVEs, all scanner `not-fixed`. The coherent remediation now
+  selects official distroless 2.6.4 with native shell-free verified-TLS probes,
+  reviewed in ADR-0011. Immediate next: exact-digest scan/recovery, not installation.
+  No exception, suppression, TLS bypass, sidecar or custom image is introduced.
 - After artifact remediation: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe

@@ -11,8 +11,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SECRETS = ROOT / "infrastructure/production/secrets"
 NAMESPACE = "hooshix-secrets"
 LABELS = {"app.kubernetes.io/name": "openbao"}
-STATUS = "bao status -format=json >/dev/null 2>&1"
-ALIVE = STATUS + "; code=$?; test \"$code\" -eq 0 || test \"$code\" -eq 2"
+# Same verified TLS endpoint, without a shell or interpreting sealed as an error.
+STATUS = ["/usr/bin/bao", "status", "-format=json"]
+ALIVE = ["/usr/bin/bao", "read", "-field=sealed", "sys/seal-status"]
 
 
 def candidate(storage_class: str) -> dict:
@@ -23,7 +24,7 @@ def candidate(storage_class: str) -> dict:
         raise ValueError("reviewed storage class required")
     pin = json.loads((SECRETS / "openbao-image.json").read_text())
     if (pin["version"] != "2.6.4" or not re.fullmatch(
-            r"ghcr\.io/openbao/openbao-ubi@sha256:[a-f0-9]{64}", pin["image"]) or
+            r"ghcr\.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}", pin["image"]) or
             pin["production_promotion"] != "blocked-until-supply-chain-staging-and-recovery-evidence"):
         raise ValueError("reviewed image pin required")
     config = json.loads((SECRETS / "openbao-server.json").read_text())
@@ -32,8 +33,8 @@ def candidate(storage_class: str) -> dict:
         return {"apiVersion": api, "kind": kind,
                 "metadata": {"name": name, "namespace": NAMESPACE}, **body}
 
-    def probe(command: str, period: int, failures: int) -> dict:
-        return {"exec": {"command": ["/bin/sh", "-c", command]},
+    def probe(command: list[str], period: int, failures: int) -> dict:
+        return {"exec": {"command": command.copy()},
                 "timeoutSeconds": 5, "periodSeconds": period, "failureThreshold": failures}
 
     namespace = {"apiVersion": "v1", "kind": "Namespace", "metadata": {
@@ -49,7 +50,7 @@ def candidate(storage_class: str) -> dict:
                                        {"name": "https-raft", "port": 8201, "targetPort": 8201}]})
     container = {"name": "openbao", "image": pin["image"], "imagePullPolicy": "IfNotPresent",
         # Bypass the upstream entrypoint's development/chown behavior.
-        "command": ["bao"], "args": ["server", "-config=/openbao/config/server.json"],
+        "command": ["/usr/bin/bao"], "args": ["server", "-config=/openbao/config/server.json"],
         "env": [{"name": "BAO_ADDR", "value": "https://127.0.0.1:8200"},
                 {"name": "BAO_CACERT", "value": "/openbao/tls/ca.crt"},
                 {"name": "BAO_CLIENT_TIMEOUT", "value": "3s"},

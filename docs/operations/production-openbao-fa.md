@@ -181,7 +181,7 @@ Istio identity and authorization impact: Not applicable; no runtime identity or 
 Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
 Observability added or changed: hash-bound candidate receipt and retained failed scan reports
 Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
-Tests executed: 9 artifact tests and all 175 production tests Passed locally; context/index/diff Passed; old 2.6.1 artifact scan Failed with 10 blocking matches; UBI 2.6.4 native recovery Passed but artifact scan Failed with 10 High matches at 8ba84ee7 / run 37187635536; all other baseline leaf jobs Passed
+Tests executed: 9 artifact tests and all 176 production tests Passed locally; context/index/diff Passed; old 2.6.1 artifact scan Failed with 10 blocking matches; UBI 2.6.4 native recovery Passed but artifact scan Failed with 10 High matches at 8ba84ee7 / run 37187635536; all other baseline leaf jobs Passed; final distroless artifact scan/recovery required
 Architecture deviations: None; no platform promotion or application release trust expansion
 Rollback considerations: source change revert only; no live deployment/data/access changes
 
@@ -198,7 +198,7 @@ timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق دا
 این pipeline صرفاً CI disposable است و خودش Argo CD/Production را اجرا نمی‌کند.
 
 در run `37187139233` نسخهٔ Alpine 2.6.4 بازیابی را گذراند، ولی اسکن یک High
-برای zlib (`CVE-2026-85091`) نشان داد. کاندیدای فعلی variant رسمی
+برای zlib (`CVE-2026-85091`) نشان داد. کاندیدای ردشده variant رسمی
 `ghcr.io/openbao/openbao-ubi` نسخهٔ 2.6.4، پایهٔ UBI10 minimal است؛ source commit
 باینری همان است و هیچ image سفارشی یا suppression ایجاد نشده. digest/index و
 حجم فشردهٔ حدود ۱۴۲ MB در `openbao-image.json` ثبت شده‌اند. آزمون‌های نسخهٔ قبلی
@@ -224,3 +224,19 @@ WSL/VPS شما انجام نمی‌شود. ظرفیت دیسک و runtime واق
 [Expat](https://access.redhat.com/security/cve/cve-2026-76641)،
 [OpenSSL DTLS](https://access.redhat.com/security/cve/cve-2026-84782).
 وجود توضیح vendor به‌تنهایی false-positive یا exception را اثبات نمی‌کند.
+
+### کاندیدای فعلی: distroless رسمی و probe بدون shell
+
+ADR-0011 اکنون variant رسمی `openbao-distroless:2.6.4` را انتخاب می‌کند؛ باینری
+همان release است، image سفارشی ساخته نمی‌شود و حجم فشرده حدود ۷۷ MB است.
+نیازی به shell نیست: startup/liveness فرمان `bao read -field=sealed sys/seal-status`
+را مستقیم اجرا می‌کنند؛ readiness فرمان `bao status -format=json` را اجرا می‌کند و
+فقط exit صفر را قبول می‌کند. وضعیت sealed/uninitialized باعث restart بیهوده نمی‌شود
+ولی اجازهٔ Ready شدن نمی‌دهد. خروجی probe فقط metadata عمومی وضعیت است؛ token یا
+محتوای secret خوانده نمی‌شود.
+
+همهٔ probeها همچنان HTTPS loopback، CA نصب‌شده، timeout سه‌ثانیه و صفر retry دارند؛
+TCP/HTTP probe، خاموش‌کردن TLS verification، sidecar یا فایل اجرایی جدید نداریم.
+CI هر دو مسیر native را با hostname گواهی اشتباه هم آزمایش می‌کند و انتظار خطا دارد.
+اسکن و بازیابی مستقل همین digest باید قبل از merge موفق شوند. پس از آن هم نصب واقعی
+به امضا/provenance، staging، storage/TLS/custody و recovery واقعی نیاز دارد.

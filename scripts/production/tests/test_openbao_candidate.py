@@ -1,7 +1,6 @@
 import contextlib
 import io
 import json
-import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -63,7 +62,7 @@ class OpenBaoCandidateTest(unittest.TestCase):
         for kind in ("requests", "limits"):
             self.assertEqual({"cpu", "memory", "ephemeral-storage"}, set(self.container["resources"][kind]))
         self.assertEqual(30, self.pod["terminationGracePeriodSeconds"])
-        self.assertEqual(["bao"], self.container["command"])
+        self.assertEqual(["/usr/bin/bao"], self.container["command"])
         self.assertEqual(["server", "-config=/openbao/config/server.json"], self.container["args"])
         for forbidden in ("hostNetwork", "hostPID", "hostIPC", "initContainers"):
             self.assertNotIn(forbidden, self.pod)
@@ -104,19 +103,18 @@ class OpenBaoCandidateTest(unittest.TestCase):
         self.assertEqual({}, self.items["AuthorizationPolicy"]["spec"])
         self.assertEqual("ambient", self.items["Namespace"]["metadata"]["labels"]["istio.io/dataplane-mode"])
 
-    def test_probe_exit_contract_sealed_does_not_restart_or_become_ready(self):
-        for code in (0, 1, 2, 127):
-            for command, expected in ((renderer.ALIVE, code in (0, 2)), (renderer.STATUS, code == 0)):
-                with self.subTest(code=code, command=command):
-                    # Fixed synthetic shell function: no OpenBao/image download locally.
-                    result = subprocess.run(["/bin/sh", "-c", f"bao() {{ return {code}; }}; " + command],
-                                            capture_output=True, timeout=2, check=False)
-                    self.assertEqual(expected, result.returncode == 0)
-                    self.assertEqual(b"", result.stdout)
-                    self.assertEqual(b"", result.stderr)
-        self.assertEqual(renderer.ALIVE, self.container["startupProbe"]["exec"]["command"][-1])
-        self.assertEqual(renderer.ALIVE, self.container["livenessProbe"]["exec"]["command"][-1])
-        self.assertEqual(renderer.STATUS, self.container["readinessProbe"]["exec"]["command"][-1])
+    def test_native_probes_keep_tls_sealed_safety_without_shell_or_tcp_bypass(self):
+        self.assertEqual(["/usr/bin/bao", "read", "-field=sealed", "sys/seal-status"], renderer.ALIVE)
+        self.assertEqual(["/usr/bin/bao", "status", "-format=json"], renderer.STATUS)
+        for name, command in (("startupProbe", renderer.ALIVE), ("livenessProbe", renderer.ALIVE),
+                              ("readinessProbe", renderer.STATUS)):
+            probe = self.container[name]
+            self.assertEqual(command, probe["exec"]["command"])
+            self.assertEqual(5, probe["timeoutSeconds"])
+            self.assertNotIn("httpGet", probe)
+            self.assertNotIn("tcpSocket", probe)
+            self.assertNotIn("/bin/sh", probe["exec"]["command"])
+        self.assertNotIn("sealedcode", json.dumps(self.manifest))
 
     def test_cli_requires_candidate_mode_and_never_prints_bad_config(self):
         output = io.StringIO()

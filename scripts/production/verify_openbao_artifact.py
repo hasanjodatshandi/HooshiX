@@ -27,7 +27,7 @@ def validate(directory: Path, revision: str, now: datetime) -> dict:
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("commit required")
     pin = load(ROOT / "infrastructure/production/secrets/openbao-image.json")
-    if (not re.fullmatch(r"ghcr\.io/openbao/openbao-ubi@sha256:[a-f0-9]{64}", pin["image"])
+    if (not re.fullmatch(r"ghcr\.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}", pin["image"])
             or pin["platform"] != "linux/amd64"
             or pin["production_promotion"] != "blocked-until-supply-chain-staging-and-recovery-evidence"):
         raise ValueError("blocked immutable candidate required")
