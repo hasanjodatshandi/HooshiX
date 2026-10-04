@@ -35,6 +35,21 @@ Windows، دستورهای `bash` روی Linux/WSL، و دستورهای بخش 
 رمزها، private key، token و unseal share در این برگه، Git، chat یا CI قرار نمی‌گیرند.
 برای مقدار واقعی secrets از جریان مصوب OpenBao و دسترسی کوتاه‌مدت استفاده کنید.
 
+### اطلاعات تأییدشدهٔ نصب فعلی مالک
+
+در ۲۰۲۶-۱۰-۰۴ مالک دامنهٔ نهایی `hooshix.com` و اتصال DNS آن به VPS را اعلام کرد.
+`public_hostname` در manifest واقعی این نصب `hooshix.com` و `publicOrigin` در BFF
+`https://hooshix.com` خواهد بود؛ `www` یا دامنهٔ ایمیل از این اعلام نتیجه نمی‌شود.
+نام عمومی سایت، `trustDomain` داخلی Istio، issuer داخلی Identity یا Root قبلی را عوض نمی‌کند.
+TLS عمومی سایت با Root خصوصی mesh یکی نیست.
+
+مشاهدهٔ فقط‌خواندنی این تاریخ: DNS سیستم `188.240.196.151` را برگرداند؛ handshake
+HTTPS با SNI دامنه و بررسی hostname، خطای `tlsv1 alert internal error` داد.
+این مشاهده نه propagation جهانی DNS، نه گواهی معتبر و نه آماده‌بودن برنامه را اثبات می‌کند.
+قبل از go-live، TLS صحیح دامنه و مسیر مصوب upstream/L4 با PROXY v2، CIDR دقیق و
+رد اتصال مستقیم origin باید جداگانه commissioning شوند. فعلاً DNS/فایروال/VPS تغییر
+نکرده‌اند و مجوز دادهٔ واقعی کاربران یا ترافیک Production صادر نشده است.
+
 ## ۳. سورس درست و نسخه ابزارها
 
 در checkout همان محصول، در Linux/WSL:

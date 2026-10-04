@@ -14,6 +14,44 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دامنهٔ نصب فعلی مالک
 `hooshix.com` است؛ تنظیمات شبکه و HTTPS آن شاهد جداگانه لازم دارند.
 
+### انتشار کاندیدای خصوصی بدون نصب
+
+بعد از merge و موفقیت `Repository baseline` برای **همان SHA روی main**:
+
+1. GitHub ← Actions ← **Production release evidence** ← Run workflow.
+2. branch را `main` و `release_kind` را `openbao-candidate` انتخاب کنید.
+3. `release_manifest_path` برای این حالت خالی می‌ماند؛ برای `applications` همچنان
+   manifest واقعیِ هفت برنامه الزامی است و gateهای قبلی تغییر نمی‌کنند.
+4. مالک در environment محافظت‌شدهٔ `production-release`، **Review deployments**
+   را بررسی و approve کند. کلید خصوصی، PAT یا credential VPS وارد CI نکنید.
+5. فقط اگر job و cleanup `Passed` شدند، artifact عمومی
+   `openbao-publication-<run_id>-<attempt>` و `receipt.json` را بررسی کنید.
+   نبود receipt یا job ناموفق، موفقیت انتشار/امضا نیست.
+
+مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-openbao@sha256:<same-digest>`
+است؛ tag فقط locator کاندیداست، نه authority استقرار. Cosign 3.0.6 از installer
+checksum-pin‌شدهٔ موجود، `copy` همان manifest Linux/amd64 را بدون rebuild/force
+انجام می‌دهد. این فرمان در همین نسخه deprecated اما موجود است؛ این مسیر محدود
+برای reuse ابزار فعلی است، نه افزودن ابزار یا policy موازی. artifactهای legacy
+upstream ممکن است کپی شوند؛ جای امضای مورد انتظار workflow خودمان نیستند.
+خصوصی‌بودن package پس از copy و پیش از sign الزام است؛ خطای API، package عمومی،
+digest/نسخه/architecture نامنطبق، scanner/feed نامعتبر یا High/Critical اجازهٔ sign
+نمی‌دهند. کپی ناقص ممکن است در registry بماند؛ بدون receipt/امضا قابل promotion نیست.
+
+SBOM از **تصویر نهایی در مقصد** تولید می‌شود. تصویر، provenance نوع
+`unchanged-upstream-import` و CycloneDX با همان OIDC issuer/subject دقیق workflow
+موجود امضا و payload/digest آن‌ها بررسی می‌شوند؛ signer اشتباه باید رد شود.
+این provenance ادعای ساخت binary upstream توسط HooshiX یا اثبات independent upstream
+build نیست. receipt، staging/admission/deployment/promotion را `Not verified` نگه
+می‌دارد؛ policy هفت برنامه و renderer کاندیدا خودکار به این mirror تغییر نمی‌کنند.
+جایگزینی digest در GitOps فقط با staging/admission/شبکه/PKI/storage/recovery معتبر
+و PR promotion مستقل انجام می‌شود. فایل auth موقت runner پاک و فقط SBOM/scan/
+provenance/receipt عمومی ۳۰ روز نگهداری می‌شوند؛ Root/Shamir/کلید خواندن VPS در آن نیستند.
+
+مراجع نسخهٔ دقیق: [Cosign copy 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/cmd/cosign/cli/copy.go)،
+[attestation 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/pkg/cosign/attestation/attestation.go).
+Context7 و سورس رسمی همین tag برای رفتار copy/attestation تطبیق داده شدند.
+
 ادامهٔ فعلی: آزمون Kubernetes بنیاد OpenBao در pipeline موجود Repository baseline اجرا می‌شود.
 این آزمون از credential واقعی، VPS یا Root مالک استفاده نمی‌کند؛ نتیجهٔ آن فقط
 برای API/PVC/TLS/probe است و به‌تنهایی staging مصوب یا مجوز promotion نیست.
