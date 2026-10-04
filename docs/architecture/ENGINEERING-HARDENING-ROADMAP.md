@@ -207,6 +207,10 @@ Remediation must not weaken these verified current properties:
   commands against the pinned native image. Target-cluster/staging, admission,
   client identity edges, off-host snapshots and commissioning remain unverified;
   see `../operations/production-openbao-fa.md` for operator steps and limits.
+- The artifact continuation adds required CI-only exact-digest SBOM/vulnerability
+  evidence with current DB update, 120h maximum DB built age and High/Critical
+  blocking, retained public receipts and negative tests. It does not commission
+  OpenBao, sign/promote the artifact or change SSH/MCP/sudo.
 - Next: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe

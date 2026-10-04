@@ -104,9 +104,32 @@ pipeline موجود `Repository baseline` همهٔ production testها و render
 
 ### ادامهٔ بررسی artifact در CI
 
-قدم بعدی این تغییر، ساخت SBOM و اسکن آسیب‌پذیری برای همان digest عمومی است؛
-این بررسی نصب، امضای artifact، آزمون staging یا اجازهٔ promotion نیست.
-هیچ کلید Production برای این job لازم نیست و دانلود فقط روی runner موقت GitHub است.
+job اجباری `OpenBao pinned artifact security` در `Repository baseline` روی PR،
+main، اجرای روزانه و اجرای دستی فعال است. ابزارهای Syft 1.51.0 و Grype 0.117.0
+از installer با checksum موجود نصب می‌شوند؛ تصویر عمومی دقیق Linux/amd64 یک‌بار
+catalog می‌شود و SBOMهای Syft و CycloneDX تولید می‌شوند. دیتابیس در همان run
+به‌روز می‌شود؛ update ناموفق، دیتابیس نامعتبر/قدیمی‌تر از ۱۲۰ ساعت (پیش‌فرض
+نسخهٔ پین‌شده)، خطای scanner یا High/Critical بدون استثنا job و gate نهایی را
+رد می‌کند. این حد صرفاً معیار evidence کاندیداست، نه تأیید freshness سیاست Production.
+
+برای استفاده: در GitHub ← Actions ← Repository baseline ← Run workflow، branch
+موردنظر را انتخاب کنید. نتیجهٔ همین commit و job بالا را ببینید و artifact
+`openbao-artifact-<run_id>-<attempt>` را دانلود کنید. SBOMها، گزارش کامل Grype،
+زمان ساخت DB و نسخهٔ ابزارها نگه‌داری می‌شوند؛ receipt موفق شامل digest، commit،
+hash فایل‌ها، زمان اسکن و شمارش severity است. artifact به مدت ۳۰ روز موجود است.
+در run ناموفق گزارش عمومی را بررسی کنید؛ نبود receipt، موفقیت نیست. به‌روزکردن
+digest یا پذیرش ریسک نیازمند بررسی مستقل است؛ gate را خاموش نکنید.
+
+این بررسی نصب، امضای artifact، آزمون staging یا اجازهٔ promotion نیست؛
+receipt صریحاً promotion و signature/provenance را `Not verified` ثبت می‌کند.
+هیچ کلید Production برای این job لازم نیست؛ دانلود فقط روی runner موقت GitHub
+انجام می‌شود و job هیچ دسترسی OIDC/signing/registry-secret ندارد.
+
+مراجع رسمی نسخه‌ها:
+[Syft image metadata](https://github.com/anchore/syft/blob/v1.51.0/syft/source/image_metadata.go)،
+[Grype DB status](https://github.com/anchore/grype/blob/v0.117.0/grype/vulnerability/provider.go)،
+[Grype freshness](https://github.com/anchore/grype/blob/v0.117.0/cmd/grype/cli/options/database.go).
+Context7 برای CLI اسکن و DB freshness استفاده شد و schema با tagهای دقیق تطبیق یافت.
 
 Architecture review mode: full-read
 Architecture document version/commit: main@58c067ecac27b5fdbab93801c765d59b282b3404
