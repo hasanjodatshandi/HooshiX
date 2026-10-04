@@ -137,7 +137,7 @@ job اسکن `Failed` شد (exit 2)؛ ۸ High و ۲ Critical روی
 این نتیجه مربوط به digest قبلی نسخهٔ 2.6.1 است. اصلاح در همان PR #163 نسخهٔ
 امنیتی رسمی 2.6.4 را در شاخهٔ 2.6.x انتخاب می‌کند؛ ADR-0011، baseline، قراردادها
 و تست‌ها هم‌زمان به‌روز می‌شوند. image و manifest/config با hash دقیق و metadata
-نسخه/commit بررسی شدند؛ نتیجهٔ اسکن و بازیابی جدید هنوز pending است. نصب نکنید.
+نسخه/commit بررسی شدند؛ نتیجهٔ UBI در انتهای این راهنما ثبت شده است. نصب نکنید.
 اسکن و بازیابی native باید روی همان digest جدید تکرار شوند. این خطا
 نباید با suppression، `--only-fixed` یا خاموش‌کردن gate دور زده شود.
 
@@ -181,7 +181,7 @@ Istio identity and authorization impact: Not applicable; no runtime identity or 
 Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
 Observability added or changed: hash-bound candidate receipt and retained failed scan reports
 Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
-Tests executed: 9 artifact tests and all 175 production tests Passed locally; context/index/diff Passed; old 2.6.1 artifact scan Failed with 10 blocking matches; new 2.6.4 scan and native recovery CI pending
+Tests executed: 9 artifact tests and all 175 production tests Passed locally; context/index/diff Passed; old 2.6.1 artifact scan Failed with 10 blocking matches; UBI 2.6.4 native recovery Passed but artifact scan Failed with 10 High matches at 8ba84ee7 / run 37187635536; all other baseline leaf jobs Passed
 Architecture deviations: None; no platform promotion or application release trust expansion
 Rollback considerations: source change revert only; no live deployment/data/access changes
 
@@ -206,3 +206,21 @@ timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق دا
 اسکن شامل بسته‌های RPM/OS و باینری Go است؛ default dev entrypoint همچنان override
 می‌شود و UID، filesystem و منابع محدود تغییر نکرده‌اند. هیچ دانلود image روی
 WSL/VPS شما انجام نمی‌شود. ظرفیت دیسک و runtime واقعی قبل از نصب جداگانه بررسی شود.
+
+نتیجهٔ UBI روی commit `8ba84ee7`، [run 37187635536](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37187635536):
+بازیابی `Passed`؛ اسکن `Failed` با ۱۰ match از پنج CVE:
+`CVE-2026-76642` روی libmount/libfdisk/libblkid؛ `CVE-2026-75804` و
+`CVE-2026-84782` روی openssl-libs/openssl؛ `CVE-2026-76641` روی expat؛
+`CVE-2026-86145` روی pcre2-syntax/pcre2. scanner برای همهٔ آن‌ها `not-fixed`
+و بدون نسخهٔ اصلاح‌شده گزارش داده است. این شمارش بسته‌هاست، نه ۱۰ CVE مستقل.
+تمام jobهای دیگر baseline گذشتند ولی gate نهایی به‌درستی رد شد.
+
+برای ادامه، همین digest را نصب یا دوباره بدون تغییر تست نکنید. یک اصلاح artifact
+یا adjudication مستند طبق سیاست فعلی لازم است و سپس scan/recovery روی digest جدید
+تکرار می‌شود. variant رسمی distroless بدون shell است و با probeهای فعلی جایگزین
+مستقیم نیست؛ انتخاب آن بدون بررسی سازگاری sealed/TLS/probe مجاز نیست.
+این نتیجه اجازهٔ init واقعی، نصب JIT، حذف sudo یا merge PR #163 را نمی‌دهد.
+مراجع بررسی اولیهٔ vendor:
+[Expat](https://access.redhat.com/security/cve/cve-2026-76641)،
+[OpenSSL DTLS](https://access.redhat.com/security/cve/cve-2026-84782).
+وجود توضیح vendor به‌تنهایی false-positive یا exception را اثبات نمی‌کند.

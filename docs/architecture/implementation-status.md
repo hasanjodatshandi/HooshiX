@@ -36,11 +36,22 @@ and compressed size were checked without downloading image layers locally.
 At `acfc833d`, run `37187139233` job `111391372471` passed native recovery, while
 artifact job `111391372383` failed on one High CVE-2026-85091 in zlib 1.3.2-r0
 (no scanner-reported fixed version). The 10 previous OpenSSL matches were absent.
-The selected candidate is now official `openbao-ubi:2.6.4`, pinned by Linux/amd64
-manifest/index and the same upstream source revision. New exact-artifact scanning
-and recovery are required; flavor selection alone does not prove remediation or
-authorize deployment. The larger compressed size is recorded in the compatibility
-matrix. No exception, suppression, local rebuild, cluster or host mutation exists.
+The selected candidate is official `openbao-ubi:2.6.4`, pinned by Linux/amd64
+manifest/index and the same upstream source revision. At `8ba84ee7b087ae4ffb4d79762719dcb3fbc09d86`,
+run `37187635536`: native recovery job `111392873888` `Passed`; artifact job
+`111392873939` `Failed` (exit 2), with 10 High matches across five CVEs:
+CVE-2026-76642 (`libmount`, `libfdisk`, `libblkid`), CVE-2026-75804 and
+CVE-2026-84782 (`openssl-libs`, `openssl`), CVE-2026-76641 (`expat`), and
+CVE-2026-86145 (`pcre2-syntax`, `pcre2`). Each scanner fix state was `not-fixed`
+with no fixed version reported. All other baseline leaf jobs passed; the
+aggregate correctly failed. Successful recovery does not approve this artifact.
+Next: a coherent reviewed artifact remediation or evidence-backed vulnerability
+adjudication under current policy, then exact-digest scan/recovery rerun. Do not
+repeat this unchanged digest expecting a different result or silently select a
+different major/minor, custom image or probe policy. Official distroless is not a
+drop-in replacement: it lacks the shell used by the validated sealed-safe probes.
+The larger compressed size is recorded in the compatibility matrix. No exception,
+suppression, local rebuild, cluster or host mutation exists.
 Do not bypass the gate, install the vulnerable image or mark Stage 10 completed.
 
 On 2026-10-02 a private SSH session inspected and partially commissioned host audit. `auditd` was active but had no rules. The reviewed `infrastructure/production/host/audit.rules` loaded 23 rules through `augenrules --load` on the observed boot; kernel reported `enabled 1`, `lost 0`, `backlog 0`. MariaDB `SERVER_AUDIT` was enabled for `CONNECT` only, writing to a bounded local file owned by `mysql:adm`; real connection and temporary DDL exercise confirmed the plugin path, then SQL-text events were disabled because DDL/DCL can expose secrets. Native `sudo-rs 0.2.13-0ubuntu1.2` rejected the tested sudoers I/O options; the invalid file was moved out of the active directory and `visudo -cf` passed. No sudo I/O/session coverage, Kubernetes API or database privileged-action audit, off-host export, tamper-resistant receipt, OpenBao materialization, JIT cutover, or post-reboot audit validation is claimed. Existing standing sudo remains; Production Readiness is `NOT VERIFIED`. The reproducible partial procedure and limits are in `../operations/production-host-audit-fa.md`. The audit policy is tracked in this repository, while live recovery/export evidence remains outstanding.
