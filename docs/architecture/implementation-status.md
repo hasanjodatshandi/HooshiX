@@ -11,6 +11,14 @@ Only the existing exact signer identity is used; application manifest/admission
 contracts remain unchanged. Source presence/unit tests are not publication evidence:
 actual environment-approved execution, approved target-compatible staging, runtime
 admission, real custody/recovery and deployment remain `Not verified`.
+Approved run `37222311660` copied the exact pinned manifest but failed the
+private-package gate: read-only GitHub metadata returned `public` for
+`hooshix/platform-openbao`. Scan/sign/publication remain `Not verified`.
+The owner-approved replacement is `hooshix/platform-openbao-private`; the
+publisher and evidence validator accept only that exact owned mirror (or the
+unchanged upstream for credential-free scan evidence). The old package is not
+deleted or accepted for publication. Actual private publication still requires
+the protected main workflow and a successful receipt; source tests do not prove it.
 Usage is in `../operations/production-openbao-fa.md`.
 The owner selected `hooshix.com`; local DNS observation returned `188.240.196.151`,
 but hostname-checked HTTPS handshake failed with TLS alert internal error. No global

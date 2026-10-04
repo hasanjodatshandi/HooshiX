@@ -196,6 +196,14 @@ need environment evidence. Operator usage/receipt limits are documented in
 
 ### Stage 10 continuation — 2026-10-02
 
+- Current publication continuation: run `37222311660` passed exact-manifest copy
+  but rejected the public `hooshix/platform-openbao` package before scan/sign.
+  The owner approved the new fixed `hooshix/platform-openbao-private` destination;
+  publisher/validator and negative tests reject the old mirror and retain all
+  digest, private-visibility, scan, signer and promotion gates. No package deletion
+  or VPS change is made. Next: pass protected PR/main CI, obtain fresh owner release
+  approval and verify publication receipt; then continue staging/commissioning.
+  Stage 10 remains `IN PROGRESS`; actual private publication is `Not verified`.
 - 2026-10-04: PR #163 merged at `ca155496` after final baseline/frontend
   `37190183009`/`37190182906` passed. Owner selected private GHCR; the real
   release environment requires exact `main` and owner review. The registry

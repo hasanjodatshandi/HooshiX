@@ -15,8 +15,8 @@ from pathlib import Path
 import verify_openbao_artifact as artifact
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
 
-REPOSITORY = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao"
-PACKAGE_API = "users/hasanjodatshandi/packages/container/hooshix%2Fplatform-openbao"
+REPOSITORY = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private"
+PACKAGE_API = "users/hasanjodatshandi/packages/container/hooshix%2Fplatform-openbao-private"
 BUILD_TYPE = "https://github.com/hasanjodatshandi/HooshiX/openbao-upstream-import/v1"
 
 

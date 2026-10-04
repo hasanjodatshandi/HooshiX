@@ -36,14 +36,14 @@ class OpenBaoPublicationTest(unittest.TestCase):
         self.image = publisher.REPOSITORY + "@sha256:" + self.digest
         self.calls = []
         self.visibility, self.severity, self.wrong_digest = "private\n", None, False
-        self.fail = None
+        self.tool_failure = None
 
     def mock_run(self, argv, timeout=180):
         self.calls.append(argv)
         if argv[:2] == ["cosign", "copy"] and any(value.startswith("--platform") for value in argv):
             # Cosign 3.0.6 SignedEntityForPlatform rejects a single-image manifest.
             raise subprocess.CalledProcessError(1, argv, stderr="specified reference is not a multiarch image")
-        if self.fail and argv[:len(self.fail)] == self.fail:
+        if self.tool_failure and argv[:len(self.tool_failure)] == self.tool_failure:
             raise subprocess.CalledProcessError(1, argv, stderr="synthetic sensitive error")
         if argv[1] == "version":
             return {"syft": "Version: 1.51.0", "grype": "Version: 0.117.0", "cosign": "GitVersion: v3.0.6"}[argv[0]]
@@ -78,6 +78,9 @@ class OpenBaoPublicationTest(unittest.TestCase):
         self.assertFalse(any(argv[:2] == ["cosign", "sign"] for argv in self.calls))
 
     def test_private_same_digest_signed_candidate_never_deploys(self):
+        self.assertEqual("ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private", publisher.REPOSITORY)
+        self.assertEqual("users/hasanjodatshandi/packages/container/hooshix%2Fplatform-openbao-private",
+                         publisher.PACKAGE_API)
         receipt = self.publish()
         self.assertEqual("Passed", receipt["publication"])
         self.assertEqual("Passed", receipt["signature_provenance"])
@@ -99,14 +102,14 @@ class OpenBaoPublicationTest(unittest.TestCase):
                         ["cosign", "sign"], ["cosign", "attest"], ["cosign", "verify-attestation"]):
             with self.subTest(failure=failure):
                 self.directory = Path(self.temp.name) / ("evidence-" + str(len(self.calls)))
-                self.fail = ["grype", "sbom:" + str(self.directory / "syft.json")] if failure[0] == "grype" and failure[1].startswith("sbom:") else failure
+                self.tool_failure = ["grype", "sbom:" + str(self.directory / "syft.json")] if failure[0] == "grype" and failure[1].startswith("sbom:") else failure
                 with self.assertRaises(subprocess.CalledProcessError):
                     self.publish()
                 self.assertFalse((self.directory / "receipt.json").exists())
                 attempt = json.loads((self.directory / "attempt.json").read_text())
                 self.assertEqual("Not verified", attempt["publication"])
                 self.assertEqual("attempt-only-not-success-receipt", attempt["purpose"])
-        self.fail = None
+        self.tool_failure = None
         for index, visibility in enumerate(("public", "internal", "", "private\npublic")):
             self.directory = Path(self.temp.name) / ("visibility-" + str(index))
             self.calls = []
@@ -114,6 +117,8 @@ class OpenBaoPublicationTest(unittest.TestCase):
             with self.subTest(visibility=visibility), self.assertRaises(ValueError):
                 self.publish()
             self.assert_not_signed()
+            self.assertFalse(any(argv[:2] == ["syft", "scan"] for argv in self.calls))
+            self.assertFalse((self.directory / "receipt.json").exists())
 
     def test_wrong_digest_and_blocking_vulnerabilities_stop_before_signing(self):
         for index, (severity, wrong_digest) in enumerate((("High", False), ("Critical", False), (None, True))):

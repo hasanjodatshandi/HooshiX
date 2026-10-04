@@ -32,7 +32,7 @@ def validate(directory: Path, revision: str, now: datetime, image: str | None = 
             or pin["production_promotion"] != "blocked-until-supply-chain-staging-and-recovery-evidence"):
         raise ValueError("blocked immutable candidate required")
     digest = pin["image"].split("@")[1]
-    mirror = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao@" + digest
+    mirror = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private@" + digest
     image = pin["image"] if image is None else image
     if image not in (pin["image"], mirror):
         raise ValueError("only pinned upstream or exact owned mirror allowed")

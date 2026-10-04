@@ -2,8 +2,8 @@
 
 ## محدودهٔ این تغییر
 
-هدف این PR آماده‌کردن بستهٔ قابل بازبینی Kubernetes برای OpenBao 2.6.4 است؛
-نه فعال‌کردن Production، init واقعی، تغییر SSH/MCP یا حذف sudo دائمی.
+تغییر جاری، مقصد انتشار کاندیدای OpenBao 2.6.4 را به بستهٔ خصوصی مصوب تغییر
+می‌دهد؛ نه فعال‌کردن Production، init واقعی، تغییر SSH/MCP یا حذف sudo دائمی.
 تعریف reusable در `infrastructure/production/secrets/` می‌ماند و تا عبور از
 gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` نمی‌شود.
 
@@ -16,12 +16,21 @@ staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دا
 
 ### انتشار کاندیدای خصوصی بدون نصب
 
+مقصد جدیدِ تأییدشدهٔ مالک `hooshix/platform-openbao-private` است. اجرای
+`37222311660` کپی همان digest را گذراند ولی gate خصوصی‌بودن را رد کرد؛ API
+GitHub برای بستهٔ قبلی `hooshix/platform-openbao` مقدار `public` برگرداند.
+بستهٔ قبلی حذف یا تغییر نمی‌کند و در انتشار بعدی مقصد معتبر نیست. طبق
+[مستندات رسمی GHCR](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-visibility-of-packages-for-your-personal-account)،
+بستهٔ عمومی دوباره خصوصی نمی‌شود؛ بستهٔ تازه در حساب شخصی پیش‌فرض خصوصی دارد،
+اما pipeline همچنان وضعیت واقعی آن را پیش از اسکن و امضا بررسی می‌کند.
+تغییر نام به‌تنهایی شاهد انتشار، staging یا نصب نیست.
+
 اجرای اولیهٔ `37218037965` بعد از approval مالک در مرحلهٔ copy شکست خورد؛
 هیچ receipt موفق یا امضایی صادر نشد و auth موقت پاک شد. Cosign 3.0.6 گزینهٔ
 `--platform` را فقط برای multiarch index قبول می‌کند؛ pin فعلی manifest تک‌معماری
 است. فرمان copy بنابراین **بدون `--platform`** همان digest را می‌گیرد؛ Syft و
-validator معماری و digest مقصد را همچنان بررسی می‌کنند. اصلاح جاری فقط
-این سازگاری، تست regression و diagnostics امن آن را پوشش می‌دهد؛
+validator معماری و digest مقصد را همچنان بررسی می‌کنند. این اصلاحِ merge‌شده
+سازگاری copy، تست regression و diagnostics امن آن را پوشش می‌دهد؛
 اجازهٔ نصب یا عبور از approval/scan/signature را تغییر نمی‌دهد.
 
 بعد از merge و موفقیت `Repository baseline` برای **همان SHA روی main**:
@@ -40,7 +49,7 @@ validator معماری و digest مقصد را همچنان بررسی می‌ک
 می‌ماند؛ مدرک موفقیت نیست. خطای native فقط با category محدود
 `OPENBAO_TOOL_FAILURE` گزارش می‌شود؛ متن خام پاسخ/error/credential منتشر نمی‌شود.
 
-مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-openbao@sha256:<same-digest>`
+مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private@sha256:<same-digest>`
 است؛ tag فقط locator کاندیداست، نه authority استقرار. Cosign 3.0.6 از installer
 checksum-pin‌شدهٔ موجود، `copy` همان manifest Linux/amd64 را بدون rebuild/force
 انجام می‌دهد. این فرمان در همین نسخه deprecated اما موجود است؛ این مسیر محدود
@@ -64,6 +73,29 @@ provenance/receipt عمومی ۳۰ روز نگهداری می‌شوند؛ Root/
 [platform selection 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/pkg/oci/platform/platform.go)،
 [attestation 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/pkg/cosign/attestation/attestation.go).
 Context7 و سورس رسمی همین tag برای رفتار copy/attestation تطبیق داده شدند.
+
+### گزارش تغییر مقصد خصوصی
+
+Architecture review mode: full-read
+Architecture document version/commit: main@e5e932d1f63faca4dea2054b551a60dde4b357b1
+Architecture sections reviewed: supply chain, secrets, runtime, testing, readiness, delivery
+Search terms used: platform-openbao, PACKAGE_API, private, mirror, visibility
+ADRs reviewed or changed: ADR-0011/0017/0045 reviewed; None changed
+Changed bounded context/module: platform OpenBao candidate publisher/validator/tests/runbook
+Contracts changed: exact candidate mirror name only; upstream pin and seven-application contracts unchanged
+Database migration: Not applicable
+Transaction boundary: Not applicable
+Timeout/deadline behavior: unchanged bounded tool/API/job deadlines
+Retry/cancellation/concurrency behavior: unchanged; no force, overwrite, new retries or package deletion
+Kafka/event and idempotency behavior: Not applicable
+Security impact: reject old public mirror; require actual new-package private visibility before scan/sign
+Istio identity and authorization impact: None; no workload/admission promotion
+Logging and PII impact: unchanged finite diagnostics; no raw credentials/provider output
+Observability added or changed: None
+Build/CI/architecture enforcement changed: publisher and validator exact repository expectations; existing CI retained
+Tests executed: focused publisher/artifact regression Failed before change, Passed after; final PR/main CI tracked in PR #169
+Architecture deviations: None
+Rollback considerations: source revert cannot authorize signing public package; existing package and VPS untouched
 
 پیش‌نیاز موجود: آزمون Kubernetes بنیاد OpenBao در pipeline Repository baseline اجرا می‌شود.
 این آزمون از credential واقعی، VPS یا Root مالک استفاده نمی‌کند؛ نتیجهٔ آن فقط

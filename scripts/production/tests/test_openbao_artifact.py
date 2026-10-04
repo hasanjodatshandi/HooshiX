@@ -31,13 +31,17 @@ class OpenBaoArtifactTest(unittest.TestCase):
             return verifier.validate(Path("evidence"), "a" * 40, self.now, image=image)
 
     def test_mirror_must_keep_exact_owned_repository_digest_and_catalog_binding(self):
-        mirror = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao@" + self.pin["image"].split("@")[1]
+        mirror = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private@" + self.pin["image"].split("@")[1]
         self.values["syft.json"]["source"]["metadata"]["repoDigests"] = [mirror]
         self.assertEqual(mirror, self.validate(image=mirror)["image"])
         for image in (mirror.replace("hasanjodatshandi", "other"), mirror.replace("platform-openbao", "other"),
+                      mirror.replace("platform-openbao-private", "platform-openbao"),
                       mirror.rsplit("@", 1)[0] + ":latest", mirror[:-64] + "0" * 64):
+            # A matching catalog must not make an unapproved repository valid.
+            self.values["syft.json"]["source"]["metadata"]["repoDigests"] = [image]
             with self.subTest(image=image), self.assertRaises(ValueError):
                 self.validate(image=image)
+        self.values["syft.json"]["source"]["metadata"]["repoDigests"] = [mirror]
         with self.assertRaises(ValueError):
             self.validate()  # Upstream CI cannot silently accept mirror catalog metadata.
 
