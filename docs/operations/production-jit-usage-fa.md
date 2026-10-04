@@ -290,7 +290,7 @@ token اولیه. این تست فقط روی runner موقت اجرا می‌ش
 OpenBao در فایل محلی باید exporter، retention و کنترل فضای دیسک محافظت‌شده داشته
 باشد؛ configuration فعلی به‌تنهایی اجازهٔ استفادهٔ واقعی از secrets نمی‌دهد.
 
-ساختار audit با [مستندات رسمی همان tag نسخهٔ ۲.۶.۱](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/configuration/audit.mdx)
+ساختار audit با [مستندات رسمی همان tag نسخهٔ ۲.۶.۱](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/configuration/audit.mdx)
 و رفتار health/init با Context7 و منابع رسمی OpenBao بررسی شده است؛ مثال latest
 جای نسخهٔ نصب‌شده را نمی‌گیرد.
 

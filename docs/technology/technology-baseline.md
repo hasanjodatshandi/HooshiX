@@ -82,7 +82,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
 | Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
-| Secret authority | OpenBao 2.6.1 | unchanged by ADR-0042/0043/0044/0045 |
+| Secret authority | OpenBao 2.6.4 | unchanged by ADR-0042/0043/0044/0045 |
 | Admission policy | Kyverno 1.18.2 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
 | Image signing | Cosign 3.0.6 | ADR-0017/0045; exact image signature + provenance + signed SBOM attestation |
 | SBOM | Syft 1.51.0 -> CycloneDX JSON | ADR-0035/0045; generated from exact final releasable image; signed/indexed by image digest |
@@ -159,7 +159,7 @@ external black-box host-down signal required before production
 
 All observability components share the host failure/capacity domain and do not create HA. Their CPU/RAM/IO/disk/cardinality is included in the complete-stack benchmark. Required privileged/security audit remains separately durable/off-host.
 
-Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, SSH-key/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.1, unchanged end-user MFA, and ADR-0045 pre-runtime DevSecOps gates.
+Network/security controls remain ADR-0043 trusted PROXY-v2 -> WAF -> BFF, exact trusted client address, WireGuard-only management reachability, SSH-key/JIT privilege, Istio Ambient, blocking Kyverno CEL policies, OpenBao 2.6.4, unchanged end-user MFA, and ADR-0045 pre-runtime DevSecOps gates.
 
 A `2 vCPU / 3-4 GiB RAM` host is not an approved capacity claim. Sizing requires complete-stack evidence with >=30% validated resource headroom.
 

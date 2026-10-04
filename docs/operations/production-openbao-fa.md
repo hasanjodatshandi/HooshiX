@@ -2,7 +2,7 @@
 
 ## محدودهٔ این تغییر
 
-هدف این PR آماده‌کردن بستهٔ قابل بازبینی Kubernetes برای OpenBao 2.6.1 است؛
+هدف این PR آماده‌کردن بستهٔ قابل بازبینی Kubernetes برای OpenBao 2.6.4 است؛
 نه فعال‌کردن Production، init واقعی، تغییر SSH/MCP یا حذف sudo دائمی.
 تعریف reusable در `infrastructure/production/secrets/` می‌ماند و تا عبور از
 gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` نمی‌شود.
@@ -134,9 +134,11 @@ Context7 برای CLI اسکن و DB freshness استفاده شد و schema ب�
 نتیجهٔ واقعی run `37186602660` روی commit `d1cbce42`:
 job اسکن `Failed` شد (exit 2)؛ ۸ High و ۲ Critical روی
 `libssl3/libcrypto3=3.5.7-r0`، با fix گزارش‌شدهٔ `3.5.8-r0` وجود دارد.
-PR #163 هنوز draft و merge نشده است. image فعلی را نصب نکنید. ادامهٔ کار باید
-artifact اصلاح‌شده و immutable را بررسی کند، بدون تغییر خاموش نسخهٔ موردتأیید
-OpenBao، سپس اسکن و بازیابی native روی همان artifact تکرار شود. این خطا
+این نتیجه مربوط به digest قبلی نسخهٔ 2.6.1 است. اصلاح در همان PR #163 نسخهٔ
+امنیتی رسمی 2.6.4 را در شاخهٔ 2.6.x انتخاب می‌کند؛ ADR-0011، baseline، قراردادها
+و تست‌ها هم‌زمان به‌روز می‌شوند. image و manifest/config با hash دقیق و metadata
+نسخه/commit بررسی شدند؛ نتیجهٔ اسکن و بازیابی جدید هنوز pending است. نصب نکنید.
+اسکن و بازیابی native باید روی همان digest جدید تکرار شوند. این خطا
 نباید با suppression، `--only-fixed` یا خاموش‌کردن gate دور زده شود.
 
 Architecture review mode: full-read
@@ -184,7 +186,7 @@ Architecture deviations: None; no platform promotion or application release trus
 Rollback considerations: source change revert only; no live deployment/data/access changes
 
 منابع: Context7 برای OpenBao فراخوانی شد و رفتار exitهای status، پارامترهای CA،
-timeout و retry با مستندات رسمی tag دقیق 2.6.1 تطبیق داده شد:
-[status](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/status.mdx)،
-[CLI](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/index.mdx)،
-[configuration](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/configuration/index.mdx).
+timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق داده شد:
+[status](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/commands/status.mdx)،
+[CLI](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/commands/index.mdx)،
+[configuration](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/configuration/index.mdx).

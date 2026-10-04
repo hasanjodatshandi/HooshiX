@@ -4,7 +4,7 @@ This file is the canonical repository-level status view for architecture, implem
 
 The 2026-10-04 OpenBao continuation adds a deterministic, public-only Kubernetes
 foundation candidate through `scripts/production/render_openbao_candidate.py`.
-It references the existing 2.6.1 digest/configuration, a separately provisioned TLS
+It references the selected 2.6.4 digest/configuration, a separately provisioned TLS
 Secret, retained single-node Raft PVC, bounded non-root workload and fail-closed
 network/mesh policies. It is outside the active Argo CD roots: rendering does not
 authorize deployment. Client edges, Kubernetes Auth/ESO, host materialization,
@@ -24,13 +24,17 @@ provenance, actual staging, deployed-inventory rescan or production promotion ev
 
 Executed artifact scan at `d1cbce42a5fd81ebbf616ca911f8e77f005931d4`, Repository
 baseline run `37186602660`, job `111389727930`: `Failed` (Grype exit 2). The pinned
-upstream image has 10 blocking package matches: 8 High and 2 Critical in
+previous 2.6.1 upstream image has 10 blocking package matches: 8 High and 2 Critical in
 `libssl3`/`libcrypto3` version `3.5.7-r0`; scanner reports fixes at `3.5.8-r0`.
 Public CI annotations identify CVE-2026-63072, CVE-2026-14457, CVE-2026-63073
 (Critical), CVE-2026-18798 and CVE-2026-63076, each on both packages. Reports were
 retained; no successful candidate receipt or promotion is claimed. PR #163 remains
-draft/unmerged. Next: review a patched immutable artifact without silently changing
-the approved OpenBao version, then rerun exact-artifact scanning and native recovery.
+draft/unmerged. The coherent security remediation selects official OpenBao 2.6.4
+on the same minor line, with ADR-0011/technology/profile/renderer/test pins updated
+together. Registry index, manifest/config hashes, Linux/amd64, OCI version/revision
+and compressed size were checked without downloading image layers locally.
+New exact-artifact scanning and native recovery are pending; selection alone does
+not prove that vulnerabilities are fixed or authorize deployment.
 Do not bypass the gate, install the vulnerable image or mark Stage 10 completed.
 
 On 2026-10-02 a private SSH session inspected and partially commissioned host audit. `auditd` was active but had no rules. The reviewed `infrastructure/production/host/audit.rules` loaded 23 rules through `augenrules --load` on the observed boot; kernel reported `enabled 1`, `lost 0`, `backlog 0`. MariaDB `SERVER_AUDIT` was enabled for `CONNECT` only, writing to a bounded local file owned by `mysql:adm`; real connection and temporary DDL exercise confirmed the plugin path, then SQL-text events were disabled because DDL/DCL can expose secrets. Native `sudo-rs 0.2.13-0ubuntu1.2` rejected the tested sudoers I/O options; the invalid file was moved out of the active directory and `visudo -cf` passed. No sudo I/O/session coverage, Kubernetes API or database privileged-action audit, off-host export, tamper-resistant receipt, OpenBao materialization, JIT cutover, or post-reboot audit validation is claimed. Existing standing sudo remains; Production Readiness is `NOT VERIFIED`. The reproducible partial procedure and limits are in `../operations/production-host-audit-fa.md`. The audit policy is tracked in this repository, while live recovery/export evidence remains outstanding.
@@ -293,7 +297,7 @@ OS/sudo exporter, health/backlog gate or OpenBao materialization workflow.
 Broker integration and live commissioning remain `Not verified`; standing sudo is
 preserved until those controls and complete recovery/admin workflows are tested.
 On 2026-10-02 the owner confirmed availability of two independent secure custody
-locations; actual share distribution remains `Not verified`. Public OpenBao 2.6.1
+locations; actual share distribution remains `Not verified`. Public OpenBao 2.6.4
 upstream Linux/amd64 image metadata and a native TLS/Raft/declarative non-raw audit
 configuration now exist under `infrastructure/production/secrets/`. The mandatory
 Repository baseline job `OpenBao TLS and Raft recovery` uses disposable secrets to
@@ -305,7 +309,8 @@ hourly encrypted off-host snapshots, recovery custody, OpenBao-to-host audit
 materialization and JIT installation remain `Not verified`. No standing sudo,
 SSH, MCP or bucket configuration is changed by the rehearsal.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
-all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`.
+all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`
+for the former 2.6.1 pin only, not the newly selected 2.6.4 artifact.
 
 Architecture documents describe approved targets. A target path named in documentation is not proof that executable implementation exists.
 

@@ -113,7 +113,7 @@
   "secrets": {
     "application_hot_path_openbao_calls": false,
     "external_secrets_operator": "2.8.0",
-    "openbao": "2.6.1",
+    "openbao": "2.6.4",
     "openbao_instances": 1,
     "secret_values_in_git": false,
     "shamir_shares": 3,

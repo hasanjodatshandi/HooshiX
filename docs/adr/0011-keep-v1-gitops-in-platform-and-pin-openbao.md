@@ -21,11 +21,25 @@ Service manifests, platform infrastructure, WAF, Istio policies, NetworkPolicies
 
 Promotion uses pull-request review, immutable image digests, automated sync, self-heal, prune, `allowEmpty=false`, `PruneLast=true`, and `Prune=confirm` for explicitly destructive critical resources. Direct unreviewed production cluster mutation is prohibited. Production rollback is Git revert only when rollback is safe for the corresponding schema/data state.
 
-OpenBao is exactly `2.6.1`, pinned by immutable image digest. v1 uses a single OpenBao Raft instance/PVC with manual Shamir seal (`3` shares, threshold `2`) and hourly encrypted off-PVC snapshots. Normal application hot paths consume mounted/local key material; they do not make routine per-request OpenBao calls.
+OpenBao is exactly `2.6.4`, pinned by immutable image digest. v1 uses a single OpenBao Raft instance/PVC with manual Shamir seal (`3` shares, threshold `2`) and hourly encrypted off-PVC snapshots. Normal application hot paths consume mounted/local key material; they do not make routine per-request OpenBao calls.
 
 External Secrets Operator is the normal Kubernetes synchronization boundary. Secret values never enter Git, images, Helm/Kustomize values, logs, traces, metrics, or CI output. Logical secret/key names are stable; physical endpoint/materialization paths are typed configurable values.
 
 The offline Istio Root CA private key is never stored in OpenBao or Kubernetes.
+
+## Security patch selection
+
+The 2026-10-04 artifact review selects upstream `2.6.4` within the existing 2.6
+line, rather than introducing 2.7 or a custom rebuilt image. The previous 2.6.1
+digest failed Grype with High/Critical OpenSSL matches. The official 2.6.4
+security release also fixes audit-failure response handling, expired AppRole
+SecretID authentication and Kubernetes JWT validation on renewal. Exact registry
+manifest/config hashes, platform, version and source revision are checked when
+pinning; final-image scanning and native TLS/Shamir/Raft recovery remain required
+before merge. There is no existing live OpenBao store to upgrade. This source
+selection does not approve installation, signing, staging or production promotion.
+
+Source: [official 2.6.4 release](https://github.com/openbao/openbao/releases/tag/v2.6.4).
 
 ## Verification Requirements
 

@@ -115,7 +115,7 @@ def rehearse():
     version = command(["/usr/bin/docker", "run", "--rm", "--network", "none", "--read-only",
                        "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                        "--user", str(os.getuid()), "--entrypoint", "bao", image, "version"])
-    if not re.search(rb"\bOpenBao v2\.6\.1\b", version):
+    if not re.search(rb"^OpenBao v2\.6\.4(?:\s|$)", version):
         raise RehearsalFailed("fixture exact version mismatch")
     with tempfile.TemporaryDirectory(prefix="hooshix-openbao-ci-") as temporary:
         with contextlib.ExitStack() as cleanup:
@@ -173,7 +173,7 @@ def rehearse():
             source, client, data = start("source")
             step("source-health")
             health = client.wait_health(501)
-            if health["version"] != "2.6.1":
+            if health["version"] != "2.6.4":
                 raise RehearsalFailed("fixture health version mismatch")
             step("probe-sealed")
             for probe in (ALIVE, STATUS + '; code=$?; test "$code" -eq 2'):

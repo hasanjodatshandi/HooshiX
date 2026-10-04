@@ -22,7 +22,7 @@ def candidate(storage_class: str) -> dict:
             for label in storage_class.split("."))):
         raise ValueError("reviewed storage class required")
     pin = json.loads((SECRETS / "openbao-image.json").read_text())
-    if (pin["version"] != "2.6.1" or not re.fullmatch(
+    if (pin["version"] != "2.6.4" or not re.fullmatch(
             r"ghcr\.io/openbao/openbao@sha256:[a-f0-9]{64}", pin["image"]) or
             pin["production_promotion"] != "blocked-until-supply-chain-staging-and-recovery-evidence"):
         raise ValueError("reviewed image pin required")

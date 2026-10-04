@@ -27,7 +27,7 @@ The following controls are explicitly unchanged in both profiles:
 - Istio workload identity, strict mTLS, NetworkPolicy, and least-privilege authorization when the profile passes its required mesh benchmark;
 - signed immutable artifacts, provenance, SBOM verification, vulnerability gates, and Kyverno admission enforcement;
 - upstream volumetric protection, Traefik, Caddy/Coraza WAF, and direct-edge-bypass prohibitions;
-- OpenBao 2.6.1 as the production secret authority and all current OpenBao/External Secrets/local-key workflows.
+- OpenBao 2.6.4 as the production secret authority and all current OpenBao/External Secrets/local-key workflows.
 
 **OpenBao is outside the simplification scope and MUST NOT be removed, replaced, or weakened by this profile.**
 

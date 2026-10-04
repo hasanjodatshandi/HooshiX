@@ -192,7 +192,7 @@ Remediation must not weaken these verified current properties:
 - Owner confirmed availability of two independent secure recovery-custody
   locations. This is readiness to arrange custody, not evidence that shares
   have been generated/distributed or that recovery has passed.
-- OpenBao 2.6.1 Linux/amd64 upstream image metadata is pinned, with a TLS/Raft/
+- OpenBao 2.6.4 Linux/amd64 upstream image metadata is pinned, with a TLS/Raft/
   non-raw persistent audit configuration. The new mandatory Repository baseline
   job executes an isolated TLS/Shamir 3-share/2-threshold/restart/snapshot-restore/
   ACL/audit-leak/initial-root-revocation rehearsal using disposable CI-only secrets.
@@ -213,8 +213,9 @@ Remediation must not weaken these verified current properties:
   OpenBao, sign/promote the artifact or change SSH/MCP/sudo.
 - Artifact scan `37186602660` at `d1cbce42` failed: 8 High + 2 Critical package
   matches in OpenSSL `libssl3`/`libcrypto3` 3.5.7-r0 (scanner fix 3.5.8-r0).
-  PR #163 remains draft/unmerged. Immediate next: review and validate a patched
-  immutable artifact, repeat scanner/native recovery checks; no waiver/install.
+  PR #163 remains draft/unmerged. The remediation selects upstream 2.6.4 in the
+  same 2.6 minor line and updates ADR-0011/current source pins together. Immediate
+  next: exact new-digest scanner/native recovery checks; no waiver/install.
 - After artifact remediation: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe

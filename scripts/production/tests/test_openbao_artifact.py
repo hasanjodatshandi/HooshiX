@@ -17,7 +17,9 @@ class OpenBaoArtifactTest(unittest.TestCase):
         self.now = datetime(2026, 10, 4, tzinfo=timezone.utc)
         self.values = {"syft.json": {"source": {"type": "image", "metadata": {
             "manifestDigest": self.pin["image"].split("@")[1], "os": "linux",
-            "architecture": "amd64", "repoDigests": [self.pin["image"]]}}, "artifacts": [{}]},
+            "architecture": "amd64", "repoDigests": [self.pin["image"]], "labels": {
+                "org.opencontainers.image.version": "v" + self.pin["version"],
+                "org.opencontainers.image.revision": self.pin["source_revision"]}}}, "artifacts": [{}]},
             "cyclonedx.json": {"bomFormat": "CycloneDX", "components": [{}]},
             "grype.json": {"matches": []}, "database.json": {
                 "valid": True, "schemaVersion": "6.0.0", "built": self.now.isoformat()}}
@@ -59,6 +61,16 @@ class OpenBaoArtifactTest(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 self.validate()
 
+    def test_source_version_and_revision_must_match_security_patch(self):
+        labels = self.values["syft.json"]["source"]["metadata"]["labels"]
+        for key, invalid in (("org.opencontainers.image.version", "v2.6.1"),
+                             ("org.opencontainers.image.revision", "0" * 40)):
+            original = labels[key]
+            labels[key] = invalid
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.validate()
+            labels[key] = original
+
     def test_high_critical_unknown_schema_and_missing_scan_rejected(self):
         for severity in ("High", "Critical", "new-schema"):
             self.values["grype.json"] = {"matches": [{"vulnerability": {"severity": severity}}]}
@@ -77,7 +89,7 @@ class OpenBaoArtifactTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.validate()
         self.pin["production_promotion"] = "blocked-until-supply-chain-staging-and-recovery-evidence"
-        self.pin["image"] = "ghcr.io/openbao/openbao:2.6.1"
+        self.pin["image"] = "ghcr.io/openbao/openbao:2.6.4"
         with self.assertRaises(ValueError):
             self.validate()
 

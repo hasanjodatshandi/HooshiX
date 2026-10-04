@@ -172,7 +172,7 @@ HA retains current Teleport path.
 
 ## 11. OpenBao/MFA
 
-OpenBao 2.6.1 remains unchanged secret authority with current Raft/PVC/Shamir/snapshot/restore/ESO/Kubernetes Auth behavior. Application hot paths use validated local mounted material, not new per-request OpenBao RPC.
+OpenBao 2.6.4 remains unchanged secret authority with current Raft/PVC/Shamir/snapshot/restore/ESO/Kubernetes Auth behavior. Application hot paths use validated local mounted material, not new per-request OpenBao RPC.
 
 End-user MFA/session/browser security semantics remain unchanged. Infrastructure profile does not permit Email/SMS downgrade around required active TOTP.
 

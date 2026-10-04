@@ -37,7 +37,9 @@ def validate(directory: Path, revision: str, now: datetime) -> dict:
     metadata = source["metadata"]
     if (source["type"] != "image" or metadata["manifestDigest"] != pin["image"].split("@")[1]
             or metadata["os"] != "linux" or metadata["architecture"] != "amd64"
-            or pin["image"] not in metadata["repoDigests"]):
+            or pin["image"] not in metadata["repoDigests"]
+            or metadata["labels"]["org.opencontainers.image.version"] != "v" + pin["version"]
+            or metadata["labels"]["org.opencontainers.image.revision"] != pin["source_revision"]):
         raise ValueError("catalog source does not match pinned image")
     if not syft.get("artifacts") or cdx.get("bomFormat") != "CycloneDX" or not cdx.get("components"):
         raise ValueError("nonempty SBOM required")
