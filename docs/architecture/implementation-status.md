@@ -33,8 +33,14 @@ draft/unmerged. The coherent security remediation selects official OpenBao 2.6.4
 on the same minor line, with ADR-0011/technology/profile/renderer/test pins updated
 together. Registry index, manifest/config hashes, Linux/amd64, OCI version/revision
 and compressed size were checked without downloading image layers locally.
-New exact-artifact scanning and native recovery are pending; selection alone does
-not prove that vulnerabilities are fixed or authorize deployment.
+At `acfc833d`, run `37187139233` job `111391372471` passed native recovery, while
+artifact job `111391372383` failed on one High CVE-2026-85091 in zlib 1.3.2-r0
+(no scanner-reported fixed version). The 10 previous OpenSSL matches were absent.
+The selected candidate is now official `openbao-ubi:2.6.4`, pinned by Linux/amd64
+manifest/index and the same upstream source revision. New exact-artifact scanning
+and recovery are required; flavor selection alone does not prove remediation or
+authorize deployment. The larger compressed size is recorded in the compatibility
+matrix. No exception, suppression, local rebuild, cluster or host mutation exists.
 Do not bypass the gate, install the vulnerable image or mark Stage 10 completed.
 
 On 2026-10-02 a private SSH session inspected and partially commissioned host audit. `auditd` was active but had no rules. The reviewed `infrastructure/production/host/audit.rules` loaded 23 rules through `augenrules --load` on the observed boot; kernel reported `enabled 1`, `lost 0`, `backlog 0`. MariaDB `SERVER_AUDIT` was enabled for `CONNECT` only, writing to a bounded local file owned by `mysql:adm`; real connection and temporary DDL exercise confirmed the plugin path, then SQL-text events were disabled because DDL/DCL can expose secrets. Native `sudo-rs 0.2.13-0ubuntu1.2` rejected the tested sudoers I/O options; the invalid file was moved out of the active directory and `visudo -cf` passed. No sudo I/O/session coverage, Kubernetes API or database privileged-action audit, off-host export, tamper-resistant receipt, OpenBao materialization, JIT cutover, or post-reboot audit validation is claimed. Existing standing sudo remains; Production Readiness is `NOT VERIFIED`. The reproducible partial procedure and limits are in `../operations/production-host-audit-fa.md`. The audit policy is tracked in this repository, while live recovery/export evidence remains outstanding.

@@ -107,7 +107,7 @@ def rehearse():
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.getuid() == 0:
         raise RehearsalFailed("disposable non-root GitHub runner required")
     image = json.loads((SECRETS / "openbao-image.json").read_text())["image"]
-    if not re.fullmatch(r"ghcr\.io/openbao/openbao@sha256:[a-f0-9]{64}", image):
+    if not re.fullmatch(r"ghcr\.io/openbao/openbao-ubi@sha256:[a-f0-9]{64}", image):
         raise RehearsalFailed("fixture immutable image required")
     step("image-pull")
     command(["/usr/bin/docker", "pull", "--quiet", image], timeout=180)

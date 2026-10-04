@@ -89,7 +89,7 @@ class OpenBaoArtifactTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.validate()
         self.pin["production_promotion"] = "blocked-until-supply-chain-staging-and-recovery-evidence"
-        self.pin["image"] = "ghcr.io/openbao/openbao:2.6.4"
+        self.pin["image"] = "ghcr.io/openbao/openbao-ubi:2.6.4"
         with self.assertRaises(ValueError):
             self.validate()
 

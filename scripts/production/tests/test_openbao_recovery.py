@@ -86,7 +86,8 @@ class OpenBaoRecoveryTest(unittest.TestCase):
     def test_image_exact_pin_and_recovery_are_required_by_baseline(self):
         pin = json.loads((recovery.SECRETS / "openbao-image.json").read_text())
         self.assertEqual("2.6.4", pin["version"])
-        self.assertRegex(pin["image"], r"^ghcr.io/openbao/openbao@sha256:[a-f0-9]{64}$")
+        self.assertRegex(pin["image"], r"^ghcr.io/openbao/openbao-ubi@sha256:[a-f0-9]{64}$")
+        self.assertEqual("ubi10-minimal", pin["runtime_flavor"])
         self.assertEqual("blocked-until-supply-chain-staging-and-recovery-evidence", pin["production_promotion"])
         workflow = (recovery.ROOT / ".github/workflows/repository-baseline.yml").read_text()
         baseline = workflow.split("  baseline:", 1)[1]

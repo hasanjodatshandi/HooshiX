@@ -215,7 +215,10 @@ Remediation must not weaken these verified current properties:
   matches in OpenSSL `libssl3`/`libcrypto3` 3.5.7-r0 (scanner fix 3.5.8-r0).
   PR #163 remains draft/unmerged. The remediation selects upstream 2.6.4 in the
   same 2.6 minor line and updates ADR-0011/current source pins together. Immediate
-  next: exact new-digest scanner/native recovery checks; no waiver/install.
+  Alpine 2.6.4 recovery passed but scan still reported one High zlib CVE-2026-85091
+  in run 37187139233. The candidate now uses official UBI10-minimal 2.6.4 at the
+  same source revision, with exact digest/size recorded. Immediate next: its own
+  scanner/native recovery checks; no exception, suppression or install.
 - After artifact remediation: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit
   adapter backed by OpenBao, revoke/expiry integration and recovery-safe

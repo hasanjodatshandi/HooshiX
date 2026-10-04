@@ -196,3 +196,13 @@ timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق دا
 سیاست ممیزی، TLS و عدم تماس hot-path تغییری ندارند. downgrade کور با data/PVC
 جدید مجاز نیست؛ برای deployment آینده، snapshot رمز‌شده و restore مستقل لازم است.
 این pipeline صرفاً CI disposable است و خودش Argo CD/Production را اجرا نمی‌کند.
+
+در run `37187139233` نسخهٔ Alpine 2.6.4 بازیابی را گذراند، ولی اسکن یک High
+برای zlib (`CVE-2026-85091`) نشان داد. کاندیدای فعلی variant رسمی
+`ghcr.io/openbao/openbao-ubi` نسخهٔ 2.6.4، پایهٔ UBI10 minimal است؛ source commit
+باینری همان است و هیچ image سفارشی یا suppression ایجاد نشده. digest/index و
+حجم فشردهٔ حدود ۱۴۲ MB در `openbao-image.json` ثبت شده‌اند. آزمون‌های نسخهٔ قبلی
+برای این variant کفایت ندارند؛ jobهای اسکن و بازیابی خود آن باید سبز شوند.
+اسکن شامل بسته‌های RPM/OS و باینری Go است؛ default dev entrypoint همچنان override
+می‌شود و UID، filesystem و منابع محدود تغییر نکرده‌اند. هیچ دانلود image روی
+WSL/VPS شما انجام نمی‌شود. ظرفیت دیسک و runtime واقعی قبل از نصب جداگانه بررسی شود.

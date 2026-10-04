@@ -82,7 +82,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
 | Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
-| Secret authority | OpenBao 2.6.4 | ADR-0011 same-minor security patch; native recovery and exact-artifact scan gates; topology/authority unchanged |
+| Secret authority | OpenBao 2.6.4, official openbao-ubi (UBI10 minimal) | ADR-0011 same-minor security patch/upstream flavor; native recovery and exact-artifact scan gates; topology/authority unchanged |
 | Admission policy | Kyverno 1.18.2 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
 | Image signing | Cosign 3.0.6 | ADR-0017/0045; exact image signature + provenance + signed SBOM attestation |
 | SBOM | Syft 1.51.0 -> CycloneDX JSON | ADR-0035/0045; generated from exact final releasable image; signed/indexed by image digest |
