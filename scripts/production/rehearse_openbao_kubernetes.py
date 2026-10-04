@@ -179,6 +179,8 @@ def rehearse(tools: Path, receipt: Path) -> None:
             step("schema-candidate")
             k("apply", "-f", "-", data=json.dumps(manifest["items"][0]).encode(), public_schema=True)
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(manifest).encode(), public_schema=True)
+            # Server dry-run does not persist the candidate's ServiceAccount, required by Pod admission.
+            k("apply", "-f", "-", data=json.dumps(manifest["items"][1]).encode(), public_schema=True)
             # Prove restricted PSA rejects an unsafe Pod, not just intended labels.
             pod_spec = json.loads(json.dumps(manifest["items"][-1]["spec"]["template"]["spec"]))
             pod_spec["volumes"].append({"name": "data", "emptyDir": {}})
