@@ -317,6 +317,7 @@ docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/production-jit-usage-fa.md
 docs/operations/production-openbao-fa.md
+docs/operations/production-openbao-storage-fa.md
 docs/operations/wireguard-management-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
@@ -515,16 +516,19 @@ scripts/production/offline-ca/tools.lock.json
 scripts/production/parspack_audit_transport.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
+scripts/production/provision_openbao_storage.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/readiness.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
+scripts/production/rehearse_openbao_storage.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/render_openbao_candidate.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-host-inspection.ps1
+scripts/production/run-openbao-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/tests/test_ghcr_release.py
 scripts/production/tests/test_host_audit_policy.py
@@ -538,6 +542,7 @@ scripts/production/tests/test_openbao_candidate.py
 scripts/production/tests/test_openbao_kubernetes.py
 scripts/production/tests/test_openbao_publication.py
 scripts/production/tests/test_openbao_recovery.py
+scripts/production/tests/test_openbao_storage.py
 scripts/production/tests/test_parspack_audit_transport.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py

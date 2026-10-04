@@ -50,6 +50,7 @@ This matrix records production technology combinations that must remain compatib
 | Current OS-audit bootstrap | Ubuntu 26.04 amd64; `auditd`/`libauparse0t64`/`libauplugin1` `1:4.1.2-1ubuntu0.1` | verify package state, active daemon, numeric enabled/lost status and finite log bounds; multi-word informational status accepted, duplicate keys denied; full audit/JIT separately gated |
 | `production-ha` human access | Teleport 18.10.0 | JIT/SSO/WebAuthn/session-audit evidence |
 | OpenBao | 2.6.4, official openbao-distroless / static nonroot | ADR-0011 same-minor security patch and reviewed upstream flavor; exact Linux/amd64 digest/source revision, native shell-free verified-TLS probes, fresh SBOM/scan and TLS/Shamir/Raft restart/restore evidence required; 77,272,197-byte compressed image; no topology, seal or promotion waiver |
+| Current OpenBao host storage foundation | Ubuntu 26.04 amd64; util-linux 2.41.3-3ubuntu2.2 / e2fsprogs 1.47.2-3ubuntu4 / systemd 259.5-0ubuntu3.4 / python3 3.14.3-0ubuntu2 | ADR-0011 preallocated fixed 8GiB ext4 loop filesystem; exact existing packages checked, never installed/downgraded by installer; disposable 64MiB ENOSPC/remount tests do not substitute for target reboot, mount-loss guard, local PV/GitOps, strict mesh/admission or complete-stack capacity |
 | Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0 with repository safe-rule-logging patch; combined image/rules, opaque-cookie and log-privacy tests |
 | Argo CD | 3.4.2 | security-patched line; reconciliation/rollback validation |
 

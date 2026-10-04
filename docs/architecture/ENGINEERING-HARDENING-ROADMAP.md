@@ -173,13 +173,22 @@ The fixture passed in run `37210210133`, job `111459680073`, at PR #166 head
 unchanged: signed artifact/approved target-compatible staging, reviewed GitOps
 promotion, real Shamir custody/snapshots/recovery, then audit/JIT cutover.
 
-The next coherent continuation adds protected-main publication/signing for an
-unchanged OpenBao import candidate in the existing release workflow. It does not
-approve staging, extend application admission or deploy to the VPS. The public
-hostname is owner-approved `hooshix.com`; TLS and the ADR-0043 L4/origin path still
-need environment evidence. Operator usage/receipt limits are documented in
-`../operations/production-openbao-fa.md` and installation guide §2. Stage 10 stays
-`IN PROGRESS`; matching CI and actual approved publication results must be recorded.
+Protected-main publication/signing of the unchanged private OpenBao import candidate
+passed in run `37228262995` at main `6131ed82e22e4990efe33c9433d01d76a65d1265`.
+It does not approve staging, extend application admission or deploy to the VPS.
+The 2026-10-05 owner-supplied authenticated inventory reports K3s Ready with Calico,
+CoreDNS and Kyverno, but no StorageClass/CSI or OpenBao/Istio/Argo workload. A subsequent
+read-only host inspection found ext4 root, no separate data partition, roughly 128GiB
+free and 16GiB RAM; this is not complete-stack capacity evidence.
+
+The owner approved the next bounded step: **at most 8GiB VPS-only OpenBao storage**,
+without repartitioning, large developer-host files or SSH/MCP changes. The fixed
+filesystem installer, 64MiB disposable CI ENOSPC/remount checks and local-sudo usage
+are owned by `../operations/production-openbao-storage-fa.md` and ADR-0011.
+Actual installation/reboot, mount-loss guard, local PV/GitOps, mesh/admission/TLS,
+staging and recovery remain separate unverified commissioning gates. The public
+hostname is `hooshix.com`; TLS and the ADR-0043 L4/origin path still need environment
+evidence. Stage 10 stays `IN PROGRESS`; no production traffic or readiness is claimed.
 
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
