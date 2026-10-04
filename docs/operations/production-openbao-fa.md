@@ -102,6 +102,12 @@ pipeline موجود `Repository baseline` همهٔ production testها و render
 می‌کند. runner موقت cleanup دارد؛ این آزمون را روی لپ‌تاپ/VPS با دادهٔ واقعی
 اجرا نکنید. وضعیت run همان commit را بررسی کنید؛ run سبز قبلی شاهد تغییر جدید نیست.
 
+### ادامهٔ بررسی artifact در CI
+
+قدم بعدی این تغییر، ساخت SBOM و اسکن آسیب‌پذیری برای همان digest عمومی است؛
+این بررسی نصب، امضای artifact، آزمون staging یا اجازهٔ promotion نیست.
+هیچ کلید Production برای این job لازم نیست و دانلود فقط روی runner موقت GitHub است.
+
 Architecture review mode: full-read
 Architecture document version/commit: main@58c067ecac27b5fdbab93801c765d59b282b3404
 Architecture sections reviewed: platform, runtime/deployment, security/secrets, readiness, capacity, recovery, delivery
