@@ -16,6 +16,11 @@ staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دا
 
 ### انتشار کاندیدای خصوصی بدون نصب
 
+اجرای اولیهٔ `37218037965` بعد از approval مالک در مرحلهٔ copy شکست خورد؛
+هیچ receipt موفق یا امضایی صادر نشد و auth موقت پاک شد. اصلاح جاری فقط
+انتخاب platform برای digest تک‌معماری و تست regression آن را پوشش می‌دهد؛
+اجازهٔ نصب یا عبور از approval/scan/signature را تغییر نمی‌دهد.
+
 بعد از merge و موفقیت `Repository baseline` برای **همان SHA روی main**:
 
 1. GitHub ← Actions ← **Production release evidence** ← Run workflow.
