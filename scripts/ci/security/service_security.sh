@@ -92,6 +92,33 @@ verify_gitleaks_fixtures() {
     exit 1
   fi
 
+  # The registry exception is one fixed prose line, not a trusted file or prefix.
+  local registry_fixture="${fixture_root}/registry-prose/docs/architecture/ENGINEERING-HARDENING-ROADMAP.md"
+  mkdir -p "$(dirname "$registry_fixture")"
+  printf '%s%s\n' \
+    '  continuation uses ephemeral workflow package authentication, ' \
+    'owned/private' > "$registry_fixture"
+  docker run "${common[@]}" \
+    --volume "${fixture_root}/registry-prose:/fixture:ro" \
+    "${GITLEAKS_IMAGE}" \
+    dir --config /config/.gitleaks.toml --no-banner --redact=100 /fixture \
+    >/tmp/gitleaks-registry-prose-control.log 2>&1
+  printf 'token = "%s%s"\n' \
+    '9Kq7mX2vP4sN8cR1tY6a' \
+    'B3dF5hJ7L9wZ0uE2iO4p' >> "$registry_fixture"
+  set +e
+  docker run "${common[@]}" \
+    --volume "${fixture_root}/registry-prose:/fixture:ro" \
+    "${GITLEAKS_IMAGE}" \
+    dir --config /config/.gitleaks.toml --no-banner --redact=100 --exit-code 42 /fixture \
+    >/tmp/gitleaks-registry-secret-control.log 2>&1
+  status=$?
+  set -e
+  if [[ "${status}" -ne 42 ]]; then
+    echo 'Gitleaks registry prose exception hid a credential control.' >&2
+    exit 1
+  fi
+
   mkdir "${fixture_root}/history"
   git -C "${fixture_root}/history" init --quiet
   git -C "${fixture_root}/history" config user.name 'HooshiX CI Fixture'

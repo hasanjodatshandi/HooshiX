@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-24.04
     environment: production-release
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
       - name: Check out protected main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,6 +43,9 @@ jobs:
           python3 - "$RELEASE_MANIFEST" "$GITHUB_OUTPUT" <<'PY'
           import json,sys
           manifest=json.load(open(sys.argv[1],encoding='utf-8'))
+          if not all(image.startswith('ghcr.io/hasanjodatshandi/hooshix/')
+                     for image in manifest['images'].values()):
+              raise SystemExit('Release images must use the owner-selected GHCR namespace')
           with open(sys.argv[2],'a',encoding='utf-8') as output:
               print('git_revision='+manifest['git_revision'],file=output)
               print('cosign_identity='+manifest['cosign']['certificate_identity'],file=output)
@@ -50,17 +57,37 @@ jobs:
           set -euo pipefail
           scripts/production/install_release_tools.sh "$RUNNER_TEMP/hooshix-release-bin"
           echo "$RUNNER_TEMP/hooshix-release-bin" >> "$GITHUB_PATH"
-      - name: Configure protected registry credentials
+      - name: Authenticate with ephemeral repository package token
         shell: bash
         env:
-          REGISTRY_DOCKER_CONFIG_JSON: ${{ secrets.PRODUCTION_REGISTRY_DOCKER_CONFIG_JSON }}
+          GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [[ -n "$REGISTRY_DOCKER_CONFIG_JSON" ]]
+          [[ -n "$GHCR_TOKEN" ]]
           install -d -m 0700 "$RUNNER_TEMP/docker-config"
-          printf '%s' "$REGISTRY_DOCKER_CONFIG_JSON" > "$RUNNER_TEMP/docker-config/config.json"
+          printf '%s' "$GHCR_TOKEN" | timeout 30 docker --config "$RUNNER_TEMP/docker-config" \
+            login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           chmod 0600 "$RUNNER_TEMP/docker-config/config.json"
-          python3 -m json.tool "$RUNNER_TEMP/docker-config/config.json" >/dev/null
+      - name: Require private owned packages before signing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_MANIFEST: ${{ inputs.release_manifest_path }}
+        run: |
+          set -euo pipefail
+          python3 - "$RELEASE_MANIFEST" > "$RUNNER_TEMP/ghcr-packages.txt" <<'PY'
+          import json,sys,urllib.parse
+          manifest=json.load(open(sys.argv[1],encoding='utf-8'))
+          for image in manifest['images'].values():
+              package=image.split('@sha256:',1)[0].removeprefix('ghcr.io/hasanjodatshandi/')
+              print(urllib.parse.quote(package,safe=''))
+          PY
+          mapfile -t packages < "$RUNNER_TEMP/ghcr-packages.txt"
+          [[ "${#packages[@]}" == 7 ]] || { echo 'Seven private packages required' >&2; exit 1; }
+          for package in "${packages[@]}"; do
+            visibility=$(timeout 20 gh api "users/hasanjodatshandi/packages/container/$package" --jq '.visibility')
+            [[ "$visibility" == private ]] || { echo 'Private package verification failed' >&2; exit 1; }
+          done
       - name: Refresh vulnerability database once
         shell: bash
         run: |
@@ -105,3 +132,9 @@ jobs:
           path: ${{ runner.temp }}/release-evidence
           if-no-files-found: error
           retention-days: 90
+      - name: Remove temporary registry authentication
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f -- "$RUNNER_TEMP/docker-config/config.json"

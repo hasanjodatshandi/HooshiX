@@ -168,6 +168,13 @@ Remediation must not weaken these verified current properties:
 
 ### Stage 10 continuation — 2026-10-02
 
+- 2026-10-04: PR #163 merged at `ca155496` after final baseline/frontend
+  `37190183009`/`37190182906` passed. Owner selected private GHCR; the real
+  release environment requires exact `main` and owner review. The registry
+  continuation uses ephemeral workflow package authentication, owned/private
+  package checks and bounded cleanup. Read-only VPS token instructions are in
+  `../operations/production-ghcr-fa.md`. Publication, staging, actual OpenBao/JIT
+  and the remaining Production gates are not completed by this source change.
 - Owner-attested correction of the current ParsPack audit destination is accepted;
   the owner explicitly requested no further bucket checks. Prior probe results are
   historical evidence, not independent verification after that correction.
