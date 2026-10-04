@@ -37,8 +37,11 @@ class OpenBaoArtifactTest(unittest.TestCase):
         for image in (mirror.replace("hasanjodatshandi", "other"), mirror.replace("platform-openbao", "other"),
                       mirror.replace("platform-openbao-private", "platform-openbao"),
                       mirror.rsplit("@", 1)[0] + ":latest", mirror[:-64] + "0" * 64):
+            # A matching catalog must not make an unapproved repository valid.
+            self.values["syft.json"]["source"]["metadata"]["repoDigests"] = [image]
             with self.subTest(image=image), self.assertRaises(ValueError):
                 self.validate(image=image)
+        self.values["syft.json"]["source"]["metadata"]["repoDigests"] = [mirror]
         with self.assertRaises(ValueError):
             self.validate()  # Upstream CI cannot silently accept mirror catalog metadata.
 
