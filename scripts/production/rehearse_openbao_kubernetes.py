@@ -189,6 +189,8 @@ def rehearse(tools: Path, receipt: Path) -> None:
             step("schema-pod")
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), public_schema=True)
             pod_spec["containers"][0]["securityContext"]["privileged"] = True
+            # Keep the unsafe fixture structurally valid so PSA, not core schema validation, denies it.
+            pod_spec["containers"][0]["securityContext"]["allowPrivilegeEscalation"] = True
             step("schema-psa-negative")
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), expected=1,
               public_schema=True, required_error=b'violates PodSecurity "restricted:v1.35": privileged')
