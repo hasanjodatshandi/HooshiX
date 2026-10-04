@@ -244,10 +244,20 @@ class OpenBaoStorageTest(unittest.TestCase):
         source = (Path(storage.__file__).parent / 'run-openbao-storage.ps1').read_text()
         self.assertIn('exec(compile(b,str(p)', source)
         self.assertIn('bytes([', source)
+        self.assertIn('/usr/bin/python3 -I -c', source)
+        self.assertIn("read(32769)", source)
         self.assertIn('Get-FileHash', source)
         self.assertNotIn('Read-Host', source)
         self.assertNotIn('-ExecutionPolicy', source)
         self.assertIn('$InstallApproved8GiB', source)
+
+    def test_privileged_python_isolation_rejects_current_directory_module_injection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            Path(temp, 'hashlib.py').write_text('raise RuntimeError("untrusted module executed")\n')
+            result = subprocess.run([sys.executable, '-I', '-c',
+                                     'import hashlib; assert len(hashlib.sha256(b"fixture").digest()) == 32'],
+                                    cwd=temp, capture_output=True, timeout=10, check=False)
+            self.assertEqual(0, result.returncode)
 
 
 if __name__ == '__main__':

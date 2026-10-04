@@ -39,6 +39,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$dst\run-openbao-storag
 `backing_bytes: 8589934592` بدهد؛ `PUBLIC_RECEIPT` مسیر رسید کوچک است.
 این launcher فقط سورس عمومی را می‌فرستد، hash همان bytes را پیش از اجرای root
 بررسی می‌کند و هیچ رمز، کلید یا kubeconfig نمی‌خواند/کپی نمی‌کند.
+Python در حالت isolated (`-I`) اجرا می‌شود تا module یا PYTHONPATH حساب کاربر
+وارد اجرای root نشود؛ خواندن سورس ارسالی نیز حداکثر ۳۲KiB است.
 
 برای plan/بررسی فقط‌خواندنی، همان دستور را **بدون** `-InstallApproved8GiB`
 اجرا کنید. قبل از نصب، reserve حداقل ۳۰٪ بررسی می‌شود؛ پس از نصب، mount،
