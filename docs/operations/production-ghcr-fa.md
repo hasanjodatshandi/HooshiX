@@ -40,3 +40,14 @@ environment واقعی `production-release` در GitHub ایجاد شد: فقط 
 
 مرجع: [مستندات رسمی GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 Context7 و مستندات رسمی برای token موقت، scope خواندن و private پیش‌فرض بررسی شدند.
+
+## شواهد این تغییر
+
+۱۸۲ تست production شامل شش تست مرز registry، قراردادها و context محلی `Passed` شدند.
+CI اولیهٔ `63e93bb7` در Gitleaks رد شد: تنها finding در خط ۱۷۴ roadmap، عبارت ثابت
+عمومی `owned/private` بود؛ این متن credential نیست. استثنای بازبینی‌شده فقط rule
+`generic-api-key`، همان فایل و **کل همان خط ثابت** را شامل می‌شود؛ تغییر متن یا افزودن
+مقدار واقعی با آن تطبیق نمی‌کند. اسکن secret فعلی و تاریخچه و fixture مثبت همچنان
+الزامی‌اند؛ هیچ file-wide allowlist، حذف rule یا پنهان‌کردن مقدار واقعی وجود ندارد.
+fixture اجرایی جدید در همان فایلِ مجاز، ابتدا متن عمومی را قبول و سپس یک کلید
+مصنوعی افزوده‌شده را رد می‌کند؛ این کنترل در شش security job موجود اجرا می‌شود.

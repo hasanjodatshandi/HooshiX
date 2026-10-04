@@ -26,3 +26,11 @@ condition = "AND"
 paths = ['''(^|/)docs/architecture/testing-and-quality-gates\.md$''']
 regexTarget = "line"
 regexes = ['''For Compromised Password, SBOM/advisory evaluation covers both''']
+
+[[allowlists]]
+description = "Reviewed fixed registry-ownership prose; no credential value"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)docs/architecture/ENGINEERING-HARDENING-ROADMAP\.md$''']
+regexTarget = "line"
+regexes = ['''^[ \t\r\n]*continuation uses ephemeral workflow package authentication, owned/private[ \t\r\n]*$''']
