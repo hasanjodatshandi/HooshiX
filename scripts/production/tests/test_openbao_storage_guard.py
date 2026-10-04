@@ -3,6 +3,7 @@ import os
 import stat
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -59,10 +60,11 @@ class StorageGuardTest(unittest.TestCase):
 
     def test_only_dedicated_uid_group_and_modes_are_accepted(self):
         path = Mock()
-        for mode in (0o700, 0o770):
+        for mode in (0o700, 0o770, 0o2770):
             path.lstat.return_value = SimpleNamespace(st_mode=stat.S_IFDIR | mode, st_uid=10001, st_gid=10001)
             storage.data_owner(path)
         for mode, uid, gid in ((0o777, 10001, 10001), (0o750, 10001, 10001),
+                               (0o4770, 10001, 10001), (0o1770, 10001, 10001),
                                (0o770, 1000, 10001), (0o770, 10001, 0)):
             path.lstat.return_value = SimpleNamespace(st_mode=stat.S_IFDIR | mode, st_uid=uid, st_gid=gid)
             with self.assertRaises(storage.StorageFailed):
@@ -127,6 +129,45 @@ class StorageGuardTest(unittest.TestCase):
         self.assertIn('InstallApprovedGuard', launcher)
         self.assertIn('CHOOSE_ONE_STORAGE_OPERATION', launcher)
         self.assertLess(Path(storage.__file__).stat().st_size, 32768)
+
+    def test_installer_checks_conflicts_before_writes_and_binds_only_after_health(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            guard, unit, dropin = (root / name for name in ('guard.py', 'guard.service', '30.conf'))
+            events = []
+            def native(argv, **_):
+                events.append(tuple(argv))
+                return storage.GUARD_NAME if '--property=BindsTo' in argv else 'active'
+            def create(path, content):
+                events.append(('create', path.name))
+                path.write_bytes(content)
+            with patch.multiple(storage, BASE=root, GUARD=guard, GUARD_UNIT=unit, K3S_DROPIN=dropin), \
+                    patch.object(storage, 'execute', return_value={'storage_foundation': 'Passed'}), \
+                    patch.object(storage, 'protected'), patch.object(storage, 'parents'), \
+                    patch.object(storage, 'create_file', side_effect=create) as writes, \
+                    patch.object(storage, 'run', side_effect=native), patch.object(storage, 'check_worker') as check:
+                dropin.write_bytes(b'foreign policy')
+                with self.assertRaisesRegex(storage.StorageFailed, 'GUARD_INSTALL_CONFLICT'):
+                    storage.install_guard(b'public reviewed source')
+                writes.assert_not_called()
+                check.assert_not_called()
+                dropin.unlink()
+                result = storage.install_guard(b'public reviewed source')
+                self.assertEqual('Passed', result['storage_guard'])
+                self.assertFalse(result['k3s_restart_performed'])
+                start = ('/usr/bin/systemctl', 'start', storage.GUARD_NAME)
+                self.assertLess(events.index(start), events.index(('create', dropin.name)))
+                self.assertFalse(any('restart' in event or 'reboot' in event for event in events))
+                self.assertEqual(3, writes.call_count)
+                writes.reset_mock()
+                storage.install_guard(b'public reviewed source')
+                writes.assert_not_called()
+
+    def test_ci_rearm_does_not_reset_garbage_collected_inactive_dependents(self):
+        source = Path(storage.__file__).with_name('rehearse_openbao_storage.py').read_text()
+        self.assertIn("'reset-failed', guard_name]", source)
+        self.assertNotIn("'reset-failed', guard_name, dummy_name", source)
+        self.assertIn("'absent_source_bind_denied'", source)
 
     def test_review_only_static_local_pv_matches_stateful_claim_without_dynamic_fallback(self):
         manifest = candidate()

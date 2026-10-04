@@ -43,6 +43,8 @@ def guard_rehearsal(root, image, volume, mount_name, size):
     guard_unit = Path('/etc/systemd/system') / guard_name
     dummy_unit = Path('/etc/systemd/system') / dummy_name
     created = []
+    existing_bind = root / 'existing-bind'
+    missing_bind = root / 'new-bind'
     try:
         for path, text in ((guard_unit, storage.guard_unit(script, mount_name)),
                            (dummy_unit, f'[Unit]\nBindsTo={guard_name}\nAfter={guard_name}\n'
@@ -52,7 +54,7 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         storage.run(['/usr/bin/systemd-analyze', 'verify', str(guard_unit), str(dummy_unit)])
         storage.run(['/usr/bin/systemctl', 'daemon-reload'])
         # Native kubelet-compatible permissions must not cause a false trip.
-        os.chmod(volume / 'data', 0o770)
+        os.chmod(volume / 'data', 0o2770)
         storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
         storage.require(storage.run(['/usr/bin/systemctl', 'is-active', guard_name]) == 'active',
                         'GUARD_STARTUP_FAILED')
@@ -62,7 +64,9 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         storage.run(['/usr/bin/mount', '-o', 'remount,rw', str(volume)])
         time.sleep(6)
         wait_inactive(dummy_name)  # No automatic restart/re-arm after fault recovery.
-        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name, dummy_name])
+        # Inactive non-failed dependents may already be garbage-collected by systemd.
+        # Reset only the failed guard; starting a dependent loads it again normally.
+        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name])
         storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
         # Backing pathname replacement/loss must stop the dependent too.
         retained = root / 'retained.ext4'
@@ -74,20 +78,30 @@ def guard_rehearsal(root, image, volume, mount_name, size):
             retained.rename(image)
         # A wrong UUID prevents READY=1 and therefore prevents dependent startup.
         state.write_text(json.dumps(receipt | {'uuid': '00000000-0000-0000-0000-000000000000'}))
-        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name, dummy_name])
+        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name])
         denied = subprocess.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         storage.require(denied.returncode != 0, 'INVALID_STORAGE_STARTUP_ALLOWED')
         wait_inactive(dummy_name)
         state.write_text(json.dumps(receipt))
-        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name, dummy_name])
+        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name])
         storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
+        existing_bind.mkdir(mode=0o700)
+        missing_bind.mkdir(mode=0o700)
+        storage.run(['/usr/bin/mount', '--bind', str(volume / 'data'), str(existing_bind)])
+        marker_hash = hashlib.sha256((existing_bind / 'marker').read_bytes()).hexdigest()
         # Kernel unmount, not a systemctl stop: tests unexpected mount disappearance.
         storage.run(['/usr/bin/umount', str(volume)])
         wait_inactive(dummy_name)
         wait_inactive(guard_name)
         storage.protected(volume, directory=True, mode=0o700)
         storage.require(not any(volume.iterdir()), 'ROOT_FALLBACK_DIRECTORY_PRESENT')
+        storage.require(hashlib.sha256((existing_bind / 'marker').read_bytes()).hexdigest() == marker_hash,
+                        'EXISTING_BIND_CHANGED_FILESYSTEM')
+        absent = subprocess.run(['/usr/bin/mount', '--bind', str(volume / 'data'), str(missing_bind)],
+                                timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        storage.require(absent.returncode != 0 and not os.path.ismount(missing_bind),
+                        'ABSENT_SOURCE_BIND_ALLOWED')
         child = os.fork()
         if child == 0:
             try:
@@ -105,10 +119,14 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         storage.run(['/usr/bin/systemctl', 'start', mount_name])
         return {label: 'Passed' for label in ('startup_identity', 'fsGroup_permissions',
                 'readonly_fault_stop', 'backing_loss_stop', 'unexpected_unmount_stop',
-                'explicit_rearm_only', 'unmounted_nonroot_fallback_denied')}
+                'explicit_rearm_only', 'unmounted_nonroot_fallback_denied',
+                'existing_bind_retained', 'absent_source_bind_denied')}
     finally:
         if created:
             storage.run(['/usr/bin/systemctl', 'stop', *(path.name for path in reversed(created))])
+        for bind in (missing_bind, existing_bind):
+            if os.path.ismount(bind):
+                storage.run(['/usr/bin/umount', str(bind)])
         for path in reversed(created):
             path.unlink()
         storage.run(['/usr/bin/systemctl', 'daemon-reload'])

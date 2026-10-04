@@ -64,7 +64,8 @@ backing، اندازه، flags، data owner و enable/active واحد بررسی
 تا تکمیل guard واقعی mount-loss/قبل از K3s، local PV/StorageClass با Retain و
 node affinity از مسیر GitOps و سایر gateها، workload به این مسیر وصل نکنید.
 این mount به‌تنهایی guard زمان اجرا نیست. Kubelet با fsGroup=10001 ممکن است
-مجوز پوشهٔ داده را از 0700 به 0770 تغییر دهد؛ هر دو فقط برای همان UID/GID مجازند.
+مجوز پوشهٔ داده را از 0700 به 2770 (گروه اختصاصی و setgid) تغییر دهد؛ این دو
+و حالت انتقالی 0770 فقط برای همان UID/GID مجازند؛ مجوز سایر کاربران ممنوع است.
 
 ## نصب محافظ پس از CI موفق
 
@@ -118,7 +119,7 @@ containerهای قبلی نیست.** bind mount موجود filesystem قبلی �
 در رخداد fault، public traffic بسته بماند. filesystem/backing و رسید UUID را
 بازیابی و دستور `--guard-check` را موفق کنید؛ برای حل خطا پوشهٔ `/data` روی
 دیسک اصلی نسازید، filesystem را فرمت نکنید و guard را دور نزنید. با پنجرهٔ
-نگهداری مصوب، سپس `systemctl reset-failed hooshix-openbao-storage-guard.service k3s.service`
+نگهداری مصوب، سپس `systemctl reset-failed hooshix-openbao-storage-guard.service`
 و `systemctl start k3s.service` را اجرا کنید. unseal/health OpenBao و سایر
 وابستگی‌های امنیتی جداگانه تأیید شوند؛ راه‌اندازی K3s مجوز traffic نیست.
 

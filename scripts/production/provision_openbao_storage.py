@@ -199,7 +199,7 @@ def data_owner(path):
     require(stat.S_ISDIR(info.st_mode) and info.st_uid == 10001 and info.st_gid == 10001,
             'UNSAFE_DATA_DIRECTORY')
     # Kubelet's fsGroup=10001 may add group rwx; never allow any other principal.
-    require(stat.S_IMODE(info.st_mode) in (0o700, 0o770), 'UNSAFE_DATA_MODE')
+    require(stat.S_IMODE(info.st_mode) in (0o700, 0o770, 0o2770), 'UNSAFE_DATA_MODE')
 
 
 def check_mount(image, mount, state_path, size):
