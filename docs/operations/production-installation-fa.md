@@ -171,6 +171,9 @@ SHA256 CSR را در سرور با `sha256sum cluster.csr.pem` بگیرید و �
 
 برای Root موجود مالک، بسته تازه را با `InstallationId=hooshix-production` بسازید؛ بسته‌های قدیمی
 schema ۱/۲ این استثنا را نمی‌شناسند. فقط ابزارهای عمومی را به دستگاه آفلاین ببرید.
+CI بعد از موفقیت fixtureها بسته عمومی همان نصب را به‌عنوان artifact
+`hooshix-public-offline-signing-<GIT_SHA>` نگه می‌دارد؛ فقط artifact اجرای موفقِ commit
+بازبینی‌شده/merged را استفاده کنید، نه artifact PR ناشناس. SHA256 ZIP در خروجی build ثبت است.
 اگر state همان نصب در دستگاه آفلاین موجود نیست، `run-sign.cmd` مسیر پوشه backup قبلی را می‌پرسد:
 داخل آن `root-key.enc.pem`، `root-cert.pem` و `backup-receipt.json` باشند.
 SHA256 گواهی عمومیِ مصوب بالا و SHA256 مستقل CSR را وارد کنید؛ رمز فقط در دستگاه آفلاین.

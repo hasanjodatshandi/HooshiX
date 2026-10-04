@@ -25,6 +25,17 @@ jobs:
         shell: powershell
         run: |
           .\scripts\production\tests\test_offline_ca.ps1 -PackageDirectory "$env:RUNNER_TEMP\HooshiX-public-ca"
+      - name: Build public owner-installation signing package after fixtures pass
+        shell: powershell
+        run: |
+          .\scripts\production\offline-ca\build-package.ps1 -InstallationId hooshix-production -OutputDirectory "$env:RUNNER_TEMP\HooshiX-production-offline-ca" -ToolBundleDirectory "$env:RUNNER_TEMP\HooshiX-public-ca"
+      - name: Retain only the public signing tool package, never fixture keys
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hooshix-public-offline-signing-${{ github.sha }}
+          path: ${{ runner.temp }}/HooshiX-production-offline-ca.zip
+          if-no-files-found: error
+          retention-days: 14
       - name: Validate production PowerShell launchers without remote execution
         shell: powershell
         run: |
