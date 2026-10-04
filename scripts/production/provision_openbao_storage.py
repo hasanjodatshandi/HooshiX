@@ -8,11 +8,12 @@ import subprocess
 from pathlib import Path
 
 SIZE = 8 * 1024**3
-BASE = Path('/var/lib/hooshix/storage')
+HOST_NAME = 'mail.hooshix.com'
+BASE = Path('/var/lib/hooshixstorage')
 IMAGE = BASE / 'openbao.ext4'
 MOUNT = BASE / 'openbao'
 STATE = BASE / 'openbao-storage.json'
-UNIT_NAME = 'var-lib-hooshix-storage-openbao.mount'
+UNIT_NAME = 'var-lib-hooshixstorage-openbao.mount'
 UNIT = Path('/etc/systemd/system') / UNIT_NAME
 OPTIONS = 'loop,nosuid,nodev,noexec,noatime,errors=remount-ro'
 HOST_PACKAGES = {'e2fsprogs': '1.47.2-3ubuntu4', 'python3': '3.14.3-0ubuntu2',
@@ -162,6 +163,7 @@ def verify(state):
 def execute(install=False):
     require(os.geteuid() == 0, 'LOCAL_SUDO_REQUIRED')
     require(os.uname().machine == 'x86_64', 'HOST_ARCHITECTURE_UNSUPPORTED')
+    require(os.uname().nodename == HOST_NAME, 'WRONG_TARGET_HOST')
     parents(BASE, missing=True)
     # No changes occur before host metadata/capacity/tool checks succeed.
     result = metadata()
@@ -177,7 +179,7 @@ def execute(install=False):
         headroom(SIZE, os.statvfs('/var/lib'))
         result.update(storage_foundation='Not verified', planned_bytes=SIZE, mutation=False)
         return result
-    for directory in (BASE.parent, BASE):
+    for directory in (BASE,):
         if not directory.exists():
             directory.mkdir(mode=0o755)
             os.chmod(directory, 0o755)

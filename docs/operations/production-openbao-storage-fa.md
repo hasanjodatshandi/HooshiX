@@ -16,6 +16,10 @@ MCP ‏۲۲۲۲، ایمیل و پارتیشن‌های موجود را تغیی
 systemd ‏`259.5-0ubuntu3.4` و python3 ‏`3.14.3-0ubuntu2`.
 اینها در بررسی فقط‌خواندنی دیده شدند؛ ابزار package نصب یا downgrade نمی‌کند.
 اگر به‌روزرسانی شده‌اند، version review لازم است، نه خاموش‌کردن gate.
+hostname هدف فعلی نیز `mail.hooshix.com` است؛ اجرای اشتباهی روی developer host
+یا میزبان دیگر رد می‌شود. مسیر تازه و root-owned ‏`/var/lib/hooshixstorage`
+عمداً جداست؛ مسیر موجود `/var/lib/hooshix` متعلق به حساب مدیر است و برای
+storage قابل اعتماد بازنویسی یا تغییر مالکیت نمی‌شود.
 
 در Windows PowerShell، این **دو فایل عمومی از revision merge‌شده و CI موفق**
 را در پوشهٔ تازهٔ محلی کپی کنید؛ فایل credential لازم نیست:
@@ -44,11 +48,11 @@ backing، اندازه، flags، data owner و enable/active واحد بررسی
 
 | مورد | مسیر |
 | --- | --- |
-| فایل رزرو ۸GiB، root/0600 | `/var/lib/hooshix/storage/openbao.ext4` |
-| رسید هویت filesystem، root/0600 | `/var/lib/hooshix/storage/openbao-storage.json` |
-| mount مستقل | `/var/lib/hooshix/storage/openbao` |
-| دادهٔ UID/GID 10001، mode 0700 | `/var/lib/hooshix/storage/openbao/data` |
-| واحد boot | `var-lib-hooshix-storage-openbao.mount` |
+| فایل رزرو ۸GiB، root/0600 | `/var/lib/hooshixstorage/openbao.ext4` |
+| رسید هویت filesystem، root/0600 | `/var/lib/hooshixstorage/openbao-storage.json` |
+| mount مستقل | `/var/lib/hooshixstorage/openbao` |
+| دادهٔ UID/GID 10001، mode 0700 | `/var/lib/hooshixstorage/openbao/data` |
+| واحد boot | `var-lib-hooshixstorage-openbao.mount` |
 
 اجرای مجدد موفق همان filesystem را بررسی می‌کند و داده را فرمت نمی‌کند.
 تا تکمیل guard واقعی mount-loss/قبل از K3s، local PV/StorageClass با Retain و
@@ -63,9 +67,9 @@ node affinity از مسیر GitOps و سایر gateها، workload به این �
 - دستور زیر فقط وضعیت را می‌خواند؛ برای اجرا رمز sudo محلی لازم است:
 
 ```bash
-sudo systemctl is-active var-lib-hooshix-storage-openbao.mount
-sudo findmnt --mountpoint /var/lib/hooshix/storage/openbao
-sudo df -B1 /var/lib/hooshix/storage/openbao
+sudo systemctl is-active var-lib-hooshixstorage-openbao.mount
+sudo findmnt --mountpoint /var/lib/hooshixstorage/openbao
+sudo df -B1 /var/lib/hooshixstorage/openbao
 ```
 
 - reserve پنج‌درصد ext4 برای UID غیرroot قابل مصرف نیست؛ با نزدیک‌شدن فضای

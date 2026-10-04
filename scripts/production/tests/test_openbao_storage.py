@@ -1,4 +1,5 @@
 import errno
+import json
 import os
 import stat
 import subprocess
@@ -17,8 +18,8 @@ import rehearse_openbao_storage as rehearsal
 class OpenBaoStorageTest(unittest.TestCase):
     def test_install_is_explicit_fixed_size_without_path_override(self):
         self.assertEqual(8 * 1024**3, storage.SIZE)
-        self.assertEqual('/var/lib/hooshix/storage/openbao.ext4', str(storage.IMAGE))
-        self.assertEqual('/var/lib/hooshix/storage/openbao', str(storage.MOUNT))
+        self.assertEqual('/var/lib/hooshixstorage/openbao.ext4', str(storage.IMAGE))
+        self.assertEqual('/var/lib/hooshixstorage/openbao', str(storage.MOUNT))
         text = Path(storage.__file__).read_text()
         self.assertNotIn('hostPath', text)
         self.assertNotIn('kubectl', text)
@@ -29,6 +30,10 @@ class OpenBaoStorageTest(unittest.TestCase):
     def test_nonroot_and_wrong_architecture_fail_before_mutation(self):
         with patch.object(os, 'geteuid', return_value=1000), patch.object(storage, 'run') as run:
             with self.assertRaisesRegex(storage.StorageFailed, 'LOCAL_SUDO_REQUIRED'):
+                storage.execute(True)
+        with patch.object(os, 'geteuid', return_value=0), \
+                patch.object(os, 'uname', return_value=SimpleNamespace(machine='x86_64', nodename='Quantum')):
+            with self.assertRaisesRegex(storage.StorageFailed, 'WRONG_TARGET_HOST'):
                 storage.execute(True)
             run.assert_not_called()
         with patch.object(os, 'geteuid', return_value=0), \
@@ -154,6 +159,66 @@ class OpenBaoStorageTest(unittest.TestCase):
                     storage.install_locked()
                 format_disk.assert_not_called()
             self.assertIn('/dev/vda1', unit.read_text())
+
+    def test_retry_of_matching_state_never_formats_or_overwrites_data(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            image, state, unit, mount = (root / name for name in ('image', 'state', 'unit', 'mount'))
+            image.write_bytes(b'preserved-raft')
+            state.write_text(json.dumps({'schema_version': 1, 'bytes': storage.SIZE, 'uuid': 'uuid'}))
+            unit.write_text(storage.UNIT_TEXT)
+            mount.mkdir()
+            (mount / 'data').mkdir()
+            def command(argv, **_):
+                if argv[0].endswith('blkid'):
+                    return 'uuid'
+                if argv[0].endswith('findmnt'):
+                    return '/dev/loop0'
+                if argv[0].endswith('losetup'):
+                    return str(image)
+                return ''
+            with patch.multiple(storage, IMAGE=image, STATE=state, UNIT=unit, MOUNT=mount), \
+                    patch.object(storage, 'parents'), \
+                    patch.object(storage, 'protected', return_value=SimpleNamespace(st_size=storage.SIZE)), \
+                    patch.object(storage, 'run', side_effect=command), patch.object(os.path, 'ismount', return_value=True), \
+                    patch.object(os, 'chmod'), patch.object(storage, 'verify', return_value={'status': 'Passed'}), \
+                    patch.object(storage, 'reserve_and_format') as format_disk, \
+                    patch.object(storage, 'create_file') as create:
+                self.assertEqual({'status': 'Passed'}, storage.install_locked())
+                format_disk.assert_not_called()
+                create.assert_not_called()
+            self.assertEqual(b'preserved-raft', image.read_bytes())
+
+    def test_verifier_rejects_wrong_backing_options_size_state_and_disabled_unit(self):
+        state = {'schema_version': 1, 'bytes': storage.SIZE, 'uuid': 'uuid'}
+        good_mount = {'target': str(storage.MOUNT), 'source': '/dev/loop0', 'fstype': 'ext4',
+                      'options': 'rw,nosuid,nodev,noexec,noatime'}
+        def verify_with(mount=good_mount, backing=str(storage.IMAGE), size=storage.SIZE, enabled='enabled', value=state):
+            def command(argv, **_):
+                if argv[0].endswith('blkid'):
+                    return 'uuid'
+                if argv[0].endswith('findmnt'):
+                    return json.dumps({'filesystems': [mount]})
+                if argv[0].endswith('losetup'):
+                    return backing
+                if argv[1] == 'is-enabled':
+                    return enabled
+                return 'active'
+            with patch.object(storage, 'protected', return_value=SimpleNamespace(
+                    st_size=storage.SIZE, st_blocks=storage.SIZE // 512)), \
+                    patch.object(Path, 'read_text', return_value=storage.UNIT_TEXT), \
+                    patch.object(storage, 'run', side_effect=command), patch.object(storage, 'metadata', return_value={}), \
+                    patch.object(os, 'statvfs', return_value=SimpleNamespace(f_blocks=size, f_frsize=1, f_bavail=10)):
+                return storage.verify(value)
+        self.assertEqual('Passed', verify_with()['storage_foundation'])
+        cases = [{'mount': good_mount | {'source': '/dev/vda1'}},
+                 {'mount': good_mount | {'options': good_mount['options'] + ',discard'}},
+                 {'mount': good_mount | {'fstype': 'tmpfs'}}, {'backing': '/foreign/image'},
+                 {'size': storage.SIZE + 1}, {'enabled': 'disabled'},
+                 {'value': state | {'uuid': 'foreign'}}]
+        for values in cases:
+            with self.subTest(values=values), self.assertRaises(storage.StorageFailed):
+                verify_with(**values)
 
     def test_unit_is_isolated_boot_enabled_not_ssh_or_k3s_override(self):
         self.assertIn('WantedBy=local-fs.target', storage.UNIT_TEXT)
