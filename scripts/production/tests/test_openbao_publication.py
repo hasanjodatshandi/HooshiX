@@ -124,6 +124,21 @@ class OpenBaoPublicationTest(unittest.TestCase):
                 publisher.publish(self.directory, env)
             run.assert_not_called()
 
+    def test_wrong_tool_version_and_wrong_signer_acceptance_cannot_create_receipt(self):
+        def wrong_tool(argv, timeout=180):
+            return "Version: 9.0.0" if argv[:2] == ["syft", "version"] else self.mock_run(argv, timeout)
+        with patch.object(publisher, "run", side_effect=wrong_tool), self.assertRaises(ValueError):
+            publisher.publish(self.directory, self.env)
+        self.assert_not_signed()
+        self.directory = Path(self.temp.name) / "wrong-signer"
+        def wrong_signer(argv, timeout=180):
+            if argv[:2] == ["cosign", "verify"] and any(value.endswith(".wrong") for value in argv):
+                return "unexpected success"
+            return self.mock_run(argv, timeout)
+        with patch.object(publisher, "run", side_effect=wrong_signer), self.assertRaises(ValueError):
+            publisher.publish(self.directory, self.env)
+        self.assertFalse((self.directory / "receipt.json").exists())
+
     def test_signed_payload_wrong_type_predicate_digest_and_missing_fail_closed(self):
         predicate = {"public": "value"}
         publisher.verify_payload(envelope(predicate, "test", self.digest), "test", predicate, self.digest)

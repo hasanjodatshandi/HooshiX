@@ -35,7 +35,7 @@ review. The continuation replaces long-lived CI registry credentials with the
 ephemeral package token, rejects other namespaces/non-private packages before
 signing, and cleans up runner authentication. Instructions and read-only VPS
 credential custody are in `../operations/production-ghcr-fa.md`.
-This workflow does not build/publish images, deploy workloads or approve readiness.
+The application lane does not build/publish images, deploy workloads or approve readiness.
 Actual private package publication, staging/promotion and secret materialization
 remain `Not verified`.
 

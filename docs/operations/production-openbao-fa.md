@@ -52,7 +52,7 @@ provenance/receipt عمومی ۳۰ روز نگهداری می‌شوند؛ Root/
 [attestation 3.0.6](https://github.com/sigstore/cosign/blob/v3.0.6/pkg/cosign/attestation/attestation.go).
 Context7 و سورس رسمی همین tag برای رفتار copy/attestation تطبیق داده شدند.
 
-ادامهٔ فعلی: آزمون Kubernetes بنیاد OpenBao در pipeline موجود Repository baseline اجرا می‌شود.
+پیش‌نیاز موجود: آزمون Kubernetes بنیاد OpenBao در pipeline Repository baseline اجرا می‌شود.
 این آزمون از credential واقعی، VPS یا Root مالک استفاده نمی‌کند؛ نتیجهٔ آن فقط
 برای API/PVC/TLS/probe است و به‌تنهایی staging مصوب یا مجوز promotion نیست.
 

@@ -30,9 +30,14 @@ credential نوشتن باید token موقت همان job در GitHub Actions �
 workflow موجود `Production release evidence` اکنون login با token موقت، بررسی
 namespace انتخاب‌شده، GET محدود برای private بودن هفت package، و پاک‌سازی فایل
 احراز هویت runner را انجام می‌دهد. خطای API یا package عمومی اجازهٔ امضا نمی‌دهد.
-این workflow تصاویر را نمی‌سازد؛ فقط digestهای منتشرشده و manifest تأییدشده را
+حالت `applications` این workflow تصاویر برنامه را نمی‌سازد/منتشر نمی‌کند؛ فقط digestهای منتشرشده و manifest تأییدشده را
 اسکن و امضا می‌کند. build/publish تصاویر و staging قبل از manifest واقعی release لازم‌اند؛
 نبود manifest/تصویر/approval موفقیت نیست. مرحلهٔ انتشار اجازهٔ rollout نمی‌دهد.
+
+حالت جداگانهٔ `openbao-candidate` همان تصویر عمومی pin‌شدهٔ OpenBao را **بدون rebuild**
+به package خصوصی platform کپی و SBOM/scan/import-provenance/signature آن را بررسی
+می‌کند. این حالت manifest هفت برنامه را جایگزین نمی‌کند و مجوز نصب نیست؛ راهنمای
+اجرای دستی و environment approval در [راهنمای OpenBao](production-openbao-fa.md) است.
 
 environment واقعی `production-release` در GitHub ایجاد شد: فقط branch دقیق `main`
 و reviewer حساب مالک. مالک تک‌نفره اجازهٔ تأیید اجرای خودش را دارد؛ این دسترسی مستقل
