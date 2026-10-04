@@ -21,7 +21,8 @@ from pathlib import Path
 from rehearse_openbao_recovery import BOUND, Client, RehearsalFailed, initialize
 from render_openbao_candidate import ALIVE, NAMESPACE, ROOT, STATUS, candidate
 
-STEPS = frozenset({"tools", "cluster", "schema", "tls", "workload", "sealed",
+STEPS = frozenset({"tools", "cluster", "schema", "schema-crds", "schema-candidate",
+                   "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "unseal", "acl", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
@@ -32,12 +33,19 @@ def step(name: str) -> None:
 
 
 def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
-        expected: int = 0, bound: int = BOUND) -> bytes:
+        expected: int = 0, bound: int = BOUND, public_schema: bool = False,
+        required_error: bytes | None = None) -> bytes:
     # Native argv only. Secret input/output stays in memory, never diagnostics.
-    result = subprocess.run(args, input=data, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    result = subprocess.run(args, input=data, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE if public_schema else subprocess.DEVNULL,
                             timeout=timeout, check=False,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
-    if result.returncode != expected or len(result.stdout) > bound:
+    if (result.returncode != expected or len(result.stdout) > bound or
+            (required_error is not None and required_error not in (result.stderr or b""))):
+        if public_schema:
+            # Only public schema input, before TLS/Secret/init. Escape CI controls and bound output.
+            print("OPENBAO_PUBLIC_SCHEMA_ERROR=" + json.dumps(
+                (result.stderr or b"")[:4096].decode("utf-8", errors="replace")), flush=True)
         raise RehearsalFailed("Kubernetes fixture command failed")
     return result.stdout
 
@@ -96,9 +104,15 @@ def rehearse(tools: Path, receipt: Path) -> None:
         cluster_config.write_text(json.dumps({"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
                                              "nodes": [{"role": "control-plane"}]}))
 
-        def k(*args: str, data: bytes | None = None, timeout: int = 30, expected: int = 0) -> bytes:
+        schema_only = True
+
+        def k(*args: str, data: bytes | None = None, timeout: int = 30, expected: int = 0,
+              public_schema: bool = False, required_error: bytes | None = None) -> bytes:
+            if public_schema and not schema_only:
+                raise RehearsalFailed("schema diagnostics disabled after secret generation")
             return run([kubectl, "--kubeconfig", str(kubeconfig), "--context", "kind-" + name,
-                        "--request-timeout=10s", *args], data=data, timeout=timeout, expected=expected)
+                        "--request-timeout=10s", *args], data=data, timeout=timeout, expected=expected,
+                       public_schema=public_schema, required_error=required_error)
 
         def get(kind_name: str, resource: str):
             return json.loads(k("-n", NAMESPACE, "get", kind_name, resource, "-o", "json"))
@@ -156,20 +170,27 @@ def rehearse(tools: Path, receipt: Path) -> None:
                 crd = chart.extractfile("base/files/crd-all.gen.yaml")
                 if crd is None:
                     raise RehearsalFailed("CRDs missing")
-                k("apply", "--server-side", "-f", "-", data=crd.read(BOUND + 1))
+                step("schema-crds")
+                k("apply", "--server-side", "-f", "-", data=crd.read(BOUND + 1), public_schema=True)
             for crd_name in ("peerauthentications.security.istio.io", "authorizationpolicies.security.istio.io"):
-                k("wait", "--for=condition=Established", "crd/" + crd_name, "--timeout=30s", timeout=40)
+                k("wait", "--for=condition=Established", "crd/" + crd_name, "--timeout=30s", timeout=40,
+                  public_schema=True)
             manifest = candidate("standard")
-            k("apply", "-f", "-", data=json.dumps(manifest["items"][0]).encode())
-            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(manifest).encode())
+            step("schema-candidate")
+            k("apply", "-f", "-", data=json.dumps(manifest["items"][0]).encode(), public_schema=True)
+            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(manifest).encode(), public_schema=True)
             # Prove restricted PSA rejects an unsafe Pod, not just intended labels.
             pod_spec = json.loads(json.dumps(manifest["items"][-1]["spec"]["template"]["spec"]))
             pod_spec["volumes"].append({"name": "data", "emptyDir": {}})
             test_pod = {"apiVersion": "v1", "kind": "Pod", "metadata": {
                 "name": "ci-admission-probe", "namespace": NAMESPACE}, "spec": pod_spec}
-            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode())
+            step("schema-pod")
+            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), public_schema=True)
             pod_spec["containers"][0]["securityContext"]["privileged"] = True
-            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), expected=1)
+            step("schema-psa-negative")
+            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), expected=1,
+              public_schema=True, required_error=b'violates PodSecurity "restricted:v1.35": privileged')
+            schema_only = False
             step("tls")
             key, cert = directory / "tls.key", directory / "tls.crt"
             run(["/usr/bin/openssl", "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-nodes",

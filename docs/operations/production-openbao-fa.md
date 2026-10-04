@@ -41,7 +41,9 @@ ACL منفی، restart، نگهداری همان PVC پس از scale صفر و �
 کلیدها، سهم‌ها، tokenها، kubeconfig و خروجی خام در log/artifact منتشر نمی‌شوند.
 cleanup بخشی از موفقیت است؛ cluster و پوشهٔ خصوصی حذف می‌شوند و تنها receipt
 عمومی `openbao-kubernetes-<run_id>-<attempt>` به مدت ۳۰ روز نگهداری می‌شود.
-هنگام شکست فقط نام مرحلهٔ ثابت عمومی منتشر می‌شود و receipt موفق ایجاد نمی‌شود.
+هنگام شکست نام مرحلهٔ ثابت عمومی منتشر می‌شود و receipt موفق ایجاد نمی‌شود.
+فقط در schema و پیش از ساخت TLS/Secret، خطای عمومی API به‌صورت escaped و با
+سقف ۴KiB نمایش داده می‌شود؛ پس از آن diagnostics خام همیشه بسته است.
 در timeout/cancel، runner موقت GitHub جمع‌آوری می‌شود؛ این ابزار اصلاً context
 یا credential یک کلاستر موجود را استفاده نمی‌کند.
 

@@ -95,6 +95,22 @@ class OpenBaoKubernetesTest(unittest.TestCase):
             self.assertEqual([tools], list(root.iterdir()))
             self.assertNotIn("private diagnostic", output.getvalue())
 
+    def test_public_schema_diagnostics_are_bounded_and_negative_requires_psa_reason(self):
+        reason = b'violates PodSecurity "restricted:v1.35": privileged'
+        result = Mock(returncode=1, stdout=b"", stderr=reason)
+        output = io.StringIO()
+        with patch.object(subprocess, "run", return_value=result) as native, \
+                contextlib.redirect_stdout(output):
+            rehearsal.run(["kubectl"], public_schema=True, expected=1, required_error=reason)
+            self.assertEqual(subprocess.PIPE, native.call_args.kwargs["stderr"])
+            self.assertEqual("", output.getvalue())
+            result.stderr = b"unrelated failure\n::error::" + b"x" * 5000
+            with self.assertRaises(rehearsal.RehearsalFailed):
+                rehearsal.run(["kubectl"], public_schema=True, expected=1, required_error=reason)
+        line = output.getvalue().strip().split("=", 1)[1]
+        self.assertLessEqual(len(json.loads(line).encode()), 4096)
+        self.assertNotIn("\n::error::", output.getvalue())
+
     def test_fixed_step_labels_and_failure_receipt_do_not_reveal_errors(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
