@@ -2,6 +2,17 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+The 2026-10-05 OpenBao storage continuation adds a bounded systemd notify/watchdog
+identity guard, a K3s BindsTo+After dependency installer with no restart, and a
+fixed review-only Retain/node-affine local PV/no-provisioner StorageClass candidate.
+The existing required CI fixture checks real startup/fault/stop/re-arm/fallback
+behavior on 64MiB, not on the VPS; the candidate's API schema is checked separately.
+The earlier 8GiB filesystem installation on the VPS passed, but target guard
+installation, next-start/reboot behavior, actual PV binding, workload promotion,
+mesh/admission/TLS, recovery and Production readiness remain `Not verified`.
+K3s stop is not claimed to terminate all running containers. Owner instructions:
+`../operations/production-openbao-storage-fa.md`; Stage 10 remains `IN PROGRESS`.
+
 Stage 10 continuation: the existing protected `production-release` workflow now has
 an explicit `openbao-candidate` dispatch lane. It requires successful baseline for
 the exact main SHA, imports the pinned upstream Linux/amd64 digest unchanged into

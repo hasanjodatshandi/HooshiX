@@ -1,5 +1,9 @@
 # فضای محدود OpenBao روی VPS
 
+بستهٔ ادامهٔ این بنیاد، محافظ هویت mount پیش از K3s و در زمان اجرا و کاندیدای
+local PV است؛ نصب محافظ و اتصال واقعی Kubernetes از وجود کد یا نتیجهٔ CI
+استنتاج نمی‌شود.
+
 مالک ساخت فضای حداکثر ۸GiB روی VPS فعلی را تأیید کرده است. این تغییر فقط
 بنیاد storage است؛ OpenBao، Secret، PV یا workload نصب نمی‌کند و SSH، پورت
 MCP ‏۲۲۲۲، ایمیل و پارتیشن‌های موجود را تغییر نمی‌دهد.
@@ -59,7 +63,88 @@ backing، اندازه، flags، data owner و enable/active واحد بررسی
 اجرای مجدد موفق همان filesystem را بررسی می‌کند و داده را فرمت نمی‌کند.
 تا تکمیل guard واقعی mount-loss/قبل از K3s، local PV/StorageClass با Retain و
 node affinity از مسیر GitOps و سایر gateها، workload به این مسیر وصل نکنید.
-این mount به‌تنهایی مانع fallback volume به دیسک ریشه برای pod آینده نیست.
+این mount به‌تنهایی guard زمان اجرا نیست. Kubelet با fsGroup=10001 ممکن است
+مجوز پوشهٔ داده را از 0700 به 2770 (گروه اختصاصی و setgid) تغییر دهد؛ این دو
+و حالت انتقالی 0770 فقط برای همان UID/GID مجازند؛ مجوز سایر کاربران ممنوع است.
+
+## نصب محافظ پس از CI موفق
+
+در ۲۰۲۶-۱۰-۰۵ ساخت واقعی این filesystem با رسید عمومی `Passed` و
+`backing_bytes=8589934592` تأیید شد؛ reboot و اتصال Kubernetes هنوز
+`Not verified` است. برای نصب محافظ دوباره فایل ۸GiB ساخته نمی‌شود.
+
+از همان دستور کپی دو فایل عمومیِ **main با CI موفق** در بخش بالا استفاده کنید؛
+سپس به‌جای گزینهٔ ساخت فضا این دستور را اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$dst\run-openbao-storage.ps1" -InstallApprovedGuard
+```
+
+این اقدام باید با اطلاع مالک انجام شود: اگر هویت storage از دست برود، K3s
+متوقف می‌شود و مدیریت کلاستر در دسترس نخواهد بود. نصب، restart/reboot نمی‌کند؛
+SSH، MCP روی ۲۲۲۲، ایمیل، پارتیشن و داده‌های فعلی عوض نمی‌شوند. رمز sudo
+فقط همان پنجره وارد می‌شود. source پس از بررسی hash همان bytes در مسیر root-only
+`/var/lib/hooshixstorage/openbao-storage-guard.py` نصب می‌شود؛ فایل متعارض
+جایگزین نمی‌شود. ابتدا guard سالم شروع می‌شود، سپس dependency زیر اضافه می‌شود:
+
+```text
+mount → hooshix-openbao-storage-guard.service → k3s.service
+```
+
+فایل dependency: `/etc/systemd/system/k3s.service.d/30-hooshix-openbao-storage.conf`.
+شروع K3s بعدی منتظر `READY=1` محافظ می‌ماند. هر پنج ثانیه یک بررسی بدون retry
+با deadline کل ۱۲ ثانیه و deadline دوثانیه‌ای command انجام می‌شود. mount،
+UUID، inode/device و geometry فایل backing، flags، اندازه و owner بررسی می‌شوند؛
+timeout/خطا موفق نیست. watchdog سی‌ثانیه‌ای هنگ والد را هم fail-closed می‌کند.
+مصرف guard به ۵٪ یک CPU، ۶۴MiB حافظه و هشت task محدود است. failure یا unmount
+به توقف dependent می‌انجامد؛ بازگشت mount به‌تنهایی K3s را دوباره شروع نمی‌کند.
+
+خروجی نصب باید `storage_guard: Passed` بدهد؛
+`target_startup_and_fault_test: Not verified` عمدی است. آزمون startup/reboot واقعی
+نیاز به maintenance و کنسول نجات دارد و خودکار اجرا نمی‌شود. بررسی فقط‌خواندنی:
+
+```bash
+sudo systemctl is-active hooshix-openbao-storage-guard.service
+sudo systemctl show k3s.service -p BindsTo -p After
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/openbao-storage-guard.py --guard-check
+```
+
+دستور آخر در موفقیت exit صفر و بدون خروجی است. **توقف K3s به معنی توقف همهٔ
+containerهای قبلی نیست.** bind mount موجود filesystem قبلی را نگه می‌دارد؛
+بدون mount، پوشهٔ root-only خالی است و `/data` وجود ندارد؛ local PV نباید به
+دایرکتوری دیگری یا provisioner دینامیک fallback کند.
+
+### بازیابی و rollback محافظ
+
+در رخداد fault، public traffic بسته بماند. filesystem/backing و رسید UUID را
+بازیابی و دستور `--guard-check` را موفق کنید؛ برای حل خطا پوشهٔ `/data` روی
+دیسک اصلی نسازید، filesystem را فرمت نکنید و guard را دور نزنید. با پنجرهٔ
+نگهداری مصوب، سپس `systemctl reset-failed hooshix-openbao-storage-guard.service`
+و `systemctl start k3s.service` را اجرا کنید. unseal/health OpenBao و سایر
+وابستگی‌های امنیتی جداگانه تأیید شوند؛ راه‌اندازی K3s مجوز traffic نیست.
+
+پیش از وجود PV/workload، rollback کد با حفظ داده و فقط در maintenance مصوب:
+فایل drop-in اختصاصی بالا را به نامی بدون پسوند `.conf` منتقل کنید، daemon-reload
+کنید و guard را متوقف کنید. بعد از اتصال workload، این کار guard را حذف می‌کند
+و بدون طرح recovery/traffic-closed مصوب مجاز نیست. فایل backing/state/unit mount
+حذف یا فرمت نمی‌شوند. نسخهٔ متفاوت source به‌جای overwrite نیازمند تغییر
+بازبینی‌شده و maintenance است؛ installer فعلی fail-closed آن را رد می‌کند.
+
+## کاندیدای local PV؛ هنوز نصب نکنید
+
+```bash
+python3 scripts/production/render_openbao_local_storage.py --candidate
+python3 scripts/production/render_openbao_candidate.py --candidate --storage-class hooshix-openbao-local
+```
+
+اولی فقط StorageClass بدون provisioner با WaitForFirstConsumer و PV ثابت با
+Retain، مسیر دقیق `/var/lib/hooshixstorage/openbao/data`، node affinity دقیق
+`hooshix-production-1` و رزرو برای PVC ‏`hooshix-secrets/data-openbao-0` می‌سازد.
+دومی workload بررسی‌پذیر همان class را می‌سازد. هیچ apply یا نوشتن فایل انجام
+نمی‌شود؛ خروجی را مستقیم apply نکنید. فعال‌سازی فقط از promotion بازبینی‌شدهٔ
+GitOps پس از guard/storage هدف، mesh/admission/TLS، staging و recovery معتبر است.
+۸Gi ظرفیت اعلامی backing است، نه تضمین هشت GiB فضای قابل استفاده بعد از ext4.
+تغییر claimRef، node یا مسیر خودکار نیست؛ از reuse دستی PV داده‌دار خودداری کنید.
 
 ## خطا، کنترل فضا و rollback بدون حذف داده
 
@@ -89,8 +174,36 @@ sudo df -B1 /var/lib/hooshixstorage/openbao
 
 CI موجود `OpenBao Kubernetes foundation` نمونهٔ ۶۴MiB را می‌سازد، با UID10001
 تا ENOSPC می‌نویسد، unmount/remount و marker/hash و cleanup را بررسی می‌کند؛
+محافظ واقعی systemd با یک dependent بی‌ضرر را برای UUID نامعتبر در startup،
+read-only، گم‌شدن backing، unmount ناگهانی، عدم re-arm خودکار، fsGroup و رد
+نوشتن غیرroot روی مسیر unmounted آزمایش می‌کند. اتصال dependency به سرویس
+از قبل روشن بدون restart، حفظ bind موجود و رد bind جدید با source گم‌شده
+نیز بررسی می‌شوند. API موقت Kubernetes schema
+کاندیدای local PV را نیز بررسی می‌کند؛ این schema شاهد bind واقعی PV هدف نیست.
 artifact فقط رسید JSON است، نه image/filesystem یا secret. روی Windows/VPS
 این rehearsal را اجرا نکنید.
 
 وضعیت ساخت واقعی، reboot، PV، OpenBao، backup و ظرفیت کامل stack از نتیجهٔ
 CI استنتاج نمی‌شود. Stage 10 و آمادگی Production همچنان `Not verified` هستند.
+
+## گزارش بازبینی این بسته
+
+Architecture review mode: full-read
+Architecture document version/commit: main@bd74e6401539aae22c8c72f91d2a3e7fc7528e02
+Architecture sections reviewed: storage, platform, runtime, security, capacity, recovery, testing, delivery
+ADRs reviewed or changed: ADR-0011 clarified guard/fsGroup; ADR-0002/0030/0042..0045 reviewed
+Changed bounded context/module: OpenBao host storage guard and review-only local PV
+Contracts changed: explicit guard installation switch; fixed public PV candidate; no business API
+Database migration: Not applicable
+Transaction boundary: Not applicable
+Timeout/deadline behavior: check 12s total/2s native; poll 5s; startup 15s; watchdog 30s; stop 5s
+Retry/cancellation/concurrency behavior: one check worker, no retry/automatic re-arm; service cgroup cleanup
+Kafka/event and idempotency behavior: Not applicable
+Security impact: reject wrong backing inode/device/UUID/options; root-only source; hash same bytes; no SSH/MCP change
+Istio identity and authorization impact: None; no active workload/policy promotion
+Logging and PII impact: finite public diagnostics; worker output discarded; no credentials
+Observability added or changed: systemd health/watchdog and bounded public CI receipt; no production alert claim
+Build/CI/architecture enforcement changed: existing required fixture expanded, no gate removal
+Tests executed: 228 local production tests and repository/contract/context/diff checks Passed; protected final-head/main and native fixture results tracked in PR #171
+Architecture deviations: None
+Rollback considerations: preserve data, approved maintenance, no blind format/restart/guard bypass
