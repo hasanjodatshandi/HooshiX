@@ -39,11 +39,11 @@ def step(name: str) -> None:
     print(f"OPENBAO_STEP={name}", flush=True)
 
 
-def command(args: list[str], *, timeout: int = 30) -> bytes:
+def command(args: list[str], *, timeout: int = 30, expected_exit: int = 0) -> bytes:
     result = subprocess.run(args, check=False, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, timeout=timeout,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
-    if result.returncode or len(result.stdout) > 8192:
+    if result.returncode != expected_exit or len(result.stdout) > 8192:
         raise RehearsalFailed("fixture command failed")
     return result.stdout
 
@@ -107,15 +107,15 @@ def rehearse():
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.getuid() == 0:
         raise RehearsalFailed("disposable non-root GitHub runner required")
     image = json.loads((SECRETS / "openbao-image.json").read_text())["image"]
-    if not re.fullmatch(r"ghcr\.io/openbao/openbao@sha256:[a-f0-9]{64}", image):
+    if not re.fullmatch(r"ghcr\.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}", image):
         raise RehearsalFailed("fixture immutable image required")
     step("image-pull")
     command(["/usr/bin/docker", "pull", "--quiet", image], timeout=180)
     step("image-version")
     version = command(["/usr/bin/docker", "run", "--rm", "--network", "none", "--read-only",
                        "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-                       "--user", str(os.getuid()), "--entrypoint", "bao", image, "version"])
-    if not re.search(rb"\bOpenBao v2\.6\.1\b", version):
+                       "--user", str(os.getuid()), "--entrypoint", "/usr/bin/bao", image, "version"])
+    if not re.search(rb"^OpenBao v2\.6\.4(?:\s|$)", version):
         raise RehearsalFailed("fixture exact version mismatch")
     with tempfile.TemporaryDirectory(prefix="hooshix-openbao-ci-") as temporary:
         with contextlib.ExitStack() as cleanup:
@@ -166,20 +166,26 @@ def rehearse():
                          "--network", network, "--ip", cluster_ips[label],
                          "--mount", f"type=bind,src={fixture_config},dst=/openbao/config.json,readonly",
                          "--mount", f"type=bind,src={data},dst=/openbao/data",
-                         "--publish", "127.0.0.1::8200", "--entrypoint", "bao", image,
+                         "--publish", "127.0.0.1::8200", "--entrypoint", "/usr/bin/bao", image,
                          "server", "-config=/openbao/config.json"])
                 return name, Client(mapped_port(name), tls / "tls.crt"), data
 
             source, client, data = start("source")
             step("source-health")
             health = client.wait_health(501)
-            if health["version"] != "2.6.1":
+            if health["version"] != "2.6.4":
                 raise RehearsalFailed("fixture health version mismatch")
             step("probe-sealed")
-            for probe in (ALIVE, STATUS + '; code=$?; test "$code" -eq 2'):
-                command(["/usr/bin/docker", "exec", "-e", "BAO_ADDR=https://127.0.0.1:8200",
-                         "-e", "BAO_CACERT=/openbao/tls/tls.crt", "-e", "BAO_CLIENT_TIMEOUT=3s",
-                         "-e", "BAO_MAX_RETRIES=0", source, "/bin/sh", "-c", probe])
+            def cli_probe(probe: list[str], expected_exit: int, *, wrong_hostname: bool = False):
+                args = ["/usr/bin/docker", "exec", "-e", "BAO_ADDR=https://127.0.0.1:8200",
+                        "-e", "BAO_CACERT=/openbao/tls/tls.crt", "-e", "BAO_CLIENT_TIMEOUT=3s",
+                        "-e", "BAO_MAX_RETRIES=0", "-e", "HOME=/tmp"]
+                if wrong_hostname:
+                    args += ["-e", "BAO_TLS_SERVER_NAME=wrong.invalid"]
+                return command(args + [source] + probe, expected_exit=expected_exit, timeout=5)
+
+            cli_probe(ALIVE, 0)
+            cli_probe(STATUS, 2)
             # A client trusting the system roots must reject this disposable, untrusted certificate.
             step("tls-negative")
             try:
@@ -189,12 +195,14 @@ def rehearse():
                     raise RehearsalFailed("fixture TLS negative inconclusive") from None
             else:
                 raise RehearsalFailed("fixture TLS verification bypass")
+            # Both native probe paths must fail closed on a certificate-name mismatch.
+            cli_probe(ALIVE, 2, wrong_hostname=True)
+            cli_probe(STATUS, 1, wrong_hostname=True)
             step("source-init")
             keys, root_token = initialize(client)
             step("probe-unsealed")
-            command(["/usr/bin/docker", "exec", "-e", "BAO_ADDR=https://127.0.0.1:8200",
-                     "-e", "BAO_CACERT=/openbao/tls/tls.crt", "-e", "BAO_CLIENT_TIMEOUT=3s",
-                     "-e", "BAO_MAX_RETRIES=0", source, "/bin/sh", "-c", STATUS])
+            cli_probe(ALIVE, 0)
+            cli_probe(STATUS, 0)
             step("kv-and-acl")
             client.call("sys/mounts/fixture", "POST", {"type": "kv", "options": {"version": "2"}}, root_token, 204)
             canary = "ci-only-" + uuid.uuid4().hex
@@ -216,6 +224,8 @@ def rehearse():
             # Re-read the loopback mapping before probing the restarted API.
             client = Client(mapped_port(source), tls / "tls.crt")
             client.wait_health(503)
+            cli_probe(ALIVE, 0)
+            cli_probe(STATUS, 2)
             for key in keys[:2]:
                 client.call("sys/unseal", "PUT", {"key": key})
             client.wait_health(200)

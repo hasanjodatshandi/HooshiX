@@ -124,7 +124,7 @@ WAF/application quotas complement upstream volumetric protection; none replaces 
 
 ## 9. Secrets/OpenBao
 
-OpenBao 2.6.1 remains unchanged production secret authority with current Raft/PVC/Shamir/snapshot/restore/Kubernetes Auth/External Secrets workflows.
+OpenBao 2.6.4 remains unchanged production secret authority with current Raft/PVC/Shamir/snapshot/restore/Kubernetes Auth/External Secrets workflows.
 
 - secrets never enter Git/images/values/logs/traces/metrics/unapproved CI;
 - ADR-0045 requires blocking Gitleaks current-tree and Git-history detection for committed secret material when implemented;

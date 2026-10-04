@@ -2,7 +2,7 @@
 
 ## محدودهٔ این تغییر
 
-هدف این PR آماده‌کردن بستهٔ قابل بازبینی Kubernetes برای OpenBao 2.6.1 است؛
+هدف این PR آماده‌کردن بستهٔ قابل بازبینی Kubernetes برای OpenBao 2.6.4 است؛
 نه فعال‌کردن Production، init واقعی، تغییر SSH/MCP یا حذف sudo دائمی.
 تعریف reusable در `infrastructure/production/secrets/` می‌ماند و تا عبور از
 gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` نمی‌شود.
@@ -59,10 +59,12 @@ DNSهای `openbao.hooshix-secrets.svc` و
 باید جدا و کنترل‌شده باشد؛ کلید root CA Istio وارد OpenBao، Kubernetes یا این
 Secret نمی‌شود. mount TLS فقط‌خواندنی و mode `0440` با fsGroup اختصاصی است.
 
-probeهای startup/liveness از `bao status` با TLS معتبر استفاده می‌کنند و exit
-صفر (باز) یا دو (sealed) را زنده می‌دانند؛ readiness فقط صفر را می‌پذیرد.
-خطای TLS/شبکه/فرایند و exit یک موفق نیست. خروجی probe چاپ نمی‌شود، timeout
-سه ثانیه و retry صفر است. unseal دستی زمان‌بر، دلیل restart مداوم نیست.
+probeهای startup/liveness فرمان native `bao read -field=sealed sys/seal-status`
+را با TLS معتبر اجرا می‌کنند و فقط exit صفر را زنده می‌دانند؛ این endpoint در
+حالت sealed/uninitialized هم قابل خواندن است. readiness از `bao status -format=json`
+استفاده می‌کند و فقط exit صفر (unsealed) را می‌پذیرد، نه exit دو (sealed).
+خطای TLS/شبکه/فرایند موفق نیست. خروجی فقط metadata عمومی وضعیت است؛ timeout
+سه ثانیه و retry صفر است و shell وجود ندارد. unseal دستی دلیل restart مداوم نیست.
 StatefulSet از `OnDelete` استفاده می‌کند: تغییر config/image به‌تنهایی pod را
 restart نمی‌کند؛ replacement باید پس از snapshot، پنجرهٔ نگهداری و آمادگی
 دو سهم با Argo CD و رویهٔ بازبینی‌شده انجام شود. downgrade یا حذف PVC rollback
@@ -102,6 +104,45 @@ pipeline موجود `Repository baseline` همهٔ production testها و render
 می‌کند. runner موقت cleanup دارد؛ این آزمون را روی لپ‌تاپ/VPS با دادهٔ واقعی
 اجرا نکنید. وضعیت run همان commit را بررسی کنید؛ run سبز قبلی شاهد تغییر جدید نیست.
 
+### ادامهٔ بررسی artifact در CI
+
+job اجباری `OpenBao pinned artifact security` در `Repository baseline` روی PR،
+main، اجرای روزانه و اجرای دستی فعال است. ابزارهای Syft 1.51.0 و Grype 0.117.0
+از installer با checksum موجود نصب می‌شوند؛ تصویر عمومی دقیق Linux/amd64 یک‌بار
+catalog می‌شود و SBOMهای Syft و CycloneDX تولید می‌شوند. دیتابیس در همان run
+به‌روز می‌شود؛ update ناموفق، دیتابیس نامعتبر/قدیمی‌تر از ۱۲۰ ساعت (پیش‌فرض
+نسخهٔ پین‌شده)، خطای scanner یا High/Critical بدون استثنا job و gate نهایی را
+رد می‌کند. این حد صرفاً معیار evidence کاندیداست، نه تأیید freshness سیاست Production.
+
+برای استفاده: در GitHub ← Actions ← Repository baseline ← Run workflow، branch
+موردنظر را انتخاب کنید. نتیجهٔ همین commit و job بالا را ببینید و artifact
+`openbao-artifact-<run_id>-<attempt>` را دانلود کنید. SBOMها، گزارش کامل Grype،
+زمان ساخت DB و نسخهٔ ابزارها نگه‌داری می‌شوند؛ receipt موفق شامل digest، commit،
+hash فایل‌ها، زمان اسکن و شمارش severity است. artifact به مدت ۳۰ روز موجود است.
+در run ناموفق گزارش عمومی را بررسی کنید؛ نبود receipt، موفقیت نیست. به‌روزکردن
+digest یا پذیرش ریسک نیازمند بررسی مستقل است؛ gate را خاموش نکنید.
+
+این بررسی نصب، امضای artifact، آزمون staging یا اجازهٔ promotion نیست؛
+receipt صریحاً promotion و signature/provenance را `Not verified` ثبت می‌کند.
+هیچ کلید Production برای این job لازم نیست؛ دانلود فقط روی runner موقت GitHub
+انجام می‌شود و job هیچ دسترسی OIDC/signing/registry-secret ندارد.
+
+مراجع رسمی نسخه‌ها:
+[Syft image metadata](https://github.com/anchore/syft/blob/v1.51.0/syft/source/image_metadata.go)،
+[Grype DB status](https://github.com/anchore/grype/blob/v0.117.0/grype/vulnerability/provider.go)،
+[Grype freshness](https://github.com/anchore/grype/blob/v0.117.0/cmd/grype/cli/options/database.go).
+Context7 برای CLI اسکن و DB freshness استفاده شد و schema با tagهای دقیق تطبیق یافت.
+
+نتیجهٔ واقعی run `37186602660` روی commit `d1cbce42`:
+job اسکن `Failed` شد (exit 2)؛ ۸ High و ۲ Critical روی
+`libssl3/libcrypto3=3.5.7-r0`، با fix گزارش‌شدهٔ `3.5.8-r0` وجود دارد.
+این نتیجه مربوط به digest قبلی نسخهٔ 2.6.1 است. اصلاح در همان PR #163 نسخهٔ
+امنیتی رسمی 2.6.4 را در شاخهٔ 2.6.x انتخاب می‌کند؛ ADR-0011، baseline، قراردادها
+و تست‌ها هم‌زمان به‌روز می‌شوند. image و manifest/config با hash دقیق و metadata
+نسخه/commit بررسی شدند؛ نتیجهٔ UBI در انتهای این راهنما ثبت شده است. نصب نکنید.
+اسکن و بازیابی native باید روی همان digest جدید تکرار شوند. این خطا
+نباید با suppression، `--only-fixed` یا خاموش‌کردن gate دور زده شود.
+
 Architecture review mode: full-read
 Architecture document version/commit: main@58c067ecac27b5fdbab93801c765d59b282b3404
 Architecture sections reviewed: platform, runtime/deployment, security/secrets, readiness, capacity, recovery, delivery
@@ -119,12 +160,91 @@ Istio identity and authorization impact: dedicated SA, Ambient/STRICT, deny-all 
 Logging and PII impact: probe output discarded; existing non-raw audit configuration unchanged
 Observability added or changed: startup/readiness/liveness only; exporter/alert/capacity Not verified
 Build/CI/architecture enforcement changed: existing production unit/render gate and native recovery probe checks
-Tests executed: 18 focused OpenBao tests and 165 production tests Passed locally; native probe/TLS/Raft job Passed on PR #162 at 68bea8aa (run 37183265521); final-head protected CI pending; Kubernetes runtime Not verified
+Tests executed: 18 focused OpenBao tests and 165 production tests Passed locally; PR #162 final-head and post-merge main baseline (37183798133) and frontend E2E (37183797999) Passed; Kubernetes runtime Not verified
 Architecture deviations: None; candidate is deliberately outside active GitOps roots
 Rollback considerations: retain PVC, reviewed prior digest/config, never blind downgrade/delete; live rollback Not verified
 
+Artifact continuation review:
+
+Architecture review mode: full-read
+Architecture document version/commit: main@d8aef05a23103a2f8637730dbc105de94cd8d736
+Architecture sections reviewed: delivery/supply chain, secret authority, readiness, security tool ownership
+Search terms used: OpenBao, SBOM, Grype, Syft, freshness, immutable digest, promotion
+ADRs reviewed or changed: ADR-0011 security patch selected; ADR-0042 version reference aligned; ADR-0017/0035/0038/0045 reviewed without semantic changes
+Changed bounded context/module: credential-free CI platform artifact evidence
+Contracts changed: bounded public candidate scan receipt CLI; existing release chain unchanged
+Database migration: Not applicable
+Transaction boundary: Not applicable
+Timeout/deadline behavior: CI 12m; DB update 180s, catalog 300s, scan 180s
+Retry/cancellation/concurrency behavior: single explicit DB update, no layered retry; isolated disposable runner
+Kafka/event and idempotency behavior: Not applicable
+Security impact: exact public digest, nonempty SBOM, freshness and severity fail closed; no Production credentials
+Istio identity and authorization impact: Not applicable; no runtime identity or grants changed
+Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
+Observability added or changed: hash-bound candidate receipt and retained failed scan reports
+Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
+Tests executed: 9 artifact tests and all 176 production tests Passed locally; context/index/diff/script static verification Passed; rejected 2.6.1 and UBI scans Failed; current distroless artifact security and native TLS/Raft recovery Passed at 4bc15ff / run 37189671503, frontend E2E Passed in run 37189671363; final protected PR/main runs remain merge evidence
+Architecture deviations: None; no platform promotion or application release trust expansion
+Rollback considerations: source change revert only; no live deployment/data/access changes
+
 منابع: Context7 برای OpenBao فراخوانی شد و رفتار exitهای status، پارامترهای CA،
-timeout و retry با مستندات رسمی tag دقیق 2.6.1 تطبیق داده شد:
-[status](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/status.mdx)،
-[CLI](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/index.mdx)،
-[configuration](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/configuration/index.mdx).
+timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق داده شد:
+[status](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/commands/status.mdx)،
+[CLI](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/commands/index.mdx)،
+[configuration](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/configuration/index.mdx).
+
+انتخاب patch با [release امنیتی رسمی 2.6.4](https://github.com/openbao/openbao/releases/tag/v2.6.4)
+و مستندات Context7 تطبیق داده شد؛ نسخهٔ major/minor، Shamir 3/2، Raft/PVC،
+سیاست ممیزی، TLS و عدم تماس hot-path تغییری ندارند. downgrade کور با data/PVC
+جدید مجاز نیست؛ برای deployment آینده، snapshot رمز‌شده و restore مستقل لازم است.
+این pipeline صرفاً CI disposable است و خودش Argo CD/Production را اجرا نمی‌کند.
+
+در run `37187139233` نسخهٔ Alpine 2.6.4 بازیابی را گذراند، ولی اسکن یک High
+برای zlib (`CVE-2026-85091`) نشان داد. کاندیدای ردشده variant رسمی
+`ghcr.io/openbao/openbao-ubi` نسخهٔ 2.6.4، پایهٔ UBI10 minimal است؛ source commit
+باینری همان است و هیچ image سفارشی یا suppression ایجاد نشده. digest/index و
+حجم فشردهٔ حدود ۱۴۲ MB در `openbao-image.json` ثبت شده‌اند. آزمون‌های نسخهٔ قبلی
+برای این variant کفایت ندارند؛ jobهای اسکن و بازیابی خود آن باید سبز شوند.
+اسکن شامل بسته‌های RPM/OS و باینری Go است؛ default dev entrypoint همچنان override
+می‌شود و UID، filesystem و منابع محدود تغییر نکرده‌اند. هیچ دانلود image روی
+WSL/VPS شما انجام نمی‌شود. ظرفیت دیسک و runtime واقعی قبل از نصب جداگانه بررسی شود.
+
+نتیجهٔ UBI روی commit `8ba84ee7`، [run 37187635536](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37187635536):
+بازیابی `Passed`؛ اسکن `Failed` با ۱۰ match از پنج CVE:
+`CVE-2026-76642` روی libmount/libfdisk/libblkid؛ `CVE-2026-75804` و
+`CVE-2026-84782` روی openssl-libs/openssl؛ `CVE-2026-76641` روی expat؛
+`CVE-2026-86145` روی pcre2-syntax/pcre2. scanner برای همهٔ آن‌ها `not-fixed`
+و بدون نسخهٔ اصلاح‌شده گزارش داده است. این شمارش بسته‌هاست، نه ۱۰ CVE مستقل.
+تمام jobهای دیگر baseline گذشتند ولی gate نهایی به‌درستی رد شد.
+
+برای ادامه، همین digest را نصب یا دوباره بدون تغییر تست نکنید. یک اصلاح artifact
+یا adjudication مستند طبق سیاست فعلی لازم است و سپس scan/recovery روی digest جدید
+تکرار می‌شود. این نتیجهٔ تاریخی UBI مجوز نصب آن نیست. جایگزینی distroless نیازمند
+بررسی سازگاری sealed/TLS/probe بود؛ این بررسی و نتیجهٔ جدید در بخش بعد آمده است.
+نتیجهٔ UBI اجازهٔ init واقعی، نصب JIT یا حذف sudo را نمی‌دهد.
+مراجع بررسی اولیهٔ vendor:
+[Expat](https://access.redhat.com/security/cve/cve-2026-76641)،
+[OpenSSL DTLS](https://access.redhat.com/security/cve/cve-2026-84782).
+وجود توضیح vendor به‌تنهایی false-positive یا exception را اثبات نمی‌کند.
+
+### کاندیدای فعلی: distroless رسمی و probe بدون shell
+
+ADR-0011 اکنون variant رسمی `openbao-distroless:2.6.4` را انتخاب می‌کند؛ باینری
+همان release است، image سفارشی ساخته نمی‌شود و حجم فشرده حدود ۷۷ MB است.
+نیازی به shell نیست: startup/liveness فرمان `bao read -field=sealed sys/seal-status`
+را مستقیم اجرا می‌کنند؛ readiness فرمان `bao status -format=json` را اجرا می‌کند و
+فقط exit صفر را قبول می‌کند. وضعیت sealed/uninitialized باعث restart بیهوده نمی‌شود
+ولی اجازهٔ Ready شدن نمی‌دهد. خروجی probe فقط metadata عمومی وضعیت است؛ token یا
+محتوای secret خوانده نمی‌شود.
+
+همهٔ probeها همچنان HTTPS loopback، CA نصب‌شده، timeout سه‌ثانیه و صفر retry دارند؛
+TCP/HTTP probe، خاموش‌کردن TLS verification، sidecar یا فایل اجرایی جدید نداریم.
+CI هر دو مسیر native را با hostname گواهی اشتباه هم آزمایش می‌کند و انتظار خطا دارد.
+روی head `4bc15ff56877d821bdce649fa0eb95b591fa97c5`،
+[run 37189671503](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37189671503)
+اسکن امنیتی digest دقیق و بازیابی native TLS/Raft را مستقل با نتیجهٔ `Passed` اجرا کرد؛
+[frontend E2E](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37189671363)
+هم `Passed` شد. ۱۷۶ تست production و بررسی static اسکریپت‌ها نیز محلی `Passed` شدند.
+این مانع کاندیدای image/probe رفع شده است؛ وضعیت نهایی PR/main باید پیش از merge
+بررسی شود. نصب واقعی همچنان به امضا/provenance، staging، storage/TLS/custody و
+recovery واقعی نیاز دارد؛ SSH، پورت MCP و sudo تغییری نکرده‌اند.

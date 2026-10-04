@@ -195,7 +195,7 @@ If the external monitor also fails during a total-host incident, record a monito
 
 ## 11. OpenBao — unchanged
 
-Use current OpenBao 2.6.1 Shamir/Raft/PVC/encrypted-snapshot/restore/unseal/ESO procedures. Normal workloads continue only within existing validated local-key/stale-source bounds.
+Use current OpenBao 2.6.4 Shamir/Raft/PVC/encrypted-snapshot/restore/unseal/ESO procedures. Normal workloads continue only within existing validated local-key/stale-source bounds.
 
 Never respond to OpenBao outage by removing/replacing OpenBao, putting secrets in Git/values/images/logs/traces/metrics, disabling validation, or creating plaintext fallback.
 

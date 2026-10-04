@@ -528,6 +528,7 @@ scripts/production/tests/test_install_audit_prerequisite.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py
 scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_parspack_audit_transport.py
@@ -539,6 +540,7 @@ scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_verify.py
 scripts/production/verify.py
 scripts/production/verify_host_audit.py
+scripts/production/verify_openbao_artifact.py
 scripts/production/verify_release.py
 services/authorization-service/.dockerignore
 services/authorization-service/Dockerfile

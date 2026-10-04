@@ -222,7 +222,7 @@ Compromised Password:
 
 OpenBao unchanged:
 
-- [ ] exact 2.6.1 topology/version and Shamir/Raft/PVC/snapshot/restore/unseal evidence.
+- [ ] exact 2.6.4 topology/version and Shamir/Raft/PVC/snapshot/restore/unseal evidence.
 - [ ] External Secrets/Kubernetes Auth/local mounted key workflows pass.
 - [ ] no per-request OpenBao hot-path regression.
 - [ ] no secret in Git/image/values/log/trace/metric/CI.

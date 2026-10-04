@@ -40,11 +40,11 @@ class OpenBaoRecoveryTest(unittest.TestCase):
                 Path(args[args.index("-keyout") + 1]).touch()
             if args[1:2] == ["port"]:
                 return b"127.0.0.1:18200\n"
-            return b"OpenBao v2.6.1"
+            return b"OpenBao v2.6.4"
 
         client = Mock()
         client.base = "https://127.0.0.1:18200/v1/"
-        client.wait_health.return_value = {"version": "2.6.1"}
+        client.wait_health.return_value = {"version": "2.6.4"}
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.object(os, "getuid", return_value=1000), \
                 patch.object(recovery, "command", side_effect=run), patch.object(recovery, "Client", return_value=client), \
                 patch.object(recovery.urllib.request, "build_opener") as opener, \
@@ -85,8 +85,9 @@ class OpenBaoRecoveryTest(unittest.TestCase):
 
     def test_image_exact_pin_and_recovery_are_required_by_baseline(self):
         pin = json.loads((recovery.SECRETS / "openbao-image.json").read_text())
-        self.assertEqual("2.6.1", pin["version"])
-        self.assertRegex(pin["image"], r"^ghcr.io/openbao/openbao@sha256:[a-f0-9]{64}$")
+        self.assertEqual("2.6.4", pin["version"])
+        self.assertRegex(pin["image"], r"^ghcr.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}$")
+        self.assertEqual("distroless-static-nonroot", pin["runtime_flavor"])
         self.assertEqual("blocked-until-supply-chain-staging-and-recovery-evidence", pin["production_promotion"])
         workflow = (recovery.ROOT / ".github/workflows/repository-baseline.yml").read_text()
         baseline = workflow.split("  baseline:", 1)[1]
@@ -102,6 +103,16 @@ class OpenBaoRecoveryTest(unittest.TestCase):
                 with self.assertRaises(recovery.RehearsalFailed):
                     recovery.rehearse()
                 run.assert_not_called()
+
+    def test_old_patch_and_prerelease_are_rejected_before_fixture_initialization(self):
+        for version in (b"OpenBao v2.6.1", b"OpenBao v2.6.4-rc1"):
+            with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
+                    patch.object(os, "getuid", return_value=1000), \
+                    patch.object(recovery, "command", return_value=version), \
+                    patch.object(recovery, "initialize") as initialize:
+                with self.assertRaises(recovery.RehearsalFailed):
+                    recovery.rehearse()
+                initialize.assert_not_called()
 
     def test_no_redirect_even_for_loopback(self):
         with self.assertRaises(recovery.RehearsalFailed):
@@ -124,6 +135,12 @@ class OpenBaoRecoveryTest(unittest.TestCase):
                     recovery.command(["/usr/bin/docker", "version"])
                 self.assertNotIn("private-fixture", str(error.exception))
                 self.assertEqual(1, run.call_count)
+
+    def test_probe_sealed_exit_is_explicit_not_a_general_failure_bypass(self):
+        with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 2, b"sealed")):
+            self.assertEqual(b"sealed", recovery.command(recovery.STATUS, expected_exit=2))
+            with self.assertRaises(recovery.RehearsalFailed):
+                recovery.command(recovery.STATUS)
 
     def test_insufficient_share_does_not_unseal(self):
         from unittest.mock import Mock
