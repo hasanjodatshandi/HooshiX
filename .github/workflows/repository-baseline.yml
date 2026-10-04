@@ -143,6 +143,11 @@ jobs:
           timeout 180 grype "sbom:$evidence/syft.json" --fail-on high -o json > "$evidence/grype.json"
           python3 scripts/production/verify_openbao_artifact.py \
             --evidence-dir "$evidence" --revision "$(git rev-parse HEAD)" > "$evidence/receipt.json"
+      - name: Report public blocking findings without approving promotion
+        if: ${{ always() }}
+        run: |
+          python3 scripts/production/verify_openbao_artifact.py --report \
+            --evidence-dir "$RUNNER_TEMP/openbao-artifact" --revision "$(git rev-parse HEAD)"
       - name: Retain public scan evidence including failed scans
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

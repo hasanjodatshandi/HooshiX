@@ -1,4 +1,6 @@
 import copy
+import contextlib
+import io
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -100,6 +102,19 @@ class OpenBaoArtifactTest(unittest.TestCase):
             self.assertNotIn(forbidden, job)
         self.assertIn("- openbao-artifact", workflow)
         self.assertIn('if [ "${OPENBAO_ARTIFACT_RESULT}" !=', workflow)
+
+    def test_failed_scan_diagnostics_escape_commands_and_do_not_validate(self):
+        scan = {"matches": [{"vulnerability": {"severity": "High", "id": "CVE-test\n::error::%"},
+                             "artifact": {"name": "pkg", "version": "1"}}]}
+        output = io.StringIO()
+        with patch.object(sys, "argv", ["verify", "--report", "--evidence-dir", "ci", "--revision", "a" * 40]), \
+                patch.object(verifier, "load", return_value=scan), \
+                patch.object(verifier, "validate") as validate, contextlib.redirect_stdout(output):
+            self.assertEqual(0, verifier.main())
+            validate.assert_not_called()
+        self.assertIn("OPENBAO_BLOCKING_FINDINGS=1", output.getvalue())
+        self.assertNotIn("\n::error::", output.getvalue())
+        self.assertIn("%25", output.getvalue())
 
 
 if __name__ == "__main__":

@@ -69,7 +69,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument("--revision", required=True)
+    parser.add_argument("--report", action="store_true", help="public diagnostics only; never writes a receipt")
     args = parser.parse_args()
+    if args.report:
+        try:
+            scan = load(args.evidence_dir / "grype.json")
+            findings = [match for match in scan["matches"]
+                        if match["vulnerability"]["severity"] in ("High", "Critical")]
+            print(f"OPENBAO_BLOCKING_FINDINGS={len(findings)}")
+            for match in findings[:20]:
+                detail = json.dumps({"id": match["vulnerability"]["id"],
+                                     "severity": match["vulnerability"]["severity"],
+                                     "package": match["artifact"]["name"],
+                                     "version": match["artifact"]["version"],
+                                     "fix": match["vulnerability"].get("fix")}, ensure_ascii=True)
+                # JSON escapes control characters; escape workflow-command delimiters too.
+                print("::notice title=OpenBao blocking vulnerability::" + detail.replace("%", "%25"))
+        except (ValueError, KeyError, TypeError, OSError):
+            print("OPENBAO_SCAN_DIAGNOSTICS=Inconclusive; inspect failed job and artifacts")
+        return 0  # Reporting is not the required scan/validation gate.
     try:
         result = validate(args.evidence_dir, args.revision, datetime.now(timezone.utc))
     except (ValueError, KeyError, TypeError, OSError):
