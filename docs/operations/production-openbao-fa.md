@@ -9,6 +9,11 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 
 ## ترتیب اجرا و نقطهٔ ادامه
 
+بستهٔ کاری جاری: انتشار همان digest رسمی OpenBao به GHCR خصوصی، اسکن و امضای
+کاندیدا در workflow محافظت‌شدهٔ موجود. این کار ساخت مجدد upstream، نصب روی VPS،
+staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دامنهٔ نصب فعلی مالک
+`hooshix.com` است؛ تنظیمات شبکه و HTTPS آن شاهد جداگانه لازم دارند.
+
 ادامهٔ فعلی: آزمون Kubernetes بنیاد OpenBao در pipeline موجود Repository baseline اجرا می‌شود.
 این آزمون از credential واقعی، VPS یا Root مالک استفاده نمی‌کند؛ نتیجهٔ آن فقط
 برای API/PVC/TLS/probe است و به‌تنهایی staging مصوب یا مجوز promotion نیست.
