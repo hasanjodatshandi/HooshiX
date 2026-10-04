@@ -2,6 +2,17 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+The 2026-10-04 OpenBao continuation adds a deterministic, public-only Kubernetes
+foundation candidate through `scripts/production/render_openbao_candidate.py`.
+It references the existing 2.6.1 digest/configuration, a separately provisioned TLS
+Secret, retained single-node Raft PVC, bounded non-root workload and fail-closed
+network/mesh policies. It is outside the active Argo CD roots: rendering does not
+authorize deployment. Client edges, Kubernetes Auth/ESO, host materialization,
+signed promotion, target-cluster validation, capacity, hourly encrypted off-host
+snapshots and recovery custody remain commissioning gates. SSH/MCP/sudo are
+unchanged. Instructions and evidence limits are in
+`../operations/production-openbao-fa.md`; Stage 10 remains `IN PROGRESS`.
+
 On 2026-10-02 a private SSH session inspected and partially commissioned host audit. `auditd` was active but had no rules. The reviewed `infrastructure/production/host/audit.rules` loaded 23 rules through `augenrules --load` on the observed boot; kernel reported `enabled 1`, `lost 0`, `backlog 0`. MariaDB `SERVER_AUDIT` was enabled for `CONNECT` only, writing to a bounded local file owned by `mysql:adm`; real connection and temporary DDL exercise confirmed the plugin path, then SQL-text events were disabled because DDL/DCL can expose secrets. Native `sudo-rs 0.2.13-0ubuntu1.2` rejected the tested sudoers I/O options; the invalid file was moved out of the active directory and `visudo -cf` passed. No sudo I/O/session coverage, Kubernetes API or database privileged-action audit, off-host export, tamper-resistant receipt, OpenBao materialization, JIT cutover, or post-reboot audit validation is claimed. Existing standing sudo remains; Production Readiness is `NOT VERIFIED`. The reproducible partial procedure and limits are in `../operations/production-host-audit-fa.md`. The audit policy is tracked in this repository, while live recovery/export evidence remains outstanding.
 
 On 2026-10-03 the reviewed 25-rule candidate was deployed after preserving the previous 23-rule file. `augenrules --load` succeeded; verifier receipt reported exact policy/kernel consistency, `enabled=1`, `lost=0`, and `backlog=0`. A harmless canary argument produced zero `EXECVE`/`PROCTITLE` matches. This proves the local filter behavior on the current boot only; event coverage, off-host export, audit/JIT and Production readiness remain `Not verified`. Native sudo-rs still lacks the tested I/O settings; upstream sudo is installed alongside it, but neither alternative nor sudoers was changed. OpenBao/JIT, full event coverage, safe session recording and recovery remain commissioning gates.
