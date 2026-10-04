@@ -102,6 +102,9 @@ try {
     $script:InstallationId='hooshix-production'
     Expect-Failure { Assert-NewRootAllowed } 'EXISTING_ROOT_APPROVED_USE_SIGN*'
     Expect-Failure { Assert-KeyMatches $key $cert $password } 'ROOT_INSTALLATION_IDENTITY_REJECTED'
+    $sameName=Join-Path $fixture 'unapproved-same-installation.pem'
+    $null=Invoke-OpenSSL -ArgumentVector @('req','-new','-x509','-sha256','-key',$key,'-passin','stdin','-config',(Join-Path $script:PackageRoot 'root.cnf'),'-extensions','root_ca','-subj','/O=HooshiX/CN=hooshix-production Offline Root CA','-days','365','-out',$sameName) -Password $password
+    Expect-Failure { Assert-KeyMatches $key $sameName $password } 'ROOT_INSTALLATION_IDENTITY_REJECTED'
     $exception.certificate_file_sha256=(Get-FileHash -LiteralPath $cert).Hash.ToLowerInvariant()
     $exception.subject_rfc2253=Invoke-OpenSSL -ArgumentVector @('x509','-in',$cert,'-subject','-nameopt','RFC2253','-noout')
     $legacy=@{ schema_version=1; certificate_sha256=(Get-FileHash -LiteralPath $cert).Hash; encrypted_key_sha256=(Get-FileHash -LiteralPath $key).Hash; production_approved=$false; offline_custody='Not verified' }
