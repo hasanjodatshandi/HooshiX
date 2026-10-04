@@ -168,7 +168,7 @@ Architecture review mode: full-read
 Architecture document version/commit: main@d8aef05a23103a2f8637730dbc105de94cd8d736
 Architecture sections reviewed: delivery/supply chain, secret authority, readiness, security tool ownership
 Search terms used: OpenBao, SBOM, Grype, Syft, freshness, immutable digest, promotion
-ADRs reviewed or changed: ADR-0011, ADR-0017, ADR-0035, ADR-0038, ADR-0045 reviewed; None changed
+ADRs reviewed or changed: ADR-0011 security patch selected; ADR-0042 version reference aligned; ADR-0017/0035/0038/0045 reviewed without semantic changes
 Changed bounded context/module: credential-free CI platform artifact evidence
 Contracts changed: bounded public candidate scan receipt CLI; existing release chain unchanged
 Database migration: Not applicable
@@ -181,7 +181,7 @@ Istio identity and authorization impact: Not applicable; no runtime identity or 
 Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
 Observability added or changed: hash-bound candidate receipt and retained failed scan reports
 Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
-Tests executed: 8 artifact tests and all 173 production tests Passed locally; repository structure and native OpenBao recovery Passed at d1cbce42 in run 37186602660; artifact scan Failed with 10 blocking matches; documentation-only final-head CI pending
+Tests executed: 9 artifact tests and all 175 production tests Passed locally; context/index/diff Passed; old 2.6.1 artifact scan Failed with 10 blocking matches; new 2.6.4 scan and native recovery CI pending
 Architecture deviations: None; no platform promotion or application release trust expansion
 Rollback considerations: source change revert only; no live deployment/data/access changes
 
@@ -190,3 +190,9 @@ timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق دا
 [status](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/commands/status.mdx)،
 [CLI](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/commands/index.mdx)،
 [configuration](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/configuration/index.mdx).
+
+انتخاب patch با [release امنیتی رسمی 2.6.4](https://github.com/openbao/openbao/releases/tag/v2.6.4)
+و مستندات Context7 تطبیق داده شد؛ نسخهٔ major/minor، Shamir 3/2، Raft/PVC،
+سیاست ممیزی، TLS و عدم تماس hot-path تغییری ندارند. downgrade کور با data/PVC
+جدید مجاز نیست؛ برای deployment آینده، snapshot رمز‌شده و restore مستقل لازم است.
+این pipeline صرفاً CI disposable است و خودش Argo CD/Production را اجرا نمی‌کند.

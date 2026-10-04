@@ -36,7 +36,8 @@ security release also fixes audit-failure response handling, expired AppRole
 SecretID authentication and Kubernetes JWT validation on renewal. Exact registry
 manifest/config hashes, platform, version and source revision are checked when
 pinning; final-image scanning and native TLS/Shamir/Raft recovery remain required
-before merge. There is no existing live OpenBao store to upgrade. This source
+before merge. Current commissioning evidence does not establish a live OpenBao
+store; this change performs no live datastore upgrade. This source
 selection does not approve installation, signing, staging or production promotion.
 
 Source: [official 2.6.4 release](https://github.com/openbao/openbao/releases/tag/v2.6.4).
