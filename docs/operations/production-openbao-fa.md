@@ -59,10 +59,12 @@ DNSهای `openbao.hooshix-secrets.svc` و
 باید جدا و کنترل‌شده باشد؛ کلید root CA Istio وارد OpenBao، Kubernetes یا این
 Secret نمی‌شود. mount TLS فقط‌خواندنی و mode `0440` با fsGroup اختصاصی است.
 
-probeهای startup/liveness از `bao status` با TLS معتبر استفاده می‌کنند و exit
-صفر (باز) یا دو (sealed) را زنده می‌دانند؛ readiness فقط صفر را می‌پذیرد.
-خطای TLS/شبکه/فرایند و exit یک موفق نیست. خروجی probe چاپ نمی‌شود، timeout
-سه ثانیه و retry صفر است. unseal دستی زمان‌بر، دلیل restart مداوم نیست.
+probeهای startup/liveness فرمان native `bao read -field=sealed sys/seal-status`
+را با TLS معتبر اجرا می‌کنند و فقط exit صفر را زنده می‌دانند؛ این endpoint در
+حالت sealed/uninitialized هم قابل خواندن است. readiness از `bao status -format=json`
+استفاده می‌کند و فقط exit صفر (unsealed) را می‌پذیرد، نه exit دو (sealed).
+خطای TLS/شبکه/فرایند موفق نیست. خروجی فقط metadata عمومی وضعیت است؛ timeout
+سه ثانیه و retry صفر است و shell وجود ندارد. unseal دستی دلیل restart مداوم نیست.
 StatefulSet از `OnDelete` استفاده می‌کند: تغییر config/image به‌تنهایی pod را
 restart نمی‌کند؛ replacement باید پس از snapshot، پنجرهٔ نگهداری و آمادگی
 دو سهم با Argo CD و رویهٔ بازبینی‌شده انجام شود. downgrade یا حذف PVC rollback
