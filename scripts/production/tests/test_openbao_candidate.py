@@ -39,7 +39,7 @@ class OpenBaoCandidateTest(unittest.TestCase):
         self.assertEqual("local.storage", renderer.candidate("local.storage")["items"][-1]["spec"]
                          ["volumeClaimTemplates"][0]["spec"]["storageClassName"])
 
-    def test_one_raft_identity_and_retained_bounded_pvc(self):
+    def test_one_raft_identity_and_retained_pvc_with_explicit_storage_request(self):
         self.assertEqual(1, self.workload["replicas"])
         self.assertEqual("openbao", self.workload["serviceName"])
         self.assertEqual({"type": "OnDelete"}, self.workload["updateStrategy"])
@@ -92,8 +92,14 @@ class OpenBaoCandidateTest(unittest.TestCase):
         self.assertTrue(self.items["Service"]["spec"]["publishNotReadyAddresses"])
         self.assertFalse(self.items["ServiceAccount"]["automountServiceAccountToken"])
         self.assertFalse(self.pod["automountServiceAccountToken"])
-        self.assertEqual({"podSelector": {}, "policyTypes": ["Ingress", "Egress"],
-                          "ingress": [], "egress": []}, self.items["NetworkPolicy"]["spec"])
+        network = self.items["NetworkPolicy"]["spec"]
+        self.assertEqual({}, network["podSelector"])
+        self.assertEqual(["Ingress", "Egress"], network["policyTypes"])
+        self.assertEqual([], network["ingress"])
+        self.assertEqual([{ "to": [{
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+            "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
+            "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]}], network["egress"])
         self.assertEqual({"mtls": {"mode": "STRICT"}}, self.items["PeerAuthentication"]["spec"])
         self.assertEqual({}, self.items["AuthorizationPolicy"]["spec"])
         self.assertEqual("ambient", self.items["Namespace"]["metadata"]["labels"]["istio.io/dataplane-mode"])

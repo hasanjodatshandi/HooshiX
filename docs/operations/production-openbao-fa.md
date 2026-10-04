@@ -46,6 +46,9 @@ ConfigMap مشتق از `openbao-server.json`، Service داخلی headless و S
 دارد. راه‌اندازی هیچ init container ریشه یا قابلیت افزوده‌ای ندارد.
 پیش‌فرض candidate: درخواست ۲۵۰ میلی‌CPU/۲۵۶MiB، سقف ۱ CPU/۵۱۲MiB، PVC هشت GiB
 و tmp حافظه‌ای ۱۶MiB. اینها سقف شروع آزمون هستند، **نه ظرفیت تأییدشدهٔ Production**.
+درخواست هشت GiB برای PVC سقف مصرف filesystem را ثابت نمی‌کند؛ برخی storage classها
+مثل local-path آن را quota نمی‌کنند. پیش از نصب، enforcement واقعی quota/فضای
+رزرو و رفتار پرشدن volume باید آزموده شود؛ storage فاقد کنترل رشد تأیید نمی‌شود.
 حجم audit، rotation/export و reserve دیسک باید قبل از استفادهٔ واقعی اندازه‌گیری
 و محدود شوند؛ PVC پرشده نباید باعث حذف evidence یا ادامهٔ grant جدید شود.
 
@@ -74,7 +77,9 @@ restart نمی‌کند؛ replacement باید پس از snapshot، پنجرهٔ
   admission داشته باشد؛ image upstream یا آزمون Docker به‌تنهایی مجوز promotion
   نیست. سیاست Kyverno باید namespace جدید را نیز پوشش دهد؛ policy فعلی platform
   به‌طور خودکار همهٔ namespaceهای جدید را پوشش نمی‌دهد.
-- NetworkPolicy هر دو جهت و AuthorizationPolicy دسترسی client را بسته‌اند.
+- NetworkPolicy هر دو جهت و AuthorizationPolicy دسترسی client را بسته‌اند؛ فقط
+  DNS روی TCP/UDP 53 به podهای kube-dns در kube-system مجاز است تا نام Raft/API
+  قابل حل باشد. labels/resolver واقعی هدف نیز باید پیش از نصب تطبیق داده شوند.
   kube exec/port-forward مسیر کنترل Kubernetes است، نه اثبات workload mTLS.
   قبل از ESO/host exporter، هویت، مسیر ارتباط، TokenReview محدود، trust domain،
   deadline، CA و policy دقیق آن edgeها در یک تغییر بازبینی‌شده اضافه و آزموده شوند؛
@@ -114,6 +119,12 @@ Istio identity and authorization impact: dedicated SA, Ambient/STRICT, deny-all 
 Logging and PII impact: probe output discarded; existing non-raw audit configuration unchanged
 Observability added or changed: startup/readiness/liveness only; exporter/alert/capacity Not verified
 Build/CI/architecture enforcement changed: existing production unit/render gate and native recovery probe checks
-Tests executed: 18 focused OpenBao unit/negative tests Passed; new native/Kubernetes evidence pending CI/staging
+Tests executed: 18 focused OpenBao tests and 165 production tests Passed locally; native probe/TLS/Raft job Passed on PR #162 at 68bea8aa (run 37183265521); final-head protected CI pending; Kubernetes runtime Not verified
 Architecture deviations: None; candidate is deliberately outside active GitOps roots
 Rollback considerations: retain PVC, reviewed prior digest/config, never blind downgrade/delete; live rollback Not verified
+
+منابع: Context7 برای OpenBao فراخوانی شد و رفتار exitهای status، پارامترهای CA،
+timeout و retry با مستندات رسمی tag دقیق 2.6.1 تطبیق داده شد:
+[status](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/status.mdx)،
+[CLI](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/commands/index.mdx)،
+[configuration](https://github.com/openbao/openbao/blob/v2.6.1/website/content/docs/configuration/index.mdx).

@@ -89,9 +89,12 @@ def candidate(storage_class: str) -> dict:
     workload["metadata"]["annotations"] = {"argocd.argoproj.io/sync-options": "Prune=confirm"}
     # Foundation deliberately has NO client ingress, API egress or TokenReview grant.
     # Those edges require a separately reviewed ESO/host-materialization identity.
-    network = resource("networking.k8s.io/v1", "NetworkPolicy", "openbao-deny-all",
+    network = resource("networking.k8s.io/v1", "NetworkPolicy", "openbao-isolation",
                        spec={"podSelector": {}, "policyTypes": ["Ingress", "Egress"],
-                             "ingress": [], "egress": []})
+                             "ingress": [], "egress": [{"to": [{
+                                 "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+                                 "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
+                                 "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]}]})
     mesh = resource("security.istio.io/v1", "PeerAuthentication", "default",
                     spec={"mtls": {"mode": "STRICT"}})
     authorization = resource("security.istio.io/v1", "AuthorizationPolicy", "default-deny", spec={})
