@@ -5,10 +5,113 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import provision_openbao_storage as storage
+
+
+def wait_inactive(name):
+    deadline = time.monotonic() + 25
+    while time.monotonic() < deadline:
+        state = storage.run(['/usr/bin/systemctl', 'show', name, '--property=ActiveState', '--value'])
+        if state in ('inactive', 'failed'):
+            return
+        time.sleep(0.5)
+    raise storage.StorageFailed('GUARD_DEPENDENT_STOP_TIMEOUT')
+
+
+def guard_rehearsal(root, image, volume, mount_name, size):
+    """Real systemd guard with a harmless sleep service, never the runner's K3s."""
+    state = root / 'state.json'
+    uuid = storage.run(['/usr/sbin/blkid', '-p', '-s', 'UUID', '-o', 'value', str(image)])
+    receipt = {'schema_version': 1, 'bytes': size, 'uuid': uuid}
+    storage.create_file(state, json.dumps(receipt).encode())
+    source = root / 'source.py'
+    script = root / 'guard.py'
+    storage.create_file(source, Path(storage.__file__).read_bytes())
+    wrapper = (f'import runpy,sys\nfrom pathlib import Path\nn=runpy.run_path({str(source)!r})\n'
+               "n=n['check_mount'].__globals__\n"
+               f"n['guard_check']=lambda:n['check_mount'](Path({str(image)!r}),"
+               f'Path({str(volume)!r}),Path({str(state)!r}),{size})\n'
+               f"n['guard_check']() if sys.argv[1]=='--guard-check' else n['guard_loop'](Path({str(script)!r}))\n")
+    storage.create_file(script, wrapper.encode())
+    guard_name = root.name + '-guard.service'
+    dummy_name = root.name + '-dependent.service'
+    guard_unit = Path('/etc/systemd/system') / guard_name
+    dummy_unit = Path('/etc/systemd/system') / dummy_name
+    created = []
+    try:
+        for path, text in ((guard_unit, storage.guard_unit(script, mount_name)),
+                           (dummy_unit, f'[Unit]\nBindsTo={guard_name}\nAfter={guard_name}\n'
+                            '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')):
+            storage.create_file(path, text.encode())
+            created.append(path)
+        storage.run(['/usr/bin/systemd-analyze', 'verify', str(guard_unit), str(dummy_unit)])
+        storage.run(['/usr/bin/systemctl', 'daemon-reload'])
+        # Native kubelet-compatible permissions must not cause a false trip.
+        os.chmod(volume / 'data', 0o770)
+        storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
+        storage.require(storage.run(['/usr/bin/systemctl', 'is-active', guard_name]) == 'active',
+                        'GUARD_STARTUP_FAILED')
+        storage.run(['/usr/bin/mount', '-o', 'remount,ro', str(volume)])
+        wait_inactive(dummy_name)
+        wait_inactive(guard_name)
+        storage.run(['/usr/bin/mount', '-o', 'remount,rw', str(volume)])
+        time.sleep(6)
+        wait_inactive(dummy_name)  # No automatic restart/re-arm after fault recovery.
+        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name, dummy_name])
+        storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
+        # Backing pathname replacement/loss must stop the dependent too.
+        retained = root / 'retained.ext4'
+        image.rename(retained)
+        try:
+            wait_inactive(dummy_name)
+            wait_inactive(guard_name)
+        finally:
+            retained.rename(image)
+        # A wrong UUID prevents READY=1 and therefore prevents dependent startup.
+        state.write_text(json.dumps(receipt | {'uuid': '00000000-0000-0000-0000-000000000000'}))
+        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name, dummy_name])
+        denied = subprocess.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        storage.require(denied.returncode != 0, 'INVALID_STORAGE_STARTUP_ALLOWED')
+        wait_inactive(dummy_name)
+        state.write_text(json.dumps(receipt))
+        storage.run(['/usr/bin/systemctl', 'reset-failed', guard_name, dummy_name])
+        storage.run(['/usr/bin/systemctl', 'start', dummy_name], timeout=20)
+        # Kernel unmount, not a systemctl stop: tests unexpected mount disappearance.
+        storage.run(['/usr/bin/umount', str(volume)])
+        wait_inactive(dummy_name)
+        wait_inactive(guard_name)
+        storage.protected(volume, directory=True, mode=0o700)
+        storage.require(not any(volume.iterdir()), 'ROOT_FALLBACK_DIRECTORY_PRESENT')
+        child = os.fork()
+        if child == 0:
+            try:
+                os.setgroups([])
+                os.setgid(10001)
+                os.setuid(10001)
+                (volume / 'data').mkdir()
+            except PermissionError:
+                os._exit(0)
+            except Exception:
+                os._exit(2)
+            os._exit(1)
+        _, status = os.waitpid(child, 0)
+        storage.require(os.waitstatus_to_exitcode(status) == 0, 'NONROOT_ROOT_FALLBACK_ALLOWED')
+        storage.run(['/usr/bin/systemctl', 'start', mount_name])
+        return {label: 'Passed' for label in ('startup_identity', 'fsGroup_permissions',
+                'readonly_fault_stop', 'backing_loss_stop', 'unexpected_unmount_stop',
+                'explicit_rearm_only', 'unmounted_nonroot_fallback_denied')}
+    finally:
+        if created:
+            storage.run(['/usr/bin/systemctl', 'stop', *(path.name for path in reversed(created))])
+        for path in reversed(created):
+            path.unlink()
+        storage.run(['/usr/bin/systemctl', 'daemon-reload'])
 
 
 def rehearse():
@@ -80,9 +183,10 @@ def rehearse():
                                        '-o', 'OPTIONS']))['filesystems'][0]
         storage.require({'rw', 'nodev', 'nosuid', 'noexec', 'noatime'} <= set(mount['options'].split(',')),
                         'OPTIONS_TEST_FAILED')
+        guard_checks = guard_rehearsal(root, image, volume, name, size)
         result = {'schema_version': 1, 'fixture_bytes': size, 'enospc_nonroot': 'Passed',
                   'reserved_size': 'Passed', 'systemd_remount_persistence': 'Passed',
-                  'mount_options': 'Passed', 'target_vps': 'Not verified',
+                  'mount_options': 'Passed', 'guard_checks': guard_checks, 'target_vps': 'Not verified',
                   'reboot_persistence': 'Not verified', 'production_readiness': 'Not verified'}
     finally:
         if started:

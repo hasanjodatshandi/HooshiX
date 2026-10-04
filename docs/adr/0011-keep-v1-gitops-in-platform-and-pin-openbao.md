@@ -74,12 +74,25 @@ mount flags include nodev/nosuid/noexec, with no discard. A dedicated systemd
 mount unit persists the mount configuration; actual reboot persistence remains
 unverified until observed on the target. The unmounted directory is root-only
 and empty; OpenBao's data subdirectory on the mounted filesystem is mode 0700,
-owned by UID/GID 10001. Existing/partial files are preserved, never reformatted.
+owned by UID/GID 10001. Kubelet may change only that dedicated group's permissions
+to 0770 when applying fsGroup=10001; the runtime guard accepts 0700 or 0770 with
+the exact same owner/group, never other-user access. Existing/partial files are
+preserved, never reformatted.
 
 Later reviewed GitOps may bind a static **local** PV (not hostPath) with Retain,
 exact node affinity and a no-provisioner WaitForFirstConsumer StorageClass.
 That activation must enforce mount/backing identity before K3s/workload startup
 and runtime mount-loss failure; the host mount unit alone is NOT that guard.
+The reviewed host guard uses systemd notify readiness after a successful bounded
+identity check, BindsTo+After mount/guard dependencies, no automatic restart, and
+a watchdog. Checks cover exact mount flags, mounted UUID, reserved backing size,
+loop backing pathname AND inode/device/geometry, data ownership and filesystem
+limit. Failure stops K3s control-plane/kubelet management; it does NOT claim that
+K3s stopping terminates every existing container. Existing local-volume bind
+mounts retain their filesystem; absent host mount leaves an empty root-only
+directory without a data subdirectory, so a new local-volume mount cannot bind
+a root-disk fallback. Explicit recovery and owner-approved maintenance are
+required; no native SSH/MCP/mail service dependency is added.
 Until those fail-closed activation, target storage, strict mesh/admission, TLS,
 staging and recovery checks pass, no PV/workload is enabled. A directory-based
 local-path capacity request alone does not satisfy the filesystem limit.
@@ -93,6 +106,10 @@ host tool package versions are explicitly checked; changes require review.
 See the [operator guide](../operations/production-openbao-storage-fa.md).
 
 Native semantics: [systemd mount](https://github.com/systemd/systemd/blob/v259.5/man/systemd.mount.xml),
+[dependency and readiness](https://github.com/systemd/systemd/blob/v259.5/man/systemd.unit.xml),
+[notify/watchdog](https://github.com/systemd/systemd/blob/v259.5/man/systemd.service.xml),
+[local-volume bind behavior](https://github.com/kubernetes/kubernetes/blob/v1.35.6/pkg/volume/local/local.go),
+[loop identity columns](https://github.com/util-linux/util-linux/blob/v2.41.3/sys-utils/losetup.c),
 [ext4 formatting](https://github.com/tytso/e2fsprogs/blob/v1.47.2/misc/mke2fs.8.in),
 [loop mount](https://github.com/util-linux/util-linux/blob/v2.41.3/sys-utils/mount.8.adoc).
 

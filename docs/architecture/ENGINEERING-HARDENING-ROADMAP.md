@@ -185,7 +185,13 @@ The owner approved the next bounded step: **at most 8GiB VPS-only OpenBao storag
 without repartitioning, large developer-host files or SSH/MCP changes. The fixed
 filesystem installer, 64MiB disposable CI ENOSPC/remount checks and local-sudo usage
 are owned by `../operations/production-openbao-storage-fa.md` and ADR-0011.
-Actual installation/reboot, mount-loss guard, local PV/GitOps, mesh/admission/TLS,
+The bounded filesystem was installed on the actual VPS on 2026-10-05 with a
+public `Passed` receipt and independently observed mount/backing/owner flags.
+The next coherent package implements the bounded notify/watchdog mount/backing
+identity guard and fixed Retain/node-affine review-only local PV candidate.
+CI fault tests use only a 64MiB disposable filesystem and harmless dependent;
+the guard is not assumed installed from code or CI. Real guard installation,
+target startup/reboot, local PV/GitOps, mesh/admission/TLS,
 staging and recovery remain separate unverified commissioning gates. The public
 hostname is `hooshix.com`; TLS and the ADR-0043 L4/origin path still need environment
 evidence. Stage 10 stays `IN PROGRESS`; no production traffic or readiness is claimed.

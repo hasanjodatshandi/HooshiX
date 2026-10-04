@@ -207,7 +207,8 @@ class OpenBaoStorageTest(unittest.TestCase):
             with patch.object(storage, 'protected', return_value=SimpleNamespace(
                     st_size=storage.SIZE, st_blocks=storage.SIZE // 512)), \
                     patch.object(Path, 'read_text', return_value=storage.UNIT_TEXT), \
-                    patch.object(storage, 'run', side_effect=command), patch.object(storage, 'metadata', return_value={}), \
+                    patch.object(storage, 'run', side_effect=command), patch.object(storage, 'data_owner'), \
+                    patch.object(storage, 'metadata', return_value={}), \
                     patch.object(os, 'statvfs', return_value=SimpleNamespace(f_blocks=size, f_frsize=1, f_bavail=10)):
                 return storage.verify(value)
         self.assertEqual('Passed', verify_with()['storage_foundation'])

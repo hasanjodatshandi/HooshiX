@@ -20,6 +20,7 @@ from pathlib import Path
 
 from rehearse_openbao_recovery import BOUND, Client, RehearsalFailed, initialize
 from render_openbao_candidate import ALIVE, NAMESPACE, ROOT, STATUS, candidate
+from render_openbao_local_storage import candidate as local_storage_candidate
 
 STEPS = frozenset({"tools", "cluster", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
@@ -179,6 +180,9 @@ def rehearse(tools: Path, receipt: Path) -> None:
             step("schema-candidate")
             k("apply", "-f", "-", data=json.dumps(manifest["items"][0]).encode(), public_schema=True)
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(manifest).encode(), public_schema=True)
+            # Review-only local PV schema; never bind it to the unrelated kind node.
+            k("apply", "--dry-run=server", "-f", "-",
+              data=json.dumps(local_storage_candidate()).encode(), public_schema=True)
             # Server dry-run does not persist the candidate's ServiceAccount, required by Pod admission.
             k("apply", "-f", "-", data=json.dumps(manifest["items"][1]).encode(), public_schema=True)
             # Prove restricted PSA rejects an unsafe Pod, not just intended labels.
@@ -286,7 +290,7 @@ def rehearse(tools: Path, receipt: Path) -> None:
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "revision": run(["/usr/bin/git", "rev-parse", "HEAD"]).decode().strip(), "image": image,
         "node_image": pin["KIND_NODE_IMAGE"], "kubernetes": server,
-        "checks": {label: "Passed" for label in ("server_schema", "restricted_workload", "tls_mount_fsGroup",
+        "checks": {label: "Passed" for label in ("server_schema", "static_local_pv_schema", "restricted_workload", "tls_mount_fsGroup",
             "sealed_probes", "tls_hostname_negative", "shamir_3_2", "kv_acl", "restart", "pvc_retention",
             "pvc_data_persistence", "root_revocation", "container_log_privacy", "cleanup")},
         "network_mesh_admission": "Not verified: default kind CNI; Istio CRDs only",
