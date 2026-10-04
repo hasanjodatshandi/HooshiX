@@ -24,11 +24,22 @@ class OpenBaoArtifactTest(unittest.TestCase):
             "grype.json": {"matches": []}, "database.json": {
                 "valid": True, "schemaVersion": "6.0.0", "built": self.now.isoformat()}}
 
-    def validate(self):
+    def validate(self, image=None):
         def read(path):
             return self.pin if path.name == "openbao-image.json" else self.values[path.name]
         with patch.object(verifier, "load", side_effect=read), patch.object(Path, "read_bytes", return_value=b"public"):
-            return verifier.validate(Path("evidence"), "a" * 40, self.now)
+            return verifier.validate(Path("evidence"), "a" * 40, self.now, image=image)
+
+    def test_mirror_must_keep_exact_owned_repository_digest_and_catalog_binding(self):
+        mirror = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao@" + self.pin["image"].split("@")[1]
+        self.values["syft.json"]["source"]["metadata"]["repoDigests"] = [mirror]
+        self.assertEqual(mirror, self.validate(image=mirror)["image"])
+        for image in (mirror.replace("hasanjodatshandi", "other"), mirror.replace("platform-openbao", "other"),
+                      mirror.rsplit("@", 1)[0] + ":latest", mirror[:-64] + "0" * 64):
+            with self.subTest(image=image), self.assertRaises(ValueError):
+                self.validate(image=image)
+        with self.assertRaises(ValueError):
+            self.validate()  # Upstream CI cannot silently accept mirror catalog metadata.
 
     def test_candidate_receipt_never_approves_promotion(self):
         receipt = self.validate()

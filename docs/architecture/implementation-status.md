@@ -2,6 +2,21 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+Stage 10 continuation: the existing protected `production-release` workflow now has
+an explicit `openbao-candidate` dispatch lane. It requires successful baseline for
+the exact main SHA, imports the pinned upstream Linux/amd64 digest unchanged into
+the fixed private GHCR platform package, scans the final destination image, and
+signs/verifies exact-digest signature, upstream-import provenance and CycloneDX.
+Only the existing exact signer identity is used; application manifest/admission
+contracts remain unchanged. Source presence/unit tests are not publication evidence:
+actual environment-approved execution, approved target-compatible staging, runtime
+admission, real custody/recovery and deployment remain `Not verified`.
+Usage is in `../operations/production-openbao-fa.md`.
+The owner selected `hooshix.com`; local DNS observation returned `188.240.196.151`,
+but hostname-checked HTTPS handshake failed with TLS alert internal error. No global
+DNS propagation, valid TLS or live application readiness is claimed; external L4/
+origin-control commissioning remains required. See the installation guide §2.
+
 On 2026-10-04 the owner approved continuation with the exact existing Root under
 ADR-0002 for `hooshix-production` / `production-single-server`. The offline CA package
 schema 3 hash-binds `root-authority.json` and supports the existing encrypted portable
@@ -20,7 +35,7 @@ review. The continuation replaces long-lived CI registry credentials with the
 ephemeral package token, rejects other namespaces/non-private packages before
 signing, and cleans up runner authentication. Instructions and read-only VPS
 credential custody are in `../operations/production-ghcr-fa.md`.
-This workflow does not build/publish images, deploy workloads or approve readiness.
+The application lane does not build/publish images, deploy workloads or approve readiness.
 Actual private package publication, staging/promotion and secret materialization
 remain `Not verified`.
 

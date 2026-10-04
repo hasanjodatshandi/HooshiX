@@ -2,9 +2,17 @@ name: Production release evidence
 on:
   workflow_dispatch:
     inputs:
+      release_kind:
+        description: Applications release or unchanged OpenBao import candidate (never deploys)
+        required: true
+        default: applications
+        type: choice
+        options:
+          - applications
+          - openbao-candidate
       release_manifest_path:
         description: Tracked reviewed production release manifest under deploy/releases/production
-        required: true
+        required: false
         type: string
 permissions:
   contents: read
@@ -14,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.release_kind == 'applications'
     runs-on: ubuntu-24.04
     environment: production-release
     timeout-minutes: 60
@@ -138,3 +146,67 @@ jobs:
         run: |
           set -euo pipefail
           rm -f -- "$RUNNER_TEMP/docker-config/config.json"
+
+  openbao-candidate:
+    if: github.ref == 'refs/heads/main' && inputs.release_kind == 'openbao-candidate'
+    runs-on: ubuntu-24.04
+    environment: production-release
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      packages: write
+    env:
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+      SYFT_CHECK_FOR_APP_UPDATE: 'false'
+      GOMAXPROCS: '2'
+    steps:
+      - name: Check out protected main without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require successful baseline for this exact main revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          timeout 20 gh run list --workflow repository-baseline.yml --commit "$GITHUB_SHA" \
+            --event push --status success --limit 5 --json headSha,conclusion,status \
+            | python3 -c 'import json,os,sys; runs=json.load(sys.stdin); assert any(r["headSha"]==os.environ["GITHUB_SHA"] and r["conclusion"]=="success" and r["status"]=="completed" for r in runs), "Exact main baseline must pass first"'
+      - name: Install existing integrity-pinned release tools
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/openbao-release-bin"
+          echo "$RUNNER_TEMP/openbao-release-bin" >> "$GITHUB_PATH"
+      - name: Authenticate with ephemeral package token only
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/docker-config"
+          printf '%s' "$GHCR_TOKEN" | timeout 30 docker --config "$RUNNER_TEMP/docker-config" \
+            login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          chmod 0600 "$RUNNER_TEMP/docker-config/config.json"
+      - name: Import scan sign and verify unchanged private candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCKER_CONFIG: ${{ runner.temp }}/docker-config
+        run: python3 scripts/production/publish_openbao_candidate.py
+      - name: Remove temporary registry authentication
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f -- "$RUNNER_TEMP/docker-config/config.json"
+          test ! -e "$RUNNER_TEMP/docker-config/config.json"
+      - name: Retain public candidate evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: openbao-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/openbao-release-evidence/
+          retention-days: 30
+          if-no-files-found: error

@@ -23,7 +23,7 @@ def load(path: Path) -> dict:
     return value
 
 
-def validate(directory: Path, revision: str, now: datetime) -> dict:
+def validate(directory: Path, revision: str, now: datetime, image: str | None = None) -> dict:
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("commit required")
     pin = load(ROOT / "infrastructure/production/secrets/openbao-image.json")
@@ -31,13 +31,18 @@ def validate(directory: Path, revision: str, now: datetime) -> dict:
             or pin["platform"] != "linux/amd64"
             or pin["production_promotion"] != "blocked-until-supply-chain-staging-and-recovery-evidence"):
         raise ValueError("blocked immutable candidate required")
+    digest = pin["image"].split("@")[1]
+    mirror = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao@" + digest
+    image = pin["image"] if image is None else image
+    if image not in (pin["image"], mirror):
+        raise ValueError("only pinned upstream or exact owned mirror allowed")
     names = ("syft.json", "cyclonedx.json", "grype.json", "database.json")
     syft, cdx, scan, db = (load(directory / name) for name in names)
     source = syft["source"]
     metadata = source["metadata"]
-    if (source["type"] != "image" or metadata["manifestDigest"] != pin["image"].split("@")[1]
+    if (source["type"] != "image" or metadata["manifestDigest"] != digest
             or metadata["os"] != "linux" or metadata["architecture"] != "amd64"
-            or pin["image"] not in metadata["repoDigests"]
+            or image not in metadata["repoDigests"]
             or metadata["labels"]["org.opencontainers.image.version"] != "v" + pin["version"]
             or metadata["labels"]["org.opencontainers.image.revision"] != pin["source_revision"]):
         raise ValueError("catalog source does not match pinned image")
@@ -58,7 +63,7 @@ def validate(directory: Path, revision: str, now: datetime) -> dict:
     if counts["High"] or counts["Critical"]:
         raise ValueError("High/Critical vulnerability gate failed")
     return {"schema_version": 1, "component": "openbao", "owner": "platform",
-            "environment": "candidate", "image": pin["image"], "platform": pin["platform"],
+            "environment": "candidate", "image": image, "platform": pin["platform"],
             "source_revision": pin["source_revision"], "repository_revision": revision,
             "observed_at": now.isoformat(), "database_built_at": built.isoformat(),
             "maximum_database_age_seconds": int(MAX_DB_AGE.total_seconds()),

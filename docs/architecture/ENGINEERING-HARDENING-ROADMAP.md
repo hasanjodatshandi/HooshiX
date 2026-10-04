@@ -173,6 +173,14 @@ The fixture passed in run `37210210133`, job `111459680073`, at PR #166 head
 unchanged: signed artifact/approved target-compatible staging, reviewed GitOps
 promotion, real Shamir custody/snapshots/recovery, then audit/JIT cutover.
 
+The next coherent continuation adds protected-main publication/signing for an
+unchanged OpenBao import candidate in the existing release workflow. It does not
+approve staging, extend application admission or deploy to the VPS. The public
+hostname is owner-approved `hooshix.com`; TLS and the ADR-0043 L4/origin path still
+need environment evidence. Operator usage/receipt limits are documented in
+`../operations/production-openbao-fa.md` and installation guide §2. Stage 10 stays
+`IN PROGRESS`; matching CI and actual approved publication results must be recorded.
+
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
 | 1 | Current-truth documentation reconciliation | `COMPLETED` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Final corrected implementation head `a4dca87963854083be505091283ed645bda59fe1`; protected repository baseline run `33181670174` attempt 2 and frontend E2E run `33181670044` passed |
