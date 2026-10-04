@@ -1,5 +1,7 @@
 """Exercise the bounded publisher without network, credentials or image downloads."""
 import base64
+from contextlib import redirect_stderr
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -38,6 +40,9 @@ class OpenBaoPublicationTest(unittest.TestCase):
 
     def mock_run(self, argv, timeout=180):
         self.calls.append(argv)
+        if argv[:2] == ["cosign", "copy"] and any(value.startswith("--platform") for value in argv):
+            # Cosign 3.0.6 SignedEntityForPlatform rejects a single-image manifest.
+            raise subprocess.CalledProcessError(1, argv, stderr="specified reference is not a multiarch image")
         if self.fail and argv[:len(self.fail)] == self.fail:
             raise subprocess.CalledProcessError(1, argv, stderr="synthetic sensitive error")
         if argv[1] == "version":
@@ -81,7 +86,8 @@ class OpenBaoPublicationTest(unittest.TestCase):
         for key in ("deployment", "runtime_admission", "staging", "production_promotion", "upstream_build_provenance"):
             self.assertEqual("Not verified", receipt[key])
         copy_call = next(argv for argv in self.calls if argv[:2] == ["cosign", "copy"])
-        self.assertIn(self.pin["image"], copy_call)
+        self.assertEqual(["cosign", "copy", self.pin["image"],
+                          publisher.REPOSITORY + ":candidate-" + self.digest], copy_call)
         self.assertNotIn("-f", copy_call)
         self.assertLess(self.calls.index(next(argv for argv in self.calls if argv[0] == "gh")),
                         self.calls.index(["cosign", "sign", "--yes", self.image]))
@@ -97,6 +103,9 @@ class OpenBaoPublicationTest(unittest.TestCase):
                 with self.assertRaises(subprocess.CalledProcessError):
                     self.publish()
                 self.assertFalse((self.directory / "receipt.json").exists())
+                attempt = json.loads((self.directory / "attempt.json").read_text())
+                self.assertEqual("Not verified", attempt["publication"])
+                self.assertEqual("attempt-only-not-success-receipt", attempt["purpose"])
         self.fail = None
         for index, visibility in enumerate(("public", "internal", "", "private\npublic")):
             self.directory = Path(self.temp.name) / ("visibility-" + str(index))
@@ -158,6 +167,20 @@ class OpenBaoPublicationTest(unittest.TestCase):
         for forbidden in ("secrets.", "KUBECONFIG", "kubectl", "continue-on-error", "pull_request_target"):
             self.assertNotIn(forbidden, job)
         self.assertIn("verify_release.py", text.split("  openbao-candidate:\n")[0])
+
+    def test_tool_diagnostics_are_finite_categories_and_never_raw_errors(self):
+        for message, category in (("specified reference is not a multiarch image", "single-manifest-platform-selection"),
+                                  ("UNAUTHORIZED", "registry-unauthorized"), ("DENIED", "registry-denied"),
+                                  ("already exists. Use `-f`", "destination-conflict"),
+                                  ("other native error", "tool-error")):
+            output = io.StringIO()
+            error = subprocess.CalledProcessError(1, ["cosign", "copy", "synthetic-private-argv"],
+                                                  output="synthetic-private-stdout",
+                                                  stderr=message + "\nsynthetic-private-token\n::error::untrusted")
+            with self.subTest(category=category), patch.object(publisher.subprocess, "run", side_effect=error), \
+                    redirect_stderr(output), self.assertRaises(subprocess.CalledProcessError):
+                publisher.run(["cosign", "copy", "synthetic-private-argv"], timeout=300)
+            self.assertEqual("OPENBAO_TOOL_FAILURE=" + category + "\n", output.getvalue())
 
 
 if __name__ == "__main__":
