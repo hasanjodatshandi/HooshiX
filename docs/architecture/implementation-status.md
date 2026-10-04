@@ -28,8 +28,8 @@ previous 2.6.1 upstream image has 10 blocking package matches: 8 High and 2 Crit
 `libssl3`/`libcrypto3` version `3.5.7-r0`; scanner reports fixes at `3.5.8-r0`.
 Public CI annotations identify CVE-2026-63072, CVE-2026-14457, CVE-2026-63073
 (Critical), CVE-2026-18798 and CVE-2026-63076, each on both packages. Reports were
-retained; no successful candidate receipt or promotion is claimed. PR #163 remains
-draft/unmerged. The coherent security remediation selects official OpenBao 2.6.4
+retained; that failed candidate produced no successful receipt or promotion.
+The coherent security remediation in PR #163 selects official OpenBao 2.6.4
 on the same minor line, with ADR-0011/technology/profile/renderer/test pins updated
 together. Registry index, manifest/config hashes, Linux/amd64, OCI version/revision
 and compressed size were checked without downloading image layers locally.
@@ -49,10 +49,15 @@ The current candidate is official `openbao-distroless:2.6.4`, with the same bina
 source revision and a 77,272,197-byte compressed artifact. ADR-0011 reviews the
 compatible native shell-free probes: read-only seal-status for startup/liveness,
 unsealed-only status for readiness, verified loopback TLS/CA, finite deadlines,
-zero retries, and wrong-hostname rejection on both paths in CI. Exact-digest
-scan/recovery must pass independently. No exception, suppression, custom rebuild,
-sidecar, cluster or host mutation exists.
-Do not bypass the gate, install the vulnerable image or mark Stage 10 completed.
+zero retries, and wrong-hostname rejection on both paths in CI. At reviewed head
+`4bc15ff56877d821bdce649fa0eb95b591fa97c5`, run `37189671503` independently
+passed exact-digest artifact security (job `111399051112`) and native TLS/Raft
+recovery (job `111399051130`); frontend E2E run `37189671363` also passed.
+All 176 production tests, context checks and script static verification passed
+locally. These results resolve the candidate scan/probe blocker, not production
+commissioning. No exception, suppression, custom rebuild, sidecar, cluster or
+host mutation exists. The final protected PR/main runs remain the merge evidence.
+Do not install a rejected image or mark Stage 10 completed from candidate CI.
 
 On 2026-10-02 a private SSH session inspected and partially commissioned host audit. `auditd` was active but had no rules. The reviewed `infrastructure/production/host/audit.rules` loaded 23 rules through `augenrules --load` on the observed boot; kernel reported `enabled 1`, `lost 0`, `backlog 0`. MariaDB `SERVER_AUDIT` was enabled for `CONNECT` only, writing to a bounded local file owned by `mysql:adm`; real connection and temporary DDL exercise confirmed the plugin path, then SQL-text events were disabled because DDL/DCL can expose secrets. Native `sudo-rs 0.2.13-0ubuntu1.2` rejected the tested sudoers I/O options; the invalid file was moved out of the active directory and `visudo -cf` passed. No sudo I/O/session coverage, Kubernetes API or database privileged-action audit, off-host export, tamper-resistant receipt, OpenBao materialization, JIT cutover, or post-reboot audit validation is claimed. Existing standing sudo remains; Production Readiness is `NOT VERIFIED`. The reproducible partial procedure and limits are in `../operations/production-host-audit-fa.md`. The audit policy is tracked in this repository, while live recovery/export evidence remains outstanding.
 

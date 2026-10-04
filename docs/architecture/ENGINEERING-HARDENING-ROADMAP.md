@@ -213,15 +213,18 @@ Remediation must not weaken these verified current properties:
   OpenBao, sign/promote the artifact or change SSH/MCP/sudo.
 - Artifact scan `37186602660` at `d1cbce42` failed: 8 High + 2 Critical package
   matches in OpenSSL `libssl3`/`libcrypto3` 3.5.7-r0 (scanner fix 3.5.8-r0).
-  PR #163 remains draft/unmerged. The remediation selects upstream 2.6.4 in the
+  The remediation in PR #163 selects upstream 2.6.4 in the
   same 2.6 minor line and updates ADR-0011/current source pins together. Immediate
   Alpine 2.6.4 recovery passed but scan still reported one High zlib CVE-2026-85091
-  in run 37187139233. The candidate now uses official UBI10-minimal 2.6.4 at the
+  in run 37187139233. The rejected UBI candidate used official UBI10-minimal 2.6.4 at the
   same source revision, with exact digest/size recorded. Its own run `37187635536`
   at `8ba84ee7` passed native recovery but failed scanning on 10 High package
   matches across five CVEs, all scanner `not-fixed`. The coherent remediation now
   selects official distroless 2.6.4 with native shell-free verified-TLS probes,
-  reviewed in ADR-0011. Immediate next: exact-digest scan/recovery, not installation.
+  reviewed in ADR-0011. At `4bc15ff`, run `37189671503` independently passed
+  artifact security and native TLS/Raft recovery; frontend `37189671363` passed.
+  The candidate scan/probe blocker is resolved. Immediate next: protected merge,
+  then signed/staging-validated artifact and real commissioning, not direct installation.
   No exception, suppression, TLS bypass, sidecar or custom image is introduced.
 - After artifact remediation: commission OpenBao with owner-controlled offline Shamir custody and
   tested snapshot/recovery, then protected broker/caller/signing-key enrollment, real OS/off-host audit

@@ -181,7 +181,7 @@ Istio identity and authorization impact: Not applicable; no runtime identity or 
 Logging and PII impact: public upstream package/CVE inventory only; no user data or secrets
 Observability added or changed: hash-bound candidate receipt and retained failed scan reports
 Build/CI/architecture enforcement changed: required artifact job plus Baseline aggregation; negative contract tests
-Tests executed: 9 artifact tests and all 176 production tests Passed locally; context/index/diff Passed; old 2.6.1 artifact scan Failed with 10 blocking matches; UBI 2.6.4 native recovery Passed but artifact scan Failed with 10 High matches at 8ba84ee7 / run 37187635536; all other baseline leaf jobs Passed; final distroless artifact scan/recovery required
+Tests executed: 9 artifact tests and all 176 production tests Passed locally; context/index/diff/script static verification Passed; rejected 2.6.1 and UBI scans Failed; current distroless artifact security and native TLS/Raft recovery Passed at 4bc15ff / run 37189671503, frontend E2E Passed in run 37189671363; final protected PR/main runs remain merge evidence
 Architecture deviations: None; no platform promotion or application release trust expansion
 Rollback considerations: source change revert only; no live deployment/data/access changes
 
@@ -217,9 +217,9 @@ WSL/VPS شما انجام نمی‌شود. ظرفیت دیسک و runtime واق
 
 برای ادامه، همین digest را نصب یا دوباره بدون تغییر تست نکنید. یک اصلاح artifact
 یا adjudication مستند طبق سیاست فعلی لازم است و سپس scan/recovery روی digest جدید
-تکرار می‌شود. variant رسمی distroless بدون shell است و با probeهای فعلی جایگزین
-مستقیم نیست؛ انتخاب آن بدون بررسی سازگاری sealed/TLS/probe مجاز نیست.
-این نتیجه اجازهٔ init واقعی، نصب JIT، حذف sudo یا merge PR #163 را نمی‌دهد.
+تکرار می‌شود. این نتیجهٔ تاریخی UBI مجوز نصب آن نیست. جایگزینی distroless نیازمند
+بررسی سازگاری sealed/TLS/probe بود؛ این بررسی و نتیجهٔ جدید در بخش بعد آمده است.
+نتیجهٔ UBI اجازهٔ init واقعی، نصب JIT یا حذف sudo را نمی‌دهد.
 مراجع بررسی اولیهٔ vendor:
 [Expat](https://access.redhat.com/security/cve/cve-2026-76641)،
 [OpenSSL DTLS](https://access.redhat.com/security/cve/cve-2026-84782).
@@ -238,5 +238,11 @@ ADR-0011 اکنون variant رسمی `openbao-distroless:2.6.4` را انتخا�
 همهٔ probeها همچنان HTTPS loopback، CA نصب‌شده، timeout سه‌ثانیه و صفر retry دارند؛
 TCP/HTTP probe، خاموش‌کردن TLS verification، sidecar یا فایل اجرایی جدید نداریم.
 CI هر دو مسیر native را با hostname گواهی اشتباه هم آزمایش می‌کند و انتظار خطا دارد.
-اسکن و بازیابی مستقل همین digest باید قبل از merge موفق شوند. پس از آن هم نصب واقعی
-به امضا/provenance، staging، storage/TLS/custody و recovery واقعی نیاز دارد.
+روی head `4bc15ff56877d821bdce649fa0eb95b591fa97c5`،
+[run 37189671503](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37189671503)
+اسکن امنیتی digest دقیق و بازیابی native TLS/Raft را مستقل با نتیجهٔ `Passed` اجرا کرد؛
+[frontend E2E](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37189671363)
+هم `Passed` شد. ۱۷۶ تست production و بررسی static اسکریپت‌ها نیز محلی `Passed` شدند.
+این مانع کاندیدای image/probe رفع شده است؛ وضعیت نهایی PR/main باید پیش از merge
+بررسی شود. نصب واقعی همچنان به امضا/provenance، staging، storage/TLS/custody و
+recovery واقعی نیاز دارد؛ SSH، پورت MCP و sudo تغییری نکرده‌اند.
