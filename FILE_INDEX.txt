@@ -311,6 +311,7 @@ docs/engineering/sql-and-flyway-coding-standards.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
 docs/operations/production-audit-sink-parspack-fa.md
+docs/operations/production-ghcr-fa.md
 docs/operations/production-host-audit-fa.md
 docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
@@ -522,6 +523,7 @@ scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-host-inspection.ps1
 scripts/production/test_jit_systemd_expiry.py
+scripts/production/tests/test_ghcr_release.py
 scripts/production/tests/test_host_audit_policy.py
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_install_audit_prerequisite.py

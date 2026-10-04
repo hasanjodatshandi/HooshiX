@@ -27,8 +27,16 @@
 credential نوشتن باید token موقت همان job در GitHub Actions با `packages: write`
 باشد، نه PAT مدیر و نه کلید خواندن VPS. workflow باید فقط روی `main` بررسی‌شده،
 در environment محافظت‌شده، با بررسی package خصوصی و digest دقیق اجرا شود.
-build/publish تصاویر و staging همچنان قبل از manifest واقعی release لازم‌اند؛
+workflow موجود `Production release evidence` اکنون login با token موقت، بررسی
+namespace انتخاب‌شده، GET محدود برای private بودن هفت package، و پاک‌سازی فایل
+احراز هویت runner را انجام می‌دهد. خطای API یا package عمومی اجازهٔ امضا نمی‌دهد.
+این workflow تصاویر را نمی‌سازد؛ فقط digestهای منتشرشده و manifest تأییدشده را
+اسکن و امضا می‌کند. build/publish تصاویر و staging قبل از manifest واقعی release لازم‌اند؛
 نبود manifest/تصویر/approval موفقیت نیست. مرحلهٔ انتشار اجازهٔ rollout نمی‌دهد.
+
+environment واقعی `production-release` در GitHub ایجاد شد: فقط branch دقیق `main`
+و reviewer حساب مالک. مالک تک‌نفره اجازهٔ تأیید اجرای خودش را دارد؛ این دسترسی مستقل
+یا تأیید آمادگی Production را اثبات نمی‌کند. حذف environment برای گذراندن job مجاز نیست.
 
 مرجع: [مستندات رسمی GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 Context7 و مستندات رسمی برای token موقت، scope خواندن و private پیش‌فرض بررسی شدند.

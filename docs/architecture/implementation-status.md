@@ -2,6 +2,19 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+On 2026-10-04 PR #163 merged at `ca155496c60507e6a0525ddcb4575cadf0db3bd3`
+after protected baseline `37190183009` and frontend `37190182906` passed at the
+reviewed final head. The owner selected private GHCR under
+`ghcr.io/hasanjodatshandi/hooshix/`. The real `production-release` environment
+now limits deployment branches to exact `main` and requires the named owner's
+review. The continuation replaces long-lived CI registry credentials with the
+ephemeral package token, rejects other namespaces/non-private packages before
+signing, and cleans up runner authentication. Instructions and read-only VPS
+credential custody are in `../operations/production-ghcr-fa.md`.
+This workflow does not build/publish images, deploy workloads or approve readiness.
+Actual private package publication, staging/promotion and secret materialization
+remain `Not verified`.
+
 The 2026-10-04 OpenBao continuation adds a deterministic, public-only Kubernetes
 foundation candidate through `scripts/production/render_openbao_candidate.py`.
 It references the selected 2.6.4 digest/configuration, a separately provisioned TLS
