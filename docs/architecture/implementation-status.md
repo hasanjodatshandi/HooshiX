@@ -46,6 +46,11 @@ approved staging: default kind CNI does not establish Calico NetworkPolicy,
 Istio workload identity or Kyverno signature admission. Target K3s/storage
 quota/capacity, signing, GitOps commissioning and Production remain `Not verified`.
 Executed results must come from the matching CI revision, not source presence.
+At PR #166 head `8e52592ec7187543b5932f153744da31f751a82e`, run `37210210133`
+job `111459680073` passed all 13 Kubernetes foundation checks and cleanup,
+retaining only `openbao-kubernetes-37210210133-1`. Final-head protected checks
+and post-merge main runs remain the merge verification; this fixture does not
+close live commissioning, signed promotion or Production readiness.
 
 The artifact continuation adds a required, credential-free `OpenBao pinned artifact
 security` job to Repository baseline (PR, main, scheduled and manual runs). The

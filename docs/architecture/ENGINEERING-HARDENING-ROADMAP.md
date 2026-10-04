@@ -168,6 +168,10 @@ sealed probes, retained PVC and restart/data persistence, ACL/revocation and
 log privacy. See `../operations/production-openbao-fa.md` for usage and evidence
 limits. It is CI fixture evidence, not target K3s/Calico/Istio/Kyverno staging,
 storage quota approval, signed promotion or a live VPS deployment.
+The fixture passed in run `37210210133`, job `111459680073`, at PR #166 head
+`8e52592ec7187543b5932f153744da31f751a82e`. Remaining commissioning order is
+unchanged: signed artifact/approved target-compatible staging, reviewed GitOps
+promotion, real Shamir custody/snapshots/recovery, then audit/JIT cutover.
 
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |

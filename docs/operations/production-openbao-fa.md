@@ -63,8 +63,15 @@ quota/پرشدن دیسک، snapshot خارج سرور، custody واقعی، st
 5. materialization credential برای exporter ممیزی؛ سپس JIT و آزمون قطع sink،
    expiry/revoke. حذف دسترسی دائمی فقط پس از تأیید جایگزین کامل و مسیر نجات.
 
-وضعیت فعلی: کد foundation و آزمون‌های آن آماده است؛ اجرای Kubernetes، استقرار
-واقعی، recovery و Stage 10 همچنان `Not verified` هستند. کلید WireGuard گزارش‌شده به‌عنوان افشاشده نیاز به
+وضعیت فعلی: آزمون Kubernetes موقت بنیاد در
+[run 37210210133](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37210210133)،
+job `111459680073` روی head ‏`8e52592ec7187543b5932f153744da31f751a82e`،
+همهٔ ۱۳ check و cleanup را `Passed` ثبت کرد. artifact کوچک عمومی
+`openbao-kubernetes-37210210133-1` نتیجه را دارد؛ secret یا فایل fixture ندارد.
+دو خطای آماده‌سازی آزمون، نبود ServiceAccount هنگام dry-run Pod و ناسازگاری
+ساختاری Pod منفی، در همین PR اصلاح شدند؛ رد منفی اکنون باید صریحاً از PSA باشد.
+gateهای final-head و main پس از merge جداگانه بررسی می‌شوند. استقرار
+واقعی، recovery عملیاتی و Stage 10 همچنان `Not verified` هستند. کلید WireGuard گزارش‌شده به‌عنوان افشاشده نیاز به
 چرخش کنترل‌شده با کنسول نجات فعال دارد؛ کلید یا محتوای فایل آن را در گفتگو
 نفرستید. این PR شبکهٔ مدیریت یا پورت MCP را تغییر نمی‌دهد.
 
@@ -258,10 +265,10 @@ Retry/cancellation/concurrency behavior: finite readiness polling; no API write 
 Kafka/event and idempotency behavior: Not applicable
 Security impact: synthetic secrets only, pinned tools/images, explicit kubeconfig/context, no real credentials
 Istio identity and authorization impact: CRD schema only; actual mesh enforcement Not verified
-Logging and PII impact: fixed step labels; native output/errors withheld; only successful public receipt uploaded
+Logging and PII impact: fixed steps; only bounded escaped pre-secret schema errors; private native output withheld; successful public receipt only
 Observability added or changed: commit/digest-bound public fixture receipt
 Build/CI/architecture enforcement changed: blocking Kubernetes job in existing baseline; checksum and cleanup checks
-Tests executed: 189 production unit tests Passed; actual Kubernetes execution requires matching CI run
+Tests executed: 190 production unit tests, production contract verifier, repository/context/static/diff checks Passed locally; Kubernetes job 111459680073 in run 37210210133 Passed at 8e52592; final-head/main protected checks remain separate merge evidence
 Architecture deviations: None; fixture explicitly does not authorize staging/promotion
 Rollback considerations: source revert only; no live data/SSH/sudo change; disposable cluster/private files removed
 
