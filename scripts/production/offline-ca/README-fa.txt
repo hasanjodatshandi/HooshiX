@@ -24,3 +24,12 @@ NETWORK_ADAPTER_UP: همه آداپتورهای شبکه، از جمله VPN/WSL
 این ابزار گواهی Root را می‌سازد؛ به‌تنهایی تأیید Production یا نصب mesh نیست.
 run-sign.cmd فقط CSR عمومی intermediate همان نصب را با Root آفلاین امضا می‌کند؛ import/rotation در cluster جداگانه بررسی می‌شود.
 راهنمای کامل و محدودیت‌های جاری: docs/operations/production-installation-fa.md در سورس پروژه.
+
+ادامه با Root موجود مالک (فقط hooshix-production):
+تأیید مالک به hash دقیق در root-authority.json بسته متصل است؛ ToOnline دوباره لازم نیست.
+run-root.cmd یا run-backup.cmd را برای تکرار کار قبلی اجرا نکنید.
+وقتی CSR عمومی cluster آماده شد، run-sign.cmd را روی رایانه آفلاین اجرا کنید.
+اگر state جدید موجود نیست، ابزار مسیر پوشه پشتیبان رمزدار قبلی را می‌پرسد.
+پوشه باید root-key.enc.pem، root-cert.pem و backup-receipt.json داشته باشد؛ آن را آنلاین نیاورید.
+SHA256 گواهی را از گواهی عمومیِ مستقل یا policy مصوب مقایسه و وارد کنید؛ رمز فقط همان‌جا وارد شود.
+فقط signed-intermediate-* عمومی برگردد. رسید قدیمی تغییر نمی‌کند؛ تأیید مالک جای اثبات نصب نیست.

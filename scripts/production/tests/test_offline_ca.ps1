@@ -94,8 +94,51 @@ try {
     Assert-Backup $copy
     Assert-KeyMatches (Join-Path $copy 'root-key.enc.pem') (Join-Path $copy 'root-cert.pem') $password
     $script:Checks++
+    # Synthetic legacy receipt/root only. Never load or decrypt the operator Root.
+    # Inject a fixture digest in memory, not a production bypass flag or policy file.
+    $savedId=$script:InstallationId
+    $savedAuthority=$script:RootAuthority | ConvertTo-Json -Depth 5
+    $exception=$script:RootAuthority.existing_root_exception
+    $script:InstallationId='hooshix-production'
+    Expect-Failure { Assert-NewRootAllowed } 'EXISTING_ROOT_APPROVED_USE_SIGN*'
+    Expect-Failure { Assert-KeyMatches $key $cert $password } 'ROOT_INSTALLATION_IDENTITY_REJECTED'
+    $exception.certificate_file_sha256=(Get-FileHash -LiteralPath $cert).Hash.ToLowerInvariant()
+    $exception.subject_rfc2253=Invoke-OpenSSL -ArgumentVector @('x509','-in',$cert,'-subject','-nameopt','RFC2253','-noout')
+    $legacy=@{ schema_version=1; certificate_sha256=(Get-FileHash -LiteralPath $cert).Hash; encrypted_key_sha256=(Get-FileHash -LiteralPath $key).Hash; production_approved=$false; offline_custody='Not verified' }
+    $legacy | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding UTF8
+    $legacyBytes=[IO.File]::ReadAllBytes($marker)
+    Assert-Backup $backup
+    Assert-KeyMatches $key $cert $password
+    Check ([Convert]::ToBase64String([IO.File]::ReadAllBytes($marker)) -ceq [Convert]::ToBase64String($legacyBytes)) 'LEGACY_RECEIPT_REWRITTEN'
+    Expect-Failure { Assert-KeyMatches $boot $cert $wrong } 'OPENSSL_FAILED*'
+    $exception.owner_approved=$false
+    Expect-Failure { Assert-Backup $backup } 'BACKUP_INSTALLATION_MISMATCH'
+    $exception.owner_approved='true'
+    Expect-Failure { Assert-Backup $backup } 'BACKUP_INSTALLATION_MISMATCH'
+    $exception.owner_approved=$true
+    $exception.profile='production-ha'
+    Expect-Failure { Assert-Backup $backup } 'BACKUP_INSTALLATION_MISMATCH'
+    $exception.profile='production-single-server'
+    $exception.subject_rfc2253='subject=CN=wrong'
+    Expect-Failure { Assert-KeyMatches $key $cert $password } 'ROOT_INSTALLATION_IDENTITY_REJECTED'
+    $exception.subject_rfc2253=Invoke-OpenSSL -ArgumentVector @('x509','-in',$cert,'-subject','-nameopt','RFC2253','-noout')
+    $script:InstallationId='another-customer'
+    Expect-Failure { Assert-Backup $backup } 'BACKUP_INSTALLATION_MISMATCH'
+    $script:InstallationId='hooshix-production'
+    $legacy.certificate_sha256='0'*64
+    $legacy | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding UTF8
+    Expect-Failure { Assert-Backup $backup } 'BACKUP_CERTIFICATE_HASH_REJECTED'
+    $legacy.certificate_sha256=(Get-FileHash -LiteralPath $cert).Hash
+    $legacy.encrypted_key_sha256='0'*64
+    $legacy | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding UTF8
+    Expect-Failure { Assert-Backup $backup } 'BACKUP_KEY_HASH_REJECTED'
+    $script:InstallationId=$savedId
+    Assert-NewRootAllowed
+    $script:RootAuthority=$savedAuthority | ConvertFrom-Json
+    [IO.File]::WriteAllBytes($marker,$original)
     $csrKey=Join-Path $fixture 'intermediate.enc.pem'; $csr=Join-Path $fixture 'cluster.csr.pem'
     $null=Invoke-OpenSSL -ArgumentVector @('genpkey','-algorithm','RSA','-pkeyopt','rsa_keygen_bits:4096','-aes-256-cbc','-pass','stdin','-out',$csrKey) -Password $password
+    Expect-Failure { Assert-KeyMatches $csrKey $cert $password } 'KEY_CERTIFICATE_MISMATCH'
     $null=Invoke-OpenSSL -ArgumentVector @('req','-new','-sha256','-key',$csrKey,'-passin','stdin','-subj',('/CN='+$script:InstallationId+' Cluster Intermediate CA'),'-addext','basicConstraints=critical,CA:true,pathlen:5','-out',$csr) -Password $password
     $csrHash=(Get-FileHash -LiteralPath $csr).Hash
     $signed=Join-Path $fixture 'signed'
@@ -107,9 +150,27 @@ try {
     $description=Invoke-OpenSSL -ArgumentVector @('x509','-in',(Join-Path $signed 'ca-cert.pem'),'-text','-noout')
     Check ($description -match 'CA:TRUE, pathlen:0' -and $description -notmatch 'pathlen:5') 'CSR_EXTENSIONS_COPIED'
     Check (@(Get-ChildItem -LiteralPath $signed).Count -eq 4) 'SIGNED_PUBLIC_FILE_SET_WRONG'
+    $script:InstallationId='hooshix-production'
+    $exception=$script:RootAuthority.existing_root_exception
+    $exception.certificate_file_sha256=(Get-FileHash -LiteralPath $cert).Hash.ToLowerInvariant()
+    $exception.subject_rfc2253=Invoke-OpenSSL -ArgumentVector @('x509','-in',$cert,'-subject','-nameopt','RFC2253','-noout')
+    $legacyCsr=Join-Path $fixture 'legacy-cluster.csr.pem'
+    $null=Invoke-OpenSSL -ArgumentVector @('req','-new','-sha256','-key',$csrKey,'-passin','stdin','-subj','/CN=hooshix-production Cluster Intermediate CA','-out',$legacyCsr) -Password $password
+    $legacySigned=Join-Path $fixture 'legacy-signed'
+    Sign-Intermediate $legacyCsr (Get-FileHash -LiteralPath $legacyCsr).Hash $key $cert $password $legacySigned
+    Check (Test-Path -LiteralPath (Join-Path $legacySigned 'ca-cert.pem')) 'EXISTING_ROOT_SIGNING_FAILED'
+    $script:InstallationId=$savedId
+    $script:RootAuthority=$savedAuthority | ConvertFrom-Json
     Expect-Failure { Sign-Intermediate $csr $csrHash $key $cert $password $signed } 'EXISTING_SIGNED_OUTPUT_PRESERVED'
     $script:InstallationId='another-customer'
     Expect-Failure { Sign-Intermediate $csr $csrHash $key $cert $password (Join-Path $fixture 'wrong-install') } 'ROOT_INSTALLATION_IDENTITY_REJECTED'
+    Assert-Package
+    $policyFile=Join-Path $script:PackageRoot 'root-authority.json'
+    $originalPolicy=[IO.File]::ReadAllBytes($policyFile)
+    try {
+        [IO.File]::AppendAllText($policyFile,"`n ",[Text.UTF8Encoding]::new($false))
+        Expect-Failure { Assert-Package } 'PACKAGE_HASH_MISMATCH: root-authority.json'
+    } finally { [IO.File]::WriteAllBytes($policyFile,$originalPolicy) }
     Assert-Package
     # The manifest catches tampering and tolerates text transfer's CRLF conversion.
     $scriptFile=Join-Path $script:PackageRoot 'offline-ca.ps1'
