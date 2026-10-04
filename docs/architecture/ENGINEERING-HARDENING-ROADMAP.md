@@ -162,6 +162,17 @@ Next: complete intermediate custody/import/rotation and OpenBao/GitOps commissio
 then execute the remaining runtime/recovery/provider/capacity gates. Stage 10 is not completed
 by this Root approval or passing tooling CI.
 
+The next bounded OpenBao commissioning step is the mandatory disposable
+Kubernetes foundation job in Repository baseline: schema/PSA, non-root TLS mount,
+sealed probes, retained PVC and restart/data persistence, ACL/revocation and
+log privacy. See `../operations/production-openbao-fa.md` for usage and evidence
+limits. It is CI fixture evidence, not target K3s/Calico/Istio/Kyverno staging,
+storage quota approval, signed promotion or a live VPS deployment.
+The fixture passed in run `37210210133`, job `111459680073`, at PR #166 head
+`8e52592ec7187543b5932f153744da31f751a82e`. Remaining commissioning order is
+unchanged: signed artifact/approved target-compatible staging, reviewed GitOps
+promotion, real Shamir custody/snapshots/recovery, then audit/JIT cutover.
+
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
 | 1 | Current-truth documentation reconciliation | `COMPLETED` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Final corrected implementation head `a4dca87963854083be505091283ed645bda59fe1`; protected repository baseline run `33181670174` attempt 2 and frontend E2E run `33181670044` passed |

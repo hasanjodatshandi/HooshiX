@@ -9,6 +9,49 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 
 ## ترتیب اجرا و نقطهٔ ادامه
 
+ادامهٔ فعلی: آزمون Kubernetes بنیاد OpenBao در pipeline موجود Repository baseline اجرا می‌شود.
+این آزمون از credential واقعی، VPS یا Root مالک استفاده نمی‌کند؛ نتیجهٔ آن فقط
+برای API/PVC/TLS/probe است و به‌تنهایی staging مصوب یا مجوز promotion نیست.
+
+### استفاده از آزمون خودکار Kubernetes
+
+در GitHub ← Actions ← Repository baseline ← Run workflow، branch/commit موردنظر
+را انتخاب کنید. job جدید `OpenBao Kubernetes foundation` اجباری است؛ شکست آن
+`Baseline verify` را رد می‌کند. PR و main نیز خودکار همین آزمون را اجرا می‌کنند.
+دستور داخلی job برای runner موقت است؛ روی VPS یا لپ‌تاپ اجرا نکنید:
+
+```bash
+python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
+  --tools-dir "$RUNNER_TEMP/openbao-kubernetes-tools" \
+  --receipt "$RUNNER_TEMP/openbao-kubernetes-receipt.json"
+```
+
+kind 0.32.0 و kubectl 1.35.6 با SHA256 ثبت‌شده در `infrastructure/kind/pins.env`
+نصب می‌شوند. node همان digest قبلی kind/Kubernetes 1.35.5 است؛ **این آزمون
+جای شواهد K3s 1.35.6+Calico+Istio+Kyverno هدف را نمی‌گیرد**. CRDهای Istio از
+chart vendored دارای hash نصب می‌شوند تا schema با API واقعی بررسی شود؛ mesh
+یا admission امضای artifact در این fixture راه‌اندازی نشده است. default CNI
+kind اثبات اجرای NetworkPolicy نیست؛ این محدودیت در receipt ثبت می‌شود.
+
+آزمون، همان candidate و digest OpenBao را بدون تغییر security context و منابع
+اجرا می‌کند: پذیرش Pod محدود و رد privileged، خواندن Secret با fsGroup، TLS/SAN
+و hostname اشتباه، عدم Ready/restart در حالت sealed، Shamir سه سهم/آستانه دو،
+ACL منفی، restart، نگهداری همان PVC پس از scale صفر و خواندن داده پس از بازگشت،
+لغو root token و بررسی عدم نشت در stdout container. همهٔ secretها مصنوعی‌اند؛
+کلیدها، سهم‌ها، tokenها، kubeconfig و خروجی خام در log/artifact منتشر نمی‌شوند.
+cleanup بخشی از موفقیت است؛ cluster و پوشهٔ خصوصی حذف می‌شوند و تنها receipt
+عمومی `openbao-kubernetes-<run_id>-<attempt>` به مدت ۳۰ روز نگهداری می‌شود.
+هنگام شکست نام مرحلهٔ ثابت عمومی منتشر می‌شود و receipt موفق ایجاد نمی‌شود.
+فقط در schema و پیش از ساخت TLS/Secret، خطای عمومی API به‌صورت escaped و با
+سقف ۴KiB نمایش داده می‌شود؛ پس از آن diagnostics خام همیشه بسته است.
+در timeout/cancel، runner موقت GitHub جمع‌آوری می‌شود؛ این ابزار اصلاً context
+یا credential یک کلاستر موجود را استفاده نمی‌کند.
+
+حجم دادهٔ fixture کوچک است؛ PVC local-path سقف واقعی هشت GiB را تضمین نمی‌کند.
+quota/پرشدن دیسک، snapshot خارج سرور، custody واقعی، staging مصوب، امضا، Argo CD
+و نصب روی VPS همچنان مرحله‌های جداگانهٔ commissioning هستند. Root قبلی مالک
+و پورت MCP ‏۲۲۲۲ و SSH/sudo در این آزمون هیچ نقشی ندارند.
+
 1. آماده‌کردن workload تک‌نمونهٔ Raft، PVC با نگهداری هنگام حذف workload،
    TLS خصوصی، ServiceAccount مستقل، منابع محدود، NetworkPolicy و STRICT mTLS.
 2. آزمون ساختار و کنترل‌های منفی در pipeline موجود؛ آزمون native TLS/Raft
@@ -20,8 +63,15 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 5. materialization credential برای exporter ممیزی؛ سپس JIT و آزمون قطع sink،
    expiry/revoke. حذف دسترسی دائمی فقط پس از تأیید جایگزین کامل و مسیر نجات.
 
-وضعیت فعلی: کد foundation و آزمون‌های آن آماده است؛ اجرای Kubernetes، استقرار
-واقعی، recovery و Stage 10 همچنان `Not verified` هستند. کلید WireGuard گزارش‌شده به‌عنوان افشاشده نیاز به
+وضعیت فعلی: آزمون Kubernetes موقت بنیاد در
+[run 37210210133](https://github.com/hasanjodatshandi/HooshiX/actions/runs/37210210133)،
+job `111459680073` روی head ‏`8e52592ec7187543b5932f153744da31f751a82e`،
+همهٔ ۱۳ check و cleanup را `Passed` ثبت کرد. artifact کوچک عمومی
+`openbao-kubernetes-37210210133-1` نتیجه را دارد؛ secret یا فایل fixture ندارد.
+دو خطای آماده‌سازی آزمون، نبود ServiceAccount هنگام dry-run Pod و ناسازگاری
+ساختاری Pod منفی، در همین PR اصلاح شدند؛ رد منفی اکنون باید صریحاً از PSA باشد.
+gateهای final-head و main پس از merge جداگانه بررسی می‌شوند. استقرار
+واقعی، recovery عملیاتی و Stage 10 همچنان `Not verified` هستند. کلید WireGuard گزارش‌شده به‌عنوان افشاشده نیاز به
 چرخش کنترل‌شده با کنسول نجات فعال دارد؛ کلید یا محتوای فایل آن را در گفتگو
 نفرستید. این PR شبکهٔ مدیریت یا پورت MCP را تغییر نمی‌دهد.
 
@@ -198,6 +248,33 @@ timeout و retry با مستندات رسمی tag دقیق 2.6.4 تطبیق دا
 سیاست ممیزی، TLS و عدم تماس hot-path تغییری ندارند. downgrade کور با data/PVC
 جدید مجاز نیست؛ برای deployment آینده، snapshot رمز‌شده و restore مستقل لازم است.
 این pipeline صرفاً CI disposable است و خودش Argo CD/Production را اجرا نمی‌کند.
+
+### گزارش تغییر آزمون Kubernetes
+
+Architecture review mode: full-read
+Architecture document version/commit: main@d086adcb41d4d7c6e71e5eb1a54e86664ea8046e
+Architecture sections reviewed: platform, runtime/deployment, secrets, testing, readiness, delivery, capacity
+Search terms used: OpenBao, PVC, fsGroup, PSA, sealed, kind, GitOps, staging
+ADRs reviewed or changed: ADR-0002/0011/0017/0042/0045 reviewed; None changed
+Changed bounded context/module: disposable CI OpenBao Kubernetes foundation
+Contracts changed: CI-only CLI and public receipt; no production contract
+Database migration: Not applicable
+Transaction boundary: Not applicable
+Timeout/deadline behavior: job 15m; creation 240s; API 10s; probes 3s; cleanup 120s
+Retry/cancellation/concurrency behavior: finite readiness polling; no API write retries; unique isolated cluster
+Kafka/event and idempotency behavior: Not applicable
+Security impact: synthetic secrets only, pinned tools/images, explicit kubeconfig/context, no real credentials
+Istio identity and authorization impact: CRD schema only; actual mesh enforcement Not verified
+Logging and PII impact: fixed steps; only bounded escaped pre-secret schema errors; private native output withheld; successful public receipt only
+Observability added or changed: commit/digest-bound public fixture receipt
+Build/CI/architecture enforcement changed: blocking Kubernetes job in existing baseline; checksum and cleanup checks
+Tests executed: 190 production unit tests, production contract verifier, repository/context/static/diff checks Passed locally; Kubernetes job 111459680073 in run 37210210133 Passed at 8e52592; final-head/main protected checks remain separate merge evidence
+Architecture deviations: None; fixture explicitly does not authorize staging/promotion
+Rollback considerations: source revert only; no live data/SSH/sudo change; disposable cluster/private files removed
+
+Tool documentation: Context7 kind/OpenBao docs and exact chart/tool integrity sources;
+kind release asset SHA256 from official `v0.32.0` metadata, kubectl SHA256 from
+`https://dl.k8s.io/release/v1.35.6/bin/linux/amd64/kubectl.sha256`.
 
 در run `37187139233` نسخهٔ Alpine 2.6.4 بازیابی را گذراند، ولی اسکن یک High
 برای zlib (`CVE-2026-85091`) نشان داد. کاندیدای ردشده variant رسمی

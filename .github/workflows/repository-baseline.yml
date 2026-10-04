@@ -157,6 +157,44 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  openbao-kubernetes:
+    name: OpenBao Kubernetes foundation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install checksum-pinned fixture tools only on disposable runner
+        run: |
+          set -euo pipefail
+          source infrastructure/kind/pins.env
+          install -d -m 0700 "$RUNNER_TEMP/openbao-kubernetes-tools"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-linux-amd64" \
+            -o "$RUNNER_TEMP/openbao-kubernetes-tools/kind"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+            -o "$RUNNER_TEMP/openbao-kubernetes-tools/kubectl"
+          printf '%s  %s\n' "$KIND_LINUX_AMD64_SHA256" "$RUNNER_TEMP/openbao-kubernetes-tools/kind" \
+            "$KUBECTL_LINUX_AMD64_SHA256" "$RUNNER_TEMP/openbao-kubernetes-tools/kubectl" | sha256sum --check --strict
+          chmod 0700 "$RUNNER_TEMP/openbao-kubernetes-tools/kind" "$RUNNER_TEMP/openbao-kubernetes-tools/kubectl"
+      - name: Rehearse public candidate with disposable TLS and Shamir data
+        run: |
+          python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
+            --tools-dir "$RUNNER_TEMP/openbao-kubernetes-tools" \
+            --receipt "$RUNNER_TEMP/openbao-kubernetes-receipt.json"
+      - name: Retain only successful public Kubernetes evidence, never fixture files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: openbao-kubernetes-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/openbao-kubernetes-receipt.json
+          retention-days: 30
+          if-no-files-found: error
+
   compromised-password-security:
     name: Compromised Password security suite
     uses: ./.github/workflows/compromised-password-service.yml
@@ -218,6 +256,7 @@ jobs:
       - repository-structure
       - openbao-recovery
       - openbao-artifact
+      - openbao-kubernetes
       - compromised-password-security
       - notification-security
       - identity-security
@@ -235,6 +274,7 @@ jobs:
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
           OPENBAO_RESULT: ${{ needs.openbao-recovery.result }}
           OPENBAO_ARTIFACT_RESULT: ${{ needs.openbao-artifact.result }}
+          OPENBAO_KUBERNETES_RESULT: ${{ needs.openbao-kubernetes.result }}
           COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
           NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
           IDENTITY_RESULT: ${{ needs.identity-security.result }}
@@ -259,6 +299,10 @@ jobs:
           fi
           if [ "${OPENBAO_ARTIFACT_RESULT}" != 'success' ]; then
             echo "OpenBao pinned artifact security result: ${OPENBAO_ARTIFACT_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${OPENBAO_KUBERNETES_RESULT}" != 'success' ]; then
+            echo "OpenBao Kubernetes foundation result: ${OPENBAO_KUBERNETES_RESULT}" >&2
             exit 1
           fi
           if [ "${COMPROMISED_PASSWORD_RESULT}" != 'success' ]; then

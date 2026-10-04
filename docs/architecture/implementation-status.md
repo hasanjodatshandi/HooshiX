@@ -35,6 +35,23 @@ snapshots and recovery custody remain commissioning gates. SSH/MCP/sudo are
 unchanged. Instructions and evidence limits are in
 `../operations/production-openbao-fa.md`; Stage 10 remains `IN PROGRESS`.
 
+The next continuation adds a blocking `OpenBao Kubernetes foundation` CI job.
+It executes the unchanged candidate/digest on a unique disposable kind 1.35.5
+cluster with checksum-pinned kind 0.32.0/kubectl 1.35.6, vendored Istio CRDs and
+synthetic TLS/Shamir material. Real API schema/PSA positives and negatives,
+non-root TLS mounts, sealed probes, ACL, pod restart, same-PVC retention/data
+persistence, root revocation and container-log privacy are exercised. Only a
+public receipt can be retained after cluster/private-file cleanup. This is not
+approved staging: default kind CNI does not establish Calico NetworkPolicy,
+Istio workload identity or Kyverno signature admission. Target K3s/storage
+quota/capacity, signing, GitOps commissioning and Production remain `Not verified`.
+Executed results must come from the matching CI revision, not source presence.
+At PR #166 head `8e52592ec7187543b5932f153744da31f751a82e`, run `37210210133`
+job `111459680073` passed all 13 Kubernetes foundation checks and cleanup,
+retaining only `openbao-kubernetes-37210210133-1`. Final-head protected checks
+and post-merge main runs remain the merge verification; this fixture does not
+close live commissioning, signed promotion or Production readiness.
+
 The artifact continuation adds a required, credential-free `OpenBao pinned artifact
 security` job to Repository baseline (PR, main, scheduled and manual runs). The
 same public Linux/amd64 digest is cataloged once into Syft/CycloneDX SBOMs and

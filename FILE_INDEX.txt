@@ -516,6 +516,7 @@ scripts/production/parspack_audit_transport.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/readiness.py
+scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
@@ -533,6 +534,7 @@ scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py
+scripts/production/tests/test_openbao_kubernetes.py
 scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_parspack_audit_transport.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
