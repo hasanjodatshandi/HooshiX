@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "default_root_origin": "offline_generated",
+  "existing_root_exception": {
+    "installation_id": "hooshix-production",
+    "profile": "production-single-server",
+    "certificate_file_sha256": "f6d49249e221fa49138771c3d86037575f55eee5f581af373f4523008e424b94",
+    "subject_rfc2253": "subject=CN=HooshiX Local Root Candidate 2026 - NOT Production Approved,O=HooshiX",
+    "origin": "connected_windows_generated",
+    "owner_approved": true,
+    "approval_date": "2026-10-04",
+    "authority": "ADR-0002",
+    "offline_custody_and_two_backups": "owner_attested",
+    "independent_recovery_evidence": "Not verified",
+    "production_readiness": "Not verified"
+  }
+}

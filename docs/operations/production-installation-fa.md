@@ -106,6 +106,26 @@ hash خود بسته تضمین اصالت ندارد اگر بسته و hash ه
 
 ## ۵. Root CA، دو پشتیبان و آزمون بازیابی
 
+### نصب فعلی مالک: ادامه با گواهی موجود، بدون تکرار ساخت
+
+مالک در ۲۰۲۶-۱۰-۰۴ استفاده از گواهی موجود را برای `hooshix-production` و فقط profile
+`production-single-server` طبق ADR-0002 تأیید کرده است. فایل‌های عمومی
+`D:\HooshiX\production-ca-public\root-cert.pem` و `backup-receipt.json` دریافت شده‌اند؛
+پوشه `ToOnline` شرط جداگانه نیست و برای این نصب ساخت Root/backup دوباره درخواست نمی‌شود.
+SHA256 دقیق **فایل** گواهی مصوب:
+
+```text
+f6d49249e221fa49138771c3d86037575f55eee5f581af373f4523008e424b94
+```
+
+گواهی روی Windows متصل ساخته شده بود؛ پذیرش مالک این منشأ را تغییر نمی‌دهد.
+نگهداری آفلاین و دو پشتیبان، تأیید مالک است؛ آزمون بازیابی مستقل توسط دستیار `Not verified` است.
+رسیدهای قدیمی و نام `NOT Production Approved` گواهی بازنویسی نمی‌شوند؛ تأیید جدید در ADR/policy ثبت است.
+کلید/رمز Root را آنلاین نیاورید. برای این نصب مرحله ساخت زیر را تکرار نکنید؛ وقتی CSR cluster
+آماده شد، از مرحله ۶ با ابزار تازه و همان backup رمزدار روی کامپیوتر آفلاین ادامه دهید.
+
+### نصب جدید یا profile دیگر: ساخت آفلاین طبق روال عادی
+
 روی رایانه آفلاین، ساعت/تاریخ درست را کنترل کنید، کابل شبکه را جدا و Wi-Fi، Bluetooth networking،
 VPN و آداپتورهای مجازی را خاموش کنید. ابزار هم نبود آداپتور فعال را بررسی می‌کند؛ این بررسی جای
 نگهداری فیزیکی امن رایانه را نمی‌گیرد.
@@ -148,6 +168,17 @@ SHA256 CSR را در سرور با `sha256sum cluster.csr.pem` بگیرید و �
 ```powershell
 .\run-sign.cmd
 ```
+
+برای Root موجود مالک، بسته تازه را با `InstallationId=hooshix-production` بسازید؛ بسته‌های قدیمی
+schema ۱/۲ این استثنا را نمی‌شناسند. فقط ابزارهای عمومی را به دستگاه آفلاین ببرید.
+CI بعد از موفقیت fixtureها بسته عمومی همان نصب را به‌عنوان artifact
+`hooshix-public-offline-signing-<GIT_SHA>` نگه می‌دارد؛ فقط artifact اجرای موفقِ commit
+بازبینی‌شده/merged را استفاده کنید، نه artifact PR ناشناس. SHA256 ZIP در خروجی build ثبت است.
+اگر state همان نصب در دستگاه آفلاین موجود نیست، `run-sign.cmd` مسیر پوشه backup قبلی را می‌پرسد:
+داخل آن `root-key.enc.pem`، `root-cert.pem` و `backup-receipt.json` باشند.
+SHA256 گواهی را با مقدار مصوب بالا مقایسه کنید؛ ابزار برای همین گواهی hash مصوب را خودکار استفاده
+می‌کند. SHA256 مستقل CSR را وارد کنید؛ رمز فقط در دستگاه آفلاین.
+این امضای CSR تازه است، نه ساخت دوباره Root یا الزام به تحویل ToOnline.
 
 مسیر CSR و hash تأییدشده را بدهید، سپس رمز Root را وارد کنید. ابزار CSR signature/subject/key
 و اعتبار کافی Root را بررسی می‌کند، extensionهای CSR را کپی نمی‌کند، intermediate یک‌ساله با
@@ -332,8 +363,9 @@ python3 scripts/production/readiness.py /safe/readiness-evidence.json --expected
 ## ۱۵. وضعیت این راهنما و کارهای هنوز باقی‌مانده
 
 ابزار عمومی ایجاد Root، دو backup، verify و امضای intermediate در سورس وجود دارد. این ابزار
-کلیدهای نصب فعلی را import یا جایگزین نمی‌کند. Root ساخته‌شده استثنایی قبلی روی دستگاه متصل، صرفاً
-candidate بود؛ خروجی موفق recovery به‌تنهایی آن را Production-approved نمی‌کند.
+کلیدهای نصب فعلی را import یا جایگزین نمی‌کند. گواهی قبلی مالک با منشأ متصل، اکنون فقط برای
+نصب مشخص و hash دقیق طبق ADR-0002 مورد پذیرش مالک است؛ این پذیرش یا خروجی recovery
+به‌تنهایی نصب mesh یا آمادگی Production را اثبات نمی‌کند.
 
 این راهنما production appliance آماده یا one-click installer همه stack نیست. تکمیل host provisioning،
 custody/import/rotation intermediate، manifestهای تمام platform، دسترسی و آزمون provider/backup/DR/capacity

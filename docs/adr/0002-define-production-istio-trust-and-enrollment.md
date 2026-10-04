@@ -59,6 +59,30 @@ Retry/fallback semantics remain owned by the application/dependency contract; me
 
 ## Verification requirements
 
+### Owner-approved existing Root continuation (2026-10-04)
+
+The owner authorizes reuse of one existing Root for this owner's
+`hooshix-production` / `production-single-server` installation without regeneration.
+The exact certificate **file SHA256** is
+`f6d49249e221fa49138771c3d86037575f55eee5f581af373f4523008e424b94`;
+its RFC2253 subject is
+`subject=CN=HooshiX Local Root Candidate 2026 - NOT Production Approved,O=HooshiX`.
+The hash-bound public tooling policy is `scripts/production/offline-ca/root-authority.json`.
+
+This is an explicit existing-root provenance exception, not proof of offline generation:
+the Root was generated on a connected Windows computer. Moving it offline cannot undo
+possible prior exposure, machine backups or snapshots. The owner accepts continuation
+with that reduced origin assurance and reports offline custody plus two physical backups.
+Independent recovery evidence remains `Not verified`; no old receipt or certificate name
+is rewritten to imply otherwise. `ToOnline` is merely a public export convention and is
+not required when this exact public certificate and the historical backup receipt are
+already available.
+
+Other installations and `production-ha` retain the normal offline-generated Root process.
+The exception does not relax key encryption, offline signing, chain/key/expiry checks,
+private-key isolation, intermediate rotation, mTLS, or any Production-readiness gate.
+The Root private key/password must never be supplied to the agent or online host.
+
 Verify CA/key custody, certificate rotation/overlap, Ambient enrollment, dedicated ServiceAccounts, STRICT mTLS positive/negative paths, least-privilege authorization, NetworkPolicy interaction including HBONE/health traffic, waypoint behavior when present, `istioctl analyze`, and absence of root private key material from Kubernetes/OpenBao.
 
 ## Rollback considerations

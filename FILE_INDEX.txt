@@ -506,6 +506,7 @@ scripts/production/offline-ca/build-package.ps1
 scripts/production/offline-ca/intermediate.cnf
 scripts/production/offline-ca/offline-ca.ps1
 scripts/production/offline-ca/openssl.cnf
+scripts/production/offline-ca/root-authority.json
 scripts/production/offline-ca/run-backup.cmd
 scripts/production/offline-ca/run-root.cmd
 scripts/production/offline-ca/run-sign.cmd

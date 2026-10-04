@@ -80,7 +80,7 @@ try {
     $null=New-Item -ItemType Directory -Path $bundle
     foreach ($directory in @('tools','licenses')) { $null=New-Item -ItemType Directory -Path (Join-Path $bundle $directory) }
     foreach ($entry in $lock.files) { Copy-Item -LiteralPath (Join-Path $ToolBundleDirectory $entry.path) -Destination (Join-Path $bundle $entry.path) }
-    foreach ($name in @('offline-ca.ps1','intermediate.cnf','run-root.cmd','run-backup.cmd','run-verify.cmd','run-sign.cmd','README-fa.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle $name) }
+    foreach ($name in @('offline-ca.ps1','root-authority.json','intermediate.cnf','run-root.cmd','run-backup.cmd','run-verify.cmd','run-sign.cmd','README-fa.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle $name) }
     $config=@"
 [req]
 prompt = no
@@ -99,13 +99,13 @@ authorityKeyIdentifier = keyid:always
     $entries=@()
     foreach ($file in Get-ChildItem -LiteralPath $bundle -File -Recurse) {
         $relative=$file.FullName.Substring($bundle.Length+1).Replace('\','/')
-        if ($relative -match '\.(ps1|cmd|txt|cnf)$' -and $relative -notmatch '^(tools|licenses)/') {
+        if ($relative -match '\.(ps1|cmd|txt|cnf|json)$' -and $relative -notmatch '^(tools|licenses)/') {
             $normalized=[IO.File]::ReadAllText($file.FullName,[Text.UTF8Encoding]::new($false,$true)).Replace("`r`n","`n").Replace("`r","`n")
             [IO.File]::WriteAllText($file.FullName,$normalized,[Text.UTF8Encoding]::new($false))
             $entries+=@{ path=$relative; sha256=(Get-Sha $file.FullName); hash_mode='text-lf-v1' }
         } else { $entries+=@{ path=$relative; sha256=(Get-Sha $file.FullName) } }
     }
-    @{ schema_version=2; source_revision=$revision; installation_id=$InstallationId; openssl=$lock.openssl; files=$entries } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $bundle 'package-manifest.json') -Encoding UTF8
+    @{ schema_version=3; source_revision=$revision; installation_id=$InstallationId; openssl=$lock.openssl; files=$entries } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $bundle 'package-manifest.json') -Encoding UTF8
     & powershell.exe -NoProfile -File (Join-Path $bundle 'offline-ca.ps1') -ValidateOnly
     if ($LASTEXITCODE -ne 0) { throw 'PACKAGE_VALIDATION_FAILED' }
     # An exclusive directory move publishes only a fully validated public package.

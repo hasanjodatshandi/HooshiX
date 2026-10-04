@@ -125,8 +125,8 @@ function Assert-Package {
     if (-not [Environment]::Is64BitOperatingSystem) { throw 'WINDOWS_X64_REQUIRED' }
     Assert-NoReparse $script:PackageRoot
     $manifest=Get-Content -LiteralPath (Join-Path $script:PackageRoot 'package-manifest.json') -Raw | ConvertFrom-Json
-    if ($manifest.schema_version -ne 2 -or $manifest.installation_id -notmatch '\A[a-z][a-z0-9-]{2,39}\z' -or $manifest.source_revision -notmatch '\A[a-f0-9]{40}\z') { throw 'INVALID_PACKAGE_MANIFEST' }
-    $expected=@('offline-ca.ps1','root.cnf','intermediate.cnf','run-root.cmd','run-backup.cmd','run-verify.cmd','run-sign.cmd','README-fa.txt','tools/openssl.exe','tools/libcrypto-3-x64.dll','tools/libssl-3-x64.dll','tools/openssl.cnf','licenses/OpenSSL-LICENSE.txt')
+    if ($manifest.schema_version -ne 3 -or $manifest.installation_id -notmatch '\A[a-z][a-z0-9-]{2,39}\z' -or $manifest.source_revision -notmatch '\A[a-f0-9]{40}\z') { throw 'INVALID_PACKAGE_MANIFEST' }
+    $expected=@('offline-ca.ps1','root-authority.json','root.cnf','intermediate.cnf','run-root.cmd','run-backup.cmd','run-verify.cmd','run-sign.cmd','README-fa.txt','tools/openssl.exe','tools/libcrypto-3-x64.dll','tools/libssl-3-x64.dll','tools/openssl.cnf','licenses/OpenSSL-LICENSE.txt')
     $actual=@($manifest.files | ForEach-Object path)
     if ($actual.Count -ne $expected.Count -or @($actual | Select-Object -Unique).Count -ne $expected.Count -or @(Compare-Object $expected $actual).Count -ne 0) { throw 'PACKAGE_FILE_SET_REJECTED' }
     $script:InstallationId=$manifest.installation_id
@@ -139,6 +139,15 @@ function Assert-Package {
         Assert-NoReparse $file
         if ((Get-ManifestHash $file $mode) -ne $entry.sha256.ToLowerInvariant()) { throw ('PACKAGE_HASH_MISMATCH: '+$entry.path) }
     }
+    $script:RootAuthority=Get-Content -LiteralPath (Join-Path $script:PackageRoot 'root-authority.json') -Raw | ConvertFrom-Json
+    $exception=$script:RootAuthority.existing_root_exception
+    if ($script:RootAuthority.schema_version -ne 1 -or $script:RootAuthority.default_root_origin -cne 'offline_generated' -or
+        $exception.installation_id -cne 'hooshix-production' -or $exception.profile -cne 'production-single-server' -or
+        $exception.owner_approved -isnot [bool] -or -not $exception.owner_approved -or
+        $exception.certificate_file_sha256 -cnotmatch '\A[a-f0-9]{64}\z' -or [string]::IsNullOrWhiteSpace($exception.subject_rfc2253) -or
+        $exception.origin -cne 'connected_windows_generated' -or $exception.authority -cne 'ADR-0002' -or
+        $exception.offline_custody_and_two_backups -cne 'owner_attested' -or
+        $exception.independent_recovery_evidence -cne 'Not verified' -or $exception.production_readiness -cne 'Not verified') { throw 'ROOT_AUTHORITY_REJECTED' }
     $allowed=@('openssl.exe','libcrypto-3-x64.dll','libssl-3-x64.dll','openssl.cnf')
     foreach ($item in Get-ChildItem -LiteralPath (Join-Path $script:PackageRoot 'tools') -Force) {
         if ($item.PSIsContainer -or $item.Name -notin $allowed) { throw 'UNEXPECTED_TOOL_DIRECTORY_CONTENT' }
@@ -190,13 +199,29 @@ function Read-KeyPassword {
 }
 
 
+function Test-ApprovedExistingRoot([string]$Certificate) {
+    $exception=$script:RootAuthority.existing_root_exception
+    if ($exception.owner_approved -isnot [bool] -or -not $exception.owner_approved -or
+        $exception.installation_id -cne $script:InstallationId -or $exception.profile -cne 'production-single-server') { return $false }
+    if ((Get-FileHash -LiteralPath $Certificate -Algorithm SHA256).Hash.ToLowerInvariant() -cne $exception.certificate_file_sha256) { return $false }
+    return (Invoke-OpenSSL -ArgumentVector @('x509','-in',$Certificate,'-subject','-nameopt','RFC2253','-noout')) -ceq $exception.subject_rfc2253
+}
+function Assert-NewRootAllowed {
+    if ($script:InstallationId -ceq $script:RootAuthority.existing_root_exception.installation_id) {
+        throw 'EXISTING_ROOT_APPROVED_USE_SIGN: do not regenerate; use the existing encrypted backup with run-sign.cmd.'
+    }
+}
 function Assert-KeyMatches([string]$Key,[string]$Certificate,[Security.SecureString]$Password) {
     $subject=Invoke-OpenSSL -ArgumentVector @('x509','-in',$Certificate,'-subject','-nameopt','RFC2253','-noout')
-    if ($subject -cne ('subject=CN='+$script:InstallationId+' Offline Root CA,O=HooshiX')) { throw 'ROOT_INSTALLATION_IDENTITY_REJECTED' }
+    if ($script:InstallationId -ceq $script:RootAuthority.existing_root_exception.installation_id) {
+        if (-not (Test-ApprovedExistingRoot $Certificate)) { throw 'ROOT_INSTALLATION_IDENTITY_REJECTED' }
+    } elseif ($subject -cne ('subject=CN='+$script:InstallationId+' Offline Root CA,O=HooshiX')) {
+        throw 'ROOT_INSTALLATION_IDENTITY_REJECTED'
+    }
     $keyPublic=Invoke-OpenSSL -ArgumentVector @('pkey','-in',$Key,'-passin','stdin','-pubout') -Password $Password
     $certPublic=Invoke-OpenSSL -ArgumentVector @('x509','-in',$Certificate,'-pubkey','-noout')
     if ($keyPublic -ne $certPublic) { throw 'KEY_CERTIFICATE_MISMATCH' }
-    $null=Invoke-OpenSSL -ArgumentVector @('verify','-x509_strict','-check_ss_sig','-CAfile',$Certificate,$Certificate)
+    $null=Invoke-OpenSSL -ArgumentVector @('verify','-x509_strict','-check_ss_sig','-no-CApath','-no-CAstore','-CAfile',$Certificate,$Certificate)
 }
 function Write-PublicReceipt([string]$State,[string]$Cert,[string]$Copies,[string]$Locations) {
     $public=Join-Path $State 'ToOnline'
@@ -258,8 +283,18 @@ function Assert-Backup([string]$Folder) {
         Assert-NoReparse $item.FullName
     }
     $marker=Get-Content -LiteralPath (Join-Path $Folder 'backup-receipt.json') -Raw | ConvertFrom-Json
-    if ($marker.schema_version -ne 1 -or $marker.installation_id -cne $script:InstallationId) { throw 'BACKUP_INSTALLATION_MISMATCH' }
-    if ($marker.root_certificate_sha256 -ne (Get-FileHash -LiteralPath (Join-Path $Folder 'root-cert.pem') -Algorithm SHA256).Hash) { throw 'BACKUP_CERTIFICATE_HASH_REJECTED' }
+    if ($marker.schema_version -ne 1) { throw 'BACKUP_INSTALLATION_MISMATCH' }
+    $certificate=Join-Path $Folder 'root-cert.pem'
+    if ($marker.PSObject.Properties.Name -contains 'installation_id') {
+        if ($marker.installation_id -cne $script:InstallationId) { throw 'BACKUP_INSTALLATION_MISMATCH' }
+        $certificateHash=$marker.root_certificate_sha256
+    } else {
+        # The old portable export has no installation ID. Only the exact approved
+        # public certificate can bind it to this installation; never edit its receipt.
+        if (-not (Test-ApprovedExistingRoot $certificate)) { throw 'BACKUP_INSTALLATION_MISMATCH' }
+        $certificateHash=$marker.certificate_sha256
+    }
+    if ($certificateHash -notmatch '\A[a-fA-F0-9]{64}\z' -or $certificateHash -ne (Get-FileHash -LiteralPath $certificate -Algorithm SHA256).Hash) { throw 'BACKUP_CERTIFICATE_HASH_REJECTED' }
     if ($marker.encrypted_key_sha256 -ne (Get-FileHash -LiteralPath (Join-Path $Folder 'root-key.enc.pem') -Algorithm SHA256).Hash) { throw 'BACKUP_KEY_HASH_REJECTED' }
     Assert-EncryptedKey (Join-Path $Folder 'root-key.enc.pem')
 }
@@ -333,6 +368,7 @@ try {
     $password=$null
     try {
         if ($Action -eq 'CreateRoot') {
+            Assert-NewRootAllowed
             if (Test-Path -LiteralPath $state) { throw 'EXISTING_ROOT_STATE_PRESERVED: do not regenerate; use run-backup.cmd if root creation previously succeeded, otherwise report this error.' }
             $parent=Split-Path $state
             if (-not (Test-Path -LiteralPath $parent)) { $null=New-Item -ItemType Directory -Path $parent }
@@ -368,7 +404,7 @@ try {
         } elseif ($Action -eq 'Verify') {
             if ([string]::IsNullOrWhiteSpace($BackupDirectory)) { $BackupDirectory=Read-Host 'Backup folder copied from ONE USB, for example D:\HooshiX-OfflineRootCA-...' }
             Assert-Backup $BackupDirectory
-            if ([string]::IsNullOrWhiteSpace($ExpectedCertificateSha256)) { $ExpectedCertificateSha256=Read-Host 'Root certificate FILE SHA256 from your separately kept ToOnline receipt (64 hexadecimal characters)' }
+            if ([string]::IsNullOrWhiteSpace($ExpectedCertificateSha256)) { $ExpectedCertificateSha256=Read-Host 'Root certificate FILE SHA256 from your separately trusted public certificate/receipt (64 hexadecimal characters)' }
             if ($ExpectedCertificateSha256 -notmatch '^[a-fA-F0-9]{64}$' -or $ExpectedCertificateSha256 -ne (Get-FileHash -LiteralPath (Join-Path $BackupDirectory 'root-cert.pem') -Algorithm SHA256).Hash) { throw 'TRUSTED_ROOT_CERTIFICATE_HASH_MISMATCH' }
             $password=Read-KeyPassword
             Assert-KeyMatches (Join-Path $BackupDirectory 'root-key.enc.pem') (Join-Path $BackupDirectory 'root-cert.pem') $password
@@ -378,11 +414,18 @@ try {
             Write-Host 'OFFLINE_RECOVERY_TEST=PASSED'
             Write-Host ('PUBLIC_RECEIPT='+$receiptPath)
         } elseif ($Action -eq 'SignIntermediate') {
+            if ([string]::IsNullOrWhiteSpace($BackupDirectory) -and (-not (Test-Path -LiteralPath $key) -or -not (Test-Path -LiteralPath $cert))) {
+                $BackupDirectory=Read-Host 'Existing encrypted Root backup folder on this offline computer (do not create a new Root)'
+                if ([string]::IsNullOrWhiteSpace($BackupDirectory)) { throw 'EXISTING_ROOT_BACKUP_REQUIRED' }
+            }
             if (-not [string]::IsNullOrWhiteSpace($BackupDirectory)) {
                 Assert-Backup $BackupDirectory
-                if ([string]::IsNullOrWhiteSpace($ExpectedCertificateSha256)) { $ExpectedCertificateSha256=Read-Host 'Root certificate FILE SHA256 from your separately kept ToOnline receipt' }
                 $key=Join-Path $BackupDirectory 'root-key.enc.pem'
                 $cert=Join-Path $BackupDirectory 'root-cert.pem'
+                if ([string]::IsNullOrWhiteSpace($ExpectedCertificateSha256)) {
+                    if (Test-ApprovedExistingRoot $cert) { $ExpectedCertificateSha256=$script:RootAuthority.existing_root_exception.certificate_file_sha256 }
+                    else { $ExpectedCertificateSha256=Read-Host 'Root certificate FILE SHA256 from your separately trusted public certificate/receipt' }
+                }
                 if ($ExpectedCertificateSha256 -notmatch '\A[a-fA-F0-9]{64}\z' -or $ExpectedCertificateSha256 -ne (Get-FileHash -LiteralPath $cert -Algorithm SHA256).Hash) { throw 'TRUSTED_ROOT_CERTIFICATE_HASH_MISMATCH' }
             }
             $csr=Read-Host 'Public CSR file from the approved cluster trust boundary'

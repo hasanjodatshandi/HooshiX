@@ -123,6 +123,17 @@ def parse_env(path: Path) -> dict[str,str]:
 
 def validate_static_contracts(profile: dict) -> list[str]:
     errors: list[str] = []
+    authority = load_json(ROOT / "scripts/production/offline-ca/root-authority.json")
+    exception = authority.get("existing_root_exception", {})
+    add(errors, authority.get("schema_version") == 1 and authority.get("default_root_origin") == "offline_generated"
+        and exception.get("installation_id") == "hooshix-production" and exception.get("profile") == "production-single-server"
+        and exception.get("owner_approved") is True and exception.get("authority") == "ADR-0002"
+        and exception.get("certificate_file_sha256") == "f6d49249e221fa49138771c3d86037575f55eee5f581af373f4523008e424b94"
+        and exception.get("subject_rfc2253") == "subject=CN=HooshiX Local Root Candidate 2026 - NOT Production Approved,O=HooshiX"
+        and exception.get("origin") == "connected_windows_generated"
+        and exception.get("offline_custody_and_two_backups") == "owner_attested"
+        and exception.get("independent_recovery_evidence") == "Not verified"
+        and exception.get("production_readiness") == "Not verified", "existing Root approval scope or evidence boundary drifted")
     for relative in REQUIRED_FILES: add(errors, (PRODUCTION/relative).is_file(), f"missing production artifact: infrastructure/production/{relative}")
     for script in REQUIRED_SCRIPTS: add(errors, script.is_file(), f"missing production verifier/tool: {script.relative_to(ROOT)}")
     if errors: return errors

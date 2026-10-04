@@ -2,6 +2,15 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+On 2026-10-04 the owner approved continuation with the exact existing Root under
+ADR-0002 for `hooshix-production` / `production-single-server`. The offline CA package
+schema 3 hash-binds `root-authority.json` and supports the existing encrypted portable
+backup without regenerating the Root or requiring another `ToOnline` export.
+Connected-Windows origin and owner-attested offline/two-backup custody remain explicit;
+historical receipts are not rewritten. This is a bounded approval and tooling change,
+not independent recovery evidence, signed intermediate installation or mesh readiness.
+Actual intermediate custody/import/rotation and platform commissioning remain `Not verified`.
+
 On 2026-10-04 PR #163 merged at `ca155496c60507e6a0525ddcb4575cadf0db3bd3`
 after protected baseline `37190183009` and frontend `37190182906` passed at the
 reviewed final head. The owner selected private GHCR under

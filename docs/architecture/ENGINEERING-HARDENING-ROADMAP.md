@@ -153,6 +153,15 @@ Remediation must not weaken these verified current properties:
 
 ## 6. Ordered remediation stages
 
+Stage 10 continuation, 2026-10-04: the owner approved reuse of the exact existing Root
+for `hooshix-production` under ADR-0002. The schema-3 offline package binds the narrow
+exception by public file SHA256, subject and installation and accepts the legacy encrypted
+backup; no repeated Root generation or `ToOnline` export is required. Origin is connected
+Windows, custody/backups are owner-attested, and independent recovery remains `Not verified`.
+Next: complete intermediate custody/import/rotation and OpenBao/GitOps commissioning,
+then execute the remaining runtime/recovery/provider/capacity gates. Stage 10 is not completed
+by this Root approval or passing tooling CI.
+
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
 | 1 | Current-truth documentation reconciliation | `COMPLETED` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Final corrected implementation head `a4dca87963854083be505091283ed645bda59fe1`; protected repository baseline run `33181670174` attempt 2 and frontend E2E run `33181670044` passed |

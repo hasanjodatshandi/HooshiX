@@ -7,6 +7,23 @@ import verify
 class ProductionProfileTest(unittest.TestCase):
     def setUp(self):self.profile=json.loads(verify.PROFILE.read_text(encoding="utf-8"))
     def test_repository_profile_passes(self):self.assertEqual([],verify.validate_repository())
+    def test_existing_root_approval_cannot_expand_scope_or_forge_evidence(self):
+        original_load = verify.load_json
+        authority_path = verify.ROOT / "scripts/production/offline-ca/root-authority.json"
+        mutations = (("installation_id", "another-customer"), ("profile", "production-ha"),
+                     ("owner_approved", "true"), ("owner_approved", False),
+                     ("certificate_file_sha256", "0" * 64), ("subject_rfc2253", "subject=CN=wrong"),
+                     ("origin", "offline_generated"), ("independent_recovery_evidence", "Passed"),
+                     ("production_readiness", "Passed"), ("offline_custody_and_two_backups", "Passed"))
+        for key, value in mutations:
+            with self.subTest(key=key, value=value):
+                def changed_load(path):
+                    data = original_load(path)
+                    if path == authority_path:
+                        data["existing_root_exception"][key] = value
+                    return data
+                with patch.object(verify, "load_json", changed_load):
+                    self.assertIn("existing Root approval scope or evidence boundary drifted", verify.validate_static_contracts(self.profile))
     def test_rejects_false_ha_or_extra_replicas(self):
         d=copy.deepcopy(self.profile); d["availability_claim"]="ha"; d["workloads"]["replicas"]=2; e=verify.validate_profile(d); self.assertTrue(any("must not claim HA" in x for x in e)); self.assertTrue(any("replica/HPA/PDB" in x for x in e))
     def test_rejects_weakened_network_or_admission(self):
