@@ -16,6 +16,15 @@ staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دا
 
 ### انتشار کاندیدای خصوصی بدون نصب
 
+مقصد جدیدِ تأییدشدهٔ مالک `hooshix/platform-openbao-private` است. اجرای
+`37222311660` کپی همان digest را گذراند ولی gate خصوصی‌بودن را رد کرد؛ API
+GitHub برای بستهٔ قبلی `hooshix/platform-openbao` مقدار `public` برگرداند.
+بستهٔ قبلی حذف یا تغییر نمی‌کند و در انتشار بعدی مقصد معتبر نیست. طبق
+[مستندات رسمی GHCR](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#configuring-visibility-of-packages-for-your-personal-account)،
+بستهٔ عمومی دوباره خصوصی نمی‌شود؛ بستهٔ تازه در حساب شخصی پیش‌فرض خصوصی دارد،
+اما pipeline همچنان وضعیت واقعی آن را پیش از اسکن و امضا بررسی می‌کند.
+تغییر نام به‌تنهایی شاهد انتشار، staging یا نصب نیست.
+
 اجرای اولیهٔ `37218037965` بعد از approval مالک در مرحلهٔ copy شکست خورد؛
 هیچ receipt موفق یا امضایی صادر نشد و auth موقت پاک شد. Cosign 3.0.6 گزینهٔ
 `--platform` را فقط برای multiarch index قبول می‌کند؛ pin فعلی manifest تک‌معماری
