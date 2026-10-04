@@ -250,6 +250,9 @@ class OpenBaoStorageTest(unittest.TestCase):
         self.assertNotIn('Read-Host', source)
         self.assertNotIn('-ExecutionPolicy', source)
         self.assertIn('$InstallApproved8GiB', source)
+        self.assertIn('; status=$?;', source)
+        self.assertLess(source.index("Write-Output ('PUBLIC_RECEIPT='"),
+                        source.index('if ($operationExit -ne 0)'))
 
     def test_privileged_python_isolation_rejects_current_directory_module_injection(self):
         with tempfile.TemporaryDirectory() as temp:

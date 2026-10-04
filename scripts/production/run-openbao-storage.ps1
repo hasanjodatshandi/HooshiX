@@ -19,11 +19,13 @@ try {
     $numeric = [string]::Join(',', [System.Text.Encoding]::UTF8.GetBytes($bootstrap))
     if ($InstallApproved8GiB) { Write-Output 'Create only approved 8GiB VPS storage. No partitions/SSH/MCP/cluster changes. Enter sudo password only here.' }
     else { Write-Output 'Read-only storage plan/verification. Enter sudo password only here.' }
-    & ssh.exe -t -o ConnectTimeout=8 hooshix-server ('sudo /usr/bin/python3 -I -c ''exec(bytes([' + $numeric + ']))'' > ' + $report + ' && cat ' + $report)
-    if ($LASTEXITCODE -ne 0) { throw 'STORAGE_FAILED_OR_PARTIALLY_APPLIED_DO_NOT_BLINDLY_RETRY' }
+    & ssh.exe -t -o ConnectTimeout=8 hooshix-server ('umask 077; sudo /usr/bin/python3 -I -c ''exec(bytes([' + $numeric + ']))'' > ' + $report + '; status=$?; /usr/bin/cat ' + $report + '; exit $status')
+    $operationExit = $LASTEXITCODE
     & scp.exe -q -o BatchMode=yes -o ConnectTimeout=8 ('hooshix-server:' + $report) $localReport
     if ($LASTEXITCODE -ne 0) { throw 'STORAGE_RECEIPT_COPY_FAILED' }
     Write-Output ('PUBLIC_RECEIPT=' + $localReport)
+    # Preserve the public failure reason too; partial host state is never deleted.
+    if ($operationExit -ne 0) { throw 'STORAGE_FAILED_OR_PARTIALLY_APPLIED_DO_NOT_BLINDLY_RETRY' }
 } finally {
     & ssh.exe -o BatchMode=yes -o ConnectTimeout=8 hooshix-server ('rm -f -- ' + $remote + ' ' + $report)
 }
