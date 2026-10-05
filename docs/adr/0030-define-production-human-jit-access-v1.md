@@ -119,6 +119,32 @@ person twice. `production-ha` remains two-reviewer and hardware-MFA governed.
 
 ## Verification requirements
 
+### Owner-approved commissioning bootstrap (2026-10-05)
+
+For the existing `hooshix-production` single-server installation only, the owner
+explicitly approves supervised local `sudo` commissioning before OpenBao-backed
+off-host audit/JIT is operational. This resolves the initial dependency cycle;
+it is not a JIT grant or Production-readiness approval. Each invocation is linked
+to the reviewed Stage 10 PR, requires local password entry, has a finite operation
+deadline, and retains protected OS audit plus a content-free public receipt.
+No new standing account, credential, sudoers rule or cluster-admin binding is
+created. Existing standing access is not removed until JIT and rescue are verified.
+
+The scope is the reviewed initial PKI/platform/OpenBao bootstrap only. The
+intermediate key may be generated in a root-only VPS `istio-system` commissioning
+directory, encrypted with an operator-held passphrase; only its public CSR leaves
+the host. The existing ADR-0002 Root remains offline. Import into `istio-system`
+requires verified Kubernetes secrets encryption and certificate/key/chain checks.
+The host bootstrap copy is removed only after validated import and recovery custody.
+
+This exception expires when audited JIT is commissioned, and is suspended on
+audit failure, unexpected target/source/configuration state, or loss of rescue
+access. It grants no application traffic, customer-data processing, artifact or
+admission waiver, mesh weakening, or normal CI deployment authority. Other
+installations and `production-ha` are unchanged. The operator must reconcile the
+bounded bootstrap operations to reviewed Git desired state and subsequently
+complete off-host audit/JIT, expiry/revocation and standing-access removal evidence.
+
 Both profiles verify no standing production admin roles, profile-scoped approval, automatic expiry, denial of static/shared privileged credentials, protected audit evidence, and proof that application workloads continue to use Istio/ServiceAccount identity rather than human credentials. The single-server profile requires at least one attributable authorized reviewer by owner direction; additional real reviewers are permitted but not required. HA retains two-person approval.
 
 `production-single-server` additionally verifies independent per-device WireGuard peer identity, shared-peer denial, peer revocation, minimal routes, management-address-only SSH, public-interface/Internet denial on every SSH port, proof that WireGuard alone grants no SSH/privilege, root/password/keyboard-interactive/shared/unapproved-key denial, the exact SSH algorithm allow-list, protected per-operator software-key enrollment/revocation, and, only when FIDO is enrolled, presence/verification positives/negatives including attempted `no-touch-required` override. It also verifies `sshd -t`, connection-specific `sshd -T`, forwarding/tunnel denial, automatic JIT expiry, `sudo` I/O/session audit, OS audit, off-host audit integrity, audit-pipeline failure behavior, and break-glass. Shell history MUST NOT satisfy any audit test.

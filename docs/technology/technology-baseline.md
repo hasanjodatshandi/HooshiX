@@ -83,6 +83,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Service mesh | Istio Ambient 1.30.3 | K8s support + single-server capacity benchmark |
 | Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
 | Secret authority | OpenBao 2.6.4, official openbao-distroless (static nonroot) | ADR-0011 same-minor security patch/upstream flavor; verified-TLS native shell-free probes, recovery and exact-artifact scan gates; topology/authority unchanged |
+| Controlled VPS intermediate-key tooling | Existing Ubuntu OpenSSL/libssl3t64 3.5.5-1ubuntu3.7 | ADR-0002/0030 bounded commissioning only; encrypted PKCS#8 custody/public CSR handoff; no package upgrade or Root custody online |
 | Admission policy | Kyverno 1.18.2 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
 | Image signing | Cosign 3.0.6 | ADR-0017/0045; exact image signature + provenance + signed SBOM attestation |
 | SBOM | Syft 1.51.0 -> CycloneDX JSON | ADR-0035/0045; generated from exact final releasable image; signed/indexed by image digest |

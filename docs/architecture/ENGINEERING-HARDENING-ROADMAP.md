@@ -199,6 +199,14 @@ gates; see the storage runbook for scope, receipts and operator usage. The publi
 hostname is `hooshix.com`; TLS and the ADR-0043 L4/origin path still need environment
 evidence. Stage 10 stays `IN PROGRESS`; no production traffic or readiness is claimed.
 
+The owner-approved 2026-10-05 ADR-0030 bootstrap resolves the initial local-sudo/JIT
+dependency cycle, without waiving normal audited JIT or traffic gates. The next
+execution is the encrypted VPS intermediate CSR/public offline signing handoff
+in `../operations/production-pki-bootstrap-fa.md`, reusing the accepted Root and
+Passed storage evidence. Source/synthetic tests do not certify actual custody or
+install OpenBao; offline signing, reviewed import, mesh/GitOps/admission and
+OpenBao initialization/recovery remain commissioning work.
+
 | Stage | Work package | State | Completion boundary | Completion evidence |
 | ---: | --- | --- | --- | --- |
 | 1 | Current-truth documentation reconciliation | `COMPLETED` | Publish this register; route it from architecture sources; correct reporting-standard references, frontend milestone overstatement, Identity completion wording, and current protected-CI status; review the complete documentation diff; pass context/documentation/baseline gates. | Final corrected implementation head `a4dca87963854083be505091283ed645bda59fe1`; protected repository baseline run `33181670174` attempt 2 and frontend E2E run `33181670044` passed |

@@ -53,6 +53,7 @@ This matrix records production technology combinations that must remain compatib
 | Current OpenBao host storage foundation | Ubuntu 26.04 amd64; util-linux 2.41.3-3ubuntu2.2 / e2fsprogs 1.47.2-3ubuntu4 / systemd 259.5-0ubuntu3.4 / python3 3.14.3-0ubuntu2 | ADR-0011 preallocated fixed 8GiB ext4 loop filesystem; exact existing packages checked, never installed/downgraded by installer; disposable 64MiB ENOSPC/remount tests do not substitute for target reboot, mount-loss guard, local PV/GitOps, strict mesh/admission or complete-stack capacity |
 | Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0 with repository safe-rule-logging patch; combined image/rules, opaque-cookie and log-privacy tests |
 | Argo CD | 3.4.2 | security-patched line; reconciliation/rollback validation |
+| Current VPS intermediate CSR bootstrap | Ubuntu 26.04 amd64; `openssl`/`libssl3t64:amd64` `3.5.5-1ubuntu3.7` | ADR-0030 limited local-sudo commissioning; RSA-4096 CSR, encrypted PKCS#8 AES-256/PBKDF2-HMAC-SHA256, offline existing Root signature; no package change or workload installation |
 
 Trivy and OWASP Dependency-Check are not current baseline components. Under ADR-0045 they are reconsidered only if a distinct coverage gap is evidenced and the compatibility/ownership/exception model is reviewed.
 

@@ -2,6 +2,16 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+The owner approved the bounded ADR-0030 commissioning bootstrap on 2026-10-05.
+The controlled intermediate CSR tool retains only an encrypted root-owned key on
+the VPS and exports a hash-bound public CSR for the existing offline Root signer.
+Synthetic crypto/negative tests passed; actual CSR generation and offline signing
+remain `Not run` until the supervised operator execution. No Root regeneration,
+repeat storage maintenance, cluster mutation or OpenBao installation is claimed.
+Continuation: `../operations/production-pki-bootstrap-fa.md`; then import the
+signed intermediate and commission mesh/GitOps/admission/OpenBao. Stage 10 stays
+`IN PROGRESS`; normal audited JIT and Production readiness remain `Not verified`.
+
 The 2026-10-05 OpenBao storage continuation adds a bounded systemd notify/watchdog
 identity guard, a K3s BindsTo+After dependency installer with no restart, and a
 fixed review-only Retain/node-affine local PV/no-provisioner StorageClass candidate.
