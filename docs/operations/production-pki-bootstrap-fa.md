@@ -3,7 +3,8 @@
 مالک در ۲۰۲۶-۱۰-۰۵ bootstrap محدود را تأیید کرد؛ اختیار و پایان این استثنا در
 [ADR-0030](../adr/0030-define-production-human-jit-access-v1.md#owner-approved-commissioning-bootstrap-2026-10-05)
 است. Root موجود طبق [ADR-0002](../adr/0002-define-production-istio-trust-and-enrollment.md)
-دوباره ساخته نمی‌شود. این راهنما مرحلهٔ CSR است، نه ادعای نصب OpenBao یا آمادگی Production.
+دوباره ساخته نمی‌شود. این راهنما CSR و import گواهی میانی است، نه ادعای نصب
+OpenBao یا آمادگی Production.
 
 ## ۱. فقط یک اجرا روی Windows متصل
 
@@ -72,6 +73,42 @@ import همین گواهی است، نه تولید Root/کلید جدید. impo
 نصب mesh/GitOps/OpenBao، custody واقعی Shamir، backup/restore، audit/JIT و مجوز
 traffic هنوز مرحله‌های اجرا‌نشده‌اند. ابزار CSR آن‌ها را `Passed` اعلام نمی‌کند.
 
+### ورود گواهی امضاشده با یک اجرا
+
+سه فایل `bootstrap_intermediate_csr.py`، `import_intermediate_ca.py` و
+`run-intermediate-import.ps1` از همان main merge‌شده و CI موفق کنار فایل‌های
+CSR در Windows قرار می‌گیرند. پوشهٔ عمومی امضاشده فقط چهار فایل بالا را دارد:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-stage10-intermediate-20261005\run-intermediate-import.ps1' -ReviewedCommit <verified-main-sha> -PublicDirectory 'C:\Users\Coder\Downloads\HooshiX-stage10-intermediate-20261005\signed-intermediate-82360de7a72240eba9ced5e3522f7625'
+```
+
+رمز sudo و سپس **رمز قبلی کلید میانی** را فقط همان پنجره وارد کنید؛ رمز Root
+لازم نیست. `CA_IMPORT=Passed` و `PUBLIC_RECEIPT` نتیجهٔ ورود واقعی را نشان می‌دهند.
+فقط namespace `istio-system` در صورت نبودن و Secret `cacerts` ساخته می‌شوند؛
+هیچ workload، mesh یا OpenBao هنوز نصب نمی‌شود. namespace اولیه restricted است؛
+استثنای مصوب CNI/ztunnel فقط هنگام نصب بازبینی‌شدهٔ mesh اعمال می‌شود.
+
+کلید میانی از فایل رمزدار موجود در حافظهٔ root باز می‌شود و پس از تطبیق با CSR
+و گواهی، فقط از stdin به API رمزگذاری‌شدهٔ K3s می‌رود. فایل بدون رمز روی دیسک
+یا در Windows ساخته نمی‌شود. چهار کلید Secret مطابق قرارداد رسمی Istio هستند؛
+Root فقط certificate عمومی است. stdout/stderr فرمان‌های native ضبط عمومی نمی‌شوند.
+API audit پیش‌فرض K3s بدون policy سفارشی است؛ وجود policy/config سفارشی ناشناخته
+قبل از ارسال Secret متوقف می‌شود تا logging بدنهٔ Secret نشت ایجاد نکند.
+OS audit سالم و K3s secrets encryption با hashهای منطبق در همان اجرا لازم‌اند.
+
+Secret موجود هرگز overwrite نمی‌شود. اجرای مجدد فقط Secret دقیقاً منطبق و با
+label مالکیت bootstrap را می‌پذیرد؛ mismatch حفظ و متوقف می‌شود. timeout هنگام
+create ممکن است با موفقیت سمت سرور همراه باشد: پس از بررسی علت، اجرای بعدی
+با read/reconcile ادامه می‌دهد؛ retry خودکارِ write وجود ندارد. import بر روی
+istiod زنده اجرا نمی‌شود و ابزار rotation نیست. کلید رمزدار host و CSR اصلی
+حفظ می‌شوند؛ حذفشان تا custody/recovery جداگانه مجاز نیست. این ابزار SSH، ایمیل،
+فایروال، دیسک، standing sudo، یا Root را تغییر نمی‌دهد.
+
+receipt فقط commit، hashهای عمومی، نتیجهٔ import/encryption و زمان را دارد؛
+mesh/OpenBao `Not run` و آمادگی Production `Not verified` می‌مانند. source و
+چهار فایل عمومی موقت `.cache` پاک می‌شوند؛ فایل خصوصی host دست‌نخورده می‌ماند.
+
 اگر اتصال قطع شد، همان launcher را اجرا کنید: با state کامل و hashهای درست فقط
 همان CSR عمومی دانلود می‌شود؛ کلید تازه نمی‌سازد و رمز دوباره لازم نیست. state
 ناقص/تغییرکرده، symlink، hardlink، مجوز باز یا directory اضافی باعث توقف است؛
@@ -98,6 +135,14 @@ Build/CI/architecture enforcement changed: existing production test discovery an
 Tests executed: focused synthetic native crypto and negative fixtures Passed; final PR/main CI recorded in PR #173
 Architecture deviations: only explicit ADR-0030 commissioning bootstrap, not a traffic/security waiver
 Rollback considerations: never overwrite/delete existing PKI; no live workload or Root changes
+
+Import continuation review: full-read against main@cb981cc88f5cb94f152f2c9c729ca65e8ef3c2b0; same effective ADRs
+Import changed boundary: existing encrypted intermediate to create-only istio-system/cacerts before control plane
+Import transaction/concurrency: shared nonblocking custody lock; namespace/Secret are separate API creates; partial state preserved
+Import remote edge: local sudo + K3s administrative identity; API request 10s/native 20s/process 600s; zero write retries; no fallback
+Import observability: content-free public receipt and fixed failure codes; no Secret body/crypto stderr output
+Import tests: synthetic native chain/key/constraints/hash/path failures plus mocked API create/reconciliation and diagnostic sanitization; final CI evidence belongs to PR #174
+Import rollback: never overwrite existing Secret; keep encrypted host key/CSR; uncertain create requires read/reconcile, not deletion
 
 مراجع نسخه‌ای: [OpenSSL 3.5 PKCS#8](https://docs.openssl.org/3.5/man1/openssl-pkcs8/)،
 [passphrase descriptor](https://docs.openssl.org/3.5/man1/openssl-passphrase-options/)،

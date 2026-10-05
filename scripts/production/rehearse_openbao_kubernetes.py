@@ -17,12 +17,14 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
+import import_intermediate_ca as ca_import
 from rehearse_openbao_recovery import BOUND, Client, RehearsalFailed, initialize
 from render_openbao_candidate import ALIVE, NAMESPACE, ROOT, STATUS, candidate
 from render_openbao_local_storage import candidate as local_storage_candidate
 
-STEPS = frozenset({"tools", "cluster", "schema", "schema-crds", "schema-candidate",
+STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "unseal", "acl", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
@@ -76,6 +78,24 @@ def wait(check, *, seconds: int = 90):
             return value
         threading.Event().wait(1)
     raise RehearsalFailed("Kubernetes fixture deadline")
+
+
+def ca_import_fixture(k):
+    # Real API create/read/reconcile with disposable data; never the operator's CA.
+    def native_kube(*args, body=None):
+        return k(*args, data=json.dumps(body).encode() if body is not None else None)
+    data = {name: b'ci-disposable-not-a-production-certificate-or-key'
+            for name in ('ca-cert.pem', 'ca-key.pem', 'root-cert.pem', 'cert-chain.pem')}
+    with patch.object(ca_import, 'kube', side_effect=native_kube):
+        ca_import.ensure_secret(data)
+        ca_import.ensure_secret(data)
+        try:
+            ca_import.ensure_secret(data | {'ca-key.pem': b'conflicting-ci-key'})
+        except ca_import.custody.BootstrapFailed:
+            pass
+        else:
+            raise RehearsalFailed('CA fixture conflict was not rejected')
+        ca_import.ensure_secret(data)  # Prove conflict rejection preserved the original.
 
 
 def rehearse(tools: Path, receipt: Path) -> None:
@@ -199,6 +219,8 @@ def rehearse(tools: Path, receipt: Path) -> None:
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), expected=1,
               public_schema=True, required_error=b'violates PodSecurity "restricted:v1.35": privileged')
             schema_only = False
+            step("ca-import")
+            ca_import_fixture(k)
             step("tls")
             key, cert = directory / "tls.key", directory / "tls.crt"
             run(["/usr/bin/openssl", "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-nodes",
@@ -290,7 +312,7 @@ def rehearse(tools: Path, receipt: Path) -> None:
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "revision": run(["/usr/bin/git", "rev-parse", "HEAD"]).decode().strip(), "image": image,
         "node_image": pin["KIND_NODE_IMAGE"], "kubernetes": server,
-        "checks": {label: "Passed" for label in ("server_schema", "static_local_pv_schema", "restricted_workload", "tls_mount_fsGroup",
+        "checks": {label: "Passed" for label in ("ca_secret_create_reconcile_conflict", "server_schema", "static_local_pv_schema", "restricted_workload", "tls_mount_fsGroup",
             "sealed_probes", "tls_hostname_negative", "shamir_3_2", "kv_acl", "restart", "pvc_retention",
             "pvc_data_persistence", "root_revocation", "container_log_privacy", "cleanup")},
         "network_mesh_admission": "Not verified: default kind CNI; Istio CRDs only",
