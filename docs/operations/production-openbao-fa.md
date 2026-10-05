@@ -49,6 +49,15 @@ container، host namespace، capability یا host mount خارج از این م�
 
 ### انتشار دسته‌ای سه تصویر mesh
 
+مالک امنیت در ۲۰۲۶-۱۰-۰۵ عمومی‌بودن **فقط سه کپی بدون تغییر تصاویر رسمی
+Istio** (`istiod`، `cni` و `ztunnel`) را تأیید کرد. خصوصی‌بودن این سه کپی دیگر
+شرط انتشار نیست؛ visibility واقعی (`public` یا `private`) همچنان بررسی و در
+receipt ثبت می‌شود و تغییر آن هنگام امضا، پاسخ نامعتبر یا `internal` رد می‌شود.
+پسوند تاریخی `-private` در نام package تضمین visibility نیست و تغییر نام یا
+حذف package انجام نمی‌شود. اسکن High/Critical، digest ثابت، امضای CI دقیق،
+provenance و SBOM هیچ‌کدام حذف نمی‌شوند. OpenBao، تصاویر برنامه‌ها، secretها
+و دسترسی VPS در این تأیید نیستند و الزام خصوصی‌بودن قبلی آن‌ها تغییر نمی‌کند.
+
 در workflow موجود **Production release evidence**، حالت `mesh-candidate`
 سه digest Linux/amd64 مربوط به Istio 1.30.3 در `infrastructure/istio/pins.env`
 را بدون rebuild به این بسته‌های خصوصی منتقل می‌کند:
