@@ -499,6 +499,7 @@ scripts/production/apply_human_sshd_candidate.sh
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
+scripts/production/import_intermediate_ca.py
 scripts/production/inspect_host.py
 scripts/production/install_audit_prerequisite.py
 scripts/production/install_release_tools.sh
@@ -533,6 +534,7 @@ scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-guard-maintenance.ps1
 scripts/production/run-host-inspection.ps1
 scripts/production/run-intermediate-csr.ps1
+scripts/production/run-intermediate-import.ps1
 scripts/production/run-openbao-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/tests/test_ghcr_release.py
@@ -540,6 +542,7 @@ scripts/production/tests/test_host_audit_policy.py
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_install_audit_prerequisite.py
 scripts/production/tests/test_intermediate_csr.py
+scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_offline_ca.ps1

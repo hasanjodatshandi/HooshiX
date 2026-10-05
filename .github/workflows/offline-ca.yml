@@ -42,6 +42,7 @@ jobs:
           .\scripts\production\run-host-inspection.ps1 -ValidateOnly
           .\scripts\production\run-guard-maintenance.ps1 -ValidateOnly
           .\scripts\production\run-intermediate-csr.ps1 -ValidateOnly
+          .\scripts\production\run-intermediate-import.ps1 -ValidateOnly
           .\scripts\production\run-audit-prerequisite.ps1 -ValidateOnly
           .\scripts\production\run-audit-prerequisite.ps1 -ValidateOnly -VerifyOnly
           try {
