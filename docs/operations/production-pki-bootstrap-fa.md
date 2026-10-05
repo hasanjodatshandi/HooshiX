@@ -93,8 +93,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 و گواهی، فقط از stdin به API رمزگذاری‌شدهٔ K3s می‌رود. فایل بدون رمز روی دیسک
 یا در Windows ساخته نمی‌شود. چهار کلید Secret مطابق قرارداد رسمی Istio هستند؛
 Root فقط certificate عمومی است. stdout/stderr فرمان‌های native ضبط عمومی نمی‌شوند.
-API audit پیش‌فرض K3s بدون policy سفارشی است؛ وجود policy/config سفارشی ناشناخته
-قبل از ارسال Secret متوقف می‌شود تا logging بدنهٔ Secret نشت ایجاد نکند.
+وجود policy ممیزی به‌تنهایی خطا نیست؛ policy واقعی باید بررسی شود تا logging
+بدنهٔ Secret نشت ایجاد نکند. سیاستی که فقط Metadata را ثبت می‌کند نباید باعث
+توقف bootstrap شود؛ سیاست ناشناخته یا دارای ثبت بدنه همچنان قبل از ورود کلید رد می‌شود.
 OS audit سالم و K3s secrets encryption با hashهای منطبق در همان اجرا لازم‌اند.
 
 Secret موجود هرگز overwrite نمی‌شود. اجرای مجدد فقط Secret دقیقاً منطبق و با
