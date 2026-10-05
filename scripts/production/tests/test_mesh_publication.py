@@ -78,10 +78,30 @@ class MeshPublicationTest(unittest.TestCase):
                 self.assertTrue(argv[-1].endswith('-123-2'))
         self.assertEqual(0o700, self.directory.stat().st_mode & 0o777)
 
-    def test_public_package_bad_digest_or_high_critical_vulnerabilities_never_sign(self):
-        for index, (visibility, severity, digest) in enumerate((('public', None, False),
+    def test_approved_public_imports_record_actual_visibility_and_keep_signing(self):
+        self.visibility = 'public'
+        result = self.publish()
+        for component in result['components'].values():
+            self.assertEqual('public', component['registry_visibility'])
+            self.assertEqual('Passed', component['signature_provenance'])
+            self.assertEqual('Passed', component['wrong_signer'])
+        self.assertEqual(3, sum(argv[:2] == ['cosign', 'sign'] for argv in self.calls))
+
+    def test_visibility_exception_cannot_target_openbao_or_application_packages(self):
+        with patch.object(target, 'run') as native:
+            for component in ('openbao', 'conversation', 'istiod/other', 'other'):
+                with self.subTest(component=component), self.assertRaises(ValueError):
+                    target.visibility(component)
+            native.assert_not_called()
+        import publish_openbao_candidate as openbao
+        self.assertIn('!= "private"', (target.ROOT / 'scripts/production/publish_openbao_candidate.py').read_text())
+        self.assertNotEqual(openbao.REPOSITORY, target.REPOSITORIES['istiod'])
+
+    def test_unapproved_visibility_bad_digest_or_high_critical_vulnerabilities_never_sign(self):
+        for index, (visibility, severity, digest) in enumerate((('', None, False),
                 ('internal', None, False), ('private', 'High', False), ('private', 'Critical', False),
-                ('private', 'Unrecognized', False), ('private', None, True))):
+                ('private', 'Unrecognized', False), ('private', None, True),
+                ('public', 'High', False), ('public', 'Critical', False), ('public', None, True))):
             self.directory = Path(self.temp.name) / str(index)
             self.visibility, self.severity, self.bad_digest = visibility, severity, digest
             self.calls = []

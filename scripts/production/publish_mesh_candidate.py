@@ -31,6 +31,18 @@ def targets():
             for component in COMPONENTS}
 
 
+def visibility(component):
+    # Owner approval applies ONLY to these three fixed upstream-import packages.
+    if component not in COMPONENTS:
+        raise ValueError('unapproved mesh component')
+    package = 'hooshix%2Fplatform-istio-' + component + '-private'
+    result = run(['gh', 'api', 'users/hasanjodatshandi/packages/container/' + package,
+                  '--jq', '.visibility'], timeout=20).strip()
+    if result not in ('private', 'public'):
+        raise ValueError('unapproved mesh package visibility')
+    return result
+
+
 def validate(directory, image, now):
     names = ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json')
     syft, cdx, scan, database = (load(directory / name) for name in names)
@@ -92,23 +104,25 @@ def publish(directory: Path, env: dict):
     results = {}
     # Validate ALL three copies/scans before signing ANY component.
     for component, target in selected.items():
-        print('MESH_PUBLICATION_STEP=' + component + '-copy-scan', flush=True)
+        print('MESH_PUBLICATION_STEP=' + component + '-copy', flush=True)
         folder = directory / component
         folder.mkdir(mode=0o700)
         digest = target['image'].split('@sha256:')[1]
         tag = REPOSITORIES[component] + ':candidate-' + digest + '-' + invocation.removeprefix('github:').replace(':', '-')
         run(['cosign', 'copy', target['upstream'], tag], timeout=300)
-        package = 'hooshix%2Fplatform-istio-' + component + '-private'
-        if run(['gh', 'api', 'users/hasanjodatshandi/packages/container/' + package,
-                '--jq', '.visibility'], timeout=20).strip() != 'private':
-            raise ValueError('private owned mesh package required')
+        print('MESH_PUBLICATION_STEP=' + component + '-visibility', flush=True)
+        initial_visibility = visibility(component)
         (folder / 'database.json').write_text(database)
+        print('MESH_PUBLICATION_STEP=' + component + '-sbom', flush=True)
         run(['syft', 'scan', target['image'], '--from', 'registry', '--platform', 'linux/amd64',
              '-o', 'syft-json=' + str(folder / 'syft.json'),
              '-o', 'cyclonedx-json=' + str(folder / 'cyclonedx.json')], timeout=300)
+        print('MESH_PUBLICATION_STEP=' + component + '-scan', flush=True)
         (folder / 'grype.json').write_text(run([
             'grype', 'sbom:' + str(folder / 'syft.json'), '--fail-on', 'high', '-o', 'json'], timeout=180))
+        print('MESH_PUBLICATION_STEP=' + component + '-validation', flush=True)
         results[component] = validate(folder, target['image'], datetime.now(timezone.utc))
+        results[component]['registry_visibility'] = initial_visibility
     flags = ['--certificate-identity', EXPECTED_CERTIFICATE_IDENTITY,
              '--certificate-oidc-issuer', EXPECTED_OIDC_ISSUER]
     for component, target in selected.items():
@@ -132,12 +146,10 @@ def publish(directory: Path, env: dict):
         else:
             raise ValueError('wrong signer unexpectedly accepted')
         run(['cosign', 'verify', *flags, image])
-        package = 'hooshix%2Fplatform-istio-' + component + '-private'
-        if run(['gh', 'api', 'users/hasanjodatshandi/packages/container/' + package,
-                '--jq', '.visibility'], timeout=20).strip() != 'private':
+        if visibility(component) != results[component]['registry_visibility']:
             raise ValueError('mesh package visibility changed during publication')
         results[component].update({'signature_provenance': 'Passed', 'wrong_signer': 'Passed',
-                                   'registry_visibility': 'private', 'upstream_image': target['upstream']})
+                                   'upstream_image': target['upstream']})
         results[component]['sha256'][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     return {'schema_version': 1, 'component': 'mesh', 'owner': 'platform',
             'version': '1.30.3', 'repository_revision': revision,
