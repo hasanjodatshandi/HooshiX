@@ -49,9 +49,18 @@ container، host namespace، capability یا host mount خارج از این م�
 
 ### انتشار دسته‌ای سه تصویر mesh
 
+مالک امنیت در ۲۰۲۶-۱۰-۰۵ عمومی‌بودن **فقط سه کپی بدون تغییر تصاویر رسمی
+Istio** (`istiod`، `cni` و `ztunnel`) را تأیید کرد. خصوصی‌بودن این سه کپی دیگر
+شرط انتشار نیست؛ visibility واقعی (`public` یا `private`) همچنان بررسی و در
+receipt ثبت می‌شود و تغییر آن هنگام امضا، پاسخ نامعتبر یا `internal` رد می‌شود.
+پسوند تاریخی `-private` در نام package تضمین visibility نیست و تغییر نام یا
+حذف package انجام نمی‌شود. اسکن High/Critical، digest ثابت، امضای CI دقیق،
+provenance و SBOM هیچ‌کدام حذف نمی‌شوند. OpenBao، تصاویر برنامه‌ها، secretها
+و دسترسی VPS در این تأیید نیستند و الزام خصوصی‌بودن قبلی آن‌ها تغییر نمی‌کند.
+
 در workflow موجود **Production release evidence**، حالت `mesh-candidate`
 سه digest Linux/amd64 مربوط به Istio 1.30.3 در `infrastructure/istio/pins.env`
-را بدون rebuild به این بسته‌های خصوصی منتقل می‌کند:
+را بدون rebuild به این سه بستهٔ ثابت منتقل می‌کند:
 
 - `hooshix/platform-istio-istiod-private`
 - `hooshix/platform-istio-cni-private`
@@ -63,13 +72,13 @@ container، host namespace، capability یا host mount خارج از این م�
 برای کاندیدا خالی است. اگر environment درخواست approval داشت، همان اجرای
 main را بررسی و approve کنید. کلید VPS/Root/PAT در CI قرار نمی‌گیرد.
 
-pipeline فقط از token موقت همان repository استفاده می‌کند. خصوصی‌بودن واقعی
+pipeline فقط از token موقت همان repository استفاده می‌کند. visibility مجاز و واقعی
 هر package، digest، معماری، SBOM غیرخالی و اسکن تازه با نبود High/Critical
-باید برای هر سه تصویر موفق باشد؛ سپس امضا آغاز می‌شود. registry عمومی، DB
+باید برای هر سه تصویر موفق باشد؛ سپس امضا آغاز می‌شود. visibility نامعتبر، DB
 قدیمی/نامعتبر، اسکن ناموفق، signer اشتباه یا provenance نامنطبق اجازهٔ receipt
 موفق نمی‌دهد. سه SBOM و provenance نوع `unchanged-upstream-import` با هویت
 دقیق workflow موجود امضا و دوباره بررسی می‌شوند؛ این ادعای ساخت upstream
-توسط HooshiX نیست. خصوصی‌بودن پس از امضا هم دوباره بررسی می‌شود؛ تغییر سطح
+توسط HooshiX نیست. visibility پس از امضا هم دوباره بررسی می‌شود؛ تغییر سطح
 دسترسی حین انتشار، receipt موفق را متوقف می‌کند. tag شامل digest و شناسهٔ اجرای CI است تا تلاش تازه، tag
 تلاش ناقص را overwrite نکند. digest ثابت می‌ماند؛ force و حذف package نداریم.
 
