@@ -7,9 +7,15 @@ identity guard, a K3s BindsTo+After dependency installer with no restart, and a
 fixed review-only Retain/node-affine local PV/no-provisioner StorageClass candidate.
 The existing required CI fixture checks real startup/fault/stop/re-arm/fallback
 behavior on 64MiB, not on the VPS; the candidate's API schema is checked separately.
-The earlier 8GiB filesystem installation on the VPS passed, but target guard
-installation, next-start/reboot behavior, actual PV binding, workload promotion,
-mesh/admission/TLS, recovery and Production readiness remain `Not verified`.
+The 8GiB filesystem and identity guard are installed on the VPS. Healthy reboot
+persistence/startup passed; the post-boot identity was independently matched.
+Owner-approved target maintenance on 2026-10-05 passed guard process-fault and
+unexpected mount-loss shutdown, no automatic re-arm after remount, explicit
+guard/K3s recovery and API readiness. Protected host-service PIDs/active states
+were unchanged. `verify_storage_guard.py` records this bounded procedure; its
+negative unit tests do not replace native evidence. Actual PV binding, workload
+promotion, mesh/admission/TLS, OpenBao recovery and Production readiness remain
+`Not verified`. The read-only storage verifier deliberately does not certify reboot.
 K3s stop is not claimed to terminate all running containers. Owner instructions:
 `../operations/production-openbao-storage-fa.md`; Stage 10 remains `IN PROGRESS`.
 

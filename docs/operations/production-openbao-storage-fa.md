@@ -6,8 +6,9 @@
 از موفقیت محافظ یا CI استنتاج نمی‌شود و هنوز `Not verified` است.
 
 مالک ساخت فضای حداکثر ۸GiB روی VPS فعلی را تأیید کرده است. این تغییر فقط
-بنیاد storage است؛ OpenBao، Secret، PV یا workload نصب نمی‌کند و SSH، پورت
-MCP ‏۲۲۲۲، ایمیل و پارتیشن‌های موجود را تغییر نمی‌دهد.
+بنیاد storage است؛ OpenBao، Secret، PV یا workload نصب نمی‌کند و SSH، ایمیل
+و پارتیشن‌های موجود را تغییر نمی‌دهد. مهاجرت MCP جداگانه تمام شده است؛ این
+رویه سرویس‌ها یا مسیرهای آن را دوباره فعال نمی‌کند.
 
 فایل‌سیستم ext4 مستقل داخل یک فایل از پیش رزروشده روی دیسک VPS قرار می‌گیرد.
 سقف فایل ۸GiB است؛ فضای قابل استفاده به علت metadata و reserve کمتر خواهد بود.
@@ -62,8 +63,8 @@ backing، اندازه، flags، data owner و enable/active واحد بررسی
 | واحد boot | `var-lib-hooshixstorage-openbao.mount` |
 
 اجرای مجدد موفق همان filesystem را بررسی می‌کند و داده را فرمت نمی‌کند.
-تا تکمیل guard واقعی mount-loss/قبل از K3s، local PV/StorageClass با Retain و
-node affinity از مسیر GitOps و سایر gateها، workload به این مسیر وصل نکنید.
+محافظ واقعی نصب و آزموده شده است، اما تا فعال‌سازی local PV/StorageClass با
+Retain و node affinity از مسیر GitOps و سایر gateها، workload به این مسیر وصل نکنید.
 این mount به‌تنهایی guard زمان اجرا نیست. Kubelet با fsGroup=10001 ممکن است
 مجوز پوشهٔ داده را از 0700 به 2770 (گروه اختصاصی و setgid) تغییر دهد؛ این دو
 و حالت انتقالی 0770 فقط برای همان UID/GID مجازند؛ مجوز سایر کاربران ممنوع است.
@@ -71,8 +72,9 @@ node affinity از مسیر GitOps و سایر gateها، workload به این �
 ## نصب محافظ پس از CI موفق
 
 در ۲۰۲۶-۱۰-۰۵ ساخت واقعی این filesystem با رسید عمومی `Passed` و
-`backing_bytes=8589934592` تأیید شد؛ reboot و اتصال Kubernetes هنوز
-`Not verified` است. برای نصب محافظ دوباره فایل ۸GiB ساخته نمی‌شود.
+`backing_bytes=8589934592` تأیید شد؛ محافظ و آزمون سالمِ reboot نیز `Passed`
+هستند؛ اتصال PV/Workload هنوز `Not verified` است. دستور نصب زیر برای بازتولید
+در محیط مصوب است؛ روی VPS فعلی دوباره فایل ۸GiB ساخته نمی‌شود.
 
 از همان دستور کپی دو فایل عمومیِ **main با CI موفق** در بخش بالا استفاده کنید؛
 سپس به‌جای گزینهٔ ساخت فضا این دستور را اجرا کنید:
@@ -83,7 +85,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$dst\run-openbao-storag
 
 این اقدام باید با اطلاع مالک انجام شود: اگر هویت storage از دست برود، K3s
 متوقف می‌شود و مدیریت کلاستر در دسترس نخواهد بود. نصب، restart/reboot نمی‌کند؛
-SSH، MCP روی ۲۲۲۲، ایمیل، پارتیشن و داده‌های فعلی عوض نمی‌شوند. رمز sudo
+SSH، ایمیل، پارتیشن و داده‌های فعلی عوض نمی‌شوند. رمز sudo
 فقط همان پنجره وارد می‌شود. source پس از بررسی hash همان bytes در مسیر root-only
 `/var/lib/hooshixstorage/openbao-storage-guard.py` نصب می‌شود؛ فایل متعارض
 جایگزین نمی‌شود. ابتدا guard سالم شروع می‌شود، سپس dependency زیر اضافه می‌شود:
@@ -102,7 +104,8 @@ timeout/خطا موفق نیست. watchdog سی‌ثانیه‌ای هنگ وا�
 
 خروجی نصب باید `storage_guard: Passed` بدهد؛
 `target_startup_and_fault_test: Not verified` عمدی است. آزمون startup/reboot واقعی
-نیاز به maintenance و کنسول نجات دارد و خودکار اجرا نمی‌شود. بررسی فقط‌خواندنی:
+نیاز به maintenance و کنسول نجات دارد و خودکار اجرا نمی‌شود. این فیلد عمومی
+نتیجهٔ اجرای مستقل هدف را باطل نمی‌کند. بررسی فقط‌خواندنی:
 
 ```bash
 sudo systemctl is-active hooshix-openbao-storage-guard.service
@@ -130,6 +133,70 @@ containerهای قبلی نیست.** bind mount موجود filesystem قبلی �
 و بدون طرح recovery/traffic-closed مصوب مجاز نیست. فایل backing/state/unit mount
 حذف یا فرمت نمی‌شوند. نسخهٔ متفاوت source به‌جای overwrite نیازمند تغییر
 بازبینی‌شده و maintenance است؛ installer فعلی fail-closed آن را رد می‌کند.
+
+## آزمون عملی هدف و نتیجهٔ ثبت‌شده
+
+در ۲۰۲۶-۱۰-۰۵، آزمون سالمِ reboot با رسید مستقل و boot ID نهایی
+`0a76f3c7-4ef4-4678-9e91-c6e380096d7d` موفق شد؛ همان ID در بررسی زنده
+تأیید شد. سپس در maintenance مصوب مالک، ابزار عمومی زیر اجرا شد. فایل‌های
+secret، بک‌آپ، فضای ۸GiB جدید یا فایل پرکنندهٔ دیسک تولید نمی‌کند.
+
+| شاهد هدف | نتیجه |
+| --- | --- |
+| filesystem، guard و startup پس از reboot سالم | `Passed` |
+| قطع فرایند guard و توقف dependent K3s | `Passed` |
+| گم‌شدن mount و توقف K3s، مسیر root-only خالی | `Passed` |
+| بازگشت mount بدون شروع خودکار K3s | `Passed` |
+| بازیابی صریح mount/guard/K3s و API `/readyz` | `Passed` |
+| PID و وضعیت SSH، وب، ایمیل، MariaDB، audit و WireGuard | `Passed`; unchanged |
+| اتصال PV، OpenBao، unseal/backup/recovery و آمادگی Production | `Not verified` |
+
+رسید اجرای fault در `2026-10-05T08:04:26.599852+00:00` ثبت شد؛ source عملیاتی
+SHA256 برابر `2e48438be76dd609e6a037d59f9e0a68ac69041af8119d8a26a7fabdb458083c`
+بود. این نتیجه صرفاً برای host و guard نصب‌شدهٔ main@f2699c5d معتبر است.
+guard نصب‌شده تغییر نکرد: SHA256 برابر
+`2f061f547c5db602d1e7da3caa70c5c138e377b96a5948be9a2ae331a4f00933`.
+CI منفیِ read-only/backing-loss و نمونهٔ کوچک ENOSPC جای اجرای آن faultها
+روی VPS نیستند؛ انجام همهٔ faultهای CI روی هدف ادعا نمی‌شود.
+
+برای استفادهٔ بعدی، از revision merge‌شده با CI موفق، فقط دو فایل عمومی
+را در پوشهٔ موقت تازه کپی کنید:
+
+```powershell
+$src = '\\wsl.localhost\Ubuntu\home\coder\workspace\Hooshix-stage10-root\scripts\production'
+$dst = Join-Path $env:TEMP ('HooshiX-guard-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $dst | Out-Null
+Copy-Item -LiteralPath (Join-Path $src 'verify_storage_guard.py'), (Join-Path $src 'run-guard-maintenance.ps1') -Destination $dst
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$dst\run-guard-maintenance.ps1" -ReadOnly
+```
+
+بدون `-ReadOnly` آزمون maintenance اجرا می‌شود: کنسول نجات VNC باید باز و
+ورود به آن آزموده باشد. `MAINTENANCE` را برای تأیید توقف موقت مدیریت K3s
+بنویسید و رمز sudo را فقط همان پنجره وارد کنید. اسکریپت تنها source عمومی
+hash-bound را با Python isolated اجرا می‌کند؛ رمز/ترمینال ضبط نمی‌شود.
+پس از پایان، `PUBLIC_RECEIPT` محل رسید کوچک روی Windows است.
+
+آزمون fault فقط با mount/guard سالم، API آماده، دادهٔ خالی و نبود هیچ PVC در
+کلاستر مجاز است و lock اختصاصی storage را نگه می‌دارد. قبل از fault، timer
+بازیابی برای ۸ دقیقه بعد فعال می‌شود. قطع فرایند و unmount/remount همان
+mount انجام می‌شود؛ سپس بازیابی صریح و حفظ PID سرویس‌ها تأیید می‌شوند و
+فقط پس از موفقیت، timer لغو می‌شود. توقف K3s توقف همهٔ containerها نیست.
+این timer صرفاً بازیابی maintenance مصوب است، نه re-arm عادی fault؛ شروع
+K3s همچنان به کنترل هویت mount و `READY=1` محافظ وابسته است.
+
+اگر ارتباط قطع شد یا `Failed` گرفتید، کورکورانه تکرار نکنید. از VNC:
+
+```bash
+sudo systemctl status hooshix-storage-maintenance-recovery.timer k3s.service hooshix-openbao-storage-guard.service --no-pager
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/openbao-storage-guard.py --guard-check
+```
+
+تا بازیابی و بررسی مستقل، timer را لغو نکنید؛ backing/data را حذف یا فرمت
+نکنید. اگر نسخهٔ guard یا package تغییر کرده، ابزار fail-closed متوقف می‌شود
+و review نسخه لازم است. وجود داده/PVC مانع همین fault test است؛ برای سیستم
+داده‌دار طرح maintenance و backup/recovery مستقل لازم است. این ابزار هیچ
+reboot، نصب package، تغییر SSH/firewall/ایمیل، ساخت PV، init/unseal یا
+خواندن secret انجام نمی‌دهد؛ اجرای مجدد آزمون موفق فعلی لازم نیست.
 
 ## کاندیدای local PV؛ هنوز نصب نکنید
 
@@ -170,8 +237,9 @@ sudo df -B1 /var/lib/hooshixstorage/openbao
   هیچ `rm`، resize یا format مجدد در راهنمای rollback وجود ندارد.
 - این واحد فقط WantedBy دارد و خرابی آن به‌تنهایی نباید boot کل VPS/ایمیل را
   متوقف کند. قبل از فعال‌کردن PV، guard وابستگی fail-closed لازم است.
-- برای آزمون reboot، reboot مستقل با هماهنگی downtime و کنسول نجات لازم است؛
-  اجرای installer reboot نمی‌کند. فعلاً `reboot_persistence: Not verified` است.
+- اجرای installer reboot نمی‌کند؛ فیلد `reboot_persistence: Not verified`
+  در verifier عمومی عمدی است. آزمون سالمِ مستقل هدف در بخش بالا `Passed`
+  است؛ این نتیجه از CI یا verifier عمومی استنتاج نشده است.
 
 CI موجود `OpenBao Kubernetes foundation` نمونهٔ ۶۴MiB را می‌سازد، با UID10001
 تا ENOSPC می‌نویسد، unmount/remount و marker/hash و cleanup را بررسی می‌کند؛
@@ -205,6 +273,6 @@ Istio identity and authorization impact: None; no active workload/policy promoti
 Logging and PII impact: finite public diagnostics; worker output discarded; no credentials
 Observability added or changed: systemd health/watchdog and bounded public CI receipt; no production alert claim
 Build/CI/architecture enforcement changed: existing required fixture expanded, no gate removal
-Tests executed: 228 local production tests and repository/contract/context/diff checks Passed; protected final-head/main and native fixture results tracked in PR #171
+Tests executed: guard/PV foundation tests and native CI fixture tracked in PR #171; target process-fault/mount-loss/recovery and protected-service checks Passed on 2026-10-05; this continuation's production suite and final-head/main CI tracked in PR #172
 Architecture deviations: None
 Rollback considerations: preserve data, approved maintenance, no blind format/restart/guard bypass

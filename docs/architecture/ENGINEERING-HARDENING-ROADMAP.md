@@ -187,12 +187,15 @@ filesystem installer, 64MiB disposable CI ENOSPC/remount checks and local-sudo u
 are owned by `../operations/production-openbao-storage-fa.md` and ADR-0011.
 The bounded filesystem was installed on the actual VPS on 2026-10-05 with a
 public `Passed` receipt and independently observed mount/backing/owner flags.
-The next coherent package implements the bounded notify/watchdog mount/backing
-identity guard and fixed Retain/node-affine review-only local PV candidate.
-CI fault tests use only a 64MiB disposable filesystem and harmless dependent;
-the guard is not assumed installed from code or CI. Real guard installation,
-target startup/reboot, local PV/GitOps, mesh/admission/TLS,
-staging and recovery remain separate unverified commissioning gates. The public
+The bounded notify/watchdog mount/backing identity guard is installed and the
+fixed Retain/node-affine local PV remains review-only. Healthy target reboot
+persistence/startup passed, with the post-boot identity independently matched.
+Owner-approved 2026-10-05 native maintenance passed guard process-fault,
+mount-loss shutdown, remount without automatic re-arm, explicit recovery/API
+readiness and unchanged protected host-service PIDs. This is separate from the
+64MiB disposable CI fixture and its harmless dependent. Local PV/GitOps,
+mesh/admission/TLS, staging and OpenBao recovery remain unverified commissioning
+gates; see the storage runbook for scope, receipts and operator usage. The public
 hostname is `hooshix.com`; TLS and the ADR-0043 L4/origin path still need environment
 evidence. Stage 10 stays `IN PROGRESS`; no production traffic or readiness is claimed.
 
