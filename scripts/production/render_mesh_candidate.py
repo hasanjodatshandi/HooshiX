@@ -51,6 +51,36 @@ def values(component, pin):
     return result
 
 
+def validate_node_exception(component, pod, pin):
+    """Bound owner-approved network privileges; this is not runtime admission evidence."""
+    account, name, group, capabilities, paths = {
+        'cni': ('istio-cni', 'install-cni', 0,
+                {'NET_ADMIN', 'NET_RAW', 'SYS_PTRACE', 'SYS_ADMIN', 'DAC_OVERRIDE'},
+                {'/proc', '/var/run/ztunnel', '/var/run/istio-cni', '/var/run/netns',
+                 values('cni', pin)['cniConfDir'], values('cni', pin)['cniBinDir']}),
+        'ztunnel': ('ztunnel', 'istio-proxy', 1337,
+                    {'NET_ADMIN', 'SYS_ADMIN', 'NET_RAW'}, {'/var/run/ztunnel'}),
+    }[component]
+    containers = pod.get('containers', [])
+    if (pod.get('serviceAccountName') != account or pod.get('hostNetwork', False)
+            or pod.get('hostPID', False) or pod.get('hostIPC', False)
+            or pod.get('initContainers') or pod.get('ephemeralContainers')
+            or len(containers) != 1 or containers[0].get('name') != name):
+        raise ValueError('network exception identity or host namespace rejected')
+    context = containers[0].get('securityContext', {})
+    caps = context.get('capabilities', {})
+    if (context.get('privileged') is not False or context.get('runAsUser') != 0
+            or context.get('runAsGroup') != group or context.get('runAsNonRoot') is not False
+            or caps.get('drop') != ['ALL'] or set(caps.get('add', [])) != capabilities):
+        raise ValueError('network exception security context rejected')
+    if component == 'ztunnel' and (context.get('allowPrivilegeEscalation') is not True
+                                  or context.get('readOnlyRootFilesystem') is not True):
+        raise ValueError('ztunnel context differs from approved baseline')
+    mounts = [v['hostPath']['path'] for v in pod.get('volumes', []) if 'hostPath' in v]
+    if len(mounts) != len(paths) or set(mounts) != paths:
+        raise ValueError('network exception host mounts rejected')
+
+
 def render(helm, component, pin):
     import yaml
     version = pin['ISTIO_VERSION']
@@ -75,10 +105,10 @@ def render(helm, component, pin):
     for item in items:
         if item['kind'] in ('Deployment', 'DaemonSet'):
             pod = item['spec']['template']['spec']
-            allowed = {pin['ISTIO_' + name + '_DISTROLESS_AMD64_DIGEST'] for name in ('PILOT', 'CNI', 'ZTUNNEL')}
+            expected_image = values(component, pin)['image']
             for container in pod['containers'] + pod.get('initContainers', []):
                 image = container['image']
-                if '@' not in image or image.rsplit('@', 1)[1] not in allowed:
+                if image != expected_image:
                     raise ValueError('unpinned mesh workload rejected')
             for container in pod['containers']:
                 limits = container.get('resources', {}).get('limits', {})
@@ -86,6 +116,8 @@ def render(helm, component, pin):
                     raise ValueError('bounded mesh resources required')
             if pod.get('serviceAccountName') in (None, '', 'default'):
                 raise ValueError('dedicated mesh service account required')
+            if component in ('cni', 'ztunnel'):
+                validate_node_exception(component, pod, pin)
             if component == 'istiod':
                 if item['kind'] != 'Deployment' or item['spec'].get('replicas') != 1:
                     raise ValueError('single-server control plane required')

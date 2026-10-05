@@ -11,6 +11,39 @@ import render_mesh_candidate as target
 
 
 class MeshCandidateTest(unittest.TestCase):
+    def test_network_exception_rejects_every_broader_privilege(self):
+        pin = target.pins()
+        pod = {'serviceAccountName': 'ztunnel', 'containers': [{
+            'name': 'istio-proxy', 'securityContext': {
+                'privileged': False, 'runAsUser': 0, 'runAsGroup': 1337,
+                'runAsNonRoot': False, 'allowPrivilegeEscalation': True,
+                'readOnlyRootFilesystem': True, 'capabilities': {
+                    'drop': ['ALL'], 'add': ['NET_ADMIN', 'SYS_ADMIN', 'NET_RAW']}}}],
+            'volumes': [{'name': 'ztunnel', 'hostPath': {'path': '/var/run/ztunnel'}}]}
+        target.validate_node_exception('ztunnel', pod, pin)
+        for field in ('hostNetwork', 'hostPID', 'hostIPC', 'account', 'container',
+                      'privileged', 'capability', 'mount', 'writable-root', 'init', 'ephemeral'):
+            changed = json.loads(json.dumps(pod))
+            context = changed['containers'][0]['securityContext']
+            if field in ('hostNetwork', 'hostPID', 'hostIPC'):
+                changed[field] = True
+            elif field == 'account':
+                changed['serviceAccountName'] = 'other'
+            elif field == 'container':
+                changed['containers'].append(changed['containers'][0].copy())
+            elif field == 'privileged':
+                context['privileged'] = True
+            elif field == 'capability':
+                context['capabilities']['add'].append('SYS_MODULE')
+            elif field == 'mount':
+                changed['volumes'].append({'hostPath': {'path': '/'}})
+            elif field == 'writable-root':
+                context['readOnlyRootFilesystem'] = False
+            else:
+                changed['initContainers' if field == 'init' else 'ephemeralContainers'] = [{'name': 'other'}]
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                target.validate_node_exception('ztunnel', changed, pin)
+
     def test_existing_chart_integrity_and_three_exact_images(self):
         pin = target.pins()
         for component in target.COMPONENTS:

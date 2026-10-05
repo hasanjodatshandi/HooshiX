@@ -59,6 +59,32 @@ Waypoints are absent by default unless an explicit L7 need is measured/reviewed.
 
 Single-server Ambient is benchmark-gated. If it cannot fit the validated capacity envelope, add host capacity or approve a reviewed security architecture; do not silently disable mTLS/workload identity.
 
+### Narrow network-node exception
+
+For HooshiX Stage 10, the security-owner explicitly approved this scope on 2026-10-05;
+implementation remains reviewed through PR #176. Only Istio 1.30.3's `istio-cni`
+and `ztunnel` DaemonSets in `istio-system` may use the following node privileges:
+
+- `istio-cni` ServiceAccount, single `install-cni` container: UID/GID 0, drop ALL,
+  add exactly NET_ADMIN, NET_RAW, SYS_PTRACE, SYS_ADMIN, DAC_OVERRIDE;
+- `ztunnel` ServiceAccount, single `istio-proxy` container: UID 0/GID 1337, drop ALL,
+  add exactly NET_ADMIN, SYS_ADMIN, NET_RAW; the upstream-required privilege
+  escalation is permitted only for this container; root filesystem stays read-only;
+- neither component may use `privileged=true`, host networking, host PID/IPC,
+  additional init/ephemeral containers, or additional host mounts;
+- CNI host mounts are limited to the verified target CNI binary/config directories,
+  `/proc`, `/var/run/ztunnel`, `/var/run/istio-cni`, and `/var/run/netns`;
+  ztunnel mounts only `/var/run/ztunnel`. Verify effective containerd/Calico paths
+  before deployment; the default K3s paths are not evidence for a customized host.
+
+Exact immutable signed images, provenance/SBOM, finite resources and fail-closed
+admission remain required. Before relaxing namespace Pod Security labels to permit
+these two workloads, blocking admission must enforce their exact identity, images,
+privileges and mounts and deny all other exceptions in the namespace. Offline
+render validation alone is not that runtime evidence. Application workloads and
+other namespaces retain the production non-root baseline. No unsigned-image,
+public-route, SSH, or mail exception is granted.
+
 ## 4. Helm/GitOps/promotion
 
 Helm 4 + Argo CD remain current packaging/GitOps path.

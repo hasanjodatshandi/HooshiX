@@ -40,6 +40,13 @@ manifest شامل base، istiod، CNI و ztunnel با سه image digest دقیق
 نصب OpenBao را اثبات نمی‌کند. استثناهای محدود control-plane و مرحلهٔ نصب
 همچنان باید در همین تغییر بازبینی و آزمایش شوند؛ pipeline چیزی را مستقر نمی‌کند.
 
+مالک امنیت در ۲۰۲۶-۱۰-۰۵ استثنای سطح سیستم را فقط برای `istio-cni` و
+`ztunnel` تأیید کرد. محدودهٔ دقیق در بخش «Narrow network-node exception»
+از `docs/architecture/runtime-and-deployment.md` ثبت شده است. renderer اضافه‌شدن
+container، host namespace، capability یا host mount خارج از این محدوده را رد
+می‌کند. این تأیید و آزمون render جای سیاست blocking واقعی Kubernetes را
+نمی‌گیرند؛ تا نصب و آزمون آن سیاست، برچسب امنیتی namespace ضعیف نمی‌شود.
+
 ### انتشار دسته‌ای سه تصویر mesh
 
 در workflow موجود **Production release evidence**، حالت `mesh-candidate`
@@ -74,11 +81,13 @@ renderer عمومی هنوز image upstream را نشان می‌دهد؛ جای
 باید از receipt معتبر و بازبینی deployment مشتق شود، نه از نام package.
 
 Architecture review mode: full-read. Owning decisions: ADR-0002/0011/0017/0030/0045.
-Scope: public mesh render/import evidence only; versions and existing OpenBao/application
+Scope: public mesh render/import evidence and owner-approved narrow node privilege
+contract only; versions and existing OpenBao/application
 release contracts unchanged. Remote edge: protected CI to fixed vendor/GHCR registries;
 exact identity, finite native/job deadlines, serial three-component execution, no retry,
 no force/overwrite, fail-closed validation, public allow-list diagnostics. No database,
-business transaction, Kafka, tenant/PII, production host, namespace or mesh policy changes.
+business transaction, Kafka, tenant/PII, production host or namespace changes. The network
+exception is explicit current guidance; its runtime admission enforcement remains pending.
 Tests: mocked positive/negative publication and render gates, native offline Helm render,
 existing repository production/static suites; exact PR/main CI is recorded separately.
 Rollback: revert preparation code; previously published candidates remain immutable,
