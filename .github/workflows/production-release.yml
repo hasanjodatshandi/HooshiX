@@ -3,13 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       release_kind:
-        description: Applications release or unchanged OpenBao import candidate (never deploys)
+        description: Applications release or unchanged OpenBao/mesh import candidate (never deploys)
         required: true
         default: applications
         type: choice
         options:
           - applications
           - openbao-candidate
+          - mesh-candidate
       release_manifest_path:
         description: Tracked reviewed production release manifest under deploy/releases/production
         required: false
@@ -148,10 +149,10 @@ jobs:
           rm -f -- "$RUNNER_TEMP/docker-config/config.json"
 
   openbao-candidate:
-    if: github.ref == 'refs/heads/main' && inputs.release_kind == 'openbao-candidate'
+    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate')
     runs-on: ubuntu-24.04
     environment: production-release
-    timeout-minutes: 25
+    timeout-minutes: 35
     permissions:
       contents: read
       actions: read
@@ -195,7 +196,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/docker-config
-        run: python3 scripts/production/publish_openbao_candidate.py
+          RELEASE_KIND: ${{ inputs.release_kind }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_KIND" in
+            openbao-candidate) python3 scripts/production/publish_openbao_candidate.py ;;
+            mesh-candidate) python3 scripts/production/publish_mesh_candidate.py ;;
+            *) exit 1 ;;
+          esac
       - name: Remove temporary registry authentication
         if: always()
         run: |
@@ -206,7 +214,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: openbao-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/openbao-release-evidence/
+          name: ${{ inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/${{ inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
           retention-days: 30
           if-no-files-found: error

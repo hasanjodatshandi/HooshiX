@@ -520,6 +520,7 @@ scripts/production/parspack_audit_transport.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/provision_openbao_storage.py
+scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/readiness.py
 scripts/production/rehearse_openbao_kubernetes.py
@@ -547,6 +548,7 @@ scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_mesh_candidate.py
+scripts/production/tests/test_mesh_publication.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py

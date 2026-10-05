@@ -40,6 +40,49 @@ manifest شامل base، istiod، CNI و ztunnel با سه image digest دقیق
 نصب OpenBao را اثبات نمی‌کند. استثناهای محدود control-plane و مرحلهٔ نصب
 همچنان باید در همین تغییر بازبینی و آزمایش شوند؛ pipeline چیزی را مستقر نمی‌کند.
 
+### انتشار دسته‌ای سه تصویر mesh
+
+در workflow موجود **Production release evidence**، حالت `mesh-candidate`
+سه digest Linux/amd64 مربوط به Istio 1.30.3 در `infrastructure/istio/pins.env`
+را بدون rebuild به این بسته‌های خصوصی منتقل می‌کند:
+
+- `hooshix/platform-istio-istiod-private`
+- `hooshix/platform-istio-cni-private`
+- `hooshix/platform-istio-ztunnel-private`
+
+این حالت فقط از main با baseline موفق همان SHA و environment موجود
+`production-release` اجرا می‌شود. مالک در GitHub ← Actions این workflow را
+با `release_kind=mesh-candidate` و branch `main` اجرا می‌کند؛ فیلد manifest
+برای کاندیدا خالی است. اگر environment درخواست approval داشت، همان اجرای
+main را بررسی و approve کنید. کلید VPS/Root/PAT در CI قرار نمی‌گیرد.
+
+pipeline فقط از token موقت همان repository استفاده می‌کند. خصوصی‌بودن واقعی
+هر package، digest، معماری، SBOM غیرخالی و اسکن تازه با نبود High/Critical
+باید برای هر سه تصویر موفق باشد؛ سپس امضا آغاز می‌شود. registry عمومی، DB
+قدیمی/نامعتبر، اسکن ناموفق، signer اشتباه یا provenance نامنطبق اجازهٔ receipt
+موفق نمی‌دهد. سه SBOM و provenance نوع `unchanged-upstream-import` با هویت
+دقیق workflow موجود امضا و دوباره بررسی می‌شوند؛ این ادعای ساخت upstream
+توسط HooshiX نیست. tag شامل digest و شناسهٔ اجرای CI است تا تلاش تازه، tag
+تلاش ناقص را overwrite نکند. digest ثابت می‌ماند؛ force و حذف package نداریم.
+
+artifact عمومی `mesh-publication-<run_id>-<attempt>` شامل اسکن‌ها، SBOMها،
+provenance و فقط در موفقیت کامل `receipt.json` است؛ `attempt.json` فقط شروع
+تلاش را نشان می‌دهد. token موقت در cleanup پاک می‌شود. نصب، staging واقعی،
+admission هدف، promotion و آماده‌بودن OpenBao با این انتشار تأیید نمی‌شوند.
+renderer عمومی هنوز image upstream را نشان می‌دهد؛ جایگزینی mirror در نصب
+باید از receipt معتبر و بازبینی deployment مشتق شود، نه از نام package.
+
+Architecture review mode: full-read. Owning decisions: ADR-0002/0011/0017/0030/0045.
+Scope: public mesh render/import evidence only; versions and existing OpenBao/application
+release contracts unchanged. Remote edge: protected CI to fixed vendor/GHCR registries;
+exact identity, finite native/job deadlines, serial three-component execution, no retry,
+no force/overwrite, fail-closed validation, public allow-list diagnostics. No database,
+business transaction, Kafka, tenant/PII, production host, namespace or mesh policy changes.
+Tests: mocked positive/negative publication and render gates, native offline Helm render,
+existing repository production/static suites; exact PR/main CI is recorded separately.
+Rollback: revert preparation code; previously published candidates remain immutable,
+not installed or promoted. Installer, target runtime and recovery remain unfinished.
+
 بستهٔ کاری جاری: انتشار همان digest رسمی OpenBao به GHCR خصوصی، اسکن و امضای
 کاندیدا در workflow محافظت‌شدهٔ موجود. این کار ساخت مجدد upstream، نصب روی VPS،
 staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دامنهٔ نصب فعلی مالک
