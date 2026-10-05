@@ -106,6 +106,15 @@ class MeshPublicationTest(unittest.TestCase):
         self.assertEqual(3, sum(argv[0] == 'grype' and argv[1].startswith('sbom:') for argv in self.calls))
         self.assertFalse(any(argv[:2] == ['cosign', 'sign'] for argv in self.calls))
 
+    def test_visibility_change_during_signing_prevents_success_receipt(self):
+        def changed(argv, timeout=180):
+            if argv[:2] == ['cosign', 'sign']:
+                self.visibility = 'public'
+            return self.native(argv, timeout)
+        with patch.object(target, 'run', side_effect=changed), self.assertRaises(ValueError):
+            target.publish(self.directory, self.env)
+        self.assertFalse((self.directory / 'receipt.json').exists())
+
     def test_stale_database_wrong_architecture_and_empty_sbom_rejected(self):
         self.publish()
         folder = self.directory / 'istiod'

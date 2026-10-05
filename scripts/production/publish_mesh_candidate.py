@@ -132,6 +132,10 @@ def publish(directory: Path, env: dict):
         else:
             raise ValueError('wrong signer unexpectedly accepted')
         run(['cosign', 'verify', *flags, image])
+        package = 'hooshix%2Fplatform-istio-' + component + '-private'
+        if run(['gh', 'api', 'users/hasanjodatshandi/packages/container/' + package,
+                '--jq', '.visibility'], timeout=20).strip() != 'private':
+            raise ValueError('mesh package visibility changed during publication')
         results[component].update({'signature_provenance': 'Passed', 'wrong_signer': 'Passed',
                                    'registry_visibility': 'private', 'upstream_image': target['upstream']})
         results[component]['sha256'][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()

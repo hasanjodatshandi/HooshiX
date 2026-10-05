@@ -62,7 +62,8 @@ pipeline فقط از token موقت همان repository استفاده می‌ک
 قدیمی/نامعتبر، اسکن ناموفق، signer اشتباه یا provenance نامنطبق اجازهٔ receipt
 موفق نمی‌دهد. سه SBOM و provenance نوع `unchanged-upstream-import` با هویت
 دقیق workflow موجود امضا و دوباره بررسی می‌شوند؛ این ادعای ساخت upstream
-توسط HooshiX نیست. tag شامل digest و شناسهٔ اجرای CI است تا تلاش تازه، tag
+توسط HooshiX نیست. خصوصی‌بودن پس از امضا هم دوباره بررسی می‌شود؛ تغییر سطح
+دسترسی حین انتشار، receipt موفق را متوقف می‌کند. tag شامل digest و شناسهٔ اجرای CI است تا تلاش تازه، tag
 تلاش ناقص را overwrite نکند. digest ثابت می‌ماند؛ force و حذف package نداریم.
 
 artifact عمومی `mesh-publication-<run_id>-<attempt>` شامل اسکن‌ها، SBOMها،
