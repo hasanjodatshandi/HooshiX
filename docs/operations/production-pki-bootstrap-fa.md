@@ -96,6 +96,14 @@ Root فقط certificate عمومی است. stdout/stderr فرمان‌های nat
 وجود policy ممیزی به‌تنهایی خطا نیست؛ policy واقعی باید بررسی شود تا logging
 بدنهٔ Secret نشت ایجاد نکند. سیاستی که فقط Metadata را ثبت می‌کند نباید باعث
 توقف bootstrap شود؛ سیاست ناشناخته یا دارای ثبت بدنه همچنان قبل از ورود کلید رد می‌شود.
+ابزار فقط policy سراسری `rules: [{level: Metadata}]` را می‌پذیرد؛ حذف مرحلهٔ
+`ResponseComplete` یا `Panic` مجاز نیست. فایل پیش‌فرض K3s و drop-inهای مرتب‌شده
+با parser امنِ موجود سرور (`python3-yaml=6.0.3-1build1`) خوانده می‌شوند؛ نصب پکیج
+یا تغییر policy سرور انجام نمی‌شود. parser محدود به ۳۲KiB، ۵۱۲ node و عمق ۱۶
+است و alias، کلید تکراری و object سفارشی را رد می‌کند. argument مبهم/verbosity
+یا نسخهٔ متفاوت parser قبل از ورود رمز متوقف می‌شود. خطای قبلی
+`API_AUDIT_CONFIGURATION_REVIEW_REQUIRED` در همین VPS ناشی از رد کردن هر policy
+در ابزار قبلی بود، نه خرابی Root/CSR؛ گواهی موجود نیاز به ساخت یا امضای مجدد ندارد.
 OS audit سالم و K3s secrets encryption با hashهای منطبق در همان اجرا لازم‌اند.
 
 Secret موجود هرگز overwrite نمی‌شود. اجرای مجدد فقط Secret دقیقاً منطبق و با
@@ -143,6 +151,11 @@ Import transaction/concurrency: shared nonblocking custody lock; namespace/Secre
 Import remote edge: local sudo + K3s administrative identity; API request 10s/native 20s/process 600s; zero write retries; no fallback
 Import observability: content-free public receipt and fixed failure codes; no Secret body/crypto stderr output
 Import tests: synthetic native chain/key/constraints/hash/path failures plus mocked API create/reconciliation and diagnostic sanitization; final CI evidence belongs to PR #174
+
+Audit gate repair review: full-read against main@0ee21841d94abfbe5f36fe90b3c797df3ea919aa; same effective ADRs, no security waiver
+Audit gate repair: existing whole-request Metadata policy supported; config replacement/append ordering and parser/package integrity checked; audit remains enabled and unchanged
+Audit gate fixtures: realistic Metadata success, body logging/ambiguous arguments/duplicate keys/aliases/custom tags/parser drift/depth-size-node limits denied before password or Secret write; final exact-head CI evidence belongs to PR #175
+External authority: official K3s hardening guide API audit configuration and PyYAML SafeLoader documentation retrieved through Context7; existing signed Ubuntu parser used on VPS, hash-pinned CPython 3.12 wheel only on CI fixtures
 Import rollback: never overwrite existing Secret; keep encrypted host key/CSR; uncertain create requires read/reconcile, not deletion
 
 مراجع نسخه‌ای: [OpenSSL 3.5 PKCS#8](https://docs.openssl.org/3.5/man1/openssl-pkcs8/)،

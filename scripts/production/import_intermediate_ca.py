@@ -22,6 +22,7 @@ import bootstrap_intermediate_csr as custody
 PUBLIC_FILES = ('ca-cert.pem', 'cert-chain.pem', 'root-cert.pem', 'signing-receipt.json')
 LABELS = {'app.kubernetes.io/part-of': 'hooshix-platform',
           'app.kubernetes.io/managed-by': 'hooshix-pki-bootstrap'}
+YAML_PACKAGE = '6.0.3-1build1'
 
 
 def sha(content):
@@ -109,9 +110,68 @@ def validate_public(files, marker, work):
     return public_key
 
 
+def audit_yaml(content):
+    # Existing signed Ubuntu PyYAML; no package installation. Basic tags only.
+    import yaml
+    custody.require(yaml.__version__ == '6.0.3' and len(content) <= 32768,
+                    'API_AUDIT_PARSER_REVIEW_REQUIRED')
+
+    class AuditLoader(yaml.SafeLoader):
+        nodes = 0
+        depth = 0
+
+        def compose_node(self, parent, index):
+            self.nodes += 1
+            self.depth += 1
+            custody.require(self.nodes <= 512 and self.depth <= 16
+                            and not self.check_event(yaml.AliasEvent), 'API_AUDIT_YAML_REJECTED')
+            try:
+                return super().compose_node(parent, index)
+            finally:
+                self.depth -= 1
+
+        def construct_mapping(self, node, deep=False):
+            result = {}
+            for key_node, value_node in node.value:
+                custody.require(key_node.tag == 'tag:yaml.org,2002:str', 'API_AUDIT_YAML_REJECTED')
+                key = self.construct_object(key_node)
+                custody.require(key not in result, 'API_AUDIT_YAML_REJECTED')
+                result[key] = self.construct_object(value_node, deep=True)
+            return result
+
+    try:
+        result = yaml.load(content, Loader=AuditLoader)
+    except yaml.YAMLError:
+        raise custody.BootstrapFailed('API_AUDIT_YAML_REJECTED') from None
+    custody.require(isinstance(result, dict), 'API_AUDIT_YAML_REJECTED')
+    return result
+
+
+def audit_file(path):
+    custody.require(path.is_absolute(), 'API_AUDIT_PATH_REJECTED')
+    for parent in reversed(path.parents):
+        custody.protected(parent, directory=True)
+    custody.protected(path)
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), 'rb') as stream:
+        content = stream.read(32769)
+    return audit_yaml(content)
+
+
+def metadata_policy(policy):
+    # Deliberately support the whole-request Metadata policy, not arbitrary rule
+    # matching where ordering/resources/users could allow Secret body logging.
+    custody.require(set(policy) <= {'apiVersion', 'kind', 'rules', 'omitStages', 'omitManagedFields'}
+                    and policy.get('apiVersion') == 'audit.k8s.io/v1'
+                    and policy.get('kind') == 'Policy'
+                    and policy.get('rules') == [{'level': 'Metadata'}]
+                    and isinstance(policy.get('omitStages', []), list)
+                    and all(stage in ('RequestReceived', 'ResponseStarted')
+                            for stage in policy.get('omitStages', []))
+                    and isinstance(policy.get('omitManagedFields', False), bool),
+                    'API_AUDIT_POLICY_NOT_METADATA_ONLY')
+
+
 def audit_policy_preflight():
-    # K3s default has no API audit policy. Unknown/custom body logging must be reviewed
-    # before any Secret request; do not parse an arbitrary YAML policy permissively.
     pid = custody.native(['/usr/bin/systemctl', 'show', 'k3s.service', '-p', 'MainPID', '--value']).strip()
     custody.require(re.fullmatch(rb'[1-9][0-9]*', pid), 'CLUSTER_PROCESS_NOT_VERIFIED')
     proc = Path('/proc') / pid.decode()
@@ -119,6 +179,7 @@ def audit_policy_preflight():
     environment = (proc / 'environ').read_bytes()
     custody.require(len(command) <= 32768 and len(environment) <= 32768
                     and b'audit-policy-file' not in command
+                    and b'--kube-apiserver-arg' not in command
                     and b'--config' not in command
                     and not any(arg == b'-c' or arg.startswith(b'-c=') for arg in command.split(b'\0'))
                     and not any(entry.startswith((b'K3S_CONFIG_FILE=', b'K3S_KUBE_APISERVER_ARG='))
@@ -128,12 +189,39 @@ def audit_policy_preflight():
     paths = [config] if config.exists() or config.is_symlink() else []
     if dropins.exists() or dropins.is_symlink():
         custody.protected(dropins, directory=True)
-        paths += list(dropins.glob('*.yaml'))
+        paths += sorted(dropins.glob('*.yaml'))
     custody.require(len(paths) <= 16, 'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
+    if not paths:
+        return
+    custody.require(custody.native(['/usr/bin/dpkg-query', '-W', '-f=${Version}', 'python3-yaml'])
+                    .decode() == YAML_PACKAGE, 'API_AUDIT_PARSER_REVIEW_REQUIRED')
+    api_args = []
     for path in paths:
-        custody.protected(path)
-        custody.require(b'audit-policy-file' not in path.read_bytes(),
+        config = audit_file(path)
+        normal, append = 'kube-apiserver-arg', 'kube-apiserver-arg+'
+        custody.require(not (normal in config and append in config), 'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
+        if normal in config:
+            api_args = config[normal]
+        if append in config:
+            custody.require(isinstance(config[append], list) and isinstance(api_args, list),
+                            'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
+            api_args = api_args + config[append]
+        custody.require(isinstance(api_args, list) and len(api_args) <= 32
+                        and all(isinstance(arg, str) and len(arg) <= 2048
+                                and not any(ord(c) < 32 for c in arg) for arg in api_args),
                         'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
+    # Diagnostics at high verbosity can log bodies independently of API audit.
+    custody.require(not any(arg.lstrip('-').startswith(('v=', 'vmodule=')) for arg in api_args),
+                    'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
+    policies = [arg.split('=', 1)[1] for arg in api_args
+                if arg.split('=', 1)[0].lstrip('-') == 'audit-policy-file' and '=' in arg]
+    custody.require(len(policies) <= 1
+                    and not any(arg.lstrip('-').startswith('audit-policy-file')
+                                and not arg.lstrip('-').startswith('audit-policy-file=')
+                                for arg in api_args),
+                    'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
+    if policies:
+        metadata_policy(audit_file(Path(policies[0])))
 
 
 def kube(*args, body=None):
