@@ -10,10 +10,18 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 ## ترتیب اجرا و نقطهٔ ادامه
 
 ادامهٔ جاری ۲۰۲۶-۱۰-۰۵: مالک bootstrap محدود ADR-0030 را تأیید کرد. storage/guard
-و آزمون هدف قبلی دوباره اجرا نمی‌شوند. مسیر CSR رمزدار/امضای Root موجود در
-[راهنمای PKI](production-pki-bootstrap-fa.md) آماده می‌شود؛ فقط CSR عمومی خارج
-VPS می‌رود. نصب OpenBao هنوز تا PKI، mesh/GitOps/admission و commissioning
-واقعی `Not verified` است؛ تأیید bootstrap به‌تنهایی این gateها را عبور نمی‌دهد.
+و آزمون هدف قبلی دوباره اجرا نمی‌شوند. امضای Root موجود و import واقعی گواهی
+در `istio-system/cacerts` روی main@4a5a38ed2af15d38fde32eb5d792d50f59c2c0c2
+`Passed` شدند؛ receipt عمومی `INTERMEDIATE_IMPORTED` در ساعت
+`2026-10-05T16:32:07.336344+00:00`، encryption را `Passed`، حفظ کلید رمزدار host
+و آفلاین‌ماندن Root را تأیید می‌کند. Root/CSR دوباره ساخته نمی‌شوند.
+OpenBao هنوز **نصب نشده است**؛ موفقیت PKI، نصب یا سلامت OpenBao نیست.
+بستهٔ بعدی یک تغییر منسجم commissioning واقعی platform/OpenBao است؛ اسکریپت
+`scripts/platform/istio_install.sh` به context محلی kind محدود است و نباید به‌جای
+installer Production اجرا شود. CI شواهد نصب/خطا و bundle عمومی را بررسی می‌کند؛
+احراز هویت privileged و secrets فقط در پنجرهٔ محلی مالک می‌مانند. مراحل باقی‌مانده
+mesh/GitOps/admission، TLS سرور OpenBao، فعال‌سازی PV، init/unseal با custody سهم‌ها
+و بازیابی واقعی هستند؛ هیچ‌کدام با receipt قبلی `Passed` اعلام نمی‌شوند.
 
 بستهٔ کاری جاری: انتشار همان digest رسمی OpenBao به GHCR خصوصی، اسکن و امضای
 کاندیدا در workflow محافظت‌شدهٔ موجود. این کار ساخت مجدد upstream، نصب روی VPS،
