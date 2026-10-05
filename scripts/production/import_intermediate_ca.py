@@ -120,6 +120,7 @@ def audit_policy_preflight():
     custody.require(len(command) <= 32768 and len(environment) <= 32768
                     and b'audit-policy-file' not in command
                     and b'--config' not in command
+                    and not any(arg == b'-c' or arg.startswith(b'-c=') for arg in command.split(b'\0'))
                     and not any(entry.startswith((b'K3S_CONFIG_FILE=', b'K3S_KUBE_APISERVER_ARG='))
                                 for entry in environment.split(b'\0')), 'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
     config = Path('/etc/rancher/k3s/config.yaml')
@@ -128,6 +129,7 @@ def audit_policy_preflight():
     if dropins.exists() or dropins.is_symlink():
         custody.protected(dropins, directory=True)
         paths += list(dropins.glob('*.yaml'))
+    custody.require(len(paths) <= 16, 'API_AUDIT_CONFIGURATION_REVIEW_REQUIRED')
     for path in paths:
         custody.protected(path)
         custody.require(b'audit-policy-file' not in path.read_bytes(),

@@ -152,7 +152,7 @@ class IntermediateImportTest(unittest.TestCase):
                 target.ensure_secret({'ca-key.pem': self.private})
             self.assertEqual(3, kube.call_count)
 
-    def test_wrong_password_no_cluster_write_and_main_sanitizes_failure(self):
+    def test_wrong_password_and_main_sanitizes_failure(self):
         with self.assertRaisesRegex(custody.BootstrapFailed, '^NATIVE_OPERATION_FAILED$'):
             custody.native([custody.OPENSSL, 'pkey', '-in', str(self.state / 'ca-key.enc.pem'),
                             '-passin', 'stdin'], input_bytes=b'wrong-secret-password\n')
@@ -187,6 +187,7 @@ class IntermediateImportTest(unittest.TestCase):
         for command, environment, accepted in ((b'k3s\0server\0', b'PATH=x', True),
                 (b'k3s --audit-policy-file=x', b'', False),
                 (b'k3s --config custom.yaml', b'', False),
+                (b'k3s\0server\0-c\0custom.yaml', b'', False),
                 (b'k3s', b'K3S_CONFIG_FILE=x', False),
                 (b'k3s', b'K3S_KUBE_APISERVER_ARG=audit-policy-file=x', False)):
             with self.subTest(command=command, environment=environment), \
@@ -199,6 +200,20 @@ class IntermediateImportTest(unittest.TestCase):
                 else:
                     with self.assertRaisesRegex(custody.BootstrapFailed, 'API_AUDIT_CONFIGURATION'):
                         target.audit_policy_preflight()
+
+    def test_failed_import_password_never_reaches_secret_write(self):
+        with patch.object(custody, 'STATE', self.state), patch.object(custody, 'BASE', self.state), \
+                patch.object(custody, 'ROOT_SHA256', target.sha(self.root)), \
+                patch.object(custody, 'preflight'), patch.object(custody, 'protected'), \
+                patch.object(custody, 'public_receipt', return_value=self.marker), \
+                patch.object(target, 'audit_policy_preflight'), \
+                patch.object(target, 'read_public', return_value=self.files()), \
+                patch.object(target, 'open', return_value=io.BytesIO(), create=True), \
+                patch.object(target.getpass, 'getpass', return_value='wrong-password-never-output'), \
+                patch.object(target, 'ensure_secret') as secret:
+            with self.assertRaisesRegex(custody.BootstrapFailed, '^NATIVE_OPERATION_FAILED$'):
+                target.execute('a' * 40, Path('/home/hooshixadmin/.cache/hooshix-ca-import-' + 'a' * 32 + '/public'))
+            secret.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -149,3 +149,7 @@ Import rollback: never overwrite existing Secret; keep encrypted host key/CSR; u
 [Istio plug-in CA](https://istio.io/latest/docs/tasks/security/cert-management/plugin-ca-cert/).
 Context7 و مستندات رسمی برای این رفتار بررسی شدند؛ مصدر نسخهٔ Ubuntu موجود
 `openssl`/`libssl3t64:amd64` برابر `3.5.5-1ubuntu3.7` است، نه مجوز upgrade خودکار.
+برای import، رفتار config/drop-in و گزینه‌های audit با Context7 و
+[مستندات رسمی K3s](https://docs.k3s.io/installation/configuration) و
+[hardening guide](https://docs.k3s.io/security/hardening-guide#api-server-audit-configuration)
+بررسی شده است؛ policy سفارشی ناشناخته قبل از ارسال Secret پذیرفته نمی‌شود.
