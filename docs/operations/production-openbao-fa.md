@@ -10,10 +10,88 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 ## ترتیب اجرا و نقطهٔ ادامه
 
 ادامهٔ جاری ۲۰۲۶-۱۰-۰۵: مالک bootstrap محدود ADR-0030 را تأیید کرد. storage/guard
-و آزمون هدف قبلی دوباره اجرا نمی‌شوند. مسیر CSR رمزدار/امضای Root موجود در
-[راهنمای PKI](production-pki-bootstrap-fa.md) آماده می‌شود؛ فقط CSR عمومی خارج
-VPS می‌رود. نصب OpenBao هنوز تا PKI، mesh/GitOps/admission و commissioning
-واقعی `Not verified` است؛ تأیید bootstrap به‌تنهایی این gateها را عبور نمی‌دهد.
+و آزمون هدف قبلی دوباره اجرا نمی‌شوند. امضای Root موجود و import واقعی گواهی
+در `istio-system/cacerts` روی main@4a5a38ed2af15d38fde32eb5d792d50f59c2c0c2
+`Passed` شدند؛ receipt عمومی `INTERMEDIATE_IMPORTED` در ساعت
+`2026-10-05T16:32:07.336344+00:00`، encryption را `Passed`، حفظ کلید رمزدار host
+و آفلاین‌ماندن Root را تأیید می‌کند. Root/CSR دوباره ساخته نمی‌شوند.
+OpenBao هنوز **نصب نشده است**؛ موفقیت PKI، نصب یا سلامت OpenBao نیست.
+بستهٔ بعدی یک تغییر منسجم commissioning واقعی platform/OpenBao است؛ اسکریپت
+`scripts/platform/istio_install.sh` به context محلی kind محدود است و نباید به‌جای
+installer Production اجرا شود. CI شواهد نصب/خطا و bundle عمومی را بررسی می‌کند؛
+احراز هویت privileged و secrets فقط در پنجرهٔ محلی مالک می‌مانند. مراحل باقی‌مانده
+mesh/GitOps/admission، TLS سرور OpenBao، فعال‌سازی PV، init/unseal با custody سهم‌ها
+و بازیابی واقعی هستند؛ هیچ‌کدام با receipt قبلی `Passed` اعلام نمی‌شوند.
+
+### آماده‌سازی خودکار manifest شبکهٔ سرویس
+
+در PR جاری، `Repository baseline` با Helm دقیق 4.2.4 و chartهای vendored
+دارای checksum، manifest عمومی Istio 1.30.3 را برای K3s 1.35.6 می‌سازد.
+artifact با نام `mesh-commissioning-candidate-<run_id>-<attempt>` هفت روز
+نگهداری می‌شود. این job به VPS یا کلیدهای شما دسترسی ندارد و نصب انجام نمی‌دهد.
+ابزار محلی معادل `python3 scripts/production/render_mesh_candidate.py` است؛
+خروجی آن را مستقیم روی سرور apply نکنید.
+
+manifest شامل base، istiod، CNI و ztunnel با سه image digest دقیق، منابع محدود
+و یک نمونهٔ control plane است. mount گواهی موجود `cacerts` اجباری است؛
+نبود آن اجازهٔ ساخت خودکار CA تازه نمی‌دهد. مسیرهای CNI مطابق مستندات K3s
+انتخاب شده‌اند، اما باید با نصب واقعی Calico روی VPS تطبیق داده شوند.
+موفقیت render یا آزمون واحد، admission، ارتباط mTLS، آماده‌بودن workload یا
+نصب OpenBao را اثبات نمی‌کند. استثناهای محدود control-plane و مرحلهٔ نصب
+همچنان باید در همین تغییر بازبینی و آزمایش شوند؛ pipeline چیزی را مستقر نمی‌کند.
+
+مالک امنیت در ۲۰۲۶-۱۰-۰۵ استثنای سطح سیستم را فقط برای `istio-cni` و
+`ztunnel` تأیید کرد. محدودهٔ دقیق در بخش «Narrow network-node exception»
+از `docs/architecture/runtime-and-deployment.md` ثبت شده است. renderer اضافه‌شدن
+container، host namespace، capability یا host mount خارج از این محدوده را رد
+می‌کند. این تأیید و آزمون render جای سیاست blocking واقعی Kubernetes را
+نمی‌گیرند؛ تا نصب و آزمون آن سیاست، برچسب امنیتی namespace ضعیف نمی‌شود.
+
+### انتشار دسته‌ای سه تصویر mesh
+
+در workflow موجود **Production release evidence**، حالت `mesh-candidate`
+سه digest Linux/amd64 مربوط به Istio 1.30.3 در `infrastructure/istio/pins.env`
+را بدون rebuild به این بسته‌های خصوصی منتقل می‌کند:
+
+- `hooshix/platform-istio-istiod-private`
+- `hooshix/platform-istio-cni-private`
+- `hooshix/platform-istio-ztunnel-private`
+
+این حالت فقط از main با baseline موفق همان SHA و environment موجود
+`production-release` اجرا می‌شود. مالک در GitHub ← Actions این workflow را
+با `release_kind=mesh-candidate` و branch `main` اجرا می‌کند؛ فیلد manifest
+برای کاندیدا خالی است. اگر environment درخواست approval داشت، همان اجرای
+main را بررسی و approve کنید. کلید VPS/Root/PAT در CI قرار نمی‌گیرد.
+
+pipeline فقط از token موقت همان repository استفاده می‌کند. خصوصی‌بودن واقعی
+هر package، digest، معماری، SBOM غیرخالی و اسکن تازه با نبود High/Critical
+باید برای هر سه تصویر موفق باشد؛ سپس امضا آغاز می‌شود. registry عمومی، DB
+قدیمی/نامعتبر، اسکن ناموفق، signer اشتباه یا provenance نامنطبق اجازهٔ receipt
+موفق نمی‌دهد. سه SBOM و provenance نوع `unchanged-upstream-import` با هویت
+دقیق workflow موجود امضا و دوباره بررسی می‌شوند؛ این ادعای ساخت upstream
+توسط HooshiX نیست. خصوصی‌بودن پس از امضا هم دوباره بررسی می‌شود؛ تغییر سطح
+دسترسی حین انتشار، receipt موفق را متوقف می‌کند. tag شامل digest و شناسهٔ اجرای CI است تا تلاش تازه، tag
+تلاش ناقص را overwrite نکند. digest ثابت می‌ماند؛ force و حذف package نداریم.
+
+artifact عمومی `mesh-publication-<run_id>-<attempt>` شامل اسکن‌ها، SBOMها،
+provenance و فقط در موفقیت کامل `receipt.json` است؛ `attempt.json` فقط شروع
+تلاش را نشان می‌دهد. token موقت در cleanup پاک می‌شود. نصب، staging واقعی،
+admission هدف، promotion و آماده‌بودن OpenBao با این انتشار تأیید نمی‌شوند.
+renderer عمومی هنوز image upstream را نشان می‌دهد؛ جایگزینی mirror در نصب
+باید از receipt معتبر و بازبینی deployment مشتق شود، نه از نام package.
+
+Architecture review mode: full-read. Owning decisions: ADR-0002/0011/0017/0030/0045.
+Scope: public mesh render/import evidence and owner-approved narrow node privilege
+contract only; versions and existing OpenBao/application
+release contracts unchanged. Remote edge: protected CI to fixed vendor/GHCR registries;
+exact identity, finite native/job deadlines, serial three-component execution, no retry,
+no force/overwrite, fail-closed validation, public allow-list diagnostics. No database,
+business transaction, Kafka, tenant/PII, production host or namespace changes. The network
+exception is explicit current guidance; its runtime admission enforcement remains pending.
+Tests: mocked positive/negative publication and render gates, native offline Helm render,
+existing repository production/static suites; exact PR/main CI is recorded separately.
+Rollback: revert preparation code; previously published candidates remain immutable,
+not installed or promoted. Installer, target runtime and recovery remain unfinished.
 
 بستهٔ کاری جاری: انتشار همان digest رسمی OpenBao به GHCR خصوصی، اسکن و امضای
 کاندیدا در workflow محافظت‌شدهٔ موجود. این کار ساخت مجدد upstream، نصب روی VPS،

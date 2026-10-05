@@ -25,7 +25,8 @@ BOUND = 8 * 1024 * 1024
 STEPS = frozenset({"image-pull", "image-version", "tls-fixture", "source-start", "source-health",
                    "tls-negative", "source-init", "kv-and-acl", "snapshot", "restart", "restart-read",
                    "restore-start", "restore-init", "snapshot-restore", "restore-read",
-                   "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed"})
+                   "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed",
+                   "kv-mount", "kv-write", "acl-policy", "acl-token", "acl-write-denied"})
 
 
 class RehearsalFailed(Exception):
@@ -204,13 +205,18 @@ def rehearse():
             cli_probe(ALIVE, 0)
             cli_probe(STATUS, 0)
             step("kv-and-acl")
+            step("kv-mount")
             client.call("sys/mounts/fixture", "POST", {"type": "kv", "options": {"version": "2"}}, root_token, 204)
             canary = "ci-only-" + uuid.uuid4().hex
+            step("kv-write")
             client.call("fixture/data/audit", "POST", {"data": {"value": canary}}, root_token)
+            step("acl-policy")
             client.call("sys/policies/acl/audit-reader", "PUT", {"policy":
                 'path "fixture/data/audit" { capabilities = ["read"] }'}, root_token, 204)
+            step("acl-token")
             reader = client.call("auth/token/create", "POST", {"policies": ["audit-reader"],
                 "no_default_policy": True, "ttl": "5m", "explicit_max_ttl": "5m"}, root_token)["auth"]["client_token"]
+            step("acl-write-denied")
             client.call("fixture/data/audit", "POST", {"data": {"value": "must-not-write"}}, reader, 403)
             step("snapshot")
             snapshot = client.call("sys/storage/raft/snapshot", token=root_token, raw=True)
