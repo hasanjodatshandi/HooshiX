@@ -54,6 +54,7 @@ This matrix records production technology combinations that must remain compatib
 | Caddy/Coraza/CRS | 2.11.4 / 3.7.0 / 4.25.1 LTS | coraza-caddy 2.5.0 with repository safe-rule-logging patch; combined image/rules, opaque-cookie and log-privacy tests |
 | Argo CD | 3.4.2 | security-patched line; reconciliation/rollback validation |
 | Current VPS intermediate CSR bootstrap | Ubuntu 26.04 amd64; `openssl`/`libssl3t64:amd64` `3.5.5-1ubuntu3.7` | ADR-0030 limited local-sudo commissioning; RSA-4096 CSR, encrypted PKCS#8 AES-256/PBKDF2-HMAC-SHA256, offline existing Root signature; no package change or workload installation |
+| Current VPS intermediate import audit gate | Ubuntu `python3-yaml` 6.0.3-1build1 / PyYAML 6.0.3 already installed | fixed default K3s config/drop-in order; bounded safe YAML; globally Metadata-only audit accepted; body logging, ambiguous selectors, parser drift and unsafe YAML denied before key entry |
 
 Trivy and OWASP Dependency-Check are not current baseline components. Under ADR-0045 they are reconsidered only if a distinct coverage gap is evidenced and the compatibility/ownership/exception model is reviewed.
 

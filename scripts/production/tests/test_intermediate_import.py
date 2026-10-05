@@ -14,6 +14,98 @@ import bootstrap_intermediate_csr as custody
 import import_intermediate_ca as target
 
 
+class AuditPolicyTest(unittest.TestCase):
+    policy = b'apiVersion: audit.k8s.io/v1\nkind: Policy\nomitStages: [RequestReceived]\nrules:\n- level: Metadata\n'
+    original_preflight = staticmethod(target.audit_policy_preflight)
+
+    def preflight(self, configs, policy=None, package=None):
+        default = '/etc/rancher/k3s/config.yaml'
+        dropins = '/etc/rancher/k3s/config.yaml.d'
+        files = {default: configs[0]}
+        files.update({dropins + '/' + name: content for name, content in configs[1:]})
+        files['/etc/rancher/k3s/audit.yaml'] = self.policy if policy is None else policy
+        with patch.object(custody, 'native', side_effect=[b'123\n',
+                         (target.YAML_PACKAGE if package is None else package).encode()]), \
+                patch.object(Path, 'read_bytes', side_effect=[b'k3s\0server\0', b'PATH=/usr/bin']), \
+                patch.object(Path, 'exists', lambda p: str(p) == default
+                             or (str(p) == dropins and len(configs) > 1)), \
+                patch.object(Path, 'is_symlink', return_value=False), \
+                patch.object(Path, 'glob', return_value=[Path(dropins + '/' + name)
+                             for name, _ in reversed(configs[1:])]), \
+                patch.object(custody, 'protected'), \
+                patch.object(target, 'audit_file', side_effect=lambda p: target.audit_yaml(files[str(p)])):
+            self.original_preflight()
+
+    def test_existing_global_metadata_policy_is_supported(self):
+        target.metadata_policy(target.audit_yaml(self.policy))
+        self.preflight([b'kube-apiserver-arg:\n- audit-policy-file=/etc/rancher/k3s/audit.yaml\n- audit-log-maxbackup=10\n'])
+
+    def test_dropin_replace_and_append_in_sorted_order(self):
+        self.preflight([b'kube-apiserver-arg: [audit-policy-file=/unreviewed]\n',
+                        ('20-append.yaml', b'kube-apiserver-arg+: [audit-log-maxbackup=10]\n'),
+                        ('10-replace.yaml', b'kube-apiserver-arg: [audit-policy-file=/etc/rancher/k3s/audit.yaml]\n')])
+
+    def test_unsafe_yaml_shapes_bounds_and_parser_drift_rejected(self):
+        for content in (b'kind: Policy\nkind: Other\n', b'a: &x [1]\nb: *x\n',
+                        b'a: !!python/object/apply:os.system [echo]\n', b'1: value\n',
+                        b'a: x\n---\nb: y\n', b'[]', b'a: [' + b'[' * 17 + b']' * 17 + b']',
+                        b'a: [' + b'0,' * 600 + b']', b'a: ' + b'x' * 32768):
+            with self.subTest(content=content[:60]), self.assertRaises(custody.BootstrapFailed):
+                target.audit_yaml(content)
+        import yaml
+        with patch.object(yaml, '__version__', 'unreviewed'), self.assertRaises(custody.BootstrapFailed):
+            target.audit_yaml(self.policy)
+        with self.assertRaisesRegex(custody.BootstrapFailed, 'PARSER_REVIEW_REQUIRED'):
+            self.preflight([b'kube-apiserver-arg: []\n'], package='unreviewed')
+
+    def test_body_logging_selectors_and_missing_completion_audit_rejected(self):
+        safe = target.audit_yaml(self.policy)
+        for policy in (safe | {'rules': [{'level': level}]} for level in ('None', 'Request', 'RequestResponse')):
+            with self.subTest(policy=policy), self.assertRaises(custody.BootstrapFailed):
+                target.metadata_policy(policy)
+        for change in ({'rules': [{'level': 'Metadata', 'users': ['operator']}]},
+                       {'rules': [{'level': 'Metadata'}, {'level': 'Request'}]},
+                       {'omitStages': ['ResponseComplete']}, {'omitStages': ['Panic']},
+                       {'omitStages': 'RequestReceived'}, {'omitManagedFields': 'yes'},
+                       {'unknown': True}, {'kind': 'Other'}):
+            with self.subTest(change=change), self.assertRaises(custody.BootstrapFailed):
+                target.metadata_policy(safe | change)
+
+    def test_ambiguous_args_and_verbose_body_diagnostics_rejected(self):
+        for args in ('[audit-policy-file=x, audit-policy-file=y]', '[audit-policy-file]',
+                     '[audit-policy-file x]', '[v=9]', '[--vmodule=x=9]', '[7]', 'null'):
+            with self.subTest(args=args), self.assertRaises(custody.BootstrapFailed):
+                self.preflight([('kube-apiserver-arg: ' + args + '\n').encode()])
+        with self.assertRaises(custody.BootstrapFailed):
+            self.preflight([b'kube-apiserver-arg: []\nkube-apiserver-arg+: []\n'])
+
+    def test_unsafe_policy_blocks_before_password_and_secret_write(self):
+        with patch.object(custody, 'preflight'), \
+                patch.object(target, 'audit_policy_preflight', side_effect=lambda: self.preflight(
+                    [b'kube-apiserver-arg: [audit-policy-file=/etc/rancher/k3s/audit.yaml]\n'],
+                    self.policy.replace(b'Metadata', b'RequestResponse'))), \
+                patch.object(target.getpass, 'getpass') as password, \
+                patch.object(target, 'ensure_secret') as secret:
+            with self.assertRaisesRegex(custody.BootstrapFailed, 'NOT_METADATA_ONLY'):
+                target.execute('a' * 40, Path('/home/hooshixadmin/.cache/hooshix-ca-import-' + 'a' * 32 + '/public'))
+            password.assert_not_called()
+            secret.assert_not_called()
+
+    def test_policy_file_requires_absolute_root_protected_path(self):
+        with self.assertRaisesRegex(custody.BootstrapFailed, 'PATH_REJECTED'):
+            target.audit_file(Path('relative.yaml'))
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / 'policy.yaml'
+            path.write_bytes(self.policy)
+            with patch.object(custody, 'protected') as protected:
+                self.assertEqual('Policy', target.audit_file(path)['kind'])
+                self.assertEqual(len(path.parents) + 1, protected.call_count)
+            path.unlink()
+            path.symlink_to(Path(name) / 'missing')
+            with patch.object(custody, 'protected'), self.assertRaises(OSError):
+                target.audit_file(path)
+
+
 class IntermediateImportTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
