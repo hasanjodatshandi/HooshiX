@@ -527,6 +527,7 @@ scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
+scripts/production/render_mesh_candidate.py
 scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
 scripts/production/rollback_human_sshd_candidate.sh
@@ -545,6 +546,7 @@ scripts/production/tests/test_intermediate_csr.py
 scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
+scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py

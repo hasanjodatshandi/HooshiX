@@ -23,6 +23,23 @@ installer Production اجرا شود. CI شواهد نصب/خطا و bundle عم
 mesh/GitOps/admission، TLS سرور OpenBao، فعال‌سازی PV، init/unseal با custody سهم‌ها
 و بازیابی واقعی هستند؛ هیچ‌کدام با receipt قبلی `Passed` اعلام نمی‌شوند.
 
+### آماده‌سازی خودکار manifest شبکهٔ سرویس
+
+در PR جاری، `Repository baseline` با Helm دقیق 4.2.4 و chartهای vendored
+دارای checksum، manifest عمومی Istio 1.30.3 را برای K3s 1.35.6 می‌سازد.
+artifact با نام `mesh-commissioning-candidate-<run_id>-<attempt>` هفت روز
+نگهداری می‌شود. این job به VPS یا کلیدهای شما دسترسی ندارد و نصب انجام نمی‌دهد.
+ابزار محلی معادل `python3 scripts/production/render_mesh_candidate.py` است؛
+خروجی آن را مستقیم روی سرور apply نکنید.
+
+manifest شامل base، istiod، CNI و ztunnel با سه image digest دقیق، منابع محدود
+و یک نمونهٔ control plane است. mount گواهی موجود `cacerts` اجباری است؛
+نبود آن اجازهٔ ساخت خودکار CA تازه نمی‌دهد. مسیرهای CNI مطابق مستندات K3s
+انتخاب شده‌اند، اما باید با نصب واقعی Calico روی VPS تطبیق داده شوند.
+موفقیت render یا آزمون واحد، admission، ارتباط mTLS، آماده‌بودن workload یا
+نصب OpenBao را اثبات نمی‌کند. استثناهای محدود control-plane و مرحلهٔ نصب
+همچنان باید در همین تغییر بازبینی و آزمایش شوند؛ pipeline چیزی را مستقر نمی‌کند.
+
 بستهٔ کاری جاری: انتشار همان digest رسمی OpenBao به GHCR خصوصی، اسکن و امضای
 کاندیدا در workflow محافظت‌شدهٔ موجود. این کار ساخت مجدد upstream، نصب روی VPS،
 staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دامنهٔ نصب فعلی مالک

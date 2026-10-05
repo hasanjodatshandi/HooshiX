@@ -83,6 +83,27 @@ jobs:
       - name: Verify production
         run: make production-verify
 
+      - name: Render pinned K3s mesh commissioning candidate without cluster writes
+        run: |
+          set -euo pipefail
+          mesh_tools=$(mktemp -d "$RUNNER_TEMP/mesh-tools.XXXXXXXX")
+          trap 'rm -rf -- "$mesh_tools"' EXIT
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
+            https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz -o "$mesh_tools/helm.tar.gz"
+          printf '%s  %s\n' c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 \
+            "$mesh_tools/helm.tar.gz" | sha256sum --check --strict
+          tar -xzf "$mesh_tools/helm.tar.gz" -C "$mesh_tools" linux-amd64/helm
+          PATH="$mesh_tools/linux-amd64:$PATH" python3 scripts/production/render_mesh_candidate.py \
+            > "$RUNNER_TEMP/mesh-commissioning-candidate.json"
+
+      - name: Retain public mesh candidate only, no deployment approval
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mesh-commissioning-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mesh-commissioning-candidate.json
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Render isolated OpenBao candidate without secrets or cluster access
         run: python3 scripts/production/render_openbao_candidate.py --candidate --storage-class ci-review-only > /dev/null
 
