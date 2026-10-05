@@ -31,6 +31,7 @@ Offline Root CA
 - intermediate lifetime: one year;
 - intermediate rotation begins 90 days before expiry with >=30-day overlap;
 - intermediate private key exists only in the tightly controlled `istio-system` trust boundary and is encrypted at rest;
+- initial supervised, encrypted VPS custody before `cacerts` import is limited to the owner-approved commissioning exception in ADR-0030; only the public CSR goes to the offline Root;
 - workload certificate TTL: 24 hours with automatic rotation.
 
 ### Enrollment

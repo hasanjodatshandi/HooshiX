@@ -111,6 +111,12 @@ Stage 9 is complete. The owner explicitly reactivated the final application mile
 Production Commissioning & Readiness (Engineering Hardening Stage 10, IN PROGRESS)
 ```
 
+Owner-approved limited commissioning bootstrap is recorded in ADR-0030 on 2026-10-05.
+Continue with the [encrypted intermediate CSR/public offline-signing handoff](../operations/production-pki-bootstrap-fa.md),
+then reviewed mesh/GitOps/OpenBao installation. Do not repeat passed native storage
+guard/reboot/fault tests or regenerate the accepted Root. CSR preparation is not
+workload installation or a Production-traffic approval.
+
 Stage 9's completion boundary and interruption-safe evidence are owned by ADR-0054, ADR-0057,
 `services/conversation-service.md`, and `ENGINEERING-HARDENING-ROADMAP.md`. Stage 9 completed from
 base `9f0a811f78006f76c25d95b4499d4dfc868ba5aa`; the exact exercised runtime commit was

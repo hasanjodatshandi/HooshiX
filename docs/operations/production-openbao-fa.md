@@ -9,6 +9,12 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 
 ## ترتیب اجرا و نقطهٔ ادامه
 
+ادامهٔ جاری ۲۰۲۶-۱۰-۰۵: مالک bootstrap محدود ADR-0030 را تأیید کرد. storage/guard
+و آزمون هدف قبلی دوباره اجرا نمی‌شوند. مسیر CSR رمزدار/امضای Root موجود در
+[راهنمای PKI](production-pki-bootstrap-fa.md) آماده می‌شود؛ فقط CSR عمومی خارج
+VPS می‌رود. نصب OpenBao هنوز تا PKI، mesh/GitOps/admission و commissioning
+واقعی `Not verified` است؛ تأیید bootstrap به‌تنهایی این gateها را عبور نمی‌دهد.
+
 بستهٔ کاری جاری: انتشار همان digest رسمی OpenBao به GHCR خصوصی، اسکن و امضای
 کاندیدا در workflow محافظت‌شدهٔ موجود. این کار ساخت مجدد upstream، نصب روی VPS،
 staging مصوب، تحویل Shamir یا اجازهٔ Production نیست. دامنهٔ نصب فعلی مالک
