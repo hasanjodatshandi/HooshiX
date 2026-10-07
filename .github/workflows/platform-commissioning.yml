@@ -56,13 +56,13 @@ jobs:
           set -euo pipefail
           source infrastructure/kind/pins.env
           install -d -m 0700 "$RUNNER_TEMP/platform-tools"
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 90 \
+          curl --fail --location --max-redirs 5 --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 \
             "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-linux-amd64" \
             -o "$RUNNER_TEMP/platform-tools/kind"
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 90 \
+          curl --fail --location --max-redirs 5 --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 \
             "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
             -o "$RUNNER_TEMP/platform-tools/kubectl"
-          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 90 \
+          curl --fail --location --max-redirs 5 --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 \
             https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz -o "$RUNNER_TEMP/platform-tools/helm.tar.gz"
           printf '%s  %s\n' "$KIND_LINUX_AMD64_SHA256" "$RUNNER_TEMP/platform-tools/kind" \
             "$KUBECTL_LINUX_AMD64_SHA256" "$RUNNER_TEMP/platform-tools/kubectl" \
