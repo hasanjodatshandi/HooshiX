@@ -57,7 +57,8 @@ class MeshPublicationTest(unittest.TestCase):
         return ''
 
     def publish(self):
-        with patch.object(target, 'run', side_effect=self.native):
+        with patch.object(target, 'run', side_effect=self.native), \
+                patch.object(target, 'repair_owned_import', return_value='Preserved'):
             return target.publish(self.directory, self.env)
 
     def test_three_private_same_digest_imports_all_scanned_before_any_signing(self):
@@ -75,6 +76,7 @@ class MeshPublicationTest(unittest.TestCase):
             if argv[:2] == ['cosign', 'copy']:
                 self.assertNotIn('-f', argv)
                 self.assertNotIn('--platform', argv)
+                self.assertEqual(['--attachment-tag-prefix', 'import-'], argv[2:4])
                 self.assertTrue(argv[-1].endswith('-123-2'))
         self.assertEqual(0o700, self.directory.stat().st_mode & 0o777)
 
@@ -160,7 +162,8 @@ class MeshPublicationTest(unittest.TestCase):
             if argv[:2] == ['cosign', 'sign']:
                 self.visibility = 'public'
             return self.native(argv, timeout)
-        with patch.object(target, 'run', side_effect=changed), self.assertRaises(ValueError):
+        with patch.object(target, 'run', side_effect=changed), \
+                patch.object(target, 'repair_owned_import', return_value='Preserved'), self.assertRaises(ValueError):
             target.publish(self.directory, self.env)
         self.assertFalse((self.directory / 'receipt.json').exists())
 
@@ -192,9 +195,18 @@ class MeshPublicationTest(unittest.TestCase):
                 if argv[1] == tool:
                     raise subprocess.CalledProcessError(1, argv, stderr='synthetic private error')
                 return self.native(argv, timeout)
-            with patch.object(target, 'run', side_effect=failed), self.assertRaises(subprocess.CalledProcessError):
+            with patch.object(target, 'run', side_effect=failed), \
+                    patch.object(target, 'repair_owned_import', return_value='Preserved'), self.assertRaises(subprocess.CalledProcessError):
                 target.publish(self.directory, self.env)
             self.assertFalse((self.directory / 'receipt.json').exists())
+
+    def test_referrer_repair_failure_blocks_signing_and_success_receipt(self):
+        with patch.object(target, 'run', side_effect=self.native), \
+                patch.object(target, 'repair_owned_import', side_effect=ValueError('unreviewed alias')), \
+                self.assertRaises(ValueError):
+            target.publish(self.directory, self.env)
+        self.assertFalse(any(argv[:2] == ['cosign', 'sign'] for argv in self.calls))
+        self.assertFalse((self.directory / 'receipt.json').exists())
 
     def test_threshold_failure_preserves_public_json_and_never_signs(self):
         report = json.dumps({'matches': [{'vulnerability': {'severity': 'High'}}]})

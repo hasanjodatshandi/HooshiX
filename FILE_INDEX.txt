@@ -527,6 +527,7 @@ scripts/production/provision_openbao_storage.py
 scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/readiness.py
+scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
@@ -535,6 +536,7 @@ scripts/production/render_gitops.py
 scripts/production/render_mesh_candidate.py
 scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
+scripts/production/repair_import_referrers.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-guard-maintenance.ps1
@@ -545,6 +547,7 @@ scripts/production/run-openbao-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/tests/test_ghcr_release.py
 scripts/production/tests/test_host_audit_policy.py
+scripts/production/tests/test_import_referrers.py
 scripts/production/tests/test_inspect_host.py
 scripts/production/tests/test_install_audit_prerequisite.py
 scripts/production/tests/test_intermediate_csr.py

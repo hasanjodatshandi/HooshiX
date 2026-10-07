@@ -71,7 +71,8 @@ class OpenBaoPublicationTest(unittest.TestCase):
         return ""
 
     def publish(self):
-        with patch.object(publisher, "run", side_effect=self.mock_run):
+        with patch.object(publisher, "run", side_effect=self.mock_run), \
+                patch.object(publisher, "repair_owned_import", return_value="Preserved"):
             return publisher.publish(self.directory, self.env)
 
     def assert_not_signed(self):
@@ -89,7 +90,7 @@ class OpenBaoPublicationTest(unittest.TestCase):
         for key in ("deployment", "runtime_admission", "staging", "production_promotion", "upstream_build_provenance"):
             self.assertEqual("Not verified", receipt[key])
         copy_call = next(argv for argv in self.calls if argv[:2] == ["cosign", "copy"])
-        self.assertEqual(["cosign", "copy", self.pin["image"],
+        self.assertEqual(["cosign", "copy", "--attachment-tag-prefix", "import-", self.pin["image"],
                           publisher.REPOSITORY + ":candidate-" + self.digest], copy_call)
         self.assertNotIn("-f", copy_call)
         self.assertLess(self.calls.index(next(argv for argv in self.calls if argv[0] == "gh")),
@@ -149,7 +150,8 @@ class OpenBaoPublicationTest(unittest.TestCase):
             if argv[:2] == ["cosign", "verify"] and any(value.endswith(".wrong") for value in argv):
                 return "unexpected success"
             return self.mock_run(argv, timeout)
-        with patch.object(publisher, "run", side_effect=wrong_signer), self.assertRaises(ValueError):
+        with patch.object(publisher, "run", side_effect=wrong_signer), \
+                patch.object(publisher, "repair_owned_import", return_value="Preserved"), self.assertRaises(ValueError):
             publisher.publish(self.directory, self.env)
         self.assertFalse((self.directory / "receipt.json").exists())
 
@@ -177,6 +179,7 @@ class OpenBaoPublicationTest(unittest.TestCase):
         for message, category in (("specified reference is not a multiarch image", "single-manifest-platform-selection"),
                                   ("UNAUTHORIZED", "registry-unauthorized"), ("DENIED", "registry-denied"),
                                   ("already exists. Use `-f`", "destination-conflict"),
+                                  ("fallback tag manifest is not an OCI image index", "referrer-alias-conflict"),
                                   ("other native error", "tool-error")):
             output = io.StringIO()
             error = subprocess.CalledProcessError(1, ["cosign", "copy", "synthetic-private-argv"],

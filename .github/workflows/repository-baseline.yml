@@ -207,6 +207,8 @@ jobs:
           set -euo pipefail
           scripts/production/install_release_tools.sh "$RUNNER_TEMP/mesh-tools"
           echo "$RUNNER_TEMP/mesh-tools" >> "$GITHUB_PATH"
+      - name: Verify native Cosign import and referrer contract on synthetic loopback registry
+        run: python3 scripts/production/rehearse_import_referrers.py
       - name: Require fresh scans of all three exact public upstream imports
         run: |
           set -euo pipefail

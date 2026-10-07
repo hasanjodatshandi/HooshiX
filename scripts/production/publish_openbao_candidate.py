@@ -14,6 +14,7 @@ from pathlib import Path
 
 import verify_openbao_artifact as artifact
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
+from repair_import_referrers import repair_owned_import
 
 REPOSITORY = "ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private"
 PACKAGE_API = "users/hasanjodatshandi/packages/container/hooshix%2Fplatform-openbao-private"
@@ -29,6 +30,7 @@ def run(argv: list[str], timeout: int = 180) -> str:
         reason = "tool-error"
         for needle, category in (("specified reference is not a multiarch image", "single-manifest-platform-selection"),
                                  ("UNAUTHORIZED", "registry-unauthorized"), ("DENIED", "registry-denied"),
+                                 ("fallback tag manifest is not an OCI image index", "referrer-alias-conflict"),
                                  ("already exists. Use `-f`", "destination-conflict")):
             if needle in (error.stderr or ""):
                 reason = category
@@ -107,7 +109,7 @@ def publish(directory: Path, env: dict[str, str]) -> dict:
     stage("copy")
     # The pin is already the single linux/amd64 manifest, not its multiarch index.
     # Cosign 3.0.6 --platform only accepts indexes; destination scan verifies architecture.
-    run(["cosign", "copy", pin["image"], tag], timeout=300)
+    run(["cosign", "copy", "--attachment-tag-prefix", "import-", pin["image"], tag], timeout=300)
     stage("private-package")
     if run(["gh", "api", PACKAGE_API, "--jq", ".visibility"], timeout=20).strip() != "private":
         raise ValueError("owned package must be private before signing")
@@ -124,6 +126,7 @@ def publish(directory: Path, env: dict[str, str]) -> dict:
     path = directory / "import-provenance.json"
     path.write_text(json.dumps(predicate, sort_keys=True) + "\n")
     stage("sign-attest")
+    print("OPENBAO_REFERRER_ALIAS=" + repair_owned_import(image), flush=True)
     run(["cosign", "sign", "--yes", image])
     for kind, filename in (("slsaprovenance1", path), ("cyclonedx", directory / "cyclonedx.json")):
         run(["cosign", "attest", "--yes", "--predicate", str(filename), "--type", kind, image])

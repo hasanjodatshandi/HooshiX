@@ -14,6 +14,7 @@ from publish_openbao_candidate import context, run, verify_payload
 from render_mesh_candidate import ROOT, pins, values
 from verify_openbao_artifact import MAX_BYTES, load
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
+from repair_import_referrers import repair_owned_import
 
 COMPONENTS = ('istiod', 'cni', 'ztunnel')
 REPOSITORIES = {component: 'ghcr.io/hasanjodatshandi/hooshix/platform-istio-' + component + '-private'
@@ -138,7 +139,7 @@ def publish(directory: Path, env: dict):
         folder.mkdir(mode=0o700)
         digest = target['image'].split('@sha256:')[1]
         tag = REPOSITORIES[component] + ':candidate-' + digest + '-' + invocation.removeprefix('github:').replace(':', '-')
-        run(['cosign', 'copy', target['upstream'], tag], timeout=300)
+        run(['cosign', 'copy', '--attachment-tag-prefix', 'import-', target['upstream'], tag], timeout=300)
         print('MESH_PUBLICATION_STEP=' + component + '-visibility', flush=True)
         initial_visibility = visibility(component)
         (folder / 'database.json').write_text(database)
@@ -154,16 +155,20 @@ def publish(directory: Path, env: dict):
     flags = ['--certificate-identity', EXPECTED_CERTIFICATE_IDENTITY,
              '--certificate-oidc-issuer', EXPECTED_OIDC_ISSUER]
     for component, target in selected.items():
-        print('MESH_PUBLICATION_STEP=' + component + '-sign-verify', flush=True)
+        print('MESH_PUBLICATION_STEP=' + component + '-referrer-alias', flush=True)
         folder, image = directory / component, target['image']
         predicate = provenance(component, target, revision, invocation)
         path = folder / 'import-provenance.json'
         path.write_text(json.dumps(predicate, sort_keys=True) + '\n')
+        print('MESH_REFERRER_ALIAS=' + repair_owned_import(image), flush=True)
+        print('MESH_PUBLICATION_STEP=' + component + '-sign', flush=True)
         run(['cosign', 'sign', '--yes', image])
         for kind, filename, uri, expected in (
                 ('slsaprovenance1', path, 'https://slsa.dev/provenance/v1', predicate),
                 ('cyclonedx', folder / 'cyclonedx.json', 'https://cyclonedx.org/bom', load(folder / 'cyclonedx.json'))):
+            print('MESH_PUBLICATION_STEP=' + component + '-attest-' + kind, flush=True)
             run(['cosign', 'attest', '--yes', '--predicate', str(filename), '--type', kind, image])
+            print('MESH_PUBLICATION_STEP=' + component + '-verify-' + kind, flush=True)
             verify_payload(run(['cosign', 'verify-attestation', '--type', kind, *flags, image]),
                            uri, expected, image.split('@sha256:')[1])
         try:
