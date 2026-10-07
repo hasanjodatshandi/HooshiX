@@ -353,6 +353,7 @@ infrastructure/istio/platform-apps-waypoint.yaml
 infrastructure/kind/README.md
 infrastructure/kind/cluster.yaml
 infrastructure/kind/pins.env
+infrastructure/kyverno/chart/3.9.1/kyverno-3.9.1.tgz
 infrastructure/kyverno/pins.env
 infrastructure/kyverno/policies/platform-workload-hardening.yaml
 infrastructure/kyverno/vendor/1.18.2/install.yaml
@@ -562,6 +563,7 @@ scripts/production/tests/test_intermediate_csr.py
 scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
+scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_mesh_publication.py
 scripts/production/tests/test_offline_ca.ps1
@@ -583,6 +585,7 @@ scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_target_storage_guard.py
 scripts/production/tests/test_verify.py
+scripts/production/upgrade_kyverno.py
 scripts/production/verify.py
 scripts/production/verify_host_audit.py
 scripts/production/verify_openbao_artifact.py

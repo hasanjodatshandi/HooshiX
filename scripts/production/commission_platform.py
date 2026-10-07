@@ -23,12 +23,14 @@ from pathlib import Path
 import bootstrap_intermediate_csr as custody
 import import_intermediate_ca as ca_import
 import verify_storage_guard as storage
+import upgrade_kyverno
 
 STATE = custody.BASE / 'platform-commissioning'
 MANAGER = 'hooshix-platform-commissioning'
 LABELS = {'app.kubernetes.io/part-of': 'hooshix-platform',
           'app.kubernetes.io/managed-by': MANAGER}
 BOUND = 2 * 1024 * 1024
+PLAN_BOUND = 8 * 1024 * 1024
 PRESERVED = ('ssh.service', 'nginx.service', 'postfix.service', 'dovecot.service',
              'auditd.service', 'wg-quick@wg-hooshix.service', 'k3s.service')
 
@@ -99,7 +101,7 @@ def kernel_audit():
 
 
 def progress(label, revision):
-    require(label in ('admission', 'tls', 'mesh', 'storage', 'openbao', 'verification'),
+    require(label in ('kyverno', 'admission', 'tls', 'mesh', 'storage', 'openbao', 'verification'),
             'INVALID_COMMISSIONING_PHASE')
     kernel_audit()
     native(['/usr/sbin/auditctl', '-m', 'HooshiX PR181 platform commissioning '
@@ -137,15 +139,16 @@ def read_plan(path, digest, revision):
             'REVIEWED_SOURCE_AND_PLAN_REQUIRED')
     with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as stream:
         info = os.fstat(stream.fileno())
-        require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and 0 < info.st_size <= BOUND,
+        require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and 0 < info.st_size <= PLAN_BOUND,
                 'BOUNDED_REGULAR_PLAN_REQUIRED')
-        content = stream.read(BOUND + 1)
+        content = stream.read(PLAN_BOUND + 1)
     require(hashlib.sha256(content).hexdigest() == digest, 'PLAN_HASH_CONFLICT')
     value = json.loads(content)
     require(value.get('schema_version') == 1 and value.get('installation_id') == 'hooshix-production'
             and value.get('profile') == 'production-single-server'
             and [s['component'] for s in value['mesh']['stages']] == ['base', 'istiod', 'cni', 'ztunnel']
             and value['openbao']['items'][-1]['metadata']['name'] == 'openbao'
+            and value['kyverno_upgrade']['version'] == upgrade_kyverno.VERSION
             and len(value['admission']['items']) == 6, 'REVIEWED_PLAN_SHAPE_REQUIRED')
     # Evidence was authenticated against the exact CI run by the bundle builder;
     # no caller-provided "Passed" string alone authorizes this plan.
@@ -332,6 +335,9 @@ def execute(path, digest, revision, public_directory):
                 require(get(kind, name, ns) is None, 'UNOWNED_PLATFORM_INSTALLATION_PRESERVED')
             custody.create(marker, json.dumps(record).encode())
         # Keep the existing imported CA and the secrets namespace's Restricted PSA.
+        progress('kyverno', revision)
+        upgrade_kyverno.execute(plan['kyverno_upgrade'], path.parent, STATE,
+                               Path('/etc/rancher/k3s/k3s.yaml'), kube=kube, native=native, get=get)
         for name in ('istio-system', 'hooshix-secrets'):
             apply({'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': name}})
         progress('admission', revision)
@@ -375,6 +381,7 @@ def execute(path, digest, revision, public_directory):
         require(snapshot_services() == before, 'PRESERVED_SERVICE_STATE_CHANGED')
         return {'schema_version': 1, 'source_revision': revision, 'plan_sha256': digest,
                 'observed_at': datetime.now(timezone.utc).isoformat(), 'mesh_installation': 'Passed',
+                'kyverno_upgrade': 'Passed', 'kyverno_version': upgrade_kyverno.VERSION,
                 'openbao_installation': 'Passed', 'openbao_state': 'Installed; sealed; not initialized',
                 'tls_and_sealed_probes': 'Passed', 'retained_local_pvc': 'Passed',
                 'protected_audit_and_storage_guard': 'Passed', 'mail_management_k3s_preserved': 'Passed',

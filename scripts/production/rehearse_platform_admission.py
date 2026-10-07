@@ -6,11 +6,13 @@ import copy
 import hashlib
 import json
 import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
 import render_mesh_candidate as mesh
 import render_platform_admission as admission
+import upgrade_kyverno
 from rehearse_openbao_recovery import RehearsalFailed
 
 
@@ -140,14 +142,15 @@ class Staging:
         self.checks["calico_runtime"] = "Passed"
         k("wait", "--for=condition=Ready", "nodes", "--all", "--timeout=90s", timeout=105)
         print("PLATFORM_STEP=kyverno", flush=True)
-        kyverno = pin_file("infrastructure/kyverno/pins.env")
-        data = vendored("infrastructure/kyverno/vendor/" + kyverno["KYVERNO_VERSION"] + "/install.yaml",
-                        kyverno["KYVERNO_INSTALL_SHA256"])
-        for name, key in (("kyverno", "ADMISSION"), ("kyvernopre", "PRE"),
-                          ("background-controller", "BACKGROUND"), ("cleanup-controller", "CLEANUP"),
-                          ("reports-controller", "REPORTS")):
-            old = "reg.kyverno.io/kyverno/" + name + ":v" + kyverno["KYVERNO_VERSION"]
-            new = "reg.kyverno.io/kyverno/" + name + "@" + kyverno["KYVERNO_" + key + "_AMD64_DIGEST"]
+        # Start from the exact existing VPS release, then exercise the SAME
+        # CRD-preserving Helm adoption as the supervised installer.
+        data = vendored("infrastructure/kyverno/vendor/1.18.2/install.yaml",
+                        '3dcd43eaf11f0719084217148cd0c82a8fa49faa9b1a783ea5bea2cf84041bda')
+        old_images = dict(upgrade_kyverno.OLD_IMAGES)
+        old_images['pre'] = 'reg.kyverno.io/kyverno/kyvernopre@sha256:341402e2860cce765a744735c0a3a9c0d0978a82dfdff7b76332afb8d3a2d20b'
+        for component, new in old_images.items():
+            image_name = 'kyverno' if component == 'admission' else 'kyvernopre' if component == 'pre' else component + '-controller'
+            old = "reg.kyverno.io/kyverno/" + image_name + ":v1.18.2"
             if old.encode() not in data:
                 raise ValueError("exact Kyverno vendor image required")
             data = data.replace(old.encode(), new.encode())
@@ -156,6 +159,34 @@ class Staging:
         for name in ("admission", "background", "cleanup", "reports"):
             k("-n", "kyverno", "rollout", "status", "deployment/kyverno-" + name + "-controller",
               "--timeout=180s", timeout=195)
+        preserved_policy = {'apiVersion': 'policies.kyverno.io/v1', 'kind': 'ValidatingPolicy',
+            'metadata': {'name': 'fixture-upgrade-retention'}, 'spec': {'failurePolicy': 'Fail',
+            'validationActions': ['Deny'], 'autogen': {'podControllers': {'controllers': []}},
+            'matchConstraints': {'resourceRules': [{'apiGroups': [''], 'apiVersions': ['v1'],
+                'operations': ['CREATE'], 'resources': ['configmaps']}]},
+            'validations': [{'expression': 'true', 'message': 'fixture retention only'}]}}
+        apply(k, preserved_policy)
+        policy_before = json.loads(k('get', 'validatingpolicy', 'fixture-upgrade-retention', '-o', 'json'))
+        upgrade_plan = upgrade_kyverno.candidate()
+        shutil.copyfile(mesh.ROOT / 'infrastructure/kyverno/chart/3.9.1/kyverno-3.9.1.tgz', directory / 'kyverno-3.9.1.tgz')
+        tools = Path(os.environ['RUNNER_TEMP']) / 'platform-tools'
+        shutil.copyfile(tools / 'helm.tar.gz', directory / 'helm-linux-amd64.tar.gz')
+
+        def upgrade_kube(*args, body=None):
+            return k(*args, data=json.dumps(body).encode() if body is not None else None)
+
+        def upgrade_get(kind, name, namespace=None):
+            scope = ['-n', namespace] if namespace else []
+            data = k(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json')
+            return json.loads(data) if data.strip() else None
+
+        upgrade_kyverno.execute(upgrade_plan, directory, directory, directory / 'kubeconfig',
+                               kube=upgrade_kube, native=run, get=upgrade_get)
+        policy_after = json.loads(k('get', 'validatingpolicy', 'fixture-upgrade-retention', '-o', 'json'))
+        if (policy_before['metadata']['uid'] != policy_after['metadata']['uid']
+                or policy_before['spec'] != policy_after['spec']):
+            raise ValueError('existing Kyverno policy was not preserved')
+        self.checks['kyverno_upgrade'] = 'Passed'
         for name in admission.NAMESPACES:
             apply(k, namespace(name))
         for name in ("kyverno", *admission.NAMESPACES):
@@ -318,6 +349,7 @@ class Staging:
             for label, account, plaintext in (("mtls-positive", "commissioning-probe", False),
                                               ("wrong-serviceaccount", "commissioning-wrong", False),
                                               ("plaintext-negative", "commissioning-probe", True)):
+                print('PLATFORM_NETWORK_PROBE=' + label, flush=True)
                 spec = copy.deepcopy(pod)
                 spec["serviceAccountName"] = account
                 labels = {"hooshix-fixture": "probe"}
@@ -333,6 +365,13 @@ class Staging:
 
                 state = wait(terminated, seconds=60)
                 output = k("-n", "hooshix-secrets", "logs", label)
+                # CLI here only runs status on a sealed, uninitialized fixture.
+                # Classify fixed public errors; never print raw workload logs.
+                causes = [name for name in ('lookup', 'i/o timeout', 'connection refused', 'x509',
+                                           'permission denied', 'EOF', 'no such file', 'context deadline')
+                          if name.lower().encode() in output.lower()]
+                print('PLATFORM_NETWORK_RESULT=' + json.dumps({'probe': label, 'exit_code': state['exitCode'],
+                      'error_classes': causes}), flush=True)
                 if label == "mtls-positive":
                     if state["exitCode"] != 2 or json.loads(output).get("sealed") is not True:
                         raise ValueError("authorized Ambient API probe failed")

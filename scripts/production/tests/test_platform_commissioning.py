@@ -24,6 +24,7 @@ class PlatformCommissioningTest(unittest.TestCase):
     def plan(self):
         return {'schema_version': 1, 'installation_id': 'hooshix-production',
                 'profile': 'production-single-server',
+                'kyverno_upgrade': {'version': '1.19.1'},
                 'mesh': {'stages': [{'component': name} for name in ('base', 'istiod', 'cni', 'ztunnel')]},
                 'openbao': bao.candidate('hooshix-openbao-local'),
                 'admission_prerequisites': admission.reporting_permissions(),

@@ -31,6 +31,18 @@ TLS، حالت sealed، Shamir مصنوعی ۳/۲، restart/PVC، ACL و لغو 
 هیچ Root، کلید یا سهم واقعی مالک به CI نمی‌رود؛ فقط token موقت `packages:read`
 در حافظه و Secret کلاستر موقت استفاده می‌شود. cleanup پیش‌نیاز receipt موفق است.
 
+همین آزمون ابتدا Kyverno ۱٫۱۸٫۲ فعلی VPS را نصب و سپس با chart رسمی ۳٫۹٫۱ به
+۱٫۱۹٫۱ ارتقا می‌دهد. نسخهٔ جدید اشکال اعتماد به annotation نتیجهٔ image verification
+را رفع می‌کند؛ آزمون annotation جعلی نیز باید رد شود. پنج تصویر upstream با
+امضای رسمی release و digest ثابت تأیید می‌شوند. chart و Helm ۴٫۲٫۴ نیز hash ثابت دارند.
+طبق [راهنمای رسمی ارتقا](https://kyverno.io/docs/installation/upgrading/)، تغییر صرف
+image برای ارتقا کافی نیست. نصب قبلی به release محدود Helm منتقل می‌شود؛ CRDها
+با حفظ resourceVersion و نسخه‌های ذخیره‌شده به‌روزرسانی می‌شوند، نه حذف/ساخت مجدد.
+وجود resource متعلق به نصب دیگر یا نسخهٔ ذخیره‌شدهٔ ناسازگار عملیات را متوقف می‌کند.
+policy موجود باید با همان UID و spec پس از ارتقا باقی بماند. adoption نخست فقط
+قبل از workloadهای برنامه مجاز است؛ retry همان release و digest مجاز، حذف خودکار نیست.
+در شکست، uninstall/rollback خودکار یا حذف policy/CRD انجام نمی‌شود.
+
 artifact عمومی `platform-staging-<run>-<attempt>` نتیجهٔ واقعی را ثبت می‌کند.
 صرف وجود workflow یا موفقیت unit test، نتیجهٔ این lane محسوب نمی‌شود. مسیر CNI
 kind، Root مصنوعی و storage موقت جای بررسی هدف K3s، CA موجود و PV محدود VPS را
@@ -116,7 +128,7 @@ webhook مستقل با همان شرط‌های امنیتی انجام می‌
 SLO درخواست‌های کاربران/authorization تغییری نمی‌کند. این بودجه، شاهد ظرفیت
 کل stack نیست و آزمون کامل ظرفیت Production همچنان لازم است.
 
-ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، شش policy
+ترتیب اجرا: هدف/audit/encryption/storage موجود، ارتقای بررسی‌شدهٔ Kyverno، pull Secret محدود، شش policy
 با Deny، mesh، TLS سرویس با CA قبلی، PV محلی Retain و StatefulSet. محدودیت PSA
 فقط در `istio-system` و بعد از policy فعال، برای دو جزءٔ شبکهٔ تأییدشده اعمال
 می‌شود؛ `hooshix-secrets` همچنان Restricted است. هشت GiB دوباره ساخته نمی‌شود.
@@ -158,6 +170,6 @@ Istio identity and authorization impact: fixture-only exact probe principal; pro
 Logging and PII impact: fixed step labels and public receipt; private raw diagnostics suppressed
 Observability added or changed: content-free staging checks; no production telemetry changes
 Build/CI/architecture enforcement changed: native staging workflow plus deterministic production tests
-Tests executed: local production/static/context verification Passed; native platform staging Not run until CI executes
+Tests executed: local production/static/context verification Passed; complete native staging and target installation require executed receipts
 Architecture deviations: None; staging evidence never substitutes target validation or traffic readiness
 Rollback considerations: no VPS changes; disposable cleanup deletes only its unique kind cluster

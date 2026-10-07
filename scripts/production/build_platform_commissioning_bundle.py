@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,11 +17,12 @@ import render_openbao_local_storage as storage
 import render_platform_admission as admission
 import import_intermediate_ca as ca_import
 import verify_platform_publication_run as publication
+import upgrade_kyverno
 
 SOURCES = ('bootstrap_intermediate_csr.py', 'import_intermediate_ca.py',
-           'verify_storage_guard.py', 'commission_platform.py')
+           'verify_storage_guard.py', 'upgrade_kyverno.py', 'commission_platform.py')
 WORKFLOW = '.github/workflows/platform-commissioning.yml'
-CHECKS = frozenset({'calico_runtime', 'admission_audit_negative', 'admission_deny_negative',
+CHECKS = frozenset({'calico_runtime', 'kyverno_upgrade', 'admission_audit_negative', 'admission_deny_negative',
                    'signed_mesh_admission_and_runtime', 'admission_wrong_signer',
                    'admission_missing_sbom', 'admission_wrong_provenance_revision',
                    'mtls_positive', 'wrong_serviceaccount', 'plaintext_negative'})
@@ -102,14 +104,22 @@ def build(output, staging_run, mesh_run, bao_run, public_ca):
                 or staging['mesh_images'] != {k: v['image'] for k, v in mesh_receipt['components'].items()}):
             raise ValueError('staging and publication identities differ')
         plan = admission.render(mesh_receipt, bao_receipt, mesh.candidate())
+        plan['kyverno_upgrade'] = upgrade_kyverno.candidate()
         plan['storage'] = storage.candidate()
         plan['commissioning_evidence'] = {'source_revision': revision, 'staging': 'Passed',
                                          'run_id': int(staging_run), 'observed_at': staging['observed_at']}
         content = json.dumps(plan, separators=(',', ':')).encode()
-        if len(content) > 2 * 1024 * 1024:
+        if len(content) > 8 * 1024 * 1024:
             raise ValueError('bounded public plan required')
         output.mkdir(mode=0o700, parents=False)
         (output / 'plan.json').write_bytes(content)
+        shutil.copyfile(mesh.ROOT / 'infrastructure/kyverno/chart/3.9.1/kyverno-3.9.1.tgz', output / 'kyverno-3.9.1.tgz')
+        request = urllib.request.Request('https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz')
+        with urllib.request.urlopen(request, timeout=30) as response:
+            archive = response.read(32 * 1024**2 + 1)
+        if len(archive) > 32 * 1024**2 or hashlib.sha256(archive).hexdigest() != upgrade_kyverno.HELM_ARCHIVE_SHA:
+            raise ValueError('pinned bounded public Helm archive required')
+        (output / 'helm-linux-amd64.tar.gz').write_bytes(archive)
         for name in (*SOURCES, 'run-platform-commissioning.ps1'):
             shutil.copyfile(mesh.ROOT / 'scripts/production' / name, output / name)
         shutil.copyfile(mesh.ROOT / 'docs/operations/production-platform-commissioning-fa.md', output / 'USAGE-fa.md')
