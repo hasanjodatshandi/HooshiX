@@ -35,7 +35,7 @@ The local foundation installs only:
 Pinned baseline:
 
 ```text
-Istio 1.30.3
+Istio 1.30.5
 Gateway API 1.5.1
 Kubernetes 1.35.x local kind minor
 Calico 3.32.1
@@ -50,7 +50,7 @@ infrastructure/istio/pins.env
 Vendored/verified Helm artifacts belong under:
 
 ```text
-infrastructure/istio/chart/1.30.3/
+infrastructure/istio/chart/1.30.5/
 ```
 
 Image digests and chart checksums are required. An installer must verify them

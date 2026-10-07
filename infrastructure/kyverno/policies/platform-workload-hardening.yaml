@@ -23,7 +23,7 @@ spec:
       jsonPatch:
         expression: |
           object.spec.containers.map(c,
-            c.name == 'istio-proxy' && c.image == 'docker.io/istio/proxyv2:1.30.3-distroless' ?
+            c.name == 'istio-proxy' && c.image == 'docker.io/istio/proxyv2:1.30.5-distroless' ?
             JSONPatch{
               op: "replace",
               path: "/spec/containers/" + string(object.spec.containers.indexOf(c)) + "/image",

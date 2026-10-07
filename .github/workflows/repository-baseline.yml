@@ -186,6 +186,64 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  mesh-artifact:
+    name: Istio pinned artifact security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+      SYFT_CHECK_FOR_APP_UPDATE: 'false'
+    steps:
+      - name: Check out repository without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install integrity-pinned tools on disposable runner
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/mesh-tools"
+          echo "$RUNNER_TEMP/mesh-tools" >> "$GITHUB_PATH"
+      - name: Require fresh scans of all three exact public upstream imports
+        run: |
+          set -euo pipefail
+          export MESH_EVIDENCE="$RUNNER_TEMP/mesh-artifact"
+          mkdir -m 0700 "$MESH_EVIDENCE"
+          timeout 180 grype db update
+          grype db status -o json > "$MESH_EVIDENCE/database.json"
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/production')
+          from publish_mesh_candidate import run, scan, targets, validate
+          evidence = Path(os.environ['MESH_EVIDENCE'])
+          for component, target in targets().items():
+              folder = evidence / component
+              folder.mkdir(mode=0o700)
+              (folder / 'database.json').write_bytes((evidence / 'database.json').read_bytes())
+              image = target['upstream']
+              run(['syft', 'scan', image, '--from', 'registry', '--platform', 'linux/amd64',
+                   '-o', 'syft-json=' + str(folder / 'syft.json'),
+                   '-o', 'cyclonedx-json=' + str(folder / 'cyclonedx.json')], timeout=300)
+              scan(folder)
+              result = validate(folder, image, datetime.now(timezone.utc))
+              result['production_promotion'] = 'Not verified'
+              (folder / 'scan-receipt.json').write_text(json.dumps(result) + '\n')
+          PY
+      - name: Retain public evidence even when the scan fails
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mesh-artifact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mesh-artifact/
+          retention-days: 30
+          if-no-files-found: error
+
   openbao-kubernetes:
     name: OpenBao Kubernetes foundation
     runs-on: ubuntu-24.04
@@ -298,6 +356,7 @@ jobs:
       - repository-structure
       - openbao-recovery
       - openbao-artifact
+      - mesh-artifact
       - openbao-kubernetes
       - compromised-password-security
       - notification-security
@@ -316,6 +375,7 @@ jobs:
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
           OPENBAO_RESULT: ${{ needs.openbao-recovery.result }}
           OPENBAO_ARTIFACT_RESULT: ${{ needs.openbao-artifact.result }}
+          MESH_ARTIFACT_RESULT: ${{ needs.mesh-artifact.result }}
           OPENBAO_KUBERNETES_RESULT: ${{ needs.openbao-kubernetes.result }}
           COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
           NOTIFICATION_RESULT: ${{ needs.notification-security.result }}
@@ -341,6 +401,10 @@ jobs:
           fi
           if [ "${OPENBAO_ARTIFACT_RESULT}" != 'success' ]; then
             echo "OpenBao pinned artifact security result: ${OPENBAO_ARTIFACT_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${MESH_ARTIFACT_RESULT}" != 'success' ]; then
+            echo "Istio pinned artifact security result: ${MESH_ARTIFACT_RESULT}" >&2
             exit 1
           fi
           if [ "${OPENBAO_KUBERNETES_RESULT}" != 'success' ]; then

@@ -47,7 +47,7 @@ class MeshCandidateTest(unittest.TestCase):
     def test_existing_chart_integrity_and_three_exact_images(self):
         pin = target.pins()
         for component in target.COMPONENTS:
-            chart = target.ROOT / f'infrastructure/istio/chart/1.30.3/{component}-1.30.3.tgz'
+            chart = target.ROOT / f'infrastructure/istio/chart/1.30.5/{component}-1.30.5.tgz'
             self.assertEqual(pin['ISTIO_' + component.upper() + '_CHART_SHA256'],
                              hashlib.sha256(chart.read_bytes()).hexdigest())
             values = target.values(component, pin)

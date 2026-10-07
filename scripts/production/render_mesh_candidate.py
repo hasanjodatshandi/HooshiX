@@ -84,7 +84,7 @@ def validate_node_exception(component, pod, pin):
 def render(helm, component, pin):
     import yaml
     version = pin['ISTIO_VERSION']
-    if version != '1.30.3' or pin['ISTIO_TRUST_DOMAIN'] != 'prod.sajtech.internal':
+    if version != '1.30.5' or pin['ISTIO_TRUST_DOMAIN'] != 'prod.sajtech.internal':
         raise ValueError('current mesh baseline required')
     chart = ROOT / f'infrastructure/istio/chart/{version}/{component}-{version}.tgz'
     if hashlib.sha256(chart.read_bytes()).hexdigest() != pin['ISTIO_' + component.upper() + '_CHART_SHA256']:

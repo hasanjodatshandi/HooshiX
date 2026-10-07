@@ -44,7 +44,7 @@ Caddy 2.11.4
 coraza-caddy 2.5.0
 Coraza 3.7.0
 OWASP CRS 4.25.1 LTS
-Istio Ambient 1.30.3
+Istio Ambient 1.30.5
 ```
 
 Chart 41 requires the repository values to use the current `log`/`accessLog` keys and object-form `providers.file.content`. Render/upgrade verification must reject stale chart-40 key shapes before cluster mutation.

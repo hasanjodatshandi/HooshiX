@@ -116,7 +116,7 @@ Use kind only when real Kubernetes/mesh/edge/policy/telemetry integration is und
 | Cluster | `platform-local` / `kind-platform-local` |
 | Calico | 3.32.1 |
 | Helm | 4.2.4 |
-| Istio Ambient | 1.30.3 |
+| Istio Ambient | 1.30.5 |
 | Gateway API | 1.5.1 Standard |
 | Traefik | 3.7.10 / chart 41.2.0 |
 | WAF | Caddy 2.11.4 + coraza-caddy 2.5.0 + Coraza 3.7.0 + CRS 4.25.1 LTS |

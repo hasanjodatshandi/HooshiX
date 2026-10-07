@@ -23,7 +23,7 @@ This matrix records production technology combinations that must remain compatib
 | Kubernetes API/minor | 1.35.6 | selected Istio 1.30.x, CloudNativePG 1.30.x, cert-manager 1.20.x, Kyverno 1.18.x, Calico 3.32.x |
 | `production-single-server` Kubernetes | K3s `v1.35.6+k3s1` | one server/workload node; embedded SQLite; custom Calico; bundled Flannel/policy-controller/Traefik/ServiceLB disabled |
 | `production-ha` Kubernetes | kubeadm-compatible 1.35.6 | current HA control-plane/worker topology |
-| Istio | 1.30.3 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |
+| Istio | 1.30.5 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |
 | Calico | 3.32.1 | Kubernetes 1.35; K3s custom CNI; HBONE/health policy tests |
 | CloudNativePG | 1.30.0 | Kubernetes 1.35/PostgreSQL 18; one shared instance in single-server, dedicated clusters in HA |
 | PostgreSQL | 18.4 | CNPG support; distinct service DB/roles/Flyway/RLS; shared physical only in single-server |

@@ -14,7 +14,7 @@ BASELINE = ROOT / "docs/technology/technology-baseline.md"
 
 EXPECTED = {
     "platform.kubernetes": "1.35.6", "platform.k3s": "v1.35.6+k3s1",
-    "platform.calico": "3.32.1", "platform.istio_ambient": "1.30.3",
+    "platform.calico": "3.32.1", "platform.istio_ambient": "1.30.5",
     "platform.kyverno": "1.18.2", "platform.argocd": "3.4.2",
     "postgresql.postgresql": "18.4", "postgresql.cloudnativepg": "1.30.0",
     "postgresql.barman_plugin": "0.13.0", "postgresql.cert_manager": "1.20.3",

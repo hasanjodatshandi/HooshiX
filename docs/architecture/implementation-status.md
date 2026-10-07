@@ -2,6 +2,14 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
+istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
+The baseline includes a blocking credential-free scan of all three exact upstream
+imports, retains threshold-failure JSON, and never signs or deploys from PR CI.
+Historical local 1.30.3 runtime evidence below does not validate 1.30.5 runtime.
+New upstream scan, signed mirror publication, target staging/admission and VPS
+installation remain `Not verified` until their separate executed receipts exist.
+
 The owner approved the bounded ADR-0030 commissioning bootstrap on 2026-10-05.
 The controlled intermediate CSR tool retains only an encrypted root-owned key on
 the VPS and exports a hash-bound public CSR for the existing offline Root signer.

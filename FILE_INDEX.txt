@@ -340,6 +340,10 @@ infrastructure/istio/chart/1.30.3/base-1.30.3.tgz
 infrastructure/istio/chart/1.30.3/cni-1.30.3.tgz
 infrastructure/istio/chart/1.30.3/istiod-1.30.3.tgz
 infrastructure/istio/chart/1.30.3/ztunnel-1.30.3.tgz
+infrastructure/istio/chart/1.30.5/base-1.30.5.tgz
+infrastructure/istio/chart/1.30.5/cni-1.30.5.tgz
+infrastructure/istio/chart/1.30.5/istiod-1.30.5.tgz
+infrastructure/istio/chart/1.30.5/ztunnel-1.30.5.tgz
 infrastructure/istio/namespaces.yaml
 infrastructure/istio/pins.env
 infrastructure/istio/platform-apps-waypoint-networkpolicy.yaml

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from publish_openbao_candidate import context, run, verify_payload
 from render_mesh_candidate import ROOT, pins, values
-from verify_openbao_artifact import load
+from verify_openbao_artifact import MAX_BYTES, load
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
 
 COMPONENTS = ('istiod', 'cni', 'ztunnel')
@@ -23,7 +23,7 @@ BUILD_TYPE = 'https://github.com/hasanjodatshandi/HooshiX/istio-upstream-import/
 
 def targets():
     pin = pins()
-    if pin['ISTIO_VERSION'] != '1.30.3':
+    if pin['ISTIO_VERSION'] != '1.30.5':
         raise ValueError('reviewed mesh baseline required')
     return {component: {'upstream': values(component, pin)['image'],
                         'image': REPOSITORIES[component] + '@' +
@@ -76,9 +76,32 @@ def validate(directory, image, now):
             'sha256': {name: hashlib.sha256((directory / name).read_bytes()).hexdigest() for name in names}}
 
 
+def scan(directory):
+    """Keep bounded JSON on Grype threshold exit; never turn it into success."""
+    argv = ['grype', 'sbom:' + str(directory / 'syft.json'),
+            '--fail-on', 'high', '-o', 'json']
+    try:
+        output = run(argv, timeout=180)
+    except subprocess.CalledProcessError as error:
+        if error.returncode == 2 and isinstance(error.stdout, str):
+            output = error.stdout
+            if len(output.encode('utf-8')) <= MAX_BYTES:
+                try:
+                    report = json.loads(output)
+                except ValueError:
+                    report = None
+                if isinstance(report, dict) and isinstance(report.get('matches'), list):
+                    (directory / 'grype.json').write_text(output)
+                    print('MESH_SCAN=Failed; threshold reached; inspect grype.json', flush=True)
+        raise  # Includes empty/malformed reports; no signing or success receipt.
+    if len(output.encode('utf-8')) > MAX_BYTES:
+        raise ValueError('bounded scanner report required')
+    (directory / 'grype.json').write_text(output)
+
+
 def provenance(component, target, revision, invocation):
     return {'buildDefinition': {'buildType': BUILD_TYPE, 'externalParameters': {
-        'component': component, 'version': '1.30.3', 'gitRevision': revision,
+        'component': component, 'version': '1.30.5', 'gitRevision': revision,
         'image': target['image'], 'upstreamImage': target['upstream'],
         'platform': 'linux/amd64', 'operation': 'unchanged-upstream-import'},
         'internalParameters': {}, 'resolvedDependencies': [
@@ -118,8 +141,7 @@ def publish(directory: Path, env: dict):
              '-o', 'syft-json=' + str(folder / 'syft.json'),
              '-o', 'cyclonedx-json=' + str(folder / 'cyclonedx.json')], timeout=300)
         print('MESH_PUBLICATION_STEP=' + component + '-scan', flush=True)
-        (folder / 'grype.json').write_text(run([
-            'grype', 'sbom:' + str(folder / 'syft.json'), '--fail-on', 'high', '-o', 'json'], timeout=180))
+        scan(folder)
         print('MESH_PUBLICATION_STEP=' + component + '-validation', flush=True)
         results[component] = validate(folder, target['image'], datetime.now(timezone.utc))
         results[component]['registry_visibility'] = initial_visibility
@@ -152,7 +174,7 @@ def publish(directory: Path, env: dict):
                                    'upstream_image': target['upstream']})
         results[component]['sha256'][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     return {'schema_version': 1, 'component': 'mesh', 'owner': 'platform',
-            'version': '1.30.3', 'repository_revision': revision,
+            'version': '1.30.5', 'repository_revision': revision,
             'observed_at': datetime.now(timezone.utc).isoformat(), 'publication': 'Passed',
             'signer': EXPECTED_CERTIFICATE_IDENTITY, 'issuer': EXPECTED_OIDC_ISSUER,
             'components': results, 'provenance_kind': 'unchanged-upstream-import',

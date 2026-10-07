@@ -65,7 +65,7 @@
       "traefik"
     ],
     "embedded_datastore": "sqlite",
-    "istio_ambient": "1.30.3",
+    "istio_ambient": "1.30.5",
     "k3s": "v1.35.6+k3s1",
     "kubernetes": "1.35.6",
     "mesh_id": "platform-prod",

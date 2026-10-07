@@ -167,6 +167,54 @@ class MeshPublicationTest(unittest.TestCase):
                 target.publish(self.directory, self.env)
             self.assertFalse((self.directory / 'receipt.json').exists())
 
+    def test_threshold_failure_preserves_public_json_and_never_signs(self):
+        report = json.dumps({'matches': [{'vulnerability': {'severity': 'High'}}]})
+        def failed(argv, timeout=180):
+            if argv[0] == 'grype' and argv[1].startswith('sbom:'):
+                raise subprocess.CalledProcessError(2, argv, output=report,
+                                                    stderr='synthetic private error')
+            return self.native(argv, timeout)
+        with patch.object(target, 'run', side_effect=failed), self.assertRaises(subprocess.CalledProcessError):
+            target.publish(self.directory, self.env)
+        self.assertEqual(report, (self.directory / 'istiod/grype.json').read_text())
+        self.assertFalse((self.directory / 'receipt.json').exists())
+        self.assertFalse(any(argv[:2] == ['cosign', 'sign'] for argv in self.calls))
+
+    def test_threshold_exit_even_with_empty_matches_is_failure(self):
+        for index, output in enumerate(('secret-not-json', '[]', '{}',
+                                         '{"matches": []}', 'x' * (target.MAX_BYTES + 1))):
+            folder = Path(self.temp.name) / str(index)
+            folder.mkdir()
+            error = subprocess.CalledProcessError(2, ['grype'], output=output, stderr='private')
+            with patch.object(target, 'run', side_effect=error), self.assertRaises(subprocess.CalledProcessError):
+                target.scan(folder)
+            self.assertEqual(output == '{"matches": []}', (folder / 'grype.json').exists())
+
+    def test_tool_failure_never_exports_raw_diagnostics(self):
+        error = subprocess.CalledProcessError(1, ['grype'], output='private', stderr='private')
+        with patch.object(target, 'run', side_effect=error), self.assertRaises(subprocess.CalledProcessError):
+            target.scan(Path(self.temp.name))
+        self.assertFalse((Path(self.temp.name) / 'grype.json').exists())
+
+    def test_oversized_success_report_is_rejected(self):
+        with patch.object(target, 'run', return_value='x' * (target.MAX_BYTES + 1)), self.assertRaises(ValueError):
+            target.scan(Path(self.temp.name))
+        self.assertFalse((Path(self.temp.name) / 'grype.json').exists())
+
+    def test_upstream_scan_ci_is_blocking_and_has_no_publication_or_credentials(self):
+        workflow = (target.ROOT / '.github/workflows/repository-baseline.yml').read_text()
+        job = workflow.split('  mesh-artifact:\n')[1].split('  openbao-kubernetes:\n')[0]
+        for expected in ('persist-credentials: false', 'targets().items()', "target['upstream']",
+                         'scan(folder)', 'validate(folder', 'if: ${{ always() }}', 'retention-days: 30'):
+            self.assertIn(expected, job)
+        for forbidden in ('secrets.', 'packages: write', 'id-token: write', 'kubectl',
+                          'KUBECONFIG', 'continue-on-error', 'cosign sign', 'target[\'image\']'):
+            self.assertNotIn(forbidden, job)
+        aggregate = workflow.split('  baseline:\n')[1]
+        self.assertIn('      - mesh-artifact', aggregate)
+        self.assertIn('needs.mesh-artifact.result', aggregate)
+        self.assertIn('"${MESH_ARTIFACT_RESULT}" != \'success\'', aggregate)
+
     def test_fixed_images_and_protected_manual_workflow_only(self):
         selected = target.targets()
         self.assertEqual(set(target.COMPONENTS), set(selected))
