@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import os
 import stat
@@ -27,6 +28,17 @@ def require(value, message):
         # Only fixed caller-owned diagnostics; never arbitrary tool output/data.
         print('KYVERNO_UPGRADE_FAILED=' + message, file=sys.stderr, flush=True)
         raise ValueError(message)
+
+
+def spec_hash(spec):
+    # Kubernetes adds these two documented CRD defaults on API persistence.
+    # Nothing else (especially schemas, versions or conversion webhooks) is omitted.
+    value = copy.deepcopy(spec)
+    if value.get('conversion') == {'strategy': 'None'}:
+        value.pop('conversion')
+    if value.get('preserveUnknownFields') is False:
+        value.pop('preserveUnknownFields')
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
 def candidate():
@@ -92,7 +104,15 @@ def candidate():
     require(hashlib.sha256(manifest.read_bytes()).hexdigest() == pin['KYVERNO_INSTALL_SHA256'],
             'Kyverno CRD integrity failed')
     crds = [item for item in yaml.safe_load_all(manifest.read_bytes()) if item and item['kind'] == 'CustomResourceDefinition']
-    return {'version': VERSION, 'values': values, 'images': images, 'inventory': inventory, 'crds': crds}
+    legacy = root / 'infrastructure/kyverno/vendor/1.18.2/install.yaml'
+    require(hashlib.sha256(legacy.read_bytes()).hexdigest() == '3dcd43eaf11f0719084217148cd0c82a8fa49faa9b1a783ea5bea2cf84041bda',
+            'legacy CRD provenance required')
+    hashes = {item['metadata']['name']: [spec_hash(item['spec'])] for item in crds}
+    for item in yaml.safe_load_all(legacy.read_bytes()):
+        if item and item['kind'] == 'CustomResourceDefinition':
+            hashes[item['metadata']['name']].append(spec_hash(item['spec']))
+    return {'version': VERSION, 'values': values, 'images': images, 'inventory': inventory,
+            'crds': crds, 'crd_spec_hashes': hashes}
 
 
 def public_artifact(path, digest, bound):
@@ -127,8 +147,13 @@ def execute(plan, directory, state, kubeconfig, *, kube, native, get):
             labels = obj['metadata'].get('labels', {})
             annotations = obj['metadata'].get('annotations', {})
             part = 'kyverno-crds' if item['kind'] == 'CustomResourceDefinition' else 'kyverno'
-            require(labels.get('app.kubernetes.io/part-of') == part
-                    and labels.get('app.kubernetes.io/instance') == 'kyverno'
+            owned = labels.get('app.kubernetes.io/part-of') == part and labels.get('app.kubernetes.io/instance') == 'kyverno'
+            # Upstream's CEL CRDs in 1.18.2 intentionally have no ownership labels.
+            # Only byte-equivalent official old/new specs (API defaults normalized)
+            # may substitute for those labels, never just a familiar CRD name.
+            if item['kind'] == 'CustomResourceDefinition' and not labels:
+                owned = spec_hash(obj['spec']) in plan['crd_spec_hashes'][item['name']]
+            require(owned
                     and annotations.get('meta.helm.sh/release-name', 'kyverno') == 'kyverno'
                     and annotations.get('meta.helm.sh/release-namespace', 'kyverno') == 'kyverno',
                     'foreign resource preserved before Helm adoption')

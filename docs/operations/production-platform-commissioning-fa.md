@@ -42,6 +42,9 @@ image برای ارتقا کافی نیست. نصب قبلی به release محد
 policy موجود باید با همان UID و spec پس از ارتقا باقی بماند. adoption نخست فقط
 قبل از workloadهای برنامه مجاز است؛ retry همان release و digest مجاز، حذف خودکار نیست.
 در شکست، uninstall/rollback خودکار یا حذف policy/CRD انجام نمی‌شود.
+CRDهای CEL رسمی نسخهٔ قبلی label مالکیت ندارند؛ در این مورد فقط fingerprint کامل
+spec رسمی قدیم/جدید با نرمال‌سازی دو default شناخته‌شدهٔ Kubernetes پذیرفته می‌شود،
+نه صرفاً نام مشابه. schema یا conversion متفاوت خودکار بازنویسی نمی‌شود.
 
 artifact عمومی `platform-staging-<run>-<attempt>` نتیجهٔ واقعی را ثبت می‌کند.
 صرف وجود workflow یا موفقیت unit test، نتیجهٔ این lane محسوب نمی‌شود. مسیر CNI

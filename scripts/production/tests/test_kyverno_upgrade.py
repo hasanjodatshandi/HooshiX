@@ -11,6 +11,13 @@ import upgrade_kyverno as upgrade
 
 
 class KyvernoUpgradeTest(unittest.TestCase):
+    def test_crd_fingerprint_only_normalizes_documented_defaults(self):
+        spec = {'group': 'policies.kyverno.io', 'versions': [{'name': 'v1'}]}
+        self.assertEqual(upgrade.spec_hash(spec), upgrade.spec_hash(spec | {
+            'conversion': {'strategy': 'None'}, 'preserveUnknownFields': False}))
+        self.assertNotEqual(upgrade.spec_hash(spec), upgrade.spec_hash(spec | {'preserveUnknownFields': True}))
+        self.assertNotEqual(upgrade.spec_hash(spec), upgrade.spec_hash(spec | {'versions': [{'name': 'other'}]}))
+
     def plan(self):
         return {'version': upgrade.VERSION, 'images': {name: 'new-' + image for name, image in upgrade.OLD_IMAGES.items()},
                 'values': {}, 'inventory': [{'kind': 'ConfigMap', 'name': 'kyverno', 'namespace': 'kyverno'}],
