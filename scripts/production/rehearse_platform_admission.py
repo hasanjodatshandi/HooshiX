@@ -44,6 +44,20 @@ def policy_ready(k, policy):
         raise
 
 
+def admission_result(k, pod, wait, *, expected=0, message=None):
+    # Policy Ready reports webhook configuration, not an updated cache generation.
+    # Poll the harmless server-side dry-run while the reviewed policy converges.
+    # Success still requires the exact denial reason, never just any HTTP error.
+    def converged():
+        try:
+            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(pod).encode(),
+              expected=expected, public_schema=True, required_error=message)
+            return True
+        except RehearsalFailed:
+            return False
+    wait(converged, seconds=45)
+
+
 def namespace(name: str, *, ambient: bool = False):
     return {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": name,
         "labels": ({"istio.io/dataplane-mode": "ambient"} if ambient else {})}}
@@ -158,8 +172,8 @@ class Staging:
         for policy in self.plan["admission"]["items"]:
             apply(k, policy)
             policy_ready(k, policy)
-        k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test).encode(), expected=1,
-          public_schema=True, required_error=b"platform bootstrap identity/security exception rejected")
+        admission_result(k, test, wait, expected=1,
+                         message=b"platform bootstrap identity/security exception rejected")
         self.checks["admission_deny_negative"] = "Passed"
         print("PLATFORM_STEP=mesh", flush=True)
         # Fixture Root only. The owner's existing Root/CSR/credentials never enter CI.
@@ -181,13 +195,13 @@ class Staging:
                   "--timeout=180s", timeout=195)
         self.checks["signed_mesh_admission_and_runtime"] = "Passed"
         print("PLATFORM_STEP=signature-negatives", flush=True)
-        self.signature_negatives(k)
+        self.signature_negatives(k, wait)
 
-    def signature_negatives(self, k):
+    def signature_negatives(self, k, wait):
         test = {"apiVersion": "v1", "kind": "Pod", "metadata": {
             "name": "signed-positive", "namespace": "istio-system"}, "spec": self.pods["istiod"]}
         original = self.plan["admission"]["items"][1]
-        k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test).encode())
+        admission_result(k, test, wait)
         for name in ("wrong_signer", "missing_sbom", "wrong_provenance_revision"):
             changed = copy.deepcopy(original)
             if name == "wrong_signer":
@@ -202,12 +216,11 @@ class Staging:
                 message = b"platform import source revision rejected"
             try:
                 apply(k, changed)
-                k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test).encode(), expected=1,
-                  public_schema=True, required_error=message)
+                admission_result(k, test, wait, expected=1, message=message)
                 self.checks["admission_" + name] = "Passed"
             finally:
                 apply(k, original)
-        k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test).encode())
+        admission_result(k, test, wait)
 
     def manifest(self, storage_class: str):
         result = copy.deepcopy(self.plan["openbao"])

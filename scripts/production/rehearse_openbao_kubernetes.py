@@ -45,7 +45,7 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
     if (result.returncode != expected or len(result.stdout) > bound or
             (required_error is not None and required_error not in (result.stderr or b""))):
-        if public_schema:
+        if public_schema and result.stderr:
             # Only public schema input, before TLS/Secret/init. Escape CI controls and bound output.
             print("OPENBAO_PUBLIC_SCHEMA_ERROR=" + json.dumps(
                 (result.stderr or b"")[:4096].decode("utf-8", errors="replace")), flush=True)
