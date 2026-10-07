@@ -103,6 +103,13 @@ class PlatformAdmissionTest(unittest.TestCase):
             self.assertIn(required, expressions)
         self.assertNotIn("insecureIgnore", json.dumps(policy))
 
+    def test_intoto_payload_checks_use_the_verified_statement_predicate(self):
+        validations = target.image_policy('istio-system', ['image'], 'a' * 40)['spec']['validations']
+        self.assertIn('.predicate.buildDefinition.externalParameters.gitRevision', validations[2]['expression'])
+        self.assertIn('.predicate.bomFormat', validations[4]['expression'])
+        self.assertIn('verifyAttestationSignatures', validations[1]['expression'])
+        self.assertIn('verifyAttestationSignatures', validations[3]['expression'])
+
     def test_security_context_tree_is_typed_cel_not_map_comparison(self):
         expression = target.scalar_tree("c.securityContext", {"runAsUser": 0,
             "capabilities": {"drop": ["ALL"], "add": ["NET_ADMIN"]}})

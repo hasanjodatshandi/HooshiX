@@ -191,12 +191,12 @@ def image_policy(namespace: str, images: list[str], revision: str) -> dict:
         validation("platform provenance signature verification failed", "images.containers.map(image, "
                    "verifyAttestationSignatures(image, attestations.provenance, [attestors.cosign])).all(e, e > 0)"),
         validation("platform import source revision rejected", "images.containers.map(image, "
-                   "extractPayload(image, attestations.provenance).buildDefinition.externalParameters.gitRevision == "
+                   "extractPayload(image, attestations.provenance).predicate.buildDefinition.externalParameters.gitRevision == "
                    + literal(revision) + ").all(e, e)"),
         validation("platform signed SBOM verification failed", "images.containers.map(image, "
                    "verifyAttestationSignatures(image, attestations.sbom, [attestors.cosign])).all(e, e > 0)"),
         validation("platform signed SBOM is not CycloneDX", "images.containers.map(image, "
-                   "extractPayload(image, attestations.sbom).bomFormat == 'CycloneDX').all(e, e)")])
+                   "extractPayload(image, attestations.sbom).predicate.bomFormat == 'CycloneDX').all(e, e)")])
     result["spec"].update({"webhookConfiguration": {"timeoutSeconds": 15},
         "credentials": {"secrets": [PULL_SECRET]},
         "matchImageReferences": [{"glob": image} for image in images],
