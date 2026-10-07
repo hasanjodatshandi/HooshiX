@@ -91,6 +91,7 @@ class PlatformAdmissionTest(unittest.TestCase):
         self.assertEqual("policies.kyverno.io/v1", policy["apiVersion"])
         self.assertEqual("Fail", spec["failurePolicy"])
         self.assertEqual(["Deny"], spec["validationActions"])
+        self.assertEqual({'timeoutSeconds': 30}, spec['webhookConfiguration'])
         self.assertEqual({"podControllers": {"controllers": []}}, spec["autogen"])
         self.assertEqual({"admission": {"enabled": True}, "background": {"enabled": True}}, spec["evaluation"])
         self.assertEqual([{"glob": image}], spec["matchImageReferences"])

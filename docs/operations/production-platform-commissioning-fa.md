@@ -101,7 +101,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downlo
 projected یک‌ساعته جایگزین شده تا سیاست دقیق با mount تزریقی تصادفی تعارض نداشته
 باشد. هویت و RBAC قبلی حفظ می‌شود و mount/حجم‌های این دو جزء در policy پین هستند.
 امضای هر attestation در متغیر request-local یک بار بررسی می‌شود؛ payload فقط
-پس از تأیید امضا خوانده می‌شود و deadline پانزده‌ثانیه‌ای webhook حفظ می‌شود.
+پس از تأیید امضا خوانده می‌شود. بررسی cold تصویر خصوصی در آزمون به مهلت اولیهٔ
+۱۵ ثانیه رسید؛ مهلت هر webhook این نصب ۳۰ ثانیه، درخواست API برابر ۷۵ ثانیه و
+فرمان محلی ۹۰ ثانیه است تا هر دو مرحلهٔ mutate/validate فرصت محدود داشته باشند.
+در خطا یا timeout، پذیرش همچنان fail-closed است؛ deadline بیست‌دقیقه‌ای نصب و
+SLO درخواست‌های کاربران/authorization تغییری نمی‌کند. این بودجه، شاهد ظرفیت
+کل stack نیست و آزمون کامل ظرفیت Production همچنان لازم است.
 
 ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، چهار policy
 با Deny، mesh، TLS سرویس با CA قبلی، PV محلی Retain و StatefulSet. محدودیت PSA

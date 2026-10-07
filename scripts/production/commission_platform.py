@@ -62,8 +62,8 @@ def native(argv, *, data=None, expected=0, timeout=30, password=None, required_e
             os.close(read_fd)
 
 
-def kube(*args, body=None, expected=0, timeout=45, required_error=None):
-    return native([custody.K3S, 'kubectl', '--request-timeout=30s', *args],
+def kube(*args, body=None, expected=0, timeout=90, required_error=None):
+    return native([custody.K3S, 'kubectl', '--request-timeout=75s', *args],
                   data=json.dumps(body).encode() if body is not None else None,
                   expected=expected, timeout=timeout, required_error=required_error)
 

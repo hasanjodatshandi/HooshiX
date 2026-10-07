@@ -199,7 +199,7 @@ def image_policy(namespace: str, images: list[str], revision: str) -> dict:
         validation("platform signed SBOM verification failed", "variables.sbomVerified"),
         validation("platform signed SBOM is not CycloneDX", "variables.sbomVerified && images.containers.map(image, "
                    "extractPayload(image, attestations.sbom).predicate.bomFormat == 'CycloneDX').all(e, e)")])
-    result["spec"].update({"webhookConfiguration": {"timeoutSeconds": 15},
+    result["spec"].update({"webhookConfiguration": {"timeoutSeconds": 30},
         # CEL variables are lazy/request-local: verify each attestation once,
         # and never extract an unverified payload or perform duplicate I/O.
         "variables": [{"name": name + "Verified", "expression":
