@@ -159,29 +159,35 @@ class Staging:
         for name in ("admission", "background", "cleanup", "reports"):
             k("-n", "kyverno", "rollout", "status", "deployment/kyverno-" + name + "-controller",
               "--timeout=180s", timeout=195)
+        print('PLATFORM_STEP=kyverno-policy-retention', flush=True)
         preserved_policy = {'apiVersion': 'policies.kyverno.io/v1', 'kind': 'ValidatingPolicy',
             'metadata': {'name': 'fixture-upgrade-retention'}, 'spec': {'failurePolicy': 'Fail',
             'validationActions': ['Deny'], 'autogen': {'podControllers': {'controllers': []}},
             'matchConstraints': {'resourceRules': [{'apiGroups': [''], 'apiVersions': ['v1'],
                 'operations': ['CREATE'], 'resources': ['configmaps']}]},
             'validations': [{'expression': 'true', 'message': 'fixture retention only'}]}}
-        apply(k, preserved_policy)
+        k('apply', '--server-side', '--field-manager=hooshix-staging', '-f', '-',
+          data=json.dumps(preserved_policy).encode(), public_schema=True)
         policy_before = json.loads(k('get', 'validatingpolicy', 'fixture-upgrade-retention', '-o', 'json'))
+        print('PLATFORM_STEP=kyverno-render', flush=True)
         upgrade_plan = upgrade_kyverno.candidate()
         shutil.copyfile(mesh.ROOT / 'infrastructure/kyverno/chart/3.9.1/kyverno-3.9.1.tgz', directory / 'kyverno-3.9.1.tgz')
         tools = Path(os.environ['RUNNER_TEMP']) / 'platform-tools'
         shutil.copyfile(tools / 'helm.tar.gz', directory / 'helm-linux-amd64.tar.gz')
 
         def upgrade_kube(*args, body=None):
-            return k(*args, data=json.dumps(body).encode() if body is not None else None)
+            return k(*args, data=json.dumps(body).encode() if body is not None else None, public_schema=True)
 
         def upgrade_get(kind, name, namespace=None):
             scope = ['-n', namespace] if namespace else []
             data = k(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json')
             return json.loads(data) if data.strip() else None
 
+        def upgrade_native(args, **options):
+            return run(args, public_schema=True, **options)
+
         upgrade_kyverno.execute(upgrade_plan, directory, directory, directory / 'kubeconfig',
-                               kube=upgrade_kube, native=run, get=upgrade_get)
+                               kube=upgrade_kube, native=upgrade_native, get=upgrade_get)
         policy_after = json.loads(k('get', 'validatingpolicy', 'fixture-upgrade-retention', '-o', 'json'))
         if (policy_before['metadata']['uid'] != policy_after['metadata']['uid']
                 or policy_before['spec'] != policy_after['spec']):
