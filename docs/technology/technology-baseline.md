@@ -208,6 +208,10 @@ verification metadata must reflect the aligned Jackson core/BOM set before promo
 The frontend development lock resolves transitive `undici` to `8.11.2` within jsdom's
 declared `^8.9.0` range to clear the current OSV advisories; this is not a new
 production runtime dependency.
+The frontend lock resolves `source-map-js` to `1.2.2` within the existing consumers'
+`^1.2.1` ranges for the [upstream indexed-source-map DoS fix](https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2).
+No new root dependency or override is added; OSV and the existing frontend build,
+coverage, browser, accessibility, and image smoke gates remain blocking.
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
 - Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;

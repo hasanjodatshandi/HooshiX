@@ -718,6 +718,31 @@ def validate_guarded_structure(root: Path) -> list[str]:
     return errors
 
 
+def validate_spring_framework_alignment(root: Path) -> list[str]:
+    """Keep the security-patched Framework family aligned in each service lock."""
+    baseline = read_text(root / "docs/technology/technology-baseline.md")
+    match = re.search(r"^\| Spring Framework \| ([0-9]+\.[0-9]+\.[0-9]+) \|", baseline, re.MULTILINE)
+    if not match:
+        return ["explicit Spring Framework baseline required"]
+    version = match.group(1)
+    errors = []
+    for name in ("identity-service", "authorization-service", "notification-service",
+                 "compromised-password-service", "web-bff", "conversation-service"):
+        service = root / "services" / name
+        build = read_text(service / "build.gradle.kts")
+        bom = f'platform("org.springframework:spring-framework-bom:{version}")'
+        if bom not in build:
+            errors.append(f"{name}: aligned Framework BOM required")
+        modules = re.findall(r"^org\.springframework:([^:]+):([^=]+)=",
+                             read_text(service / "gradle.lockfile"), re.MULTILINE)
+        if not {"spring-framework-bom", "spring-core", "spring-webmvc"}.issubset(
+                {module for module, _ in modules}):
+            errors.append(f"{name}: complete Framework lock required")
+        if any(locked != version for _, locked in modules):
+            errors.append(f"{name}: Framework lock version differs from baseline")
+    return errors
+
+
 def validate_repository(root: Path = ROOT) -> list[str]:
     checks: tuple[tuple[str, callable], ...] = (
         ("required_paths", lambda: validate_required_paths(root)),
@@ -728,6 +753,7 @@ def validate_repository(root: Path = ROOT) -> list[str]:
         ("agent_reporting", lambda: validate_agent_reporting_contract(root)),
         ("ci_source_quality", lambda: validate_ci_source_quality(root)),
         ("contract_package_boundary", lambda: validate_contract_package_boundary(root)),
+        ("spring_framework_alignment", lambda: validate_spring_framework_alignment(root)),
         ("guarded_structure", lambda: validate_guarded_structure(root)),
     )
     errors: list[str] = []

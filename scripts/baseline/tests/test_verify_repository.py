@@ -11,6 +11,40 @@ import verify_repository as verifier  # noqa: E402
 
 
 class RepositoryBaselineVerifierTest(unittest.TestCase):
+    def test_current_six_service_framework_locks_follow_security_baseline(self) -> None:
+        self.assertEqual([], verifier.validate_spring_framework_alignment(verifier.ROOT))
+
+    def test_framework_alignment_rejects_old_mixed_missing_lock_and_bom(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            baseline = root / "docs/technology/technology-baseline.md"
+            baseline.parent.mkdir(parents=True)
+            baseline.write_text("| Spring Framework | 7.0.9 | security patch |\n")
+            for name in ("identity-service", "authorization-service", "notification-service",
+                         "compromised-password-service", "web-bff", "conversation-service"):
+                service = root / "services" / name
+                service.mkdir(parents=True)
+                (service / "build.gradle.kts").write_text(
+                    'implementation(platform("org.springframework:spring-framework-bom:7.0.9"))\n')
+                (service / "gradle.lockfile").write_text(
+                    "org.springframework:spring-framework-bom:7.0.9=runtimeClasspath\n"
+                    "org.springframework:spring-core:7.0.9=runtimeClasspath\n"
+                    "org.springframework:spring-webmvc:7.0.9=runtimeClasspath\n")
+            self.assertEqual([], verifier.validate_spring_framework_alignment(root))
+            service = root / "services/web-bff"
+            lock = service / "gradle.lockfile"
+            original = lock.read_text()
+            for changed in (original.replace("7.0.9", "7.0.8"),
+                            original + "org.springframework:spring-test:7.0.8=testRuntimeClasspath\n",
+                            ""):
+                lock.write_text(changed)
+                self.assertTrue(verifier.validate_spring_framework_alignment(root))
+            lock.write_text(original)
+            (service / "build.gradle.kts").write_text("")
+            self.assertTrue(verifier.validate_spring_framework_alignment(root))
+            baseline.write_text("| Spring Boot | 4.1.0 | baseline |\n")
+            self.assertTrue(verifier.validate_spring_framework_alignment(root))
+
     def test_dependency_parser_reads_classes_fields_and_policy_refs(self) -> None:
         registry = verifier.parse_dependency_registry(
             """version: 2
