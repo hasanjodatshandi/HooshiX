@@ -167,6 +167,9 @@ def hardening(namespace: str, pods: dict[str, dict]) -> dict:
     # either namespace. Each CEL guard still enforces only its own namespace.
     result["spec"]["matchConstraints"]["namespaceSelector"] = {"matchExpressions": [{
         "key": "kubernetes.io/metadata.name", "operator": "In", "values": list(NAMESPACES)}]}
+    # A plain "pods" match does not match the ephemeral-container update edge.
+    # The same no-ephemeral-container boundary must cover that subresource too.
+    result["spec"]["matchConstraints"]["resourceRules"][0]["resources"].append("pods/ephemeralcontainers")
     return result
 
 

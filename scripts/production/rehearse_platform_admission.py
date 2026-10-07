@@ -204,6 +204,9 @@ class Staging:
         apply(k, {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {
             "name": "openbao", "namespace": "hooshix-secrets"}})
         wrong_bao["spec"]["containers"][0]["image"] = self.mesh_receipt["components"]["istiod"]["image"]
+        # StatefulSet claim templates supply this volume only to generated Pods;
+        # a standalone server dry-run must declare a harmless placeholder itself.
+        wrong_bao["spec"].setdefault("volumes", []).append({"name": "data", "emptyDir": {}})
         admission_result(k, wrong_bao, wait, expected=1,
                          message=b"platform bootstrap identity/security exception rejected")
         self.checks["admission_deny_negative"] = "Passed"

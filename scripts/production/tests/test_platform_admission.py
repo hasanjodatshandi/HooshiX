@@ -127,6 +127,7 @@ class PlatformAdmissionTest(unittest.TestCase):
         for name in target.NAMESPACES:
             spec = target.hardening(name, {"openbao": pod})["spec"]
             selectors.append(spec["matchConstraints"]["namespaceSelector"])
+            self.assertIn("pods/ephemeralcontainers", spec["matchConstraints"]["resourceRules"][0]["resources"])
             self.assertTrue(spec["validations"][0]["expression"].startswith(
                 'object.metadata.namespace != "' + name + '" || ('))
         self.assertEqual(selectors[0], selectors[1])
