@@ -164,6 +164,7 @@ class Staging:
             apply(k, {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {
                 "name": account, "namespace": "istio-system"}})
         print("PLATFORM_STEP=admission-audit", flush=True)
+        apply(k, self.plan["admission_prerequisites"])
         # Validate exact boundary in Audit first; nothing is promoted by this step.
         for policy in self.plan["admission"]["items"]:
             audit = copy.deepcopy(policy)

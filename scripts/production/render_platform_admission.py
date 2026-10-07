@@ -20,6 +20,17 @@ BOUND = 32 * 1024
 BAO_PIN = mesh.ROOT / "infrastructure/production/secrets/openbao-image.json"
 
 
+def reporting_permissions() -> dict:
+    # Kyverno 1.18 checks get/list/watch for every matched resource, including
+    # subresources. This adds no update/debug permission and no Secret access.
+    return {"apiVersion": "v1", "kind": "List", "items": [{
+        "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole",
+        "metadata": {"name": "hooshix-platform-ephemeral-report-reader", "labels": {
+            "rbac.kyverno.io/aggregate-to-reports-controller": "true"}},
+        "rules": [{"apiGroups": [""], "resources": ["pods/ephemeralcontainers"],
+                   "verbs": ["get", "list", "watch"]}]}]}
+
+
 def publication(path: Path, component: str, now: datetime) -> dict:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > BOUND:
         raise ValueError("bounded regular public publication receipt required")
@@ -234,6 +245,7 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
                 image_policy("hooshix-secrets", [bao_receipt["image"]], bao_receipt["repository_revision"])]
     return {"schema_version": 1, "profile": "production-single-server",
             "installation_id": "hooshix-production", "mesh": candidate, "openbao": openbao,
+            "admission_prerequisites": reporting_permissions(),
             "admission": {"apiVersion": "v1", "kind": "List", "items": policies},
             "runtime_admission": "Not verified", "staging": "Not verified", "deployment": "Not verified"}
 

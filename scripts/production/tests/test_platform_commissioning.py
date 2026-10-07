@@ -26,6 +26,7 @@ class PlatformCommissioningTest(unittest.TestCase):
                 'profile': 'production-single-server',
                 'mesh': {'stages': [{'component': name} for name in ('base', 'istiod', 'cni', 'ztunnel')]},
                 'openbao': bao.candidate('hooshix-openbao-local'),
+                'admission_prerequisites': admission.reporting_permissions(),
                 'admission': {'items': [{'spec': {'failurePolicy': 'Fail', 'validationActions': ['Deny']}}] * 4},
                 'commissioning_evidence': {'source_revision': 'a' * 40, 'staging': 'Passed',
                                           'run_id': 12, 'observed_at': datetime.now(timezone.utc).isoformat()}}
@@ -53,6 +54,18 @@ class PlatformCommissioningTest(unittest.TestCase):
             link.symlink_to(path)
             with self.assertRaises(OSError):
                 host.read_plan(link, digest, 'a' * 40)
+
+    def test_reporting_subresource_permissions_cannot_grant_write_or_secrets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'plan.json'
+            for field, value in (('verbs', ['get', 'list', 'watch', 'update']),
+                                 ('resources', ['secrets']), ('apiGroups', ['*'])):
+                plan = self.plan()
+                plan['admission_prerequisites']['items'][0]['rules'][0][field] = value
+                path.write_text(json.dumps(plan))
+                digest = host.hashlib.sha256(path.read_bytes()).hexdigest()
+                with self.assertRaises(host.custody.BootstrapFailed):
+                    host.read_plan(path, digest, 'a' * 40)
 
     def test_no_root_or_unexpected_target_denied_before_execution(self):
         with patch.object(os, 'geteuid', return_value=1000), patch.object(host, 'native') as native, \

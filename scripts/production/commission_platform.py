@@ -158,6 +158,13 @@ def read_plan(path, digest, revision):
     for policy in value['admission']['items']:
         require(policy['spec']['failurePolicy'] == 'Fail'
                 and policy['spec']['validationActions'] == ['Deny'], 'BLOCKING_ADMISSION_REQUIRED')
+    require(value.get('admission_prerequisites') == {
+        'apiVersion': 'v1', 'kind': 'List', 'items': [{
+            'apiVersion': 'rbac.authorization.k8s.io/v1', 'kind': 'ClusterRole',
+            'metadata': {'name': 'hooshix-platform-ephemeral-report-reader', 'labels': {
+                'rbac.kyverno.io/aggregate-to-reports-controller': 'true'}},
+            'rules': [{'apiGroups': [''], 'resources': ['pods/ephemeralcontainers'],
+                       'verbs': ['get', 'list', 'watch']}]}]}, 'READ_ONLY_REPORTING_RBAC_REQUIRED')
     return value
 
 
@@ -329,6 +336,7 @@ def execute(path, digest, revision, public_directory):
             apply({'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': name}})
         progress('admission', revision)
         registry_credentials()
+        apply(plan['admission_prerequisites'])
         apply(plan['admission'])
         for policy in plan['admission']['items']:
             kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true', policy['kind'].lower() + '/' + policy['metadata']['name'],

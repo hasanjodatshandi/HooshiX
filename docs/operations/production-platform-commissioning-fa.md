@@ -94,6 +94,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downlo
 اجرا می‌کند؛ Secret از حافظه و stdin API ساخته می‌شود، نه فایل user-writable
 یا argv. احراز محلی و deadline بیست‌دقیقه‌ای همچنان استثنای محدود ADR-0030 است.
 
+برای گزارش‌گیریِ منع ephemeral container، یک ClusterRole فقط با مجوز
+`get/list/watch` روی `pods/ephemeralcontainers` به reports-controller موجود
+تجمیع می‌شود؛ مجوز تغییر Pod، اجرای debug یا خواندن Secret اضافه نمی‌شود.
+
 ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، چهار policy
 با Deny، mesh، TLS سرویس با CA قبلی، PV محلی Retain و StatefulSet. محدودیت PSA
 فقط در `istio-system` و بعد از policy فعال، برای دو جزءٔ شبکهٔ تأییدشده اعمال
