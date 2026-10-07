@@ -173,8 +173,18 @@ class Staging:
             'matchConstraints': {'resourceRules': [{'apiGroups': [''], 'apiVersions': ['v1'],
                 'operations': ['CREATE'], 'resources': ['configmaps']}]},
             'validations': [{'expression': 'true', 'message': 'fixture retention only'}]}}
-        k('apply', '--server-side', '--field-manager=hooshix-staging', '-f', '-',
-          data=json.dumps(preserved_policy).encode(), public_schema=True)
+        # Deployment Ready can precede the old release's webhook endpoint.
+        # Wait on this harmless idempotent fixture CREATE, not a weakened
+        # failurePolicy or a disabled webhook; expiry still fails staging.
+        def retained_policy_available():
+            try:
+                k('apply', '--server-side', '--field-manager=hooshix-staging', '-f', '-',
+                  data=json.dumps(preserved_policy).encode(), public_schema=True)
+                return True
+            except RehearsalFailed:
+                return False
+
+        wait(retained_policy_available, seconds=45)
         policy_before = json.loads(k('get', 'validatingpolicy', 'fixture-upgrade-retention', '-o', 'json'))
         print('PLATFORM_STEP=kyverno-render', flush=True)
         upgrade_plan = upgrade_kyverno.candidate()
