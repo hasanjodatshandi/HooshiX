@@ -34,13 +34,13 @@ def apply(k, resource):
 def policy_ready(k, policy):
     resource = policy["kind"].lower() + "/" + policy["metadata"]["name"]
     try:
-        k("wait", "--for=condition=Ready", resource, "--timeout=60s", timeout=75)
+        k("wait", "--for=jsonpath={.status.conditionStatus.ready}=true", resource, "--timeout=60s", timeout=75)
     except (ValueError, OSError, RehearsalFailed):
         # Only the status of a public policy is read; never its registry Secret,
         # controller logs, environment or request/response body diagnostics.
         status = json.loads(k("get", resource, "-o", "json")).get("status", {})
         print("PLATFORM_POLICY_STATUS=" + json.dumps({"name": policy["metadata"]["name"],
-              "conditions": status.get("conditions", [])})[:4096], flush=True)
+              "conditions": status.get("conditionStatus", {})})[:4096], flush=True)
         raise
 
 
