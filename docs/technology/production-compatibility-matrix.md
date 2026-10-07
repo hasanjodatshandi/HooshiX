@@ -21,7 +21,7 @@ This matrix records production technology combinations that must remain compatib
 | Cosign | 3.0.6 | exact image digest signature + provenance + signed CycloneDX SBOM attestation; compatible with Kyverno verification policy |
 | HIBP Pwned Passwords | SHA-1 offline corpus | ADR-0040: official Pwned Password source/range semantics; SHA-1 only for screening; complete acquisition/provenance/freshness/full-corpus cardinality evidence |
 | Xerial SQLite JDBC / SQLite | 3.53.2.1 / 3.53.2 | Java 25/Linux native compatibility; 20-byte SHA-1 immutable read-only dataset; no runtime provider/mutable persistence; SBOM/advisory review |
-| Kubernetes API/minor | 1.35.6 | selected Istio 1.30.x, CloudNativePG 1.30.x, cert-manager 1.20.x, Kyverno 1.18.x, Calico 3.32.x |
+| Kubernetes API/minor | 1.35.6 | selected Istio 1.30.x, CloudNativePG 1.30.x, cert-manager 1.20.x, Kyverno 1.19.x, Calico 3.32.x |
 | `production-single-server` Kubernetes | K3s `v1.35.6+k3s1` | one server/workload node; embedded SQLite; custom Calico; bundled Flannel/policy-controller/Traefik/ServiceLB disabled |
 | `production-ha` Kubernetes | kubeadm-compatible 1.35.6 | current HA control-plane/worker topology |
 | Istio | 1.30.5 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |

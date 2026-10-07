@@ -105,7 +105,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
         root = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
         if platform_directory.is_symlink() or not platform_directory.resolve(strict=True).is_relative_to(root):
             raise RehearsalFailed("runner-owned publication directory required")
-        from rehearse_platform_admission import Staging
+        from rehearse_platform_admission import Staging, admission_result
         platform = Staging(platform_directory)
     pin = pins()
     step("tools")
@@ -233,7 +233,13 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
             test_pod = {"apiVersion": "v1", "kind": "Pod", "metadata": {
                 "name": "ci-admission-probe", "namespace": NAMESPACE}, "spec": pod_spec}
             step("schema-pod")
-            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), public_schema=True)
+            if platform is None:
+                k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), public_schema=True)
+            else:
+                # The exact same bounded positive preflight used for mesh:
+                # cold registry timeout DENIES the attempt, never admits it.
+                # Only an actual successful complete signed dry-run passes.
+                admission_result(k, test_pod, wait)
             pod_spec["containers"][0]["securityContext"]["privileged"] = True
             # Keep the unsafe fixture structurally valid so PSA, not core schema validation, denies it.
             pod_spec["containers"][0]["securityContext"]["allowPrivilegeEscalation"] = True
