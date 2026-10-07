@@ -78,6 +78,35 @@ class MeshPublicationTest(unittest.TestCase):
                 self.assertTrue(argv[-1].endswith('-123-2'))
         self.assertEqual(0o700, self.directory.stat().st_mode & 0o777)
 
+    def test_docker_hub_canonical_alias_preserves_exact_repository_and_digest(self):
+        self.publish()
+        folder = self.directory / 'istiod'
+        path = folder / 'syft.json'
+        sbom = json.loads(path.read_text())
+        image = target.targets()['istiod']['upstream']
+        sbom['source']['metadata']['repoDigests'] = ['index.' + image]
+        path.write_text(json.dumps(sbom))
+        result = target.validate(folder, image, datetime.now(timezone.utc))
+        self.assertEqual('Passed', result['scan'])
+        for invalid in ('index.docker.io/other/pilot@' + image.split('@')[1],
+                        'index.' + image.replace('sha256:', 'sha256:0'),
+                        'attacker.' + image):
+            sbom['source']['metadata']['repoDigests'] = [invalid]
+            path.write_text(json.dumps(sbom))
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                target.validate(folder, image, datetime.now(timezone.utc))
+
+    def test_docker_hub_alias_cannot_replace_expected_ghcr_import(self):
+        self.publish()
+        folder = self.directory / 'istiod'
+        path = folder / 'syft.json'
+        sbom = json.loads(path.read_text())
+        image = target.targets()['istiod']['image']
+        sbom['source']['metadata']['repoDigests'] = [target.targets()['istiod']['upstream']]
+        path.write_text(json.dumps(sbom))
+        with self.assertRaises(ValueError):
+            target.validate(folder, image, datetime.now(timezone.utc))
+
     def test_approved_public_imports_record_actual_visibility_and_keep_signing(self):
         self.visibility = 'public'
         result = self.publish()
@@ -167,6 +196,55 @@ class MeshPublicationTest(unittest.TestCase):
                 target.publish(self.directory, self.env)
             self.assertFalse((self.directory / 'receipt.json').exists())
 
+    def test_threshold_failure_preserves_public_json_and_never_signs(self):
+        report = json.dumps({'matches': [{'vulnerability': {'severity': 'High'}}]})
+        def failed(argv, timeout=180):
+            if argv[0] == 'grype' and argv[1].startswith('sbom:'):
+                raise subprocess.CalledProcessError(2, argv, output=report,
+                                                    stderr='synthetic private error')
+            return self.native(argv, timeout)
+        with patch.object(target, 'run', side_effect=failed), self.assertRaises(subprocess.CalledProcessError):
+            target.publish(self.directory, self.env)
+        self.assertEqual(report, (self.directory / 'istiod/grype.json').read_text())
+        self.assertFalse((self.directory / 'receipt.json').exists())
+        self.assertFalse(any(argv[:2] == ['cosign', 'sign'] for argv in self.calls))
+
+    def test_threshold_exit_even_with_empty_matches_is_failure(self):
+        for index, output in enumerate(('secret-not-json', '[]', '{}',
+                                         '{"matches": []}', 'x' * (target.MAX_BYTES + 1))):
+            folder = Path(self.temp.name) / str(index)
+            folder.mkdir()
+            error = subprocess.CalledProcessError(2, ['grype'], output=output, stderr='private')
+            with patch.object(target, 'run', side_effect=error), self.assertRaises(subprocess.CalledProcessError):
+                target.scan(folder)
+            self.assertEqual(output == '{"matches": []}', (folder / 'grype.json').exists())
+
+    def test_tool_failure_never_exports_raw_diagnostics(self):
+        error = subprocess.CalledProcessError(1, ['grype'], output='private', stderr='private')
+        with patch.object(target, 'run', side_effect=error), self.assertRaises(subprocess.CalledProcessError):
+            target.scan(Path(self.temp.name))
+        self.assertFalse((Path(self.temp.name) / 'grype.json').exists())
+
+    def test_oversized_success_report_is_rejected(self):
+        with patch.object(target, 'run', return_value='x' * (target.MAX_BYTES + 1)), self.assertRaises(ValueError):
+            target.scan(Path(self.temp.name))
+        self.assertFalse((Path(self.temp.name) / 'grype.json').exists())
+
+    def test_upstream_scan_ci_is_blocking_and_has_no_publication_or_credentials(self):
+        workflow = (target.ROOT / '.github/workflows/repository-baseline.yml').read_text()
+        job = workflow.split('  mesh-artifact:\n')[1].split('  openbao-kubernetes:\n')[0]
+        for expected in ('persist-credentials: false', 'targets().items()', "target['upstream']",
+                         'scan(folder)', 'validate(folder', 'if: ${{ always() }}', 'retention-days: 30',
+                         'SYFT_GOLANG_CAPTURE_SYMBOLS: all'):
+            self.assertIn(expected, job)
+        for forbidden in ('secrets.', 'packages: write', 'id-token: write', 'kubectl',
+                          'KUBECONFIG', 'continue-on-error', 'cosign sign', 'target[\'image\']'):
+            self.assertNotIn(forbidden, job)
+        aggregate = workflow.split('  baseline:\n')[1]
+        self.assertIn('      - mesh-artifact', aggregate)
+        self.assertIn('needs.mesh-artifact.result', aggregate)
+        self.assertIn('"${MESH_ARTIFACT_RESULT}" != \'success\'', aggregate)
+
     def test_fixed_images_and_protected_manual_workflow_only(self):
         selected = target.targets()
         self.assertEqual(set(target.COMPONENTS), set(selected))
@@ -175,7 +253,8 @@ class MeshPublicationTest(unittest.TestCase):
             self.assertEqual(value['upstream'].split('@')[1], value['image'].split('@')[1])
         workflow = (target.ROOT / '.github/workflows/production-release.yml').read_text().split('  openbao-candidate:\n')[1]
         for expected in ('mesh-candidate', 'environment: production-release', 'packages: write',
-                         '--event push --status success', 'publish_mesh_candidate.py', 'if: always()', '--password-stdin'):
+                         '--event push --status success', 'publish_mesh_candidate.py', 'if: always()', '--password-stdin',
+                         'SYFT_GOLANG_CAPTURE_SYMBOLS: all'):
             self.assertIn(expected, workflow)
         for forbidden in ('secrets.', 'kubectl', 'KUBECONFIG', 'continue-on-error', 'pull_request_target'):
             self.assertNotIn(forbidden, workflow)
