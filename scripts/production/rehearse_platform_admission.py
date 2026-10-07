@@ -196,6 +196,16 @@ class Staging:
             policy_ready(k, policy)
         admission_result(k, test, wait, expected=1,
                          message=b"platform bootstrap identity/security exception rejected")
+        wrong_bao = {"apiVersion": "v1", "kind": "Pod", "metadata": {
+            "name": "audit-boundary-negative", "namespace": "hooshix-secrets"},
+            "spec": copy.deepcopy(self.plan["openbao"]["items"][-1]["spec"]["template"]["spec"])}
+        # Ensure native enforcement in BOTH namespaces, not just whichever
+        # selector the shared webhook controller last reconciled.
+        apply(k, {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {
+            "name": "openbao", "namespace": "hooshix-secrets"}})
+        wrong_bao["spec"]["containers"][0]["image"] = self.mesh_receipt["components"]["istiod"]["image"]
+        admission_result(k, wrong_bao, wait, expected=1,
+                         message=b"platform bootstrap identity/security exception rejected")
         self.checks["admission_deny_negative"] = "Passed"
         print("PLATFORM_STEP=mesh", flush=True)
         # Fixture Root only. The owner's existing Root/CSR/credentials never enter CI.

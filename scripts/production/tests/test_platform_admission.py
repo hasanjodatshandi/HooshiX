@@ -121,6 +121,17 @@ class PlatformAdmissionTest(unittest.TestCase):
             self.assertIn(required, expression)
         self.assertNotIn("NET_ADMIN", expression)
 
+    def test_shared_webhook_selector_cannot_drop_either_namespace(self):
+        pod = target.bao.candidate("hooshix-openbao-local")["items"][-1]["spec"]["template"]["spec"]
+        selectors = []
+        for name in target.NAMESPACES:
+            spec = target.hardening(name, {"openbao": pod})["spec"]
+            selectors.append(spec["matchConstraints"]["namespaceSelector"])
+            self.assertTrue(spec["validations"][0]["expression"].startswith(
+                'object.metadata.namespace != "' + name + '" || ('))
+        self.assertEqual(selectors[0], selectors[1])
+        self.assertEqual(list(target.NAMESPACES), selectors[0]["matchExpressions"][0]["values"])
+
 
 if __name__ == "__main__":
     unittest.main()

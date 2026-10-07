@@ -158,8 +158,16 @@ def hardening(namespace: str, pods: dict[str, dict]) -> dict:
             terms.append("has(object.spec.automountServiceAccountToken) && "
                          "object.spec.automountServiceAccountToken == false")
         options.append("(" + " && ".join("(" + term + ")" for term in terms) + ")")
-    return policy("ValidatingPolicy", "hooshix-" + namespace + "-bootstrap-boundary", namespace,
-                  [validation("platform bootstrap identity/security exception rejected", " || ".join(options))])
+    result = policy("ValidatingPolicy", "hooshix-" + namespace + "-bootstrap-boundary", namespace,
+                    [validation("platform bootstrap identity/security exception rejected",
+                                "object.metadata.namespace != " + literal(namespace)
+                                + " || (" + " || ".join(options) + ")")])
+    # v1.18 merges clustered ValidatingPolicy selectors into one shared webhook.
+    # Give both policies the SAME bounded selector so merge order cannot exclude
+    # either namespace. Each CEL guard still enforces only its own namespace.
+    result["spec"]["matchConstraints"]["namespaceSelector"] = {"matchExpressions": [{
+        "key": "kubernetes.io/metadata.name", "operator": "In", "values": list(NAMESPACES)}]}
+    return result
 
 
 def image_policy(namespace: str, images: list[str], revision: str) -> dict:

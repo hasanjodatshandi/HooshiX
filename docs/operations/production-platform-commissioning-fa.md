@@ -50,6 +50,9 @@ provenance/SBOM اعمال می‌شوند. Secret فقط با نام `hooshix-g
 policy مستقیماً روی همهٔ Podها، از جمله Podهای ساخته‌شده توسط controller، اجرا
 می‌شود. autogen برای controllerها خاموش است تا بازنویسی constraint در Kyverno
 ۱٫۱۸ محدودهٔ namespace این استثنای نصب را گسترش ندهد؛ کنترل Pod خاموش نمی‌شود.
+دو ValidatingPolicy یک selector محدود و یکسان برای هر دو namespace دارند، چون
+Kyverno ۱٫۱۸ webhook مشترک می‌سازد؛ شرط CEL هر policy فقط namespace خودش را
+کنترل می‌کند. آزمون native رد درخواست در هر دو namespace الزامی است.
 محتوای credential در خروجی نیست. metadata receipt به‌تنهایی اصالت رمزنگاری‌شده
 یا مجوز apply نیست. خروجی را مستقیماً به `kubectl apply` ندهید.
 
