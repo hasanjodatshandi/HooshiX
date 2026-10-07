@@ -92,14 +92,15 @@ jobs:
             -o "$RUNNER_TEMP/platform-tools/cosign"
           printf '%s  %s\n' "$COSIGN_LINUX_AMD64_SHA256" "$RUNNER_TEMP/platform-tools/cosign" | sha256sum --check --strict
           chmod 0700 "$RUNNER_TEMP/platform-tools/cosign"
-          export COSIGN_REPOSITORY=ghcr.io/kyverno/signatures
+          # Cosign 3 OCI bundles live in upstream's separate signatures repository;
+          # COSIGN_REPOSITORY only redirects legacy .sig tags, not OCI referrers.
           for pair in "kyverno:$KYVERNO_ADMISSION_INDEX_DIGEST" "kyvernopre:$KYVERNO_PRE_INDEX_DIGEST" \
             "background-controller:$KYVERNO_BACKGROUND_INDEX_DIGEST" "cleanup-controller:$KYVERNO_CLEANUP_INDEX_DIGEST" \
             "reports-controller:$KYVERNO_REPORTS_INDEX_DIGEST"; do
             timeout 120s "$RUNNER_TEMP/platform-tools/cosign" verify \
               --certificate-identity "https://github.com/kyverno/kyverno/.github/workflows/release.yaml@refs/tags/v${KYVERNO_VERSION}" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              "reg.kyverno.io/kyverno/${pair%%:*}@${pair#*:}" > /dev/null
+              "ghcr.io/kyverno/signatures@${pair#*:}" > /dev/null
           done
       - name: Rehearse exact private images with real Calico Ambient and fail-closed Kyverno
         env:

@@ -262,7 +262,7 @@ class Staging:
                 admission_result(k, test, wait, expected=1, message=message)
                 if name == "wrong_signer":
                     forged = copy.deepcopy(test)
-                    forged["metadata"]["annotations"] = {"kyverno.io/image-verify-outcomes": json.dumps({
+                    forged["metadata"]["annotations"] = {"kyverno.io/image-verification-outcomes": json.dumps({
                         original["metadata"]["name"]: {"name": original["metadata"]["name"],
                                                        "status": "pass", "ruleType": "ImageVerify"}})}
                     admission_result(k, forged, wait, expected=1, message=message)
