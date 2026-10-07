@@ -130,7 +130,7 @@ Current exact selected versions include:
 - Syft 1.51.0 for final-image CycloneDX JSON SBOM;
 - Grype 0.117.0 for final-image/SBOM release/deployed-artifact vulnerability correlation;
 - Cosign 3.0.6 for signature/provenance/signed-SBOM evidence;
-- Kyverno 1.18.2 for production admission.
+- Kyverno 1.19.1 for production admission.
 
 Semgrep remains first-party source SAST/repository policy. Gradle dependency verification/locks remain dependency-integrity controls, not CVE authority.
 
@@ -156,7 +156,7 @@ rescanning and production-cluster admission enforcement remain `NOT VERIFIED`.
 
 ## 8. Kyverno
 
-Kyverno 1.18.2 remains blocking/fail-closed. Greenfield production policies use stable CEL-based `policies.kyverno.io/v1` types. CI/render gates reject new legacy `ClusterPolicy`/`CleanupPolicy` manifests.
+Kyverno 1.19.1 remains blocking/fail-closed. Greenfield production policies use stable CEL-based `policies.kyverno.io/v1` types. CI/render gates reject new legacy `ClusterPolicy`/`CleanupPolicy` manifests.
 
 Production admission verifies mandatory digest/signature/provenance/SBOM evidence; it does not synchronously query a vulnerability database.
 

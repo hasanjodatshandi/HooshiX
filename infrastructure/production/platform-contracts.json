@@ -2,7 +2,7 @@
   "admission": {
     "digest_required": true,
     "failure_policy": "Fail",
-    "kyverno": "1.18.2",
+    "kyverno": "1.19.1",
     "legacy_policy_types_allowed": false,
     "policy_api": "policies.kyverno.io/v1",
     "provenance_required": true,

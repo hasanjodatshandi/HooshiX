@@ -69,7 +69,7 @@
     "istio_ambient": "1.30.5",
     "k3s": "v1.35.6+k3s1",
     "kubernetes": "1.35.6",
-    "kyverno": "1.18.2",
+    "kyverno": "1.19.1",
     "kyverno_enforcement": "deny-fail-closed",
     "kyverno_policy_api": "policies.kyverno.io/v1",
     "schedulable_workload_nodes": 1,

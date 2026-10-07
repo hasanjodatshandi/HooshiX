@@ -260,6 +260,12 @@ class Staging:
             try:
                 apply(k, changed)
                 admission_result(k, test, wait, expected=1, message=message)
+                if name == "wrong_signer":
+                    forged = copy.deepcopy(test)
+                    forged["metadata"]["annotations"] = {"kyverno.io/image-verify-outcomes": json.dumps({
+                        original["metadata"]["name"]: {"name": original["metadata"]["name"],
+                                                       "status": "pass", "ruleType": "ImageVerify"}})}
+                    admission_result(k, forged, wait, expected=1, message=message)
                 self.checks["admission_" + name] = "Passed"
             finally:
                 apply(k, original)

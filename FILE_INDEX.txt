@@ -356,6 +356,7 @@ infrastructure/kind/pins.env
 infrastructure/kyverno/pins.env
 infrastructure/kyverno/policies/platform-workload-hardening.yaml
 infrastructure/kyverno/vendor/1.18.2/install.yaml
+infrastructure/kyverno/vendor/1.19.1/install.yaml
 infrastructure/local/README.md
 infrastructure/local/compose.yaml
 infrastructure/observability/authorizationpolicy.yaml

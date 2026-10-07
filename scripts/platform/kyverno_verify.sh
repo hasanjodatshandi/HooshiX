@@ -47,4 +47,4 @@ if k apply --server-side --dry-run=server -f /tmp/kyverno-privileged.yaml >/tmp/
 grep -Eqi 'privilege|denied|validation' /tmp/kyverno-privileged.out || fail "hardening negative did not return Kyverno denial evidence"
 legacy=$(find "$ROOT/infrastructure" "$ROOT/deploy" "$ROOT/services" -type f \( -name '*.yaml' -o -name '*.yml' \) ! -path '*/vendor/*' -print0 | xargs -0 grep -lE '^apiVersion: kyverno\.io/v(1|2)$' 2>/dev/null || true)
 [[ -z "$legacy" ]] || fail "legacy Kyverno production policy API found: $legacy"
-echo "Kyverno 1.18.2 CEL admission verification PASSED"
+echo "Kyverno $KYVERNO_VERSION CEL admission verification PASSED"

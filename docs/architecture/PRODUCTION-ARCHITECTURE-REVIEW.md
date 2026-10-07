@@ -132,7 +132,7 @@ Current selected roles:
 - Syft 1.51.0: final-image CycloneDX JSON SBOM;
 - Grype 0.117.0: final-image/SBOM release/deployed-artifact vulnerability correlation under ADR-0035/0038;
 - Cosign 3.0.6: exact-digest signature, provenance, and signed SBOM attestation;
-- Kyverno 1.18.2: production admission.
+- Kyverno 1.19.1: production admission.
 
 The implemented Compromised Password, Notification, Identity, Authorization, and Web BFF service CI suites include OSV-Scanner 2.4.0 locked-dependency scanning, and the scheduled repository security workflow reuses those service security suites so declared/locked dependency advisory scanning also runs without a source change. Exact tool/checksum ownership remains in each implemented workflow. This is early dependency feedback only.
 
@@ -146,7 +146,7 @@ This is an architecture decision, not production execution evidence. Current rep
 
 ## Kyverno review
 
-The current Kyverno 1.18.2 line uses stable CEL-based `policies.kyverno.io/v1` policy types for greenfield HooshiX production controls. CI/render gates reject new legacy ClusterPolicy/CleanupPolicy families unless a narrow migration-only exception exists.
+The current Kyverno 1.19.1 line uses stable CEL-based `policies.kyverno.io/v1` policy types for greenfield HooshiX production controls. CI/render gates reject new legacy ClusterPolicy/CleanupPolicy families unless a narrow migration-only exception exists.
 
 Production admission remains separate from vulnerability database lookup. Grype promotion decisions and continuous rescanning own final-artifact vulnerability freshness; Kyverno verifies required immutable artifact identity/evidence.
 

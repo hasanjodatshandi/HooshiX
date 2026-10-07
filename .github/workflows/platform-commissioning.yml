@@ -14,6 +14,7 @@ on:
       - scripts/production/run-platform-commissioning.ps1
       - scripts/production/tests/test_platform_commissioning.py
       - infrastructure/istio/**
+      - infrastructure/kyverno/**
       - infrastructure/production/secrets/**
   workflow_dispatch:
     inputs:
@@ -81,6 +82,25 @@ jobs:
           PyYAML @ https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc
           REQUIREMENTS
           echo "PYTHONPATH=$RUNNER_TEMP/platform-yaml" >> "$GITHUB_ENV"
+      - name: Verify pinned Kyverno upstream release signatures
+        run: |
+          set -euo pipefail
+          source infrastructure/production/release-tools.env
+          source infrastructure/kyverno/pins.env
+          curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            -o "$RUNNER_TEMP/platform-tools/cosign"
+          printf '%s  %s\n' "$COSIGN_LINUX_AMD64_SHA256" "$RUNNER_TEMP/platform-tools/cosign" | sha256sum --check --strict
+          chmod 0700 "$RUNNER_TEMP/platform-tools/cosign"
+          export COSIGN_REPOSITORY=ghcr.io/kyverno/signatures
+          for pair in "kyverno:$KYVERNO_ADMISSION_INDEX_DIGEST" "kyvernopre:$KYVERNO_PRE_INDEX_DIGEST" \
+            "background-controller:$KYVERNO_BACKGROUND_INDEX_DIGEST" "cleanup-controller:$KYVERNO_CLEANUP_INDEX_DIGEST" \
+            "reports-controller:$KYVERNO_REPORTS_INDEX_DIGEST"; do
+            timeout 120s "$RUNNER_TEMP/platform-tools/cosign" verify \
+              --certificate-identity "https://github.com/kyverno/kyverno/.github/workflows/release.yaml@refs/tags/v${KYVERNO_VERSION}" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "reg.kyverno.io/kyverno/${pair%%:*}@${pair#*:}" > /dev/null
+          done
       - name: Rehearse exact private images with real Calico Ambient and fail-closed Kyverno
         env:
           GITHUB_TOKEN: ${{ github.token }}
