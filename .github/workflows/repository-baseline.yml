@@ -196,6 +196,7 @@ jobs:
       GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
       GRYPE_CHECK_FOR_APP_UPDATE: 'false'
       SYFT_CHECK_FOR_APP_UPDATE: 'false'
+      SYFT_GOLANG_CAPTURE_SYMBOLS: all
     steps:
       - name: Check out repository without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

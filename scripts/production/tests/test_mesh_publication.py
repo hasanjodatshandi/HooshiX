@@ -205,7 +205,8 @@ class MeshPublicationTest(unittest.TestCase):
         workflow = (target.ROOT / '.github/workflows/repository-baseline.yml').read_text()
         job = workflow.split('  mesh-artifact:\n')[1].split('  openbao-kubernetes:\n')[0]
         for expected in ('persist-credentials: false', 'targets().items()', "target['upstream']",
-                         'scan(folder)', 'validate(folder', 'if: ${{ always() }}', 'retention-days: 30'):
+                         'scan(folder)', 'validate(folder', 'if: ${{ always() }}', 'retention-days: 30',
+                         'SYFT_GOLANG_CAPTURE_SYMBOLS: all'):
             self.assertIn(expected, job)
         for forbidden in ('secrets.', 'packages: write', 'id-token: write', 'kubectl',
                           'KUBECONFIG', 'continue-on-error', 'cosign sign', 'target[\'image\']'):
@@ -223,7 +224,8 @@ class MeshPublicationTest(unittest.TestCase):
             self.assertEqual(value['upstream'].split('@')[1], value['image'].split('@')[1])
         workflow = (target.ROOT / '.github/workflows/production-release.yml').read_text().split('  openbao-candidate:\n')[1]
         for expected in ('mesh-candidate', 'environment: production-release', 'packages: write',
-                         '--event push --status success', 'publish_mesh_candidate.py', 'if: always()', '--password-stdin'):
+                         '--event push --status success', 'publish_mesh_candidate.py', 'if: always()', '--password-stdin',
+                         'SYFT_GOLANG_CAPTURE_SYMBOLS: all'):
             self.assertIn(expected, workflow)
         for forbidden in ('secrets.', 'kubectl', 'KUBECONFIG', 'continue-on-error', 'pull_request_target'):
             self.assertNotIn(forbidden, workflow)

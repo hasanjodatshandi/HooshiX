@@ -159,6 +159,7 @@ jobs:
       id-token: write
       packages: write
     env:
+      SYFT_GOLANG_CAPTURE_SYMBOLS: all
       GRYPE_DB_AUTO_UPDATE: 'false'
       GRYPE_DB_VALIDATE_AGE: 'true'
       GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
