@@ -223,6 +223,13 @@ class Staging:
             "data": {label: base64.b64encode(path.read_bytes()).decode() for label, path in (
                 ("ca-key.pem", key), ("ca-cert.pem", cert), ("root-cert.pem", cert), ("cert-chain.pem", cert))}})
         for stage in self.plan["mesh"]["stages"]:
+            print("PLATFORM_MESH_COMPONENT=" + stage["component"], flush=True)
+            for resource in stage["manifest"]["items"]:
+                if resource["kind"] in ("Deployment", "DaemonSet"):
+                    probe = {"apiVersion": "v1", "kind": "Pod", "metadata": {
+                        "name": "signed-mesh-preflight", "namespace": "istio-system"},
+                        "spec": resource["spec"]["template"]["spec"]}
+                    admission_result(k, probe, wait)
             apply(k, stage["manifest"])
             if stage["component"] != "base":
                 kind = "deployment" if stage["component"] == "istiod" else "daemonset"
