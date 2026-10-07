@@ -214,6 +214,11 @@ def image_policy(namespace: str, images: list[str], revision: str) -> dict:
             "ctlog": {"url": "https://rekor.sigstore.dev"}}}],
         "attestations": [{"name": "provenance", "intoto": {"type": "https://slsa.dev/provenance/v1"}},
                          {"name": "sbom", "intoto": {"type": "https://cyclonedx.org/bom"}}]})
+    # Fixed public source identifiers only, never registry credentials/request data.
+    result["spec"]["validations"][2]["messageExpression"] = (
+        "'platform import source revision rejected; verified revisions: ' + "
+        "string(images.containers.map(image, extractPayload(image, attestations.provenance)"
+        ".predicate.buildDefinition.externalParameters.gitRevision))")
     return result
 
 
