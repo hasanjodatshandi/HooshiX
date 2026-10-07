@@ -49,6 +49,29 @@ container، host namespace، capability یا host mount خارج از این م�
 
 ### انتشار دسته‌ای سه تصویر mesh
 
+#### ترمیم تداخل برچسب import و امضای Cosign 3
+
+اجرای `37584436556` پس از اسکن موفق سه تصویر در مسیر امضا متوقف شد.
+`cosign copy` نسخهٔ 3.0.6 یک alias تصویر با نام `sha256-<digest>` می‌سازد؛
+در registry بدون Referrers API همین نام برای OCI index امضاها رزرو شده است.
+فرمان copy اکنون از `--attachment-tag-prefix import-` استفاده می‌کند؛ aliasهای
+import از فهرست امضا جدا می‌شوند و helper فقط alias
+قدیمیِ دقیقاً برابر manifest تصویر کاندیدا را ترمیم کند. index موجود، digest
+دیگر، خطای API یا محتوای نامعتبر overwrite نمی‌شود. پاسخ HTTPS محدود، بدون
+redirect و با token موقت همان CI است؛ هیچ PAT جدیدی لازم نیست. ترمیم بعد از
+اسکن موفق انجام می‌شود، manifest اصلی با digest ثابت باقی می‌ماند و alias
+اشتباه به OCI index خالی تبدیل می‌شود؛ Cosign امضاهای جدید را در آن می‌نویسد.
+index موجود همراه امضاهایش دست‌نخورده می‌ماند. job سریالی publication از تغییر
+هم‌زمان این aliasها توسط دو اجرای workflow جلوگیری می‌کند. حذف package، تغییر
+digest، غیرفعال‌کردن امضا و تکرار Root/CSR بخشی از این اصلاح نیستند.
+آزمون `rehearse_import_referrers.py` با همان binary پین‌شده در CI، خطای قبلی را
+روی registry حافظه‌ای loopback بازتولید می‌کند و سپس copy، repair، امضا، هر دو
+attestation، رد کلید اشتباه و حفظ index را بررسی می‌کند. کلیدهای آن مصنوعی‌اند
+و فقط برای fixture محلی از تنظیمات بدون transparency log استفاده می‌شود؛ مسیر
+انتشار واقعی همچنان OIDC/Rekor/TUF و signer دقیق را الزام می‌کند. دادهٔ fixture
+و کلیدهایش در پایان پاک می‌شوند و چیزی روی VPS نصب نمی‌شود.
+نتیجهٔ این آزمون جای publication با OIDC یا readiness نصب را نمی‌گیرد.
+
 مالک امنیت در ۲۰۲۶-۱۰-۰۵ عمومی‌بودن **فقط سه کپی بدون تغییر تصاویر رسمی
 Istio** (`istiod`، `cni` و `ztunnel`) را تأیید کرد. خصوصی‌بودن این سه کپی دیگر
 شرط انتشار نیست؛ visibility واقعی (`public` یا `private`) همچنان بررسی و در
