@@ -353,6 +353,9 @@ class Staging:
         pod["containers"][0]["name"] = "probe"
         pod["containers"][0]["command"] = ["/usr/bin/bao", "status", "-format=json",
             "-address=https://openbao.hooshix-secrets.svc:8200", "-ca-cert=/openbao/tls/ca.crt"]
+        # Replacing Kubernetes command does not clear the server's args.
+        # bao status rejects positional arguments rather than making a request.
+        pod["containers"][0]["args"] = []
         pod["containers"][0]["volumeMounts"] = [{"name": "tls", "mountPath": "/openbao/tls", "readOnly": True}]
         for field in ("startupProbe", "readinessProbe", "livenessProbe"):
             pod["containers"][0].pop(field, None)
@@ -386,7 +389,7 @@ class Staging:
                 # CLI here only runs status on a sealed, uninitialized fixture.
                 # Classify fixed public errors; never print raw workload logs.
                 causes = [name for name in ('lookup', 'i/o timeout', 'connection refused', 'x509',
-                                           'permission denied', 'EOF', 'no such file', 'context deadline')
+                                           'permission denied', 'EOF', 'no such file', 'context deadline', 'too many arguments')
                           if name.lower().encode() in output.lower()]
                 print('PLATFORM_NETWORK_RESULT=' + json.dumps({'probe': label, 'exit_code': state['exitCode'],
                       'error_classes': causes}), flush=True)

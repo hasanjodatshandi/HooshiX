@@ -143,6 +143,34 @@ class PlatformCommissioningTest(unittest.TestCase):
         self.assertIn('--for=jsonpath={.status.conditionStatus.ready}=true', command.call_args.args)
         self.assertNotIn('--for=condition=Ready', command.call_args.args)
 
+    def test_network_status_probe_does_not_inherit_server_arguments(self):
+        instance = staging.Staging.__new__(staging.Staging)
+        instance.plan = {'openbao': bao.candidate('standard'), 'admission': {'items': [{}, {}, {}]}}
+        instance.checks = {}
+        created = []
+
+        def kube(*args, data=None, **_):
+            if args[0] == 'apply':
+                value = json.loads(data)
+                if value.get('kind') == 'Pod':
+                    created.append(value)
+            if 'get' in args:
+                name = args[args.index('pod') + 1]
+                return json.dumps({'status': {'containerStatuses': [{'state': {'terminated': {
+                    'exitCode': 2 if name == 'mtls-positive' else 1}}}]}}).encode()
+            if 'logs' in args:
+                return b'{"sealed":true}' if args[-1] == 'mtls-positive' else b'fixture denied'
+            return b''
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            instance.network(kube, lambda check, **_: check())
+        self.assertEqual(3, len(created))
+        for pod in created:
+            self.assertEqual([], pod['spec']['containers'][0]['args'])
+            self.assertEqual(['/usr/bin/bao', 'status'], pod['spec']['containers'][0]['command'][:2])
+        self.assertEqual(['server', '-config=/openbao/config/server.json'],
+                         instance.plan['openbao']['items'][-1]['spec']['template']['spec']['containers'][0]['args'])
+
     def test_target_admission_requires_exact_denial_and_positive_server_dry_run(self):
         plan = {'mesh': {'stages': [{'manifest': {'items': [{'kind': 'Deployment', 'spec': {
             'template': {'spec': {'serviceAccountName': 'istiod', 'containers': [{'image': 'mesh@sha256:x'}]}}}}]}}]},
