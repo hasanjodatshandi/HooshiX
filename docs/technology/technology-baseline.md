@@ -17,6 +17,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | --- | --- | --- |
 | JDK / Language | Eclipse Temurin 25.0.4 / Java 25 LTS | official runtime archive SHA-256 and runtime base-image digest pinned by owning service; CI verifies exact runtime build |
 | Framework | Spring Boot 4.1.0 | current stable project baseline |
+| Spring Framework | 7.0.9 | aligned official Framework BOM across all six Java services; security patch for CVE-2026-47884, Boot remains 4.1.0 |
 | Embedded servlet container | Apache Tomcat 11.0.25 (`core`, `el`, `websocket` aligned) | reviewed security override of the Boot-managed version; resolves GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6, and GHSA-h3x4-894j-xpx5; all six service locks/checksums must align |
 | HTTP model | Spring MVC | WebFlux/Reactor prohibited without revised decision |
 | Request/I/O concurrency | Virtual Threads | `spring.threads.virtual.enabled=true` |
@@ -186,6 +187,13 @@ Both profiles preserve:
 - zero-standing-privilege human access.
 
 ## 6. Version governance
+
+Spring Framework modules use the official `spring-framework-bom:7.0.9` in each service's
+native Gradle platform configuration, overriding Boot 4.1.0's affected 7.0.8 family without
+changing Boot or adding a dependency-management plugin. The [official Spring advisory](https://spring.io/security/cve-2026-47884/)
+identifies 7.0.9 as the fixed OSS release. No XsltView route was identified in application source;
+that does not waive the dependency gate. Service-owned locks/checksums, strict build and
+security/contract suites, and advisory rescans are required; runtime promotion remains separate.
 
 The Tomcat patch override follows the [official Tomcat 11 security notices](https://tomcat.apache.org/security-11.html).
 Each service uses native Gradle constraints over the Spring Boot BOM; no new dependency-management
