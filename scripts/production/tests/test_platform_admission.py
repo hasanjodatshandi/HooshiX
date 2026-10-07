@@ -1,0 +1,124 @@
+import copy
+import json
+import sys
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import render_platform_admission as target
+
+NOW = datetime(2026, 10, 7, 12, tzinfo=timezone.utc)
+
+
+def receipt(component):
+    result = {"schema_version": 1, "component": component, "publication": "Passed",
+        "provenance_kind": "unchanged-upstream-import", "signer": target.EXPECTED_CERTIFICATE_IDENTITY,
+        "issuer": target.EXPECTED_OIDC_ISSUER, "repository_revision": "a" * 40,
+        "observed_at": NOW.isoformat()}
+    parts = target.mesh_publication.targets() if component == "mesh" else {"openbao": {
+        "image": "ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private@"
+        + json.loads(target.BAO_PIN.read_bytes())["image"].split("@")[1]}}
+    values = {name: {"image": value["image"], "scan": "Passed", "signature_provenance": "Passed",
+        "wrong_signer": "Passed", "registry_visibility": "private", "approved_exceptions": [],
+        "severity_counts": {"High": 0, "Critical": 0}, "database_built_at": NOW.isoformat()}
+        for name, value in parts.items()}
+    if component == "mesh":
+        result["components"] = values
+    else:
+        result.update(values["openbao"])
+    return result
+
+
+class PlatformAdmissionTest(unittest.TestCase):
+    def validate_receipt(self, data):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipt.json"
+            path.write_text(json.dumps(data))
+            return target.publication(path, data["component"], NOW)
+
+    def test_exact_publication_inventory_identity_visibility_and_freshness(self):
+        for component in ("mesh", "openbao"):
+            good = receipt(component)
+            self.assertEqual(good, self.validate_receipt(good))
+            for field, value in (("schema_version", 2), ("signer", "untrusted"), ("issuer", "wrong"),
+                                 ("repository_revision", "main"), ("publication", "Not verified"),
+                                 ("observed_at", "2026-09-01T00:00:00+00:00"),
+                                 ("observed_at", "2026-10-07T12:01:00+00:00"),
+                                 ("observed_at", "2026-10-07T12:00:00")):
+                bad = copy.deepcopy(good)
+                bad[field] = value
+                with self.subTest(component=component, field=field), self.assertRaises(ValueError):
+                    self.validate_receipt(bad)
+            bad = copy.deepcopy(good)
+            record = bad["components"]["cni"] if component == "mesh" else bad
+            for field, value in (("image", "image:latest"), ("scan", "Failed"),
+                                 ("signature_provenance", "Not verified"), ("wrong_signer", "Failed"),
+                                 ("severity_counts", {"High": 1, "Critical": 0}),
+                                 ("severity_counts", {}), ("approved_exceptions", ["waiver"]),
+                                 ("database_built_at", "2026-10-01T00:00:00+00:00")):
+                old = record[field]
+                record[field] = value
+                with self.subTest(component=component, field=field), self.assertRaises(ValueError):
+                    self.validate_receipt(bad)
+                record[field] = old
+        bad = receipt("openbao")
+        bad["registry_visibility"] = "public"
+        with self.assertRaises(ValueError):
+            self.validate_receipt(bad)
+        bad = receipt("mesh")
+        bad["components"].pop("cni")
+        with self.assertRaises(ValueError):
+            self.validate_receipt(bad)
+
+    def test_receipt_file_symlinks_and_bounds_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipt.json"
+            path.write_bytes(b"x" * (target.BOUND + 1))
+            with self.assertRaises(ValueError):
+                target.publication(path, "mesh", NOW)
+            link = Path(directory) / "link"
+            link.symlink_to(path)
+            with self.assertRaises(ValueError):
+                target.publication(link, "mesh", NOW)
+
+    def test_stable_fail_closed_policies_bind_exact_signed_revision(self):
+        image = receipt("openbao")["image"]
+        policy = target.image_policy("hooshix-secrets", [image], "b" * 40)
+        spec = policy["spec"]
+        self.assertEqual("policies.kyverno.io/v1", policy["apiVersion"])
+        self.assertEqual("Fail", spec["failurePolicy"])
+        self.assertEqual(["Deny"], spec["validationActions"])
+        self.assertEqual([{"glob": image}], spec["matchImageReferences"])
+        self.assertEqual({"mutateDigest": False, "required": True, "verifyDigest": True},
+                         spec["validationConfigurations"])
+        self.assertEqual({"secrets": ["hooshix-ghcr-read"]}, spec["credentials"])
+        expressions = json.dumps(spec["validations"])
+        self.assertIn("b" * 40, expressions)
+        for required in ("verifyImageSignatures", "verifyAttestationSignatures", "extractPayload", "CycloneDX"):
+            self.assertIn(required, expressions)
+        self.assertNotIn("insecureIgnore", json.dumps(policy))
+
+    def test_security_context_tree_is_typed_cel_not_map_comparison(self):
+        expression = target.scalar_tree("c.securityContext", {"runAsUser": 0,
+            "capabilities": {"drop": ["ALL"], "add": ["NET_ADMIN"]}})
+        self.assertIn("has(c.securityContext.runAsUser)", expression)
+        self.assertIn("c.securityContext.capabilities.add.size() == 1", expression)
+        self.assertNotIn(" == {", expression)
+        with self.assertRaises(ValueError):
+            target.scalar_tree("c", {"unsafe/key": "value"})
+
+    def test_openbao_namespace_has_no_root_mount_or_token_exception(self):
+        pod = target.bao.candidate("hooshix-openbao-local")["items"][-1]["spec"]["template"]["spec"]
+        expression = target.hardening("hooshix-secrets", {"openbao": pod})["spec"]["validations"][0]["expression"]
+        for required in ("!has(v.hostPath)", "RuntimeDefault", "hostNetwork", "hostPID", "hostIPC",
+                         "initContainers", "ephemeralContainers", "automountServiceAccountToken == false",
+                         "runAsUser == 10001", "allowPrivilegeEscalation == false"):
+            self.assertIn(required, expression)
+        self.assertNotIn("NET_ADMIN", expression)
+
+
+if __name__ == "__main__":
+    unittest.main()

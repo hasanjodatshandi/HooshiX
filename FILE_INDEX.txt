@@ -6,6 +6,7 @@
 .github/workflows/identity-service.yml
 .github/workflows/notification-service.yml
 .github/workflows/offline-ca.yml
+.github/workflows/platform-commissioning.yml
 .github/workflows/production-release.yml
 .github/workflows/production-vulnerability-rescan.yml
 .github/workflows/repository-baseline.yml
@@ -319,6 +320,7 @@ docs/operations/production-jit-usage-fa.md
 docs/operations/production-openbao-fa.md
 docs/operations/production-openbao-storage-fa.md
 docs/operations/production-pki-bootstrap-fa.md
+docs/operations/production-platform-commissioning-fa.md
 docs/operations/wireguard-management-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
@@ -531,11 +533,13 @@ scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
+scripts/production/rehearse_platform_admission.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/render_mesh_candidate.py
 scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
+scripts/production/render_platform_admission.py
 scripts/production/repair_import_referrers.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
@@ -565,6 +569,8 @@ scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_openbao_storage.py
 scripts/production/tests/test_openbao_storage_guard.py
 scripts/production/tests/test_parspack_audit_transport.py
+scripts/production/tests/test_platform_admission.py
+scripts/production/tests/test_platform_publication_run.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_readiness.py
@@ -575,6 +581,7 @@ scripts/production/tests/test_verify.py
 scripts/production/verify.py
 scripts/production/verify_host_audit.py
 scripts/production/verify_openbao_artifact.py
+scripts/production/verify_platform_publication_run.py
 scripts/production/verify_release.py
 scripts/production/verify_storage_guard.py
 services/authorization-service/.dockerignore

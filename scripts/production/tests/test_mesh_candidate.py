@@ -62,6 +62,8 @@ class MeshCandidateTest(unittest.TestCase):
         self.assertEqual(1, pilot['replicaCount'])
         self.assertEqual('prod.sajtech.internal', pilot['meshConfig']['trustDomain'])
         self.assertEqual('platform-prod', pilot['global']['meshID'])
+        self.assertEqual({'clusterName': 'hooshix-production-1'},
+                         target.values('ztunnel', pin)['multiCluster'])
         for component in ('istiod', 'cni', 'ztunnel'):
             resources = target.values(component, pin)['resources']
             self.assertEqual('1', resources['limits']['cpu'])
