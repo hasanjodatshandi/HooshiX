@@ -107,6 +107,8 @@ class PlatformAdmissionTest(unittest.TestCase):
         validations = target.image_policy('istio-system', ['image'], 'a' * 40)['spec']['validations']
         self.assertIn('.predicate.buildDefinition.externalParameters.gitRevision', validations[2]['expression'])
         self.assertIn('.predicate.bomFormat', validations[4]['expression'])
+        for index in (2, 4):
+            self.assertIn('[attestors.cosign]) > 0 && extractPayload', validations[index]['expression'])
         self.assertIn('verifyAttestationSignatures', validations[1]['expression'])
         self.assertIn('verifyAttestationSignatures', validations[3]['expression'])
 
