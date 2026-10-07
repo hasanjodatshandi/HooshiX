@@ -12,7 +12,7 @@ SBOM و scan همان digest را ثابت می‌کند؛ جای staging یا a
 
 ## وضعیت
 
-Implementation: admission renderer and disposable signed staging lane implemented; host installer in progress
+Implementation: admission, disposable signed staging and supervised host installer implemented; executed CI/target evidence required
 VPS installation: Not run by this change
 Production readiness: Not verified
 
@@ -47,6 +47,9 @@ python3 scripts/production/render_platform_admission.py \
 خروجی شامل candidate و چهار policy پایدار CEL است. namespaceهای بسته، SA/image
 دقیق، seccomp، منع host namespace و mount خارج از استثنای دو جزءٔ شبکه، و امضای
 provenance/SBOM اعمال می‌شوند. Secret فقط با نام `hooshix-ghcr-read` ارجاع می‌شود؛
+policy مستقیماً روی همهٔ Podها، از جمله Podهای ساخته‌شده توسط controller، اجرا
+می‌شود. autogen برای controllerها خاموش است تا بازنویسی constraint در Kyverno
+۱٫۱۸ محدودهٔ namespace این استثنای نصب را گسترش ندهد؛ کنترل Pod خاموش نمی‌شود.
 محتوای credential در خروجی نیست. metadata receipt به‌تنهایی اصالت رمزنگاری‌شده
 یا مجوز apply نیست. خروجی را مستقیماً به `kubectl apply` ندهید.
 
@@ -55,7 +58,61 @@ provenance/SBOM اعمال می‌شوند. Secret فقط با نام `hooshix-g
 نام کلاستر اکنون با istiod یکسان است. مرجع، chart vendored 1.30.5 و
 [راهنمای رسمی Helm Ambient](https://istio.io/latest/docs/ambient/install/multicluster/multi-primary_multi-network/) است.
 
-فرمان نصب فقط پس از تکمیل installer و بررسی CI همین تغییر اضافه می‌شود.
+## نصب واقعی روی VPS
+
+این بخش فقط پس از موفقیت workflow بالا، بازبینی و merge تغییر به `main` مجاز است.
+روی checkout تمیز همان `main`، بستهٔ عمومی را خارج از پروژه بسازید؛ این دستور
+هیچ credential نمی‌خواند و به VPS وصل نمی‌شود. `STAGING_RUN` باید اجرای موفق
+برای tree دقیق همین نسخه باشد؛ سازنده، نتیجه و artifact را از GitHub احراز می‌کند.
+
+```bash
+python3 scripts/production/build_platform_commissioning_bundle.py \
+  --staging-run STAGING_RUN \
+  --public-ca /mnt/c/Users/Coder/Downloads/HooshiX-stage10-intermediate-20261005/signed-intermediate-82360de7a72240eba9ced5e3522f7625 \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-platform-commissioning
+```
+
+دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37611729931` هستند.
+اگر evidence بیش از پنج روز عمر دارد، publication/staging تازه لازم است، نه ساخت Root.
+بسته شامل source/plan بازبینی‌شده، hashها، چهار فایل عمومی گواهی و همین راهنماست؛
+هیچ کلید یا رمز خصوصی در بسته نیست. پوشهٔ خروجی باید تازه و بیرون پروژه باشد.
+
+در Windows ابتدا کنسول نجات کارا و یک نشست مستقل خصوصی SSH باز نگه دارید.
+سپس در PowerShell محلی، بدون transcript یا ضبط صفحه:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\HooshiX-platform-commissioning\run-platform-commissioning.ps1" -RescueAndSecondSessionReady
+```
+
+رمز sudo، token موجود GHCR با `read:packages`، و رمز **Intermediate قبلی**
+را فقط در prompt مخفی همین پنجره وارد کنید. token را از فایل خصوصی قبلی
+خودتان بردارید؛ هیچ مقدار محرمانه‌ای در گفتگو نفرستید. رمز Root لازم نیست.
+این script منبع/hash را قبل از اجرای root کنترل می‌کند و Python را با `-I`
+اجرا می‌کند؛ Secret از حافظه و stdin API ساخته می‌شود، نه فایل user-writable
+یا argv. احراز محلی و deadline بیست‌دقیقه‌ای همچنان استثنای محدود ADR-0030 است.
+
+ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، چهار policy
+با Deny، mesh، TLS سرویس با CA قبلی، PV محلی Retain و StatefulSet. محدودیت PSA
+فقط در `istio-system` و بعد از policy فعال، برای دو جزءٔ شبکهٔ تأییدشده اعمال
+می‌شود؛ `hooshix-secrets` همچنان Restricted است. هشت GiB دوباره ساخته نمی‌شود.
+کلید TLS جدید فقط موقتاً در پوشهٔ root-only و سپس Secret رمزگذاری‌شدهٔ Kubernetes
+قرار می‌گیرد؛ پوشهٔ موقت پاک می‌شود. leaf اولیه ۳۰ روز اعتبار دارد؛ قبل از بازکردن
+Production باید تمدید تحت secret authority و هشدار انقضا تکمیل شود.
+
+موفقیت فقط با `OPENBAO_INSTALLATION=Passed` و receipt عمومی پذیرفته می‌شود.
+نصب، digest واقعی، TLS/SAN، probeهای sealed، اتصال به PV مشخص و حفظ سرویس‌ها
+بررسی می‌شوند. `Ready=false` در این مرحله طبیعی است: OpenBao **sealed و هنوز
+initialize نشده** است. script هیچ root token یا سهم Shamir ایجاد نمی‌کند.
+فعال‌سازی، نگهداری امن سه سهم با threshold=2، off-host snapshot/restore، ESO،
+audit/JIT و دروازهٔ ترافیک Production هنوز مراحل بعدی‌اند.
+
+در شکست، workload/PVC/CA و marker root-only حفظ می‌شوند؛ script هیچ rollback
+با حذف داده ندارد و `--force-conflicts` استفاده نمی‌کند. فقط source و فایل‌های
+عمومی همان upload با UUID پاک می‌شوند. خطای ثابت/مرحله و receipt را بفرستید؛
+قبل از retry علت را برطرف کنید. snapshot/کلید/رمز یا خروجی Secret را نفرستید.
+desired state عمومی همین bundle باید در reconciliation بعدی GitOps از منبع
+reviewed Git حفظ شود؛ استثنا، مجوز drift یا مدیریت عادی بدون JIT نیست.
+
 هیچ کلید، رمز، سهم Shamir یا token را در گفتگو ارسال نکنید.
 
 ## گزارش بازبینی تغییر

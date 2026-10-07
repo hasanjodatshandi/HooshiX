@@ -55,7 +55,29 @@ def admission_result(k, pod, wait, *, expected=0, message=None):
             return True
         except RehearsalFailed:
             return False
-    wait(converged, seconds=45)
+    try:
+        wait(converged, seconds=45)
+    except RehearsalFailed:
+        # Narrow public control-plane diagnostics only, never Secret/config/log
+        # dumps. This distinguishes disabled evaluation, compilation/autogen and
+        # an absent webhook without exposing registry or TLS material.
+        for kind in ("validatingpolicies", "imagevalidatingpolicies"):
+            values = json.loads(k("get", kind, "-o", "json"))["items"]
+            for value in values:
+                if value["metadata"]["name"].startswith("hooshix-"):
+                    spec = value["spec"]
+                    print("PLATFORM_ADMISSION_POLICY=" + json.dumps({
+                        "name": value["metadata"]["name"], "status": value.get("status", {}),
+                        "actions": spec.get("validationActions"), "evaluation": spec.get("evaluation"),
+                        "autogen": spec.get("autogen")})[:8192], flush=True)
+        values = json.loads(k("get", "validatingwebhookconfigurations", "-o", "json"))["items"]
+        for value in values:
+            if "kyverno" in value["metadata"]["name"]:
+                print("PLATFORM_ADMISSION_WEBHOOK=" + json.dumps({
+                    "name": value["metadata"]["name"], "webhooks": [{
+                        key: webhook.get(key) for key in ("name", "rules", "namespaceSelector", "matchConditions")}
+                        for webhook in value.get("webhooks", [])]})[:16384], flush=True)
+        raise
 
 
 def namespace(name: str, *, ambient: bool = False):

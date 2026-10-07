@@ -69,6 +69,11 @@ def match_constraints(namespace: str) -> dict:
 def policy(kind: str, name: str, namespace: str, validations: list[dict]) -> dict:
     return {"apiVersion": API, "kind": kind, "metadata": {"name": name}, "spec": {
         "failurePolicy": "Fail", "validationActions": ["Deny"],
+        # Enforce every actual Pod, including controller-created Pods. Do not
+        # synthesize controller rules: Kyverno 1.18 autogen rebuilds constraints
+        # without this namespace selector, widening this bootstrap boundary.
+        "autogen": {"podControllers": {"controllers": []}},
+        "evaluation": {"admission": {"enabled": True}, "background": {"enabled": True}},
         "matchConstraints": match_constraints(namespace), "validations": validations}}
 
 

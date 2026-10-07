@@ -11,6 +11,8 @@ on:
       - scripts/production/verify_platform_publication_run.py
       - scripts/production/commission_platform.py
       - scripts/production/build_platform_commissioning_bundle.py
+      - scripts/production/run-platform-commissioning.ps1
+      - scripts/production/tests/test_platform_commissioning.py
       - infrastructure/istio/**
       - infrastructure/production/secrets/**
   workflow_dispatch:
