@@ -11,6 +11,7 @@ from pathlib import Path
 
 import render_mesh_candidate as mesh
 import render_platform_admission as admission
+from rehearse_openbao_recovery import RehearsalFailed
 
 
 def pin_file(relative: str) -> dict:
@@ -28,6 +29,19 @@ def vendored(relative: str, digest: str) -> bytes:
 def apply(k, resource):
     return k("apply", "--server-side", "--field-manager=hooshix-staging", "-f", "-",
              data=json.dumps(resource).encode())
+
+
+def policy_ready(k, policy):
+    resource = policy["kind"].lower() + "/" + policy["metadata"]["name"]
+    try:
+        k("wait", "--for=condition=Ready", resource, "--timeout=60s", timeout=75)
+    except (ValueError, OSError, RehearsalFailed):
+        # Only the status of a public policy is read; never its registry Secret,
+        # controller logs, environment or request/response body diagnostics.
+        status = json.loads(k("get", resource, "-o", "json")).get("status", {})
+        print("PLATFORM_POLICY_STATUS=" + json.dumps({"name": policy["metadata"]["name"],
+              "conditions": status.get("conditions", [])})[:4096], flush=True)
+        raise
 
 
 def namespace(name: str, *, ambient: bool = False):
@@ -88,6 +102,7 @@ class Staging:
                            ("deployment", "coredns")):
             k("-n", "kube-system", "rollout", "status", kind + "/" + name, "--timeout=180s", timeout=195)
         self.checks["calico_runtime"] = "Passed"
+        k("wait", "--for=condition=Ready", "nodes", "--all", "--timeout=90s", timeout=105)
         print("PLATFORM_STEP=kyverno", flush=True)
         kyverno = pin_file("infrastructure/kyverno/pins.env")
         data = vendored("infrastructure/kyverno/vendor/" + kyverno["KYVERNO_VERSION"] + "/install.yaml",
@@ -118,8 +133,7 @@ class Staging:
             audit = copy.deepcopy(policy)
             audit["spec"]["validationActions"] = ["Audit"]
             apply(k, audit)
-            k("wait", "--for=condition=Ready", policy["kind"].lower() + "/" + policy["metadata"]["name"],
-              "--timeout=60s", timeout=75)
+            policy_ready(k, policy)
         test = {"apiVersion": "v1", "kind": "Pod", "metadata": {
             "name": "audit-boundary-negative", "namespace": "istio-system"},
             "spec": copy.deepcopy(self.pods["istiod"])}
@@ -143,8 +157,7 @@ class Staging:
         print("PLATFORM_STEP=admission-deny", flush=True)
         for policy in self.plan["admission"]["items"]:
             apply(k, policy)
-            k("wait", "--for=condition=Ready", policy["kind"].lower() + "/" + policy["metadata"]["name"],
-              "--timeout=60s", timeout=75)
+            policy_ready(k, policy)
         k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test).encode(), expected=1,
           public_schema=True, required_error=b"platform bootstrap identity/security exception rejected")
         self.checks["admission_deny_negative"] = "Passed"

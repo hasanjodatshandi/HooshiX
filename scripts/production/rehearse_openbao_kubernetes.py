@@ -145,7 +145,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
             if public_schema and not schema_only:
                 raise RehearsalFailed("schema diagnostics disabled after secret generation")
             return run([kubectl, "--kubeconfig", str(kubeconfig), "--context", "kind-" + name,
-                        "--request-timeout=10s", *args], data=data, timeout=timeout, expected=expected,
+                        "--request-timeout=30s", *args], data=data, timeout=timeout, expected=expected,
                        public_schema=public_schema, required_error=required_error)
 
         def get(kind_name: str, resource: str):
@@ -189,7 +189,8 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
                 raise RehearsalFailed("existing cluster must not be reused")
             started = True  # Also remove a partially-created cluster on failure.
             run([kind, "create", "cluster", "--name", name, "--image", pin["KIND_NODE_IMAGE"],
-                 "--config", str(cluster_config), "--kubeconfig", str(kubeconfig), "--wait", "120s"], timeout=240)
+                 "--config", str(cluster_config), "--kubeconfig", str(kubeconfig), "--wait",
+                 "0s" if platform is not None else "120s"], timeout=240)
             kubeconfig.chmod(0o600)
             if platform is not None:
                 platform.setup(k, run, directory, wait)

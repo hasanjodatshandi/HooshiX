@@ -9,6 +9,8 @@ on:
       - scripts/production/render_mesh_candidate.py
       - scripts/production/render_platform_admission.py
       - scripts/production/verify_platform_publication_run.py
+      - scripts/production/commission_platform.py
+      - scripts/production/build_platform_commissioning_bundle.py
       - infrastructure/istio/**
       - infrastructure/production/secrets/**
   workflow_dispatch:
@@ -40,6 +42,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Download successful main publications from the exact release workflow
         env:
           GH_TOKEN: ${{ github.token }}
