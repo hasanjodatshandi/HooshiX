@@ -46,7 +46,7 @@ def values(component, pin):
                        'cniBinDir': '/var/lib/rancher/k3s/data/current/bin/'})
     else:
         result.update({'resources': resources, 'image': 'docker.io/istio/ztunnel@' + digest,
-                       'meshID': 'platform-prod', 'clusterName': 'hooshix-production-1',
+                       'meshID': 'platform-prod', 'multiCluster': {'clusterName': 'hooshix-production-1'},
                        'trustDomain': pin['ISTIO_TRUST_DOMAIN']})
     return result
 

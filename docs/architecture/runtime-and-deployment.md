@@ -156,7 +156,7 @@ Session loss causes reauthentication. Browser cookie does not reconstruct server
 
 ## 8. Kyverno admission
 
-Kyverno 1.18.2 remains blocking/fail-closed. Single-server may run one replica but does not weaken policy semantics.
+Kyverno 1.19.1 remains blocking/fail-closed. Single-server may run one replica but does not weaken policy semantics.
 
 New production controls use stable CEL-based `policies.kyverno.io/v1` policy APIs. CI/render gates reject greenfield legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy/ClusterCleanupPolicy.
 

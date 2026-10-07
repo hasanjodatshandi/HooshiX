@@ -32,7 +32,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Protobuf Java/compiler | 4.34.2 | contract code generation and Spring Boot-managed service runtime aligned |
 | Protobuf validation | Protovalidate Java 1.2.2 | schema annotations plus fail-closed server interceptor; dependency locks and checksums required |
 | External/browser API | REST + OpenAPI through BFF | current architecture |
-| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 + LZ4 Java 1.11.1 | ADR-0015 profile-aware durability; the direct LZ4 constraint overrides Kafka Clients 4.2.1 transitive 1.10.1 because GHSA-xx22-p4ch-683r is fixed in 1.11.1 |
+| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 + LZ4 Java 1.11.2 | ADR-0015 profile-aware durability; direct constraint overrides Kafka Clients transitive 1.10.1 and fixes GHSA-xx22-p4ch-683r, GHSA-4v53-57pg-c464 and GHSA-6cx8-rjf8-pr8g ([upstream security release](https://github.com/yawkat/lz4-java/releases/tag/v1.11.2)); service locks/checksums and CI compatibility tests required |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
 | Database | PostgreSQL 18.4 | profile-aware mutable relational persistence |
@@ -86,7 +86,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Secret authority | OpenBao 2.6.4, official openbao-distroless (static nonroot) | ADR-0011 same-minor security patch/upstream flavor; verified-TLS native shell-free probes, recovery and exact-artifact scan gates; topology/authority unchanged |
 | Controlled VPS intermediate-key tooling | Existing Ubuntu OpenSSL/libssl3t64 3.5.5-1ubuntu3.7 | ADR-0002/0030 bounded commissioning only; encrypted PKCS#8 custody/public CSR handoff; no package upgrade or Root custody online |
 | Controlled VPS API-audit policy parser | Existing signed Ubuntu `python3-yaml` 6.0.3-1build1 / PyYAML 6.0.3 | bounded SafeLoader, no aliases/duplicate keys/custom objects; only whole-request Metadata policy accepted before intermediate Secret import; CI uses exact hash-pinned fixture wheel, no VPS package changes |
-| Admission policy | Kyverno 1.18.2 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
+| Admission policy | Kyverno 1.19.1 | `policies.kyverno.io/v1` CEL types only for new production controls; legacy `ClusterPolicy`/`CleanupPolicy` rejected by repository gates |
 | Image signing | Cosign 3.0.6 | ADR-0017/0045; exact image signature + provenance + signed SBOM attestation |
 | SBOM | Syft 1.51.0 -> CycloneDX JSON | ADR-0035/0045; generated from exact final releasable image; signed/indexed by image digest |
 | Final-artifact vulnerability correlation | Grype 0.117.0 | ADR-0035/0038/0045; final-image/SBOM findings + owned exceptions; scanner/feed freshness is release authority |

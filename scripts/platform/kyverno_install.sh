@@ -32,24 +32,25 @@ mirror_kyverno kyvernopre "$KYVERNO_PRE_AMD64_DIGEST"
 mirror_kyverno background-controller "$KYVERNO_BACKGROUND_AMD64_DIGEST"
 mirror_kyverno cleanup-controller "$KYVERNO_CLEANUP_AMD64_DIGEST"
 mirror_kyverno reports-controller "$KYVERNO_REPORTS_AMD64_DIGEST"
-export KYVERNO_LOCAL_REPOSITORY_PREFIX
+export KYVERNO_LOCAL_REPOSITORY_PREFIX KYVERNO_VERSION
 python3 - "$file" <<'PY' | k apply --server-side --force-conflicts -f -
 from pathlib import Path
 import os,sys
 p=Path(sys.argv[1])
 s=p.read_text(encoding='utf-8')
+version=os.environ['KYVERNO_VERSION']
 repl={
- 'reg.kyverno.io/kyverno/kyverno:v1.18.2':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/kyverno@{os.environ['KYVERNO_ADMISSION_AMD64_DIGEST']}",
- 'reg.kyverno.io/kyverno/kyvernopre:v1.18.2':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/kyvernopre@{os.environ['KYVERNO_PRE_AMD64_DIGEST']}",
- 'reg.kyverno.io/kyverno/background-controller:v1.18.2':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/background-controller@{os.environ['KYVERNO_BACKGROUND_AMD64_DIGEST']}",
- 'reg.kyverno.io/kyverno/cleanup-controller:v1.18.2':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/cleanup-controller@{os.environ['KYVERNO_CLEANUP_AMD64_DIGEST']}",
- 'reg.kyverno.io/kyverno/reports-controller:v1.18.2':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/reports-controller@{os.environ['KYVERNO_REPORTS_AMD64_DIGEST']}",
+ f'reg.kyverno.io/kyverno/kyverno:v{version}':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/kyverno@{os.environ['KYVERNO_ADMISSION_AMD64_DIGEST']}",
+ f'reg.kyverno.io/kyverno/kyvernopre:v{version}':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/kyvernopre@{os.environ['KYVERNO_PRE_AMD64_DIGEST']}",
+ f'reg.kyverno.io/kyverno/background-controller:v{version}':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/background-controller@{os.environ['KYVERNO_BACKGROUND_AMD64_DIGEST']}",
+ f'reg.kyverno.io/kyverno/cleanup-controller:v{version}':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/cleanup-controller@{os.environ['KYVERNO_CLEANUP_AMD64_DIGEST']}",
+ f'reg.kyverno.io/kyverno/reports-controller:v{version}':f"{os.environ['KYVERNO_LOCAL_REPOSITORY_PREFIX']}/reports-controller@{os.environ['KYVERNO_REPORTS_AMD64_DIGEST']}",
 }
 for old,new in repl.items():
     if old not in s: raise SystemExit('missing expected Kyverno image '+old)
     s=s.replace(old,new)
-needle='''    app.kubernetes.io/version: v1.18.2\n---\napiVersion: v1\nkind: ServiceAccount\n'''
-labels='''    app.kubernetes.io/version: v1.18.2\n    pod-security.kubernetes.io/enforce: restricted\n    pod-security.kubernetes.io/audit: restricted\n    pod-security.kubernetes.io/warn: restricted\n---\napiVersion: v1\nkind: ServiceAccount\n'''
+needle=f'''    app.kubernetes.io/version: v{version}\n---\napiVersion: v1\nkind: ServiceAccount\n'''
+labels=f'''    app.kubernetes.io/version: v{version}\n    pod-security.kubernetes.io/enforce: restricted\n    pod-security.kubernetes.io/audit: restricted\n    pod-security.kubernetes.io/warn: restricted\n---\napiVersion: v1\nkind: ServiceAccount\n'''
 if needle not in s: raise SystemExit('Kyverno namespace marker missing')
 s=s.replace(needle,labels,1)
 print(s,end='')

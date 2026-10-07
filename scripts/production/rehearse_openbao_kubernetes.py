@@ -45,7 +45,7 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
     if (result.returncode != expected or len(result.stdout) > bound or
             (required_error is not None and required_error not in (result.stderr or b""))):
-        if public_schema:
+        if public_schema and result.stderr:
             # Only public schema input, before TLS/Secret/init. Escape CI controls and bound output.
             print("OPENBAO_PUBLIC_SCHEMA_ERROR=" + json.dumps(
                 (result.stderr or b"")[:4096].decode("utf-8", errors="replace")), flush=True)
@@ -98,8 +98,15 @@ def ca_import_fixture(k):
         ca_import.ensure_secret(data)  # Prove conflict rejection preserved the original.
 
 
-def rehearse(tools: Path, receipt: Path) -> None:
+def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None) -> None:
     runner_paths(tools, receipt)
+    platform = None
+    if platform_directory is not None:
+        root = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
+        if platform_directory.is_symlink() or not platform_directory.resolve(strict=True).is_relative_to(root):
+            raise RehearsalFailed("runner-owned publication directory required")
+        from rehearse_platform_admission import Staging, admission_result
+        platform = Staging(platform_directory)
     pin = pins()
     step("tools")
     for tool, key in (("kind", "KIND_LINUX_AMD64_SHA256"),
@@ -117,13 +124,19 @@ def rehearse(tools: Path, receipt: Path) -> None:
         raise RehearsalFailed("fixture kubectl version mismatch")
     name = "hooshix-bao-ci-" + uuid.uuid4().hex[:12]
     image = candidate("standard")["items"][-1]["spec"]["template"]["spec"]["containers"][0]["image"]
+    if platform is not None:
+        image = platform.bao_receipt["image"]
     started = False
     with tempfile.TemporaryDirectory(prefix="hooshix-bao-k8s-", dir=os.environ["RUNNER_TEMP"]) as temp:
         directory = Path(temp)
         kubeconfig = directory / "kubeconfig"
         cluster_config = directory / "kind.json"
-        cluster_config.write_text(json.dumps({"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
-                                             "nodes": [{"role": "control-plane"}]}))
+        cluster_configuration = {"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
+                                 "nodes": [{"role": "control-plane"}]}
+        if platform is not None:
+            cluster_configuration["networking"] = {"disableDefaultCNI": True,
+                "podSubnet": "192.168.0.0/16", "serviceSubnet": "10.96.0.0/16"}
+        cluster_config.write_text(json.dumps(cluster_configuration))
 
         schema_only = True
 
@@ -131,8 +144,12 @@ def rehearse(tools: Path, receipt: Path) -> None:
               public_schema: bool = False, required_error: bytes | None = None) -> bytes:
             if public_schema and not schema_only:
                 raise RehearsalFailed("schema diagnostics disabled after secret generation")
+            # Three independently bounded 30s verification webhooks may run
+            # sequentially. Leave room without an indefinite API request.
+            request_deadline = "120s" if platform is not None else "30s"
+            command_deadline = max(timeout, 135) if platform is not None else timeout
             return run([kubectl, "--kubeconfig", str(kubeconfig), "--context", "kind-" + name,
-                        "--request-timeout=10s", *args], data=data, timeout=timeout, expected=expected,
+                        "--request-timeout=" + request_deadline, *args], data=data, timeout=command_deadline, expected=expected,
                        public_schema=public_schema, required_error=required_error)
 
         def get(kind_name: str, resource: str):
@@ -176,8 +193,11 @@ def rehearse(tools: Path, receipt: Path) -> None:
                 raise RehearsalFailed("existing cluster must not be reused")
             started = True  # Also remove a partially-created cluster on failure.
             run([kind, "create", "cluster", "--name", name, "--image", pin["KIND_NODE_IMAGE"],
-                 "--config", str(cluster_config), "--kubeconfig", str(kubeconfig), "--wait", "120s"], timeout=240)
+                 "--config", str(cluster_config), "--kubeconfig", str(kubeconfig), "--wait",
+                 "0s" if platform is not None else "120s"], timeout=240)
             kubeconfig.chmod(0o600)
+            if platform is not None:
+                platform.setup(k, run, directory, wait)
             server = json.loads(k("version", "-o", "json"))["serverVersion"]["gitVersion"]
             if server != "v" + pin["KUBERNETES_VERSION"]:
                 raise RehearsalFailed("fixture API version mismatch")
@@ -197,6 +217,8 @@ def rehearse(tools: Path, receipt: Path) -> None:
                 k("wait", "--for=condition=Established", "crd/" + crd_name, "--timeout=30s", timeout=40,
                   public_schema=True)
             manifest = candidate("standard")
+            if platform is not None:
+                manifest = platform.manifest("standard")
             step("schema-candidate")
             k("apply", "-f", "-", data=json.dumps(manifest["items"][0]).encode(), public_schema=True)
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(manifest).encode(), public_schema=True)
@@ -211,7 +233,13 @@ def rehearse(tools: Path, receipt: Path) -> None:
             test_pod = {"apiVersion": "v1", "kind": "Pod", "metadata": {
                 "name": "ci-admission-probe", "namespace": NAMESPACE}, "spec": pod_spec}
             step("schema-pod")
-            k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), public_schema=True)
+            if platform is None:
+                k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), public_schema=True)
+            else:
+                # The exact same bounded positive preflight used for mesh:
+                # cold registry timeout DENIES the attempt, never admits it.
+                # Only an actual successful complete signed dry-run passes.
+                admission_result(k, test_pod, wait)
             pod_spec["containers"][0]["securityContext"]["privileged"] = True
             # Keep the unsafe fixture structurally valid so PSA, not core schema validation, denies it.
             pod_spec["containers"][0]["securityContext"]["allowPrivilegeEscalation"] = True
@@ -219,8 +247,9 @@ def rehearse(tools: Path, receipt: Path) -> None:
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(test_pod).encode(), expected=1,
               public_schema=True, required_error=b'violates PodSecurity "restricted:v1.35": privileged')
             schema_only = False
-            step("ca-import")
-            ca_import_fixture(k)
+            if platform is None:
+                step("ca-import")
+                ca_import_fixture(k)
             step("tls")
             key, cert = directory / "tls.key", directory / "tls.crt"
             run(["/usr/bin/openssl", "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-nodes",
@@ -251,6 +280,8 @@ def rehearse(tools: Path, receipt: Path) -> None:
             status = get("pod", "openbao-0")["status"]["containerStatuses"][0]
             if status["ready"] or status["restartCount"] != 0:
                 raise RehearsalFailed("sealed probe restarted or exposed ready workload")
+            if platform is not None:
+                platform.network(k, wait)
             process, client = forward(cert)
             try:
                 client.wait_health(501)
@@ -318,6 +349,16 @@ def rehearse(tools: Path, receipt: Path) -> None:
         "network_mesh_admission": "Not verified: default kind CNI; Istio CRDs only",
         "production_storage_quota_and_capacity": "Not verified: disposable local-path fixture",
         "signing_staging_promotion": "Not verified", "production_readiness": "Not verified"}
+    if platform is not None:
+        result.update({"scope": "Disposable Calico/Ambient/Kyverno signed platform staging",
+            "platform_checks": platform.checks,
+            "mesh_images": {name: record["image"] for name, record in platform.mesh_receipt["components"].items()},
+            "publication_revisions": {"mesh": platform.mesh_receipt["repository_revision"],
+                                      "openbao": platform.bao_receipt["repository_revision"]},
+            "network_mesh_admission": "Passed for disposable kind fixture",
+            "production_target": "Not verified: K3s paths, imported owner CA and guarded 8GiB PV not exercised",
+            "ca_secret_reconcile": "Not applicable: foundation job owns separate conflict fixture"})
+        result["checks"].pop("ca_secret_create_reconcile_conflict")
     with receipt.open("x", encoding="utf-8") as output:
         json.dump(result, output, indent=2)
         output.write("\n")
@@ -330,9 +371,10 @@ def main() -> int:
     parser.add_argument("--ci", action="store_true", required=True)
     parser.add_argument("--tools-dir", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--platform-publications", type=Path)
     args = parser.parse_args()
     try:
-        rehearse(args.tools_dir, args.receipt)
+        rehearse(args.tools_dir, args.receipt, args.platform_publications)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed):

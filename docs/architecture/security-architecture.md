@@ -159,7 +159,7 @@ A passing OSV lockfile scan is not final-image vulnerability evidence. Final-ima
 
 Trivy and OWASP Dependency-Check are not selected current default tools. A later addition requires ADR-0045 distinct-coverage evidence rather than tool-count duplication. Separate Semgrep Secrets/Supply Chain/hosted product capabilities are also not implied by the repository Semgrep CLI decision.
 
-Kyverno 1.18.2 remains production admission engine. New greenfield production controls use stable CEL-based `policies.kyverno.io/v1` policy types. CI/render gates reject new legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy/ClusterCleanupPolicy except a narrow migration-only exception with owner/removal deadline.
+Kyverno 1.19.1 remains production admission engine. New greenfield production controls use stable CEL-based `policies.kyverno.io/v1` policy types. CI/render gates reject new legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy/ClusterCleanupPolicy except a narrow migration-only exception with owner/removal deadline.
 
 Single-server may use one Kyverno replica but cannot switch critical admission to audit-only.
 

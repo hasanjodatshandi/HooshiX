@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -9,6 +10,18 @@ DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class DeterministicBootstrapTest(unittest.TestCase):
+    def test_kyverno_selected_release_manifest_and_current_authority_match(self) -> None:
+        import json
+        pins = dict(line.split('=', 1) for line in
+                    (ROOT / 'infrastructure/kyverno/pins.env').read_text().splitlines() if '=' in line)
+        version = pins['KYVERNO_VERSION']
+        self.assertEqual('1.19.1', version)
+        manifest = ROOT / 'infrastructure/kyverno/vendor' / version / 'install.yaml'
+        self.assertEqual(pins['KYVERNO_INSTALL_SHA256'], hashlib.sha256(manifest.read_bytes()).hexdigest())
+        for relative, section in (('infrastructure/production/profile.json', 'platform'),
+                                   ('infrastructure/production/platform-contracts.json', 'admission')):
+            self.assertEqual(version, json.loads((ROOT / relative).read_text())[section]['kyverno'])
+
     def test_kyverno_linux_amd64_images_are_pinned_and_mirrored_by_digest(self) -> None:
         pins = {}
         for line in (ROOT / "infrastructure/kyverno/pins.env").read_text(encoding="utf-8").splitlines():

@@ -17,6 +17,7 @@
 # Preserve checksum-pinned upstream vendor artifacts byte-for-byte.
 infrastructure/gateway-api/vendor/1.5.1/standard-install.yaml -whitespace
 infrastructure/kyverno/vendor/1.18.2/install.yaml -whitespace
+infrastructure/kyverno/vendor/1.19.1/install.yaml -whitespace
 
 infrastructure/traefik/chart/41.2.0/traefik-41.2.0.tgz binary
 

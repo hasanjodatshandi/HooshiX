@@ -32,7 +32,7 @@ Kubernetes node image v1.35.5 by exact digest
 Calico 3.32.1
 Gateway API 1.5.1
 Istio Ambient 1.30.5
-Kyverno 1.18.2
+Kyverno 1.19.1
 Traefik 3.7.10 / chart 41.2.0
 Caddy 2.11.4 + coraza-caddy 2.5.0 + Coraza 3.7.0 + CRS 4.25.1
 PostgreSQL 18.4

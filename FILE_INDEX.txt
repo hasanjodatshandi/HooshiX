@@ -6,6 +6,7 @@
 .github/workflows/identity-service.yml
 .github/workflows/notification-service.yml
 .github/workflows/offline-ca.yml
+.github/workflows/platform-commissioning.yml
 .github/workflows/production-release.yml
 .github/workflows/production-vulnerability-rescan.yml
 .github/workflows/repository-baseline.yml
@@ -319,6 +320,7 @@ docs/operations/production-jit-usage-fa.md
 docs/operations/production-openbao-fa.md
 docs/operations/production-openbao-storage-fa.md
 docs/operations/production-pki-bootstrap-fa.md
+docs/operations/production-platform-commissioning-fa.md
 docs/operations/wireguard-management-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
@@ -351,9 +353,11 @@ infrastructure/istio/platform-apps-waypoint.yaml
 infrastructure/kind/README.md
 infrastructure/kind/cluster.yaml
 infrastructure/kind/pins.env
+infrastructure/kyverno/chart/3.9.1/kyverno-3.9.1.tgz
 infrastructure/kyverno/pins.env
 infrastructure/kyverno/policies/platform-workload-hardening.yaml
 infrastructure/kyverno/vendor/1.18.2/install.yaml
+infrastructure/kyverno/vendor/1.19.1/install.yaml
 infrastructure/local/README.md
 infrastructure/local/compose.yaml
 infrastructure/observability/authorizationpolicy.yaml
@@ -501,8 +505,10 @@ scripts/platform/waf_build.sh
 scripts/platform/waf_image_smoke.py
 scripts/production/apply_human_sshd_candidate.sh
 scripts/production/bootstrap_intermediate_csr.py
+scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
+scripts/production/commission_platform.py
 scripts/production/import_intermediate_ca.py
 scripts/production/inspect_host.py
 scripts/production/install_audit_prerequisite.py
@@ -531,11 +537,13 @@ scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
+scripts/production/rehearse_platform_admission.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_gitops.py
 scripts/production/render_mesh_candidate.py
 scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
+scripts/production/render_platform_admission.py
 scripts/production/repair_import_referrers.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
@@ -544,6 +552,7 @@ scripts/production/run-host-inspection.ps1
 scripts/production/run-intermediate-csr.ps1
 scripts/production/run-intermediate-import.ps1
 scripts/production/run-openbao-storage.ps1
+scripts/production/run-platform-commissioning.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/tests/test_ghcr_release.py
 scripts/production/tests/test_host_audit_policy.py
@@ -554,6 +563,7 @@ scripts/production/tests/test_intermediate_csr.py
 scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
+scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_mesh_publication.py
 scripts/production/tests/test_offline_ca.ps1
@@ -565,6 +575,9 @@ scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_openbao_storage.py
 scripts/production/tests/test_openbao_storage_guard.py
 scripts/production/tests/test_parspack_audit_transport.py
+scripts/production/tests/test_platform_admission.py
+scripts/production/tests/test_platform_commissioning.py
+scripts/production/tests/test_platform_publication_run.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_readiness.py
@@ -572,9 +585,11 @@ scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_target_storage_guard.py
 scripts/production/tests/test_verify.py
+scripts/production/upgrade_kyverno.py
 scripts/production/verify.py
 scripts/production/verify_host_audit.py
 scripts/production/verify_openbao_artifact.py
+scripts/production/verify_platform_publication_run.py
 scripts/production/verify_release.py
 scripts/production/verify_storage_guard.py
 services/authorization-service/.dockerignore
