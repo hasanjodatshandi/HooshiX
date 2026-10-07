@@ -23,6 +23,9 @@ jacoco { toolVersion = "0.8.15" }
 dependencies {
     implementation("com.sajtech.hooshix:protobuf-contracts:1.9.1")
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
+    implementation(platform("org.springframework:spring-framework-bom:7.0.9")) {
+        because("Align Spring Framework modules with the CVE-2026-47884 security fix")
+    }
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-jooq")
