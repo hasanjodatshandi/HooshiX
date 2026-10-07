@@ -130,7 +130,7 @@ def main():
     parser.add_argument('--staging-run', required=True)
     parser.add_argument('--public-ca', type=Path, required=True)
     parser.add_argument('--mesh-run', default='37588183736')
-    parser.add_argument('--openbao-run', default='37611729931')
+    parser.add_argument('--openbao-run', default='37228262995')
     args = parser.parse_args()
     try:
         build(args.output, args.staging_run, args.mesh_run, args.openbao_run, args.public_ca)

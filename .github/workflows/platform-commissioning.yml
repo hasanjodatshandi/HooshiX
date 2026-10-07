@@ -24,7 +24,7 @@ on:
       openbao_run:
         description: Successful reviewed-main Production release private OpenBao publication run
         required: true
-        default: '37611729931'
+        default: '37228262995'
 
 permissions:
   contents: read
@@ -49,7 +49,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MESH_RUN: ${{ inputs.mesh_run || '37588183736' }}
-          OPENBAO_RUN: ${{ inputs.openbao_run || '37611729931' }}
+          OPENBAO_RUN: ${{ inputs.openbao_run || '37228262995' }}
         run: |
           set -euo pipefail
           install -d -m 0700 "$RUNNER_TEMP/platform-publications"

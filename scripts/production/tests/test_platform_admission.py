@@ -114,6 +114,9 @@ class PlatformAdmissionTest(unittest.TestCase):
         self.assertEqual('variables.provenanceVerified', validations[1]['expression'])
         self.assertEqual('variables.sbomVerified', validations[3]['expression'])
         self.assertEqual(2, json.dumps(spec).count('verifyAttestationSignatures'))
+        self.assertIn('extractPayload(images.containers[0], attestations.provenance)',
+                      validations[2]['messageExpression'])
+        self.assertNotIn('string(images.containers.map', validations[2]['messageExpression'])
 
     def test_network_component_token_mounts_are_explicit_bounded_and_pinned(self):
         plan = target.render(receipt('mesh'), receipt('openbao'), target.mesh.candidate())
