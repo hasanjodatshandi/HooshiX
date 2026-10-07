@@ -97,20 +97,40 @@ class PlatformAdmissionTest(unittest.TestCase):
         self.assertEqual({"mutateDigest": False, "required": True, "verifyDigest": True},
                          spec["validationConfigurations"])
         self.assertEqual({"secrets": ["hooshix-ghcr-read"]}, spec["credentials"])
-        expressions = json.dumps(spec["validations"])
+        expressions = json.dumps(spec["validations"] + spec["variables"])
         self.assertIn("b" * 40, expressions)
         for required in ("verifyImageSignatures", "verifyAttestationSignatures", "extractPayload", "CycloneDX"):
             self.assertIn(required, expressions)
         self.assertNotIn("insecureIgnore", json.dumps(policy))
 
     def test_intoto_payload_checks_use_the_verified_statement_predicate(self):
-        validations = target.image_policy('istio-system', ['image'], 'a' * 40)['spec']['validations']
+        spec = target.image_policy('istio-system', ['image'], 'a' * 40)['spec']
+        validations = spec['validations']
         self.assertIn('.predicate.buildDefinition.externalParameters.gitRevision', validations[2]['expression'])
         self.assertIn('.predicate.bomFormat', validations[4]['expression'])
-        for index in (2, 4):
-            self.assertIn('[attestors.cosign]) > 0 && extractPayload', validations[index]['expression'])
-        self.assertIn('verifyAttestationSignatures', validations[1]['expression'])
-        self.assertIn('verifyAttestationSignatures', validations[3]['expression'])
+        for index, name in ((2, 'provenanceVerified'), (4, 'sbomVerified')):
+            self.assertTrue(validations[index]['expression'].startswith('variables.' + name + ' && '))
+        self.assertEqual('variables.provenanceVerified', validations[1]['expression'])
+        self.assertEqual('variables.sbomVerified', validations[3]['expression'])
+        self.assertEqual(2, json.dumps(spec).count('verifyAttestationSignatures'))
+
+    def test_network_component_token_mounts_are_explicit_bounded_and_pinned(self):
+        plan = target.render(receipt('mesh'), receipt('openbao'), target.mesh.candidate())
+        for stage in plan['mesh']['stages']:
+            if stage['component'] not in ('cni', 'ztunnel'):
+                continue
+            pod = next(r['spec']['template']['spec'] for r in stage['manifest']['items']
+                       if r['kind'] == 'DaemonSet')
+            self.assertIs(False, pod['automountServiceAccountToken'])
+            token = next(v for v in pod['volumes'] if v['name'] == 'hooshix-api-token')
+            self.assertEqual({'path': 'token', 'expirationSeconds': 3600},
+                             token['projected']['sources'][0]['serviceAccountToken'])
+            mount = pod['containers'][0]['volumeMounts'][-1]
+            self.assertEqual('/var/run/secrets/kubernetes.io/serviceaccount', mount['mountPath'])
+            self.assertIs(True, mount['readOnly'])
+        expression = plan['admission']['items'][0]['spec']['validations'][0]['expression']
+        self.assertIn('object.spec.automountServiceAccountToken == false', expression)
+        self.assertIn('object.spec.volumes.size()', expression)
 
     def test_security_context_tree_is_typed_cel_not_map_comparison(self):
         expression = target.scalar_tree("c.securityContext", {"runAsUser": 0,

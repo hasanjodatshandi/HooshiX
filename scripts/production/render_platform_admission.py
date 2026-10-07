@@ -157,6 +157,10 @@ def hardening(namespace: str, pods: dict[str, dict]) -> dict:
                      "c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))")
         # Pin the privileged executable/argv, not just the image and UID/capability.
         if account in ("istio-cni", "ztunnel"):
+            terms.append("has(object.spec.automountServiceAccountToken) && "
+                         "object.spec.automountServiceAccountToken == false")
+            terms.append("has(object.spec.volumes) && ("
+                         + scalar_tree("object.spec.volumes", pod["volumes"]) + ")")
             for field in ("command", "args", "env", "envFrom", "volumeMounts"):
                 if field in container:
                     terms.append("has(object.spec.containers[0]." + field + ") && ("
@@ -188,18 +192,20 @@ def image_policy(namespace: str, images: list[str], revision: str) -> dict:
     result = policy("ImageValidatingPolicy", "hooshix-" + namespace + "-supply-chain", namespace, [
         validation("platform image signature verification failed", "images.containers.map(image, "
                    "verifyImageSignatures(image, [attestors.cosign])).all(e, e > 0)"),
-        validation("platform provenance signature verification failed", "images.containers.map(image, "
-                   "verifyAttestationSignatures(image, attestations.provenance, [attestors.cosign])).all(e, e > 0)"),
-        validation("platform import source revision rejected", "images.containers.map(image, "
-                   "verifyAttestationSignatures(image, attestations.provenance, [attestors.cosign]) > 0 && "
+        validation("platform provenance signature verification failed", "variables.provenanceVerified"),
+        validation("platform import source revision rejected", "variables.provenanceVerified && images.containers.map(image, "
                    "extractPayload(image, attestations.provenance).predicate.buildDefinition.externalParameters.gitRevision == "
                    + literal(revision) + ").all(e, e)"),
-        validation("platform signed SBOM verification failed", "images.containers.map(image, "
-                   "verifyAttestationSignatures(image, attestations.sbom, [attestors.cosign])).all(e, e > 0)"),
-        validation("platform signed SBOM is not CycloneDX", "images.containers.map(image, "
-                   "verifyAttestationSignatures(image, attestations.sbom, [attestors.cosign]) > 0 && "
+        validation("platform signed SBOM verification failed", "variables.sbomVerified"),
+        validation("platform signed SBOM is not CycloneDX", "variables.sbomVerified && images.containers.map(image, "
                    "extractPayload(image, attestations.sbom).predicate.bomFormat == 'CycloneDX').all(e, e)")])
     result["spec"].update({"webhookConfiguration": {"timeoutSeconds": 15},
+        # CEL variables are lazy/request-local: verify each attestation once,
+        # and never extract an unverified payload or perform duplicate I/O.
+        "variables": [{"name": name + "Verified", "expression":
+            "images.containers.map(image, verifyAttestationSignatures(image, attestations."
+            + attestation + ", [attestors.cosign])).all(e, e > 0)"}
+            for name, attestation in (("provenance", "provenance"), ("sbom", "sbom"))],
         "credentials": {"secrets": [PULL_SECRET]},
         "matchImageReferences": [{"glob": image} for image in images],
         "validationConfigurations": {"mutateDigest": False, "required": True, "verifyDigest": True},
@@ -232,6 +238,19 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
             pod["imagePullSecrets"] = [{"name": PULL_SECRET}]
             if component == "cni":
                 pod["containers"][0]["securityContext"]["allowPrivilegeEscalation"] = False
+            if component in ("cni", "ztunnel"):
+                # Replace Kubernetes' unpredictable automatic token mount with
+                # the same bounded API identity at an explicitly pinned path.
+                # Neither component receives any new RBAC permission.
+                pod["automountServiceAccountToken"] = False
+                pod.setdefault("volumes", []).append({"name": "hooshix-api-token", "projected": {
+                    "defaultMode": 420, "sources": [
+                        {"serviceAccountToken": {"path": "token", "expirationSeconds": 3600}},
+                        {"configMap": {"name": "kube-root-ca.crt", "items": [{"key": "ca.crt", "path": "ca.crt"}]}},
+                        {"downwardAPI": {"items": [{"path": "namespace", "fieldRef": {
+                            "apiVersion": "v1", "fieldPath": "metadata.namespace"}}]}}]}})
+                pod["containers"][0]["volumeMounts"].append({"name": "hooshix-api-token",
+                    "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount", "readOnly": True})
             # Explicit RuntimeDefault for all platform pods, including the two
             # narrowly approved root network components. No Unconfined fallback.
             pod.setdefault("securityContext", {})["seccompProfile"] = {"type": "RuntimeDefault"}

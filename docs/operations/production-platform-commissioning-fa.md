@@ -97,6 +97,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downlo
 برای گزارش‌گیریِ منع ephemeral container، یک ClusterRole فقط با مجوز
 `get/list/watch` روی `pods/ephemeralcontainers` به reports-controller موجود
 تجمیع می‌شود؛ مجوز تغییر Pod، اجرای debug یا خواندن Secret اضافه نمی‌شود.
+در CNI و ztunnel، mount خودکار token با mount صریحِ فقط‌خواندنی و token
+projected یک‌ساعته جایگزین شده تا سیاست دقیق با mount تزریقی تصادفی تعارض نداشته
+باشد. هویت و RBAC قبلی حفظ می‌شود و mount/حجم‌های این دو جزء در policy پین هستند.
+امضای هر attestation در متغیر request-local یک بار بررسی می‌شود؛ payload فقط
+پس از تأیید امضا خوانده می‌شود و deadline پانزده‌ثانیه‌ای webhook حفظ می‌شود.
 
 ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، چهار policy
 با Deny، mesh، TLS سرویس با CA قبلی، PV محلی Retain و StatefulSet. محدودیت PSA
