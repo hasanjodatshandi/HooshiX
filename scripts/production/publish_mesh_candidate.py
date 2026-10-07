@@ -47,9 +47,15 @@ def validate(directory, image, now):
     names = ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json')
     syft, cdx, scan, database = (load(directory / name) for name in names)
     metadata = syft['source']['metadata']
+    # Syft canonicalizes Docker Hub to index.docker.io; accept only that exact
+    # registry alias, preserving the repository and immutable manifest digest.
+    repo_names = {image}
+    if image.startswith('docker.io/'):
+        repo_names.add('index.' + image)
     if (syft['source']['type'] != 'image' or metadata['manifestDigest'] != image.split('@')[1]
             or metadata['architecture'] != 'amd64' or metadata['os'] != 'linux'
-            or not isinstance(metadata['repoDigests'], list) or image not in metadata['repoDigests']
+            or not isinstance(metadata['repoDigests'], list)
+            or not repo_names.intersection(metadata['repoDigests'])
             or not isinstance(syft.get('artifacts'), list) or not syft['artifacts']
             or cdx.get('bomFormat') != 'CycloneDX'
             or not isinstance(cdx.get('components'), list) or not cdx['components']):

@@ -78,6 +78,35 @@ class MeshPublicationTest(unittest.TestCase):
                 self.assertTrue(argv[-1].endswith('-123-2'))
         self.assertEqual(0o700, self.directory.stat().st_mode & 0o777)
 
+    def test_docker_hub_canonical_alias_preserves_exact_repository_and_digest(self):
+        self.publish()
+        folder = self.directory / 'istiod'
+        path = folder / 'syft.json'
+        sbom = json.loads(path.read_text())
+        image = target.targets()['istiod']['upstream']
+        sbom['source']['metadata']['repoDigests'] = ['index.' + image]
+        path.write_text(json.dumps(sbom))
+        result = target.validate(folder, image, datetime.now(timezone.utc))
+        self.assertEqual('Passed', result['scan'])
+        for invalid in ('index.docker.io/other/pilot@' + image.split('@')[1],
+                        'index.' + image.replace('sha256:', 'sha256:0'),
+                        'attacker.' + image):
+            sbom['source']['metadata']['repoDigests'] = [invalid]
+            path.write_text(json.dumps(sbom))
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                target.validate(folder, image, datetime.now(timezone.utc))
+
+    def test_docker_hub_alias_cannot_replace_expected_ghcr_import(self):
+        self.publish()
+        folder = self.directory / 'istiod'
+        path = folder / 'syft.json'
+        sbom = json.loads(path.read_text())
+        image = target.targets()['istiod']['image']
+        sbom['source']['metadata']['repoDigests'] = [target.targets()['istiod']['upstream']]
+        path.write_text(json.dumps(sbom))
+        with self.assertRaises(ValueError):
+            target.validate(folder, image, datetime.now(timezone.utc))
+
     def test_approved_public_imports_record_actual_visibility_and_keep_signing(self):
         self.visibility = 'public'
         result = self.publish()
