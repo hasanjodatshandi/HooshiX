@@ -27,7 +27,7 @@ class PlatformCommissioningTest(unittest.TestCase):
                 'mesh': {'stages': [{'component': name} for name in ('base', 'istiod', 'cni', 'ztunnel')]},
                 'openbao': bao.candidate('hooshix-openbao-local'),
                 'admission_prerequisites': admission.reporting_permissions(),
-                'admission': {'items': [{'spec': {'failurePolicy': 'Fail', 'validationActions': ['Deny']}}] * 4},
+                'admission': {'items': [{'spec': {'failurePolicy': 'Fail', 'validationActions': ['Deny']}}] * 6},
                 'commissioning_evidence': {'source_revision': 'a' * 40, 'staging': 'Passed',
                                           'run_id': 12, 'observed_at': datetime.now(timezone.utc).isoformat()}}
 

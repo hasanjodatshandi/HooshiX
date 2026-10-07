@@ -144,10 +144,10 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
               public_schema: bool = False, required_error: bytes | None = None) -> bytes:
             if public_schema and not schema_only:
                 raise RehearsalFailed("schema diagnostics disabled after secret generation")
-            # Platform image admission has bounded mutate + validate phases;
-            # leave room for both 30s webhooks without cutting either in half.
-            request_deadline = "75s" if platform is not None else "30s"
-            command_deadline = max(timeout, 90) if platform is not None else timeout
+            # Three independently bounded 30s verification webhooks may run
+            # sequentially. Leave room without an indefinite API request.
+            request_deadline = "120s" if platform is not None else "30s"
+            command_deadline = max(timeout, 135) if platform is not None else timeout
             return run([kubectl, "--kubeconfig", str(kubeconfig), "--context", "kind-" + name,
                         "--request-timeout=" + request_deadline, *args], data=data, timeout=command_deadline, expected=expected,
                        public_schema=public_schema, required_error=required_error)

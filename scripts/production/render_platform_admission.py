@@ -222,6 +222,26 @@ def image_policy(namespace: str, images: list[str], revision: str) -> dict:
     return result
 
 
+def bounded_image_policies(namespace: str, images: list[str], revision: str) -> list[dict]:
+    # Kubernetes caps each admission webhook at 30s. Keep ALL checks, but give
+    # image, provenance and SBOM verification separate bounded webhook calls;
+    # a cold registry with multiple attestations can exceed one combined call.
+    complete = image_policy(namespace, images, revision)
+    result = []
+    for suffix, indexes, attestation in (("signature", [0], None),
+                                         ("provenance", [1, 2], "provenance"),
+                                         ("sbom", [3, 4], "sbom")):
+        part = copy.deepcopy(complete)
+        part["metadata"]["name"] += "-" + suffix
+        part["spec"]["validations"] = [complete["spec"]["validations"][i] for i in indexes]
+        part["spec"]["attestations"] = [a for a in complete["spec"]["attestations"]
+                                         if a["name"] == attestation]
+        part["spec"]["variables"] = [v for v in complete["spec"]["variables"]
+                                      if v["name"] == str(attestation) + "Verified"]
+        result.append(part)
+    return result
+
+
 def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
     if (mesh_candidate.get("installation_id") != "hooshix-production"
             or mesh_candidate.get("profile") != "production-single-server"
@@ -267,8 +287,9 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
     policies = [hardening("istio-system", pods),
                 image_policy("istio-system", [p["containers"][0]["image"] for p in pods.values()],
                              mesh_receipt["repository_revision"]),
-                hardening("hooshix-secrets", {"openbao": bao_pod}),
-                image_policy("hooshix-secrets", [bao_receipt["image"]], bao_receipt["repository_revision"])]
+                hardening("hooshix-secrets", {"openbao": bao_pod})]
+    policies.extend(bounded_image_policies("hooshix-secrets", [bao_receipt["image"]],
+                                          bao_receipt["repository_revision"]))
     return {"schema_version": 1, "profile": "production-single-server",
             "installation_id": "hooshix-production", "mesh": candidate, "openbao": openbao,
             "admission_prerequisites": reporting_permissions(),

@@ -44,7 +44,7 @@ python3 scripts/production/render_platform_admission.py \
   --openbao-publication /path/to/openbao/receipt.json
 ```
 
-خروجی شامل candidate و چهار policy پایدار CEL است. namespaceهای بسته، SA/image
+خروجی شامل candidate و شش policy پایدار CEL است. namespaceهای بسته، SA/image
 دقیق، seccomp، منع host namespace و mount خارج از استثنای دو جزءٔ شبکه، و امضای
 provenance/SBOM اعمال می‌شوند. Secret فقط با نام `hooshix-ghcr-read` ارجاع می‌شود؛
 policy مستقیماً روی همهٔ Podها، از جمله Podهای ساخته‌شده توسط controller، اجرا
@@ -109,13 +109,14 @@ projected یک‌ساعته جایگزین شده تا سیاست دقیق با 
 باشد. هویت و RBAC قبلی حفظ می‌شود و mount/حجم‌های این دو جزء در policy پین هستند.
 امضای هر attestation در متغیر request-local یک بار بررسی می‌شود؛ payload فقط
 پس از تأیید امضا خوانده می‌شود. بررسی cold تصویر خصوصی در آزمون به مهلت اولیهٔ
-۱۵ ثانیه رسید؛ مهلت هر webhook این نصب ۳۰ ثانیه، درخواست API برابر ۷۵ ثانیه و
-فرمان محلی ۹۰ ثانیه است تا هر دو مرحلهٔ mutate/validate فرصت محدود داشته باشند.
+۱۵ و سپس ۳۰ ثانیه رسید؛ برای OpenBao بررسی image، provenance و SBOM در سه
+webhook مستقل با همان شرط‌های امنیتی انجام می‌شود. مهلت هر webhook برابر ۳۰
+ثانیه، درخواست API برابر ۱۲۰ و فرمان محلی ۱۳۵ ثانیه است؛ هیچ بررسی حذف نمی‌شود.
 در خطا یا timeout، پذیرش همچنان fail-closed است؛ deadline بیست‌دقیقه‌ای نصب و
 SLO درخواست‌های کاربران/authorization تغییری نمی‌کند. این بودجه، شاهد ظرفیت
 کل stack نیست و آزمون کامل ظرفیت Production همچنان لازم است.
 
-ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، چهار policy
+ترتیب اجرا: هدف/audit/encryption/storage موجود، pull Secret محدود، شش policy
 با Deny، mesh، TLS سرویس با CA قبلی، PV محلی Retain و StatefulSet. محدودیت PSA
 فقط در `istio-system` و بعد از policy فعال، برای دو جزءٔ شبکهٔ تأییدشده اعمال
 می‌شود؛ `hooshix-secrets` همچنان Restricted است. هشت GiB دوباره ساخته نمی‌شود.

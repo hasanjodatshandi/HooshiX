@@ -33,6 +33,21 @@ def receipt(component):
 
 
 class PlatformAdmissionTest(unittest.TestCase):
+    def test_split_cold_verification_retains_every_blocking_check_and_exact_identity(self):
+        complete = target.image_policy('hooshix-secrets', ['image'], 'a' * 40)
+        parts = target.bounded_image_policies('hooshix-secrets', ['image'], 'a' * 40)
+        self.assertEqual(3, len(parts))
+        self.assertEqual(complete['spec']['validations'],
+                         [v for p in parts for v in p['spec']['validations']])
+        for p in parts:
+            for key in ('attestors', 'matchConstraints', 'matchImageReferences', 'credentials',
+                        'failurePolicy', 'validationActions', 'validationConfigurations', 'webhookConfiguration'):
+                self.assertEqual(complete['spec'][key], p['spec'][key])
+        self.assertEqual([[], ['provenance'], ['sbom']],
+                         [[a['name'] for a in p['spec']['attestations']] for p in parts])
+        self.assertEqual([[], ['provenanceVerified'], ['sbomVerified']],
+                         [[v['name'] for v in p['spec']['variables']] for p in parts])
+
     def validate_receipt(self, data):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "receipt.json"

@@ -62,8 +62,8 @@ def native(argv, *, data=None, expected=0, timeout=30, password=None, required_e
             os.close(read_fd)
 
 
-def kube(*args, body=None, expected=0, timeout=90, required_error=None):
-    return native([custody.K3S, 'kubectl', '--request-timeout=75s', *args],
+def kube(*args, body=None, expected=0, timeout=135, required_error=None):
+    return native([custody.K3S, 'kubectl', '--request-timeout=120s', *args],
                   data=json.dumps(body).encode() if body is not None else None,
                   expected=expected, timeout=timeout, required_error=required_error)
 
@@ -146,7 +146,7 @@ def read_plan(path, digest, revision):
             and value.get('profile') == 'production-single-server'
             and [s['component'] for s in value['mesh']['stages']] == ['base', 'istiod', 'cni', 'ztunnel']
             and value['openbao']['items'][-1]['metadata']['name'] == 'openbao'
-            and len(value['admission']['items']) == 4, 'REVIEWED_PLAN_SHAPE_REQUIRED')
+            and len(value['admission']['items']) == 6, 'REVIEWED_PLAN_SHAPE_REQUIRED')
     # Evidence was authenticated against the exact CI run by the bundle builder;
     # no caller-provided "Passed" string alone authorizes this plan.
     evidence = value.get('commissioning_evidence', {})
