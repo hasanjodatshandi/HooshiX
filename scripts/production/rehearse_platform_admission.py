@@ -141,6 +141,12 @@ class Staging:
             k("-n", "kube-system", "rollout", "status", kind + "/" + name, "--timeout=180s", timeout=195)
         self.checks["calico_runtime"] = "Passed"
         k("wait", "--for=condition=Ready", "nodes", "--all", "--timeout=90s", timeout=105)
+        # kind alone installs a dynamic provisioner. This rehearsal owns a
+        # separate static local PV and the VPS has no dynamic storage driver.
+        # Remove only this disposable fixture's unused provisioner so that the
+        # production adoption guard is exercised unchanged.
+        k('-n', 'local-path-storage', 'delete', 'deployment/local-path-provisioner', '--timeout=30s', timeout=40)
+        k('-n', 'local-path-storage', 'wait', '--for=delete', 'pods', '--all', '--timeout=30s', timeout=40)
         print("PLATFORM_STEP=kyverno", flush=True)
         # Start from the exact existing VPS release, then exercise the SAME
         # CRD-preserving Helm adoption as the supervised installer.
