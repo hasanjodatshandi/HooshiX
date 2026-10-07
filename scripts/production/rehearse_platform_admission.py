@@ -141,10 +141,11 @@ class Staging:
             k("-n", "kube-system", "rollout", "status", kind + "/" + name, "--timeout=180s", timeout=195)
         self.checks["calico_runtime"] = "Passed"
         k("wait", "--for=condition=Ready", "nodes", "--all", "--timeout=90s", timeout=105)
-        # kind alone installs a dynamic provisioner. This rehearsal owns a
-        # separate static local PV and the VPS has no dynamic storage driver.
-        # Remove only this disposable fixture's unused provisioner so that the
-        # production adoption guard is exercised unchanged.
+        # kind's dynamic provisioner is a fixture-only persistence substitution.
+        # Defer it until after initial adoption to exercise the VPS bootstrap
+        # guard unchanged. It is restored BEFORE the fixture PVC is created;
+        # the actual VPS continues to use its reviewed static retained PV.
+        provisioner = json.loads(k('-n', 'local-path-storage', 'get', 'deployment/local-path-provisioner', '-o', 'json'))
         k('-n', 'local-path-storage', 'delete', 'deployment/local-path-provisioner', '--timeout=30s', timeout=40)
         k('-n', 'local-path-storage', 'wait', '--for=delete', 'pods', '--all', '--timeout=30s', timeout=40)
         print("PLATFORM_STEP=kyverno", flush=True)
@@ -199,6 +200,11 @@ class Staging:
                 or policy_before['spec'] != policy_after['spec']):
             raise ValueError('existing Kyverno policy was not preserved')
         self.checks['kyverno_upgrade'] = 'Passed'
+        apply(k, {'apiVersion': provisioner['apiVersion'], 'kind': 'Deployment',
+                  'metadata': {'name': 'local-path-provisioner', 'namespace': 'local-path-storage'},
+                  'spec': provisioner['spec']})
+        k('-n', 'local-path-storage', 'rollout', 'status', 'deployment/local-path-provisioner',
+          '--timeout=90s', timeout=105)
         for name in admission.NAMESPACES:
             apply(k, namespace(name))
         for name in ("kyverno", *admission.NAMESPACES):
