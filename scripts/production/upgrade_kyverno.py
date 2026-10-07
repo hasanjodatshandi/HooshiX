@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import stat
+import sys
 import tarfile
 import tempfile
 from pathlib import Path
@@ -24,7 +25,7 @@ OLD_IMAGES = {
 def require(value, message):
     if not value:
         # Only fixed caller-owned diagnostics; never arbitrary tool output/data.
-        print('KYVERNO_UPGRADE_FAILED=' + message, flush=True)
+        print('KYVERNO_UPGRADE_FAILED=' + message, file=sys.stderr, flush=True)
         raise ValueError(message)
 
 
@@ -105,7 +106,7 @@ def public_artifact(path, digest, bound):
 
 
 def execute(plan, directory, state, kubeconfig, *, kube, native, get):
-    print('KYVERNO_UPGRADE_STEP=ownership-preflight', flush=True)
+    print('KYVERNO_UPGRADE_STEP=ownership-preflight', file=sys.stderr, flush=True)
     require(plan['version'] == VERSION and set(plan['images']) == set(OLD_IMAGES), 'reviewed upgrade required')
     already_owned = True
     for name, image in OLD_IMAGES.items():
@@ -158,16 +159,16 @@ def execute(plan, directory, state, kubeconfig, *, kube, native, get):
                    '--kubeconfig', str(kubeconfig), '--values', str(values_path), '--take-ownership',
                    '--no-hooks', '--skip-crds', '--server-side=false', '--history-max=3', '--timeout=180s']
         # No automatic uninstall/rollback: a failed first adoption must preserve CRDs/policies.
-        print('KYVERNO_UPGRADE_STEP=helm-dry-run', flush=True)
+        print('KYVERNO_UPGRADE_STEP=helm-dry-run', file=sys.stderr, flush=True)
         native([*command, '--dry-run=server', '--hide-secret'], timeout=195)
-        print('KYVERNO_UPGRADE_STEP=crds', flush=True)
+        print('KYVERNO_UPGRADE_STEP=crds', file=sys.stderr, flush=True)
         for item, existing in crd_updates:
             if existing:
                 desired = dict(item, metadata=existing['metadata'])
                 kube('replace', '-f', '-', body=desired)
             else:
                 kube('create', '-f', '-', body=item)
-        print('KYVERNO_UPGRADE_STEP=helm-adoption', flush=True)
+        print('KYVERNO_UPGRADE_STEP=helm-adoption', file=sys.stderr, flush=True)
         native([*command, '--wait=watcher'], timeout=195)
     for name, image in plan['images'].items():
         obj = get('deployment', 'kyverno-' + name + '-controller', 'kyverno')
