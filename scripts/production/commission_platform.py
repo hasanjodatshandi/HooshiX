@@ -129,6 +129,28 @@ def progress(label, revision):
     print('PLATFORM_INSTALL_STEP=' + label, file=sys.stderr, flush=True)
 
 
+def refresh_image_verifiers(images):
+    # sigstore v1.10.9 keeps its first TUF mirror/error in a process singleton.
+    # Reset ONLY the two verifier processes after applying repaired policies.
+    # No trust-cache files or policies are deleted.
+    for component in ('admission', 'reports'):
+        name = 'kyverno-' + component + '-controller'
+        before = get('deployment', name, 'kyverno')
+        require(before is not None and all(before['metadata'].get('labels', {}).get(key) == value
+                for key, value in {'app.kubernetes.io/part-of': 'kyverno',
+                                   'app.kubernetes.io/instance': 'kyverno'}.items())
+                and before['spec']['template']['spec']['containers'][0]['image'] == images[component],
+                'OWNED_PINNED_IMAGE_VERIFIER_REQUIRED')
+        kube('-n', 'kyverno', 'rollout', 'restart', 'deployment/' + name)
+        kube('-n', 'kyverno', 'rollout', 'status', 'deployment/' + name,
+             '--timeout=120s', timeout=135)
+        after = get('deployment', name, 'kyverno')
+        require(after['metadata']['uid'] == before['metadata']['uid']
+                and after['spec']['template']['spec'] == before['spec']['template']['spec']
+                and after['status'].get('availableReplicas', 0) == 1,
+                'IMAGE_VERIFIER_ROLLOUT_STATE_CONFLICT')
+
+
 def target_admission(plan):
     # Read-only API requests prove native Deny before relaxing namespace PSA.
     pod = next(r['spec']['template']['spec'] for stage in plan['mesh']['stages']
@@ -371,7 +393,7 @@ def commissioning_marker(plan, digest, revision):
         custody.protected(marker, exact_mode=0o600)
         existing = json.loads(marker.read_bytes())
         # The authenticated builder permits only identical desired state or the
-        # exact additive verifier egress repair. Never replace original provenance.
+        # exact verifier egress/TUF transport repairs. Never replace original provenance.
         require(existing == record or ('resume_from' in plan and existing == plan['resume_from']),
                 'EXISTING_COMMISSIONING_PLAN_PRESERVED')
     else:
@@ -405,6 +427,7 @@ def execute(path, digest, revision, public_directory):
         for policy in plan['admission']['items']:
             kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true', policy['kind'].lower() + '/' + policy['metadata']['name'],
                  '--timeout=60s', timeout=75)
+        refresh_image_verifiers(plan['kyverno_upgrade']['images'])
         target_admission(plan)
         # Native Deny is active before admitting the two narrowly reviewed root
         # networking components. No unrelated namespace or PSA setting changes.

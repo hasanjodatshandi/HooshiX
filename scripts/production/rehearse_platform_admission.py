@@ -183,6 +183,29 @@ def verifier_egress_repair(k, pod, wait):
     print('PLATFORM_VERIFIER_HTTPS_REPAIR=Passed; existing boundary preserved', flush=True)
 
 
+def tuf_trust_boundary(k, pod, policy, wait):
+    # CI-only invalid public trust fixture: reaching the selected mirror cannot
+    # grant trust without the embedded root. Never import the owner's PKI here.
+    name = 'imagevalidatingpolicy/' + policy['metadata']['name']
+    before = json.loads(k('get', name, '-o', 'json'))
+    admission_result(k, pod, wait)
+    changed = copy.deepcopy(policy)
+    changed['spec']['attestors'][0]['cosign']['tuf']['root'] = {
+        'data': base64.b64encode(b'{"untrusted":true}').decode()}
+    try:
+        apply(k, changed)
+        admission_result(k, pod, wait, expected=1,
+                         message=b'platform image signature verification failed')
+        print('PLATFORM_TUF_UNTRUSTED_ROOT=Denied', flush=True)
+    finally:
+        apply(k, policy)
+    admission_result(k, pod, wait)
+    after = json.loads(k('get', name, '-o', 'json'))
+    if before['metadata']['uid'] != after['metadata']['uid'] or before['spec'] != after['spec']:
+        raise ValueError('TUF transport regression changed policy identity or trust')
+    print('PLATFORM_SIGNED_TUF_MIRROR=Passed; embedded root and exact signer retained', flush=True)
+
+
 class Staging:
     def __init__(self, directory: Path):
         now = datetime.now(timezone.utc)
@@ -275,8 +298,9 @@ class Staging:
         tools = Path(os.environ['RUNNER_TEMP']) / 'platform-tools'
         shutil.copyfile(tools / 'helm.tar.gz', directory / 'helm-linux-amd64.tar.gz')
 
-        def upgrade_kube(*args, body=None):
-            return k(*args, data=json.dumps(body).encode() if body is not None else None, public_schema=True)
+        def upgrade_kube(*args, body=None, **options):
+            return k(*args, data=json.dumps(body).encode() if body is not None else None,
+                     public_schema=True, **options)
 
         def upgrade_get(kind, name, namespace=None):
             scope = ['-n', namespace] if namespace else []
@@ -357,6 +381,13 @@ class Staging:
         verifier_egress_repair(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
             'name': 'signed-egress-preflight', 'namespace': 'istio-system'},
             'spec': copy.deepcopy(self.pods['istiod'])}, wait)
+        # Same bounded target recovery after the verifier's first TUF use.
+        with patch.object(commissioning, 'get', upgrade_get), patch.object(commissioning, 'kube', upgrade_kube):
+            commissioning.refresh_image_verifiers(upgrade_plan['images'])
+        print('PLATFORM_VERIFIER_PROCESS_REFRESH=Passed', flush=True)
+        tuf_trust_boundary(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
+            'name': 'signed-tuf-preflight', 'namespace': 'istio-system'},
+            'spec': copy.deepcopy(self.pods['istiod'])}, self.plan['admission']['items'][1], wait)
         print("PLATFORM_STEP=mesh", flush=True)
         # Fixture Root only. The owner's existing Root/CSR/credentials never enter CI.
         key, cert = directory / "mesh-ca.key", directory / "mesh-ca.crt"

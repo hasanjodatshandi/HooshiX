@@ -231,6 +231,81 @@ class PlatformCommissioningTest(unittest.TestCase):
                 create.assert_not_called()
                 get.assert_not_called()
 
+    def test_resume_tuf_transport_is_the_only_allowed_admission_difference(self):
+        current = self.plan()
+        current['admission']['items'] = [
+            admission.image_policy('istio-system', ['pinned-mesh@sha256:' + 'c' * 64], 'a' * 40),
+            *admission.bounded_image_policies('hooshix-secrets', ['pinned-bao@sha256:' + 'd' * 64], 'a' * 40)]
+        source = current['commissioning_evidence']['source_revision']
+        observed = current['commissioning_evidence']['observed_at']
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+
+            def save(previous):
+                content = json.dumps(previous).encode()
+                digest = host.hashlib.sha256(content).hexdigest()
+                (root / 'plan.json').write_bytes(content)
+                (root / 'bundle.json').write_text(json.dumps({'schema_version': 1,
+                    'source_revision': source, 'files': {'plan.json': digest}}))
+                return digest
+
+            with patch.object(bundle, 'git', return_value=''), \
+                    patch.object(bundle, 'staged_receipt', return_value={'observed_at': observed}):
+                for legacy in (False, True):
+                    previous = copy.deepcopy(current)
+                    if legacy:
+                        for policy in previous['admission']['items']:
+                            policy['spec']['attestors'][0]['cosign'].pop('tuf')
+                    digest = save(previous)
+                    self.assertEqual({'source_revision': source, 'plan_sha256': digest},
+                                     bundle.resume_record(root, current, 'b' * 40, root))
+                for change in ('mirror', 'root', 'subject', 'issuer', 'insecureIgnoreTlog',
+                               'validations', 'matchImageReferences'):
+                    previous = copy.deepcopy(current)
+                    spec = previous['admission']['items'][0]['spec']
+                    cosign = spec['attestors'][0]['cosign']
+                    if change == 'mirror':
+                        cosign['tuf']['mirror'] = 'https://untrusted.invalid'
+                    elif change == 'root':
+                        cosign['tuf']['root'] = {'data': 'untrusted'}
+                    elif change in ('subject', 'issuer'):
+                        cosign['keyless']['identities'][0][change] = 'untrusted'
+                    elif change == 'insecureIgnoreTlog':
+                        cosign['ctlog'][change] = True
+                    else:
+                        spec[change] = []
+                    save(previous)
+                    with self.subTest(change=change), self.assertRaises(ValueError):
+                        bundle.resume_record(root, current, 'b' * 40, root)
+                    if change in ('mirror', 'root'):
+                        with self.assertRaises(ValueError):
+                            bundle.resume_record(root, previous, 'b' * 40, root)
+
+    def test_native_tuf_regression_restores_exact_policy_even_on_failure(self):
+        policy = admission.image_policy('istio-system', ['pinned-image'], 'a' * 40)
+        observed = copy.deepcopy(policy)
+        observed['metadata']['uid'] = 'preserved'
+        with patch.object(staging, 'apply') as apply, \
+                patch.object(staging, 'admission_result') as probe, \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            staging.tuf_trust_boundary(Mock(return_value=json.dumps(observed)), {}, policy, Mock())
+            self.assertEqual(policy, apply.call_args_list[-1].args[1])
+            invalid = apply.call_args_list[0].args[1]
+            self.assertEqual(b'{"untrusted":true}', base64.b64decode(
+                invalid['spec']['attestors'][0]['cosign']['tuf']['root']['data']))
+            self.assertEqual({}, probe.call_args_list[0].kwargs)
+            self.assertEqual(1, probe.call_args_list[1].kwargs['expected'])
+            self.assertEqual(b'platform image signature verification failed',
+                             probe.call_args_list[1].kwargs['message'])
+            self.assertEqual({}, probe.call_args_list[-1].kwargs)
+            self.assertIn('PLATFORM_SIGNED_TUF_MIRROR=Passed', output.getvalue())
+        with patch.object(staging, 'apply') as apply, \
+                patch.object(staging, 'admission_result', side_effect=[None, ValueError('fixture failure')]), \
+                self.assertRaises(ValueError):
+            staging.tuf_trust_boundary(Mock(return_value=json.dumps(observed)), {}, policy, Mock())
+        self.assertEqual(policy, apply.call_args_list[-1].args[1])
+        self.assertNotIn('root', policy['spec']['attestors'][0]['cosign']['tuf'])
+
     def test_registry_token_only_in_memory_three_exact_secrets(self):
         with patch.object(host.getpass, 'getpass', return_value='synthetic-private-token'), \
                 patch.object(host, 'open', mock_open(), create=True), \
@@ -250,6 +325,32 @@ class PlatformCommissioningTest(unittest.TestCase):
             'name': 'hooshix-ghcr-read', 'namespace': namespace, 'labels': dict(host.LABELS),
             'resourceVersion': '123', 'uid': 'fixture-uid', 'annotations': {'fixture': 'preserve'}},
             'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': 'old-synthetic-data'}}
+
+    def test_verifier_refresh_is_bounded_owned_pinned_and_preserves_pod_spec(self):
+        images = {'admission': 'pinned-admission', 'reports': 'pinned-reports'}
+        deployments = [{'metadata': {'uid': name, 'labels': {
+            'app.kubernetes.io/part-of': 'kyverno', 'app.kubernetes.io/instance': 'kyverno'}},
+            'spec': {'template': {'spec': {'containers': [{'image': image}]}}},
+            'status': {'availableReplicas': 1}} for name, image in images.items()]
+        with patch.object(host, 'get', side_effect=[d for d in deployments for _ in range(2)]), \
+                patch.object(host, 'kube') as kube:
+            host.refresh_image_verifiers(images)
+        self.assertEqual(4, len(kube.call_args_list))
+        for index, component in enumerate(images):
+            name = 'deployment/kyverno-' + component + '-controller'
+            self.assertEqual(('-n', 'kyverno', 'rollout', 'restart', name), kube.call_args_list[2 * index].args)
+            self.assertEqual(135, kube.call_args_list[2 * index + 1].kwargs['timeout'])
+            self.assertIn('--timeout=120s', kube.call_args_list[2 * index + 1].args)
+        for foreign in (None, {'metadata': {'labels': {}}}):
+            with patch.object(host, 'get', return_value=foreign), patch.object(host, 'kube') as kube, \
+                    self.assertRaises(host.custody.BootstrapFailed):
+                host.refresh_image_verifiers(images)
+            kube.assert_not_called()
+        changed = copy.deepcopy(deployments[0])
+        changed['spec']['template']['spec']['containers'][0]['image'] = 'unreviewed'
+        with patch.object(host, 'get', side_effect=[deployments[0], changed]), patch.object(host, 'kube'), \
+                self.assertRaises(host.custody.BootstrapFailed):
+            host.refresh_image_verifiers(images)
 
     def test_owned_registry_rotation_preserves_metadata_and_uses_conditional_update(self):
         for namespace in ('kyverno', 'istio-system', 'hooshix-secrets'):
