@@ -20,13 +20,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 import import_intermediate_ca as ca_import
+import activate_openbao_host as activation
 from rehearse_openbao_recovery import BOUND, Client, RehearsalFailed, initialize
 from render_openbao_candidate import ALIVE, NAMESPACE, ROOT, STATUS, candidate
 from render_openbao_local_storage import candidate as local_storage_candidate
 
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
-                   "unseal", "acl", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "public-ca-projection", "unseal", "acl", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -263,6 +264,19 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
                 "data": {label: base64.b64encode(path.read_bytes()).decode() for label, path in
                          (("tls.crt", cert), ("ca.crt", cert), ("tls.key", key))}}
             k("apply", "-f", "-", data=json.dumps(secret).encode())
+            # Execute the production selector against the real fixture Secret.
+            # Only CA projection is exercised here; no init/forward is performed.
+            step("public-ca-projection")
+            def public_ca_kube(*args, operation):
+                if operation != 'GET_PUBLIC_CA':
+                    raise RehearsalFailed('unexpected public CA operation')
+                return k(*args)
+            with patch.object(activation, 'kube', side_effect=public_ca_kube), \
+                    patch.object(activation.custody, 'ROOT_SHA256', hashlib.sha256(cert.read_bytes()).hexdigest()), \
+                    patch.object(activation.transport, 'forward') as ca_forward, \
+                    patch.object(activation, 'initialize', return_value={}):
+                activation.activate({'action': 'initialize', 'recipients': []}, 'ci-projection-only', 'a' * 40)
+                ca_forward.assert_called_once_with(cert.read_text())
             step("workload")
             k("apply", "-f", "-", data=json.dumps(manifest).encode())
             wait(pod_running, seconds=180)

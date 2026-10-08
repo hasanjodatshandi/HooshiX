@@ -318,7 +318,7 @@ def main(revision):
 
 
 def activate(request, claim_uid, revision):
-    certificate = base64.b64decode(kube('-n', 'hooshix-secrets', 'get', 'secret', 'openbao-tls',
+    certificate = base64.b64decode(kube('-n', 'hooshix-secrets', 'get', 'secret', 'openbao-server-tls',
         '-o', 'jsonpath={.data.ca\\.crt}', operation='GET_PUBLIC_CA'), validate=True)
     require(hashlib.sha256(certificate).hexdigest() == custody.ROOT_SHA256, 'ROOT_CA_IDENTITY_CONFLICT')
     with transport.forward(certificate.decode('ascii')) as api:
