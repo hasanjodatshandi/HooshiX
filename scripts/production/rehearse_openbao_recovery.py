@@ -17,6 +17,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+import activate_openbao_host as activation
+import activate_openbao_operator as operator
 from render_openbao_candidate import ALIVE, STATUS
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,11 +42,12 @@ def step(name: str) -> None:
     print(f"OPENBAO_STEP={name}", flush=True)
 
 
-def command(args: list[str], *, timeout: int = 30, expected_exit: int = 0) -> bytes:
-    result = subprocess.run(args, check=False, stdout=subprocess.PIPE,
+def command(args: list[str], *, timeout: int = 30, expected_exit: int = 0,
+            data=None, output_bound=8192) -> bytes:
+    result = subprocess.run(args, input=data, check=False, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, timeout=timeout,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
-    if result.returncode != expected_exit or len(result.stdout) > 8192:
+    if result.returncode != expected_exit or len(result.stdout) > output_bound:
         raise RehearsalFailed("fixture command failed")
     return result.stdout
 
@@ -100,6 +103,39 @@ def initialize(client: Client) -> tuple[list[str], str]:
         raise RehearsalFailed("fixture insufficient-share bypass")
     client.call("sys/unseal", "PUT", {"key": keys[1]})
     client.wait_health(200)
+    return keys, token
+
+
+def initialize_encrypted(client: Client, container: str, directory: Path) -> tuple[list[str], str]:
+    # Production crypto/response validation and the EXACT native stdin CLI edge.
+    # Nothing in this rehearsal receives real keys, operator paths or VPS access.
+    directory.mkdir(mode=0o700)
+    password = 'CI only disposable custody passphrase, never production'
+    recipients = [operator.generate_recipient(directory, i, password) for i in range(1, 4)]
+
+    def api(operation, path=None, body=None):
+        if operation == 'status':
+            return client.call('sys/seal-status')
+        output = command(['/usr/bin/docker', 'exec', '-i', container, '/usr/bin/bao', 'write',
+            '-format=json', '-address=https://127.0.0.1:8200', '-ca-cert=/openbao/tls/tls.crt', path, '-'],
+            data=json.dumps(body).encode(), output_bound=activation.BOUND)
+        return json.loads(output)['data']
+
+    encrypted = activation.encrypted_result(api('write', 'sys/init', activation.init_request(recipients)))
+    # Ciphertext-only write/readback; keys are recovered from fresh private exports.
+    saved = directory / 'encrypted.json'
+    operator.create(saved, json.dumps(encrypted).encode())
+    encrypted = json.loads(operator.read_private(saved))
+    keys = [operator.decrypt(directory, i + 1, password, value)
+            for i, value in enumerate(encrypted['keys_base64'])]
+    token = operator.decrypt(directory, 1, password, encrypted['root_token'])
+    if len(set(keys)) != 3 or any(value.encode() in saved.read_bytes() for value in [*keys, token]):
+        raise RehearsalFailed('encrypted custody leakage')
+    client.wait_health(503)
+    activation.unseal(keys[:2], api=api)
+    client.wait_health(200)
+    # Already-initialized server refuses another init; no state deletion/recovery shortcut.
+    client.call('sys/init', 'PUT', activation.init_request(recipients), expected=400)
     return keys, token
 
 
@@ -200,7 +236,7 @@ def rehearse():
             cli_probe(ALIVE, 2, wrong_hostname=True)
             cli_probe(STATUS, 1, wrong_hostname=True)
             step("source-init")
-            keys, root_token = initialize(client)
+            keys, root_token = initialize_encrypted(client, source, directory / 'encrypted-custody')
             step("probe-unsealed")
             cli_probe(ALIVE, 0)
             cli_probe(STATUS, 0)
@@ -267,7 +303,7 @@ def rehearse():
                     raise RehearsalFailed("fixture audit leak or size mismatch")
             step("cleanup")
     # Cleanup is part of success, not an action performed after the success receipt.
-    print("OPENBAO_RECOVERY=Passed; TLS; Shamir 3/2; Raft restart; isolated restore; ACL; audit redaction; root revocation")
+    print("OPENBAO_RECOVERY=Passed; TLS; encrypted custody; Shamir 3/2; Raft restart; isolated restore; ACL; audit redaction; root revocation")
 
 
 def main() -> int:
@@ -277,7 +313,8 @@ def main() -> int:
     try:
         rehearse()
         return 0
-    except (OSError, ValueError, KeyError, subprocess.SubprocessError, RehearsalFailed):
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError,
+            RehearsalFailed, activation.custody.BootstrapFailed):
         print("OPENBAO_RECOVERY=Failed; inspect the named CI step; no secret diagnostics emitted")
         return 1
 

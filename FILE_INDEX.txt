@@ -317,6 +317,7 @@ docs/operations/production-host-audit-fa.md
 docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/production-jit-usage-fa.md
+docs/operations/production-openbao-activation-fa.md
 docs/operations/production-openbao-fa.md
 docs/operations/production-openbao-storage-fa.md
 docs/operations/production-pki-bootstrap-fa.md
@@ -503,6 +504,8 @@ scripts/platform/tests/test_staging_erasure_recovery.py
 scripts/platform/tests/test_staging_prepare.py
 scripts/platform/waf_build.sh
 scripts/platform/waf_image_smoke.py
+scripts/production/activate_openbao_host.py
+scripts/production/activate_openbao_operator.py
 scripts/production/apply_human_sshd_candidate.sh
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/build_platform_commissioning_bundle.py
@@ -568,6 +571,7 @@ scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_mesh_publication.py
 scripts/production/tests/test_offline_ca.ps1
+scripts/production/tests/test_openbao_activation.py
 scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py
 scripts/production/tests/test_openbao_kubernetes.py

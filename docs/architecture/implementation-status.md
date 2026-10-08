@@ -2,22 +2,38 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+Current Stage 10 continuation, 2026-10-08: target receipt
+`hooshix-platform-d6c52f209c034d019f67ee38b727724a.json`, observed at
+`2026-10-08T10:54:50.046652+00:00`, binds reviewed main
+`eabc4475ed3065a3db1c2bf782383e9ef99e23e6` and plan SHA-256
+`0522429263e84f9ae10a18f58baa9dbc3f82b5ab66f6089b30e4b89cd60a205b`.
+Mesh, Kyverno 1.19.1, exact OpenBao 2.6.4 installation, verified TLS/sealed probes,
+retained local PVC, protected audit/storage guard and existing host services are
+`Passed`. OpenBao is **installed, sealed, not initialized**. Do not repeat the
+installer or treat older pre-install evidence below as the present target state.
+Next is supervised PGP-encrypted Shamir 3/2 custody and unseal; the operator tool
+and native disposable CI do not prove actual target activation. Target custody,
+initialization/unseal, hourly off-host snapshots/restore, ESO, audited JIT,
+standing-access removal, GitOps and complete-stack readiness remain `Not verified`.
+Usage: `../operations/production-openbao-activation-fa.md`. Stage 10 stays `IN PROGRESS`.
+
 Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
 istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
 The baseline includes a blocking credential-free scan of all three exact upstream
 imports, retains threshold-failure JSON, and never signs or deploys from PR CI.
 Historical local 1.30.3 runtime evidence below does not validate 1.30.5 runtime.
-New upstream scan, signed mirror publication, target staging/admission and VPS
-installation remain `Not verified` until their separate executed receipts exist.
+The exact 1.30.5 target installation is now `Passed` in the receipt above;
+historical local evidence does not establish complete target mesh security,
+application staging/promotion or Production readiness.
 
 The owner approved the bounded ADR-0030 commissioning bootstrap on 2026-10-05.
 The controlled intermediate CSR tool retains only an encrypted root-owned key on
 the VPS and exports a hash-bound public CSR for the existing offline Root signer.
-Synthetic crypto/negative tests passed; actual CSR generation and offline signing
-remain `Not run` until the supervised operator execution. No Root regeneration,
-repeat storage maintenance, cluster mutation or OpenBao installation is claimed.
-Continuation: `../operations/production-pki-bootstrap-fa.md`; then import the
-signed intermediate and commission mesh/GitOps/admission/OpenBao. Stage 10 stays
+The owner subsequently generated the actual CSR, signed with the existing offline
+Root and imported the signed intermediate; platform TLS/sealed probes passed in
+the current target receipt above. No Root regeneration or repeat storage
+maintenance is needed. Continuation: supervised encrypted OpenBao activation,
+then remaining GitOps/admission/application commissioning. Stage 10 stays
 `IN PROGRESS`; normal audited JIT and Production readiness remain `Not verified`.
 
 The 2026-10-05 OpenBao storage continuation adds a bounded systemd notify/watchdog
@@ -31,9 +47,11 @@ Owner-approved target maintenance on 2026-10-05 passed guard process-fault and
 unexpected mount-loss shutdown, no automatic re-arm after remount, explicit
 guard/K3s recovery and API readiness. Protected host-service PIDs/active states
 were unchanged. `verify_storage_guard.py` records this bounded procedure; its
-negative unit tests do not replace native evidence. Actual PV binding, workload
-promotion, mesh/admission/TLS, OpenBao recovery and Production readiness remain
-`Not verified`. The read-only storage verifier deliberately does not certify reboot.
+negative unit tests do not replace native evidence. Actual retained PV binding,
+OpenBao installation and TLS/sealed probes passed in the current target receipt;
+application promotion, full target mesh/admission security, OpenBao recovery and
+Production readiness remain `Not verified`. The read-only storage verifier
+deliberately does not certify reboot.
 K3s stop is not claimed to terminate all running containers. Owner instructions:
 `../operations/production-openbao-storage-fa.md`; Stage 10 remains `IN PROGRESS`.
 
@@ -67,7 +85,9 @@ backup without regenerating the Root or requiring another `ToOnline` export.
 Connected-Windows origin and owner-attested offline/two-backup custody remain explicit;
 historical receipts are not rewritten. This is a bounded approval and tooling change,
 not independent recovery evidence, signed intermediate installation or mesh readiness.
-Actual intermediate custody/import/rotation and platform commissioning remain `Not verified`.
+Actual intermediate import and the bounded platform installation passed in the
+current target receipt; intermediate rotation/recovery and complete platform
+commissioning remain `Not verified`.
 
 On 2026-10-04 PR #163 merged at `ca155496c60507e6a0525ddcb4575cadf0db3bd3`
 after protected baseline `37190183009` and frontend `37190182906` passed at the
@@ -589,15 +609,15 @@ Authorization and Web BFF application services are implemented as current reposi
 | Kyverno production release admission | DESIGNED under ADR-0017/0045 | IMPLEMENTED as stable CEL release-policy generation | repository render/static verification PASSED; production cluster enforcement NOT VERIFIED |
 | Trivy / OWASP Dependency-Check | NOT SELECTED under ADR-0045 | NOT APPLICABLE | NOT APPLICABLE |
 | Production K3s/Kubernetes/Calico | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-30 read-only root inventory again passed API readiness and found all seven Calico/CoreDNS/Kyverno pods ready with zero restarts; the previously observed K3s version was `v1.35.6+k3s1`. Admission/network negative tests, reproducible production provisioning, backup/recovery and complete readiness remain NOT VERIFIED by this inventory. Local kind evidence does not replace them |
-| Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
-| Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
+| Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.30.5 installation Passed | current target installation receipt above; historical local 1.30.3 STRICT mTLS/workload-identity positives/negatives do not replace complete target/application mesh verification, still Not verified |
+| Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.19.1 upgrade Passed | current target installation receipt above; historical local 1.18.2 hardening evidence remains revision-specific; complete production application signature/provenance/SBOM admission remains Not verified |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
 | WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
-| OpenBao + External Secrets | DESIGNED | NOT PRESENT | NOT VERIFIED |
+| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed sealed/uninitialized on 2026-10-08; ESO not installed | OpenBao installation/TLS/PVC Passed in target receipt; activation/ESO/off-host recovery NOT VERIFIED |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Cross-service CI/security/supply-chain release gates | DESIGNED | Stage 10 seven-artifact source merged; protected head and merged-main CI PASSED | Semgrep/OSV/Gitleaks-capable service workflows plus frontend Semgrep/OSV/image/Helm gates are present; Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation cover all seven application release components. PR #142 head runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed; real production release/rescan/admission execution remains NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | three-node local Collector DaemonSet, bounded queues/privacy config, exact read-only pod-log hostPath, metrics, and OTLP integration PASSED |

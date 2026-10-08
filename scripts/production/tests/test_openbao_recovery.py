@@ -48,7 +48,7 @@ class OpenBaoRecoveryTest(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.object(os, "getuid", return_value=1000), \
                 patch.object(recovery, "command", side_effect=run), patch.object(recovery, "Client", return_value=client), \
                 patch.object(recovery.urllib.request, "build_opener") as opener, \
-                patch.object(recovery, "initialize", side_effect=recovery.RehearsalFailed("synthetic stop")), \
+                patch.object(recovery, "initialize_encrypted", side_effect=recovery.RehearsalFailed("synthetic stop")), \
                 contextlib.redirect_stdout(io.StringIO()):
             opener.return_value.open.side_effect = urllib.error.URLError(ssl.SSLCertVerificationError("untrusted"))
             with self.assertRaises(recovery.RehearsalFailed):
@@ -109,7 +109,7 @@ class OpenBaoRecoveryTest(unittest.TestCase):
             with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
                     patch.object(os, "getuid", return_value=1000), \
                     patch.object(recovery, "command", return_value=version), \
-                    patch.object(recovery, "initialize") as initialize:
+                    patch.object(recovery, "initialize_encrypted") as initialize:
                 with self.assertRaises(recovery.RehearsalFailed):
                     recovery.rehearse()
                 initialize.assert_not_called()
