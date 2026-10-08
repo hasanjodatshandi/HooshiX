@@ -9,7 +9,9 @@ import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
+import commission_platform as commissioning
 import render_mesh_candidate as mesh
 import render_platform_admission as admission
 import upgrade_kyverno
@@ -98,6 +100,46 @@ def registry_secret(name: str):
     return {"apiVersion": "v1", "kind": "Secret", "metadata": {
         "name": admission.PULL_SECRET, "namespace": name}, "type": "kubernetes.io/dockerconfigjson",
         "data": {".dockerconfigjson": base64.b64encode(config).decode()}}
+
+
+def registry_restart(k):
+    # Execute the production Secret update path against the disposable API.
+    # Synthetic values only: reproduce create -> SSA conflict -> conditional
+    # update, then prove stale-write rejection and same-value idempotency.
+    def registry_kube(*args, body=None, output_bound=commissioning.BOUND, **options):
+        if output_bound != commissioning.BOUND:
+            raise ValueError('registry read bound changed')
+        return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+
+    first = base64.b64encode(b'{"auths":{"fixture.invalid":{"auth":"Zmlyc3Q="}}}').decode()
+    second = base64.b64encode(b'{"auths":{"fixture.invalid":{"auth":"c2Vjb25k"}}}').decode()
+    with patch.object(commissioning, 'kube', registry_kube):
+        for ns in ('kyverno', *admission.NAMESPACES):
+            commissioning.write_registry_secret(ns, first)
+            before = commissioning.get('secret', admission.PULL_SECRET, ns)
+            conflicting = copy.deepcopy(before)
+            conflicting['metadata'].pop('managedFields', None)
+            conflicting['data']['.dockerconfigjson'] = second
+            k('apply', '--server-side', '--field-manager=' + commissioning.MANAGER, '-f', '-',
+              data=json.dumps(conflicting).encode(), expected=1, public_schema=True, required_error=b'conflict')
+            commissioning.write_registry_secret(ns, second)
+            after = commissioning.get('secret', admission.PULL_SECRET, ns)
+            if (after['metadata']['uid'] != before['metadata']['uid']
+                    or after['data'] != {'.dockerconfigjson': second}):
+                raise ValueError('registry rotation recreated Secret or lost update')
+            commissioning.write_registry_secret(ns, second)
+            unchanged = commissioning.get('secret', admission.PULL_SECRET, ns)
+            if unchanged['metadata']['resourceVersion'] != after['metadata']['resourceVersion']:
+                raise ValueError('identical registry reentry wrote state')
+            k('replace', '--field-manager=' + commissioning.MANAGER, '-f', '-',
+              data=json.dumps(before).encode(), expected=1, public_schema=True,
+              required_error=b'the object has been modified')
+            retained = commissioning.get('secret', admission.PULL_SECRET, ns)
+            if retained['data'] != after['data'] or retained['metadata']['uid'] != after['metadata']['uid']:
+                raise ValueError('stale registry update changed state')
+            # Materialize the ephemeral read-only CI token through the same
+            # owned update path, without public-schema/credential diagnostics.
+            commissioning.write_registry_secret(ns, registry_secret(ns)['data']['.dockerconfigjson'])
 
 
 class Staging:
@@ -217,8 +259,8 @@ class Staging:
           '--timeout=90s', timeout=105)
         for name in admission.NAMESPACES:
             apply(k, namespace(name))
-        for name in ("kyverno", *admission.NAMESPACES):
-            apply(k, registry_secret(name))
+        print('PLATFORM_STEP=registry-restart', flush=True)
+        registry_restart(k)
         for account in ("istiod", "istio-cni", "ztunnel"):
             apply(k, {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {
                 "name": account, "namespace": "istio-system"}})

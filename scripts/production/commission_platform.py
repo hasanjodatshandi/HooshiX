@@ -227,13 +227,33 @@ def registry_credentials():
     data = base64.b64encode(json.dumps({'auths': {'ghcr.io': {'auth': auth}}}).encode()).decode()
     del token, auth
     for ns in ('kyverno', 'istio-system', 'hooshix-secrets'):
-        value = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {
-            'name': 'hooshix-ghcr-read', 'namespace': ns, 'labels': LABELS},
-            'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': data}}
-        existing = get('secret', 'hooshix-ghcr-read', ns)
-        require(existing is None or all(existing['metadata'].get('labels', {}).get(k) == v
-                                        for k, v in LABELS.items()), 'FOREIGN_REGISTRY_SECRET_PRESERVED')
-        apply(value) if existing else create(value)
+        write_registry_secret(ns, data)
+
+
+def write_registry_secret(namespace, data):
+    require(namespace in ('kyverno', 'istio-system', 'hooshix-secrets'), 'REGISTRY_NAMESPACE_REJECTED')
+    value = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {
+        'name': 'hooshix-ghcr-read', 'namespace': namespace, 'labels': LABELS},
+        'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': data}}
+    existing = get('secret', 'hooshix-ghcr-read', namespace)
+    if existing is None:
+        create(value)
+        return
+    metadata = existing.get('metadata', {})
+    require(metadata.get('name') == 'hooshix-ghcr-read' and metadata.get('namespace') == namespace
+            and all(metadata.get('labels', {}).get(k) == v for k, v in LABELS.items())
+            and existing.get('type') == value['type']
+            and set(existing.get('data', {})) == {'.dockerconfigjson'}, 'FOREIGN_REGISTRY_SECRET_PRESERVED')
+    if existing['data'] == value['data']:
+        return
+    version = metadata.get('resourceVersion')
+    require(isinstance(version, str) and 0 < len(version) <= 128
+            and existing.get('immutable') is not True, 'REGISTRY_SECRET_UPDATE_PRECONDITION_FAILED')
+    # A prior create owns data under kubectl-create. SSA cannot rotate that
+    # field. Update ONLY this owned Secret, preserving other fields and the
+    # observed resourceVersion; stale updates fail without force or retry.
+    existing['data'] = value['data']
+    kube('replace', '--field-manager=' + MANAGER, '-f', '-', body=existing)
 
 
 def tls_secret(public_directory, revision):
