@@ -24,6 +24,7 @@ import bootstrap_intermediate_csr as custody
 import import_intermediate_ca as ca_import
 import verify_storage_guard as storage
 import upgrade_kyverno
+import platform_image_egress
 
 STATE = custody.BASE / 'platform-commissioning'
 MANAGER = 'hooshix-platform-commissioning'
@@ -88,6 +89,20 @@ def apply(value):
 
 def create(value):
     kube('create', '-f', '-', body=value)
+
+
+def install_image_verifier_egress(value):
+    require(value == platform_image_egress.candidate(), 'EXACT_VERIFIER_EGRESS_REQUIRED')
+    existing = get('networkpolicy', platform_image_egress.NAME, 'kyverno')
+    if existing is None:
+        create(value)
+        return
+    metadata = existing.get('metadata', {})
+    require(metadata.get('name') == platform_image_egress.NAME
+            and metadata.get('namespace') == 'kyverno'
+            and all(metadata.get('labels', {}).get(k) == v for k, v in platform_image_egress.LABELS.items())
+            and existing.get('spec') == value['spec'], 'EXISTING_VERIFIER_EGRESS_CONFLICT_PRESERVED')
+    # Exact reentry is read-only. No other policy is read, replaced or removed.
 
 
 def snapshot_services():
@@ -179,6 +194,8 @@ def read_plan(path, digest, revision):
                 'rbac.kyverno.io/aggregate-to-reports-controller': 'true'}},
             'rules': [{'apiGroups': [''], 'resources': ['pods/ephemeralcontainers'],
                        'verbs': ['get', 'list', 'watch']}]}]}, 'READ_ONLY_REPORTING_RBAC_REQUIRED')
+    require(value.get('image_verifier_egress') == platform_image_egress.candidate(),
+            'EXACT_VERIFIER_EGRESS_REQUIRED')
     return value
 
 
@@ -353,8 +370,8 @@ def commissioning_marker(plan, digest, revision):
     if marker.exists():
         custody.protected(marker, exact_mode=0o600)
         existing = json.loads(marker.read_bytes())
-        # The authenticated builder permits this only for identical desired
-        # state. Retain the original root-only provenance; never delete/replace it.
+        # The authenticated builder permits only identical desired state or the
+        # exact additive verifier egress repair. Never replace original provenance.
         require(existing == record or ('resume_from' in plan and existing == plan['resume_from']),
                 'EXISTING_COMMISSIONING_PLAN_PRESERVED')
     else:
@@ -381,6 +398,7 @@ def execute(path, digest, revision, public_directory):
         for name in ('istio-system', 'hooshix-secrets'):
             apply({'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': name}})
         progress('admission', revision)
+        install_image_verifier_egress(plan['image_verifier_egress'])
         registry_credentials()
         apply(plan['admission_prerequisites'])
         apply(plan['admission'])

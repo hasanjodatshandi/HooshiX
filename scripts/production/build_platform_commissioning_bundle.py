@@ -18,9 +18,10 @@ import render_platform_admission as admission
 import import_intermediate_ca as ca_import
 import verify_platform_publication_run as publication
 import upgrade_kyverno
+import platform_image_egress
 
 SOURCES = ('bootstrap_intermediate_csr.py', 'import_intermediate_ca.py',
-           'verify_storage_guard.py', 'upgrade_kyverno.py', 'commission_platform.py')
+           'verify_storage_guard.py', 'upgrade_kyverno.py', 'platform_image_egress.py', 'commission_platform.py')
 WORKFLOW = '.github/workflows/platform-commissioning.yml'
 CHECKS = frozenset({'calico_runtime', 'kyverno_upgrade', 'admission_audit_negative', 'admission_deny_negative',
                    'signed_mesh_admission_and_runtime', 'admission_wrong_signer',
@@ -101,6 +102,12 @@ def resume_record(previous_bundle, plan, revision, directory):
                     'run_id': evidence['run_id'], 'observed_at': authenticated['observed_at']}:
         raise ValueError('authenticated previous commissioning evidence required')
     desired = {key: value for key, value in plan.items() if key != 'commissioning_evidence'}
+    if desired.get('image_verifier_egress') != platform_image_egress.candidate():
+        raise ValueError('exact reviewed verifier HTTPS egress required')
+    # Only this reviewed additive network repair may differ from the authenticated
+    # legacy plan. Images, CA, storage, admission and original marker remain fixed.
+    if 'image_verifier_egress' not in previous:
+        previous['image_verifier_egress'] = platform_image_egress.candidate()
     if previous != desired:
         raise ValueError('resumption cannot change any platform desired state')
     return {'source_revision': previous_revision, 'plan_sha256': digest}
@@ -167,7 +174,7 @@ def main():
     parser.add_argument('--public-ca', type=Path, required=True)
     parser.add_argument('--mesh-run', default='37588183736')
     parser.add_argument('--openbao-run', default='37228262995')
-    parser.add_argument('--resume-bundle', type=Path, help='Previous public bundle; all desired state must be identical')
+    parser.add_argument('--resume-bundle', type=Path, help='Authenticated previous bundle; only exact additive verifier egress may differ')
     args = parser.parse_args()
     try:
         build(args.output, args.staging_run, args.mesh_run, args.openbao_run, args.public_ca, args.resume_bundle)

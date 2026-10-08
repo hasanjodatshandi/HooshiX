@@ -1,6 +1,6 @@
 param([switch]$ValidateOnly, [switch]$RescueAndSecondSessionReady)
 $ErrorActionPreference = 'Stop'
-$sources = @('bootstrap_intermediate_csr.py', 'import_intermediate_ca.py', 'verify_storage_guard.py', 'upgrade_kyverno.py', 'commission_platform.py')
+$sources = @('bootstrap_intermediate_csr.py', 'import_intermediate_ca.py', 'verify_storage_guard.py', 'upgrade_kyverno.py', 'platform_image_egress.py', 'commission_platform.py')
 $artifacts = @('kyverno-3.9.1.tgz', 'helm-linux-amd64.tar.gz')
 $publicNames = @('ca-cert.pem', 'cert-chain.pem', 'root-cert.pem', 'signing-receipt.json')
 $expectedNames = @($sources) + @($artifacts) + @('plan.json', 'run-platform-commissioning.ps1', 'USAGE-fa.md') + @($publicNames | ForEach-Object { 'public/' + $_ })
@@ -43,7 +43,7 @@ for name,digest in [$pairs]:
   content=stream.read(32769)
  if len(content)>32768 or hashlib.sha256(content).hexdigest()!=digest: raise SystemExit(1)
  sources[name]=content
-for name in ['bootstrap_intermediate_csr','import_intermediate_ca','verify_storage_guard','upgrade_kyverno']:
+for name in ['bootstrap_intermediate_csr','import_intermediate_ca','verify_storage_guard','upgrade_kyverno','platform_image_egress']:
  m=types.ModuleType(name)
  sys.modules[name]=m
  exec(compile(sources[name+'.py'],name+'.py','exec'),m.__dict__)

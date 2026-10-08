@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import platform_image_egress
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -293,6 +294,7 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
     return {"schema_version": 1, "profile": "production-single-server",
             "installation_id": "hooshix-production", "mesh": candidate, "openbao": openbao,
             "admission_prerequisites": reporting_permissions(),
+            "image_verifier_egress": platform_image_egress.candidate(),
             "admission": {"apiVersion": "v1", "kind": "List", "items": policies},
             "runtime_admission": "Not verified", "staging": "Not verified", "deployment": "Not verified"}
 

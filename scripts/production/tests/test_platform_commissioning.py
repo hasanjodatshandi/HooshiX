@@ -18,6 +18,7 @@ import commission_platform as host
 import rehearse_platform_admission as staging
 import render_openbao_candidate as bao
 import render_platform_admission as admission
+import platform_image_egress as egress
 
 
 class PlatformCommissioningTest(unittest.TestCase):
@@ -28,6 +29,7 @@ class PlatformCommissioningTest(unittest.TestCase):
                 'mesh': {'stages': [{'component': name} for name in ('base', 'istiod', 'cni', 'ztunnel')]},
                 'openbao': bao.candidate('hooshix-openbao-local'),
                 'admission_prerequisites': admission.reporting_permissions(),
+                'image_verifier_egress': egress.candidate(),
                 'admission': {'items': [{'spec': {'failurePolicy': 'Fail', 'validationActions': ['Deny']}}] * 6},
                 'commissioning_evidence': {'source_revision': 'a' * 40, 'staging': 'Passed',
                                           'run_id': 12, 'observed_at': datetime.now(timezone.utc).isoformat()}}
@@ -67,6 +69,54 @@ class PlatformCommissioningTest(unittest.TestCase):
                 digest = host.hashlib.sha256(path.read_bytes()).hexdigest()
                 with self.assertRaises(host.custody.BootstrapFailed):
                     host.read_plan(path, digest, 'a' * 40)
+
+    def test_verifier_egress_is_exact_and_never_grants_app_or_private_access(self):
+        import ipaddress
+        policy = egress.candidate()
+        spec = policy['spec']
+        self.assertEqual(['Egress'], spec['policyTypes'])
+        self.assertNotIn('ingress', spec)
+        self.assertEqual({'app.kubernetes.io/part-of': 'kyverno'}, spec['podSelector']['matchLabels'])
+        self.assertEqual(['admission-controller', 'reports-controller'],
+                         spec['podSelector']['matchExpressions'][0]['values'])
+        self.assertEqual([{'port': 443, 'protocol': 'TCP'}], spec['egress'][0]['ports'])
+        block = spec['egress'][0]['to'][0]['ipBlock']
+        self.assertEqual('0.0.0.0/0', block['cidr'])
+        for address in ('10.42.0.1', '10.43.0.1', '169.254.169.254', '127.0.0.1',
+                        '172.16.0.1', '192.168.0.1', '100.64.0.1', '224.0.0.1'):
+            self.assertTrue(any(ipaddress.ip_address(address) in ipaddress.ip_network(c)
+                                for c in block['except']))
+        for address in ('140.82.121.34', '34.36.47.134'):
+            self.assertFalse(any(ipaddress.ip_address(address) in ipaddress.ip_network(c)
+                                 for c in block['except']))
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'plan.json'
+            for value in (None, {'spec': {}}, policy | {'metadata': {}}):
+                plan = self.plan()
+                plan['image_verifier_egress'] = value
+                path.write_text(json.dumps(plan))
+                with self.assertRaises(host.custody.BootstrapFailed):
+                    host.read_plan(path, host.hashlib.sha256(path.read_bytes()).hexdigest(), 'a' * 40)
+
+    def test_egress_install_create_reentry_and_foreign_conflict_preserve_other_policies(self):
+        value = egress.candidate()
+        with patch.object(host, 'get', return_value=None) as get, patch.object(host, 'create') as create:
+            host.install_image_verifier_egress(value)
+            get.assert_called_once_with('networkpolicy', egress.NAME, 'kyverno')
+            create.assert_called_once_with(value)
+        with patch.object(host, 'get', return_value=value), patch.object(host, 'create') as create, \
+                patch.object(host, 'apply') as apply:
+            host.install_image_verifier_egress(value)
+            create.assert_not_called()
+            apply.assert_not_called()
+        for path in ('metadata', 'spec'):
+            foreign = copy.deepcopy(value)
+            foreign[path] = {}
+            with patch.object(host, 'get', return_value=foreign), patch.object(host, 'create') as create, \
+                    patch.object(host, 'apply') as apply, self.assertRaises(host.custody.BootstrapFailed):
+                host.install_image_verifier_egress(value)
+            create.assert_not_called()
+            apply.assert_not_called()
 
     def test_no_root_or_unexpected_target_denied_before_execution(self):
         with patch.object(os, 'geteuid', return_value=1000), patch.object(host, 'native') as native, \
@@ -125,6 +175,7 @@ class PlatformCommissioningTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             previous = self.plan()
+            previous.pop('image_verifier_egress')  # authenticated pre-repair plan
             source = 'a' * 40
             observed = previous['commissioning_evidence']['observed_at']
             content = json.dumps(previous).encode()
@@ -133,13 +184,14 @@ class PlatformCommissioningTest(unittest.TestCase):
             (root / 'bundle.json').write_text(json.dumps({'schema_version': 1, 'source_revision': source,
                                                         'files': {'plan.json': digest}}))
             current = copy.deepcopy(previous)
+            current['image_verifier_egress'] = egress.candidate()
             current['commissioning_evidence']['source_revision'] = 'b' * 40
             with patch.object(bundle, 'git', return_value=''), \
                     patch.object(bundle, 'staged_receipt', return_value={'observed_at': observed}) as staging:
                 self.assertEqual({'source_revision': source, 'plan_sha256': digest},
                                  bundle.resume_record(root, current, 'b' * 40, root))
                 self.assertEqual(source, staging.call_args.args[-1])
-                for field in ('openbao', 'admission', 'kyverno_upgrade', 'profile'):
+                for field in ('openbao', 'admission', 'kyverno_upgrade', 'profile', 'image_verifier_egress'):
                     altered = copy.deepcopy(current)
                     altered[field] = {'unreviewed': True}
                     with self.assertRaises(ValueError):

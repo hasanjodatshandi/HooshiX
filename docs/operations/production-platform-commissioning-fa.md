@@ -157,12 +157,38 @@ audit/JIT و دروازهٔ ترافیک Production هنوز مراحل بعدی
 برای ادامهٔ شکستِ نصب‌کننده با نسخهٔ اصلاح‌شده، در دستور ساخت بستهٔ جدید
 `--resume-bundle /path/to/previous-public-bundle` را اضافه کنید. سازنده evidence
 قبلی را از GitHub احراز می‌کند و تمام desired state را با بستهٔ جدید مقایسه می‌کند؛
-فقط source/evidence جدید مجاز است. کوچک‌ترین تغییر image، policy، منابع یا storage
+فقط source/evidence جدید و افزودن دقیق policy خروجی HTTPS بررسی تصویر که در بخش
+بعد توضیح داده شده مجاز است. هر تغییر دیگری در image، admission، منابع یا storage
 این مسیر را متوقف می‌کند. روی VPS فقط marker دقیق همان source/hash قبلی پذیرفته
 می‌شود؛ marker، PVC، CA و داده‌ها حذف یا جایگزین نمی‌شوند. evidence جدید همچنان
 باید برای tree دقیق اصلاح‌شده تازه و موفق باشد؛ این گزینه گیت CI را دور نمی‌زند.
 desired state عمومی همین bundle باید در reconciliation بعدی GitOps از منبع
 reviewed Git حفظ شود؛ استثنا، مجوز drift یا مدیریت عادی بدون JIT نیست.
+
+### رفع timeout خروجی شبکهٔ بررسی تصویر
+
+اگر میزبان به GHCR وصل می‌شود اما Pod کنترلر Kyverno timeout دارد، policy قدیمی
+`private-admission-boundary` را حذف یا باز نکنید. نصب‌کنندهٔ بازبینی‌شده فقط
+`kyverno/hooshix-image-verifier-https` را اضافه می‌کند: TCP/443 عمومی IPv4 فقط برای
+admission-controller و reports-controller. شبکه‌های خصوصی، loopback، metadata،
+CGNAT و reserved در این مجوز تازه مستثنا هستند؛ مجوزهای API/DNS قبلی حفظ می‌شوند.
+این NetworkPolicy فیلتر نام دامنه نیست؛ در سطح شبکه، HTTPS عمومی برای این دو
+کنترلر ممکن است. TLS و digest/signer/issuer/provenance/SBOM دقیق همچنان اجباری‌اند.
+هیچ برنامه، SSH، فایروال میزبان یا تنظیم ایمیلی مجوز تازه دریافت نمی‌کند.
+
+CI همان محدودیت خروجی را روی Calico واقعی بازسازی می‌کند؛ همان Pod امضاشده باید
+پیش از اصلاح رد و پس از اصلاح پذیرفته شود و UID/spec سیاست قبلی تغییر نکند.
+خطوط `PLATFORM_VERIFIER_RESTRICTED_EGRESS=Denied` و
+`PLATFORM_VERIFIER_HTTPS_REPAIR=Passed` شواهد این regression هستند؛ receipt staging
+فقط پس از همهٔ آزمون‌های امضا، mesh و OpenBao موفق صادر می‌شود.
+بستهٔ جدید را با `--resume-bundle` به بستهٔ عمومی اصلی نصب ناموفق متصل کنید؛
+marker قبلی حذف نمی‌شود. policy هم‌نام با مالکیت یا spec متفاوت عملیات را متوقف
+می‌کند؛ حذف/بازنویسی خودکار ندارد. تکرار policy دقیق و متعلق به همین نصب بدون write
+است. پس از ورود محلی رمزها، مراحل admission → TLS → mesh → storage → OpenBao
+ادامه می‌یابند. موفقیت نهایی یعنی OpenBao نصب‌شده ولی sealed و initialize‌نشده؛
+آمادگی Production یا اجازهٔ داده واقعی نیست. rollback این مجوز، در صورت نیاز،
+باید بازبینی و با احراز هویت مالک انجام شود؛ حذف آن بررسی‌های تازه را fail-closed
+می‌کند و policy قدیمی، CA، PVC و داده را نباید حذف کرد.
 
 هیچ کلید، رمز، سهم Shamir یا token را در گفتگو ارسال نکنید.
 
