@@ -509,6 +509,7 @@ scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
 scripts/production/commission_platform.py
+scripts/production/platform_image_egress.py
 scripts/production/import_intermediate_ca.py
 scripts/production/inspect_host.py
 scripts/production/install_audit_prerequisite.py
