@@ -104,10 +104,22 @@ def resume_record(previous_bundle, plan, revision, directory):
     desired = {key: value for key, value in plan.items() if key != 'commissioning_evidence'}
     if desired.get('image_verifier_egress') != platform_image_egress.candidate():
         raise ValueError('exact reviewed verifier HTTPS egress required')
-    # Only this reviewed additive network repair may differ from the authenticated
-    # legacy plan. Images, CA, storage, admission and original marker remain fixed.
+    for policy in desired['admission'].get('items', []):
+        if policy.get('kind') == 'ImageValidatingPolicy':
+            for attestor in policy['spec']['attestors']:
+                if attestor.get('cosign', {}).get('tuf') != {'mirror': admission.SIGSTORE_TUF_MIRROR}:
+                    raise ValueError('exact signed-TUF transport without root override required')
+    # Only the additive verifier egress and exact signed-TUF transport repair
+    # may differ. Trust roots, identities, validations and original marker stay fixed.
     if 'image_verifier_egress' not in previous:
         previous['image_verifier_egress'] = platform_image_egress.candidate()
+    for policy in previous['admission']['items']:
+        if policy.get('kind') != 'ImageValidatingPolicy':
+            continue
+        for attestor in policy['spec']['attestors']:
+            cosign = attestor.get('cosign')
+            if cosign is not None and 'tuf' not in cosign:
+                cosign['tuf'] = {'mirror': admission.SIGSTORE_TUF_MIRROR}
     if previous != desired:
         raise ValueError('resumption cannot change any platform desired state')
     return {'source_revision': previous_revision, 'plan_sha256': digest}
@@ -174,7 +186,7 @@ def main():
     parser.add_argument('--public-ca', type=Path, required=True)
     parser.add_argument('--mesh-run', default='37588183736')
     parser.add_argument('--openbao-run', default='37228262995')
-    parser.add_argument('--resume-bundle', type=Path, help='Authenticated previous bundle; only exact additive verifier egress may differ')
+    parser.add_argument('--resume-bundle', type=Path, help='Authenticated original bundle; only exact verifier egress and signed-TUF transport repairs may differ')
     args = parser.parse_args()
     try:
         build(args.output, args.staging_run, args.mesh_run, args.openbao_run, args.public_ca, args.resume_bundle)

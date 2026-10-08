@@ -33,6 +33,20 @@ def receipt(component):
 
 
 class PlatformAdmissionTest(unittest.TestCase):
+    def test_tuf_transport_keeps_embedded_root_and_exact_keyless_trust(self):
+        plan = target.render(receipt('mesh'), receipt('openbao'), target.mesh.candidate())
+        policies = [p for p in plan['admission']['items'] if p['kind'] == 'ImageValidatingPolicy']
+        self.assertEqual(4, len(policies))
+        for policy in policies:
+            self.assertEqual([{'name': 'cosign', 'cosign': {
+                'keyless': {'identities': [{'subject': target.EXPECTED_CERTIFICATE_IDENTITY,
+                                          'issuer': target.EXPECTED_OIDC_ISSUER}]},
+                'ctlog': {'url': 'https://rekor.sigstore.dev'},
+                'tuf': {'mirror': 'https://sigstore.github.io/root-signing'}}}],
+                policy['spec']['attestors'])
+            self.assertEqual('Fail', policy['spec']['failurePolicy'])
+            self.assertEqual(['Deny'], policy['spec']['validationActions'])
+
     def test_split_cold_verification_retains_every_blocking_check_and_exact_identity(self):
         complete = target.image_policy('hooshix-secrets', ['image'], 'a' * 40)
         parts = target.bounded_image_policies('hooshix-secrets', ['image'], 'a' * 40)

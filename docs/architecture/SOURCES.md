@@ -212,6 +212,18 @@ Technology Baseline pins Loki 3.7.4 and Tempo 3.0.2 for the reviewed current sin
 
 Kyverno 1.18 marks `policies.kyverno.io/v1` CEL types stable and legacy ClusterPolicy/CleanupPolicy families deprecated. HooshiX greenfield production policy gates therefore reject new legacy policy manifests.
 
+### Sigstore public trust metadata
+
+- Official root-signing repository and publication process: `https://github.com/sigstore/root-signing`
+- Kyverno pinned verifier implementation: `https://github.com/kyverno/kyverno/blob/v1.19.1/pkg/image/verifiers/ivpol/cosign/opts.go`
+
+The supervised platform bootstrap uses the official preproduction TUF publication
+at `https://sigstore.github.io/root-signing`, because the production CDN returns
+403 on the target. This changes metadata transport only: the embedded public
+Sigstore root, signed metadata/expiry checks, exact CI identity, transparency,
+provenance and SBOM verification remain mandatory. See the commissioning runbook
+for native evidence, fail-closed behavior and rollback; HTTP success is not trust evidence.
+
 ## Source-use rules
 
 - Do not copy upstream release notes into multiple repository authorities.

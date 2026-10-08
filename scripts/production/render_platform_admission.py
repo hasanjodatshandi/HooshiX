@@ -17,6 +17,9 @@ from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
 API = "policies.kyverno.io/v1"
 NAMESPACES = ("istio-system", "hooshix-secrets")
 PULL_SECRET = "hooshix-ghcr-read"
+# Official Sigstore preproduction publication of signed public trust metadata.
+# Transport only: omit root overrides so Kyverno retains its embedded TUF root.
+SIGSTORE_TUF_MIRROR = "https://sigstore.github.io/root-signing"
 BOUND = 32 * 1024
 BAO_PIN = mesh.ROOT / "infrastructure/production/secrets/openbao-image.json"
 
@@ -212,7 +215,8 @@ def image_policy(namespace: str, images: list[str], revision: str) -> dict:
         "validationConfigurations": {"mutateDigest": False, "required": True, "verifyDigest": True},
         "attestors": [{"name": "cosign", "cosign": {"keyless": {"identities": [{
             "subject": EXPECTED_CERTIFICATE_IDENTITY, "issuer": EXPECTED_OIDC_ISSUER}]},
-            "ctlog": {"url": "https://rekor.sigstore.dev"}}}],
+            "ctlog": {"url": "https://rekor.sigstore.dev"},
+            "tuf": {"mirror": SIGSTORE_TUF_MIRROR}}}],
         "attestations": [{"name": "provenance", "intoto": {"type": "https://slsa.dev/provenance/v1"}},
                          {"name": "sbom", "intoto": {"type": "https://cyclonedx.org/bom"}}]})
     # Fixed public source identifiers only, never registry credentials/request data.

@@ -24,8 +24,22 @@ Production readiness: Not verified
 فضای شبکهٔ کنترلر HTTP 200 دارد. این مقصد، مخزن preproduction رسمی Sigstore
 است، نه یک CA یا signer جدید؛ پذیرش آن باید همچنان از Root عمومی تعبیه‌شدهٔ
 Sigstore و زنجیرهٔ امضا/نسخه/انقضای TUF عبور کند. اعتبار HTTP به‌تنهایی شاهد
-اعتماد نیست. اصلاح مسیر در این تغییر باید همراه آزمون native انجام شود؛ تا
-receipt نصب واقعی، OpenBao و Production همچنان Not verified هستند.
+اعتماد نیست. چهار policy امضا همین mirror را صریحاً می‌گیرند؛ هیچ `tuf.root`،
+CA سفارشی، `--staging` یا گزینهٔ نادیده‌گرفتن transparency/SCT اضافه نمی‌شود.
+Root آفلاین HooshiX ربطی به این Root عمومی Sigstore ندارد و جابه‌جا نمی‌شود.
+این مقصد پیش از CDN منتشر می‌شود؛ دسترس‌پذیری یا تازگی آن تضمین نمی‌شود و
+metadata نامعتبر/منقضی admission تازه را fail-closed می‌کند، نه اینکه گیت حذف شود.
+CI همان تصویر را با Root نامعتبر رد و پس از بازگرداندن Root تعبیه‌شده قبول
+می‌کند؛ خطوط `PLATFORM_TUF_UNTRUSTED_ROOT=Denied` و
+`PLATFORM_SIGNED_TUF_MIRROR=Passed` همراه تمام negativeهای signer/provenance/SBOM
+لازم‌اند. تا receipt نصب واقعی، OpenBao و Production همچنان Not verified هستند.
+
+استفاده: پس از موفقیت pipeline و merge، بستهٔ جدید را با دستور ساخت همین راهنما
+و `--resume-bundle` به **بستهٔ اصلی** نصب ناموفق متصل کنید، نه بستهٔ اصلاحی میانی.
+فقط installer بازبینی‌شده را با ورود محلی رمزها اجرا کنید؛ نیازی به تعویض توکن
+صحیح GHCR یا امضای دوبارهٔ CA نیست. در rollback بازبینی‌شده فقط فیلد `tuf` از
+چهار attestor برداشته می‌شود تا CDN پیش‌فرض برگردد؛ اگر هنوز 403 دهد درخواست تازه
+رد خواهد شد. marker، workload/PVC، CA و credential برای rollback حذف نمی‌شوند.
 
 ## آزمون خودکار، بدون استفاده از VPS
 
@@ -168,8 +182,9 @@ audit/JIT و دروازهٔ ترافیک Production هنوز مراحل بعدی
 برای ادامهٔ شکستِ نصب‌کننده با نسخهٔ اصلاح‌شده، در دستور ساخت بستهٔ جدید
 `--resume-bundle /path/to/previous-public-bundle` را اضافه کنید. سازنده evidence
 قبلی را از GitHub احراز می‌کند و تمام desired state را با بستهٔ جدید مقایسه می‌کند؛
-فقط source/evidence جدید و افزودن دقیق policy خروجی HTTPS بررسی تصویر که در بخش
-بعد توضیح داده شده مجاز است. هر تغییر دیگری در image، admission، منابع یا storage
+فقط source/evidence جدید، افزودن دقیق policy خروجی HTTPS بررسی تصویر و افزودن
+`cosign.tuf.mirror` دقیق فوق، بدون override ریشه، مجاز است. هر تغییر دیگری در image،
+signer/issuer، validationهای admission، منابع یا storage
 این مسیر را متوقف می‌کند. روی VPS فقط marker دقیق همان source/hash قبلی پذیرفته
 می‌شود؛ marker، PVC، CA و داده‌ها حذف یا جایگزین نمی‌شوند. evidence جدید همچنان
 باید برای tree دقیق اصلاح‌شده تازه و موفق باشد؛ این گزینه گیت CI را دور نمی‌زند.
