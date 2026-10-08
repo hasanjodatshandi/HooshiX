@@ -193,6 +193,69 @@ class PlatformCommissioningTest(unittest.TestCase):
             self.assertEqual(b'hasanjodatshandi:synthetic-private-token',
                              base64.b64decode(data['auths']['ghcr.io']['auth']))
 
+    def registry_fixture(self, namespace='kyverno'):
+        return {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {
+            'name': 'hooshix-ghcr-read', 'namespace': namespace, 'labels': dict(host.LABELS),
+            'resourceVersion': '123', 'uid': 'fixture-uid', 'annotations': {'fixture': 'preserve'}},
+            'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': 'old-synthetic-data'}}
+
+    def test_owned_registry_rotation_preserves_metadata_and_uses_conditional_update(self):
+        for namespace in ('kyverno', 'istio-system', 'hooshix-secrets'):
+            existing = self.registry_fixture(namespace)
+            before = copy.deepcopy(existing)
+            with patch.object(host, 'get', return_value=existing), patch.object(host, 'kube') as kube, \
+                    patch.object(host, 'apply') as apply, patch.object(host, 'create') as create, \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                host.write_registry_secret(namespace, 'new-synthetic-data')
+            self.assertEqual('', output.getvalue())
+            kube.assert_called_once_with('replace', '--field-manager=' + host.MANAGER, '-f', '-',
+                                         body=before | {'data': {'.dockerconfigjson': 'new-synthetic-data'}})
+            apply.assert_not_called()
+            create.assert_not_called()
+
+    def test_registry_reentry_with_identical_value_does_not_write(self):
+        existing = self.registry_fixture()
+        with patch.object(host, 'get', return_value=existing), patch.object(host, 'kube') as kube, \
+                patch.object(host, 'create') as create:
+            host.write_registry_secret('kyverno', existing['data']['.dockerconfigjson'])
+        kube.assert_not_called()
+        create.assert_not_called()
+
+    def test_registry_rotation_rejects_foreign_shape_missing_version_and_immutable(self):
+        for field, value in (('name', 'foreign'), ('namespace', 'other'), ('labels', {}),
+                             ('resourceVersion', None), ('resourceVersion', ''), ('resourceVersion', 123)):
+            existing = self.registry_fixture()
+            existing['metadata'][field] = value
+            with patch.object(host, 'get', return_value=existing), patch.object(host, 'kube') as kube, \
+                    self.assertRaises(host.custody.BootstrapFailed):
+                host.write_registry_secret('kyverno', 'new-synthetic-data')
+            kube.assert_not_called()
+        for field, value in (('type', 'Opaque'), ('data', {'.dockerconfigjson': 'old', 'other': 'private'}),
+                             ('immutable', True)):
+            existing = self.registry_fixture() | {field: value}
+            with patch.object(host, 'get', return_value=existing), patch.object(host, 'kube') as kube, \
+                    self.assertRaises(host.custody.BootstrapFailed):
+                host.write_registry_secret('kyverno', 'new-synthetic-data')
+            kube.assert_not_called()
+        with patch.object(host, 'get') as get, self.assertRaises(host.custody.BootstrapFailed):
+            host.write_registry_secret('unapproved', 'new-synthetic-data')
+        get.assert_not_called()
+
+    def test_registry_conflict_fails_once_without_secret_diagnostics_or_force(self):
+        result = Mock(returncode=1, stdout=b'', stderr=b'conflict private-secret-canary')
+        with patch.object(host, 'get', return_value=self.registry_fixture()), \
+                patch.object(subprocess, 'run', return_value=result) as run, \
+                contextlib.redirect_stdout(io.StringIO()) as output, \
+                self.assertRaisesRegex(host.custody.BootstrapFailed, '^NATIVE_OPERATION_FAILED_STATE_PRESERVED$'):
+            host.write_registry_secret('kyverno', 'new-secret-canary')
+        self.assertEqual('', output.getvalue())
+        run.assert_called_once()
+        args, options = run.call_args
+        self.assertNotIn('canary', json.dumps(args))
+        self.assertNotIn('--force', args[0])
+        self.assertEqual(subprocess.DEVNULL, options['stderr'])
+        self.assertEqual('123', json.loads(options['input'])['metadata']['resourceVersion'])
+
     def test_staging_is_authenticated_and_bound_to_reviewed_tree_and_all_checks(self):
         record = {'path': bundle.WORKFLOW, 'status': 'completed', 'conclusion': 'success',
                   'repository': {'full_name': bundle.publication.REPOSITORY},
