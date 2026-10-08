@@ -82,7 +82,31 @@ def staged_receipt(run_id, directory, revision):
     return receipt
 
 
-def build(output, staging_run, mesh_run, bao_run, public_ca):
+def resume_record(previous_bundle, plan, revision, directory):
+    manifest_path = previous_bundle / 'bundle.json'
+    if manifest_path.is_symlink() or not manifest_path.is_file() or manifest_path.stat().st_size > 32768:
+        raise ValueError('bounded previous public manifest required')
+    manifest = json.loads(manifest_path.read_bytes())
+    previous_revision = manifest['source_revision']
+    digest = manifest['files']['plan.json']
+    if manifest.get('schema_version') != 1 or not re.fullmatch(r'[a-f0-9]{40}', previous_revision) \
+            or not re.fullmatch(r'[a-f0-9]{64}', digest):
+        raise ValueError('exact previous public plan identity required')
+    git('merge-base', '--is-ancestor', previous_revision, revision)
+    content = upgrade_kyverno.public_artifact(previous_bundle / 'plan.json', digest, 8 * 1024**2)
+    previous = json.loads(content)
+    evidence = previous.pop('commissioning_evidence')
+    authenticated = staged_receipt(str(evidence['run_id']), directory / 'previous-staging', previous_revision)
+    if evidence != {'source_revision': previous_revision, 'staging': 'Passed',
+                    'run_id': evidence['run_id'], 'observed_at': authenticated['observed_at']}:
+        raise ValueError('authenticated previous commissioning evidence required')
+    desired = {key: value for key, value in plan.items() if key != 'commissioning_evidence'}
+    if previous != desired:
+        raise ValueError('resumption cannot change any platform desired state')
+    return {'source_revision': previous_revision, 'plan_sha256': digest}
+
+
+def build(output, staging_run, mesh_run, bao_run, public_ca, resume_bundle=None):
     revision = git('rev-parse', 'HEAD')
     main = json.loads(publication.run(['api', 'repos/' + publication.REPOSITORY + '/commits/main']))['sha']
     if revision != main or git('status', '--porcelain') or output.exists() or output.is_symlink() \
@@ -108,6 +132,8 @@ def build(output, staging_run, mesh_run, bao_run, public_ca):
         plan['storage'] = storage.candidate()
         plan['commissioning_evidence'] = {'source_revision': revision, 'staging': 'Passed',
                                          'run_id': int(staging_run), 'observed_at': staging['observed_at']}
+        if resume_bundle is not None:
+            plan['resume_from'] = resume_record(resume_bundle, plan, revision, directory)
         content = json.dumps(plan, separators=(',', ':')).encode()
         if len(content) > 8 * 1024 * 1024:
             raise ValueError('bounded public plan required')
@@ -141,9 +167,10 @@ def main():
     parser.add_argument('--public-ca', type=Path, required=True)
     parser.add_argument('--mesh-run', default='37588183736')
     parser.add_argument('--openbao-run', default='37228262995')
+    parser.add_argument('--resume-bundle', type=Path, help='Previous public bundle; all desired state must be identical')
     args = parser.parse_args()
     try:
-        build(args.output, args.staging_run, args.mesh_run, args.openbao_run, args.public_ca)
+        build(args.output, args.staging_run, args.mesh_run, args.openbao_run, args.public_ca, args.resume_bundle)
         return 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         print('COMMISSIONING_BUNDLE=Failed; no credential read or VPS mutation')

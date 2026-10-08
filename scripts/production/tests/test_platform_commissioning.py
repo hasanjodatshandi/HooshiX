@@ -99,6 +99,86 @@ class PlatformCommissioningTest(unittest.TestCase):
         create.assert_not_called()
         apply.assert_not_called()
 
+    def test_observed_large_crd_response_is_allowed_only_for_exact_public_reads(self):
+        # Actual target maximum was 2,287,098 bytes; use a valid padded JSON
+        # fixture without a production schema, identity, annotation or secret.
+        response = b'{"kind":"CustomResourceDefinition"}' + b' ' * 2287098
+        with patch.object(subprocess, 'run', return_value=Mock(returncode=0, stdout=response)), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            for name in host.LARGE_PUBLIC_CRDS:
+                self.assertEqual('CustomResourceDefinition', host.get('customresourcedefinition', name)['kind'])
+            for kind, name, namespace in (('secret', 'credential', 'kyverno'),
+                                         ('configmap', 'kyverno', 'kyverno'),
+                                         ('customresourcedefinition', 'foreign.example.com', None),
+                                         ('customresourcedefinition', 'policies.kyverno.io', 'kyverno')):
+                with self.assertRaises(host.custody.BootstrapFailed):
+                    host.get(kind, name, namespace)
+            self.assertEqual('', output.getvalue())
+        with patch.object(subprocess, 'run', return_value=Mock(returncode=0, stdout=b' ' * (host.CRD_BOUND + 1))), \
+                self.assertRaises(host.custody.BootstrapFailed):
+            host.get('customresourcedefinition', 'policies.kyverno.io')
+        with patch.object(subprocess, 'run', return_value=Mock(returncode=1, stdout=b'{}')), \
+                self.assertRaises(host.custody.BootstrapFailed):
+            host.get('customresourcedefinition', 'policies.kyverno.io')
+
+    def test_resume_builder_requires_authenticated_identical_predecessor_plan(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            previous = self.plan()
+            source = 'a' * 40
+            observed = previous['commissioning_evidence']['observed_at']
+            content = json.dumps(previous).encode()
+            digest = host.hashlib.sha256(content).hexdigest()
+            (root / 'plan.json').write_bytes(content)
+            (root / 'bundle.json').write_text(json.dumps({'schema_version': 1, 'source_revision': source,
+                                                        'files': {'plan.json': digest}}))
+            current = copy.deepcopy(previous)
+            current['commissioning_evidence']['source_revision'] = 'b' * 40
+            with patch.object(bundle, 'git', return_value=''), \
+                    patch.object(bundle, 'staged_receipt', return_value={'observed_at': observed}) as staging:
+                self.assertEqual({'source_revision': source, 'plan_sha256': digest},
+                                 bundle.resume_record(root, current, 'b' * 40, root))
+                self.assertEqual(source, staging.call_args.args[-1])
+                for field in ('openbao', 'admission', 'kyverno_upgrade', 'profile'):
+                    altered = copy.deepcopy(current)
+                    altered[field] = {'unreviewed': True}
+                    with self.assertRaises(ValueError):
+                        bundle.resume_record(root, altered, 'b' * 40, root)
+            with patch.object(bundle, 'git', side_effect=ValueError('not ancestor')), self.assertRaises(ValueError):
+                bundle.resume_record(root, current, 'b' * 40, root)
+            with patch.object(bundle, 'git', return_value=''), \
+                    patch.object(bundle, 'staged_receipt', return_value={'observed_at': 'different'}), \
+                    self.assertRaises(ValueError):
+                bundle.resume_record(root, current, 'b' * 40, root)
+            (root / 'plan.json').write_bytes(content + b' ')
+            with patch.object(bundle, 'git', return_value=''), self.assertRaises(ValueError):
+                bundle.resume_record(root, current, 'b' * 40, root)
+
+    def test_exact_predecessor_marker_retained_and_conflicts_stop(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            marker = root / 'plan.json'
+            previous = {'source_revision': 'a' * 40, 'plan_sha256': 'a' * 64}
+            content = json.dumps(previous).encode()
+            marker.write_bytes(content)
+            with patch.object(host, 'STATE', root), patch.object(host.custody, 'protected'), \
+                    patch.object(host.custody, 'create') as create, patch.object(host, 'get') as get:
+                host.commissioning_marker({'resume_from': previous}, 'b' * 64, 'b' * 40)
+                self.assertEqual(content, marker.read_bytes())
+                for plan in ({}, {'resume_from': previous | {'plan_sha256': 'c' * 64}}):
+                    with self.assertRaises(host.custody.BootstrapFailed):
+                        host.commissioning_marker(plan, 'b' * 64, 'b' * 40)
+                create.assert_not_called()
+                get.assert_not_called()
+                marker.write_bytes(b'null')
+                with self.assertRaises(host.custody.BootstrapFailed):
+                    host.commissioning_marker({}, 'b' * 64, 'b' * 40)
+                marker.unlink()
+                with self.assertRaises(host.custody.BootstrapFailed):
+                    host.commissioning_marker({'resume_from': previous}, 'b' * 64, 'b' * 40)
+                create.assert_not_called()
+                get.assert_not_called()
+
     def test_registry_token_only_in_memory_three_exact_secrets(self):
         with patch.object(host.getpass, 'getpass', return_value='synthetic-private-token'), \
                 patch.object(host, 'open', mock_open(), create=True), \
