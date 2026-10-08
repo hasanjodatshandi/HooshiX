@@ -55,6 +55,18 @@ VPS هم تا cleanup جدا و بازبینی‌شده حفظ می‌شود.
 
 ## شکست و ادامه
 
+### اختلال فعلی ارائه‌دهنده، ۲۰۲۶-۱۰-۰۹
+
+GET فایل اولین snapshot با HTTP 200 و hash برابر نسخهٔ محلی موفق شد؛
+پاسخ فاقد `x-amz-version-id` بود و ListObjectVersions برای همان key مقدار
+`VersionId=null` برگرداند. مالک گزارش کرده پشتیبانی پارس‌پک این را اختلال
+موقت و قابل‌رفع طی چند روز دانسته است. این گزارش، تأیید API نسخه یا قفل
+همین object نیست: ارسال/hash `Passed`، تأیید نسخه `Not verified` می‌ماند.
+upload همان key تکرار نمی‌شود؛ باکت/کلید/custody/init تغییر نمی‌کند.
+
+کار مستقل بعدی آزمون recovery همان envelope در یک محیط خصوصی جداست؛
+آزمون مستقل، تأیید نسخهٔ باکت یا دروازهٔ Production را جایگزین نمی‌کند.
+
 در شکست، `RETAINED_BACKUP_DIRECTORY` را حفظ کنید. `intent.json` پیش از
 snapshot و `delivery-intent.json` پیش از PUT ثبت می‌شوند. با timeout PUT
 ممکن است object ایجاد شده باشد؛ همان object/key را کورکورانه overwrite یا
