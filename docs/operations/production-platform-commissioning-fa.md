@@ -16,6 +16,17 @@ Implementation: admission, disposable signed staging and supervised host install
 VPS installation: Not run by this change
 Production readiness: Not verified
 
+### مانع دریافت اعتماد Sigstore روی VPS
+
+بررسی فقط‌خواندنی ۸ اکتبر، credential و pull چهار image را Passed کرد، اما
+آماده‌سازی TUF در کنترلر با HTTP 403 از `tuf-repo-cdn.sigstore.dev` شکست خورد.
+همان metadata عمومی در `https://sigstore.github.io/root-signing/` از میزبان و
+فضای شبکهٔ کنترلر HTTP 200 دارد. این مقصد، مخزن preproduction رسمی Sigstore
+است، نه یک CA یا signer جدید؛ پذیرش آن باید همچنان از Root عمومی تعبیه‌شدهٔ
+Sigstore و زنجیرهٔ امضا/نسخه/انقضای TUF عبور کند. اعتبار HTTP به‌تنهایی شاهد
+اعتماد نیست. اصلاح مسیر در این تغییر باید همراه آزمون native انجام شود؛ تا
+receipt نصب واقعی، OpenBao و Production همچنان Not verified هستند.
+
 ## آزمون خودکار، بدون استفاده از VPS
 
 workflow «Platform commissioning staging» در PR داخلی مرتبط به‌صورت خودکار
