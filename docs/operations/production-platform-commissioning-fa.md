@@ -154,6 +154,13 @@ audit/JIT و دروازهٔ ترافیک Production هنوز مراحل بعدی
 با حذف داده ندارد و `--force-conflicts` استفاده نمی‌کند. فقط source و فایل‌های
 عمومی همان upload با UUID پاک می‌شوند. خطای ثابت/مرحله و receipt را بفرستید؛
 قبل از retry علت را برطرف کنید. snapshot/کلید/رمز یا خروجی Secret را نفرستید.
+برای ادامهٔ شکستِ نصب‌کننده با نسخهٔ اصلاح‌شده، در دستور ساخت بستهٔ جدید
+`--resume-bundle /path/to/previous-public-bundle` را اضافه کنید. سازنده evidence
+قبلی را از GitHub احراز می‌کند و تمام desired state را با بستهٔ جدید مقایسه می‌کند؛
+فقط source/evidence جدید مجاز است. کوچک‌ترین تغییر image، policy، منابع یا storage
+این مسیر را متوقف می‌کند. روی VPS فقط marker دقیق همان source/hash قبلی پذیرفته
+می‌شود؛ marker، PVC، CA و داده‌ها حذف یا جایگزین نمی‌شوند. evidence جدید همچنان
+باید برای tree دقیق اصلاح‌شده تازه و موفق باشد؛ این گزینه گیت CI را دور نمی‌زند.
 desired state عمومی همین bundle باید در reconciliation بعدی GitOps از منبع
 reviewed Git حفظ شود؛ استثنا، مجوز drift یا مدیریت عادی بدون JIT نیست.
 

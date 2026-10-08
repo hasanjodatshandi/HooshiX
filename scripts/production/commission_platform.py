@@ -30,6 +30,8 @@ MANAGER = 'hooshix-platform-commissioning'
 LABELS = {'app.kubernetes.io/part-of': 'hooshix-platform',
           'app.kubernetes.io/managed-by': MANAGER}
 BOUND = 2 * 1024 * 1024
+CRD_BOUND = 4 * 1024 * 1024
+LARGE_PUBLIC_CRDS = frozenset({'clusterpolicies.kyverno.io', 'policies.kyverno.io'})
 PLAN_BOUND = 8 * 1024 * 1024
 PRESERVED = ('ssh.service', 'nginx.service', 'postfix.service', 'dovecot.service',
              'auditd.service', 'wg-quick@wg-hooshix.service', 'k3s.service')
@@ -39,7 +41,7 @@ def require(value, code):
     custody.require(value, code)
 
 
-def native(argv, *, data=None, expected=0, timeout=30, password=None, required_error=None):
+def native(argv, *, data=None, expected=0, timeout=30, password=None, required_error=None, output_bound=BOUND):
     read_fd = None
     try:
         descriptors = ()
@@ -55,7 +57,7 @@ def native(argv, *, data=None, expected=0, timeout=30, password=None, required_e
                                 stderr=subprocess.PIPE if required_error else subprocess.DEVNULL,
                                 check=False, timeout=timeout,
                                 env=custody.ENV, pass_fds=descriptors)
-        require(result.returncode == expected and len(result.stdout) <= BOUND
+        require(result.returncode == expected and len(result.stdout) <= output_bound
                 and (required_error is None or required_error in result.stderr),
                 'NATIVE_OPERATION_FAILED_STATE_PRESERVED')
         return result.stdout
@@ -64,15 +66,18 @@ def native(argv, *, data=None, expected=0, timeout=30, password=None, required_e
             os.close(read_fd)
 
 
-def kube(*args, body=None, expected=0, timeout=135, required_error=None):
+def kube(*args, body=None, expected=0, timeout=135, required_error=None, output_bound=BOUND):
     return native([custody.K3S, 'kubectl', '--request-timeout=120s', *args],
                   data=json.dumps(body).encode() if body is not None else None,
-                  expected=expected, timeout=timeout, required_error=required_error)
+                  expected=expected, timeout=timeout, required_error=required_error, output_bound=output_bound)
 
 
 def get(kind, name, namespace=None):
     scope = ['-n', namespace] if namespace else []
-    value = kube(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json')
+    # These two official PUBLIC CRDs exceed 2 MiB on the target. No broader
+    # command, namespace, Secret read or diagnostic output receives this budget.
+    bound = CRD_BOUND if kind == 'customresourcedefinition' and namespace is None and name in LARGE_PUBLIC_CRDS else BOUND
+    value = kube(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json', output_bound=bound)
     return json.loads(value) if value.strip() else None
 
 
@@ -158,6 +163,12 @@ def read_plan(path, digest, revision):
     observed = datetime.fromisoformat(evidence['observed_at'])
     age = (datetime.now(timezone.utc) - observed).total_seconds() if observed.tzinfo else -1
     require(0 <= age <= 5 * 86400, 'FRESH_STAGING_REQUIRED')
+    previous = value.get('resume_from')
+    if previous is not None:
+        require(set(previous) == {'source_revision', 'plan_sha256'}
+                and re.fullmatch(r'[a-f0-9]{40}', previous['source_revision'])
+                and re.fullmatch(r'[a-f0-9]{64}', previous['plan_sha256']),
+                'EXACT_PREVIOUS_COMMISSIONING_PLAN_REQUIRED')
     for policy in value['admission']['items']:
         require(policy['spec']['failurePolicy'] == 'Fail'
                 and policy['spec']['validationActions'] == ['Deny'], 'BLOCKING_ADMISSION_REQUIRED')
@@ -316,6 +327,24 @@ def verify_bao(image):
     require(status['restartCount'] == 0 and not status['ready'], 'SEALED_PROBE_BEHAVIOR_CONFLICT')
 
 
+def commissioning_marker(plan, digest, revision):
+    marker = STATE / 'plan.json'
+    record = {'source_revision': revision, 'plan_sha256': digest}
+    if marker.exists():
+        custody.protected(marker, exact_mode=0o600)
+        existing = json.loads(marker.read_bytes())
+        # The authenticated builder permits this only for identical desired
+        # state. Retain the original root-only provenance; never delete/replace it.
+        require(existing == record or ('resume_from' in plan and existing == plan['resume_from']),
+                'EXISTING_COMMISSIONING_PLAN_PRESERVED')
+    else:
+        require('resume_from' not in plan, 'PREVIOUS_COMMISSIONING_MARKER_REQUIRED')
+        for kind, name, ns in (('statefulset', 'openbao', 'hooshix-secrets'),
+                               ('deployment', 'istiod', 'istio-system'), ('daemonset', 'ztunnel', 'istio-system')):
+            require(get(kind, name, ns) is None, 'UNOWNED_PLATFORM_INSTALLATION_PRESERVED')
+        custody.create(marker, json.dumps(record).encode())
+
+
 def execute(path, digest, revision, public_directory):
     plan = read_plan(path, digest, revision)
     before = preflight()
@@ -324,16 +353,7 @@ def execute(path, digest, revision, public_directory):
     with os.fdopen(os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'r+b') as lock:
         custody.protected(lock_path, exact_mode=0o600)
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        marker = STATE / 'plan.json'
-        record = {'source_revision': revision, 'plan_sha256': digest}
-        if marker.exists():
-            custody.protected(marker, exact_mode=0o600)
-            require(json.loads(marker.read_bytes()) == record, 'EXISTING_COMMISSIONING_PLAN_PRESERVED')
-        else:
-            for kind, name, ns in (('statefulset', 'openbao', 'hooshix-secrets'),
-                                   ('deployment', 'istiod', 'istio-system'), ('daemonset', 'ztunnel', 'istio-system')):
-                require(get(kind, name, ns) is None, 'UNOWNED_PLATFORM_INSTALLATION_PRESERVED')
-            custody.create(marker, json.dumps(record).encode())
+        commissioning_marker(plan, digest, revision)
         # Keep the existing imported CA and the secrets namespace's Restricted PSA.
         progress('kyverno', revision)
         upgrade_kyverno.execute(plan['kyverno_upgrade'], path.parent, STATE,
