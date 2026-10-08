@@ -31,7 +31,7 @@ STEPS = frozenset({"image-pull", "image-version", "tls-fixture", "source-start",
                    "restore-start", "restore-init", "snapshot-restore", "restore-read",
                    "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed",
                    "kv-mount", "kv-write", "acl-policy", "acl-token", "acl-write-denied",
-                   "lost-init-archive", "fresh-store-init", "archive-rollback"})
+                   "lost-init-archive", "fresh-store-init", "archive-rollback", "archive-restart-read"})
 
 
 class RehearsalFailed(Exception):
@@ -291,17 +291,6 @@ def rehearse():
             if restored.call("fixture/data/audit", token=reader)["data"]["data"]["value"] != canary:
                 raise RehearsalFailed("fixture restored value mismatch")
             restored.call("fixture/data/audit", "POST", {"data": {"value": "must-not-write"}}, reader, 403)
-            step("root-revoke")
-            client.call("auth/token/revoke-self", "POST", {}, root_token, 204)
-            client.call("sys/mounts", token=root_token, expected=403)
-            restored.call("auth/token/revoke-self", "POST", {}, root_token, 204)
-            restored.call("sys/mounts", token=root_token, expected=403)
-            step("audit-redaction")
-            for audit_data in (data, restored_data):
-                audit = (audit_data / "audit.jsonl").read_bytes()
-                if not audit or len(audit) > BOUND or any(value.encode() in audit for value in
-                                                        [canary, reader, root_token, temporary_root, *keys]):
-                    raise RehearsalFailed("fixture audit leak or size mismatch")
             step('lost-init-archive')
             command(['/usr/bin/docker', 'stop', source], timeout=30)
             archive = directory / 'lost-initialization'
@@ -329,8 +318,23 @@ def rehearse():
             for key in keys[:2]:
                 client.call('sys/unseal', 'PUT', {'key': key})
             client.wait_health(200)
+            step('archive-restart-read')
             if client.call('fixture/data/audit', token=reader)['data']['data']['value'] != canary:
                 raise RehearsalFailed('fixture retained archive recovery mismatch')
+            # Read persistence while its scoped reader is still valid. Revoking
+            # the parent root must THEN revoke its descendants, not orphan them.
+            step("root-revoke")
+            client.call("auth/token/revoke-self", "POST", {}, root_token, 204)
+            client.call("sys/mounts", token=root_token, expected=403)
+            client.call('fixture/data/audit', token=reader, expected=403)
+            restored.call("auth/token/revoke-self", "POST", {}, root_token, 204)
+            restored.call("sys/mounts", token=root_token, expected=403)
+            step("audit-redaction")
+            for audit_data in (data, restored_data):
+                audit = (audit_data / "audit.jsonl").read_bytes()
+                if not audit or len(audit) > BOUND or any(value.encode() in audit for value in
+                                                        [canary, reader, root_token, temporary_root, *keys]):
+                    raise RehearsalFailed("fixture audit leak or size mismatch")
             step("cleanup")
     # Cleanup is part of success, not an action performed after the success receipt.
     print("OPENBAO_RECOVERY=Passed; TLS; encrypted custody; Shamir 3/2; Raft restart; isolated restore; ACL; audit redaction; root revocation")
