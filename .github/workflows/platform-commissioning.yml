@@ -10,6 +10,7 @@ on:
       - scripts/production/render_platform_admission.py
       - scripts/production/verify_platform_publication_run.py
       - scripts/production/commission_platform.py
+      - scripts/production/platform_image_egress.py
       - scripts/production/upgrade_kyverno.py
       - scripts/production/build_platform_commissioning_bundle.py
       - scripts/production/run-platform-commissioning.ps1

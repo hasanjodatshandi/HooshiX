@@ -527,6 +527,7 @@ scripts/production/offline-ca/run-sign.cmd
 scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
 scripts/production/parspack_audit_transport.py
+scripts/production/platform_image_egress.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/provision_openbao_storage.py

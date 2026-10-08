@@ -146,6 +146,23 @@ New external destination requires owner/use case, exact destination/protocol, au
 
 Compromised Password runtime has no HIBP/provider Internet egress; HIBP corpus acquisition is offline release/build work.
 
+Platform image verification is a separate platform-owned capability, not application egress.
+`kyverno/hooshix-image-verifier-https` selects only Kyverno admission/reports controllers
+and adds TCP/443 to public IPv4 destinations, excluding private, loopback, link-local
+(including metadata), CGNAT and reserved ranges. Existing `private-admission-boundary`
+ingress, DNS and API rules remain unchanged. This supports GHCR OCI metadata/blob hosts
+and Sigstore transparency verification; DNS/IP changes do not require hard-coded public IPs.
+Standard Kubernetes NetworkPolicy is an IP/port control, **not an FQDN allow-list**:
+these trusted verifier processes can reach other public HTTPS destinations at transport level.
+TLS hostname validation, exact reviewed image digests, signer/issuer and provenance/SBOM
+remain independent blocking controls. Application workloads gain no permission. The existing
+read-only registry Secret is consumed by Kyverno, never by logs or public receipts.
+Native verification retains bounded webhook deadlines and fail-closed rejection on timeout;
+commissioning convergence is bounded to 45 seconds, not a permissive fallback. No proxy,
+firewall change, blanket namespace egress or signature bypass is introduced. Disposable Calico
+staging must deny the same signed Pod under the old restriction, admit it after this additive
+repair, preserve the old policy UID/spec and still reject wrong signer/SBOM/provenance.
+
 ADR-0054 permits one future Conversation provider edge only after its first-slice gates pass:
 
 ```text

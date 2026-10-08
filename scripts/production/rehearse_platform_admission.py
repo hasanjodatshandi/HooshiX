@@ -142,6 +142,47 @@ def registry_restart(k):
             commissioning.write_registry_secret(ns, registry_secret(ns)['data']['.dockerconfigjson'])
 
 
+def verifier_egress_repair(k, pod, wait):
+    # CI-only reconstruction of the target's existing Egress restriction. API
+    # addresses differ in kind; no target IP, credential or policy is imported.
+    service = json.loads(k('-n', 'default', 'get', 'service/kubernetes', '-o', 'json'))
+    endpoints = json.loads(k('-n', 'default', 'get', 'endpointslices',
+                             '-l', 'kubernetes.io/service-name=kubernetes', '-o', 'json'))
+    addresses = {service['spec']['clusterIP']}
+    for item in endpoints['items']:
+        for endpoint in item['endpoints']:
+            addresses.update(endpoint['addresses'])
+    fixture = {'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy',
+        'metadata': {'name': 'private-admission-boundary', 'namespace': 'kyverno'},
+        'spec': {'podSelector': {}, 'policyTypes': ['Egress'], 'egress': [
+            {'ports': [{'port': 6443, 'protocol': 'TCP'}, {'port': 443, 'protocol': 'TCP'}],
+             'to': [{'ipBlock': {'cidr': address + '/32'}} for address in sorted(addresses)]},
+            {'ports': [{'port': 53, 'protocol': p} for p in ('TCP', 'UDP')], 'to': [{
+                'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': 'kube-system'}},
+                'podSelector': {'matchLabels': {'k8s-app': 'kube-dns'}}}]},
+            {'ports': [{'port': 443, 'protocol': 'TCP'}, {'port': 9443, 'protocol': 'TCP'}],
+             'to': [{'podSelector': {}}]}]}}
+    apply(k, fixture)
+    before = json.loads(k('-n', 'kyverno', 'get', 'networkpolicy/private-admission-boundary', '-o', 'json'))
+    # Same correctly signed Pod, first denied by transport, then admitted after
+    # the production repair. A generic failing request alone cannot pass this test.
+    admission_result(k, pod, wait, expected=1, message=b'failed to evaluate policy')
+    print('PLATFORM_VERIFIER_RESTRICTED_EGRESS=Denied', flush=True)
+
+    def adapter(*args, body=None, **options):
+        options.pop('output_bound', None)
+        return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+
+    with patch.object(commissioning, 'kube', adapter):
+        commissioning.install_image_verifier_egress(admission.platform_image_egress.candidate())
+        commissioning.install_image_verifier_egress(admission.platform_image_egress.candidate())
+    admission_result(k, pod, wait)
+    after = json.loads(k('-n', 'kyverno', 'get', 'networkpolicy/private-admission-boundary', '-o', 'json'))
+    if before['metadata']['uid'] != after['metadata']['uid'] or before['spec'] != after['spec']:
+        raise ValueError('existing admission network boundary changed')
+    print('PLATFORM_VERIFIER_HTTPS_REPAIR=Passed; existing boundary preserved', flush=True)
+
+
 class Staging:
     def __init__(self, directory: Path):
         now = datetime.now(timezone.utc)
@@ -312,6 +353,10 @@ class Staging:
         admission_result(k, wrong_bao, wait, expected=1,
                          message=b"platform bootstrap identity/security exception rejected")
         self.checks["admission_deny_negative"] = "Passed"
+        print('PLATFORM_STEP=verifier-egress', flush=True)
+        verifier_egress_repair(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
+            'name': 'signed-egress-preflight', 'namespace': 'istio-system'},
+            'spec': copy.deepcopy(self.pods['istiod'])}, wait)
         print("PLATFORM_STEP=mesh", flush=True)
         # Fixture Root only. The owner's existing Root/CSR/credentials never enter CI.
         key, cert = directory / "mesh-ca.key", directory / "mesh-ca.crt"
