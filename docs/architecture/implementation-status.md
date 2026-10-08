@@ -469,8 +469,17 @@ exercise real Shamir 3/2 initialization, TLS verification, restart persistence,
 isolated snapshot restore, read-only ACL denial, audit redaction and initial-root
 revocation. This is a CI rehearsal, not a production deployment or final-artifact
 signature/provenance/SBOM promotion receipt. Production Raft/PVC, TLS provisioning,
-hourly encrypted off-host snapshots, recovery custody, OpenBao-to-host audit
-materialization and JIT installation remain `Not verified`. No standing sudo,
+hourly encrypted off-host snapshots, OpenBao-to-host audit
+materialization and JIT installation remain `Not verified`. The target activation
+receipt `activation-receipt-f1f999a1a28f47c699c72f0c04638fc7.json` (2026-10-08)
+reports initialization, encrypted-custody recovery and Shamir 3/2 unseal `Passed`;
+distribution to two custody locations is owner-attested, not independently verified.
+Supervised snapshot tooling now encrypts to those existing recipients, performs a
+conditional ciphertext-only PUT to `c892683/openbao-backups/`, version-specific
+readback and memory-only decryption/hash proof. The CI rehearsal restores the bytes
+recovered by this envelope adapter into an isolated disposable OpenBao. Target
+off-host execution and target isolated restore remain `Not verified`; no hourly
+root-token job is introduced. No standing sudo,
 SSH, MCP or bucket configuration is changed by the rehearsal.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`
@@ -642,7 +651,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
-| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed; later initialized/sealed with missing init response, owner-approved recovery Not run; ESO not installed | OpenBao installation/TLS/PVC and diagnosis Passed in target receipts; usable custody/unseal/ESO/off-host recovery NOT VERIFIED |
+| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed and initialized/unsealed Shamir 3/2 after owner-approved recovery; supervised encrypted snapshot tooling implemented; ESO not installed | Target installation/TLS/PVC, initialization, encrypted custody recovery and unseal Passed; custody distribution owner-attested; target off-host snapshots/isolated restore, hourly backup, ESO and root revocation NOT VERIFIED |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Cross-service CI/security/supply-chain release gates | DESIGNED | Stage 10 seven-artifact source merged; protected head and merged-main CI PASSED | Semgrep/OSV/Gitleaks-capable service workflows plus frontend Semgrep/OSV/image/Helm gates are present; Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation cover all seven application release components. PR #142 head runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed; real production release/rescan/admission execution remains NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | three-node local Collector DaemonSet, bounded queues/privacy config, exact read-only pod-log hostPath, metrics, and OTLP integration PASSED |

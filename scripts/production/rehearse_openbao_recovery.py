@@ -19,7 +19,9 @@ from pathlib import Path
 
 import activate_openbao_host as activation
 import activate_openbao_operator as operator
+import backup_openbao_host as snapshot_host
 import openbao_activation_transport as transport
+import openbao_snapshot_crypto as snapshot_crypto
 import recover_openbao_initialization as lost_init
 from render_openbao_candidate import ALIVE, STATUS
 
@@ -31,7 +33,8 @@ STEPS = frozenset({"image-pull", "image-version", "tls-fixture", "source-start",
                    "restore-start", "restore-init", "snapshot-restore", "restore-read",
                    "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed",
                    "kv-mount", "kv-write", "acl-policy", "acl-token", "acl-write-denied",
-                   "lost-init-archive", "fresh-store-init", "archive-rollback", "archive-restart-read"})
+                   "lost-init-archive", "fresh-store-init", "archive-rollback", "archive-restart-read",
+                   "snapshot-envelope", "snapshot-envelope-negative"})
 
 
 class RehearsalFailed(Exception):
@@ -256,9 +259,32 @@ def rehearse():
             step("acl-write-denied")
             client.call("fixture/data/audit", "POST", {"data": {"value": "must-not-write"}}, reader, 403)
             step("snapshot")
-            snapshot = client.call("sys/storage/raft/snapshot", token=root_token, raw=True)
+            snapshot = snapshot_host.snapshot(client, root_token)
             if not snapshot or canary.encode() in snapshot:
                 raise RehearsalFailed("fixture snapshot encryption mismatch")
+            step("snapshot-envelope")
+            custody = directory / 'encrypted-custody'
+            password = 'CI only disposable custody passphrase, never production'
+            recipients = json.loads(operator.read_private(custody / 'recipients.json'))
+            envelope = snapshot_crypto.seal(snapshot, recipients)
+            if any(value in envelope for value in [snapshot, root_token.encode(), canary.encode()]):
+                raise RehearsalFailed('fixture snapshot envelope leakage')
+            # The restored bytes come from the production envelope decrypt adapter.
+            recovered = snapshot_crypto.recover(envelope,
+                operator.read_private(custody / 'recipient-1.secret.pgp'), password)
+            if recovered != snapshot:
+                raise RehearsalFailed('fixture envelope roundtrip mismatch')
+            snapshot = recovered
+            step('snapshot-envelope-negative')
+            for candidate, passphrase in [(envelope, password + ' wrong'),
+                                          (envelope[:-1] + bytes([envelope[-1] ^ 1]), password)]:
+                try:
+                    snapshot_crypto.recover(candidate,
+                        operator.read_private(custody / 'recipient-1.secret.pgp'), passphrase)
+                except activation.custody.BootstrapFailed:
+                    pass
+                else:
+                    raise RehearsalFailed('fixture envelope negative bypass')
             # Let the storage snapshot writer finish before exercising process restart.
             threading.Event().wait(2)
             step("restart")
@@ -337,7 +363,7 @@ def rehearse():
                     raise RehearsalFailed("fixture audit leak or size mismatch")
             step("cleanup")
     # Cleanup is part of success, not an action performed after the success receipt.
-    print("OPENBAO_RECOVERY=Passed; TLS; encrypted custody; Shamir 3/2; Raft restart; isolated restore; ACL; audit redaction; root revocation")
+    print("OPENBAO_RECOVERY=Passed; TLS; encrypted custody and snapshot envelope; Shamir 3/2; Raft restart; isolated restore; ACL; audit redaction; root revocation")
 
 
 def main() -> int:

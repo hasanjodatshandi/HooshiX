@@ -318,6 +318,7 @@ docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/production-jit-usage-fa.md
 docs/operations/production-openbao-activation-fa.md
+docs/operations/production-openbao-backup-fa.md
 docs/operations/production-openbao-fa.md
 docs/operations/production-openbao-storage-fa.md
 docs/operations/production-pki-bootstrap-fa.md
@@ -507,6 +508,8 @@ scripts/platform/waf_image_smoke.py
 scripts/production/activate_openbao_host.py
 scripts/production/activate_openbao_operator.py
 scripts/production/apply_human_sshd_candidate.sh
+scripts/production/backup_openbao_host.py
+scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_provenance.py
@@ -530,7 +533,9 @@ scripts/production/offline-ca/run-sign.cmd
 scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
 scripts/production/openbao_activation_transport.py
+scripts/production/openbao_snapshot_crypto.py
 scripts/production/parspack_audit_transport.py
+scripts/production/parspack_snapshot_transport.py
 scripts/production/platform_image_egress.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
@@ -580,6 +585,7 @@ scripts/production/tests/test_openbao_kubernetes.py
 scripts/production/tests/test_openbao_lost_initialization.py
 scripts/production/tests/test_openbao_publication.py
 scripts/production/tests/test_openbao_recovery.py
+scripts/production/tests/test_openbao_snapshot.py
 scripts/production/tests/test_openbao_storage.py
 scripts/production/tests/test_openbao_storage_guard.py
 scripts/production/tests/test_parspack_audit_transport.py

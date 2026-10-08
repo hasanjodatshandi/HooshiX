@@ -52,7 +52,7 @@ class Client:
 
 
 @contextlib.contextmanager
-def forward(certificate):
+def forward(certificate, *, as_client=False):
     # kubectl selects an unused ephemeral port; never bind a public interface.
     args = [custody.K3S, 'kubectl', '--request-timeout=15s', '-n', 'hooshix-secrets',
             'port-forward', '--address=127.0.0.1', '--pod-running-timeout=15s',
@@ -65,7 +65,8 @@ def forward(certificate):
         line = process.stdout.readline(128)
         match = re.fullmatch(rb'Forwarding from 127\.0\.0\.1:([0-9]{1,5}) -> 8200\r?\n', line)
         custody.require(match is not None and process.poll() is None, 'ACTIVATION_LOOPBACK_REJECTED')
-        yield Client(int(match[1]), certificate).call
+        client = Client(int(match[1]), certificate)
+        yield client if as_client else client.call
     finally:
         # Initialize's durable ciphertext write happens INSIDE this context,
         # before even a forwarding teardown error can lose the response.
