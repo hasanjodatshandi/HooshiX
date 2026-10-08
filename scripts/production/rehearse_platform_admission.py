@@ -188,6 +188,7 @@ def tuf_trust_boundary(k, pod, policy, wait):
     # grant trust without the embedded root. Never import the owner's PKI here.
     name = 'imagevalidatingpolicy/' + policy['metadata']['name']
     before = json.loads(k('get', name, '-o', 'json'))
+    admission_result(k, pod, wait)
     changed = copy.deepcopy(policy)
     changed['spec']['attestors'][0]['cosign']['tuf']['root'] = {
         'data': base64.b64encode(b'{"untrusted":true}').decode()}
@@ -297,8 +298,9 @@ class Staging:
         tools = Path(os.environ['RUNNER_TEMP']) / 'platform-tools'
         shutil.copyfile(tools / 'helm.tar.gz', directory / 'helm-linux-amd64.tar.gz')
 
-        def upgrade_kube(*args, body=None):
-            return k(*args, data=json.dumps(body).encode() if body is not None else None, public_schema=True)
+        def upgrade_kube(*args, body=None, **options):
+            return k(*args, data=json.dumps(body).encode() if body is not None else None,
+                     public_schema=True, **options)
 
         def upgrade_get(kind, name, namespace=None):
             scope = ['-n', namespace] if namespace else []
@@ -379,6 +381,10 @@ class Staging:
         verifier_egress_repair(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
             'name': 'signed-egress-preflight', 'namespace': 'istio-system'},
             'spec': copy.deepcopy(self.pods['istiod'])}, wait)
+        # Same bounded target recovery after the verifier's first TUF use.
+        with patch.object(commissioning, 'get', upgrade_get), patch.object(commissioning, 'kube', upgrade_kube):
+            commissioning.refresh_image_verifiers(upgrade_plan['images'])
+        print('PLATFORM_VERIFIER_PROCESS_REFRESH=Passed', flush=True)
         tuf_trust_boundary(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
             'name': 'signed-tuf-preflight', 'namespace': 'istio-system'},
             'spec': copy.deepcopy(self.pods['istiod'])}, self.plan['admission']['items'][1], wait)

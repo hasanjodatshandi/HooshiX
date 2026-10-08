@@ -37,8 +37,16 @@ CI همان تصویر را با Root نامعتبر رد و پس از بازگ�
 استفاده: پس از موفقیت pipeline و merge، بستهٔ جدید را با دستور ساخت همین راهنما
 و `--resume-bundle` به **بستهٔ اصلی** نصب ناموفق متصل کنید، نه بستهٔ اصلاحی میانی.
 فقط installer بازبینی‌شده را با ورود محلی رمزها اجرا کنید؛ نیازی به تعویض توکن
-صحیح GHCR یا امضای دوبارهٔ CA نیست. در rollback بازبینی‌شده فقط فیلد `tuf` از
-چهار attestor برداشته می‌شود تا CDN پیش‌فرض برگردد؛ اگر هنوز 403 دهد درخواست تازه
+صحیح GHCR یا امضای دوبارهٔ CA نیست. پس از اعمال policy جدید، installer فقط دو
+Deployment متعلق به همین نصب (`kyverno-admission-controller` و
+`kyverno-reports-controller`) را با همان image و Pod spec rollout می‌کند؛ singleton
+کتابخانهٔ TUF مقصد/خطای نخست را در حافظه نگه می‌دارد و بدون process تازه می‌تواند
+باز هم به CDN قبلی وصل شود. هر rollout حداکثر ۱۲۰ ثانیه دارد؛ گیت‌ها خاموش نمی‌شوند
+و نبود controller درخواست‌های مشمول را fail-closed می‌کند. قبل/بعد، UID و spec
+حفظ می‌شوند و CI همین مسیر را با `PLATFORM_VERIFIER_PROCESS_REFRESH=Passed` اجرا
+می‌کند. annotation عملیاتی restart تنها تغییر template metadata است، نه مجوز drift
+در spec یا حذف cache. در rollback بازبینی‌شده فقط فیلد `tuf` از
+چهار attestor برداشته و همین دو controller rollout می‌شوند تا CDN پیش‌فرض برگردد؛ اگر هنوز 403 دهد درخواست تازه
 رد خواهد شد. marker، workload/PVC، CA و credential برای rollback حذف نمی‌شوند.
 
 ## آزمون خودکار، بدون استفاده از VPS

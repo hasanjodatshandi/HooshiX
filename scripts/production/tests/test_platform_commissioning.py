@@ -293,13 +293,14 @@ class PlatformCommissioningTest(unittest.TestCase):
             invalid = apply.call_args_list[0].args[1]
             self.assertEqual(b'{"untrusted":true}', base64.b64decode(
                 invalid['spec']['attestors'][0]['cosign']['tuf']['root']['data']))
-            self.assertEqual(1, probe.call_args_list[0].kwargs['expected'])
+            self.assertEqual({}, probe.call_args_list[0].kwargs)
+            self.assertEqual(1, probe.call_args_list[1].kwargs['expected'])
             self.assertEqual(b'platform image signature verification failed',
-                             probe.call_args_list[0].kwargs['message'])
+                             probe.call_args_list[1].kwargs['message'])
             self.assertEqual({}, probe.call_args_list[-1].kwargs)
             self.assertIn('PLATFORM_SIGNED_TUF_MIRROR=Passed', output.getvalue())
         with patch.object(staging, 'apply') as apply, \
-                patch.object(staging, 'admission_result', side_effect=ValueError('fixture failure')), \
+                patch.object(staging, 'admission_result', side_effect=[None, ValueError('fixture failure')]), \
                 self.assertRaises(ValueError):
             staging.tuf_trust_boundary(Mock(return_value=json.dumps(observed)), {}, policy, Mock())
         self.assertEqual(policy, apply.call_args_list[-1].args[1])
@@ -324,6 +325,32 @@ class PlatformCommissioningTest(unittest.TestCase):
             'name': 'hooshix-ghcr-read', 'namespace': namespace, 'labels': dict(host.LABELS),
             'resourceVersion': '123', 'uid': 'fixture-uid', 'annotations': {'fixture': 'preserve'}},
             'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': 'old-synthetic-data'}}
+
+    def test_verifier_refresh_is_bounded_owned_pinned_and_preserves_pod_spec(self):
+        images = {'admission': 'pinned-admission', 'reports': 'pinned-reports'}
+        deployments = [{'metadata': {'uid': name, 'labels': {
+            'app.kubernetes.io/part-of': 'kyverno', 'app.kubernetes.io/instance': 'kyverno'}},
+            'spec': {'template': {'spec': {'containers': [{'image': image}]}}},
+            'status': {'availableReplicas': 1}} for name, image in images.items()]
+        with patch.object(host, 'get', side_effect=[d for d in deployments for _ in range(2)]), \
+                patch.object(host, 'kube') as kube:
+            host.refresh_image_verifiers(images)
+        self.assertEqual(4, len(kube.call_args_list))
+        for index, component in enumerate(images):
+            name = 'deployment/kyverno-' + component + '-controller'
+            self.assertEqual(('-n', 'kyverno', 'rollout', 'restart', name), kube.call_args_list[2 * index].args)
+            self.assertEqual(135, kube.call_args_list[2 * index + 1].kwargs['timeout'])
+            self.assertIn('--timeout=120s', kube.call_args_list[2 * index + 1].args)
+        for foreign in (None, {'metadata': {'labels': {}}}):
+            with patch.object(host, 'get', return_value=foreign), patch.object(host, 'kube') as kube, \
+                    self.assertRaises(host.custody.BootstrapFailed):
+                host.refresh_image_verifiers(images)
+            kube.assert_not_called()
+        changed = copy.deepcopy(deployments[0])
+        changed['spec']['template']['spec']['containers'][0]['image'] = 'unreviewed'
+        with patch.object(host, 'get', side_effect=[deployments[0], changed]), patch.object(host, 'kube'), \
+                self.assertRaises(host.custody.BootstrapFailed):
+            host.refresh_image_verifiers(images)
 
     def test_owned_registry_rotation_preserves_metadata_and_uses_conditional_update(self):
         for namespace in ('kyverno', 'istio-system', 'hooshix-secrets'):
