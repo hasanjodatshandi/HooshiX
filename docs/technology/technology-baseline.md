@@ -32,7 +32,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Protobuf Java/compiler | 4.34.2 | contract code generation and Spring Boot-managed service runtime aligned |
 | Protobuf validation | Protovalidate Java 1.2.2 | schema annotations plus fail-closed server interceptor; dependency locks and checksums required |
 | External/browser API | REST + OpenAPI through BFF | current architecture |
-| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 + LZ4 Java 1.11.2 | ADR-0015 profile-aware durability; direct constraint overrides Kafka Clients transitive 1.10.1 and fixes GHSA-xx22-p4ch-683r, GHSA-4v53-57pg-c464 and GHSA-6cx8-rjf8-pr8g ([upstream security release](https://github.com/yawkat/lz4-java/releases/tag/v1.11.2)); service locks/checksums and CI compatibility tests required |
+| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 + LZ4 Java 1.11.4 | ADR-0015 profile-aware durability; direct constraint overrides Kafka Clients transitive 1.10.1 and fixes GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv and GHSA-mcr4-qmvw-px4g ([upstream security release](https://github.com/yawkat/lz4-java/releases/tag/v1.11.4)); service locks/checksums and CI compatibility tests required |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
 | Database | PostgreSQL 18.4 | profile-aware mutable relational persistence |
