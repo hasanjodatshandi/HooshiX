@@ -313,7 +313,8 @@ def main() -> int:
     try:
         rehearse()
         return 0
-    except (OSError, ValueError, KeyError, subprocess.SubprocessError, RehearsalFailed):
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError,
+            RehearsalFailed, activation.custody.BootstrapFailed):
         print("OPENBAO_RECOVERY=Failed; inspect the named CI step; no secret diagnostics emitted")
         return 1
 

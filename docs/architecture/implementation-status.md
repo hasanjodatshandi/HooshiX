@@ -22,17 +22,18 @@ istiod publication scan failed (run `37360607172`; reproduction: 12 High finding
 The baseline includes a blocking credential-free scan of all three exact upstream
 imports, retains threshold-failure JSON, and never signs or deploys from PR CI.
 Historical local 1.30.3 runtime evidence below does not validate 1.30.5 runtime.
-New upstream scan, signed mirror publication, target staging/admission and VPS
-installation remain `Not verified` until their separate executed receipts exist.
+The exact 1.30.5 target installation is now `Passed` in the receipt above;
+historical local evidence does not establish complete target mesh security,
+application staging/promotion or Production readiness.
 
 The owner approved the bounded ADR-0030 commissioning bootstrap on 2026-10-05.
 The controlled intermediate CSR tool retains only an encrypted root-owned key on
 the VPS and exports a hash-bound public CSR for the existing offline Root signer.
-Synthetic crypto/negative tests passed; actual CSR generation and offline signing
-remain `Not run` until the supervised operator execution. No Root regeneration,
-repeat storage maintenance, cluster mutation or OpenBao installation is claimed.
-Continuation: `../operations/production-pki-bootstrap-fa.md`; then import the
-signed intermediate and commission mesh/GitOps/admission/OpenBao. Stage 10 stays
+The owner subsequently generated the actual CSR, signed with the existing offline
+Root and imported the signed intermediate; platform TLS/sealed probes passed in
+the current target receipt above. No Root regeneration or repeat storage
+maintenance is needed. Continuation: supervised encrypted OpenBao activation,
+then remaining GitOps/admission/application commissioning. Stage 10 stays
 `IN PROGRESS`; normal audited JIT and Production readiness remain `Not verified`.
 
 The 2026-10-05 OpenBao storage continuation adds a bounded systemd notify/watchdog
@@ -46,9 +47,11 @@ Owner-approved target maintenance on 2026-10-05 passed guard process-fault and
 unexpected mount-loss shutdown, no automatic re-arm after remount, explicit
 guard/K3s recovery and API readiness. Protected host-service PIDs/active states
 were unchanged. `verify_storage_guard.py` records this bounded procedure; its
-negative unit tests do not replace native evidence. Actual PV binding, workload
-promotion, mesh/admission/TLS, OpenBao recovery and Production readiness remain
-`Not verified`. The read-only storage verifier deliberately does not certify reboot.
+negative unit tests do not replace native evidence. Actual retained PV binding,
+OpenBao installation and TLS/sealed probes passed in the current target receipt;
+application promotion, full target mesh/admission security, OpenBao recovery and
+Production readiness remain `Not verified`. The read-only storage verifier
+deliberately does not certify reboot.
 K3s stop is not claimed to terminate all running containers. Owner instructions:
 `../operations/production-openbao-storage-fa.md`; Stage 10 remains `IN PROGRESS`.
 
@@ -82,7 +85,9 @@ backup without regenerating the Root or requiring another `ToOnline` export.
 Connected-Windows origin and owner-attested offline/two-backup custody remain explicit;
 historical receipts are not rewritten. This is a bounded approval and tooling change,
 not independent recovery evidence, signed intermediate installation or mesh readiness.
-Actual intermediate custody/import/rotation and platform commissioning remain `Not verified`.
+Actual intermediate import and the bounded platform installation passed in the
+current target receipt; intermediate rotation/recovery and complete platform
+commissioning remain `Not verified`.
 
 On 2026-10-04 PR #163 merged at `ca155496c60507e6a0525ddcb4575cadf0db3bd3`
 after protected baseline `37190183009` and frontend `37190182906` passed at the
@@ -604,8 +609,8 @@ Authorization and Web BFF application services are implemented as current reposi
 | Kyverno production release admission | DESIGNED under ADR-0017/0045 | IMPLEMENTED as stable CEL release-policy generation | repository render/static verification PASSED; production cluster enforcement NOT VERIFIED |
 | Trivy / OWASP Dependency-Check | NOT SELECTED under ADR-0045 | NOT APPLICABLE | NOT APPLICABLE |
 | Production K3s/Kubernetes/Calico | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-30 read-only root inventory again passed API readiness and found all seven Calico/CoreDNS/Kyverno pods ready with zero restarts; the previously observed K3s version was `v1.35.6+k3s1`. Admission/network negative tests, reproducible production provisioning, backup/recovery and complete readiness remain NOT VERIFIED by this inventory. Local kind evidence does not replace them |
-| Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.30.3 foundation plus STRICT mTLS/workload-identity positive/negative verification PASSED; production runtime NOT VERIFIED |
-| Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local 1.18.2 stable CEL digest/workload hardening positives/negatives PASSED, including exact Collector hostPath denial; release signature/provenance/SBOM admission and production runtime NOT VERIFIED |
+| Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.30.5 installation Passed | current target installation receipt above; historical local 1.30.3 STRICT mTLS/workload-identity positives/negatives do not replace complete target/application mesh verification, still Not verified |
+| Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.19.1 upgrade Passed | current target installation receipt above; historical local 1.18.2 hardening evidence remains revision-specific; complete production application signature/provenance/SBOM admission remains Not verified |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
 | WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |

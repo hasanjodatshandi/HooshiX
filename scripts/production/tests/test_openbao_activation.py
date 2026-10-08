@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import os
 import sys
@@ -129,6 +130,42 @@ class OpenBaoActivationTest(unittest.TestCase):
         self.assertIn('os.O_NOFOLLOW', value)
         self.assertIn('hashlib.sha256(content).hexdigest()!=digest', value)
         self.assertNotIn('password', value)
+
+    def test_rpc_waits_for_root_before_body_and_never_places_secrets_in_argv(self):
+        revision = 'a' * 40
+        password, share = 'Local sudo fixture only', 'b' * 66
+        process = Mock()
+        process.stdin, process.stdout = io.BytesIO(), io.BytesIO(b'ACTIVATION_RPC_READY\n')
+        process.returncode = 0
+        def communicate(data, timeout):
+            self.assertEqual(password.encode() + b'\n', process.stdin.getvalue())
+            self.assertEqual({'action': 'unseal', 'keys': [share]}, json.loads(data))
+            self.assertEqual(190, timeout)
+            return json.dumps({'source_revision': revision, 'schema_version': 1}).encode(), None
+        process.communicate.side_effect = communicate
+        process.poll.return_value = 0
+        with patch.object(operator.subprocess, 'Popen', return_value=process) as launch, \
+                patch.object(operator.select, 'select', return_value=([process.stdout], [], [])):
+            operator.rpc('/public-fixture', revision, [], password, {'action': 'unseal', 'keys': [share]})
+        argv = ' '.join(launch.call_args.args[0])
+        self.assertNotIn(password, argv)
+        self.assertNotIn(share, argv)
+        self.assertIn('sudo -k -S', argv)
+        self.assertEqual(operator.ENV, launch.call_args.kwargs['env'])
+        self.assertTrue(process.stdin.closed and process.stdout.closed)
+
+    def test_rpc_authentication_failure_never_sends_api_body_and_reaps_process(self):
+        process = Mock()
+        process.stdin, process.stdout = io.BytesIO(), io.BytesIO()
+        process.poll.return_value = None
+        with patch.object(operator.subprocess, 'Popen', return_value=process), \
+                patch.object(operator.select, 'select', return_value=([], [], [])), \
+                self.assertRaises(host.custody.BootstrapFailed):
+            operator.rpc('/public-fixture', 'a' * 40, [], 'fixture sudo', {'action': 'initialize'})
+        process.communicate.assert_not_called()
+        process.kill.assert_called_once()
+        process.wait.assert_called_once_with(timeout=10)
+        self.assertTrue(process.stdin.closed and process.stdout.closed)
 
     def test_real_local_pgp_export_wrong_password_and_fresh_import_recovery(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -242,6 +242,10 @@ def main():
         # Lock outside the custody directory so an empty initial directory stays empty.
         lock_path = BASE / (directory.name + '.lock')
         with os.fdopen(os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'r+b') as lock:
+            info = os.fstat(lock.fileno())
+            host.require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                         and stat.S_IMODE(info.st_mode) == 0o600 and info.st_nlink == 1,
+                         'LOCAL_CUSTODY_LOCK_REJECTED')
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             recipients = prepare(directory, password)
             remote = '/home/hooshixadmin/.cache/hooshix-bao-activation-' + uuid.uuid4().hex
