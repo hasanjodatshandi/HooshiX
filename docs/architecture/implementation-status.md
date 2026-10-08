@@ -10,7 +10,7 @@ Current Stage 10 continuation, 2026-10-08: target receipt
 Mesh, Kyverno 1.19.1, exact OpenBao 2.6.4 installation, verified TLS/sealed probes,
 retained local PVC, protected audit/storage guard and existing host services are
 `Passed`. At installation time OpenBao was sealed/uninitialized; the subsequent
-owner-run diagnosis below establishes its later initialized/sealed state. Do not repeat the
+owner-run diagnosis and recovery below establish the subsequent state. Do not repeat the
 installer or treat older pre-install evidence below as the present target state.
 Next is supervised PGP-encrypted Shamir 3/2 custody and unseal; the operator tool
 and native disposable CI do not prove actual target activation. Target custody,
@@ -25,9 +25,16 @@ The subsequent owner-run activation returned
 passed preflight and found **initialized, sealed, Shamir 3/2**, existing host
 `attempt.json`, and missing host encrypted response. Local `encrypted.json` is
 also absent. The owner has no shares and explicitly approved archiving all old
-state and replacing only this fresh store. This approval is not execution evidence:
-target recovery/new activation remain `Not run`. Existing host data/intent and
-local custody must be preserved. The activation operator has a supervised read-only
+state and replacing only this fresh store. The later owner-run recovery receipt
+`recovery-receipt-7a40872c679942469077401e5d14603a.json`, observed at
+`2026-10-08T20:22:24.277689+00:00` and bound to main `70ac306c03442d1aa8804c1c28c113f73af6fdd1`,
+reports recovery/archive verification `Passed`, retaining the same PVC and
+StatefulSet. Replacement initialization is `Not run`: its next invocation failed
+at `ACTIVATION_GET_PUBLIC_CA_EXIT_FAILED`, before any init request. The focused
+repair projects only `ca.crt` from the installed `openbao-server-tls` Secret,
+retains the pinned Root check and resumes without repeating recovery. Old host
+data/intent are retained privately and local custody must be preserved.
+The activation operator has a supervised read-only
 `--diagnose-only` mode and fixed native-operation failure codes, without reading
 custody contents or retrying init. Resume explicitly requests the existing custody
 passphrase. Recovery is a separate explicit action using those same recipients,

@@ -13,6 +13,13 @@ Root، SSH، ایمیل و
 storage دوباره ساخته یا نصب نمی‌شوند. Stage 10 و Production readiness هنوز
 `Not verified` هستند.
 
+در اجرای مالک در ۲۰۲۶-۱۰-۰۸، بایگانی initialization گمشده با receipt
+`recovery-receipt-7a40872c679942469077401e5d14603a.json` موفق شد؛ مرحلهٔ بعد
+با `ACTIVATION_GET_PUBLIC_CA_EXIT_FAILED` متوقف شد. پس از اصلاح خواندن فقط
+گواهی عمومی از Secret نصب‌شدهٔ `openbao-server-tls`، ادامه باید با همان
+custody و `--resume` **بدون** `--recover-lost-initialization` باشد؛ بایگانی
+قبلی حفظ می‌شود و recovery تکرار نمی‌شود. این خروجی هنوز شاهد init/unseal نیست.
+
 هدف این تغییر واحد، initialization با Shamir سه سهم/آستانهٔ دو، رمزکردن سهم‌ها
 قبل از خروج از OpenBao، تحویل و آزمایش custody بیرون VPS، و unseal است.
 این فقط bootstrap محدود ADR-0030 است، نه جایگزین GitOps/JIT؛ client ingress،

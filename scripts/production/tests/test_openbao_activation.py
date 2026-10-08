@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import io
 import json
 import os
@@ -217,6 +218,41 @@ class OpenBaoActivationTest(unittest.TestCase):
         self.assertNotIn('-tls-skip-verify', args)
         self.assertIn('-ca-cert=/openbao/tls/ca.crt', args)
         self.assertEqual({'key': sensitive}, json.loads(kube.call_args.kwargs['data']))
+
+    def test_activation_projects_only_ca_from_the_installed_tls_secret(self):
+        from render_openbao_candidate import candidate
+        manifest = candidate('standard')['items'][-1]
+        tls = next(v for v in manifest['spec']['template']['spec']['volumes'] if v['name'] == 'tls')
+        certificate = b'disposable-public-root-fixture'
+        expected = self.encrypted()
+        with patch.object(host, 'kube', return_value=base64.b64encode(certificate)) as kube, \
+                patch.object(host.custody, 'ROOT_SHA256', hashlib.sha256(certificate).hexdigest()), \
+                patch.object(host.transport, 'forward') as forward, \
+                patch.object(host, 'initialize', return_value=expected) as initialize:
+            result = host.activate({'action': 'initialize', 'recipients': self.recipients()},
+                                   'fixture-pvc', 'a' * 40)
+        kube.assert_called_once_with('-n', 'hooshix-secrets', 'get', 'secret', tls['secret']['secretName'],
+                                    '-o', r'jsonpath={.data.ca\.crt}', operation='GET_PUBLIC_CA')
+        forward.assert_called_once_with(certificate.decode('ascii'))
+        initialize.assert_called_once_with(self.recipients(), 'fixture-pvc', 'a' * 40,
+                                           api=forward.return_value.__enter__.return_value)
+        self.assertEqual({'encrypted': expected}, result)
+
+    def test_ca_failure_precedes_forwarding_and_all_initialization(self):
+        for value, reason in ((b'', 'ROOT_CA_IDENTITY_CONFLICT'),
+                              (base64.b64encode(b'untrusted-public-root'), 'ROOT_CA_IDENTITY_CONFLICT'),
+                              (None, 'ACTIVATION_GET_PUBLIC_CA_EXIT_FAILED')):
+            with self.subTest(reason=reason, missing=value is None), \
+                    patch.object(host, 'kube', return_value=value) as kube, \
+                    patch.object(host.transport, 'forward') as forward, \
+                    patch.object(host, 'initialize') as initialize, \
+                    self.assertRaises(host.custody.BootstrapFailed) as failure:
+                if value is None:
+                    kube.side_effect = host.custody.BootstrapFailed(reason)
+                host.activate({'action': 'initialize', 'recipients': self.recipients()}, 'fixture-pvc', 'a' * 40)
+            self.assertEqual(reason, str(failure.exception))
+            forward.assert_not_called()
+            initialize.assert_not_called()
 
     def test_exclusive_private_files_and_link_denial(self):
         with tempfile.TemporaryDirectory() as temporary:
