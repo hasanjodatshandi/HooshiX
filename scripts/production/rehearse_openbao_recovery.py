@@ -19,6 +19,8 @@ from pathlib import Path
 
 import activate_openbao_host as activation
 import activate_openbao_operator as operator
+import openbao_activation_transport as transport
+import recover_openbao_initialization as lost_init
 from render_openbao_candidate import ALIVE, STATUS
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,7 +30,8 @@ STEPS = frozenset({"image-pull", "image-version", "tls-fixture", "source-start",
                    "tls-negative", "source-init", "kv-and-acl", "snapshot", "restart", "restart-read",
                    "restore-start", "restore-init", "snapshot-restore", "restore-read",
                    "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed",
-                   "kv-mount", "kv-write", "acl-policy", "acl-token", "acl-write-denied"})
+                   "kv-mount", "kv-write", "acl-policy", "acl-token", "acl-write-denied",
+                   "lost-init-archive", "fresh-store-init", "archive-rollback"})
 
 
 class RehearsalFailed(Exception):
@@ -107,19 +110,17 @@ def initialize(client: Client) -> tuple[list[str], str]:
 
 
 def initialize_encrypted(client: Client, container: str, directory: Path) -> tuple[list[str], str]:
-    # Production crypto/response validation and the EXACT native stdin CLI edge.
+    # Production crypto and the exact one-attempt verified HTTPS write adapter.
     # Nothing in this rehearsal receives real keys, operator paths or VPS access.
     directory.mkdir(mode=0o700)
     password = 'CI only disposable custody passphrase, never production'
     recipients = [operator.generate_recipient(directory, i, password) for i in range(1, 4)]
+    operator.create(directory / 'recipients.json', json.dumps(recipients).encode())
+    recipients = operator.prepare(directory, password)
 
-    def api(operation, path=None, body=None):
-        if operation == 'status':
-            return client.call('sys/seal-status')
-        output = command(['/usr/bin/docker', 'exec', '-i', container, '/usr/bin/bao', 'write',
-            '-format=json', '-address=https://127.0.0.1:8200', '-ca-cert=/openbao/tls/tls.crt', path, '-'],
-            data=json.dumps(body).encode(), output_bound=activation.BOUND)
-        return json.loads(output)['data']
+    # The disposable fixture's CA is public and identical to the mounted cert.
+    public_ca = directory.parent / 'tls' / 'tls.crt'
+    api = transport.Client(int(client.base.split(':')[2].split('/')[0]), public_ca.read_text()).call
 
     encrypted = activation.encrypted_result(api('write', 'sys/init', activation.init_request(recipients)))
     # Ciphertext-only write/readback; keys are recovered from fresh private exports.
@@ -301,6 +302,35 @@ def rehearse():
                 if not audit or len(audit) > BOUND or any(value.encode() in audit for value in
                                                         [canary, reader, root_token, temporary_root, *keys]):
                     raise RehearsalFailed("fixture audit leak or size mismatch")
+            step('lost-init-archive')
+            command(['/usr/bin/docker', 'stop', source], timeout=30)
+            archive = directory / 'lost-initialization'
+            archive.mkdir(mode=0o700)
+            owners = {'owner': os.getuid(), 'group': os.getgid()}
+            original = lost_init.inventory(data, **owners)
+            inode = data.stat().st_ino
+            lost_init.move_contents(data, archive, original, **owners)
+            if any(data.iterdir()) or data.stat().st_ino != inode:
+                raise RehearsalFailed('fixture original data directory changed')
+            command(['/usr/bin/docker', 'start', source])
+            client = Client(mapped_port(source), tls / 'tls.crt')
+            client.wait_health(501)
+            step('fresh-store-init')
+            initialize_encrypted(client, source, directory / 'replacement-custody')
+            step('archive-rollback')
+            command(['/usr/bin/docker', 'stop', source], timeout=30)
+            replacement = directory / 'replacement-initialization'
+            replacement.mkdir(mode=0o700)
+            lost_init.move_contents(data, replacement, lost_init.inventory(data, **owners), **owners)
+            lost_init.move_contents(archive, data, original, **owners)
+            command(['/usr/bin/docker', 'start', source])
+            client = Client(mapped_port(source), tls / 'tls.crt')
+            client.wait_health(503)
+            for key in keys[:2]:
+                client.call('sys/unseal', 'PUT', {'key': key})
+            client.wait_health(200)
+            if client.call('fixture/data/audit', token=reader)['data']['data']['value'] != canary:
+                raise RehearsalFailed('fixture retained archive recovery mismatch')
             step("cleanup")
     # Cleanup is part of success, not an action performed after the success receipt.
     print("OPENBAO_RECOVERY=Passed; TLS; encrypted custody; Shamir 3/2; Raft restart; isolated restore; ACL; audit redaction; root revocation")

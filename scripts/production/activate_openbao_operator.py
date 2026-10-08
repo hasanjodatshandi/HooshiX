@@ -26,7 +26,8 @@ BASE = Path('/home/coder/.local/share/hooshix-openbao-custody')
 SSH = '/mnt/c/Windows/System32/OpenSSH/ssh.exe'
 SCP = '/mnt/c/Windows/System32/OpenSSH/scp.exe'
 SOURCES = ('bootstrap_intermediate_csr.py', 'import_intermediate_ca.py',
-           'verify_storage_guard.py', 'activate_openbao_host.py')
+           'verify_storage_guard.py', 'openbao_activation_transport.py',
+           'recover_openbao_initialization.py', 'activate_openbao_host.py')
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8'}
 
 
@@ -176,7 +177,8 @@ def rpc(remote, revision, sources, password, body):
         ready, _, _ = select.select([process.stdout], [], [], 25)
         host.require(ready and process.stdout.readline(128).strip() == b'ACTIVATION_RPC_READY',
                      'LOCAL_SUDO_OR_REVIEWED_SUPERVISOR_FAILED')
-        output, _ = process.communicate(json.dumps(body).encode() + b'\n', timeout=190)
+        output, _ = process.communicate(json.dumps(body).encode() + b'\n',
+                                       timeout=310 if body.get('action') == 'recover' else 190)
         host.require(len(output) <= host.BOUND, 'RPC_OUTPUT_BOUND_EXCEEDED')
         result = json.loads(output)
         if process.returncode:
@@ -204,6 +206,25 @@ def prepare(directory, password):
         keys = [generate_recipient(directory, i, password) for i in range(1, 4)]
         create(directory / 'recipients.json', json.dumps(keys).encode())
     host.public_keys(keys)
+    # Prove the EXISTING exports match recipients and this password BEFORE a
+    # recovery/reset or an irreversible init request can occur.
+    for index, key in enumerate(keys, 1):
+        with tempfile.TemporaryDirectory(prefix='hooshix-custody-proof-') as temporary:
+            home = Path(temporary)
+            home.chmod(0o700)
+            try:
+                gpg(home, '--import', data=read_private(directory / ('recipient-' + str(index) + '.secret.pgp')))
+                host.require(gpg(home, '--export') == base64.b64decode(key, validate=True),
+                             'CUSTODY_PRIVATE_RECIPIENT_MISMATCH')
+                fingerprint = next(line.split(b':')[9].decode() for line in
+                    gpg(home, '--with-colons', '--list-keys').splitlines() if line.startswith(b'fpr:'))
+                canary = b'HooshiX existing custody passphrase proof'
+                encrypted = gpg(home, '--trust-model', 'always', '--recipient', fingerprint,
+                                '--encrypt', data=canary)
+                host.require(gpg(home, '--decrypt', password=password, data=encrypted) == canary,
+                             'CUSTODY_PASSPHRASE_PROOF_FAILED')
+            finally:
+                kill_agent(home)
     return keys
 
 
@@ -262,8 +283,11 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--resume', type=Path)
     mode.add_argument('--diagnose-only', action='store_true')
+    parser.add_argument('--recover-lost-initialization', action='store_true')
     parser.add_argument('--rescue-and-second-session-ready', action='store_true')
     args = parser.parse_args()
+    if args.recover_lost_initialization and (not args.resume or args.diagnose_only):
+        parser.error('recovery requires --resume with the ORIGINAL custody directory')
     if not args.diagnose_only and not args.rescue_and_second_session_ready:
         parser.error('activation requires --rescue-and-second-session-ready')
     os.umask(0o077)
@@ -301,8 +325,22 @@ def main():
                          'LOCAL_CUSTODY_LOCK_REJECTED')
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             recipients = prepare(directory, password)
+            if args.recover_lost_initialization:
+                host.require(not (directory / 'encrypted.json').exists()
+                             and not (directory / 'encrypted.json').is_symlink(),
+                             'LOCAL_CIPHERTEXT_EXISTS_RECOVERY_REFUSED')
+                host.require(input('Only archive and replace the LOST first initialization; type ARCHIVE: ') == 'ARCHIVE',
+                             'OWNER_RECOVERY_CONFIRMATION_REQUIRED')
             remote, sources = stage_sources()
             password_sudo = sudo_password()
+            if args.recover_lost_initialization:
+                receipt = rpc(remote, revision, sources, password_sudo,
+                              {'action': 'recover', 'recipients': recipients})
+                create(directory / ('recovery-receipt-' + uuid.uuid4().hex + '.json'), json.dumps(receipt).encode())
+                print('OPENBAO_LOST_INITIALIZATION_RECOVERY=Passed; old data retained privately', flush=True)
+                print('Recovery is separate from init. Authenticate locally again.', flush=True)
+                del password_sudo
+                password_sudo = sudo_password()
             received = rpc(remote, revision, sources, password_sudo,
                            {'action': 'initialize', 'recipients': recipients})
             del password_sudo

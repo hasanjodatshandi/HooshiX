@@ -529,6 +529,7 @@ scripts/production/offline-ca/run-root.cmd
 scripts/production/offline-ca/run-sign.cmd
 scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
+scripts/production/openbao_activation_transport.py
 scripts/production/parspack_audit_transport.py
 scripts/production/platform_image_egress.py
 scripts/production/prepare_human_sshd_candidate.py
@@ -537,6 +538,7 @@ scripts/production/provision_openbao_storage.py
 scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/readiness.py
+scripts/production/recover_openbao_initialization.py
 scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
@@ -575,6 +577,7 @@ scripts/production/tests/test_openbao_activation.py
 scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py
 scripts/production/tests/test_openbao_kubernetes.py
+scripts/production/tests/test_openbao_lost_initialization.py
 scripts/production/tests/test_openbao_publication.py
 scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_openbao_storage.py
