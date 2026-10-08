@@ -2,6 +2,21 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+Current Stage 10 continuation, 2026-10-08: target receipt
+`hooshix-platform-d6c52f209c034d019f67ee38b727724a.json`, observed at
+`2026-10-08T10:54:50.046652+00:00`, binds reviewed main
+`eabc4475ed3065a3db1c2bf782383e9ef99e23e6` and plan SHA-256
+`0522429263e84f9ae10a18f58baa9dbc3f82b5ab66f6089b30e4b89cd60a205b`.
+Mesh, Kyverno 1.19.1, exact OpenBao 2.6.4 installation, verified TLS/sealed probes,
+retained local PVC, protected audit/storage guard and existing host services are
+`Passed`. OpenBao is **installed, sealed, not initialized**. Do not repeat the
+installer or treat older pre-install evidence below as the present target state.
+Next is supervised PGP-encrypted Shamir 3/2 custody and unseal; the operator tool
+and native disposable CI do not prove actual target activation. Target custody,
+initialization/unseal, hourly off-host snapshots/restore, ESO, audited JIT,
+standing-access removal, GitOps and complete-stack readiness remain `Not verified`.
+Usage: `../operations/production-openbao-activation-fa.md`. Stage 10 stays `IN PROGRESS`.
+
 Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
 istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
 The baseline includes a blocking credential-free scan of all three exact upstream
@@ -597,7 +612,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
-| OpenBao + External Secrets | DESIGNED | NOT PRESENT | NOT VERIFIED |
+| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed sealed/uninitialized on 2026-10-08; ESO not installed | OpenBao installation/TLS/PVC Passed in target receipt; activation/ESO/off-host recovery NOT VERIFIED |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Cross-service CI/security/supply-chain release gates | DESIGNED | Stage 10 seven-artifact source merged; protected head and merged-main CI PASSED | Semgrep/OSV/Gitleaks-capable service workflows plus frontend Semgrep/OSV/image/Helm gates are present; Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation cover all seven application release components. PR #142 head runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed; real production release/rescan/admission execution remains NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | three-node local Collector DaemonSet, bounded queues/privacy config, exact read-only pod-log hostPath, metrics, and OTLP integration PASSED |

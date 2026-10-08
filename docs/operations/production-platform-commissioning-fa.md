@@ -13,8 +13,13 @@ SBOM و scan همان digest را ثابت می‌کند؛ جای staging یا a
 ## وضعیت
 
 Implementation: admission, disposable signed staging and supervised host installer implemented; executed CI/target evidence required
-VPS installation: Not run by this change
+VPS installation: Passed at main eabc4475ed3065a3db1c2bf782383e9ef99e23e6 on 2026-10-08; sealed, not initialized
 Production readiness: Not verified
+
+receipt عمومی `hooshix-platform-d6c52f209c034d019f67ee38b727724a.json` نصب mesh،
+Kyverno 1.19.1، OpenBao، retained PVC، TLS/probes و حفظ audit/storage guard و
+سرویس‌ها را `Passed` ثبت کرده است. نصب را تکرار نکنید؛ قدم بعدی
+[فعال‌سازی با custody رمزدار](production-openbao-activation-fa.md) است.
 
 ### مانع دریافت اعتماد Sigstore روی VPS
 

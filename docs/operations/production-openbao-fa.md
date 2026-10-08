@@ -2,8 +2,8 @@
 
 ## محدودهٔ این تغییر
 
-تغییر جاری، مقصد انتشار کاندیدای OpenBao 2.6.4 را به بستهٔ خصوصی مصوب تغییر
-می‌دهد؛ نه فعال‌کردن Production، init واقعی، تغییر SSH/MCP یا حذف sudo دائمی.
+ادامهٔ جاری، فعال‌سازی OpenBao 2.6.4 **نصب‌شده** با custody رمزدار است؛
+نه بازکردن Production، تغییر SSH/MCP یا حذف sudo دائمی.
 تعریف reusable در `infrastructure/production/secrets/` می‌ماند و تا عبور از
 gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` نمی‌شود.
 
@@ -15,13 +15,17 @@ gateهای promotion وارد ریشهٔ فعال `deploy/clusters/production` �
 `Passed` شدند؛ receipt عمومی `INTERMEDIATE_IMPORTED` در ساعت
 `2026-10-05T16:32:07.336344+00:00`، encryption را `Passed`، حفظ کلید رمزدار host
 و آفلاین‌ماندن Root را تأیید می‌کند. Root/CSR دوباره ساخته نمی‌شوند.
-OpenBao هنوز **نصب نشده است**؛ موفقیت PKI، نصب یا سلامت OpenBao نیست.
-بستهٔ بعدی یک تغییر منسجم commissioning واقعی platform/OpenBao است؛ اسکریپت
+در ۲۰۲۶-۱۰-۰۸، نصب واقعی با main@eabc4475ed3065a3db1c2bf782383e9ef99e23e6 و
+receipt عمومی `hooshix-platform-d6c52f209c034d019f67ee38b727724a.json` موفق شد:
+mesh، Kyverno 1.19.1، OpenBao sealed/uninitialized، TLS/probes، retained PVC و
+حفظ audit/storage guard/SSH/ایمیل/K3s همگی `Passed` بودند. این receipt، init یا
+Production readiness نیست. نصب را تکرار نکنید؛ ادامه در
+[راهنمای فعال‌سازی](production-openbao-activation-fa.md) است. اسکریپت
 `scripts/platform/istio_install.sh` به context محلی kind محدود است و نباید به‌جای
 installer Production اجرا شود. CI شواهد نصب/خطا و bundle عمومی را بررسی می‌کند؛
-احراز هویت privileged و secrets فقط در پنجرهٔ محلی مالک می‌مانند. مراحل باقی‌مانده
-mesh/GitOps/admission، TLS سرور OpenBao، فعال‌سازی PV، init/unseal با custody سهم‌ها
-و بازیابی واقعی هستند؛ هیچ‌کدام با receipt قبلی `Passed` اعلام نمی‌شوند.
+احراز هویت privileged و secrets فقط در پنجرهٔ محلی مالک می‌مانند. باقی‌مانده:
+GitOps، init/unseal با custody سهم‌ها، snapshot/restore واقعی، ESO و audit/JIT.
+بخش‌های زیر راهنمای ابزارهای انتشار/نصب موجودند، نه درخواست تکرار عملیات.
 
 ### آماده‌سازی خودکار manifest شبکهٔ سرویس
 
