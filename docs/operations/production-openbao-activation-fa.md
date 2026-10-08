@@ -68,6 +68,11 @@ root-only `/var/lib/hooshix-pki/openbao-activation` می‌مانند؛ این b
 میزبان نیست. پوشهٔ custody محلی را تا recovery/cutover پاک نکنید. پس از قطع
 دانلود یا قبل از unseal با همان `ID` ادامه دهید:
 
+در اجرای `--resume` رمز **قبلی همان custody** لازم است، نه رمز تازه؛ انتخاب
+رمز تازه exportهای موجود را باز نمی‌کند. پیام عمومی شکست native به‌تنهایی
+نشان نمی‌دهد initialization انجام شده یا نه. تا بررسی وضعیت هدف، installer
+را تکرار نکنید و هیچ فایل intent، ciphertext یا private export را حذف نکنید.
+
 ```powershell
 wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning python3 scripts/production/activate_openbao_operator.py --rescue-and-second-session-ready --resume /home/coder/.local/share/hooshix-openbao-custody/ID
 ```
