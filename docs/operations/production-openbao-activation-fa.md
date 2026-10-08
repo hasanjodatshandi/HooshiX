@@ -4,11 +4,12 @@
 
 نصب واقعی روی VPS در ۲۰۲۶-۱۰-۰۸ با receipt عمومی
 `hooshix-platform-d6c52f209c034d019f67ee38b727724a.json` موفق شد:
-OpenBao 2.6.4 نصب شده است. بررسی مالک در ۲۰۲۶-۱۰-۰۸ نشان داد initialization
-انجام شده ولی خروجی رمزدار آن ثبت نشده و سرویس sealed مانده است؛ سهم‌های
-این initialization در دسترس مالک نیستند. بازیابی فعلی، با تأیید صریح مالک،
-باید ابتدا کل datastore و intent قبلی را خصوصی و قابل‌بازگردانی بایگانی کند
-و فقط سپس مخزن همین نصب تازه را جایگزین کند؛ اجرای خودکار init دوباره ممنوع است.
+OpenBao 2.6.4 نصب شده است. پس از recovery مصوبِ initialization اولیه با
+خروجی گمشده، receipt عمومی
+`activation-receipt-f1f999a1a28f47c699c72f0c04638fc7.json` در
+۲۰۲۶-۱۰-۰۸، initialization، بازیابی ciphertext از custody و unseal با
+Shamir سه سهم/آستانهٔ دو را `Passed` ثبت کرد. مالک کپی در دو محل custody
+را تأیید کرد؛ این تأیید، اثبات مستقل توزیع یا custody چندنفره نیست.
 Root، SSH، ایمیل و
 storage دوباره ساخته یا نصب نمی‌شوند. Stage 10 و Production readiness هنوز
 `Not verified` هستند.
@@ -17,8 +18,10 @@ storage دوباره ساخته یا نصب نمی‌شوند. Stage 10 و Produ
 `recovery-receipt-7a40872c679942469077401e5d14603a.json` موفق شد؛ مرحلهٔ بعد
 با `ACTIVATION_GET_PUBLIC_CA_EXIT_FAILED` متوقف شد. پس از اصلاح خواندن فقط
 گواهی عمومی از Secret نصب‌شدهٔ `openbao-server-tls`، ادامه باید با همان
-custody و `--resume` **بدون** `--recover-lost-initialization` باشد؛ بایگانی
-قبلی حفظ می‌شود و recovery تکرار نمی‌شود. این خروجی هنوز شاهد init/unseal نیست.
+custody و `--resume` **بدون** `--recover-lost-initialization` انجام شد؛ بایگانی
+قبلی حفظ می‌شود و recovery یا init تکرار نمی‌شود. مرحلهٔ بعد
+[پشتیبان رمزدار بیرون میزبان](production-openbao-backup-fa.md) است؛ root
+revocation، scoped authentication، ESO و JIT هنوز تأیید نشده‌اند.
 
 هدف این تغییر واحد، initialization با Shamir سه سهم/آستانهٔ دو، رمزکردن سهم‌ها
 قبل از خروج از OpenBao، تحویل و آزمایش custody بیرون VPS، و unseal است.
