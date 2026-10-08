@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,6 +19,117 @@ def packet(tag, value):
 
 
 class OpenBaoActivationTest(unittest.TestCase):
+    def test_native_failure_identifies_edge_without_disclosing_any_output(self):
+        sentinel = b'fixture-secret-stdout-stderr-never-publish'
+        for result, reason in ((Mock(returncode=1, stdout=sentinel), 'EXIT_FAILED'),
+                               (Mock(returncode=0, stdout=sentinel * host.BOUND), 'OUTPUT_BOUND')):
+            with patch.object(host.subprocess, 'run', return_value=result), \
+                    self.assertRaises(host.custody.BootstrapFailed) as failure:
+                host.native(['fixture', 'secret-not-an-operation-label'], data=sentinel,
+                            operation='GET_STATEFULSET')
+            self.assertEqual('ACTIVATION_GET_STATEFULSET_' + reason, str(failure.exception))
+            self.assertNotIn(sentinel.decode(), str(failure.exception))
+        with patch.object(host.subprocess, 'run', side_effect=subprocess.TimeoutExpired(
+                'fixture-secret-argv', 25, output=sentinel)), \
+                self.assertRaises(host.custody.BootstrapFailed) as failure:
+            host.native(['fixture'], operation='BAO_INIT')
+        self.assertEqual('ACTIVATION_BAO_INIT_TIMEOUT', str(failure.exception))
+        with patch.object(host.subprocess, 'run', return_value=Mock(returncode=2, stdout=b'{}')):
+            self.assertEqual(b'{}', host.native(['fixture'], expected=(0, 2), operation='BAO_STATUS'))
+
+    def test_diagnosis_reports_failed_preflight_and_init_state_without_reading_custody(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(host, 'STATE', Path(temporary)), \
+                patch.object(host.os, 'geteuid', return_value=0), \
+                patch.object(host.os, 'uname', return_value=Mock(nodename='mail.hooshix.com')), \
+                patch.object(host.custody, 'protected'), \
+                patch.object(host, 'preflight', side_effect=host.custody.BootstrapFailed(
+                    'ACTIVATION_GET_STATEFULSET_OUTPUT_BOUND')), \
+                patch.object(host, 'bao', return_value={'initialized': True, 'sealed': True,
+                    'n': 3, 't': 2, 'version': '2.6.4', 'type': 'shamir', 'storage_type': 'raft'}), \
+                patch.object(Path, 'read_bytes', side_effect=AssertionError('no custody contents')), \
+                patch.object(host, 'initialize') as initialize, patch.object(host, 'unseal') as unseal:
+            (host.STATE / 'attempt.json').touch()
+            result = host.diagnose()
+            self.assertEqual('ACTIVATION_GET_STATEFULSET_OUTPUT_BOUND', result['preflight']['reason'])
+            self.assertEqual({'attempt.json': {'present': True}, 'encrypted.json': {'present': False}},
+                             result['journal'])
+            self.assertTrue(result['openbao']['initialized'])
+            self.assertFalse(result['mutation'])
+            initialize.assert_not_called()
+            unseal.assert_not_called()
+
+    def test_diagnosis_does_not_create_state_and_rejects_unsafe_journal(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(host.os, 'geteuid', return_value=0), \
+                patch.object(host.os, 'uname', return_value=Mock(nodename='mail.hooshix.com')), \
+                patch.object(host, 'preflight', return_value=({}, 'fixture-pvc')), \
+                patch.object(host, 'bao', side_effect=host.custody.BootstrapFailed('ACTIVATION_BAO_STATUS_TIMEOUT')):
+            path = Path(temporary) / 'absent'
+            with patch.object(host, 'STATE', path):
+                result = host.diagnose()
+            self.assertFalse(path.exists())
+            self.assertEqual('ACTIVATION_BAO_STATUS_TIMEOUT', result['openbao']['reason'])
+            path.symlink_to(temporary, target_is_directory=True)
+            with patch.object(host, 'STATE', path), self.assertRaises(host.custody.BootstrapFailed):
+                host.diagnose()
+
+    def test_diagnostic_rpc_dispatch_precedes_all_state_mutation(self):
+        stdin = Mock(buffer=io.BytesIO(b'{"action":"diagnose"}\n'))
+        result = {'mutation': False, 'preflight': {'status': 'Failed', 'reason': 'FIXED_TEST_FAILURE'}}
+        with patch.object(host.sys, 'stdin', stdin), patch.object(host.sys, 'stdout', io.StringIO()), \
+                patch.object(host.signal, 'signal'), patch.object(host.signal, 'alarm'), \
+                patch.object(host, 'diagnose', return_value=result), patch.object(host, 'preflight') as preflight, \
+                patch.object(host.custody, 'directory') as directory, patch.object(host, 'native') as native:
+            self.assertEqual(0, host.main('a' * 40))
+            preflight.assert_not_called()
+            directory.assert_not_called()
+            native.assert_not_called()
+        for request in ({'action': 'diagnose', 'recipients': []}, ['diagnose'], {'action': 'bogus'}):
+            stdin = Mock(buffer=io.BytesIO(json.dumps(request).encode() + b'\n'))
+            with patch.object(host.sys, 'stdin', stdin), patch.object(host.sys, 'stdout', io.StringIO()), \
+                    patch.object(host.signal, 'signal'), patch.object(host.signal, 'alarm'), \
+                    patch.object(host, 'preflight') as preflight, patch.object(host.custody, 'directory') as directory:
+                self.assertEqual(1, host.main('a' * 40))
+                preflight.assert_not_called()
+                directory.assert_not_called()
+
+    def test_diagnostic_operator_requires_no_gpg_custody_or_rescue_prompt(self):
+        with patch.object(sys, 'argv',
+                          ['activate_openbao_operator.py', '--diagnose-only']), \
+                patch.object(operator.os, 'getuid', return_value=1000), \
+                patch.object(operator.os, 'uname', return_value=Mock(release='microsoft')), \
+                patch.object(operator, 'sys_tty', return_value=True), \
+                patch.object(operator, 'command', side_effect=[b'', b'a' * 40, b'']), \
+                patch.object(operator, 'diagnose', return_value=0) as diagnose, \
+                patch.object(operator, 'prepare') as prepare, patch.object(operator, 'gpg') as gpg, \
+                patch.object(operator.getpass, 'getpass') as prompt:
+            self.assertEqual(0, operator.main())
+            diagnose.assert_called_once_with('a' * 40)
+            prepare.assert_not_called()
+            gpg.assert_not_called()
+            prompt.assert_not_called()
+
+    def test_resume_prompt_requires_existing_not_new_custody_password(self):
+        value = 'Disposable test custody passphrase'
+        for resuming, label in ((True, 'EXISTING'), (False, 'NEW')):
+            with patch.object(operator.getpass, 'getpass', return_value=value) as prompt:
+                self.assertEqual(value, operator.custody_passphrase(resuming))
+                self.assertIn(label, prompt.call_args_list[0].args[0])
+
+    def test_installed_storage_failure_is_sanitized_and_blocks_activation(self):
+        class StorageFailed(Exception):
+            pass
+        installed = {'StorageFailed': StorageFailed,
+                     'guard_check': Mock(side_effect=StorageFailed('fixture-private-native-output'))}
+        with patch.object(host.storage, 'load_storage', return_value=installed), \
+                self.assertRaises(host.custody.BootstrapFailed) as failure:
+            host.storage_preflight()
+        self.assertEqual('ACTIVATION_STORAGE_GUARD_FAILED', str(failure.exception))
+        with patch.object(host.storage, 'load_storage', side_effect=ValueError('fixture-private-path')), \
+                self.assertRaises(host.custody.BootstrapFailed) as failure:
+            host.storage_preflight()
+        self.assertEqual('ACTIVATION_STORAGE_SOURCE_REVIEW_REQUIRED', str(failure.exception))
+
     def recipients(self):
         return [packet(6, bytes([i])) for i in (1, 2, 3)]
 

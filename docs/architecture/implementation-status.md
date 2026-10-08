@@ -17,6 +17,14 @@ initialization/unseal, hourly off-host snapshots/restore, ESO, audited JIT,
 standing-access removal, GitOps and complete-stack readiness remain `Not verified`.
 Usage: `../operations/production-openbao-activation-fa.md`. Stage 10 stays `IN PROGRESS`.
 
+The subsequent owner-run activation returned
+`ACTIVATION_NATIVE_FAILED_STATE_PRESERVED`; actual initialization/seal state after
+that failure is not established. Existing host intent/ciphertext and local custody
+must be preserved. The activation operator now has a supervised read-only
+`--diagnose-only` mode and fixed native-operation failure codes, without reading
+custody contents or retrying init. Resume explicitly requests the existing custody
+passphrase. This source repair and its CI are not target activation evidence.
+
 Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
 istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
 The baseline includes a blocking credential-free scan of all three exact upstream
