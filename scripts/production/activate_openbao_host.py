@@ -65,22 +65,35 @@ def init_request(keys):
             'pgp_keys': keys, 'root_token_pgp_key': keys[0]}
 
 
-def native(argv, *, data=None, expected=0, timeout=25):
-    result = subprocess.run(argv, input=data, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, env=custody.ENV,
-                            timeout=timeout, check=False)
-    require(result.returncode == expected and len(result.stdout) <= BOUND,
-            'ACTIVATION_NATIVE_FAILED_STATE_PRESERVED')
+def native(argv, *, data=None, expected=0, timeout=25, operation='NATIVE'):
+    # Only code-owned operation identifiers and failure classes leave this edge.
+    # Never echo argv, stdin, stdout, stderr or exception text (including init output).
+    require(re.fullmatch(r'[A-Z0-9_]{1,55}', operation), 'OPERATION_LABEL_REJECTED')
+    try:
+        result = subprocess.run(argv, input=data, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, env=custody.ENV,
+                                timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        raise custody.BootstrapFailed('ACTIVATION_' + operation + '_TIMEOUT') from None
+    except OSError:
+        raise custody.BootstrapFailed('ACTIVATION_' + operation + '_EXEC_FAILED') from None
+    codes = expected if isinstance(expected, tuple) else (expected,)
+    require(result.returncode in codes, 'ACTIVATION_' + operation + '_EXIT_FAILED')
+    require(len(result.stdout) <= BOUND, 'ACTIVATION_' + operation + '_OUTPUT_BOUND')
     return result.stdout
 
 
-def kube(*args, data=None, expected=0):
+def kube(*args, data=None, expected=0, operation='KUBECTL'):
     return native([custody.K3S, 'kubectl', '--request-timeout=15s', *args],
-                  data=data, expected=expected)
+                  data=data, expected=expected, operation=operation)
 
 
 def get(kind, name):
-    return json.loads(kube('-n', 'hooshix-secrets', 'get', kind, name, '-o', 'json'))
+    operations = {'pod': 'GET_POD', 'statefulset': 'GET_STATEFULSET',
+                  'pvc': 'GET_PVC', 'configmap': 'GET_CONFIGMAP'}
+    require(kind in operations, 'GET_KIND_REJECTED')
+    return json.loads(kube('-n', 'hooshix-secrets', 'get', kind, name, '-o', 'json',
+                           operation=operations[kind]))
 
 
 def bao(operation, path=None, body=None):
@@ -92,13 +105,10 @@ def bao(operation, path=None, body=None):
         require(operation == 'write' and path in ('sys/init', 'sys/unseal'), 'API_PATH_REJECTED')
         args += [path, '-']
     if operation == 'status':
-        result = subprocess.run([custody.K3S, 'kubectl', '--request-timeout=15s', *args],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                timeout=25, check=False, env=custody.ENV)
-        require(result.returncode in (0, 2) and len(result.stdout) <= BOUND, 'TLS_STATUS_FAILED')
-        value = json.loads(result.stdout)
+        value = json.loads(kube(*args, expected=(0, 2), operation='BAO_STATUS'))
     else:
-        value = json.loads(kube(*args, data=json.dumps(body).encode()))['data']
+        value = json.loads(kube(*args, data=json.dumps(body).encode(),
+                               operation='BAO_INIT' if path == 'sys/init' else 'BAO_UNSEAL'))['data']
     require(isinstance(value, dict), 'API_RESPONSE_REJECTED')
     return value
 
@@ -106,22 +116,35 @@ def bao(operation, path=None, body=None):
 def service_identity():
     result = {}
     for unit in PRESERVED:
-        require(native(['/usr/bin/systemctl', 'is-active', unit]).strip() == b'active',
+        label = unit.split('.')[0].replace('@', '_').replace('-', '_').upper()
+        require(native(['/usr/bin/systemctl', 'is-active', unit],
+                       operation='SERVICE_ACTIVE_' + label).strip() == b'active',
                 'PRESERVED_SERVICE_UNAVAILABLE')
-        result[unit] = native(['/usr/bin/systemctl', 'show', unit, '-p', 'MainPID', '--value']).strip()
+        result[unit] = native(['/usr/bin/systemctl', 'show', unit, '-p', 'MainPID', '--value'],
+                              operation='SERVICE_PID_' + label).strip()
     return result
+
+
+def storage_preflight():
+    try:
+        installed = storage.load_storage()
+    except (OSError, ValueError):
+        raise custody.BootstrapFailed('ACTIVATION_STORAGE_SOURCE_REVIEW_REQUIRED') from None
+    try:
+        installed['guard_check']()
+        require(storage.show(installed, installed['GUARD_NAME']) == 'active', 'STORAGE_GUARD_REQUIRED')
+    except installed['StorageFailed']:
+        raise custody.BootstrapFailed('ACTIVATION_STORAGE_GUARD_FAILED') from None
 
 
 def preflight():
     require(os.geteuid() == 0 and os.uname().nodename == 'mail.hooshix.com', 'EXACT_VPS_SUDO_REQUIRED')
     before = service_identity()
-    audit = native(['/usr/sbin/auditctl', '-s']).decode()
+    audit = native(['/usr/sbin/auditctl', '-s'], operation='AUDIT_STATUS').decode()
     require(re.search(r'^enabled [12]$', audit, re.M) and re.search(r'^lost 0$', audit, re.M),
             'PROTECTED_AUDIT_UNHEALTHY')
     ca_import.audit_policy_preflight()
-    installed = storage.load_storage()
-    installed['guard_check']()
-    require(storage.show(installed, installed['GUARD_NAME']) == 'active', 'STORAGE_GUARD_REQUIRED')
+    storage_preflight()
     pod, workload, claim = get('pod', 'openbao-0'), get('statefulset', 'openbao'), get('pvc', 'data-openbao-0')
     require(pod['status']['phase'] == 'Running' and pod['spec']['serviceAccountName'] == 'openbao'
             and len(pod['spec']['containers']) == 1 and pod['spec']['containers'][0]['image'] == IMAGE
@@ -146,6 +169,50 @@ def preflight():
     require(status['version'] == '2.6.4' and status['type'] == 'shamir'
             and status['storage_type'] == 'raft', 'EXACT_RUNTIME_REQUIRED')
     return before, claim['metadata']['uid']
+
+
+def diagnose():
+    """Read-only preflight/status and journal metadata; no private file contents."""
+    require(os.geteuid() == 0 and os.uname().nodename == 'mail.hooshix.com', 'EXACT_VPS_SUDO_REQUIRED')
+    result = {'scope': 'read-only activation preflight, seal status and protected journal presence',
+              'mutation': False, 'production_readiness': 'Not verified'}
+    try:
+        preflight()
+        result['preflight'] = {'status': 'Passed'}
+    except custody.BootstrapFailed as error:
+        result['preflight'] = {'status': 'Failed', 'reason': str(error)}
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        result['preflight'] = {'status': 'Failed', 'reason': 'ACTIVATION_PREFLIGHT_REVIEW_REQUIRED'}
+    # Status can still establish init/seal state if an earlier preflight step failed.
+    try:
+        status = bao('status')
+        require(isinstance(status.get('initialized'), bool) and isinstance(status.get('sealed'), bool),
+                'SEAL_STATUS_REJECTED')
+        require(status.get('version') == '2.6.4' and status.get('storage_type') == 'raft'
+                and status.get('type') == 'shamir'
+                and all(type(status.get(key)) is int and 0 <= status[key] <= 3 for key in ('n', 't')),
+                'SEAL_STATUS_REJECTED')
+        result['openbao'] = {key: status[key] for key in
+                             ('initialized', 'sealed', 'n', 't', 'version', 'storage_type', 'type')
+                             if key in status}
+    except custody.BootstrapFailed as error:
+        result['openbao'] = {'status': 'Not verified', 'reason': str(error)}
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        result['openbao'] = {'status': 'Not verified', 'reason': 'SEAL_STATUS_REVIEW_REQUIRED'}
+    result['journal'] = {}
+    if STATE.exists() or STATE.is_symlink():
+        for parent in (*reversed(STATE.parents), STATE):
+            custody.protected(parent, directory=True)
+        custody.protected(STATE, directory=True, exact_mode=0o700)
+        for name in ('attempt.json', 'encrypted.json'):
+            path = STATE / name
+            present = path.exists() or path.is_symlink()
+            if present:
+                custody.protected(path, exact_mode=0o600)
+            result['journal'][name] = {'present': present}
+    else:
+        result['journal'] = {name: {'present': False} for name in ('attempt.json', 'encrypted.json')}
+    return result
 
 
 def initialize(keys, claim_uid, revision, api=bao):
@@ -204,20 +271,29 @@ def main(revision):
         line = sys.stdin.buffer.readline(BOUND + 1)
         require(0 < len(line) <= BOUND and line.endswith(b'\n'), 'BOUNDED_REQUEST_REQUIRED')
         request = json.loads(line)
+        require(isinstance(request, dict), 'REQUEST_REJECTED')
+        action = request.get('action')
+        fields = {'diagnose': {'action'}, 'initialize': {'action', 'recipients'},
+                  'unseal': {'action', 'keys', 'encrypted_sha256'}}
+        require(isinstance(action, str) and action in fields, 'ACTION_REJECTED')
+        require(set(request) == fields[action], 'REQUEST_REJECTED')
+        if action == 'diagnose':
+            result = diagnose()
+            result.update(schema_version=1, source_revision=revision,
+                          observed_at=datetime.now(timezone.utc).isoformat())
+            print(json.dumps(result), flush=True)
+            return 0
         before, claim_uid = preflight()
         custody.directory(STATE)
         lock_path = STATE / 'activation.lock'
         with os.fdopen(os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'r+b') as lock:
             custody.protected(lock_path, exact_mode=0o600)
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            action = request.get('action')
-            require(action in ('initialize', 'unseal'), 'ACTION_REJECTED')
-            native(['/usr/sbin/auditctl', '-m', 'HooshiX OpenBao activation ' + revision + ' phase=' + action])
+            native(['/usr/sbin/auditctl', '-m', 'HooshiX OpenBao activation ' + revision + ' phase=' + action],
+                   operation='AUDIT_ACTIVATION_EVENT')
             if action == 'initialize':
-                require(set(request) == {'action', 'recipients'}, 'REQUEST_REJECTED')
                 result = {'encrypted': initialize(request['recipients'], claim_uid, revision)}
             else:
-                require(set(request) == {'action', 'keys', 'encrypted_sha256'}, 'REQUEST_REJECTED')
                 for name in ('attempt.json', 'encrypted.json'):
                     custody.protected(STATE / name, exact_mode=0o600)
                 attempt = json.loads((STATE / 'attempt.json').read_bytes())
@@ -225,7 +301,7 @@ def main(revision):
                         and hashlib.sha256((STATE / 'encrypted.json').read_bytes()).hexdigest()
                         == request['encrypted_sha256'], 'CUSTODY_DOWNLOAD_PROOF_REQUIRED')
                 result = unseal(request['keys'])
-            storage.load_storage()['guard_check']()
+            storage_preflight()
             require(before == service_identity(), 'PRESERVED_SERVICE_STATE_CHANGED')
         result.update(schema_version=1, source_revision=revision,
                       observed_at=datetime.now(timezone.utc).isoformat())

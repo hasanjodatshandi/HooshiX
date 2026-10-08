@@ -63,10 +63,48 @@ Windows و alias موجود `hooshix-server` استفاده می‌کند؛ cano
 
 ## قطع اجرا، ادامه و unseal پس از restart
 
+### بررسی خطا بدون تکرار initialization
+
+اگر خروجی عمومی `ACTIVATION_NATIVE_FAILED_STATE_PRESERVED` بود، ابتدا این
+دستور را از checkout تمیز و merge‌شده در PowerShell اجرا کنید:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning python3 scripts/production/activate_openbao_operator.py --diagnose-only
+```
+
+فقط رمز sudo محلی خواسته می‌شود؛ رمز custody، GHCR یا CA لازم نیست. ابزار
+public sourceهای hash‌شده را در cache کاربر هدف stage می‌کند؛ اجرای root فقط
+preflight، وضعیت seal و وجود دو فایل journal را می‌خواند. کلیدها یا محتوای
+فایل‌های custody خوانده نمی‌شوند؛ init، unseal، audit event جدید، تغییر
+سرویس/فایروال/lock/داده انجام نمی‌شود. receipt عمومی در
+`/home/coder/.local/share/hooshix-openbao-diagnostics` ذخیره می‌شود. خروجی
+`OPENBAO_DIAGNOSTIC=Passed` فقط موفقیت بررسی است، نه فعال‌سازی.
+
+| خروجی | اقدام بعدی |
+| --- | --- |
+| `preflight.status=Failed` | علت ثابت `reason` را رفع کنید؛ activation را کورکورانه تکرار نکنید |
+| `initialized=false`، بدون intent/ciphertext و preflight موفق | با همان custody محلی `--resume` کنید؛ recipient تازه نسازید |
+| `initialized=true` و هر دو فایل journal موجود | فقط با همان custody و رمز قبلی resume کنید؛ init دوباره اجرا نمی‌شود |
+| intent موجود ولی ciphertext نیست، یا وضعیت init نامعلوم | بررسی recovery لازم است؛ marker/PV/Raft را حذف نکنید |
+| `initialized=true` ولی journal/ciphertext متعلق به ابزار موجود نیست | datastore موجود حفظ شود؛ bootstrap تازه ممنوع است |
+
+وجود فایل‌ها به‌تنهایی صحت ciphertext/هویت را ثابت نمی‌کند؛ resume بررسی
+recipients، PVC و ciphertext را همچنان انجام می‌دهد. خطاهای native جدید
+نام operation و نوع شکست را به‌صورت کد ثابت مشخص می‌کنند، مثلاً
+`ACTIVATION_GET_STATEFULSET_OUTPUT_BOUND`، `ACTIVATION_BAO_STATUS_EXIT_FAILED`
+یا `ACTIVATION_BAO_INIT_TIMEOUT`. stdout/stderr، argv و secret چاپ نمی‌شوند.
+
+### ادامه با custody موجود
+
 ابزار کلید تازه یا Root تازه نمی‌سازد. ciphertext و intent روی VPS هم در مسیر
 root-only `/var/lib/hooshix-pki/openbao-activation` می‌مانند؛ این backup بیرون
 میزبان نیست. پوشهٔ custody محلی را تا recovery/cutover پاک نکنید. پس از قطع
 دانلود یا قبل از unseal با همان `ID` ادامه دهید:
+
+در اجرای `--resume` رمز **قبلی همان custody** لازم است، نه رمز تازه؛ انتخاب
+رمز تازه exportهای موجود را باز نمی‌کند. پیام عمومی شکست native به‌تنهایی
+نشان نمی‌دهد initialization انجام شده یا نه. تا بررسی وضعیت هدف، installer
+را تکرار نکنید و هیچ فایل intent، ciphertext یا private export را حذف نکنید.
 
 ```powershell
 wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning python3 scripts/production/activate_openbao_operator.py --rescue-and-second-session-ready --resume /home/coder/.local/share/hooshix-openbao-custody/ID

@@ -207,11 +207,65 @@ def prepare(directory, password):
     return keys
 
 
+def stage_sources():
+    remote = '/home/hooshixadmin/.cache/hooshix-bao-activation-' + uuid.uuid4().hex
+    command([SSH, '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'hooshix-server',
+             'umask 077; mkdir -p .cache; mkdir ' + remote])
+    sources = []
+    for name in SOURCES:
+        path = ROOT / 'scripts/production' / name
+        content = path.read_bytes()
+        host.require(0 < len(content) <= host.BOUND, 'PUBLIC_SOURCE_BOUND_EXCEEDED')
+        sources.append((name, hashlib.sha256(content).hexdigest()))
+        windows = command(['/usr/bin/wslpath', '-w', str(path)]).decode().strip()
+        command([SCP, '-q', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', windows,
+                 'hooshix-server:' + remote + '/' + name])
+    return remote, sources
+
+
+def sudo_password():
+    value = getpass.getpass('VPS sudo password (hidden, local only): ')
+    host.require(0 < len(value) <= 1024 and not any(c in value for c in '\r\n\x00'),
+                 'LOCAL_SUDO_INPUT_REJECTED')
+    return value
+
+
+def custody_passphrase(resuming):
+    label = 'EXISTING' if resuming else 'NEW'
+    value = getpass.getpass('OpenBao custody ' + label + ' passphrase, 20-128 characters (not Root/CA/sudo): ')
+    host.require(20 <= len(value) <= 128 and not any(c in value for c in '\r\n\x00'),
+                 'CUSTODY_PASSPHRASE_REJECTED')
+    host.require(value == getpass.getpass('Repeat custody passphrase: '), 'PASSPHRASE_MISMATCH')
+    return value
+
+
+def diagnose(revision):
+    # Public sources are staged in the existing unprivileged cache. The root
+    # supervisor only reads; no custody passphrase/key/recipient is requested.
+    remote, sources = stage_sources()
+    password = sudo_password()
+    result = rpc(remote, revision, sources, password, {'action': 'diagnose'})
+    del password
+    destination = BASE.parent / 'hooshix-openbao-diagnostics'
+    destination.mkdir(mode=0o700, parents=True, exist_ok=True)
+    custody_directory(destination)
+    path = destination / ('diagnostic-' + uuid.uuid4().hex + '.json')
+    create(path, json.dumps(result).encode())
+    print(json.dumps(result), flush=True)
+    print('OPENBAO_DIAGNOSTIC=Passed; read-only inspection completed, not activation')
+    print('PUBLIC_RECEIPT=' + str(path))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--resume', type=Path)
-    parser.add_argument('--rescue-and-second-session-ready', action='store_true', required=True)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--resume', type=Path)
+    mode.add_argument('--diagnose-only', action='store_true')
+    parser.add_argument('--rescue-and-second-session-ready', action='store_true')
     args = parser.parse_args()
+    if not args.diagnose_only and not args.rescue_and_second_session_ready:
+        parser.error('activation requires --rescue-and-second-session-ready')
     os.umask(0o077)
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     warnings.simplefilter('error', getpass.GetPassWarning)
@@ -223,14 +277,13 @@ def main():
                      'CLEAN_REVIEWED_CHECKOUT_REQUIRED')
         revision = command(['/usr/bin/git', '-C', str(ROOT), 'rev-parse', 'HEAD']).decode().strip()
         command(['/usr/bin/git', '-C', str(ROOT), 'merge-base', '--is-ancestor', revision, 'origin/main'])
+        if args.diagnose_only:
+            return diagnose(revision)
         version = command(['/usr/bin/gpg', '--version']).splitlines()[0]
         host.require(version in (b'gpg (GnuPG) 2.4.4', b'gpg (GnuPG) 2.4.8'), 'LOCAL_GPG_VERSION_REVIEW_REQUIRED')
         host.require(input('Working rescue VNC and second private SSH session: type READY: ') == 'READY',
                      'RESCUE_CONFIRMATION_REQUIRED')
-        password = getpass.getpass('OpenBao custody NEW passphrase, 20-128 characters (not Root/CA/sudo): ')
-        host.require(20 <= len(password) <= 128 and not any(c in password for c in '\r\n\x00'),
-                     'CUSTODY_PASSPHRASE_REJECTED')
-        host.require(password == getpass.getpass('Repeat custody passphrase: '), 'PASSPHRASE_MISMATCH')
+        password = custody_passphrase(bool(args.resume))
         BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
         directory = args.resume or BASE / uuid.uuid4().hex
         host.require(directory.parent == BASE and re.fullmatch(r'[a-f0-9]{32}', directory.name),
@@ -248,24 +301,11 @@ def main():
                          'LOCAL_CUSTODY_LOCK_REJECTED')
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             recipients = prepare(directory, password)
-            remote = '/home/hooshixadmin/.cache/hooshix-bao-activation-' + uuid.uuid4().hex
-            command([SSH, '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'hooshix-server',
-                     'umask 077; mkdir -p .cache; mkdir ' + remote])
-            sources = []
-            for name in SOURCES:
-                path = ROOT / 'scripts/production' / name
-                content = path.read_bytes()
-                host.require(0 < len(content) <= host.BOUND, 'PUBLIC_SOURCE_BOUND_EXCEEDED')
-                sources.append((name, hashlib.sha256(content).hexdigest()))
-                windows = command(['/usr/bin/wslpath', '-w', str(path)]).decode().strip()
-                command([SCP, '-q', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', windows,
-                         'hooshix-server:' + remote + '/' + name])
-            sudo_password = getpass.getpass('VPS sudo password (hidden, local only): ')
-            host.require(0 < len(sudo_password) <= 1024 and not any(c in sudo_password for c in '\r\n\x00'),
-                         'LOCAL_SUDO_INPUT_REJECTED')
-            received = rpc(remote, revision, sources, sudo_password,
+            remote, sources = stage_sources()
+            password_sudo = sudo_password()
+            received = rpc(remote, revision, sources, password_sudo,
                            {'action': 'initialize', 'recipients': recipients})
-            del sudo_password
+            del password_sudo
             encrypted = host.encrypted_result(received['encrypted'])
             saved = directory / 'encrypted.json'
             encoded = json.dumps(encrypted).encode()
@@ -284,12 +324,11 @@ def main():
             print('Keep shares/private keys in separately protected custody; do NOT copy GPG keyrings or upload to VPS/Git.', flush=True)
             host.require(input('After verified copies in the two approved custody locations, type COPIED: ') == 'COPIED',
                          'OFF_HOST_CUSTODY_CONFIRMATION_REQUIRED')
-            sudo_password = getpass.getpass('VPS sudo password again for unseal (hidden, local only): ')
-            host.require(0 < len(sudo_password) <= 1024 and not any(c in sudo_password for c in '\r\n\x00'),
-                         'LOCAL_SUDO_INPUT_REJECTED')
-            receipt = rpc(remote, revision, sources, sudo_password, {'action': 'unseal', 'keys': keys[:2],
+            print('Unseal is a separate supervised operation; authenticate locally again.', flush=True)
+            password_sudo = sudo_password()
+            receipt = rpc(remote, revision, sources, password_sudo, {'action': 'unseal', 'keys': keys[:2],
                           'encrypted_sha256': hashlib.sha256(encoded).hexdigest()})
-            del keys, sudo_password, password
+            del keys, password_sudo, password
             receipt.update(encrypted_custody_recovery='Passed',
                            custody_distribution='Owner-attested; not independently verified')
             create(directory / ('activation-receipt-' + uuid.uuid4().hex + '.json'), json.dumps(receipt).encode())
