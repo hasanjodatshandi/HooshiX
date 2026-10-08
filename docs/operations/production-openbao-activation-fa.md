@@ -4,7 +4,12 @@
 
 نصب واقعی روی VPS در ۲۰۲۶-۱۰-۰۸ با receipt عمومی
 `hooshix-platform-d6c52f209c034d019f67ee38b727724a.json` موفق شد:
-OpenBao 2.6.4 نصب شده، sealed و هنوز initialize نشده است. Root، SSH، ایمیل و
+OpenBao 2.6.4 نصب شده است. بررسی مالک در ۲۰۲۶-۱۰-۰۸ نشان داد initialization
+انجام شده ولی خروجی رمزدار آن ثبت نشده و سرویس sealed مانده است؛ سهم‌های
+این initialization در دسترس مالک نیستند. بازیابی فعلی، با تأیید صریح مالک،
+باید ابتدا کل datastore و intent قبلی را خصوصی و قابل‌بازگردانی بایگانی کند
+و فقط سپس مخزن همین نصب تازه را جایگزین کند؛ اجرای خودکار init دوباره ممنوع است.
+Root، SSH، ایمیل و
 storage دوباره ساخته یا نصب نمی‌شوند. Stage 10 و Production readiness هنوز
 `Not verified` هستند.
 
@@ -12,7 +17,8 @@ storage دوباره ساخته یا نصب نمی‌شوند. Stage 10 و Produ
 قبل از خروج از OpenBao، تحویل و آزمایش custody بیرون VPS، و unseal است.
 این فقط bootstrap محدود ADR-0030 است، نه جایگزین GitOps/JIT؛ client ingress،
 port عمومی، Kubernetes Auth و policy برنامه تغییر نمی‌کنند. API audit باید
-Metadata باشد؛ عملیات CLI با CA mount‌شده TLS را بررسی می‌کند و هیچ secret در
+Metadata باشد؛ عملیات نوشتن با CA موجود و TLS معتبر از یک forwarding موقت
+فقط روی loopback خود میزبان انجام می‌شود و هیچ secret در
 argv/environment/فایل plaintext/خروجی قرار نمی‌گیرد.
 
 ## اجرای مالک
@@ -36,7 +42,9 @@ Windows و alias موجود `hooshix-server` استفاده می‌کند؛ cano
    تازه و رد رمز اشتباه آزمایش می‌شود. GnuPG موجود 2.4.8 روی WSL فعلی و 2.4.4
    در runner پشتیبانی می‌شوند؛ چیزی نصب یا به keyring شخصی import نمی‌شود.
 4. رمز sudo را فقط در prompt مخفی محلی وارد کنید. supervisor hash منبع را پیش
-   از اجرای root بررسی می‌کند؛ هر عملیات هدف deadline سه‌دقیقه‌ای دارد.
+   از اجرای root بررسی می‌کند؛ init/unseal deadline سه‌دقیقه‌ای و recovery
+   deadline پنج‌دقیقه‌ای دارد. timeout نوشتن init برابر ۶۰ ثانیه، unseal
+   برابر ۲۰ ثانیه و status/probeهای بدون تغییر سه ثانیه است؛ retry نداریم.
 5. خود OpenBao سهم‌ها و root token اولیه را با public keyها رمز می‌کند؛ فقط
    ciphertext به دستگاه شما برمی‌گردد. private key و رمز custody به VPS نمی‌روند.
 6. مسیر `CUSTODY_DIRECTORY` بیرون پروژه چاپ می‌شود. پس از readback دیسک، هر سه
@@ -117,14 +125,54 @@ marker یا داده را برای retry حذف نکنید و از فولدر ت
 sealed می‌شود؛ resume فقط progress ناتمام حافظه‌ای را reset و دو سهم را وارد
 می‌کند، نه datastore/key را. reboot واقعی در این تغییر انجام نمی‌شود.
 
+### فقط بازیابی initialization اول با خروجی گمشده و تأیید صریح مالک
+
+این روش نصب معمول یا reset یک مخزن Production نیست. فقط وقتی ابزار خودش
+intent را با همان recipients/PVC ثبت کرده، سرویس initialized و sealed با
+۳/۲ است، خروجی رمزدار در هر دو سمت وجود ندارد، سهم‌ها در دسترس نیستند، و
+مالک جایگزینی **فقط همین نصب تازه** را صریحاً تأیید کرده است:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning python3 scripts/production/activate_openbao_operator.py --rescue-and-second-session-ready --resume /home/coder/.local/share/hooshix-openbao-custody/ID --recover-lost-initialization
+```
+
+`ID` همان custody قبلی است؛ برای VPS فعلی
+`7509bb067d814468982cc84fa50cb4d4`. رمز **قبلی custody**، `READY` و تأیید
+`ARCHIVE` در پنجرهٔ محلی خواسته می‌شود. ابزار فقط StatefulSet خود OpenBao را
+به صفر می‌رساند و منتظر حذف pod می‌ماند. تمام داده‌های متوقف‌شده با hash و
+metadata به پوشهٔ root-only همان filesystem منتقل می‌شوند؛ داده و intent
+قبلی حذف نمی‌شوند. انتقال inodeها را حفظ می‌کند و فضای یک نسخهٔ کامل دوم
+نمی‌خواهد. دایرکتوری اصلی data، mount، PVC، CA و image ثابت می‌مانند. مخزن
+ناشناخته، خروجی رمزدار موجود، هویت ناسازگار، لینک/فایل ویژه، بیش از ۱۲۸ مدخل،
+عمق بیش از ۸ یا دادهٔ بیش از ۵۱۲MiB اجازهٔ جایگزینی نمی‌گیرد.
+
+خروجی `OPENBAO_LOST_INITIALIZATION_RECOVERY=Passed` و receipt عمومی، دو مسیر
+`data_archive` و `journal_archive` را مشخص می‌کنند. این بایگانی محلی جای backup
+خارج میزبان یا کلیدهای گمشده را نمی‌گیرد؛ محتوایش را در چت/Git نگذارید و پاک
+نکنید. پس از restart باید initialized=false و sealed=true باشد؛ عملیات
+recovery خودش init نمی‌کند. سپس رمز sudo دوباره فقط محلی خواسته می‌شود و
+activation با **همان recipients قبلی** ادامه می‌یابد. هیچ Root یا export
+خصوصی تازه ساخته نمی‌شود.
+
+در شکست/قطع recovery، `recovery-pending.json` مانع init است؛ آن را حذف یا
+دستور recovery را کورکورانه تکرار نکنید. ابزار در failure فقط replica count
+را برمی‌گرداند، نه اینکه دادهٔ جدید/ناتمام را overwrite کند. مسیر بازگردانی:
+از VNC، پس از بررسی receipt/intent و توقف همین pod، دادهٔ replacement را
+جداگانه خصوصی نگه دارید، manifest بایگانی قبلی را تطبیق دهید، تمام مدخل‌های
+آن را به همان data خالی برگردانید و intent اصلی را بازگردانید؛ سپس replica=1.
+این فقط bytes قبلی را بازیابی می‌کند؛ بدون سهم‌های قدیمی unseal ممکن نیست.
+هیچ حذف، پاک‌سازی خودکار، format، حذف PVC یا restart میزبان/K3s انجام نمی‌شود.
+
 ## شواهد و ادامهٔ Stage 10
 
 job موجود **Repository baseline / OpenBao TLS and Raft recovery** با OpenBao
 2.6.4 پین‌شده، init PGP واقعی، export رمزدار، رمز اشتباه، decrypt از keyring
-تازه، JSON stdin CLI، quorum یک/دو، منع reinit، restart، snapshot restore، ACL،
+تازه، adapter واقعی HTTPS init/unseal، quorum یک/دو، منع reinit، restart، snapshot restore، ACL،
 audit redaction و revoke root **مصنوعی** را اجرا می‌کند. به VPS/secret واقعی
 دسترسی ندارد. unitها intent/partial failure، حفظ فایل، recipient/PVC mismatch
 و منع plaintext را پوشش می‌دهند. CI یا سند، شاهد اجرای هدف نیست.
+همان job، توقف store، بایگانی با حفظ bytes/metadata، initialization مخزن
+جایگزین و بازگردانی بایگانی اصلی و خواندن دادهٔ اصلی را نیز آزمایش می‌کند.
 
 snapshot ساعتی رمزدار خارج PVC/میزبان و restore هدف، bounded audit export/rotation،
 scoped auth/ESO، لغو root token اولیه پس از ایجاد و آزمایش مسیر مدیریتی جایگزین،

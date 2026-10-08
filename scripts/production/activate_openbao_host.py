@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 import bootstrap_intermediate_csr as custody
 import import_intermediate_ca as ca_import
 import verify_storage_guard as storage
+import openbao_activation_transport as transport
+import recover_openbao_initialization as recovery
 
 STATE = custody.BASE / 'openbao-activation'
 IMAGE = ('ghcr.io/hasanjodatshandi/hooshix/platform-openbao-private@sha256:'
@@ -216,6 +218,8 @@ def diagnose():
 
 
 def initialize(keys, claim_uid, revision, api=bao):
+    require(not (STATE / 'recovery-pending.json').exists()
+            and not (STATE / 'recovery-pending.json').is_symlink(), 'RECOVERY_INCOMPLETE_NO_INIT')
     digest = public_keys(keys)
     marker, saved = STATE / 'attempt.json', STATE / 'encrypted.json'
     identity = {'recipient_sha256': digest, 'pvc_uid': claim_uid, 'image': IMAGE}
@@ -273,7 +277,7 @@ def main(revision):
         request = json.loads(line)
         require(isinstance(request, dict), 'REQUEST_REJECTED')
         action = request.get('action')
-        fields = {'diagnose': {'action'}, 'initialize': {'action', 'recipients'},
+        fields = {'diagnose': {'action'}, 'recover': {'action', 'recipients'}, 'initialize': {'action', 'recipients'},
                   'unseal': {'action', 'keys', 'encrypted_sha256'}}
         require(isinstance(action, str) and action in fields, 'ACTION_REJECTED')
         require(set(request) == fields[action], 'REQUEST_REJECTED')
@@ -283,6 +287,8 @@ def main(revision):
                           observed_at=datetime.now(timezone.utc).isoformat())
             print(json.dumps(result), flush=True)
             return 0
+        if action == 'recover':
+            signal.alarm(300)
         before, claim_uid = preflight()
         custody.directory(STATE)
         lock_path = STATE / 'activation.lock'
@@ -291,16 +297,10 @@ def main(revision):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             native(['/usr/sbin/auditctl', '-m', 'HooshiX OpenBao activation ' + revision + ' phase=' + action],
                    operation='AUDIT_ACTIVATION_EVENT')
-            if action == 'initialize':
-                result = {'encrypted': initialize(request['recipients'], claim_uid, revision)}
+            if action == 'recover':
+                result = recovery.recover(sys.modules[__name__], request['recipients'], claim_uid, revision)
             else:
-                for name in ('attempt.json', 'encrypted.json'):
-                    custody.protected(STATE / name, exact_mode=0o600)
-                attempt = json.loads((STATE / 'attempt.json').read_bytes())
-                require(attempt['pvc_uid'] == claim_uid and attempt['image'] == IMAGE
-                        and hashlib.sha256((STATE / 'encrypted.json').read_bytes()).hexdigest()
-                        == request['encrypted_sha256'], 'CUSTODY_DOWNLOAD_PROOF_REQUIRED')
-                result = unseal(request['keys'])
+                result = activate(request, claim_uid, revision)
             storage_preflight()
             require(before == service_identity(), 'PRESERVED_SERVICE_STATE_CHANGED')
         result.update(schema_version=1, source_revision=revision,
@@ -315,3 +315,21 @@ def main(revision):
         return 1
     finally:
         signal.alarm(0)
+
+
+def activate(request, claim_uid, revision):
+    certificate = base64.b64decode(kube('-n', 'hooshix-secrets', 'get', 'secret', 'openbao-tls',
+        '-o', 'jsonpath={.data.ca\\.crt}', operation='GET_PUBLIC_CA'), validate=True)
+    require(hashlib.sha256(certificate).hexdigest() == custody.ROOT_SHA256, 'ROOT_CA_IDENTITY_CONFLICT')
+    with transport.forward(certificate.decode('ascii')) as api:
+        if request['action'] == 'initialize':
+            result = {'encrypted': initialize(request['recipients'], claim_uid, revision, api=api)}
+        else:
+            for name in ('attempt.json', 'encrypted.json'):
+                custody.protected(STATE / name, exact_mode=0o600)
+            attempt = json.loads((STATE / 'attempt.json').read_bytes())
+            require(attempt['pvc_uid'] == claim_uid and attempt['image'] == IMAGE
+                    and hashlib.sha256((STATE / 'encrypted.json').read_bytes()).hexdigest()
+                    == request['encrypted_sha256'], 'CUSTODY_DOWNLOAD_PROOF_REQUIRED')
+            result = unseal(request['keys'], api=api)
+    return result

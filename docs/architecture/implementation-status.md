@@ -9,21 +9,31 @@ Current Stage 10 continuation, 2026-10-08: target receipt
 `0522429263e84f9ae10a18f58baa9dbc3f82b5ab66f6089b30e4b89cd60a205b`.
 Mesh, Kyverno 1.19.1, exact OpenBao 2.6.4 installation, verified TLS/sealed probes,
 retained local PVC, protected audit/storage guard and existing host services are
-`Passed`. OpenBao is **installed, sealed, not initialized**. Do not repeat the
+`Passed`. At installation time OpenBao was sealed/uninitialized; the subsequent
+owner-run diagnosis below establishes its later initialized/sealed state. Do not repeat the
 installer or treat older pre-install evidence below as the present target state.
 Next is supervised PGP-encrypted Shamir 3/2 custody and unseal; the operator tool
 and native disposable CI do not prove actual target activation. Target custody,
-initialization/unseal, hourly off-host snapshots/restore, ESO, audited JIT,
+custody/unseal, hourly off-host snapshots/restore, ESO, audited JIT,
 standing-access removal, GitOps and complete-stack readiness remain `Not verified`.
 Usage: `../operations/production-openbao-activation-fa.md`. Stage 10 stays `IN PROGRESS`.
 
 The subsequent owner-run activation returned
-`ACTIVATION_NATIVE_FAILED_STATE_PRESERVED`; actual initialization/seal state after
-that failure is not established. Existing host intent/ciphertext and local custody
-must be preserved. The activation operator now has a supervised read-only
+`ACTIVATION_NATIVE_FAILED_STATE_PRESERVED`. Owner-run diagnostic
+`diagnostic-c449912954c641a7af2ac6a08a87f5fb.json`, observed at
+`2026-10-08T12:40:06.910253+00:00` and bound to main `308ca42089a2c2ddadcb80177a254e48db774858`,
+passed preflight and found **initialized, sealed, Shamir 3/2**, existing host
+`attempt.json`, and missing host encrypted response. Local `encrypted.json` is
+also absent. The owner has no shares and explicitly approved archiving all old
+state and replacing only this fresh store. This approval is not execution evidence:
+target recovery/new activation remain `Not run`. Existing host data/intent and
+local custody must be preserved. The activation operator has a supervised read-only
 `--diagnose-only` mode and fixed native-operation failure codes, without reading
 custody contents or retrying init. Resume explicitly requests the existing custody
-passphrase. This source repair and its CI are not target activation evidence.
+passphrase. Recovery is a separate explicit action using those same recipients,
+never automatic reinit. The new write adapter separates bounded init/unseal
+timeouts from the unchanged 3s probes and fsyncs ciphertext before teardown.
+This source repair and its CI are not target activation evidence.
 
 Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
 istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
@@ -625,7 +635,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
-| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed sealed/uninitialized on 2026-10-08; ESO not installed | OpenBao installation/TLS/PVC Passed in target receipt; activation/ESO/off-host recovery NOT VERIFIED |
+| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed; later initialized/sealed with missing init response, owner-approved recovery Not run; ESO not installed | OpenBao installation/TLS/PVC and diagnosis Passed in target receipts; usable custody/unseal/ESO/off-host recovery NOT VERIFIED |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Cross-service CI/security/supply-chain release gates | DESIGNED | Stage 10 seven-artifact source merged; protected head and merged-main CI PASSED | Semgrep/OSV/Gitleaks-capable service workflows plus frontend Semgrep/OSV/image/Helm gates are present; Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation cover all seven application release components. PR #142 head runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed; real production release/rescan/admission execution remains NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | three-node local Collector DaemonSet, bounded queues/privacy config, exact read-only pod-log hostPath, metrics, and OTLP integration PASSED |

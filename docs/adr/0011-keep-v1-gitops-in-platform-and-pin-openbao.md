@@ -115,6 +115,37 @@ Native semantics: [systemd mount](https://github.com/systemd/systemd/blob/v259.5
 [ext4 formatting](https://github.com/tytso/e2fsprogs/blob/v1.47.2/misc/mke2fs.8.in),
 [loop mount](https://github.com/util-linux/util-linux/blob/v2.41.3/sys-utils/mount.8.adoc).
 
+### Supervised first-initialization recovery
+
+During the bounded ADR-0030 commissioning bootstrap, a lost `sys/init` response
+does not permit automatic retry, intent removal, PVC deletion or ordinary
+datastore reset. If initialization committed sealed with the operator's bound
+intent but no encrypted response, and the owner explicitly confirms that shares
+are unavailable and authorizes replacement of this fresh store, the reviewed
+recovery tool may stop only OpenBao, preserve **all** stopped data and intent in
+root-only recoverable quarantine, verify byte hashes/metadata, retain the exact
+PVC/StatefulSet/mount/data-directory identity, and start the empty replacement.
+The old store is never deleted; this is not snapshot/DR or a procedure for an
+established production secret store. Partial recovery leaves durable intent that
+blocks initialization; no reset is automatically repeated. Host guard, K3s,
+CA, SSH, email, workload digest and public/private boundaries remain unchanged.
+
+Supervised init/unseal uses one-attempt HTTPS with the existing pinned CA and
+hostname verification through a temporary **host-loopback-only** kubectl forward,
+not public ingress or a normal administration path. The write timeout is bounded
+(60s init, 20s unseal); status and unchanged workload probes retain 3s/zero retries.
+The response is PGP-encrypted by OpenBao; encrypted custody is exclusively written
+and fsynced before forwarding teardown or post-checks. The root operation has a
+180s deadline (300s for archive/restart), never logs secret request/response or
+places credentials in argv/environment. A timeout/unknown response still requires
+recovery review, never a second init. Native disposable CI must exercise this
+HTTPS adapter, encrypted custody/quorum, stopped-data archival, fresh-store init,
+and restoration of the retained original before target execution.
+
+See the [activation/recovery guide](../operations/production-openbao-activation-fa.md).
+API semantics: [OpenBao sys/init](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/api/system/init.mdx)
+and [loopback ephemeral forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/).
+
 ### Existing deployment gates
 
 - render staging and production desired state;
