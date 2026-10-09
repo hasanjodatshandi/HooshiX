@@ -161,6 +161,19 @@ class ScopedAuthTest(unittest.TestCase):
                 self.assertRaises(host.custody.BootstrapFailed):
             target.reconcile(policy)
 
+    def test_tokenreview_edge_only_allows_exact_api_addresses_and_ports(self):
+        policy = auth.tokenreview_egress(['10.96.0.1', '172.18.0.2'])
+        self.assertEqual('hooshix-secrets', policy['metadata']['namespace'])
+        self.assertEqual({'matchLabels': {'app.kubernetes.io/name': 'openbao'}}, policy['spec']['podSelector'])
+        self.assertEqual(['Egress'], policy['spec']['policyTypes'])
+        rule = policy['spec']['egress'][0]
+        self.assertEqual([{'ipBlock': {'cidr': '10.96.0.1/32'}},
+                          {'ipBlock': {'cidr': '172.18.0.2/32'}}], rule['to'])
+        self.assertEqual([{'protocol': 'TCP', 'port': 6443}, {'protocol': 'TCP', 'port': 443}], rule['ports'])
+        for invalid in ([], ['0.0.0.0/0'], ['api.example'], ['::1']):
+            with self.assertRaises((host.custody.BootstrapFailed, ValueError)):
+                auth.tokenreview_egress(invalid)
+
 
 if __name__ == '__main__':
     unittest.main()

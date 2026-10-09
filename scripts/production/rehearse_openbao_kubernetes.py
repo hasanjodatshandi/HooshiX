@@ -312,6 +312,16 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
                         for value in scoped_auth.foundation():
                             auth_host.reconcile(value)
                             auth_host.reconcile(value)  # Real owned-object no-write reconciliation.
+                        service = json.loads(k('-n', 'default', 'get', 'service/kubernetes', '-o', 'json'))
+                        endpoints = json.loads(k('-n', 'default', 'get', 'endpointslices',
+                                                 '-l', 'kubernetes.io/service-name=kubernetes', '-o', 'json'))
+                        addresses = {service['spec']['clusterIP']}
+                        for item in endpoints['items']:
+                            for endpoint in item['endpoints']:
+                                addresses.update(endpoint['addresses'])
+                        # kindnet enforces default-deny too; use the production API-only edge,
+                        # with this disposable cluster's addresses, never the VPS addresses.
+                        auth_host.reconcile(scoped_auth.tokenreview_egress(sorted(addresses)))
                         kube_ca = json.loads(k('-n', 'default', 'get', 'configmap', 'kube-root-ca.crt',
                                               '-o', 'json'))['data']['ca.crt']
                         audiences = scoped_auth.jwt_audiences(auth_host.token_request(
@@ -429,7 +439,7 @@ def main() -> int:
         rehearse(args.tools_dir, args.receipt, args.platform_publications)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
-            tarfile.TarError, RehearsalFailed):
+            tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):
         print("OPENBAO_KUBERNETES=Failed; inspect fixed CI step; secret diagnostics suppressed")
         return 1
 

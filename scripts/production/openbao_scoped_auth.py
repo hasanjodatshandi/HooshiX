@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 
 import activate_openbao_host as host
@@ -64,6 +65,19 @@ def foundation():
     objects.extend(resource('v1', 'ServiceAccount', 'eso-' + name,
                             automountServiceAccountToken=False) for name in SERVICES)
     return objects
+
+
+def tokenreview_egress(addresses):
+    host.require(isinstance(addresses, list) and 1 <= len(addresses) <= 8
+                 and all(str(ipaddress.IPv4Address(a)) == a for a in addresses),
+                 'AUTH_API_ADDRESS_REJECTED')
+    value = resource('networking.k8s.io/v1', 'NetworkPolicy', 'hooshix-openbao-tokenreview',
+        spec={'podSelector': {'matchLabels': {'app.kubernetes.io/name': 'openbao'}},
+              'policyTypes': ['Egress'], 'egress': [{
+                  'to': [{'ipBlock': {'cidr': address + '/32'}} for address in sorted(set(addresses))],
+                  'ports': [{'protocol': 'TCP', 'port': 6443}, {'protocol': 'TCP', 'port': 443}]}]})
+    value['metadata']['namespace'] = 'hooshix-secrets'
+    return value
 
 
 def store(name, api_audiences):

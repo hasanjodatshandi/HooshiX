@@ -128,14 +128,7 @@ def commission(request, revision):
                 reconcile(value)
             reconcile(auth.resource('v1', 'ConfigMap', 'hooshix-openbao-ca',
                                     data={'ca.crt': certificate.decode('ascii')}))
-            policy = auth.resource('networking.k8s.io/v1', 'NetworkPolicy',
-                'hooshix-openbao-tokenreview', spec={'podSelector': {
-                    'matchLabels': {'app.kubernetes.io/name': 'openbao'}}, 'policyTypes': ['Egress'], 'egress': [{
-                    'to': [{'ipBlock': {'cidr': '188.240.196.151/32'}},
-                           {'ipBlock': {'cidr': '10.43.0.1/32'}}],
-                    'ports': [{'protocol': 'TCP', 'port': 6443}, {'protocol': 'TCP', 'port': 443}]}]})
-            policy['metadata']['namespace'] = 'hooshix-secrets'
-            reconcile(policy)
+            reconcile(auth.tokenreview_egress(['188.240.196.151', '10.43.0.1']))
             audiences = auth.jwt_audiences(token_request(auth.NAMESPACE, 'eso-' + auth.SERVICES[0], []))
             auth.configure(api, request['root_token'], 'https://kubernetes.default.svc:443', kube_ca)
             results = auth.verify(api, request['root_token'], token_request, audiences)

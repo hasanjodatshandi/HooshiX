@@ -132,13 +132,13 @@ python3 scripts/production/build_platform_commissioning_bundle.py \
   --output /mnt/c/Users/Coder/Downloads/HooshiX-platform-commissioning
 ```
 
-دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37228262995` هستند.
-OpenBao از انتشار موفق و هنوز تازهٔ ۴ اکتبر با revision دقیق
-`6131ed82e22e4990efe33c9433d01d76a65d1265` استفاده می‌کند؛ digest آن با انتشار
-۷ اکتبر یکسان است. Kyverno ۱٫۱۸٫۲ برای هر نوع attestation فقط یک payload نگه
-می‌دارد؛ امضای مجدد همان digest با revision دیگر، انتخاب payload را مبهم می‌کند.
-بنابراین publication را صرفاً به‌دلیل جدیدتر بودن جایگزین نکنید: revision دقیق
-باید در آزمون native همان تصویر پذیرفته شود. شرط امضا، SBOM و freshness پنج‌روزه
+دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37611729931` هستند.
+رسید OpenBao از workflow موفق main در ۷ اکتبر با revision دقیق
+`ffc299093b965450e4ef433a2d8392a01c404e0c` است؛ digest ثابت تغییر نمی‌کند.
+publication و زمان ساخت پایگاه اسکن هر دو باید در پنجرهٔ پنج‌روزه باشند.
+با امضای مجدد همان digest، انتخاب payload چند attestation ممکن است مبهم شود؛
+revision دقیق رسید همچنان باید در آزمون native همان تصویر پذیرفته شود.
+صرف تازه‌بودن metadata مجوز نصب نیست. شرط امضا، SBOM و freshness پنج‌روزه
 حذف نشده است؛ evidence منقضی یا تغییر image، انتشار و staging تازه لازم دارد.
 اگر evidence بیش از پنج روز عمر دارد، publication/staging تازه لازم است، نه ساخت Root.
 بسته شامل source/plan بازبینی‌شده، hashها، چهار فایل عمومی گواهی و همین راهنماست؛
