@@ -100,12 +100,13 @@ def run(snapshot, keys, token, base):
 
         def docker(*args, expected=0, timeout=30):
             # Ignore remote Docker contexts and workstation credential configuration.
-            return operator.command(['/usr/bin/docker', '--host', 'unix:///var/run/docker.sock',
-                '--config', str(directory), *args], expected=expected, timeout=timeout)
+            return host.native(['/usr/bin/docker', '--host', 'unix:///var/run/docker.sock',
+                '--config', str(directory), *args], expected=expected, timeout=timeout,
+                operation='RESTORE_' + args[0].upper())
 
         def remove(kind, identity):
             listing = (kind, 'ls', '--all') if kind == 'container' else (kind, 'ls')
-            listed = docker(*listing, '--filter', 'name=^' + identity + '$', '--format', '{{.ID}}').strip()
+            listed = docker(*listing, '--filter', 'name=' + identity, '--format', '{{.ID}}').strip()
             if not listed:
                 return
             fmt = '{{json .Config.Labels}}' if kind == 'container' else '{{json .Labels}}'
@@ -113,6 +114,8 @@ def run(snapshot, keys, token, base):
             host.require(json.loads(result).get(LABEL) == nonce, 'RESTORE_CLEANUP_IDENTITY_REJECTED')
             args = (kind, 'rm', '--force', identity) if kind == 'container' else (kind, 'rm', identity)
             docker(*args)
+            host.require(not docker(*listing, '--filter', 'name=' + identity, '--format', '{{.ID}}').strip(),
+                         'RESTORE_CLEANUP_INCOMPLETE')
 
         docker('pull', '--quiet', image, timeout=180)
         version = docker('version', '--format', '{{.Server.Version}}').strip()

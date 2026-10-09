@@ -83,7 +83,7 @@ class IsolatedRestoreTest(unittest.TestCase):
             if args[0] == 'port':
                 return b'127.0.0.1:32789\n'
             if args[1:2] == ['ls']:
-                identity = args[args.index('--filter') + 1][6:-1]
+                identity = args[args.index('--filter') + 1].split('=', 1)[1]
                 return b'fixture-owned-id\n' if identity in created else b''
             if args[1:2] == ['inspect']:
                 if args[args.index('--format') + 1] == '{{.Internal}}':
@@ -108,6 +108,7 @@ class IsolatedRestoreTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, contextlib.ExitStack() as stack:
             for target, name, kwargs in [
                 (restore.operator, 'command', {'side_effect': command}), (restore, 'wait', {}),
+                (restore.host, 'native', {'side_effect': command}),
                 (restore.host, 'unseal', {}), (restore, 'request', {'side_effect': request}),
                 (restore.transport, 'Client', {'return_value': Mock(call=Mock(return_value={
                     'keys_base64': KEYS, 'root_token': 'fixture-temporary-root'}))})]:
