@@ -379,8 +379,14 @@ def main() -> int:
     try:
         rehearse()
         return 0
+    except activation.custody.BootstrapFailed as error:
+        reason = str(error)
+        if re.fullmatch(r'[A-Z0-9_]{1,96}', reason):
+            print('OPENBAO_RECOVERY_FAILURE=' + reason)
+        print('OPENBAO_RECOVERY=Failed; inspect the named CI step; no secret diagnostics emitted')
+        return 1
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError,
-            RehearsalFailed, activation.custody.BootstrapFailed):
+            RehearsalFailed):
         print("OPENBAO_RECOVERY=Failed; inspect the named CI step; no secret diagnostics emitted")
         return 1
 

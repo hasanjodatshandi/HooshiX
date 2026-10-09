@@ -61,7 +61,7 @@ class IsolatedRestoreTest(unittest.TestCase):
             restore.wait(client, initialized=True, sealed=False)
         client.call.assert_called_once_with('status')
 
-    def exercise(self, *, api_failure=False, cleanup_failure=False, wrong_label=False):
+    def exercise(self, *, api_failure=False, cleanup_failure=False, wrong_label=False, bad_auth=False, bad_audit=False):
         commands, created = [], set()
         def command(argv, **kwargs):
             commands.append(argv)
@@ -98,10 +98,10 @@ class IsolatedRestoreTest(unittest.TestCase):
             if api_failure:
                 raise DENIED('RESTORE_API_FAILED')
             if path == 'auth/token/lookup-self':
-                return {'data': {'policies': ['root']}}
+                return {'data': {'policies': [] if bad_auth else ['root']}}
             if path == 'sys/audit':
                 return {'data': {'protected/': {'type': 'file', 'options': {
-                    'file_path': '/openbao/data/audit.jsonl', 'log_raw': 'false'}}}}
+                    'file_path': '/openbao/data/audit.jsonl', 'log_raw': 'true' if bad_audit else 'false'}}}}
             if path == 'sys/mounts':
                 return {'data': {'cubbyhole/': {}, 'identity/': {}}}
             return {}
@@ -112,7 +112,7 @@ class IsolatedRestoreTest(unittest.TestCase):
                 (restore.transport, 'Client', {'return_value': Mock(call=Mock(return_value={
                     'keys_base64': KEYS, 'root_token': 'fixture-temporary-root'}))})]:
                 stack.enter_context(patch.object(target, name, **kwargs))
-            if api_failure or cleanup_failure or wrong_label:
+            if api_failure or cleanup_failure or wrong_label or bad_auth or bad_audit:
                 with self.assertRaises(DENIED):
                     restore.run(SNAPSHOT, KEYS, TOKEN, Path(directory))
             else:
@@ -144,6 +144,11 @@ class IsolatedRestoreTest(unittest.TestCase):
     def test_cleanup_error_cannot_return_success(self):
         _, created = self.exercise(cleanup_failure=True)
         self.assertTrue(created)
+
+    def test_original_authentication_and_non_raw_audit_are_required(self):
+        for options in [{'bad_auth': True}, {'bad_audit': True}]:
+            _, created = self.exercise(**options)
+            self.assertFalse(created)
 
     def test_cleanup_never_removes_a_foreign_label(self):
         commands, created = self.exercise(wrong_label=True)
