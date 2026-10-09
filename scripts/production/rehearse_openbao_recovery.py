@@ -23,6 +23,7 @@ import backup_openbao_host as snapshot_host
 import openbao_activation_transport as transport
 import openbao_snapshot_crypto as snapshot_crypto
 import recover_openbao_initialization as lost_init
+import restore_openbao_isolated as isolated
 from render_openbao_candidate import ALIVE, STATUS
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,7 +35,7 @@ STEPS = frozenset({"image-pull", "image-version", "tls-fixture", "source-start",
                    "root-revoke", "audit-redaction", "cleanup", "probe-sealed", "probe-unsealed",
                    "kv-mount", "kv-write", "acl-policy", "acl-token", "acl-write-denied",
                    "lost-init-archive", "fresh-store-init", "archive-rollback", "archive-restart-read",
-                   "snapshot-envelope", "snapshot-envelope-negative"})
+                   "snapshot-envelope", "snapshot-envelope-negative", "isolated-operator-adapter"})
 
 
 class RehearsalFailed(Exception):
@@ -275,6 +276,11 @@ def rehearse():
             if recovered != snapshot:
                 raise RehearsalFailed('fixture envelope roundtrip mismatch')
             snapshot = recovered
+            step('isolated-operator-adapter')
+            proof = isolated.run(snapshot, keys[:2], root_token, directory)
+            if proof['isolated_target_cleanup'] != 'Passed' or proof['restored_mount_count'] != len(
+                    client.call('sys/mounts', token=root_token)['data']):
+                raise RehearsalFailed('fixture isolated operator recovery mismatch')
             step('snapshot-envelope-negative')
             for candidate, passphrase in [(envelope, password + ' wrong'),
                                           (envelope[:-1] + bytes([envelope[-1] ^ 1]), password)]:

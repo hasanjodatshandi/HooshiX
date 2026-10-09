@@ -556,6 +556,7 @@ scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
 scripts/production/render_platform_admission.py
 scripts/production/repair_import_referrers.py
+scripts/production/restore_openbao_isolated.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
 scripts/production/run-guard-maintenance.ps1
@@ -581,6 +582,7 @@ scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_openbao_activation.py
 scripts/production/tests/test_openbao_artifact.py
 scripts/production/tests/test_openbao_candidate.py
+scripts/production/tests/test_openbao_isolated_restore.py
 scripts/production/tests/test_openbao_kubernetes.py
 scripts/production/tests/test_openbao_lost_initialization.py
 scripts/production/tests/test_openbao_publication.py

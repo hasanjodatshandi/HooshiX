@@ -478,8 +478,16 @@ Supervised snapshot tooling now encrypts to those existing recipients, performs 
 conditional ciphertext-only PUT to `c892683/openbao-backups/`, version-specific
 readback and memory-only decryption/hash proof. The CI rehearsal restores the bytes
 recovered by this envelope adapter into an isolated disposable OpenBao. Target
-off-host execution and target isolated restore remain `Not verified`; no hourly
-root-token job is introduced. No standing sudo,
+off-host ciphertext GET/hash are `Passed` for the retained first snapshot; its
+provider readback has no usable version ID (`VersionId=null`). The owner reports
+a temporary ParsPack incident; actual version/retention proof remains `Not verified`,
+not waived, and the same key is not uploaded again. A supervised operator-local
+recovery adapter now restores that retained envelope into a disposable, loopback-TLS,
+internal-network, RAM-backed clone and verifies the original Shamir quorum, root
+authentication and protected audit before deleting its owned target. The native CI
+rehearsal exercises this adapter using synthetic secrets only. Actual owner-local
+recovery execution and VPS recovery remain `Not verified`; no hourly root-token job
+is introduced. No standing sudo,
 SSH, MCP or bucket configuration is changed by the rehearsal.
 Protected baseline run `36883186086` and frontend run `36883185616` passed
 all twelve checks at implementation head `c31e6ae59513c3946d07b2247431dceeafc098c9`

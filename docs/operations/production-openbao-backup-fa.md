@@ -67,6 +67,47 @@ upload همان key تکرار نمی‌شود؛ باکت/کلید/custody/init 
 کار مستقل بعدی آزمون recovery همان envelope در یک محیط خصوصی جداست؛
 آزمون مستقل، تأیید نسخهٔ باکت یا دروازهٔ Production را جایگزین نمی‌کند.
 
+### آزمون بازیابی بک‌آپ موجود، بدون اتصال به VPS
+
+از checkout تمیز و merge‌شده با CI موفق، در PowerShell بدون ضبط/transcript:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/restore_openbao_isolated.py --snapshot /home/coder/.local/share/hooshix-openbao-backup/64e48c07a0074d6896e46537b837c032 --custody /home/coder/.local/share/hooshix-openbao-custody/7509bb067d814468982cc84fa50cb4d4
+```
+
+فقط **همان رمز custody OpenBao** یک بار درخواست می‌شود؛ sudo، GHCR، رمز
+Root/CA یا تغییر باکت لازم نیست. ابزار hash envelope و اتصال آن به همان
+recipientها را بررسی می‌کند؛ snapshot، دو سهم و root token فقط در حافظهٔ
+operator بازیابی می‌شوند. این عملیات recovery تحت نظارت است، نه محیط توسعه؛
+هیچ secret واقعی به CI یا فایل plaintext منتقل نمی‌شود.
+
+Docker محلی با socket ثابت، نسخهٔ حداقل ۲۸ و قابلیت محدودسازی swap لازم است.
+همان digest عمومی OpenBao 2.6.4 (برابر mirror خصوصی Production) دریافت
+می‌شود؛ کلید/گواهی یک‌روزهٔ آزمایشی جدید فقط برای TLS همین clone است، نه
+Root یا intermediate پروژه. هدف با نام تصادفی، شبکهٔ `--internal`، پورت
+TLS فقط روی `127.0.0.1`، data روی tmpfs با حد 128MiB، RAM با حد 512MiB و
+swap غیرفعال برای container ساخته می‌شود. Docker daemon و سیستم operator
+باید مورد اعتماد باشند؛ سایر پردازش‌های مدیر همان دستگاه مرز مستقل نیستند.
+
+فقط همین clone خالی init و `snapshot-force` می‌شود؛ پس از restore، دو سهم
+اصلی آن را unseal می‌کنند و احراز هویت اصلی، mountها و audit بدون `log_raw`
+آزمایش می‌شوند. هیچ endpoint ورودی، مسیر data Production، SSH، upload،
+لغو root یا init/unseal VPS وجود ندارد. سازوکار force برای هدف خالی جدا
+طبق [API نسخهٔ 2.6.4](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/api/system/storage/raft.mdx)
+است؛ استفاده از آن روی مخزن فعال مجاز نیست.
+
+موفقیت فقط پس از حذف clone و شبکهٔ دارای label مالک همین اجرا گزارش می‌شود:
+`OPENBAO_ISOLATED_RECOVERY=Passed` و `PUBLIC_RECEIPT` عمومی در پوشهٔ همان
+بک‌آپ. اصل بک‌آپ/custody تغییر نمی‌کند. این نتیجه recovery محلی را ثابت
+می‌کند، نه restore VPS، نسخه‌سازی باکت، scheduler ساعتی یا آمادگی Production.
+CI همین adapter را با snapshot و سهم‌های **مصنوعی** اجرا می‌کند.
+
+در شکست، نتیجهٔ عمومی را بفرستید؛ هیچ init/upload/reset خودکار تکرار نشود.
+در kill سخت یا قطع Docker، cleanup ممکن است کامل نشود: container/network
+با پیشوند `hooshix-bao-restore-` و label `hooshix.isolated-restore` همان اجرا
+باید پیش از retry بررسی و فقط با تطبیق هویت حذف شود. دادهٔ clone موقت است؛
+اصل فایل‌های recovery را پاک نکنید.
+
 در شکست، `RETAINED_BACKUP_DIRECTORY` را حفظ کنید. `intent.json` پیش از
 snapshot و `delivery-intent.json` پیش از PUT ثبت می‌شوند. با timeout PUT
 ممکن است object ایجاد شده باشد؛ همان object/key را کورکورانه overwrite یا
