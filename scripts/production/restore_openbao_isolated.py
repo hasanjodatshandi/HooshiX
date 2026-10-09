@@ -87,7 +87,7 @@ def run(snapshot, keys, token, base):
     host.require(isinstance(snapshot, bytes) and snapshot.startswith(b'\x1f\x8b\x08')
                  and len(snapshot) <= crypto.MAX_SNAPSHOT, 'RESTORE_SNAPSHOT_REJECTED')
     host.require(isinstance(keys, list) and len(keys) == 2
-                 and all(isinstance(k, str) and re.fullmatch(r'[A-Za-z0-9+/]{44}', k) for k in keys)
+                 and all(isinstance(k, str) and re.fullmatch(r'(?:[a-fA-F0-9]{66}|[A-Za-z0-9+/]{44})', k) for k in keys)
                  and len(set(keys)) == 2,
                  'RESTORE_SHARES_REJECTED')
     host.require(isinstance(token, str) and re.fullmatch(r'[A-Za-z0-9_.-]{16,1024}', token),

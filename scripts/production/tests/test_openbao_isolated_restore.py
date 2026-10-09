@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import restore_openbao_isolated as restore
 
-KEYS = ['a' * 44, 'b' * 44]
+KEYS = ['a' * 66, 'b' * 66]  # PGP custody decrypts hexadecimal shares, matching the live adapter.
 TOKEN = 'fixture-original-root-token'
 SNAPSHOT = b'\x1f\x8b\x08fixture-encrypted-raft'
 DENIED = restore.host.custody.BootstrapFailed
