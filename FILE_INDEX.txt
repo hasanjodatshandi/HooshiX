@@ -318,11 +318,13 @@ docs/operations/production-human-access-prerequisites-fa.md
 docs/operations/production-installation-fa.md
 docs/operations/production-jit-usage-fa.md
 docs/operations/production-openbao-activation-fa.md
+docs/operations/production-openbao-auth-fa.md
 docs/operations/production-openbao-backup-fa.md
 docs/operations/production-openbao-fa.md
 docs/operations/production-openbao-storage-fa.md
 docs/operations/production-pki-bootstrap-fa.md
 docs/operations/production-platform-commissioning-fa.md
+docs/operations/stage10-production-deployment-guide-fa.md
 docs/operations/wireguard-management-fa.md
 docs/runbooks/chatgpt-web-desktop-mcp.md
 docs/runbooks/chatgpt-web-ops-mcp.md
