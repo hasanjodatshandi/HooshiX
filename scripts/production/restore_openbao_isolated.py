@@ -150,12 +150,12 @@ def run(snapshot, keys, token, base):
                 '--mount', f'type=bind,src={directory / "server.json"},dst=/openbao/config.json,readonly',
                 '--entrypoint', '/usr/bin/bao', image,
                 'server', '-config=/openbao/config.json')
+            docker('start', name)
             attached = json.loads(docker('container', 'inspect', '--format', '{{json .NetworkSettings.Networks}}', name))
             host.require(set(attached) == {network} and attached[network]['IPAddress'] == TARGET,
                          'RESTORE_PRIVATE_BIND_REQUIRED')
             host.require(docker('container', 'inspect', '--format', '{{json .HostConfig.PortBindings}}', name).strip()
                          in (b'{}', b'null'), 'RESTORE_NO_PUBLIC_PORT_REQUIRED')
-            docker('start', name)
             # Internal-only Docker bridges intentionally do not publish host ports.
             client = transport.Client(8200, (directory / 'tls.crt').read_text())
             client.base = 'https://' + TARGET + ':8200/v1/'
