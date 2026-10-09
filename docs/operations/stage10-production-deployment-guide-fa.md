@@ -315,6 +315,9 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 کلاستر اعمال می‌کند؛ آدرس‌های VPS وارد fixture نمی‌شوند. شواهد انتشار امضاشده
 باید publication و پایگاه اسکن تازه در پنجرهٔ پنج‌روزه داشته باشند؛ عبور از این
 پنجره نیازمند رسید تازهٔ workflow معتبر main است، نه افزایش مهلت گیت.
+برای artifact واردشدهٔ ثابت، تازه‌سازی اسکن از طریق اجرای مجدد workflow اصلی
+همان revision امضاشده انجام می‌شود؛ شمارهٔ attempt و artifact باید منطبق باشند.
+روش اجرا در [راهنمای commissioning](production-platform-commissioning-fa.md) است.
 
 برای نصب دوم، رسیدهای مدیریت، foundation، audit، storage/guard، PKI، platform،
 activation، snapshot و isolated recovery باید مربوط به خود همان نصب باشند.
