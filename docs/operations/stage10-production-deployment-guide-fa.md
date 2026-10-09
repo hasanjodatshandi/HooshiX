@@ -39,6 +39,7 @@ Stage10 و Production readiness همچنان `Not verified` هستند.
 | OpenBao custody/init/unseal | Passed؛ توزیع custody تأیید مالک | custody و سهم‌های تازه |
 | snapshot | ciphertext/hash Passed؛ نسخهٔ باکت Not verified | مقصد و شواهد مستقل |
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
+| scoped auth OpenBao | ابزار و قرارداد شش هویت آماده؛ هدف Not run | بستهٔ اختصاصی مقصد |
 | ESO/JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -298,6 +299,18 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 
 ## ۱۳. رسیدن به نقطهٔ فعلی و مراحل بعد
 
+### احراز هویت محدود OpenBao؛ قدم اجرایی بعد
+
+[راهنمای اجرای شش هویت](production-openbao-auth-fa.md) شامل دستور owner-local،
+ورودی‌ها، expected result، سطح ACL و recovery است. ابزار از store/custody موجود
+استفاده می‌کند؛ init/restart/root revocation تکرار نمی‌شود. هر `eso-<service>`
+فقط خواندن مسیر `hooshix/data/production/<service>/*` را با token حداکثر پنج
+دقیقه دارد. TokenReview واقعی با JWT تازه و audience دقیق، بدون reviewer
+دائمی انجام می‌شود. SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
+واقعی هنوز نصب/همگام نشده است. اجرای VPS این مرحله **Not run** است؛ فقط پس
+از CI موفق، merge و اجرای مالک با receipt مستقل نتیجه به Passed تغییر می‌کند.
+بستهٔ فعلی به سرور اول bind است؛ برای نصب دوم، داده‌های مرحلهٔ ۱ لازم‌اند.
+
 برای نصب دوم، رسیدهای مدیریت، foundation، audit، storage/guard، PKI، platform،
 activation، snapshot و isolated recovery باید مربوط به خود همان نصب باشند.
 وضعیت هر کنترل جدا ثبت شود؛ قبول شواهد یک بخش، بخش دیگر را تأیید نمی‌کند.
@@ -317,3 +330,7 @@ activation، snapshot و isolated recovery باید مربوط به خود هم�
 این بخش‌ها هنوز دستور اجرایی تکمیل‌شده ندارند و **Not verified** هستند. با هر
 تغییر Stage10 همین بخش با روش نهایی، commands مقصد، ورودی‌ها، خروجی مورد انتظار،
 کاربرد روزمره و recovery لازم تکمیل می‌شود؛ مرحلهٔ اجرا‌نشده موفق معرفی نمی‌شود.
+
+در انتظار طولانی CI/workflow، دستیار لینک و وضعیت را می‌دهد و turn را پایان
+می‌دهد؛ مالک پایان را اعلام می‌کند و دستیار سپس یک بار نتیجه را بررسی می‌کند.
+این روش انتظار، شرط CI/بازبینی قبل از merge را تغییر نمی‌دهد.

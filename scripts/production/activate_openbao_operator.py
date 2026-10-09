@@ -149,7 +149,9 @@ def decrypt(directory, index, password, encrypted):
             kill_agent(home)
 
 
-def bootstrap(remote, revision, sources):
+def bootstrap(remote, revision, sources, supervisor='activate_openbao_host'):
+    host.require(supervisor in ('activate_openbao_host', 'bootstrap_openbao_auth'),
+                 'REVIEWED_SUPERVISOR_REQUIRED')
     # Short public command avoids the Windows command-line size failure.
     return f"""import os,stat,hashlib,sys,types
 p={remote!r}
@@ -159,12 +161,13 @@ for name,digest in {sources!r}:
  if not stat.S_ISREG(s.st_mode) or s.st_nlink!=1 or len(content)>32768 or hashlib.sha256(content).hexdigest()!=digest: raise SystemExit(1)
  m=types.ModuleType(name[:-3]); m.__file__=p+'/'+name; sys.modules[name[:-3]]=m
  exec(compile(content,name,'exec'),m.__dict__)
-raise SystemExit(sys.modules['activate_openbao_host'].main({revision!r}))
+raise SystemExit(sys.modules[{supervisor!r}].main({revision!r}))
 """
 
 
-def rpc(remote, revision, sources, password, body):
-    payload = bootstrap(remote, revision, sources)
+def rpc(remote, revision, sources, password, body, *, supervisor='activate_openbao_host'):
+    payload = bootstrap(remote, revision, sources, supervisor)
+    ready_label = b'AUTH_RPC_READY' if supervisor == 'bootstrap_openbao_auth' else b'ACTIVATION_RPC_READY'
     argv = [SSH, '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'hooshix-server',
             'sudo -k -S -p "" /usr/bin/python3 -I -c ' + shlex.quote(payload)]
     process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -175,10 +178,11 @@ def rpc(remote, revision, sources, password, body):
         process.stdin.write(password.encode() + b'\n')
         process.stdin.flush()
         ready, _, _ = select.select([process.stdout], [], [], 25)
-        host.require(ready and process.stdout.readline(128).strip() == b'ACTIVATION_RPC_READY',
+        host.require(ready and process.stdout.readline(128).strip() == ready_label,
                      'LOCAL_SUDO_OR_REVIEWED_SUPERVISOR_FAILED')
         output, _ = process.communicate(json.dumps(body).encode() + b'\n',
-                                       timeout=310 if body.get('action') == 'recover' else 190)
+                                       timeout=610 if supervisor == 'bootstrap_openbao_auth'
+                                       else 310 if body.get('action') == 'recover' else 190)
         host.require(len(output) <= host.BOUND, 'RPC_OUTPUT_BOUND_EXCEEDED')
         result = json.loads(output)
         if process.returncode:
@@ -228,20 +232,21 @@ def prepare(directory, password):
     return keys
 
 
-def stage_sources():
+def stage_sources(sources=SOURCES):
     remote = '/home/hooshixadmin/.cache/hooshix-bao-activation-' + uuid.uuid4().hex
     command([SSH, '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'hooshix-server',
              'umask 077; mkdir -p .cache; mkdir ' + remote])
-    sources = []
-    for name in SOURCES:
+    hashes = []
+    for name in sources:
+        host.require(re.fullmatch(r'[a-z_]+\.py', name), 'PUBLIC_SOURCE_NAME_REJECTED')
         path = ROOT / 'scripts/production' / name
         content = path.read_bytes()
         host.require(0 < len(content) <= host.BOUND, 'PUBLIC_SOURCE_BOUND_EXCEEDED')
-        sources.append((name, hashlib.sha256(content).hexdigest()))
+        hashes.append((name, hashlib.sha256(content).hexdigest()))
         windows = command(['/usr/bin/wslpath', '-w', str(path)]).decode().strip()
         command([SCP, '-q', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', windows,
                  'hooshix-server:' + remote + '/' + name])
-    return remote, sources
+    return remote, hashes
 
 
 def sudo_password():
