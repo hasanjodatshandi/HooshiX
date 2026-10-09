@@ -30,7 +30,7 @@ class IsolatedRestoreTest(unittest.TestCase):
         response = Mock(status=204)
         response.read.return_value = b''
         context = Mock(__enter__=Mock(return_value=response), __exit__=Mock(return_value=False))
-        client = Mock(base='https://127.0.0.1:32789/v1/')
+        client = Mock(base='https://' + restore.TARGET + ':8200/v1/')
         client.opener.open.return_value = context
         self.assertEqual({}, restore.request(client, 'sys/storage/raft/snapshot-force', 'POST', SNAPSHOT, TOKEN, 204))
         request = client.opener.open.call_args.args[0]
@@ -47,7 +47,7 @@ class IsolatedRestoreTest(unittest.TestCase):
             restore.request(client, 'sys/mounts', token=TOKEN)
 
     def test_native_errors_never_reveal_token_or_response(self):
-        client = Mock(base='https://127.0.0.1:32789/v1/')
+        client = Mock(base='https://' + restore.TARGET + ':8200/v1/')
         client.opener.open.side_effect = OSError(TOKEN)
         with self.assertRaisesRegex(DENIED, '^RESTORE_API_FAILED$'):
             restore.request(client, 'sys/mounts', token=TOKEN)
@@ -88,6 +88,11 @@ class IsolatedRestoreTest(unittest.TestCase):
             if args[1:2] == ['inspect']:
                 if args[args.index('--format') + 1] == '{{.Internal}}':
                     return b'true\n'
+                if args[args.index('--format') + 1] == '{{json .NetworkSettings.Networks}}':
+                    network = next(value for value in created if value.startswith('hooshix-bao-restore-net-'))
+                    return json.dumps({network: {'IPAddress': restore.TARGET}}).encode()
+                if args[args.index('--format') + 1] == '{{json .HostConfig.PortBindings}}':
+                    return b'{}'
                 return json.dumps({restore.LABEL: 'wrong' if wrong_label else args[-1].split('-')[-1]}).encode()
             if args[1:2] == ['rm']:
                 if cleanup_failure:
@@ -127,11 +132,11 @@ class IsolatedRestoreTest(unittest.TestCase):
         commands, created = self.exercise()
         self.assertFalse(created)
         argv = next(argv for argv in commands if argv[5:6] == ['create'])
-        for value in ['--read-only', 'ALL', 'no-new-privileges', '512m', '1', '64', 'none',
-                      '127.0.0.1::8200']:
+        for value in ['--read-only', 'ALL', 'no-new-privileges', '512m', '1', '64', 'none', restore.TARGET]:
             self.assertIn(value, argv)
         self.assertTrue(any(value.startswith('/openbao/data:rw,nosuid,nodev,noexec,size=128m') for value in argv))
         self.assertTrue(any(argv[5:7] == ['network', 'create'] and '--internal' in argv for argv in commands))
+        self.assertNotIn('--publish', argv)
         for argv in commands:
             self.assertNotIn(TOKEN, ' '.join(argv))
             self.assertNotIn('sudo', argv)

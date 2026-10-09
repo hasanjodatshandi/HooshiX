@@ -482,7 +482,7 @@ off-host ciphertext GET/hash are `Passed` for the retained first snapshot; its
 provider readback has no usable version ID (`VersionId=null`). The owner reports
 a temporary ParsPack incident; actual version/retention proof remains `Not verified`,
 not waived, and the same key is not uploaded again. A supervised operator-local
-recovery adapter now restores that retained envelope into a disposable, loopback-TLS,
+recovery adapter now restores that retained envelope into a disposable, private-TLS,
 internal-network, RAM-backed clone and verifies the original Shamir quorum, root
 authentication and protected audit before deleting its owned target. The native CI
 rehearsal exercises this adapter using synthetic secrets only. Actual owner-local

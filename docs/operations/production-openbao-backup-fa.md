@@ -81,13 +81,17 @@ recipientها را بررسی می‌کند؛ snapshot، دو سهم و root tok
 operator بازیابی می‌شوند. این عملیات recovery تحت نظارت است، نه محیط توسعه؛
 هیچ secret واقعی به CI یا فایل plaintext منتقل نمی‌شود.
 
-Docker محلی با socket ثابت، نسخهٔ حداقل ۲۸ و قابلیت محدودسازی swap لازم است.
+Docker Engine محلی Linux با socket ثابت و قابلیت محدودسازی swap لازم است.
 همان digest عمومی OpenBao 2.6.4 (برابر mirror خصوصی Production) دریافت
 می‌شود؛ کلید/گواهی یک‌روزهٔ آزمایشی جدید فقط برای TLS همین clone است، نه
-Root یا intermediate پروژه. هدف با نام تصادفی، شبکهٔ `--internal`، پورت
-TLS فقط روی `127.0.0.1`، data روی tmpfs با حد 128MiB، RAM با حد 512MiB و
+Root یا intermediate پروژه. هدف با نام تصادفی، شبکهٔ `--internal` روی
+TEST-NET-2 (`198.51.100.0/29`)، بدون هیچ publish پورت میزبان، TLS روی IP
+خصوصی همان clone (`198.51.100.2`)، data روی tmpfs با حد 128MiB، RAM با حد 512MiB و
 swap غیرفعال برای container ساخته می‌شود. Docker daemon و سیستم operator
 باید مورد اعتماد باشند؛ سایر پردازش‌های مدیر همان دستگاه مرز مستقل نیستند.
+این subnet باید آزاد باشد؛ ابزار شبکهٔ موجود را reuse یا تغییر نمی‌دهد.
+طبق [راهنمای Docker](https://docs.docker.com/engine/network/port-publishing/)،
+میزبان به bridge داخلی دسترسی دارد؛ برای همین publish عمومی لازم نیست.
 
 فقط همین clone خالی init و `snapshot-force` می‌شود؛ پس از restore، دو سهم
 اصلی آن را unseal می‌کنند و احراز هویت اصلی، mountها و audit بدون `log_raw`

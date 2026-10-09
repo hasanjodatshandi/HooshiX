@@ -29,6 +29,7 @@ import openbao_snapshot_crypto as crypto
 
 ROOT = Path(__file__).resolve().parents[2]
 LABEL = 'hooshix.isolated-restore'
+TARGET = '198.51.100.2'  # TEST-NET-2, exclusively owned by this disposable internal bridge.
 
 
 def approved_image():
@@ -44,8 +45,7 @@ def request(client, path, method='GET', body=None, token=None, expected=200):
     host.require((method, path) in {('POST', 'sys/storage/raft/snapshot-force'),
                  ('GET', 'auth/token/lookup-self'), ('GET', 'sys/audit'), ('GET', 'sys/mounts')},
                  'RESTORE_API_PATH_REJECTED')
-    host.require(re.fullmatch(r'https://127\.0\.0\.1:[0-9]{1,5}/v1/', client.base),
-                 'RESTORE_LOOPBACK_BIND_REQUIRED')
+    host.require(client.base == 'https://' + TARGET + ':8200/v1/', 'RESTORE_PRIVATE_BIND_REQUIRED')
     host.require(isinstance(token, str) and re.fullmatch(r'[A-Za-z0-9_.-]{16,1024}', token),
                  'RESTORE_TOKEN_REJECTED')
     host.require((method == 'GET' and body is None and expected == 200)
@@ -118,29 +118,28 @@ def run(snapshot, keys, token, base):
                          'RESTORE_CLEANUP_INCOMPLETE')
 
         docker('pull', '--quiet', image, timeout=180)
-        version = docker('version', '--format', '{{.Server.Version}}').strip()
-        host.require(re.fullmatch(rb'[0-9]+\.[0-9]+\.[0-9]+', version) and int(version.split(b'.')[0]) >= 28,
-                     'RESTORE_DOCKER_LOOPBACK_SAFETY_REQUIRED')
         host.require(docker('info', '--format', '{{.SwapLimit}}').strip() == b'true',
                      'RESTORE_SWAP_LIMIT_REQUIRED')
         operator.command(['/usr/bin/openssl', 'req', '-x509', '-newkey', 'rsa:3072', '-sha256',
             '-nodes', '-days', '1', '-subj', '/CN=hooshix-disposable-recovery-only',
-            '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', str(directory / 'tls.key'),
+            '-addext', 'subjectAltName=IP:' + TARGET, '-keyout', str(directory / 'tls.key'),
             '-out', str(directory / 'tls.crt')])
         (directory / 'tls.key').chmod(0o600)
         config = json.loads((ROOT / 'infrastructure/production/secrets/openbao-server.json').read_bytes())
-        config.update(api_addr='https://127.0.0.1:8200', cluster_addr='https://127.0.0.1:8201')
+        config.update(api_addr='https://' + TARGET + ':8200', cluster_addr='https://' + TARGET + ':8201')
         config['listener'][0]['tcp']['max_request_size'] = crypto.MAX_SNAPSHOT
         config['listener'][0]['tcp']['max_request_duration'] = '60s'
         config['default_max_request_duration'] = '60s'
         operator.create(directory / 'server.json', json.dumps(config).encode())
         with contextlib.ExitStack() as cleanup:
             cleanup.callback(remove, 'network', network)
-            docker('network', 'create', '--internal', '--label', LABEL + '=' + nonce, network)
+            docker('network', 'create', '--internal', '--subnet', '198.51.100.0/29',
+                   '--label', LABEL + '=' + nonce, network)
             host.require(docker('network', 'inspect', '--format', '{{.Internal}}', network).strip() == b'true',
                          'RESTORE_EGRESS_ISOLATION_REQUIRED')
             cleanup.callback(remove, 'container', name)
             docker('create', '--name', name, '--label', LABEL + '=' + nonce, '--network', network,
+                '--ip', TARGET,
                 '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
                 '--user', f'{os.getuid()}:{os.getgid()}', '--memory', '512m', '--memory-swap', '512m',
                 '--cpus', '1', '--pids-limit', '64', '--log-driver', 'none',
@@ -149,12 +148,17 @@ def run(snapshot, keys, token, base):
                 '--mount', f'type=bind,src={directory / "tls.key"},dst=/openbao/tls/tls.key,readonly',
                 '--mount', f'type=bind,src={directory / "tls.crt"},dst=/openbao/tls/tls.crt,readonly',
                 '--mount', f'type=bind,src={directory / "server.json"},dst=/openbao/config.json,readonly',
-                '--publish', '127.0.0.1::8200', '--entrypoint', '/usr/bin/bao', image,
+                '--entrypoint', '/usr/bin/bao', image,
                 'server', '-config=/openbao/config.json')
+            attached = json.loads(docker('container', 'inspect', '--format', '{{json .NetworkSettings.Networks}}', name))
+            host.require(set(attached) == {network} and attached[network]['IPAddress'] == TARGET,
+                         'RESTORE_PRIVATE_BIND_REQUIRED')
+            host.require(docker('container', 'inspect', '--format', '{{json .HostConfig.PortBindings}}', name).strip()
+                         in (b'{}', b'null'), 'RESTORE_NO_PUBLIC_PORT_REQUIRED')
             docker('start', name)
-            match = re.fullmatch(rb'127\.0\.0\.1:([0-9]{1,5})\s*', docker('port', name, '8200/tcp'))
-            host.require(match is not None, 'RESTORE_LOOPBACK_BIND_REQUIRED')
-            client = transport.Client(int(match[1]), (directory / 'tls.crt').read_text())
+            # Internal-only Docker bridges intentionally do not publish host ports.
+            client = transport.Client(8200, (directory / 'tls.crt').read_text())
+            client.base = 'https://' + TARGET + ':8200/v1/'
             wait(client, initialized=False, sealed=True)
             # Only the newly created RAM-backed clone is initialized/force-restored.
             initial = client.call('write', 'sys/init', {'secret_shares': 3, 'secret_threshold': 2})
