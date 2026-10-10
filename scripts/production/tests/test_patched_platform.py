@@ -40,7 +40,7 @@ class PatchedPlatformTest(unittest.TestCase):
         self.assertEqual('patched-upstream-source-build', result['provenance_kind'])
 
     def test_registry_resolution_binds_repository_manifest_config_and_platform(self):
-        repository = 'ghcr.io/hasanjodatshandi/hooshix/platform-eso-patched-private'
+        repository = 'ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private'
         image = repository + '@sha256:' + 'b' * 64
         source = {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'b' * 64,
             'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}
@@ -117,6 +117,9 @@ class PatchedPlatformTest(unittest.TestCase):
 
     def test_publication_resolves_registry_then_scans_all_digests_before_signing(self):
         commands = []
+        repositories = {component: 'ghcr.io/hasanjodatshandi/hooshix/platform-' + name + '-patched-private'
+            for component, name in (('eso', 'eso-v2'), ('openbao', 'openbao'),
+                                    ('istiod', 'istiod'), ('cni', 'cni'))}
 
         def fake_run(argv, **kwargs):
             commands.append(argv)
@@ -133,8 +136,7 @@ class PatchedPlatformTest(unittest.TestCase):
         def evidence(path):
             if path.name == 'cyclonedx.json':
                 return {'bomFormat': 'CycloneDX', 'components': [{}]}
-            image = ('ghcr.io/hasanjodatshandi/hooshix/platform-' + path.parent.name
-                     + '-patched-private@sha256:' + 'c' * 64)
+            image = repositories[path.parent.name] + '@sha256:' + 'c' * 64
             return {'source': {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'c' * 64,
                 'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}}
 
@@ -150,10 +152,32 @@ class PatchedPlatformTest(unittest.TestCase):
             result = target.publish(Path('unused'), {})
         self.assertEqual('Passed', result['publication'])
         self.assertEqual('Not verified', result['production_promotion'])
+        self.assertEqual({component: repository + '@sha256:' + 'c' * 64
+            for component, repository in repositories.items()}, result['images'])
+        self.assertEqual(['users/hasanjodatshandi/packages/container/'
+            + repository.removeprefix('ghcr.io/hasanjodatshandi/').replace('/', '%2F')
+            for repository in repositories.values()], [argv[2] for argv in commands if argv[0] == 'gh'])
         scans = [argv for argv in commands if argv[0] == 'syft']
         self.assertEqual(8, len(scans))
         self.assertTrue(all('@sha256:' in argv[2] for argv in scans[1::2]))
         self.assertFalse(any('.RepoDigests' in ' '.join(argv) for argv in commands))
+
+    def test_nonprivate_package_stops_before_registry_scan_or_signing(self):
+        for visibility in ('public', 'internal', '', 'private\npublic'):
+            commands = []
+            def fake_run(argv, **kwargs):
+                commands.append(argv)
+                return 'b' * 40 if argv[0] == 'git' else visibility
+            with self.subTest(visibility=visibility), \
+                    patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                    patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
+                    patch.object(Path, 'write_text'), patch.object(target, 'build',
+                        return_value=('tag', {'image_config_digest': self.digest})), \
+                    self.assertRaises(ValueError):
+                target.publish(Path('unused'), {})
+            self.assertEqual('users/hasanjodatshandi/packages/container/hooshix%2Fplatform-eso-v2-patched-private',
+                             next(argv[2] for argv in commands if argv[0] == 'gh'))
+            self.assertFalse(any(argv[0] in ('syft', 'grype', 'cosign') for argv in commands))
 
     def test_failed_component_scan_prevents_all_signing(self):
         commands = []
