@@ -20,16 +20,21 @@ recipe, credential-free four-component build/scan CI and protected-main private
 publication path are implemented. Both CNI executables are covered; runtime
 base files/users/entrypoints remain unchanged. Rebuilt bytes use distinct
 `patched-upstream-source-build` provenance, never unchanged-import claims.
-At candidate `c441e5316cd1791e54b4f94b885851708795831c`, source-security run
-`38036263062` passed all four build/scan jobs. Publication, native compatibility
-and adoption into digest/admission contracts remain `Not verified`.
+At candidate `1ce7d8ac91f9688996da94ca4ec38ad0f26690b0`, source-security run
+`38050468775` passed all four build/scan jobs. Repository baseline run
+`38050468774`, commissioning staging run `38050468781` and web E2E run
+`38050468658` also passed on that exact candidate. Publication, ESO native
+delivery compatibility and adoption into digest/admission contracts remain
+`Not verified`.
 PR/push/manual baseline gates now build and scan the selected final source
 candidates, while scheduled upstream scans remain blocking and preserve the old
 image findings. The OpenBao candidate gate also requires disposable native
 TLS/Shamir/Raft restart/restore/ACL/audit/root-revocation checks using its exact
 local configuration digest; protected-main publication repeats that test on the
-new publication build before any push/signing. This baseline wiring and native
-candidate evidence are not yet CI-verified. Ztunnel is still scanned unchanged;
+new publication build before any push/signing. The baseline wiring, native
+OpenBao candidate recovery and native JIT expiry gate are `Passed` in run
+`38050468774`; this is disposable CI evidence, not VPS activation or JIT evidence.
+Ztunnel is still scanned unchanged;
 waypoint is not replaced by this build path. No live vulnerability is considered
 resolved until the signed replacement is independently validated and rolled out.
 
