@@ -177,6 +177,18 @@ def build(component, directory):
     return tag, receipt
 
 
+def published_image(repository, source, image_id):
+    metadata = source['metadata']
+    digest = metadata['manifestDigest']
+    if (source['type'] != 'image' or not re.fullmatch(r'sha256:[a-f0-9]{64}', digest)
+            or metadata['imageID'] != image_id
+            or metadata['os'] != 'linux' or metadata['architecture'] != 'amd64'
+            or not isinstance(metadata['repoDigests'], list)
+            or repository + '@' + digest not in metadata['repoDigests']):
+        raise ValueError('exact published repository configuration and platform required')
+    return repository + '@' + digest
+
+
 def publish(directory, env):
     revision, invocation = context(env)
     if run(['git', 'rev-parse', 'HEAD']).strip() != revision:
@@ -191,6 +203,7 @@ def publish(directory, env):
         'production_readiness': 'Not verified'}) + '\n')
     selected, targets = recipe(), {}
     for component, (tag, receipt) in built.items():
+        print('PATCHED_PUBLICATION_STEP=' + component + '-push', flush=True)
         repository = 'ghcr.io/hasanjodatshandi/hooshix/platform-' + component + '-patched-private'
         target = repository + ':candidate-' + revision + '-' + invocation.replace(':', '-')
         run(['docker', 'tag', tag, target])
@@ -199,12 +212,14 @@ def publish(directory, env):
             + component + '-patched-private', '--jq', '.visibility']).strip()
         if visibility != 'private':
             raise ValueError('private candidate package required')
-        digests = json.loads(run(['docker', 'image', 'inspect', '--format', '{{json .RepoDigests}}', target]))
-        matches = [item for item in digests if item.startswith(repository + '@sha256:')]
-        if len(matches) != 1:
-            raise ValueError('exact published digest required')
-        image = matches[0]
         folder = directory / component
+        print('PATCHED_PUBLICATION_STEP=' + component + '-registry-resolve', flush=True)
+        # Resolve remotely: Docker's local RepoDigests is not registry authority.
+        run(['syft', 'scan', target, '--from', 'registry', '--platform', 'linux/amd64',
+             '-o', 'syft-json=' + str(folder / 'registry-resolution.json')], timeout=300)
+        image = published_image(repository, load(folder / 'registry-resolution.json')['source'],
+                                receipt['image_config_digest'])
+        print('PATCHED_PUBLICATION_STEP=' + component + '-digest-scan', flush=True)
         run(['syft', 'scan', image, '--from', 'registry', '--platform', 'linux/amd64',
             '-o', 'syft-json=' + str(folder / 'syft.json'),
             '-o', 'cyclonedx-json=' + str(folder / 'cyclonedx.json')], timeout=300)
@@ -217,6 +232,7 @@ def publish(directory, env):
     flags = ['--certificate-identity', EXPECTED_CERTIFICATE_IDENTITY,
              '--certificate-oidc-issuer', EXPECTED_OIDC_ISSUER]
     for component, image in targets.items():
+        print('PATCHED_PUBLICATION_STEP=' + component + '-sign-verify', flush=True)
         folder = directory / component
         source = selected['sources'][SOURCE[component]]
         predicate = {'buildDefinition': {'buildType': BUILD_TYPE,
