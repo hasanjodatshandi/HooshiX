@@ -175,6 +175,17 @@ See the [scoped-auth guide](../operations/production-openbao-auth-fa.md).
 
 ### Existing deployment gates
 
+For this unchanged upstream OpenBao import, `openbao-image.json/import_provenance`
+binds the exact owned image digest to its reviewed original import revision
+`6131ed82e22e4990efe33c9433d01d76a65d1265`. Native admission still verifies the
+exact keyless signer/issuer and that exact signed payload revision; no wildcard,
+unverified payload or multiple-revision fallback is allowed. A later authenticated
+main publication/rescan receipt retains its own execution revision and must pass
+the unchanged five-day publication/database freshness and vulnerability gates.
+Refreshing scan evidence is not a claim that immutable upstream bytes were rebuilt.
+This separation does not apply to rebuilt application artifacts or mesh imports.
+Changing the image requires a separately reviewed import anchor and native tests.
+
 - render staging and production desired state;
 - run Helm/Kustomize/Kubernetes schema/policy validation;
 - verify immutable image/chart digests and scan rendered output for secrets;

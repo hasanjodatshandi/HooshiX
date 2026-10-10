@@ -132,22 +132,21 @@ python3 scripts/production/build_platform_commissioning_bundle.py \
   --output /mnt/c/Users/Coder/Downloads/HooshiX-platform-commissioning
 ```
 
-دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37228262995` هستند.
-رسید OpenBao از آخرین attempt موفق همان workflow اصلی با revision دقیق
-`6131ed82e22e4990efe33c9433d01d76a65d1265` است؛ digest ثابت تغییر نمی‌کند.
+دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37611729931` هستند.
+رسید اسکن/انتشار OpenBao از main با revision
+`ffc299093b965450e4ef433a2d8392a01c404e0c` است؛ digest ثابت تغییر نمی‌کند.
 publication و زمان ساخت پایگاه اسکن هر دو باید در پنجرهٔ پنج‌روزه باشند.
 با امضای مجدد همان digest، انتخاب payload چند attestation ممکن است مبهم شود؛
-revision دقیق رسید همچنان باید در آزمون native همان تصویر پذیرفته شود.
+برای تصویر upstream واردشدهٔ بدون تغییر، revision امضای ورود در
+`openbao-image.json/import_provenance` به digest دقیق bind است:
+`6131ed82e22e4990efe33c9433d01d76a65d1265`. سیاست native فقط همان revision،
+signer و issuer دقیق را می‌پذیرد؛ revision اجرای اسکن تازه جای آن را نمی‌گیرد.
 صرف تازه‌بودن metadata مجوز نصب نیست. شرط امضا، SBOM و freshness پنج‌روزه
 حذف نشده است؛ evidence منقضی یا تغییر image، انتشار و staging تازه لازم دارد.
-برای تازه‌کردن اسکنِ همین artifact بدون تغییر revision امضاشده، workflow اصلی
-را دوباره اجرا کنید و تا موفقیت attempt جدید صبر کنید:
-
-```bash
-gh run rerun 37228262995 --repo hasanjodatshandi/HooshiX
-```
-
-دانلود فقط آخرین attempt موفق، با artifact متناظر همان attempt، مجاز است.
+رسید تازه باید از آخرین attempt موفق با artifact متناظر دانلود شود. ابزار
+قدیمی انتشار برای refresh تصویرِ از قبل موجود روش تکرارپذیر تأییدشده ندارد؛
+تا آماده‌شدن روش بازبینی‌شده، پس از انقضای رسید نصب متوقف می‌شود. تصویر،
+امضاها یا referrerها را برای تازه‌سازی حذف یا force-overwrite نکنید.
 اگر evidence بیش از پنج روز عمر دارد، publication/staging تازه لازم است، نه ساخت Root.
 بسته شامل source/plan بازبینی‌شده، hashها، چهار فایل عمومی گواهی و همین راهنماست؛
 هیچ کلید یا رمز خصوصی در بسته نیست. پوشهٔ خروجی باید تازه و بیرون پروژه باشد.
