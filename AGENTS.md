@@ -252,6 +252,28 @@ Capacity problems are solved by safe tuning, more capacity, approved externaliza
 
 ## 14. Change discipline
 
+### Stage 10 living operator guide
+
+Until Production Commissioning & Readiness (Stage 10) is complete, every change
+that affects Stage 10 installation or operation MUST update
+`docs/operations/stage10-production-deployment-guide-fa.md` in the same coherent
+change. Keep it a clean, current Persian operator guide for reproducing deployment
+on another server: final supported steps, prerequisites, target bindings, commands,
+expected results, secret custody, verification and recovery precautions. Do not
+append failed attempts, debugging transcripts, obsolete fixes or trial-and-error
+history. Replace superseded instructions; distinguish prepared tooling from
+executed target evidence and mark unavailable target-specific commands explicitly.
+This guide is an operator entrypoint, not a replacement for current ADRs or the
+readiness gates. Do not claim an unexecuted step succeeded.
+
+### Owner-managed GitHub wait
+
+For long-running GitHub CI/workflows, submit the required work, report the run/PR
+link and current known state, then end the turn. Do not repeatedly poll or wait
+for GitHub completion. The owner will check and announce completion; then verify
+the result once and continue. This changes waiting behavior only: do not waive
+checks, treat unfinished runs as Passed, or merge before required checks succeed.
+
 All normal changes follow `docs/engineering/repository-change-workflow.md`.
 
 One PR is one coherent reviewed engineering change. Conversation prompts are not engineering boundaries.

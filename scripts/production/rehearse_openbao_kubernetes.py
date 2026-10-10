@@ -21,13 +21,15 @@ from unittest.mock import patch
 
 import import_intermediate_ca as ca_import
 import activate_openbao_host as activation
+import bootstrap_openbao_auth as auth_host
+import openbao_scoped_auth as scoped_auth
 from rehearse_openbao_recovery import BOUND, Client, RehearsalFailed, initialize
 from render_openbao_candidate import ALIVE, NAMESPACE, ROOT, STATUS, candidate
 from render_openbao_local_storage import candidate as local_storage_candidate
 
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
-                   "public-ca-projection", "unseal", "acl", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "public-ca-projection", "unseal", "acl", "scoped-auth", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -302,6 +304,50 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
                 step("unseal")
                 keys, token = initialize(client)
                 k("-n", NAMESPACE, "wait", "--for=condition=Ready", "pod/openbao-0", "--timeout=60s", timeout=70)
+                if platform is None:
+                    step("scoped-auth")
+                    def auth_kube(*args, data=None, expected=0, operation):
+                        return k(*args, data=data, expected=expected)
+                    with patch.object(auth_host.host, 'kube', side_effect=auth_kube):
+                        for value in scoped_auth.foundation():
+                            auth_host.reconcile(value)
+                            auth_host.reconcile(value)  # Real owned-object no-write reconciliation.
+                        service = json.loads(k('-n', 'default', 'get', 'service/kubernetes', '-o', 'json'))
+                        endpoints = json.loads(k('-n', 'default', 'get', 'endpointslices',
+                                                 '-l', 'kubernetes.io/service-name=kubernetes', '-o', 'json'))
+                        addresses = {service['spec']['clusterIP']}
+                        for item in endpoints['items']:
+                            for endpoint in item['endpoints']:
+                                addresses.update(endpoint['addresses'])
+                        # kindnet enforces default-deny too; use the production API-only edge,
+                        # with this disposable cluster's addresses, never the VPS addresses.
+                        auth_host.reconcile(scoped_auth.tokenreview_egress(sorted(addresses)))
+                        kube_ca = json.loads(k('-n', 'default', 'get', 'configmap', 'kube-root-ca.crt',
+                                              '-o', 'json'))['data']['ca.crt']
+                        audiences = scoped_auth.jwt_audiences(auth_host.token_request(
+                            scoped_auth.NAMESPACE, 'eso-' + scoped_auth.SERVICES[0], []))
+                        api = auth_host.API(client)
+                        scoped_auth.configure(api, token, 'https://kubernetes.default.svc:443', kube_ca)
+                        scoped_auth.configure(api, token, 'https://kubernetes.default.svc:443', kube_ca)
+                        scoped_private = []
+                        for service_name in scoped_auth.SERVICES:
+                            path = f'hooshix/data/production/{service_name}/commissioning-probe'
+                            value = 'synthetic-scoped-auth-' + uuid.uuid4().hex
+                            api.call(path, 'POST', {'data': {'value': value}}, token)
+                            jwt = auth_host.token_request(scoped_auth.NAMESPACE, 'eso-' + service_name,
+                                                         [*audiences, scoped_auth.AUDIENCE])
+                            login = api.call('auth/' + scoped_auth.MOUNT + '/login', 'POST',
+                                            {'role': 'eso-' + service_name, 'jwt': jwt})['auth']['client_token']
+                            scoped_private.extend([value, jwt, login])
+                            try:
+                                if api.call(path, token=login)['data']['data']['value'] != value:
+                                    raise RehearsalFailed('scoped service readback failed')
+                            finally:
+                                api.call('auth/token/revoke', 'POST', {'token': login}, token, 204)
+                        scoped_auth.verify(api, token, auth_host.token_request, audiences)
+                        scoped_logs = k('-n', NAMESPACE, 'logs', 'openbao-0', '--tail=-1')
+                        if any(value.encode() in scoped_logs for value in scoped_private):
+                            raise RehearsalFailed('scoped authentication container log leak')
                 step("acl")
                 client.call("sys/mounts/fixture", "POST", {"type": "kv", "options": {"version": "2"}}, token, 204)
                 canary = "ci-only-" + uuid.uuid4().hex
@@ -373,6 +419,8 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
             "production_target": "Not verified: K3s paths, imported owner CA and guarded 8GiB PV not exercised",
             "ca_secret_reconcile": "Not applicable: foundation job owns separate conflict fixture"})
         result["checks"].pop("ca_secret_create_reconcile_conflict")
+    else:
+        result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
     with receipt.open("x", encoding="utf-8") as output:
         json.dump(result, output, indent=2)
         output.write("\n")
@@ -391,7 +439,7 @@ def main() -> int:
         rehearse(args.tools_dir, args.receipt, args.platform_publications)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
-            tarfile.TarError, RehearsalFailed):
+            tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):
         print("OPENBAO_KUBERNETES=Failed; inspect fixed CI step; secret diagnostics suppressed")
         return 1
 

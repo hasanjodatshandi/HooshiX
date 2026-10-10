@@ -146,7 +146,45 @@ See the [activation/recovery guide](../operations/production-openbao-activation-
 API semantics: [OpenBao sys/init](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/api/system/init.mdx)
 and [loopback ephemeral forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/).
 
+### Scoped authentication commissioning
+
+The existing store's supervised bootstrap may establish dedicated secret-delivery
+identities before ESO installation, without restarting OpenBao or revoking the
+initial root credential. Six `platform-apps/eso-<service>` accounts are bound by
+exact name, namespace and audience to read-only KV-v2 paths for their owning
+service. They receive no default policy and OpenBao tokens have a five-minute
+explicit maximum lifetime. Client TokenRequest JWTs carry the API audience plus
+the explicit OpenBao audience. Kubernetes TokenReview remains authoritative;
+issuer validation is delegated to that API, not an unverified decoded JWT.
+Only `create tokenreviews.authentication.k8s.io` is granted to those six accounts;
+the broader `system:auth-delegator` permission set is not required. No static
+reviewer JWT or automatically mounted OpenBao pod token is added.
+
+This step adds only the existing OpenBao pod's bounded API egress. Application
+namespaces retain restricted PSA, default-deny network and STRICT/default-deny
+mesh boundaries. Prepared namespace-scoped SecretStore contracts reference a
+public CA ConfigMap and a dedicated account; they do not install ESO, grant its
+controller TokenRequest permissions or open client ingress. Those are separately
+verified commissioning requirements. Native synthetic tests must cover six
+service-specific canary reads, cross-service/write/admin denial, wrong identity,
+namespace and audience denial, short lifetime and token revocation. Root/PVC/
+custody and host services are preserved. Owner-local root use remains confined to
+the ADR-0030 supervised bootstrap; no hourly root job is introduced.
+
+See the [scoped-auth guide](../operations/production-openbao-auth-fa.md).
+
 ### Existing deployment gates
+
+For this unchanged upstream OpenBao import, `openbao-image.json/import_provenance`
+binds the exact owned image digest to its reviewed original import revision
+`6131ed82e22e4990efe33c9433d01d76a65d1265`. Native admission still verifies the
+exact keyless signer/issuer and that exact signed payload revision; no wildcard,
+unverified payload or multiple-revision fallback is allowed. A later authenticated
+main publication/rescan receipt retains its own execution revision and must pass
+the unchanged five-day publication/database freshness and vulnerability gates.
+Refreshing scan evidence is not a claim that immutable upstream bytes were rebuilt.
+This separation does not apply to rebuilt application artifacts or mesh imports.
+Changing the image requires a separately reviewed import anchor and native tests.
 
 - render staging and production desired state;
 - run Helm/Kustomize/Kubernetes schema/policy validation;

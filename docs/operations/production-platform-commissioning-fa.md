@@ -132,14 +132,21 @@ python3 scripts/production/build_platform_commissioning_bundle.py \
   --output /mnt/c/Users/Coder/Downloads/HooshiX-platform-commissioning
 ```
 
-دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37228262995` هستند.
-OpenBao از انتشار موفق و هنوز تازهٔ ۴ اکتبر با revision دقیق
-`6131ed82e22e4990efe33c9433d01d76a65d1265` استفاده می‌کند؛ digest آن با انتشار
-۷ اکتبر یکسان است. Kyverno ۱٫۱۸٫۲ برای هر نوع attestation فقط یک payload نگه
-می‌دارد؛ امضای مجدد همان digest با revision دیگر، انتخاب payload را مبهم می‌کند.
-بنابراین publication را صرفاً به‌دلیل جدیدتر بودن جایگزین نکنید: revision دقیق
-باید در آزمون native همان تصویر پذیرفته شود. شرط امضا، SBOM و freshness پنج‌روزه
+دو شمارهٔ انتشار پیش‌فرض، mesh=`37588183736` و OpenBao=`37611729931` هستند.
+رسید اسکن/انتشار OpenBao از main با revision
+`ffc299093b965450e4ef433a2d8392a01c404e0c` است؛ digest ثابت تغییر نمی‌کند.
+publication و زمان ساخت پایگاه اسکن هر دو باید در پنجرهٔ پنج‌روزه باشند.
+با امضای مجدد همان digest، انتخاب payload چند attestation ممکن است مبهم شود؛
+برای تصویر upstream واردشدهٔ بدون تغییر، revision امضای ورود در
+`openbao-image.json/import_provenance` به digest دقیق bind است:
+`6131ed82e22e4990efe33c9433d01d76a65d1265`. سیاست native فقط همان revision،
+signer و issuer دقیق را می‌پذیرد؛ revision اجرای اسکن تازه جای آن را نمی‌گیرد.
+صرف تازه‌بودن metadata مجوز نصب نیست. شرط امضا، SBOM و freshness پنج‌روزه
 حذف نشده است؛ evidence منقضی یا تغییر image، انتشار و staging تازه لازم دارد.
+رسید تازه باید از آخرین attempt موفق با artifact متناظر دانلود شود. ابزار
+قدیمی انتشار برای refresh تصویرِ از قبل موجود روش تکرارپذیر تأییدشده ندارد؛
+تا آماده‌شدن روش بازبینی‌شده، پس از انقضای رسید نصب متوقف می‌شود. تصویر،
+امضاها یا referrerها را برای تازه‌سازی حذف یا force-overwrite نکنید.
 اگر evidence بیش از پنج روز عمر دارد، publication/staging تازه لازم است، نه ساخت Root.
 بسته شامل source/plan بازبینی‌شده، hashها، چهار فایل عمومی گواهی و همین راهنماست؛
 هیچ کلید یا رمز خصوصی در بسته نیست. پوشهٔ خروجی باید تازه و بیرون پروژه باشد.

@@ -185,7 +185,7 @@ def main():
     parser.add_argument('--staging-run', required=True)
     parser.add_argument('--public-ca', type=Path, required=True)
     parser.add_argument('--mesh-run', default='37588183736')
-    parser.add_argument('--openbao-run', default='37228262995')
+    parser.add_argument('--openbao-run', default='37611729931')
     parser.add_argument('--resume-bundle', type=Path, help='Authenticated original bundle; only exact verifier egress and signed-TUF transport repairs may differ')
     args = parser.parse_args()
     try:

@@ -81,6 +81,16 @@ def match_constraints(namespace: str) -> dict:
                                "operations": ["CREATE", "UPDATE"], "resources": ["pods"]}]}
 
 
+def openbao_import_revision(receipt: dict) -> str:
+    # Unchanged upstream bytes retain their reviewed import lineage; a rescan is not a rebuild.
+    anchor = json.loads(BAO_PIN.read_bytes())["import_provenance"]
+    if (anchor["image"] != receipt["image"]
+            or receipt.get("provenance_kind") != "unchanged-upstream-import"
+            or not re.fullmatch(r"[a-f0-9]{40}", anchor["revision"])):
+        raise ValueError("exact reviewed OpenBao import lineage required")
+    return anchor["revision"]
+
+
 def policy(kind: str, name: str, namespace: str, validations: list[dict]) -> dict:
     return {"apiVersion": API, "kind": kind, "metadata": {"name": name}, "spec": {
         "failurePolicy": "Fail", "validationActions": ["Deny"],
@@ -294,7 +304,7 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
                              mesh_receipt["repository_revision"]),
                 hardening("hooshix-secrets", {"openbao": bao_pod})]
     policies.extend(bounded_image_policies("hooshix-secrets", [bao_receipt["image"]],
-                                          bao_receipt["repository_revision"]))
+                                          openbao_import_revision(bao_receipt)))
     return {"schema_version": 1, "profile": "production-single-server",
             "installation_id": "hooshix-production", "mesh": candidate, "openbao": openbao,
             "admission_prerequisites": reporting_permissions(),

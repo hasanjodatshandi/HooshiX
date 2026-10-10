@@ -33,6 +33,26 @@ def receipt(component):
 
 
 class PlatformAdmissionTest(unittest.TestCase):
+    def test_rescan_revision_does_not_replace_exact_reviewed_import_lineage(self):
+        record = receipt('openbao')
+        revision = target.openbao_import_revision(record)
+        self.assertEqual('6131ed82e22e4990efe33c9433d01d76a65d1265', revision)
+        record['repository_revision'] = 'b' * 40
+        self.assertEqual(revision, target.openbao_import_revision(record))
+        plan = target.render(receipt('mesh'), record, target.mesh.candidate())
+        provenance = next(p for p in plan['admission']['items']
+                          if p['metadata']['name'].endswith('secrets-supply-chain-provenance'))
+        self.assertIn(revision, provenance['spec']['validations'][1]['expression'])
+        self.assertNotIn('b' * 40, provenance['spec']['validations'][1]['expression'])
+        for field, value in (('image', 'other@sha256:' + '0' * 64),
+                             ('provenance_kind', 'application-rebuild')):
+            bad = {**record, field: value}
+            with self.assertRaises(ValueError):
+                target.openbao_import_revision(bad)
+        with patch.object(target.json, 'loads', return_value={'import_provenance': {
+                'image': record['image'], 'revision': '*'}}), self.assertRaises(ValueError):
+            target.openbao_import_revision(record)
+
     def test_tuf_transport_keeps_embedded_root_and_exact_keyless_trust(self):
         plan = target.render(receipt('mesh'), receipt('openbao'), target.mesh.candidate())
         policies = [p for p in plan['admission']['items'] if p['kind'] == 'ImageValidatingPolicy']
