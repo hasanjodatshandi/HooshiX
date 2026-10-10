@@ -1,0 +1,66 @@
+name: Patched platform source security
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/patched-platform-source.yml'
+      - '.github/workflows/production-release.yml'
+      - 'infrastructure/production/release/patched-platform-sources.json'
+      - 'scripts/production/build_patched_platform.py'
+      - 'scripts/production/tests/test_patched_platform.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patched-platform-source.yml'
+      - 'infrastructure/production/release/patched-platform-sources.json'
+      - 'scripts/production/build_patched_platform.py'
+permissions:
+  contents: read
+concurrency:
+  group: patched-platform-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-security:
+    name: Patched source ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        component: [eso, openbao, istiod, cni]
+    env:
+      SYFT_GOLANG_CAPTURE_SYMBOLS: all
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+      SYFT_CHECK_FOR_APP_UPDATE: 'false'
+    steps:
+      - name: Check out reviewed candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install existing integrity-pinned scanners
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/patched-tools"
+          echo "$RUNNER_TEMP/patched-tools" >> "$GITHUB_PATH"
+      - name: Build official source and scan every rebuilt executable
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          timeout 180 grype db update
+          python3 scripts/production/build_patched_platform.py --component "$COMPONENT" \
+            --directory "$RUNNER_TEMP/patched-evidence"
+      - name: Preserve public build and scan evidence even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: patched-${{ matrix.component }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/patched-evidence/Dockerfile
+            ${{ runner.temp }}/patched-evidence/*json
+            ${{ runner.temp }}/patched-evidence/module-evidence/
+          retention-days: 30
+          if-no-files-found: error

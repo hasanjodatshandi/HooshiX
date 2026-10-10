@@ -60,6 +60,13 @@ This matrix records production technology combinations that must remain compatib
 
 Trivy and OWASP Dependency-Check are not current baseline components. Under ADR-0045 they are reconsidered only if a distinct coverage gap is evidenced and the compatibility/ownership/exception model is reviewed.
 
+The owner-approved source-security candidate recipe preserves ESO 2.12.0,
+OpenBao 2.6.4 and Istio 1.30.5 while rebuilding the affected Go executables
+with Go 1.26.9 and fixed x/net 0.60.0 dependencies. It does not change the
+effective image pins or claim compatibility: rebuilt-image scans, native tests,
+distinct source-build provenance and signed digest/admission adoption remain
+required. Both CNI binaries are rebuilt; ztunnel and waypoint are unchanged.
+
 ## Upgrade and profile-validation rule
 
 An upgrade or initial profile approval is complete only after the affected set proves, as applicable:

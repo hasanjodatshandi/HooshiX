@@ -396,6 +396,61 @@ python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz
 نصب تکمیل شوند. render، readiness یا موفقیت runtime را ثابت نمی‌کند. چون این
 مرحله فقط فایل عمومی موقت تولید می‌کند، rollback روی سرور لازم نیست.
 
+### ساخت candidate امنیتی از سورس رسمی
+
+recipe ثابت `infrastructure/production/release/patched-platform-sources.json`
+برای ESO `2.12.0`، OpenBao `2.6.4` و Istio `1.30.5` است. نسخهٔ محصول و chart
+حفظ می‌شود؛ compiler برابر Go `1.26.9` با تصویر builder دارای digest ثابت است.
+`x/net=v0.60.0` و وابستگی‌های لازم آن (`x/crypto=v0.57.0`، `x/sys=v0.48.0`،
+`x/term=v0.46.0` و `x/text=v0.42.0`) ثابت‌اند. archive سورس رسمی هر پروژه به
+commit و SHA-256 bind است؛ checksum، sumdb، `go mod verify` و build readonly
+خاموش نمی‌شوند. این مسیر ساخت جدید، تصویر رسمی upstream نیست.
+
+فقط فایل‌های Go جایگزین می‌شوند؛ runtime پایهٔ قفل‌شده، کاربران، entrypoint،
+گواهی‌ها و فایل‌های iptables حفظ می‌شوند. هر دو `install-cni` و `istio-cni`
+بازسازی می‌شوند. OpenBao نسخهٔ `2.6.4` را برای قرارداد recovery حفظ می‌کند؛
+UI طبق `openbao-server.json` خاموش می‌ماند. Ztunnelِ Rust و waypoint توسط این
+مسیر تغییر نمی‌کنند و بررسی/هماهنگی digest آن‌ها مستقل باقی می‌ماند.
+
+برای بررسی محلی قراردادها، بدون VPS یا credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_patched_platform.py
+```
+
+ساخت‌های سنگین در workflow `Patched platform source security` انجام می‌شوند:
+چهار job با نام‌های `Patched source eso/openbao/istiod/cni`. هر job باید
+`PATCHED_PLATFORM=Passed`، scan بدون High/Critical، compiler/dependency صحیح
+در تمام فایل‌های اجرایی و رسید candidate تولید کند. artifact عمومی شامل
+SBOM، اسکن، recipe تولیدشده، graph ماژول‌ها، hashهای `go.mod/go.sum` و buildinfo
+است؛ هیچ image در PR push یا امضا نمی‌شود. موفقیت این چهار job به‌تنهایی
+سازگاری runtime، آماده‌بودن Production یا موفقیت سایر گیت‌ها نیست.
+
+انتشار بعدی فقط پس از merge بازبینی‌شده و baseline موفق همان main، از workflow
+موجود `production-release.yml` با `release_kind=patched-platform-candidate`
+و environment مصوب انجام می‌شود. مثال زیر **فعلاً اجرا نشود**؛ گیت‌های
+baseline/digest/admission باید ابتدا برای candidate جدید هماهنگ شوند:
+
+```bash
+gh workflow run production-release.yml --ref main \
+  -f release_kind=patched-platform-candidate
+```
+
+انتشار، تمام چهار تصویر را می‌سازد و اسکن می‌کند؛ سپس به packageهای خصوصی
+`platform-<eso|openbao|istiod|cni>-patched-private` در GHCR همان حساب می‌فرستد.
+config digest پس از push کنترل می‌شود؛ SBOM/scan برای digest واقعی registry
+دوباره بررسی می‌شود. فقط پس از موفقیت همهٔ تصاویر، امضا، provenance از نوع
+`patched-upstream-source-build` و CycloneDX امضاشده صادر و signer مثبت/منفی
+بررسی می‌شوند. provenance سورس، recipe، compiler، base image، وابستگی‌ها،
+hashهای واقعی فایل‌های ماژول و revision مخزن را ثبت می‌کند. خروجی
+`publication.json` صرفاً candidate است؛ admission فعلی به‌صورت خودکار آن را
+نمی‌پذیرد. آزمون native، update pin/digest و rollout روی VPS مرحلهٔ جداست.
+
+این مرحله فایل یا دادهٔ VPS را تغییر نمی‌دهد؛ Root، اسرار و snapshot موجود
+حفظ می‌شوند. هیچ reset/reinit یا rollback سرور برای ساخت candidate لازم نیست.
+گیت امنیتی تصاویر upstream قدیمی حذف یا موفق معرفی نمی‌شود؛ تا تصویب و آزمون
+digestهای جایگزین، baseline و استقرار همچنان مسدود می‌مانند.
+
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
 1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.

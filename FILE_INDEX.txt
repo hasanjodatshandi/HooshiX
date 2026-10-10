@@ -6,6 +6,7 @@
 .github/workflows/identity-service.yml
 .github/workflows/notification-service.yml
 .github/workflows/offline-ca.yml
+.github/workflows/patched-platform-source.yml
 .github/workflows/platform-commissioning.yml
 .github/workflows/production-release.yml
 .github/workflows/production-vulnerability-rescan.yml
@@ -387,6 +388,7 @@ infrastructure/production/profile.json
 infrastructure/production/recovery/recovery-policy.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
+infrastructure/production/release/patched-platform-sources.json
 infrastructure/production/release/release-policy.json
 infrastructure/production/secrets/eso-image.json
 infrastructure/production/secrets/openbao-image.json
@@ -516,6 +518,7 @@ scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
+scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
@@ -601,6 +604,7 @@ scripts/production/tests/test_openbao_snapshot.py
 scripts/production/tests/test_openbao_storage.py
 scripts/production/tests/test_openbao_storage_guard.py
 scripts/production/tests/test_parspack_audit_transport.py
+scripts/production/tests/test_patched_platform.py
 scripts/production/tests/test_platform_admission.py
 scripts/production/tests/test_platform_commissioning.py
 scripts/production/tests/test_platform_publication_run.py

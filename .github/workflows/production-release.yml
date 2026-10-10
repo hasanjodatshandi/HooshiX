@@ -11,6 +11,7 @@ on:
           - applications
           - openbao-candidate
           - mesh-candidate
+          - patched-platform-candidate
       release_manifest_path:
         description: Tracked reviewed production release manifest under deploy/releases/production
         required: false
@@ -149,10 +150,10 @@ jobs:
           rm -f -- "$RUNNER_TEMP/docker-config/config.json"
 
   openbao-candidate:
-    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate')
+    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate')
     runs-on: ubuntu-24.04
     environment: production-release
-    timeout-minutes: 35
+    timeout-minutes: ${{ inputs.release_kind == 'patched-platform-candidate' && 180 || 35 }}
     permissions:
       contents: read
       actions: read
@@ -203,6 +204,11 @@ jobs:
           case "$RELEASE_KIND" in
             openbao-candidate) python3 scripts/production/publish_openbao_candidate.py ;;
             mesh-candidate) python3 scripts/production/publish_mesh_candidate.py ;;
+            patched-platform-candidate)
+              timeout 180 grype db update
+              python3 scripts/production/build_patched_platform.py --publish \
+                --directory "$RUNNER_TEMP/patched-release-evidence"
+              ;;
             *) exit 1 ;;
           esac
       - name: Remove temporary registry authentication
@@ -215,7 +221,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/${{ inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
+          name: ${{ inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/${{ inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
           retention-days: 30
           if-no-files-found: error

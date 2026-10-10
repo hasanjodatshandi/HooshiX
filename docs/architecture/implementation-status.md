@@ -12,6 +12,17 @@ is not installation or Kubernetes-version compatibility evidence. Signature/prov
 native scoped delivery, ESO installation and application secret materialization
 remain `Not verified`; no target mutation or additional root use occurs here.
 
+Owner-approved source-security candidates retain ESO 2.12.0, OpenBao 2.6.4
+and Istio 1.30.5 product versions while rebuilding their Go executables with
+Go 1.26.9 and x/net 0.60.0 plus its fixed transitive requirements. The pinned
+recipe, credential-free four-component build/scan CI and protected-main private
+publication path are implemented. Both CNI executables are covered; runtime
+base files/users/entrypoints remain unchanged. Rebuilt bytes use distinct
+`patched-upstream-source-build` provenance, never unchanged-import claims.
+Actual rebuilt-image scans, publication, native compatibility and adoption into
+digest/admission contracts remain `Not verified`; existing upstream scan gates
+remain blocking. Ztunnel and waypoint are not replaced by this build path.
+
 Stage 10 scoped-auth continuation: supervised tooling now prepares six dedicated
 `platform-apps/eso-<service>` delivery identities, exact service-only KV-v2 read
 policies, five-minute OpenBao tokens and client-JWT Kubernetes TokenReview without
