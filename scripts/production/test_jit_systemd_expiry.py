@@ -14,6 +14,14 @@ from pathlib import Path
 
 from jit_runtime import SERVICE_PROPERTIES
 
+CHILD_FIXTURE = (
+    "import os,time,pathlib,sys; child=os.fork(); "
+    "receipt=pathlib.Path(sys.argv[1]); staged=receipt.with_suffix('.tmp'); "
+    "staged.write_text(str(os.getpid())) if child == 0 else None; "
+    "staged.replace(receipt) if child == 0 else None; "
+    "time.sleep(60) if child == 0 else None"
+)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -26,10 +34,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="hooshix-jit-expiry-") as temp:
         receipt = Path(temp) / "pids"
         # Parent exits immediately, while the background child remains active.
-        fixture = ("import os,time,pathlib; child=os.fork(); "
-                   "pathlib.Path(__import__('sys').argv[1]).write_text(str(os.getpid())) "
-                   "if child == 0 else None; "
-                   "time.sleep(60) if child == 0 else None")
+        # Publish the complete PID atomically before the observer can see its path.
         argv = ["/usr/bin/systemd-run", *manager, "--quiet", "--unit", unit]
         for prop in (*SERVICE_PROPERTIES, "RuntimeMaxSec=4s"):
             # User managers cannot provide root-only mount sandboxing; CI tests all properties.
@@ -41,7 +46,7 @@ def main():
             argv.extend(("--property", f"ReadWritePaths={temp}"))
         lock = Path(temp) / "operator.lock"
         argv.extend(("--", "/usr/bin/flock", "--nonblock", "--no-fork", "--", str(lock),
-                     sys.executable, "-c", fixture, str(receipt)))
+                     sys.executable, "-c", CHILD_FIXTURE, str(receipt)))
         started = time.monotonic()
         try:
             subprocess.run(argv, check=True, timeout=5, stdout=subprocess.DEVNULL)
