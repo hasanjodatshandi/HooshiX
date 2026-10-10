@@ -82,7 +82,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | WAF engine | Coraza 3.7.0 | current choice |
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.5 | K8s support + single-server capacity benchmark |
-| Secrets sync | External Secrets Operator 2.8.0 | namespace-scoped stores preferred |
+| Secrets sync | External Secrets Operator 2.12.0 | namespace-scoped stores preferred |
 | Secret authority | OpenBao 2.6.4, official openbao-distroless (static nonroot) | ADR-0011 same-minor security patch/upstream flavor; verified-TLS native shell-free probes, recovery and exact-artifact scan gates; topology/authority unchanged |
 | Controlled VPS intermediate-key tooling | Existing Ubuntu OpenSSL/libssl3t64 3.5.5-1ubuntu3.7 | ADR-0002/0030 bounded commissioning only; encrypted PKCS#8 custody/public CSR handoff; no package upgrade or Root custody online |
 | Controlled VPS API-audit policy parser | Existing signed Ubuntu `python3-yaml` 6.0.3-1build1 / PyYAML 6.0.3 | bounded SafeLoader, no aliases/duplicate keys/custom objects; only whole-request Metadata policy accepted before intermediate Secret import; CI uses exact hash-pinned fixture wheel, no VPS package changes |

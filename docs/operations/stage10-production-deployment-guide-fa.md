@@ -330,7 +330,7 @@ activation، snapshot و isolated recovery باید مربوط به خود هم�
 
 ### پیش‌نیاز artifact نصب ESO
 
-نسخهٔ مصوب ESO `2.8.0` است؛ تصویر رسمی amd64 و chart همان نسخه در
+نسخهٔ مصوب ESO `2.12.0` است؛ تصویر رسمی amd64 و chart همان نسخه در
 `infrastructure/production/secrets/eso-image.json` با digest/checksum دقیق
 قفل شده‌اند. job اجباری `ESO pinned artifact security` در Repository baseline
 chart را با SHA-256 بررسی و تصویر دقیق را با Syft/Grype و پایگاه حداکثر
@@ -350,8 +350,14 @@ python3 -m unittest discover -s scripts/production/tests -p test_eso_artifact.py
 TokenRequest شش حساب `eso-<service>` مجاز است. ingress OpenBao و شبکه/mesh ESO
 به‌طور مستقل و محدود آزموده می‌شوند. این مرحله root را لغو نمی‌کند.
 
-مراجع نسخه‌ای: [chart رسمی 2.8.0](https://github.com/external-secrets/external-secrets/releases/tag/helm-chart-2.8.0)،
-[RBAC محدود](https://github.com/external-secrets/external-secrets/blob/v2.8.0/docs/guides/security-best-practices.md).
+مراجع نسخه‌ای: [chart رسمی 2.12.0](https://github.com/external-secrets/external-secrets/releases/tag/helm-chart-2.12.0)،
+[RBAC محدود](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/guides/security-best-practices.md).
+
+upstream این نسخه را با Kubernetes `1.36` تست می‌کند؛ سازگاری با K3s
+`1.35.6` فعلی هنوز `Not verified` است. قبل از نصب، آزمون native موقت با همین
+نسخهٔ Kubernetes، تحویل محدود اسرار و رد دسترسی خارج از scope لازم است.
+این انتخاب نسخه، مجوز ارتقای Kubernetes یا نصب با تنظیمات پیش‌فرض chart نیست.
+مرجع سازگاری: [سیاست پشتیبانی نسخهٔ 2.12.0](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/introduction/stability-support.md).
 
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 

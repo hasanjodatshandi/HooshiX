@@ -20,14 +20,14 @@ def pin():
     chart = selected['chart']
     if (selected.get('schema_version') != 1
             or selected['version'] != baseline['external_secrets_operator']['version']
-            or selected['version'] != '2.8.0' or chart['version'] != selected['version']
+            or selected['version'] != '2.12.0' or chart['version'] != selected['version']
             or not re.fullmatch(r'ghcr\.io/external-secrets/external-secrets@sha256:[a-f0-9]{64}', selected['image'])
             or selected['platform'] != 'linux/amd64'
             or not re.fullmatch(r'sha256:[a-f0-9]{64}', selected['index_digest'])
             or not re.fullmatch(r'[a-f0-9]{40}', selected['upstream_tag_revision'])
             or type(selected['compressed_bytes']) is not int or not 0 < selected['compressed_bytes'] < 256 * 1024 * 1024
             or chart['url'] != 'https://github.com/external-secrets/external-secrets/releases/download/'
-               'helm-chart-2.8.0/external-secrets-2.8.0.tgz'
+               'helm-chart-2.12.0/external-secrets-2.12.0.tgz'
             or not re.fullmatch(r'[a-f0-9]{64}', chart['sha256'])
             or selected['production_promotion'] != BLOCKED):
         raise ValueError('reviewed immutable blocked ESO candidate required')

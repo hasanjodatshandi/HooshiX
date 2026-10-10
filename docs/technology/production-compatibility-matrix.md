@@ -37,6 +37,7 @@ This matrix records production technology combinations that must remain compatib
 | Traefik | 3.7.10 / chart 41.2.0 | Gateway API 1.5.1; ADR-0043 trusted PROXY-v2/external-L4-only origin; chart-41 render migration |
 | Caddy client-address handling | 2.11.4 | trusted-proxy strict parsing; internal exact client address overwrite; caller headers untrusted |
 | Helm | 4.2.4 | render/schema/policy compatibility |
+| External Secrets Operator | 2.12.0 | exact official amd64 image/chart pins; namespace-scoped Vault KV-v2 stores, explicit audiences and six-account TokenRequest delegation; upstream tests Kubernetes 1.36, so compatibility with selected 1.35.6 remains Not verified until disposable native delivery/RBAC/mesh tests pass; no Kubernetes upgrade implied |
 | Kyverno | 1.19.1 | Kubernetes 1.35; `policies.kyverno.io/v1` CEL types; verifies current Cosign digest/signature/provenance/SBOM evidence; CI/render rejects legacy `kyverno.io/v1` ClusterPolicy/Policy and `kyverno.io/v2` CleanupPolicy for new production controls |
 | OpenTelemetry Collector Contrib | 0.157.0 | Kubernetes 1.35; internal OTLP; approved processors/exporters; exact read-only pod-log mount; finite memory/queues; no public receiver |
 | Spring Boot tracing | 4.1.0 starter/OpenTelemetry path | OTLP to Collector; W3C propagation; trace/baggage not authority; no prohibited PII/secret attributes |

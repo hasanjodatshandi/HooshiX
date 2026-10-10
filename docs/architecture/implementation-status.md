@@ -2,7 +2,7 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
-ESO 2.8.0 artifact preparation pins the official amd64 image and chart by digest/
+ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum. A blocking credential-free baseline job produces exact-image SBOM and
 fresh Grype evidence, rejecting High/Critical matches. Signature/provenance,
 native scoped delivery, ESO installation and application secret materialization

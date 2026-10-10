@@ -32,6 +32,7 @@ class ESOArtifactTest(unittest.TestCase):
         receipt = self.validate()
         self.assertEqual('Passed', receipt['scan'])
         self.assertEqual('external-secrets', receipt['component'])
+        self.assertEqual('2.12.0', receipt['version'])
         self.assertEqual(432000, receipt['maximum_database_age_seconds'])
         for field in ('signature_provenance', 'upstream_build_provenance',
                       'native_secret_delivery', 'deployment', 'production_promotion'):
@@ -40,20 +41,26 @@ class ESOArtifactTest(unittest.TestCase):
     def test_pin_rejects_other_registry_tag_version_chart_and_approval(self):
         cases = [('image', 'ghcr.io/other/eso@sha256:' + 'a' * 64),
                  ('image', 'ghcr.io/external-secrets/external-secrets:latest'),
-                 ('platform', 'linux/arm64'), ('version', '2.9.0'),
+                 ('platform', 'linux/arm64'), ('version', '2.8.0'),
                  ('index_digest', 'sha256:bad'), ('upstream_tag_revision', '*'),
                  ('compressed_bytes', True), ('production_promotion', 'Passed')]
         for key, value in cases:
             bad = self.pin | {key: value}
             with self.subTest(key=key), patch.object(target, 'load', side_effect=[bad,
-                    {'external_secrets_operator': {'version': '2.8.0'}}]), self.assertRaises(ValueError):
+                    {'external_secrets_operator': {'version': '2.12.0'}}]), self.assertRaises(ValueError):
                 target.pin()
-        for key, value in [('url', 'https://other/chart.tgz'), ('sha256', '*'), ('version', '2.7.0')]:
+        for key, value in [('url', 'https://other/chart.tgz'),
+                           ('url', self.pin['chart']['url'].replace('2.12.0', '2.8.0')),
+                           ('sha256', '*'), ('version', '2.8.0')]:
             bad = copy.deepcopy(self.pin)
             bad['chart'][key] = value
             with self.subTest(chart=key), patch.object(target, 'load', side_effect=[bad,
-                    {'external_secrets_operator': {'version': '2.8.0'}}]), self.assertRaises(ValueError):
+                    {'external_secrets_operator': {'version': '2.12.0'}}]), self.assertRaises(ValueError):
                 target.pin()
+
+        with patch.object(target, 'load', side_effect=[self.pin,
+                {'external_secrets_operator': {'version': '2.8.0'}}]), self.assertRaises(ValueError):
+            target.pin()
 
     def test_scan_rejects_wrong_digest_platform_empty_inventory_and_stale_database(self):
         original = copy.deepcopy(self.files)
