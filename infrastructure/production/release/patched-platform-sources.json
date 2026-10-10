@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "go_version": "1.26.9",
+  "builder": "docker.io/library/golang@sha256:bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff",
+  "modules": {
+    "golang.org/x/net": "v0.60.0",
+    "golang.org/x/crypto": "v0.57.0",
+    "golang.org/x/sys": "v0.48.0",
+    "golang.org/x/term": "v0.46.0",
+    "golang.org/x/text": "v0.42.0"
+  },
+  "sources": {
+    "eso": {
+      "repository": "external-secrets/external-secrets",
+      "revision": "9d17906e8e4c5532ffe513f72273df03b7b07bc6",
+      "archive_sha256": "8be071b3bea4cf7dc7cb4cfc8c022511cb9b26c1eb13ddd6382a957e69eca579",
+      "version": "2.12.0"
+    },
+    "openbao": {
+      "repository": "openbao/openbao",
+      "revision": "8206bc114009a0e468bbdae143f292922e1dbe27",
+      "archive_sha256": "2cb6cac72dea586560345df0bab0caf84b63cbcf81a617bf62c2d79d0dfd8d18",
+      "version": "2.6.4"
+    },
+    "istio": {
+      "repository": "istio/istio",
+      "revision": "55b832fad2bc55f47e658b68cd1a7abf9540dbc9",
+      "archive_sha256": "efe712def0fdf74a5aa377e260e8366253e81b1eb81da4a314d9707b290004fa",
+      "version": "1.30.5"
+    }
+  },
+  "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence"
+}

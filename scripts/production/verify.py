@@ -19,7 +19,7 @@ EXPECTED = {
     "postgresql.postgresql": "18.4", "postgresql.cloudnativepg": "1.30.0",
     "postgresql.barman_plugin": "0.13.0", "postgresql.cert_manager": "1.20.3",
     "redis.version": "8.2.8", "kafka.version": "4.2.1", "secrets.openbao": "2.6.4",
-    "secrets.external_secrets_operator": "2.8.0", "edge.traefik": "3.7.10",
+    "secrets.external_secrets_operator": "2.12.0", "edge.traefik": "3.7.10",
     "edge.traefik_chart": "41.2.0", "edge.gateway_api": "1.5.1",
     "observability.otel_collector": "0.157.0", "observability.prometheus": "3.13.2",
     "observability.alertmanager": "0.33.1", "observability.loki": "3.7.4",

@@ -13,9 +13,38 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import jit_runtime as jit
+import test_jit_systemd_expiry as expiry
 
 
 class JitRuntimeTest(unittest.TestCase):
+    def test_expiry_child_publishes_complete_pid_atomically(self):
+        with tempfile.TemporaryDirectory() as temp:
+            receipt = Path(temp) / "pids"
+            write_text = Path.write_text
+
+            def staged_write(path, data):
+                self.assertFalse(receipt.exists())
+                self.assertEqual(path, receipt.with_suffix(".tmp"))
+                return write_text(path, data)
+
+            def observe(seconds):
+                self.assertEqual(seconds, 60)
+                self.assertEqual(receipt.read_text(), str(os.getpid()))
+                self.assertFalse(receipt.with_suffix(".tmp").exists())
+
+            with patch("os.fork", return_value=0), patch.object(sys, "argv", ["fixture", str(receipt)]), \
+                    patch.object(Path, "write_text", autospec=True, side_effect=staged_write), \
+                    patch("time.sleep", side_effect=observe) as sleep:
+                exec(expiry.CHILD_FIXTURE, {})
+            sleep.assert_called_once_with(60)
+
+    def test_expiry_parent_does_not_publish_pid_or_sleep(self):
+        with patch("os.fork", return_value=123), patch.object(sys, "argv", ["fixture", "unused"]), \
+                patch.object(Path, "write_text") as write, patch("time.sleep") as sleep:
+            exec(expiry.CHILD_FIXTURE, {})
+        write.assert_not_called()
+        sleep.assert_not_called()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

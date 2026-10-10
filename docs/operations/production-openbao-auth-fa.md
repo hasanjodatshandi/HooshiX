@@ -98,4 +98,4 @@ JWT TokenRequest/TokenReview، شش canary مستقل، ACL negatives و revocat
 آزمون می‌کند. این شاهد اجرای واقعی VPS یا مسیر ESO/Ambient نیست.
 
 مراجع: [OpenBao Kubernetes auth نسخهٔ 2.6.4](https://github.com/openbao/openbao/blob/v2.6.4/website/content/docs/auth/kubernetes.mdx)،
-[ESO Vault provider نسخهٔ 2.8.0](https://github.com/external-secrets/external-secrets/blob/v2.8.0/docs/provider/hashicorp-vault.md).
+[ESO Vault provider نسخهٔ 2.12.0](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/provider/hashicorp-vault.md).

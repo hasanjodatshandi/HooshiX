@@ -151,6 +151,9 @@ root/password/keyboard-interactive login ممنوع، public-key فعال، forw
 ورود تازه و ماندگاری پس از reboot آزموده شوند. FIDO2 در پروفایل تک‌سرور اختیاری
 است؛ Ed25519 رمزدار مجاز است. پورت ۲۲۲۲ نیاز این محصول نیست.
 sudo اولیه تا commissioning واقعی JIT و recovery حفظ می‌شود.
+گیت CI روی runner دورریختنی، انقضای cgroup، توقف فرزند پس‌زمینه و آزادشدن
+قفل مدیر را بررسی می‌کند؛ PID آزمون فقط پس از نوشتن کامل به‌صورت اتمی منتشر
+می‌شود. موفقیت این آزمون جای آزمون JIT واقعی روی سرور مقصد را نمی‌گیرد.
 [دسترسی انسانی](production-human-access-prerequisites-fa.md).
 
 ## ۵. audit میزبان
@@ -327,6 +330,147 @@ refresh بازبینی‌شده ادامه ندهید؛ روش تکرارپذی�
 برای نصب دوم، رسیدهای مدیریت، foundation، audit، storage/guard، PKI، platform،
 activation، snapshot و isolated recovery باید مربوط به خود همان نصب باشند.
 وضعیت هر کنترل جدا ثبت شود؛ قبول شواهد یک بخش، بخش دیگر را تأیید نمی‌کند.
+
+### پیش‌نیاز artifact نصب ESO
+
+نسخهٔ مصوب ESO `2.12.0` است؛ تصویر رسمی amd64 و chart همان نسخه در
+`infrastructure/production/secrets/eso-image.json` با digest/checksum دقیق
+به‌عنوان ورودی سورس/base قفل شده‌اند. job اجباری `ESO pinned artifact security`
+در Repository baseline، chart را با SHA-256 بررسی می‌کند؛ در PR/push/manual
+تصویر نهاییِ بازسازی‌شده از recipe ثابت را با Syft/Grype و پایگاه حداکثر
+پنج‌روزه اسکن می‌کند. اجرای scheduled تصویر upstream قبلی را جداگانه پایش
+می‌کند و یافته‌های آن را رفع‌شده فرض نمی‌کند؛ High/Critical موجب توقف است. artifact عمومی
+`eso-artifact-<run>-<attempt>` شامل رسید و گزارش‌هاست؛ scan Passed فقط بررسی
+artifact است، نه امضا، نصب، تحویل secret یا آماده‌بودن Production.
+
+برای مرور pin و آزمون محلی، بدون دسترسی VPS یا credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_eso_artifact.py
+```
+
+تا انتشار امضاشده، آزمون native تحویل شش هویت و بستهٔ نصب بازبینی‌شده آماده
+نشده‌اند، دستور نصب ESO روی VPS وجود ندارد. نصب بعدی باید namespace-scoped
+باشد، cluster stores/push secrets و TokenRequest عمومی را غیرفعال کند؛ فقط
+TokenRequest شش حساب `eso-<service>` مجاز است. ingress OpenBao و شبکه/mesh ESO
+به‌طور مستقل و محدود آزموده می‌شوند. این مرحله root را لغو نمی‌کند.
+
+مراجع نسخه‌ای: [chart رسمی 2.12.0](https://github.com/external-secrets/external-secrets/releases/tag/helm-chart-2.12.0)،
+[RBAC محدود](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/guides/security-best-practices.md).
+
+upstream این نسخه را با Kubernetes `1.36` تست می‌کند؛ سازگاری با K3s
+`1.35.6` فعلی هنوز `Not verified` است. قبل از نصب، آزمون native موقت با همین
+نسخهٔ Kubernetes، تحویل محدود اسرار و رد دسترسی خارج از scope لازم است.
+این انتخاب نسخه، مجوز ارتقای Kubernetes یا نصب با تنظیمات پیش‌فرض chart نیست.
+مرجع سازگاری: [سیاست پشتیبانی نسخهٔ 2.12.0](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/introduction/stability-support.md).
+
+### آماده‌سازی manifest محدود ESO، بدون نصب
+
+`scripts/production/render_eso_candidate.py` chart دارای checksum مصوب را با
+Helm `4.2.4` برای Kubernetes `1.35.6` render می‌کند. خروجی عمومی فاقد credential
+است و سه Deployment تک‌نمونهٔ controller، webhook و cert-controller دارد؛
+تصویر هر سه به digest مصوب تبدیل می‌شود. هر container غیر-root است، همهٔ
+capabilityها حذف می‌شوند، filesystem فقط‌خواندنی و seccomp از نوع
+`RuntimeDefault` است. منابع هر container: request برابر `50m/64Mi` و limit
+برابر `500m/256Mi`، با فضای موقت `16Mi/64Mi`؛ liveness/readiness الزامی است.
+
+controller فقط `platform-apps` را پردازش می‌کند؛ cluster stores و push secrets
+خاموش‌اند و CRD/مجوز ClusterGenerator صادر نمی‌شود. مجوز ساخت TokenRequest فقط برای شش
+`eso-<service>` موجود است. دسترسی Secret مربوط به cert-controller نیز به
+همین namespace محدود است؛ مجوزهای cluster فقط metadata گواهی CRD/webhook
+را پوشش می‌دهند. webhookها فقط همین namespace را انتخاب می‌کنند، با
+`failurePolicy=Fail` و timeout پنج‌ثانیه‌ای. نقش‌های view/edit اضافی حذف می‌شوند.
+
+در checkout همین تغییر، با Helm مصوب و PyYAML موجود، بدون VPS یا credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_eso_render.py
+chart_dir=$(mktemp -d)
+curl --fail --location --silent --show-error --max-time 60 \
+  --proto '=https' --proto-redir '=https' \
+  https://github.com/external-secrets/external-secrets/releases/download/helm-chart-2.12.0/external-secrets-2.12.0.tgz \
+  -o "$chart_dir/chart.tgz"
+python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz" \
+  > "$chart_dir/scoped-candidate.json"
+```
+
+موفقیت با exit code صفر و خروجی `kind=List` مشخص می‌شود؛ checksum نامعتبر یا
+خروجی خارج از محدودیت موجب توقف است. job artifact همین render را پس از scan
+اجرا و `scoped-candidate.json` را نگه می‌دارد. این فایل را اکنون روی VPS apply
+نکنید: CRDها، امضا/admission، شبکه/mTLS و آزمون native تحویل هنوز باید در بستهٔ
+نصب تکمیل شوند. render، readiness یا موفقیت runtime را ثابت نمی‌کند. چون این
+مرحله فقط فایل عمومی موقت تولید می‌کند، rollback روی سرور لازم نیست.
+
+### ساخت candidate امنیتی از سورس رسمی
+
+recipe ثابت `infrastructure/production/release/patched-platform-sources.json`
+برای ESO `2.12.0`، OpenBao `2.6.4` و Istio `1.30.5` است. نسخهٔ محصول و chart
+حفظ می‌شود؛ compiler برابر Go `1.26.9` با تصویر builder دارای digest ثابت است.
+`x/net=v0.60.0` و وابستگی‌های لازم آن (`x/crypto=v0.57.0`، `x/sys=v0.48.0`،
+`x/term=v0.46.0` و `x/text=v0.42.0`) ثابت‌اند. archive سورس رسمی هر پروژه به
+commit و SHA-256 bind است؛ checksum، sumdb، `go mod verify` و build readonly
+خاموش نمی‌شوند. این مسیر ساخت جدید، تصویر رسمی upstream نیست.
+
+فقط فایل‌های Go جایگزین می‌شوند؛ runtime پایهٔ قفل‌شده، کاربران، entrypoint،
+گواهی‌ها و فایل‌های iptables حفظ می‌شوند. هر دو `install-cni` و `istio-cni`
+بازسازی می‌شوند. OpenBao نسخهٔ `2.6.4` را برای قرارداد recovery حفظ می‌کند؛
+UI طبق `openbao-server.json` خاموش می‌ماند. Ztunnelِ Rust و waypoint توسط این
+مسیر تغییر نمی‌کنند و بررسی/هماهنگی digest آن‌ها مستقل باقی می‌ماند.
+
+برای بررسی محلی قراردادها، بدون VPS یا credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_patched_platform.py
+```
+
+ساخت‌های سنگین در workflow `Patched platform source security` انجام می‌شوند:
+چهار job با نام‌های `Patched source eso/openbao/istiod/cni`. هر job باید
+`PATCHED_PLATFORM=Passed`، scan بدون High/Critical، compiler/dependency صحیح
+در تمام فایل‌های اجرایی و رسید candidate تولید کند. artifact عمومی شامل
+SBOM، اسکن، recipe تولیدشده، graph ماژول‌ها، hashهای `go.mod/go.sum` و buildinfo
+است؛ هیچ image در PR push یا امضا نمی‌شود. موفقیت این چهار job به‌تنهایی
+سازگاری runtime، آماده‌بودن Production یا موفقیت سایر گیت‌ها نیست.
+
+انتشار بعدی فقط پس از merge بازبینی‌شده و baseline موفق همان main، از workflow
+موجود `production-release.yml` با `release_kind=patched-platform-candidate`
+و environment مصوب انجام می‌شود. دستور زیر تنها وقتی اجرا شود که PR بازبینی
+و merge شده و baseline روی SHA دقیق همان main موفق باشد؛ موفقیت PR به‌تنهایی کافی نیست.
+انتشار صرفاً candidate امضاشده می‌سازد؛ پذیرش digest در admission و نصب هنوز
+مرحلهٔ جداگانه و اجرا‌نشده هستند:
+
+```bash
+gh workflow run production-release.yml --ref main \
+  -f release_kind=patched-platform-candidate
+```
+
+انتشار، تمام چهار تصویر را می‌سازد و اسکن می‌کند؛ سپس به packageهای خصوصی
+`platform-<eso|openbao|istiod|cni>-patched-private` در GHCR همان حساب می‌فرستد.
+config digest پس از push کنترل می‌شود؛ SBOM/scan برای digest واقعی registry
+دوباره بررسی می‌شود. قبل از هر push، OpenBao بازسازی‌شده با همان config digest
+روی runner موقت آزمون TLS، Shamir، restart، restore، ACL، ممیزی و لغو root
+مصنوعی را می‌گذراند؛ failure مانع انتشار همهٔ تصاویر می‌شود. این آزمون هیچ
+داده یا root واقعی VPS را تغییر نمی‌دهد. فقط پس از موفقیت همهٔ تصاویر، امضا، provenance از نوع
+`patched-upstream-source-build` و CycloneDX امضاشده صادر و signer مثبت/منفی
+بررسی می‌شوند. provenance سورس، recipe، compiler، base image، وابستگی‌ها،
+hashهای واقعی فایل‌های ماژول و revision مخزن را ثبت می‌کند. خروجی
+`publication.json` صرفاً candidate است؛ admission فعلی به‌صورت خودکار آن را
+نمی‌پذیرد. آزمون native، update pin/digest و rollout روی VPS مرحلهٔ جداست.
+
+این مرحله فایل یا دادهٔ VPS را تغییر نمی‌دهد؛ Root، اسرار و snapshot موجود
+حفظ می‌شوند. هیچ reset/reinit یا rollback سرور برای ساخت candidate لازم نیست.
+گیت‌های PR/push/manual اکنون تصویر نهاییِ source candidate را می‌سازند و
+اسکن می‌کنند؛ OpenBao در baseline همان آزمون native را هم می‌گذراند و
+ztunnel بدون تغییر اسکن می‌شود. گیت scheduled تصاویر upstream قبلی را
+همچنان با همان شدت High/Critical پایش می‌کند. baseline جدید می‌تواند اجازهٔ
+انتشار candidate را بدهد، نه نصب یا اعلام رفع آسیب‌پذیری روی VPS. تا آزمون و
+تصویب digestهای امضاشده، استقرار همچنان مسدود است. روی revision
+`1ce7d8ac91f9688996da94ca4ec38ad0f26690b0`، baseline شمارهٔ `38050468774`،
+چهار ساخت امنیتی شمارهٔ `38050468775`، staging شمارهٔ `38050468781` و
+E2E شمارهٔ `38050468658` همگی `Passed` هستند. baseline شامل آزمون native
+OpenBao بازسازی‌شده و انقضای JIT روی runner است؛ این شواهد، نصب ESO یا رفع
+آسیب‌پذیری تصویر فعلی VPS را ثابت نمی‌کنند. برای هر تغییر بعدی و merge، نتیجهٔ
+CI مربوط به SHA دقیق جدید لازم است؛ پس از merge نیز baseline همان main کنترل شود.
+
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
 1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.

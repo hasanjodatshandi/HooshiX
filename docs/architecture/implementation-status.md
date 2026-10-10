@@ -2,6 +2,42 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
+checksum as source-build inputs. A blocking credential-free baseline job produces
+final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical
+matches; scheduled runs separately monitor unchanged upstream pins. The same gate renders a
+credential-free candidate for three restricted workloads in `platform-apps`,
+with TokenRequest delegated only for the six existing delivery accounts and
+certificate-controller Secret permissions confined to that namespace. Rendering
+is not installation or Kubernetes-version compatibility evidence. Signature/provenance,
+native scoped delivery, ESO installation and application secret materialization
+remain `Not verified`; no target mutation or additional root use occurs here.
+
+Owner-approved source-security candidates retain ESO 2.12.0, OpenBao 2.6.4
+and Istio 1.30.5 product versions while rebuilding their Go executables with
+Go 1.26.9 and x/net 0.60.0 plus its fixed transitive requirements. The pinned
+recipe, credential-free four-component build/scan CI and protected-main private
+publication path are implemented. Both CNI executables are covered; runtime
+base files/users/entrypoints remain unchanged. Rebuilt bytes use distinct
+`patched-upstream-source-build` provenance, never unchanged-import claims.
+At candidate `1ce7d8ac91f9688996da94ca4ec38ad0f26690b0`, source-security run
+`38050468775` passed all four build/scan jobs. Repository baseline run
+`38050468774`, commissioning staging run `38050468781` and web E2E run
+`38050468658` also passed on that exact candidate. Publication, ESO native
+delivery compatibility and adoption into digest/admission contracts remain
+`Not verified`.
+PR/push/manual baseline gates now build and scan the selected final source
+candidates, while scheduled upstream scans remain blocking and preserve the old
+image findings. The OpenBao candidate gate also requires disposable native
+TLS/Shamir/Raft restart/restore/ACL/audit/root-revocation checks using its exact
+local configuration digest; protected-main publication repeats that test on the
+new publication build before any push/signing. The baseline wiring, native
+OpenBao candidate recovery and native JIT expiry gate are `Passed` in run
+`38050468774`; this is disposable CI evidence, not VPS activation or JIT evidence.
+Ztunnel is still scanned unchanged;
+waypoint is not replaced by this build path. No live vulnerability is considered
+resolved until the signed replacement is independently validated and rolled out.
+
 Stage 10 scoped-auth continuation: supervised tooling now prepares six dedicated
 `platform-apps/eso-<service>` delivery identities, exact service-only KV-v2 read
 policies, five-minute OpenBao tokens and client-JWT Kubernetes TokenReview without
@@ -68,8 +104,9 @@ This source repair and its CI are not target activation evidence.
 
 Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
 istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
-The baseline includes a blocking credential-free scan of all three exact upstream
-imports, retains threshold-failure JSON, and never signs or deploys from PR CI.
+The baseline includes blocking credential-free final-artifact scans of rebuilt
+istiod/CNI and unchanged ztunnel; scheduled runs scan all three upstream pins.
+It retains threshold-failure JSON and never signs or deploys from PR CI.
 Historical local 1.30.3 runtime evidence below does not validate 1.30.5 runtime.
 The exact 1.30.5 target installation is now `Passed` in the receipt above;
 historical local evidence does not establish complete target mesh security,
@@ -179,10 +216,11 @@ retaining only `openbao-kubernetes-37210210133-1`. Final-head protected checks
 and post-merge main runs remain the merge verification; this fixture does not
 close live commissioning, signed promotion or Production readiness.
 
-The artifact continuation adds a required, credential-free `OpenBao pinned artifact
-security` job to Repository baseline (PR, main, scheduled and manual runs). The
-same public Linux/amd64 digest is cataloged once into Syft/CycloneDX SBOMs and
-scanned with integrity-pinned Grype. High/Critical findings, scanner/update errors,
+The required, credential-free `OpenBao pinned artifact security` baseline job
+builds and scans the selected source candidate and exercises native recovery on
+PR/main/manual runs. Scheduled runs retain the unchanged upstream Linux/amd64
+digest scan. Both paths generate exact-image Syft/CycloneDX inventory and use
+integrity-pinned Grype. High/Critical findings, scanner/update errors,
 invalid source binding or a database older than the pinned scanner's 120h default
 fail closed. Public evidence is retained for 30 days, including failed scans;
 only a successful validation creates a candidate receipt. This is not signature,
