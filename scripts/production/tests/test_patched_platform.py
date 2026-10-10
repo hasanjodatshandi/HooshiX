@@ -39,6 +39,24 @@ class PatchedPlatformTest(unittest.TestCase):
         self.assertEqual('Not verified', result['production_promotion'])
         self.assertEqual('patched-upstream-source-build', result['provenance_kind'])
 
+    def test_registry_resolution_binds_repository_manifest_config_and_platform(self):
+        repository = 'ghcr.io/hasanjodatshandi/hooshix/platform-eso-patched-private'
+        image = repository + '@sha256:' + 'b' * 64
+        source = {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'b' * 64,
+            'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}
+        self.assertEqual(image, target.published_image(repository, source, self.digest))
+        for field, value in (('manifestDigest', 'latest'), ('imageID', 'sha256:' + 'c' * 64),
+                ('repoDigests', []), ('repoDigests', 'not-a-list'),
+                ('repoDigests', ['ghcr.io/other/image@sha256:' + 'b' * 64]),
+                ('os', 'windows'), ('architecture', 'arm64')):
+            bad = copy.deepcopy(source)
+            bad['metadata'][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                target.published_image(repository, bad, self.digest)
+        source['type'] = 'directory'
+        with self.assertRaises(ValueError):
+            target.published_image(repository, source, self.digest)
+
     def test_stale_database_unknown_severity_high_and_critical_fail_closed(self):
         for severity in ('High', 'Critical', 'changed-schema'):
             self.files['grype.json']['matches'] = [{'vulnerability': {'severity': severity}}]
@@ -96,6 +114,46 @@ class PatchedPlatformTest(unittest.TestCase):
         with patch.object(target, 'build') as builder, self.assertRaises(ValueError):
             target.publish(Path('unused'), {})
         builder.assert_not_called()
+
+    def test_publication_resolves_registry_then_scans_all_digests_before_signing(self):
+        commands = []
+
+        def fake_run(argv, **kwargs):
+            commands.append(argv)
+            if argv[0] == 'git':
+                return 'b' * 40
+            if argv[0] == 'gh':
+                return 'private'
+            if argv[0] == 'cosign':
+                self.assertEqual(4, scanned.call_count)
+                if any(arg.endswith('.wrong') for arg in argv):
+                    raise target.subprocess.CalledProcessError(1, argv)
+            return ''
+
+        def evidence(path):
+            if path.name == 'cyclonedx.json':
+                return {'bomFormat': 'CycloneDX', 'components': [{}]}
+            image = ('ghcr.io/hasanjodatshandi/hooshix/platform-' + path.parent.name
+                     + '-patched-private@sha256:' + 'c' * 64)
+            return {'source': {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'c' * 64,
+                'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}}
+
+        receipt = {'image_config_digest': self.digest, 'recipe_sha256': 'd' * 64,
+                   'module_files_sha256': {'go.mod': 'e' * 64, 'go.sum': 'f' * 64}}
+        with patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                patch.object(target, 'recipe', return_value=self.selected), \
+                patch.object(target, 'base_image', return_value='base@sha256:' + 'a' * 64), \
+                patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
+                patch.object(Path, 'write_text'), patch.object(target, 'build', return_value=('tag', receipt)), \
+                patch.object(target, 'load', side_effect=evidence), patch.object(target, 'scan'), \
+                patch.object(target, 'registry_scan') as scanned, patch.object(target, 'verify_payload'):
+            result = target.publish(Path('unused'), {})
+        self.assertEqual('Passed', result['publication'])
+        self.assertEqual('Not verified', result['production_promotion'])
+        scans = [argv for argv in commands if argv[0] == 'syft']
+        self.assertEqual(8, len(scans))
+        self.assertTrue(all('@sha256:' in argv[2] for argv in scans[1::2]))
+        self.assertFalse(any('.RepoDigests' in ' '.join(argv) for argv in commands))
 
     def test_failed_component_scan_prevents_all_signing(self):
         commands = []

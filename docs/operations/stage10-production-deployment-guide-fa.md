@@ -445,8 +445,11 @@ gh workflow run production-release.yml --ref main \
 
 انتشار، تمام چهار تصویر را می‌سازد و اسکن می‌کند؛ سپس به packageهای خصوصی
 `platform-<eso|openbao|istiod|cni>-patched-private` در GHCR همان حساب می‌فرستد.
-config digest پس از push کنترل می‌شود؛ SBOM/scan برای digest واقعی registry
-دوباره بررسی می‌شود. قبل از هر push، OpenBao بازسازی‌شده با همان config digest
+پس از push، Syft با احراز هویت موقت CI و TLS مستقیم به registry مراجعه می‌کند؛
+manifest digest تنها با تطبیق repository، config digest تصویر ساخته‌شده و
+پلتفرم `linux/amd64` پذیرفته می‌شود. `RepoDigests` محلی Docker مرجع انتشار
+نیست. سپس SBOM/scan با آدرس immutable همان digest دوباره تولید می‌شود و
+config digest نیز مجدداً تطبیق داده می‌شود. قبل از هر push، OpenBao بازسازی‌شده با همان config digest
 روی runner موقت آزمون TLS، Shamir، restart، restore، ACL، ممیزی و لغو root
 مصنوعی را می‌گذراند؛ failure مانع انتشار همهٔ تصاویر می‌شود. این آزمون هیچ
 داده یا root واقعی VPS را تغییر نمی‌دهد. فقط پس از موفقیت همهٔ تصاویر، امضا، provenance از نوع
