@@ -327,6 +327,32 @@ refresh بازبینی‌شده ادامه ندهید؛ روش تکرارپذی�
 برای نصب دوم، رسیدهای مدیریت، foundation، audit، storage/guard، PKI، platform،
 activation، snapshot و isolated recovery باید مربوط به خود همان نصب باشند.
 وضعیت هر کنترل جدا ثبت شود؛ قبول شواهد یک بخش، بخش دیگر را تأیید نمی‌کند.
+
+### پیش‌نیاز artifact نصب ESO
+
+نسخهٔ مصوب ESO `2.8.0` است؛ تصویر رسمی amd64 و chart همان نسخه در
+`infrastructure/production/secrets/eso-image.json` با digest/checksum دقیق
+قفل شده‌اند. job اجباری `ESO pinned artifact security` در Repository baseline
+chart را با SHA-256 بررسی و تصویر دقیق را با Syft/Grype و پایگاه حداکثر
+پنج‌روزه اسکن می‌کند؛ High/Critical موجب توقف است. artifact عمومی
+`eso-artifact-<run>-<attempt>` شامل رسید و گزارش‌هاست؛ scan Passed فقط بررسی
+artifact است، نه امضا، نصب، تحویل secret یا آماده‌بودن Production.
+
+برای مرور pin و آزمون محلی، بدون دسترسی VPS یا credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_eso_artifact.py
+```
+
+تا انتشار امضاشده، آزمون native تحویل شش هویت و بستهٔ نصب بازبینی‌شده آماده
+نشده‌اند، دستور نصب ESO روی VPS وجود ندارد. نصب بعدی باید namespace-scoped
+باشد، cluster stores/push secrets و TokenRequest عمومی را غیرفعال کند؛ فقط
+TokenRequest شش حساب `eso-<service>` مجاز است. ingress OpenBao و شبکه/mesh ESO
+به‌طور مستقل و محدود آزموده می‌شوند. این مرحله root را لغو نمی‌کند.
+
+مراجع نسخه‌ای: [chart رسمی 2.8.0](https://github.com/external-secrets/external-secrets/releases/tag/helm-chart-2.8.0)،
+[RBAC محدود](https://github.com/external-secrets/external-secrets/blob/v2.8.0/docs/guides/security-best-practices.md).
+
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
 1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.

@@ -184,6 +184,62 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  eso-artifact:
+    name: ESO pinned artifact security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SYFT_GOLANG_CAPTURE_SYMBOLS: all
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+      SYFT_CHECK_FOR_APP_UPDATE: 'false'
+    steps:
+      - name: Check out repository without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install existing integrity-pinned release tools
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/eso-tools"
+          echo "$RUNNER_TEMP/eso-tools" >> "$GITHUB_PATH"
+      - name: Verify chart checksum and scan exact public upstream digest
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/eso-artifact"
+          mkdir -m 0700 "$evidence"
+          python3 - <<'PY' > "$evidence/inputs.txt"
+          import sys
+          sys.path.insert(0, 'scripts/production')
+          from verify_eso_artifact import pin
+          selected = pin()
+          for value in (selected['image'], selected['chart']['url'], selected['chart']['sha256']):
+              print(value)
+          PY
+          mapfile -t inputs < "$evidence/inputs.txt"
+          curl --fail --location --silent --show-error --max-time 60 --proto '=https' --proto-redir '=https' \
+            "${inputs[1]}" -o "$evidence/chart.tgz"
+          printf '%s  %s\n' "${inputs[2]}" "$evidence/chart.tgz" | sha256sum --check --strict
+          timeout 180 grype db update
+          grype db status -o json > "$evidence/database.json"
+          syft version -o json > "$evidence/syft-version.json"
+          grype version -o json > "$evidence/grype-version.json"
+          timeout 300 syft scan "${inputs[0]}" --from registry --platform linux/amd64 \
+            -o "syft-json=$evidence/syft.json" -o "cyclonedx-json=$evidence/cyclonedx.json"
+          timeout 180 grype "sbom:$evidence/syft.json" --fail-on high -o json > "$evidence/grype.json"
+          python3 scripts/production/verify_eso_artifact.py \
+            --evidence-dir "$evidence" --revision "$(git rev-parse HEAD)" > "$evidence/receipt.json"
+      - name: Retain public evidence including failed scans; never sign or deploy
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eso-artifact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/eso-artifact/
+          retention-days: 30
+          if-no-files-found: error
+
   mesh-artifact:
     name: Istio pinned artifact security
     runs-on: ubuntu-24.04
@@ -357,6 +413,7 @@ jobs:
       - repository-structure
       - openbao-recovery
       - openbao-artifact
+      - eso-artifact
       - mesh-artifact
       - openbao-kubernetes
       - compromised-password-security
@@ -376,6 +433,7 @@ jobs:
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
           OPENBAO_RESULT: ${{ needs.openbao-recovery.result }}
           OPENBAO_ARTIFACT_RESULT: ${{ needs.openbao-artifact.result }}
+          ESO_ARTIFACT_RESULT: ${{ needs.eso-artifact.result }}
           MESH_ARTIFACT_RESULT: ${{ needs.mesh-artifact.result }}
           OPENBAO_KUBERNETES_RESULT: ${{ needs.openbao-kubernetes.result }}
           COMPROMISED_PASSWORD_RESULT: ${{ needs.compromised-password-security.result }}
@@ -402,6 +460,10 @@ jobs:
           fi
           if [ "${OPENBAO_ARTIFACT_RESULT}" != 'success' ]; then
             echo "OpenBao pinned artifact security result: ${OPENBAO_ARTIFACT_RESULT}" >&2
+            exit 1
+          fi
+          if [ "${ESO_ARTIFACT_RESULT}" != 'success' ]; then
+            echo "ESO pinned artifact security result: ${ESO_ARTIFACT_RESULT}" >&2
             exit 1
           fi
           if [ "${MESH_ARTIFACT_RESULT}" != 'success' ]; then

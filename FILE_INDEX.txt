@@ -388,6 +388,7 @@ infrastructure/production/recovery/recovery-policy.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
 infrastructure/production/release/release-policy.json
+infrastructure/production/secrets/eso-image.json
 infrastructure/production/secrets/openbao-image.json
 infrastructure/production/secrets/openbao-server.json
 infrastructure/production/secrets/secrets-policy.json
@@ -571,6 +572,7 @@ scripts/production/run-intermediate-import.ps1
 scripts/production/run-openbao-storage.ps1
 scripts/production/run-platform-commissioning.ps1
 scripts/production/test_jit_systemd_expiry.py
+scripts/production/tests/test_eso_artifact.py
 scripts/production/tests/test_ghcr_release.py
 scripts/production/tests/test_host_audit_policy.py
 scripts/production/tests/test_import_referrers.py
@@ -609,6 +611,7 @@ scripts/production/tests/test_target_storage_guard.py
 scripts/production/tests/test_verify.py
 scripts/production/upgrade_kyverno.py
 scripts/production/verify.py
+scripts/production/verify_eso_artifact.py
 scripts/production/verify_host_audit.py
 scripts/production/verify_openbao_artifact.py
 scripts/production/verify_platform_publication_run.py

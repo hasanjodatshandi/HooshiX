@@ -2,6 +2,12 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+ESO 2.8.0 artifact preparation pins the official amd64 image and chart by digest/
+checksum. A blocking credential-free baseline job produces exact-image SBOM and
+fresh Grype evidence, rejecting High/Critical matches. Signature/provenance,
+native scoped delivery, ESO installation and application secret materialization
+remain `Not verified`; no target mutation or additional root use occurs here.
+
 Stage 10 scoped-auth continuation: supervised tooling now prepares six dedicated
 `platform-apps/eso-<service>` delivery identities, exact service-only KV-v2 read
 policies, five-minute OpenBao tokens and client-JWT Kubernetes TokenReview without
