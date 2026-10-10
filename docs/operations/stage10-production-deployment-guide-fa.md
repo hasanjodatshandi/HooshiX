@@ -359,6 +359,43 @@ upstream این نسخه را با Kubernetes `1.36` تست می‌کند؛ سا
 این انتخاب نسخه، مجوز ارتقای Kubernetes یا نصب با تنظیمات پیش‌فرض chart نیست.
 مرجع سازگاری: [سیاست پشتیبانی نسخهٔ 2.12.0](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/introduction/stability-support.md).
 
+### آماده‌سازی manifest محدود ESO، بدون نصب
+
+`scripts/production/render_eso_candidate.py` chart دارای checksum مصوب را با
+Helm `4.2.4` برای Kubernetes `1.35.6` render می‌کند. خروجی عمومی فاقد credential
+است و سه Deployment تک‌نمونهٔ controller، webhook و cert-controller دارد؛
+تصویر هر سه به digest مصوب تبدیل می‌شود. هر container غیر-root است، همهٔ
+capabilityها حذف می‌شوند، filesystem فقط‌خواندنی و seccomp از نوع
+`RuntimeDefault` است. منابع هر container: request برابر `50m/64Mi` و limit
+برابر `500m/256Mi`، با فضای موقت `16Mi/64Mi`؛ liveness/readiness الزامی است.
+
+controller فقط `platform-apps` را پردازش می‌کند؛ cluster stores و push secrets
+خاموش‌اند و CRD/مجوز ClusterGenerator صادر نمی‌شود. مجوز ساخت TokenRequest فقط برای شش
+`eso-<service>` موجود است. دسترسی Secret مربوط به cert-controller نیز به
+همین namespace محدود است؛ مجوزهای cluster فقط metadata گواهی CRD/webhook
+را پوشش می‌دهند. webhookها فقط همین namespace را انتخاب می‌کنند، با
+`failurePolicy=Fail` و timeout پنج‌ثانیه‌ای. نقش‌های view/edit اضافی حذف می‌شوند.
+
+در checkout همین تغییر، با Helm مصوب و PyYAML موجود، بدون VPS یا credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_eso_render.py
+chart_dir=$(mktemp -d)
+curl --fail --location --silent --show-error --max-time 60 \
+  --proto '=https' --proto-redir '=https' \
+  https://github.com/external-secrets/external-secrets/releases/download/helm-chart-2.12.0/external-secrets-2.12.0.tgz \
+  -o "$chart_dir/chart.tgz"
+python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz" \
+  > "$chart_dir/scoped-candidate.json"
+```
+
+موفقیت با exit code صفر و خروجی `kind=List` مشخص می‌شود؛ checksum نامعتبر یا
+خروجی خارج از محدودیت موجب توقف است. job artifact همین render را پس از scan
+اجرا و `scoped-candidate.json` را نگه می‌دارد. این فایل را اکنون روی VPS apply
+نکنید: CRDها، امضا/admission، شبکه/mTLS و آزمون native تحویل هنوز باید در بستهٔ
+نصب تکمیل شوند. render، readiness یا موفقیت runtime را ثابت نمی‌کند. چون این
+مرحله فقط فایل عمومی موقت تولید می‌کند، rollback روی سرور لازم نیست.
+
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
 1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.

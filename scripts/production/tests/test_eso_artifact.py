@@ -91,7 +91,9 @@ class ESOArtifactTest(unittest.TestCase):
         workflow = (target.ROOT / '.github/workflows/repository-baseline.yml').read_text()
         job = workflow.split('  eso-artifact:\n')[1].split('  mesh-artifact:\n')[0]
         for required in ('--fail-on high', '--from registry --platform linux/amd64',
-                         'sha256sum --check --strict', 'if: ${{ always() }}'):
+                         'sha256sum --check --strict', 'if: ${{ always() }}',
+                         'render_eso_candidate.py --chart', 'scoped-candidate.json',
+                         '--require-hashes'):
             self.assertIn(required, job)
         for forbidden in ('secrets.', 'id-token:', 'packages: write', 'continue-on-error',
                           '--only-fixed', 'cosign sign', 'kubectl'):

@@ -4,7 +4,11 @@ This file is the canonical repository-level status view for architecture, implem
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum. A blocking credential-free baseline job produces exact-image SBOM and
-fresh Grype evidence, rejecting High/Critical matches. Signature/provenance,
+fresh Grype evidence, rejecting High/Critical matches. The same gate renders a
+credential-free candidate for three restricted workloads in `platform-apps`,
+with TokenRequest delegated only for the six existing delivery accounts and
+certificate-controller Secret permissions confined to that namespace. Rendering
+is not installation or Kubernetes-version compatibility evidence. Signature/provenance,
 native scoped delivery, ESO installation and application secret materialization
 remain `Not verified`; no target mutation or additional root use occurs here.
 

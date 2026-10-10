@@ -231,6 +231,23 @@ jobs:
           timeout 180 grype "sbom:$evidence/syft.json" --fail-on high -o json > "$evidence/grype.json"
           python3 scripts/production/verify_eso_artifact.py \
             --evidence-dir "$evidence" --revision "$(git rev-parse HEAD)" > "$evidence/receipt.json"
+      - name: Render restricted scoped ESO candidate without cluster writes
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-deps --only-binary=:all: \
+            --require-hashes --timeout 15 --retries 0 --target "$RUNNER_TEMP/eso-yaml" -r /dev/stdin <<'REQUIREMENTS'
+          PyYAML @ https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc
+          REQUIREMENTS
+          tools="$RUNNER_TEMP/eso-render-tools"
+          mkdir -m 0700 "$tools"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
+            https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz -o "$tools/helm.tar.gz"
+          printf '%s  %s\n' c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 \
+            "$tools/helm.tar.gz" | sha256sum --check --strict
+          tar -xzf "$tools/helm.tar.gz" -C "$tools" linux-amd64/helm
+          PATH="$tools/linux-amd64:$PATH" PYTHONPATH="$RUNNER_TEMP/eso-yaml" \
+            python3 scripts/production/render_eso_candidate.py --chart "$RUNNER_TEMP/eso-artifact/chart.tgz" \
+            > "$RUNNER_TEMP/eso-artifact/scoped-candidate.json"
       - name: Retain public evidence including failed scans; never sign or deploy
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
