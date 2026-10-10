@@ -22,7 +22,7 @@ Stageهای قبلی ساخت/آزمون محصول‌اند و برای نصب 
 
 ## وضعیت پوشش فعلی
 
-پایهٔ بررسی‌شده: `main@07eaf65de368339b7ee2a03bfb12dc862417f887`، ۲۰۲۶-۱۰-۰۹.
+پایهٔ بررسی‌شده: `main@467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`، ۲۰۲۶-۱۰-۱۰.
 این SHA مرجع این ویرایش است، نه الزام استفادهٔ دائمی از نسخهٔ قدیمی.
 سرور اول OpenBao نصب‌شده، initialized و unsealed دارد؛ recovery ایزولهٔ محلی
 با سهم‌های اصلی `Passed` است. تأیید نسخه/retention مقصد backup، scheduler ساعتی،
@@ -39,7 +39,7 @@ Stage10 و Production readiness همچنان `Not verified` هستند.
 | OpenBao custody/init/unseal | Passed؛ توزیع custody تأیید مالک | custody و سهم‌های تازه |
 | snapshot | ciphertext/hash Passed؛ نسخهٔ باکت Not verified | مقصد و شواهد مستقل |
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
-| scoped auth OpenBao | ابزار و قرارداد شش هویت آماده؛ هدف Not run | بستهٔ اختصاصی مقصد |
+| scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO/JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -299,7 +299,7 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 
 ## ۱۳. رسیدن به نقطهٔ فعلی و مراحل بعد
 
-### احراز هویت محدود OpenBao؛ قدم اجرایی بعد
+### احراز هویت محدود OpenBao؛ مرحلهٔ اجراشده
 
 [راهنمای اجرای شش هویت](production-openbao-auth-fa.md) شامل دستور owner-local،
 ورودی‌ها، expected result، سطح ACL و recovery است. ابزار از store/custody موجود
@@ -307,8 +307,10 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 فقط خواندن مسیر `hooshix/data/production/<service>/*` را با token حداکثر پنج
 دقیقه دارد. TokenReview واقعی با JWT تازه و audience دقیق، بدون reviewer
 دائمی انجام می‌شود. SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
-واقعی هنوز نصب/همگام نشده است. اجرای VPS این مرحله **Not run** است؛ فقط پس
-از CI موفق، merge و اجرای مالک با receipt مستقل نتیجه به Passed تغییر می‌کند.
+واقعی هنوز نصب/همگام نشده است. اجرای مالک روی VPS اول `OPENBAO_SCOPED_AUTH=Passed`
+گزارش کرده است؛ رسید عمومی `auth-481ef67e63ce4f7d97e6a6a3c60e562a.json`
+خارج Git نگهداری می‌شود. این نتیجه فقط scoped auth را اثبات می‌کند، نه ESO،
+تحویل اسرار، audit خارج میزبان یا آمادگی Production.
 بستهٔ فعلی به سرور اول bind است؛ برای نصب دوم، داده‌های مرحلهٔ ۱ لازم‌اند.
 
 آزمون disposable نیز همان قاعدهٔ خروجی محدود TokenReview را با IPهای API همان
@@ -327,7 +329,7 @@ activation، snapshot و isolated recovery باید مربوط به خود هم�
 وضعیت هر کنترل جدا ثبت شود؛ قبول شواهد یک بخش، بخش دیگر را تأیید نمی‌کند.
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
-1. scoped authentication OpenBao و ESO؛ سیاست مستقل هر سرویس و تحویل اسرار.
+1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.
 2. دسترسی عملیاتی محدود، backup ساعتی، recovery و audit امن خارج میزبان؛ root
    اولیه فقط پس از جایگزین معتبر و آزمون recovery لغو شود.
 3. JIT واقعی: expiry/revoke/disconnect، سپس حذف دسترسی دائمی با مسیر نجات کارا.
