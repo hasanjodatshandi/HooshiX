@@ -204,13 +204,17 @@ def publish(directory, env):
     selected, targets = recipe(), {}
     for component, (tag, receipt) in built.items():
         print('PATCHED_PUBLICATION_STEP=' + component + '-push', flush=True)
-        repository = 'ghcr.io/hasanjodatshandi/hooshix/platform-' + component + '-patched-private'
+        package_component = 'eso-v2' if component == 'eso' else component
+        package = 'hooshix/platform-' + package_component + '-patched-private'
+        repository = 'ghcr.io/hasanjodatshandi/' + package
         target = repository + ':candidate-' + revision + '-' + invocation.replace(':', '-')
         run(['docker', 'tag', tag, target])
         run(['docker', 'push', target], timeout=300)
-        visibility = run(['gh', 'api', 'users/hasanjodatshandi/packages/container/hooshix%2Fplatform-'
-            + component + '-patched-private', '--jq', '.visibility']).strip()
+        print('PATCHED_PUBLICATION_STEP=' + component + '-visibility', flush=True)
+        visibility = run(['gh', 'api', 'users/hasanjodatshandi/packages/container/'
+            + package.replace('/', '%2F'), '--jq', '.visibility']).strip()
         if visibility != 'private':
+            print('PATCHED_PACKAGE_VISIBILITY=Rejected; private required', flush=True)
             raise ValueError('private candidate package required')
         folder = directory / component
         print('PATCHED_PUBLICATION_STEP=' + component + '-registry-resolve', flush=True)
