@@ -28,6 +28,17 @@ Git/source
 
 Independent checks may run in parallel only when their inputs and authority permit it. Production promotion requires all mandatory predecessor evidence.
 
+For the blocked Stage10 platform source candidates, PR/push/manual baseline
+artifact gates build and scan final images from the immutable reviewed source
+recipe, not the vulnerable binary still present in the upstream runtime base.
+OpenBao also executes disposable native recovery on the exact scanned local
+configuration digest. Scheduled upstream-pin scans remain blocking monitoring
+of the unchanged image inventory. Passing candidate gates permits protected-main
+candidate publication only; publication rebuilds/scans, repeats native OpenBao
+recovery, binds the actual registry digest and signs before any admission or
+staging/promotion. Neither CI path resolves findings in deployed old digests or
+approves deployment without the separate signed-digest/runtime evidence.
+
 ## 3. Source SAST — Semgrep
 
 Semgrep remains the selected blocking source SAST/source-policy mechanism.

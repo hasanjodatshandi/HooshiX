@@ -138,8 +138,9 @@ jobs:
   openbao-artifact:
     name: OpenBao pinned artifact security
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 55
     env:
+      SYFT_GOLANG_CAPTURE_SYMBOLS: all
       GRYPE_DB_AUTO_UPDATE: 'false'
       GRYPE_DB_VALIDATE_AGE: 'true'
       GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
@@ -155,7 +156,17 @@ jobs:
           set -euo pipefail
           scripts/production/install_release_tools.sh "$RUNNER_TEMP/openbao-tools"
           echo "$RUNNER_TEMP/openbao-tools" >> "$GITHUB_PATH"
-      - name: Catalog exact public digest and require fresh vulnerability scan
+      - name: Build and scan selected source candidate with native recovery
+        if: github.event_name != 'schedule'
+        run: |
+          set -euo pipefail
+          timeout 180 grype db update
+          python3 scripts/production/build_patched_platform.py --component openbao \
+            --directory "$RUNNER_TEMP/openbao-artifact"
+          image=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/openbao-artifact/receipt.json"))["image_config_digest"])')
+          python3 scripts/production/rehearse_openbao_recovery.py --ci --image-config-digest "$image"
+      - name: Monitor unchanged upstream digest on scheduled runs
+        if: github.event_name == 'schedule'
         run: |
           set -euo pipefail
           evidence="$RUNNER_TEMP/openbao-artifact"
@@ -171,7 +182,7 @@ jobs:
           python3 scripts/production/verify_openbao_artifact.py \
             --evidence-dir "$evidence" --revision "$(git rev-parse HEAD)" > "$evidence/receipt.json"
       - name: Report public blocking findings without approving promotion
-        if: ${{ always() }}
+        if: ${{ always() && github.event_name == 'schedule' }}
         run: |
           python3 scripts/production/verify_openbao_artifact.py --report \
             --evidence-dir "$RUNNER_TEMP/openbao-artifact" --revision "$(git rev-parse HEAD)"
@@ -180,14 +191,16 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: openbao-artifact-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/openbao-artifact/
+          path: |
+            ${{ runner.temp }}/openbao-artifact/
+            !${{ runner.temp }}/openbao-artifact/**/source.tar.gz
           retention-days: 30
           if-no-files-found: error
 
   eso-artifact:
     name: ESO pinned artifact security
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 55
     env:
       SYFT_GOLANG_CAPTURE_SYMBOLS: all
       GRYPE_DB_AUTO_UPDATE: 'false'
@@ -205,7 +218,7 @@ jobs:
           set -euo pipefail
           scripts/production/install_release_tools.sh "$RUNNER_TEMP/eso-tools"
           echo "$RUNNER_TEMP/eso-tools" >> "$GITHUB_PATH"
-      - name: Verify chart checksum and scan exact public upstream digest
+      - name: Verify chart checksum and selected final artifact
         run: |
           set -euo pipefail
           evidence="$RUNNER_TEMP/eso-artifact"
@@ -223,6 +236,11 @@ jobs:
             "${inputs[1]}" -o "$evidence/chart.tgz"
           printf '%s  %s\n' "${inputs[2]}" "$evidence/chart.tgz" | sha256sum --check --strict
           timeout 180 grype db update
+          if [ "$GITHUB_EVENT_NAME" != 'schedule' ]; then
+            python3 scripts/production/build_patched_platform.py --component eso \
+              --directory "$evidence/source-candidate"
+            exit 0
+          fi
           grype db status -o json > "$evidence/database.json"
           syft version -o json > "$evidence/syft-version.json"
           grype version -o json > "$evidence/grype-version.json"
@@ -253,14 +271,16 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: eso-artifact-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/eso-artifact/
+          path: |
+            ${{ runner.temp }}/eso-artifact/
+            !${{ runner.temp }}/eso-artifact/**/source.tar.gz
           retention-days: 30
           if-no-files-found: error
 
   mesh-artifact:
     name: Istio pinned artifact security
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 105
     env:
       GRYPE_DB_AUTO_UPDATE: 'false'
       GRYPE_DB_VALIDATE_AGE: 'true'
@@ -280,7 +300,7 @@ jobs:
           echo "$RUNNER_TEMP/mesh-tools" >> "$GITHUB_PATH"
       - name: Verify native Cosign import and referrer contract on synthetic loopback registry
         run: python3 scripts/production/rehearse_import_referrers.py
-      - name: Require fresh scans of all three exact public upstream imports
+      - name: Require fresh final-artifact scans of all three selected mesh components
         run: |
           set -euo pipefail
           export MESH_EVIDENCE="$RUNNER_TEMP/mesh-artifact"
@@ -295,9 +315,13 @@ jobs:
           from pathlib import Path
           sys.path.insert(0, 'scripts/production')
           from publish_mesh_candidate import run, scan, targets, validate
+          from build_patched_platform import build
           evidence = Path(os.environ['MESH_EVIDENCE'])
           for component, target in targets().items():
               folder = evidence / component
+              if component in ('istiod', 'cni') and os.environ['GITHUB_EVENT_NAME'] != 'schedule':
+                  build(component, folder)
+                  continue
               folder.mkdir(mode=0o700)
               (folder / 'database.json').write_bytes((evidence / 'database.json').read_bytes())
               image = target['upstream']
@@ -314,7 +338,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mesh-artifact-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/mesh-artifact/
+          path: |
+            ${{ runner.temp }}/mesh-artifact/
+            !${{ runner.temp }}/mesh-artifact/**/source.tar.gz
           retention-days: 30
           if-no-files-found: error
 

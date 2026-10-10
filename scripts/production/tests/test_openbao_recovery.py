@@ -114,6 +114,36 @@ class OpenBaoRecoveryTest(unittest.TestCase):
                     recovery.rehearse()
                 initialize.assert_not_called()
 
+    def test_local_candidate_refuses_tags_wrong_identity_and_platform_before_secrets(self):
+        digest = 'sha256:' + 'a' * 64
+        valid = {'Id': digest, 'Architecture': 'amd64', 'Os': 'linux'}
+        for image, metadata in [('candidate:latest', valid), (digest, dict(valid, Id='wrong')),
+                                (digest, dict(valid, Architecture='arm64')),
+                                (digest, dict(valid, Os='windows'))]:
+            with self.subTest(image=image, metadata=metadata), \
+                    patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                    patch.object(os, 'getuid', return_value=1000), \
+                    patch.object(recovery, 'command', return_value=(metadata['Id'] + ' ' +
+                        metadata['Architecture'] + ' ' + metadata['Os']).encode()), \
+                    patch.object(recovery, 'initialize_encrypted') as initialize, \
+                    self.assertRaises(recovery.RehearsalFailed):
+                recovery.rehearse(image)
+            initialize.assert_not_called()
+
+    def test_local_candidate_uses_immutable_configuration_without_pulling(self):
+        digest = 'sha256:' + 'a' * 64
+        replies = [(digest + ' amd64 linux').encode(),
+                   b'OpenBao v2.6.4-rc1']
+        with patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                patch.object(os, 'getuid', return_value=1000), \
+                patch.object(recovery, 'command', side_effect=replies) as run, \
+                self.assertRaises(recovery.RehearsalFailed):
+            recovery.rehearse(digest)
+        self.assertEqual(['/usr/bin/docker', 'image', 'inspect', '--format',
+                          '{{.Id}} {{.Architecture}} {{.Os}}', digest], run.call_args_list[0].args[0])
+        self.assertIn(digest, run.call_args_list[1].args[0])
+        self.assertFalse(any('pull' in call.args[0] for call in run.call_args_list))
+
     def test_no_redirect_even_for_loopback(self):
         with self.assertRaises(recovery.RehearsalFailed):
             recovery.NoRedirect().redirect_request(None, None, 302, "", {}, "https://other.invalid")

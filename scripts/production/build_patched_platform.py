@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -145,6 +146,7 @@ def build(component, directory):
         raise ValueError('bounded official source integrity required')
     (directory / 'source.tar.gz').write_bytes(data)
     (directory / 'Dockerfile').write_text(dockerfile(component, selected))
+    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n')
     tag = 'hooshix-patched-' + component + ':candidate'
     run(['docker', 'build', '--platform', 'linux/amd64', '--tag', tag, str(directory)], timeout=2700)
     image_id = run(['docker', 'image', 'inspect', '--format', '{{.Id}}', tag]).strip()
@@ -181,6 +183,12 @@ def publish(directory, env):
         raise ValueError('exact protected checkout required')
     directory.mkdir(mode=0o700)
     built = {component: build(component, directory / component) for component in COMPONENTS}
+    run([sys.executable, str(ROOT / 'scripts/production/rehearse_openbao_recovery.py'), '--ci',
+         '--image-config-digest', built['openbao'][1]['image_config_digest']], timeout=420)
+    (directory / 'openbao/native-recovery.json').write_text(json.dumps({
+        'schema_version': 1, 'image_config_digest': built['openbao'][1]['image_config_digest'],
+        'disposable_tls_shamir_raft_restore_acl_audit_root_revoke': 'Passed',
+        'production_readiness': 'Not verified'}) + '\n')
     selected, targets = recipe(), {}
     for component, (tag, receipt) in built.items():
         repository = 'ghcr.io/hasanjodatshandi/hooshix/platform-' + component + '-patched-private'

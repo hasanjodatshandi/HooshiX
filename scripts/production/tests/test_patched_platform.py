@@ -109,6 +109,24 @@ class PatchedPlatformTest(unittest.TestCase):
             target.publish(Path('unused'), {})
         self.assertFalse(any(argv[0] in ('docker', 'cosign') for argv in commands))
 
+    def test_native_recovery_failure_prevents_publication_and_signing(self):
+        commands = []
+        digest = 'sha256:' + 'a' * 64
+        def fake_run(argv, **kwargs):
+            commands.append(argv)
+            if argv[0] == 'git':
+                return 'b' * 40
+            raise target.subprocess.CalledProcessError(1, argv)
+        with patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                patch.object(target, 'run', side_effect=fake_run), \
+                patch.object(Path, 'mkdir'), \
+                patch.object(target, 'build', return_value=('candidate', {'image_config_digest': digest})) as builder, \
+                self.assertRaises(target.subprocess.CalledProcessError):
+            target.publish(Path('unused'), {})
+        self.assertEqual(4, builder.call_count)
+        self.assertEqual(['--ci', '--image-config-digest', digest], commands[1][-3:])
+        self.assertFalse(any(argv[0] in ('docker', 'cosign') for argv in commands))
+
     def test_ci_has_no_signing_or_credentials_and_release_requires_main(self):
         workflow = (target.ROOT / '.github/workflows/patched-platform-source.yml').read_text()
         for forbidden in ('id-token: write', 'packages: write', 'secrets.', '--publish',
@@ -118,6 +136,22 @@ class PatchedPlatformTest(unittest.TestCase):
         self.assertIn('--publish', release)
         self.assertIn('Exact main baseline must pass first', release)
         self.assertIn('environment: production-release', release)
+
+    def test_baseline_scans_selected_final_candidates_and_retains_scheduled_monitor(self):
+        workflow = (target.ROOT / '.github/workflows/repository-baseline.yml').read_text()
+        for component in ('openbao', 'eso'):
+            self.assertIn('--component ' + component, workflow)
+        self.assertIn("component in ('istiod', 'cni')", workflow)
+        self.assertIn('build(component, folder)', workflow)
+        self.assertIn('--ci --image-config-digest "$image"', workflow)
+        self.assertIn("if: github.event_name == 'schedule'", workflow)
+        self.assertIn("os.environ['GITHUB_EVENT_NAME'] != 'schedule'", workflow)
+        self.assertIn("if [ \"$GITHUB_EVENT_NAME\" != 'schedule' ]", workflow)
+        self.assertIn('scan(folder)', workflow)  # Unchanged Rust ztunnel still scanned.
+        baseline = workflow.split('  baseline:', 1)[1]
+        for job in ('openbao-artifact', 'eso-artifact', 'mesh-artifact'):
+            self.assertIn('- ' + job, baseline)
+            self.assertIn('${{ needs.' + job + '.result }}', baseline)
 
 
 if __name__ == '__main__':

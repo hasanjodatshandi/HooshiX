@@ -144,15 +144,24 @@ def initialize_encrypted(client: Client, container: str, directory: Path) -> tup
     return keys, token
 
 
-def rehearse():
+def rehearse(image_config_digest=None):
     # No production host, owner credential path, key environment, or cluster mutation exists here.
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.getuid() == 0:
         raise RehearsalFailed("disposable non-root GitHub runner required")
-    image = json.loads((SECRETS / "openbao-image.json").read_text())["image"]
-    if not re.fullmatch(r"ghcr\.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}", image):
-        raise RehearsalFailed("fixture immutable image required")
-    step("image-pull")
-    command(["/usr/bin/docker", "pull", "--quiet", image], timeout=180)
+    if image_config_digest is None:
+        image = json.loads((SECRETS / "openbao-image.json").read_text())["image"]
+        if not re.fullmatch(r"ghcr\.io/openbao/openbao-distroless@sha256:[a-f0-9]{64}", image):
+            raise RehearsalFailed("fixture immutable image required")
+        step("image-pull")
+        command(["/usr/bin/docker", "pull", "--quiet", image], timeout=180)
+    else:
+        image = image_config_digest
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
+            raise RehearsalFailed("fixture immutable local configuration required")
+        actual = command(["/usr/bin/docker", "image", "inspect", "--format",
+                          "{{.Id}} {{.Architecture}} {{.Os}}", image]).strip()
+        if actual != (image + ' amd64 linux').encode():
+            raise RehearsalFailed("fixture local configuration mismatch")
     step("image-version")
     version = command(["/usr/bin/docker", "run", "--rm", "--network", "none", "--read-only",
                        "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
@@ -375,9 +384,10 @@ def rehearse():
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ci", action="store_true", required=True)
-    parser.parse_args()
+    parser.add_argument("--image-config-digest", help="Already built and scanned disposable CI image only")
+    args = parser.parse_args()
     try:
-        rehearse()
+        rehearse(args.image_config_digest)
         return 0
     except activation.custody.BootstrapFailed as error:
         reason = str(error)

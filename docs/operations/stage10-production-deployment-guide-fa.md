@@ -332,9 +332,11 @@ activation، snapshot و isolated recovery باید مربوط به خود هم�
 
 نسخهٔ مصوب ESO `2.12.0` است؛ تصویر رسمی amd64 و chart همان نسخه در
 `infrastructure/production/secrets/eso-image.json` با digest/checksum دقیق
-قفل شده‌اند. job اجباری `ESO pinned artifact security` در Repository baseline
-chart را با SHA-256 بررسی و تصویر دقیق را با Syft/Grype و پایگاه حداکثر
-پنج‌روزه اسکن می‌کند؛ High/Critical موجب توقف است. artifact عمومی
+به‌عنوان ورودی سورس/base قفل شده‌اند. job اجباری `ESO pinned artifact security`
+در Repository baseline، chart را با SHA-256 بررسی می‌کند؛ در PR/push/manual
+تصویر نهاییِ بازسازی‌شده از recipe ثابت را با Syft/Grype و پایگاه حداکثر
+پنج‌روزه اسکن می‌کند. اجرای scheduled تصویر upstream قبلی را جداگانه پایش
+می‌کند و یافته‌های آن را رفع‌شده فرض نمی‌کند؛ High/Critical موجب توقف است. artifact عمومی
 `eso-artifact-<run>-<attempt>` شامل رسید و گزارش‌هاست؛ scan Passed فقط بررسی
 artifact است، نه امضا، نصب، تحویل secret یا آماده‌بودن Production.
 
@@ -429,7 +431,9 @@ SBOM، اسکن، recipe تولیدشده، graph ماژول‌ها، hashهای
 انتشار بعدی فقط پس از merge بازبینی‌شده و baseline موفق همان main، از workflow
 موجود `production-release.yml` با `release_kind=patched-platform-candidate`
 و environment مصوب انجام می‌شود. مثال زیر **فعلاً اجرا نشود**؛ گیت‌های
-baseline/digest/admission باید ابتدا برای candidate جدید هماهنگ شوند:
+baseline باید روی revision جدید موفق شوند و PR با بازبینی merge شود.
+انتشار صرفاً candidate امضاشده می‌سازد؛ پذیرش digest در admission و نصب هنوز
+مرحلهٔ جداگانه و اجرا‌نشده هستند:
 
 ```bash
 gh workflow run production-release.yml --ref main \
@@ -439,7 +443,10 @@ gh workflow run production-release.yml --ref main \
 انتشار، تمام چهار تصویر را می‌سازد و اسکن می‌کند؛ سپس به packageهای خصوصی
 `platform-<eso|openbao|istiod|cni>-patched-private` در GHCR همان حساب می‌فرستد.
 config digest پس از push کنترل می‌شود؛ SBOM/scan برای digest واقعی registry
-دوباره بررسی می‌شود. فقط پس از موفقیت همهٔ تصاویر، امضا، provenance از نوع
+دوباره بررسی می‌شود. قبل از هر push، OpenBao بازسازی‌شده با همان config digest
+روی runner موقت آزمون TLS، Shamir، restart، restore، ACL، ممیزی و لغو root
+مصنوعی را می‌گذراند؛ failure مانع انتشار همهٔ تصاویر می‌شود. این آزمون هیچ
+داده یا root واقعی VPS را تغییر نمی‌دهد. فقط پس از موفقیت همهٔ تصاویر، امضا، provenance از نوع
 `patched-upstream-source-build` و CycloneDX امضاشده صادر و signer مثبت/منفی
 بررسی می‌شوند. provenance سورس، recipe، compiler، base image، وابستگی‌ها،
 hashهای واقعی فایل‌های ماژول و revision مخزن را ثبت می‌کند. خروجی
@@ -448,8 +455,14 @@ hashهای واقعی فایل‌های ماژول و revision مخزن را ث�
 
 این مرحله فایل یا دادهٔ VPS را تغییر نمی‌دهد؛ Root، اسرار و snapshot موجود
 حفظ می‌شوند. هیچ reset/reinit یا rollback سرور برای ساخت candidate لازم نیست.
-گیت امنیتی تصاویر upstream قدیمی حذف یا موفق معرفی نمی‌شود؛ تا تصویب و آزمون
-digestهای جایگزین، baseline و استقرار همچنان مسدود می‌مانند.
+گیت‌های PR/push/manual اکنون تصویر نهاییِ source candidate را می‌سازند و
+اسکن می‌کنند؛ OpenBao در baseline همان آزمون native را هم می‌گذراند و
+ztunnel بدون تغییر اسکن می‌شود. گیت scheduled تصاویر upstream قبلی را
+همچنان با همان شدت High/Critical پایش می‌کند. baseline جدید می‌تواند اجازهٔ
+انتشار candidate را بدهد، نه نصب یا اعلام رفع آسیب‌پذیری روی VPS. تا آزمون و
+تصویب digestهای امضاشده، استقرار همچنان مسدود است. اجرای دوبارهٔ CI جدید را
+در PR194 بررسی کنید؛ موفقیت قبلی چهار build به‌تنهایی این wiring جدید را
+تأیید نمی‌کند.
 
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 

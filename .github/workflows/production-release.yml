@@ -222,6 +222,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/${{ inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
+          path: |
+            ${{ runner.temp }}/${{ inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
+            !${{ runner.temp }}/patched-release-evidence/**/source.tar.gz
           retention-days: 30
           if-no-files-found: error
