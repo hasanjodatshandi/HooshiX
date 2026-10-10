@@ -444,7 +444,12 @@ gh workflow run production-release.yml --ref main \
 ```
 
 انتشار، تمام چهار تصویر را می‌سازد و اسکن می‌کند؛ سپس به packageهای خصوصی
-`platform-<eso|openbao|istiod|cni>-patched-private` در GHCR همان حساب می‌فرستد.
+`platform-eso-v2-patched-private` برای ESO و
+`platform-<openbao|istiod|cni>-patched-private` برای بقیه، در GHCR همان حساب می‌فرستد.
+همهٔ این packageها باید Private بمانند؛ visibility مستقل از مخزن است.
+package عمومی `platform-eso-patched-private` مقصد این انتشار نیست؛ آن را برای
+استقرار انتخاب نکنید. package عمومی در GitHub قابل تبدیل مجدد به Private نیست؛
+از مقصد تازهٔ بالا استفاده کنید، بدون حذف package یا تغییر visibility مخزن.
 پس از push، Syft با احراز هویت موقت CI و TLS مستقیم به registry مراجعه می‌کند؛
 manifest digest تنها با تطبیق repository، config digest تصویر ساخته‌شده و
 پلتفرم `linux/amd64` پذیرفته می‌شود. `RepoDigests` محلی Docker مرجع انتشار
