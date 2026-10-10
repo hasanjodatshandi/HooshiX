@@ -201,7 +201,7 @@ def publish(directory, env):
         'schema_version': 1, 'image_config_digest': built['openbao'][1]['image_config_digest'],
         'disposable_tls_shamir_raft_restore_acl_audit_root_revoke': 'Passed',
         'production_readiness': 'Not verified'}) + '\n')
-    selected, targets = recipe(), {}
+    selected, targets, visibilities = recipe(), {}, {}
     for component, (tag, receipt) in built.items():
         print('PATCHED_PUBLICATION_STEP=' + component + '-push', flush=True)
         package_component = 'eso-v2' if component == 'eso' else component
@@ -213,9 +213,12 @@ def publish(directory, env):
         print('PATCHED_PUBLICATION_STEP=' + component + '-visibility', flush=True)
         visibility = run(['gh', 'api', 'users/hasanjodatshandi/packages/container/'
             + package.replace('/', '%2F'), '--jq', '.visibility']).strip()
-        if visibility != 'private':
-            print('PATCHED_PACKAGE_VISIBILITY=Rejected; private required', flush=True)
-            raise ValueError('private candidate package required')
+        # Owner approval is limited to the fixed ESO package above.
+        allowed = ('private', 'public') if component == 'eso' else ('private',)
+        if visibility not in allowed:
+            print('PATCHED_PACKAGE_VISIBILITY=Rejected; unapproved visibility', flush=True)
+            raise ValueError('approved candidate package visibility required')
+        visibilities[component] = visibility
         folder = directory / component
         print('PATCHED_PUBLICATION_STEP=' + component + '-registry-resolve', flush=True)
         # Resolve remotely: Docker's local RepoDigests is not registry authority.
@@ -268,7 +271,8 @@ def publish(directory, env):
         else:
             raise ValueError('wrong signer accepted')
     return {'schema_version': 1, 'provenance_kind': 'patched-upstream-source-build',
-        'repository_revision': revision, 'images': targets, 'publication': 'Passed',
+        'repository_revision': revision, 'images': targets, 'registry_visibility': visibilities,
+        'publication': 'Passed',
         'runtime_admission': 'Not verified', 'production_promotion': 'Not verified'}
 
 

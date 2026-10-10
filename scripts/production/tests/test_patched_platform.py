@@ -126,7 +126,7 @@ class PatchedPlatformTest(unittest.TestCase):
             if argv[0] == 'git':
                 return 'b' * 40
             if argv[0] == 'gh':
-                return 'private'
+                return 'public' if 'platform-eso-v2-' in argv[2] else 'private'
             if argv[0] == 'cosign':
                 self.assertEqual(4, scanned.call_count)
                 if any(arg.endswith('.wrong') for arg in argv):
@@ -152,6 +152,8 @@ class PatchedPlatformTest(unittest.TestCase):
             result = target.publish(Path('unused'), {})
         self.assertEqual('Passed', result['publication'])
         self.assertEqual('Not verified', result['production_promotion'])
+        self.assertEqual({'eso': 'public', 'openbao': 'private', 'istiod': 'private', 'cni': 'private'},
+                         result['registry_visibility'])
         self.assertEqual({component: repository + '@sha256:' + 'c' * 64
             for component, repository in repositories.items()}, result['images'])
         self.assertEqual(['users/hasanjodatshandi/packages/container/'
@@ -162,8 +164,8 @@ class PatchedPlatformTest(unittest.TestCase):
         self.assertTrue(all('@sha256:' in argv[2] for argv in scans[1::2]))
         self.assertFalse(any('.RepoDigests' in ' '.join(argv) for argv in commands))
 
-    def test_nonprivate_package_stops_before_registry_scan_or_signing(self):
-        for visibility in ('public', 'internal', '', 'private\npublic'):
+    def test_unapproved_eso_visibility_stops_before_registry_scan_or_signing(self):
+        for visibility in ('internal', '', 'private\npublic'):
             commands = []
             def fake_run(argv, **kwargs):
                 commands.append(argv)
@@ -178,6 +180,34 @@ class PatchedPlatformTest(unittest.TestCase):
             self.assertEqual('users/hasanjodatshandi/packages/container/hooshix%2Fplatform-eso-v2-patched-private',
                              next(argv[2] for argv in commands if argv[0] == 'gh'))
             self.assertFalse(any(argv[0] in ('syft', 'grype', 'cosign') for argv in commands))
+
+    def test_public_visibility_exception_cannot_reach_other_components(self):
+        for rejected in ('openbao', 'istiod', 'cni'):
+            commands = []
+            def fake_run(argv, **kwargs):
+                commands.append(argv)
+                if argv[0] == 'git':
+                    return 'b' * 40
+                if argv[0] == 'gh':
+                    return 'public' if 'platform-' + rejected + '-' in argv[2] else 'private'
+                return ''
+            def evidence(path):
+                name = 'eso-v2' if path.parent.name == 'eso' else path.parent.name
+                image = 'ghcr.io/hasanjodatshandi/hooshix/platform-' + name + '-patched-private@sha256:' + 'c' * 64
+                return {'source': {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'c' * 64,
+                    'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}}
+            with self.subTest(component=rejected), \
+                    patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                    patch.object(target, 'recipe', return_value=self.selected), \
+                    patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
+                    patch.object(Path, 'write_text'), patch.object(target, 'build',
+                        return_value=('tag', {'image_config_digest': self.digest})), \
+                    patch.object(target, 'load', side_effect=evidence), \
+                    patch.object(target, 'scan'), patch.object(target, 'registry_scan'), \
+                    self.assertRaises(ValueError):
+                target.publish(Path('unused'), {})
+            self.assertFalse(any(argv[0] == 'cosign' for argv in commands))
+            self.assertIn('platform-' + rejected + '-', commands[-1][2])
 
     def test_failed_component_scan_prevents_all_signing(self):
         commands = []
