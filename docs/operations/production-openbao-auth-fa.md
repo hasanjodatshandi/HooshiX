@@ -37,6 +37,25 @@ SecretStoreهای namespace-scoped، CA عمومی ConfigMap و role/SA مشخص
 ساخت بستهٔ اختصاصی اجرا نشود. rescue VNC و نشست مستقل خصوصی SSH باز بمانند.
 از checkout تمیز، در PowerShell محلی بدون transcript/ضبط:
 
+پیش از اجرای ابزار، `platform-apps` باید سه برچسب `istio.io/dataplane-mode=ambient`،
+`pod-security.kubernetes.io/enforce=restricted` و
+`pod-security.kubernetes.io/enforce-version=v1.35` داشته باشد. ابزار namespace
+موجود را خودکار relabel نمی‌کند. اگر فقط برچسب Ambient غایب است، ابتدا بررسی کنید:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl get namespace platform-apps --show-labels'
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl get pods -n platform-apps'
+```
+
+فقط وقتی namespace هیچ Pod ندارد و دو برچسب امنیتی دقیقاً مطابق‌اند:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl label namespace platform-apps istio.io/dataplane-mode=ambient'
+```
+
+برای namespace دارای workload یا هر تعارض دیگر، توقف و بررسی جداگانه لازم است؛
+حذف namespace یا overwrite برچسب‌ها روش نصب نیست.
+
 ```powershell
 wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_openbao_auth_operator.py --custody /home/coder/.local/share/hooshix-openbao-custody/7509bb067d814468982cc84fa50cb4d4 --rescue-and-second-session-ready
 ```
@@ -60,6 +79,11 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 نتیجهٔ مورد انتظار `OPENBAO_SCOPED_AUTH=Passed` و مسیر `PUBLIC_RECEIPT` خارج Git
 در `/home/coder/.local/share/hooshix-openbao-auth/` است. فقط نتیجهٔ عمومی را
 بفرستید؛ token، رمز، shares، ciphertext یا فایل credential نفرستید.
+
+اجرای مالک روی VPS اول با source `467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`
+نتیجهٔ `Passed` گزارش کرده است؛ رسید عمومی
+`auth-481ef67e63ce4f7d97e6a6a3c60e562a.json` خارج Git است. root حفظ شده و ESO
+نصب نشده است. این شاهد جای آزمون مستقل نصب دوم را نمی‌گیرد.
 
 ## کاربرد و مرحلهٔ بعد
 

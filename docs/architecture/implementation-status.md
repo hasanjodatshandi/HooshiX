@@ -8,7 +8,14 @@ policies, five-minute OpenBao tokens and client-JWT Kubernetes TokenReview witho
 a static reviewer token or OpenBao restart. Only `create tokenreviews` is granted
 to those six accounts. Namespaced ESO SecretStore contracts use a public CA and
 fresh TokenRequest audiences; ESO is not installed and actual secret delivery,
-target scoped-auth execution, root revocation and JIT remain `Not verified`.
+root revocation and JIT remain `Not verified`.
+Owner-run target scoped-auth returned `OPENBAO_SCOPED_AUTH=Passed` on source
+`467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`, with public receipt
+`auth-481ef67e63ce4f7d97e6a6a3c60e562a.json` retained outside Git. The owner
+confirmed an empty `platform-apps` before adding its required Ambient label;
+existing Restricted/v1.35 labels were preserved. Root remains preserved and
+ESO is not installed. This is owner-reported target evidence, not independent
+off-host-audit, secret-delivery or Production-readiness evidence.
 Native Kubernetes CI coverage exercises the production adapter using synthetic
 canaries; its result is run-specific, not VPS/ESO/mesh evidence. Operator entrypoint:
 `../operations/stage10-production-deployment-guide-fa.md` and
