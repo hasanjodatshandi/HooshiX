@@ -58,10 +58,14 @@ def token_delegation():
 
 
 def network(api_addresses):
-    if not 1 <= len(api_addresses) <= 16:
+    if not isinstance(api_addresses, (list, tuple, set, frozenset)) or not 1 <= len(api_addresses) <= 16:
         raise ValueError('bounded exact API addresses required')
+    if any(not isinstance(address, str) or str(ipaddress.IPv4Address(address)) != address
+           for address in api_addresses):
+        raise ValueError('canonical IPv4 API literals required')
     addresses = sorted({str(ipaddress.IPv4Address(address)) for address in api_addresses})
-    if any(ipaddress.ip_address(address).is_unspecified or
+    if any(address.startswith('0.') or ipaddress.ip_address(address).is_reserved or
+           ipaddress.ip_address(address).is_unspecified or
            ipaddress.ip_address(address).is_multicast or
            ipaddress.ip_address(address).is_loopback or
            ipaddress.ip_address(address).is_link_local for address in addresses):

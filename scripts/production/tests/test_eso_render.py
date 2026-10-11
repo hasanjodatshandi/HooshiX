@@ -100,7 +100,8 @@ class ESORenderTest(unittest.TestCase):
         self.assertEqual(['8200'], target.authorization()['spec']['rules'][0]['to'][0]['operation']['ports'])
 
     def test_network_rejects_unbounded_or_non_unicast_api_input(self):
-        for addresses in ([], ['0.0.0.0'], ['::1'], ['127.0.0.1'], ['169.254.169.254'],
+        for addresses in ([], ['0.0.0.0'], ['0.0.0.1'], ['255.255.255.255'], [123], [True],
+                          '10.43.0.1', ['::1'], ['127.0.0.1'], ['169.254.169.254'],
                           ['224.0.0.1'], ['10.43.0.0/16'], ['kubernetes.default.svc'],
                           ['10.0.0.' + str(n) for n in range(1, 18)]):
             with self.subTest(addresses=addresses), self.assertRaises(ValueError):
