@@ -432,6 +432,21 @@ checksum chart، مرز namespace، RBAC و محدودیت منابع بدون �
 job بررسی ESO هر دو render را جدا در artifact عمومی نگه می‌دارد؛ هیچ‌کدام
 بدون تکمیل گیت‌های نصب، desired state فعال روی VPS نیستند.
 
+### آزمون native تحویل ESO در کلاستر موقت
+
+job اجباری `OpenBao Kubernetes foundation` همان chart دارای checksum و
+Helm `4.2.4` را برای تصویر اصلاح‌شده استفاده می‌کند. دو CRD مستقل
+`SecretStore` و `ExternalSecret` نصب می‌شوند؛ حساب‌ها و issuer کلاستر موقت
+به OpenBao ساختگی متصل‌اند و هیچ credential یا Root واقعی وارد CI نمی‌شود.
+هر شش هویت باید مقدار مخصوص سرویس خود را دریافت و پس از تغییر آن به‌روز کنند؛
+خواندن مسیر سرویس دیگر نباید Secret بسازد. حذف ExternalSecret باید Secret
+تحت مالکیت آن را حذف کند. مقدارهای آزمایشی نباید در log اپراتور ظاهر شوند.
+پس از حذف کلاستر، فقط receipt عمومی با digest واقعی و نتیجهٔ آزمون حفظ می‌شود.
+
+این آزمون روی kind `1.35.5` اجرا می‌شود؛ آزمون K3s `1.35.6`، admission امضا و
+Ambient mTLS روی VPS همچنان مستقل و الزامی‌اند. اجرای CI مجوز نصب مستقیم نیست.
+نسخهٔ غیررمزدار اسرار واقعی، خروجی کامل Secret یا فایل custody در artifact قرار نگیرد.
+
 ### ساخت candidate امنیتی از سورس رسمی
 
 recipe ثابت `infrastructure/production/release/patched-platform-sources.json`
