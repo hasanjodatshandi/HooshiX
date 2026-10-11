@@ -38,6 +38,30 @@ class ESOArtifactTest(unittest.TestCase):
                       'native_secret_delivery', 'deployment', 'production_promotion'):
             self.assertEqual('Not verified', receipt[field])
 
+    def test_published_selection_preserves_upstream_build_base_and_blocked_promotion(self):
+        selected = target.published_pin()
+        self.assertEqual(self.pin['published_security_candidate']['image'], selected['image'])
+        self.assertEqual(self.pin['chart'], selected['chart'])
+        self.assertEqual('2.12.0', selected['version'])
+        self.assertEqual(target.BLOCKED, selected['production_promotion'])
+        self.assertEqual(self.pin['image'], target.pin()['image'])
+        self.assertNotIn('index_digest', selected)
+        self.assertNotIn('compressed_bytes', selected)
+
+    def test_published_selection_rejects_foreign_tag_recipe_and_promotion(self):
+        for key, value in [('image', 'ghcr.io/other/eso@sha256:' + 'a' * 64),
+                ('image', 'ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private:latest'),
+                ('image', 'ghcr.io/hasanjodatshandi/hooshix/platform-eso-patched-private@sha256:' + 'a' * 64),
+                ('repository_revision', 'main'), ('publication_run_id', '1;command'),
+                ('publication_run_id', '0'), ('recipe_sha256', '0' * 64),
+                ('provenance_kind', 'unchanged-upstream-import'),
+                ('production_promotion', 'Passed')]:
+            selected = copy.deepcopy(self.pin)
+            selected['published_security_candidate'][key] = value
+            with self.subTest(key=key, value=value), \
+                    patch.object(target, 'pin', return_value=selected), self.assertRaises(ValueError):
+                target.published_pin()
+
     def test_pin_rejects_other_registry_tag_version_chart_and_approval(self):
         cases = [('image', 'ghcr.io/other/eso@sha256:' + 'a' * 64),
                  ('image', 'ghcr.io/external-secrets/external-secrets:latest'),
@@ -93,6 +117,7 @@ class ESOArtifactTest(unittest.TestCase):
         for required in ('--fail-on high', '--from registry --platform linux/amd64',
                          'sha256sum --check --strict', 'if: ${{ always() }}',
                          'render_eso_candidate.py --chart', 'scoped-candidate.json',
+                         '--published-candidate', 'scoped-published-candidate.json',
                          '--require-hashes'):
             self.assertIn(required, job)
         for forbidden in ('secrets.', 'id-token:', 'packages: write', 'continue-on-error',

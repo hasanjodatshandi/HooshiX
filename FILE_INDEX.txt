@@ -553,6 +553,7 @@ scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/readiness.py
 scripts/production/recover_openbao_initialization.py
+scripts/production/rehearse_eso_delivery.py
 scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
@@ -577,6 +578,7 @@ scripts/production/run-openbao-storage.ps1
 scripts/production/run-platform-commissioning.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/tests/test_eso_artifact.py
+scripts/production/tests/test_eso_delivery.py
 scripts/production/tests/test_eso_render.py
 scripts/production/tests/test_ghcr_release.py
 scripts/production/tests/test_host_audit_policy.py

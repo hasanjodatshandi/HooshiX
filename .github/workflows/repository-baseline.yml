@@ -266,6 +266,9 @@ jobs:
           PATH="$tools/linux-amd64:$PATH" PYTHONPATH="$RUNNER_TEMP/eso-yaml" \
             python3 scripts/production/render_eso_candidate.py --chart "$RUNNER_TEMP/eso-artifact/chart.tgz" \
             > "$RUNNER_TEMP/eso-artifact/scoped-candidate.json"
+          PATH="$tools/linux-amd64:$PATH" PYTHONPATH="$RUNNER_TEMP/eso-yaml" \
+            python3 scripts/production/render_eso_candidate.py --chart "$RUNNER_TEMP/eso-artifact/chart.tgz" \
+            --published-candidate > "$RUNNER_TEMP/eso-artifact/scoped-published-candidate.json"
       - name: Retain public evidence including failed scans; never sign or deploy
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -382,10 +385,30 @@ jobs:
           printf '%s  %s\n' "$KIND_LINUX_AMD64_SHA256" "$RUNNER_TEMP/openbao-kubernetes-tools/kind" \
             "$KUBECTL_LINUX_AMD64_SHA256" "$RUNNER_TEMP/openbao-kubernetes-tools/kubectl" | sha256sum --check --strict
           chmod 0700 "$RUNNER_TEMP/openbao-kubernetes-tools/kind" "$RUNNER_TEMP/openbao-kubernetes-tools/kubectl"
+      - name: Prepare pinned ESO chart and Helm for synthetic delivery
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/openbao-kubernetes-tools"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            https://github.com/external-secrets/external-secrets/releases/download/helm-chart-2.12.0/external-secrets-2.12.0.tgz \
+            -o "$tools/eso-chart.tgz"
+          curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 \
+            https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz -o "$tools/helm.tar.gz"
+          printf '%s  %s\n' 4b584136b7311c0af8c8719d377cc5b1a7ef12c2de18f1fdb30614eab75bdeb3 "$tools/eso-chart.tgz" \
+            c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 "$tools/helm.tar.gz" | sha256sum --check --strict
+          tar -xzf "$tools/helm.tar.gz" -C "$tools" linux-amd64/helm
+          install -m 0700 "$tools/linux-amd64/helm" "$tools/helm"
+          python3 -m pip install --disable-pip-version-check --no-deps --only-binary=:all: \
+            --require-hashes --timeout 15 --retries 0 --target "$RUNNER_TEMP/eso-native-yaml" -r /dev/stdin <<'REQUIREMENTS'
+          PyYAML @ https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc
+          REQUIREMENTS
       - name: Rehearse public candidate with disposable TLS and Shamir data
         run: |
+          export PYTHONPATH="$RUNNER_TEMP/eso-native-yaml"
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/openbao-kubernetes-tools" \
+            --eso-chart "$RUNNER_TEMP/openbao-kubernetes-tools/eso-chart.tgz" \
             --receipt "$RUNNER_TEMP/openbao-kubernetes-receipt.json"
       - name: Retain only successful public Kubernetes evidence, never fixture files
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

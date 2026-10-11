@@ -153,7 +153,13 @@ identities before ESO installation, without restarting OpenBao or revoking the
 initial root credential. Six `platform-apps/eso-<service>` accounts are bound by
 exact name, namespace and audience to read-only KV-v2 paths for their owning
 service. They receive no default policy and OpenBao tokens have a five-minute
-explicit maximum lifetime. Client TokenRequest JWTs carry the API audience plus
+explicit maximum lifetime. ESO may read `auth/token/lookup-self` and update
+`auth/token/revoke-self` to validate and retire only its own short-lived token;
+no general token lookup/create/renew/revoke or default policy is granted. The
+supervised reconciler upgrades only the exact prior service-read-only ACL to
+this contract; unknown ACLs fail before mutation, and current ACLs are no-write
+reentries. Native delivery validates these self-only operations as well as
+cross-service denial. Client TokenRequest JWTs carry the API audience plus
 the explicit OpenBao audience. Kubernetes TokenReview remains authoritative;
 issuer validation is delegated to that API, not an unverified decoded JWT.
 Only `create tokenreviews.authentication.k8s.io` is granted to those six accounts;

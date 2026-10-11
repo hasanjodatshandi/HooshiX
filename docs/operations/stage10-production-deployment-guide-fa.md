@@ -300,6 +300,13 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 و recovery Passed باشند. کلید قبلی دوباره PUT نمی‌شود. backup/custody سرور اول
 برای init نصب دوم استفاده نمی‌شوند. scheduler ساعتی هنوز مرحلهٔ بعد است.
 
+اگر ارائه‌دهنده فعلاً API نسخه‌سازی یا قفل را پشتیبانی نمی‌کند، این بخش
+`Not verified` باقی می‌ماند؛ probe/upload دوره‌ای یا ارسال مجدد همان key انجام
+نشود. نسخهٔ رمزدار محلی و custody حفظ شوند. آماده‌سازی مستقل ESO و منابع
+استقرار می‌تواند ادامه پیدا کند، اما این تعویق مجوز بازکردن ترافیک Production،
+لغو root یا صدور JIT بدون ممیزی امن نیست. پس از اعلام رفع مشکل ارائه‌دهنده،
+مسیر نسخه/retention و readback مستقل دوباره تأیید شود.
+
 ## ۱۳. رسیدن به نقطهٔ فعلی و مراحل بعد
 
 ### احراز هویت محدود OpenBao؛ مرحلهٔ اجراشده
@@ -309,7 +316,12 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 استفاده می‌کند؛ init/restart/root revocation تکرار نمی‌شود. هر `eso-<service>`
 فقط خواندن مسیر `hooshix/data/production/<service>/*` را با token حداکثر پنج
 دقیقه دارد. TokenReview واقعی با JWT تازه و audience دقیق، بدون reviewer
-دائمی انجام می‌شود. SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
+دائمی انجام می‌شود. برای ESO، خواندن `auth/token/lookup-self` و لغو همان token
+با `auth/token/revoke-self` نیز لازم است؛ ایجاد، تمدید یا لغو token دیگران
+مجاز نیست و policy پیش‌فرض اضافه نمی‌شود. اجرای مجدد ابزار supervised فقط
+ACL قبلی دقیق همین شش حساب را به این قرارداد ارتقا می‌دهد؛ ACL ناشناخته
+متوقف می‌شود. این ارتقا هنوز روی VPS اجرا نشده است.
+SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
 واقعی هنوز نصب/همگام نشده است. اجرای مالک روی VPS اول `OPENBAO_SCOPED_AUTH=Passed`
 گزارش کرده است؛ رسید عمومی `auth-481ef67e63ce4f7d97e6a6a3c60e562a.json`
 خارج Git نگهداری می‌شود. این نتیجه فقط scoped auth را اثبات می‌کند، نه ESO،
@@ -378,7 +390,10 @@ controller فقط `platform-apps` را پردازش می‌کند؛ cluster stor
 خاموش‌اند و CRD/مجوز ClusterGenerator صادر نمی‌شود. مجوز ساخت TokenRequest فقط برای شش
 `eso-<service>` موجود است. دسترسی Secret مربوط به cert-controller نیز به
 همین namespace محدود است؛ مجوزهای cluster فقط metadata گواهی CRD/webhook
-را پوشش می‌دهند. webhookها فقط همین namespace را انتخاب می‌کنند، با
+و خواندن `EndpointSlice` با `get/list/watch` را پوشش می‌دهند. مورد آخر برای
+cache داخلی readiness گواهی‌ساز نسخهٔ مصوب لازم است؛ اجازهٔ تغییر EndpointSlice
+یا خواندن Secret سایر namespaceها نمی‌دهد. با پشتیبانی upstream از cache محدود
+به namespace، این مجوز metadata حذف شود. webhookها فقط همین namespace را انتخاب می‌کنند، با
 `failurePolicy=Fail` و timeout پنج‌ثانیه‌ای. نقش‌های view/edit اضافی حذف می‌شوند.
 
 در checkout همین تغییر، با Helm مصوب و PyYAML موجود، بدون VPS یا credential:
@@ -400,6 +415,48 @@ python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz
 نکنید: CRDها، امضا/admission، شبکه/mTLS و آزمون native تحویل هنوز باید در بستهٔ
 نصب تکمیل شوند. render، readiness یا موفقیت runtime را ثابت نمی‌کند. چون این
 مرحله فقط فایل عمومی موقت تولید می‌کند، rollback روی سرور لازم نیست.
+
+برای آماده‌سازی نصب با تصویر اصلاح‌شدهٔ منتشرشده، به‌جای تصویر upstream،
+دستور render را با گزینهٔ ثابت زیر اجرا کنید:
+
+```bash
+python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz" \
+  --published-candidate > "$chart_dir/scoped-published-candidate.json"
+```
+
+این گزینه تصویر دلخواه نمی‌گیرد؛ فقط `published_security_candidate` در
+`eso-image.json` را انتخاب می‌کند. digest انتخاب‌شده به انتشار موفق
+[38137708512](https://github.com/hasanjodatshandi/HooshiX/actions/runs/38137708512)
+روی revision `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` و recipe ثابت bind است.
+تصویر ESO و هر سه workload برابر
+`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:961e047189afbfcc2a5ce58468f7205fc94a14eab45bf5eacbfa8fa4b839e397`
+خواهد بود. بدون این گزینه، render تصویر upstream را برای بررسی پایه حفظ
+می‌کند؛ آن خروجی را با candidate اصلاح‌شده اشتباه نگیرید.
+
+این انتخاب هنوز نصب یا promotion نیست. scan تازه، امضا/provenance همان digest،
+admission، CRDها، شبکه/mTLS و آزمون native تحویل شش هویت پیش از apply لازم‌اند.
+متادیتای اندازه/index upstream به تصویر بازسازی‌شده نسبت داده نمی‌شود؛
+checksum chart، مرز Secret namespace و محدودیت منابع حفظ می‌شوند؛ استثنای
+خواندن metadataِ EndpointSlice فقط برای گواهی‌ساز طبق توضیح بالا است.
+job بررسی ESO هر دو render را جدا در artifact عمومی نگه می‌دارد؛ هیچ‌کدام
+بدون تکمیل گیت‌های نصب، desired state فعال روی VPS نیستند.
+
+### آزمون native تحویل ESO در کلاستر موقت
+
+job اجباری `OpenBao Kubernetes foundation` همان chart دارای checksum و
+Helm `4.2.4` را برای تصویر اصلاح‌شده استفاده می‌کند. سه CRD مستقل
+`SecretStore`، `ExternalSecret` و `GeneratorState` داخلی نصب می‌شوند؛
+ClusterSecretStore، ClusterExternalSecret و PushSecret نصب یا فعال نمی‌شوند.
+حساب‌ها و issuer کلاستر موقت
+به OpenBao ساختگی متصل‌اند و هیچ credential یا Root واقعی وارد CI نمی‌شود.
+هر شش هویت باید مقدار مخصوص سرویس خود را دریافت و پس از تغییر آن به‌روز کنند؛
+خواندن مسیر سرویس دیگر نباید Secret بسازد. حذف ExternalSecret باید Secret
+تحت مالکیت آن را حذف کند. مقدارهای آزمایشی نباید در log اپراتور ظاهر شوند.
+پس از حذف کلاستر، فقط receipt عمومی با digest واقعی و نتیجهٔ آزمون حفظ می‌شود.
+
+این آزمون روی kind `1.35.5` اجرا می‌شود؛ آزمون K3s `1.35.6`، admission امضا و
+Ambient mTLS روی VPS همچنان مستقل و الزامی‌اند. اجرای CI مجوز نصب مستقیم نیست.
+نسخهٔ غیررمزدار اسرار واقعی، خروجی کامل Secret یا فایل custody در artifact قرار نگیرد.
 
 ### ساخت candidate امنیتی از سورس رسمی
 

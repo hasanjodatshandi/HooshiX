@@ -29,7 +29,7 @@ from render_openbao_local_storage import candidate as local_storage_candidate
 
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
-                   "public-ca-projection", "unseal", "acl", "scoped-auth", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -101,8 +101,14 @@ def ca_import_fixture(k):
         ca_import.ensure_secret(data)  # Prove conflict rejection preserved the original.
 
 
-def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None) -> None:
+def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
+             eso_chart: Path | None = None) -> None:
     runner_paths(tools, receipt)
+    if eso_chart is not None:
+        runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
+        if (platform_directory is not None or eso_chart.is_symlink()
+                or not eso_chart.resolve(strict=True).is_relative_to(runtime)):
+            raise RehearsalFailed('ESO requires owned disposable foundation paths')
     platform = None
     if platform_directory is not None:
         root = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
@@ -348,6 +354,11 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
                         scoped_logs = k('-n', NAMESPACE, 'logs', 'openbao-0', '--tail=-1')
                         if any(value.encode() in scoped_logs for value in scoped_private):
                             raise RehearsalFailed('scoped authentication container log leak')
+                        if eso_chart is not None:
+                            step('eso-delivery')
+                            from rehearse_eso_delivery import rehearse as delivery
+                            eso_result = delivery(k, wait, run, eso_chart, str(tools / 'helm'),
+                                api, token, cert.read_text(), audiences, addresses)
                 step("acl")
                 client.call("sys/mounts/fixture", "POST", {"type": "kv", "options": {"version": "2"}}, token, 204)
                 canary = "ci-only-" + uuid.uuid4().hex
@@ -421,6 +432,8 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None)
         result["checks"].pop("ca_secret_create_reconcile_conflict")
     else:
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
+        if eso_chart is not None:
+            result['eso_delivery'] = eso_result
     with receipt.open("x", encoding="utf-8") as output:
         json.dump(result, output, indent=2)
         output.write("\n")
@@ -434,9 +447,10 @@ def main() -> int:
     parser.add_argument("--tools-dir", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--platform-publications", type=Path)
+    parser.add_argument("--eso-chart", type=Path)
     args = parser.parse_args()
     try:
-        rehearse(args.tools_dir, args.receipt, args.platform_publications)
+        rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):

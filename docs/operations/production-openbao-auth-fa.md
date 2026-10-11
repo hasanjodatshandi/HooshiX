@@ -14,6 +14,18 @@ identity-service، notification-service و web-bff ساخته می‌شوند. �
 سرویس دیگر و مدیریت OpenBao مجاز نیست. token برنامه/تحویل حداکثر ۳۰۰ ثانیه
 اعتبار دارد و policy پیش‌فرض ندارد. root فعلی فقط در حافظهٔ عملیات تحت نظارت است.
 
+برای سازگاری ESO، دو endpoint خود token نیز مجازند:
+`auth/token/lookup-self` با `read` و `auth/token/revoke-self` با `update`.
+این مجوزها فقط همان token را بررسی/لغو می‌کنند؛ token دیگران، ایجاد/تمدید token
+و دسترسی مدیریتی مجاز نیست. اجرای مجدد فقط ACL قبلی دقیق همین سرویس‌ها را
+به این قرارداد ارتقا می‌دهد؛ ACL ناشناخته overwrite نمی‌شود. پس از ارتقا،
+ابزار lookup و self-revocation واقعی و رد خواندن با token لغوشده را آزمایش می‌کند.
+ارتقای VPS فعلی باید پس از merge و CI موفق، با همین دستور زیر و احراز هویت محلی انجام شود.
+
+مرجع رفتار نسخهٔ مصوب:
+[ESO 2.12.0 token validation](https://github.com/external-secrets/external-secrets/blob/v2.12.0/providers/v1/vault/validate.go)
+و [token close/revocation](https://github.com/external-secrets/external-secrets/blob/v2.12.0/providers/v1/vault/auth.go).
+
 mount مستقل `hooshix-kubernetes` با TokenReview واقعی و JWT تازهٔ client کار
 می‌کند؛ static reviewer token یا token خودکار Pod OpenBao اضافه نمی‌شود و
 OpenBao restart نمی‌شود. فقط شش حساب تحویل، `create tokenreviews` دارند؛
