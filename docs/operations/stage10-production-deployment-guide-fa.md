@@ -415,6 +415,20 @@ NetworkPolicy محدود می‌سازد: API/DNS برای ESO، فقط APIها�
 ترافیک health خود node ممکن است از قواعد معمول NetworkPolicy مستثنا باشد؛
 این قاعده به‌تنهایی احراز هویت API یا شاهد جلوگیری از دسترسی host نیست.
 
+برای خروجی کامل candidate عمومی، به دستور `--published-candidate` پایین، برای
+هر نشانی IPv4 کشف‌شدهٔ API یک `--api-address <IP>` اضافه کنید. مثال شکل دستور:
+
+```bash
+python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz" \
+  --published-candidate --api-address "$api_service_ip" --api-address "$api_endpoint_ip" \
+  > "$chart_dir/scoped-published-network-candidate.json"
+```
+
+دو متغیر بالا باید IP واقعی Service و endpoint API همان نصب باشند؛ مقدار
+نامشخص، CIDR، hostname، loopback یا نشانی نامعتبر پذیرفته نمی‌شود. بدون این
+گزینه، خروجی تنها منابع ESO را دارد، نه شبکه/مجوز OpenBao. هیچ‌کدام را پیش از
+بستهٔ نصب و آزمون ترکیبی روی VPS apply نکنید.
+
 این منابع هنوز مجوز apply روی VPS نیستند. آزمون runner تحویل شش هویت را اجرا
 می‌کند، اما آزمون ترکیبی Calico/Ambient/admission و نصب هدف باید تکمیل شود.
 برچسب webhook را به namespace یا دو Deployment دیگر تعمیم ندهید؛ cert-controller

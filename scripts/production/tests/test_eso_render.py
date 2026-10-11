@@ -107,6 +107,20 @@ class ESORenderTest(unittest.TestCase):
             with self.subTest(addresses=addresses), self.assertRaises(ValueError):
                 target.network(addresses)
 
+    def test_cli_includes_same_network_and_identity_boundary_without_cluster_writes(self):
+        import io
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['render', '--chart', '/fixture/chart',
+                '--published-candidate', '--api-address', '10.43.0.1',
+                '--api-address', '188.240.196.151']), \
+                patch.object(target.shutil, 'which', return_value='/fixture/helm'), \
+                patch.object(target, 'render', return_value={'kind': 'List', 'items': []}) as render, \
+                patch.object(sys, 'stdout', output):
+            self.assertEqual(0, target.main())
+        render.assert_called_once_with(Path('/fixture/chart'), '/fixture/helm', published=True)
+        self.assertEqual(target.network(['10.43.0.1', '188.240.196.151']) + [target.authorization()],
+                         json.loads(output.getvalue())['items'])
+
     def test_reject_boundary_rbac_and_secret_drift(self):
         for modify in (
                 lambda items: items[0]['metadata'].update(namespace='other'),

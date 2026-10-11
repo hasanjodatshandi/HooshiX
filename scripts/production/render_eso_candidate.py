@@ -246,12 +246,17 @@ def main():
     parser.add_argument('--chart', type=Path, required=True)
     parser.add_argument('--published-candidate', action='store_true',
                         help='render the reviewed published security digest; not deployment approval')
+    parser.add_argument('--api-address', action='append', default=[],
+                        help='exact discovered IPv4 API address; include bounded network/mesh resources')
     args = parser.parse_args()
     try:
         helm = shutil.which('helm')
         if not helm:
             raise ValueError('Helm required')
         result = render(args.chart, os.path.abspath(helm), published=args.published_candidate)
+        if args.api_address:
+            result['items'].extend(network(args.api_address))
+            result['items'].append(authorization())
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError, yaml.YAMLError):
         parser.exit(1, 'ESO_RENDER=Failed; no cluster writes or installation\n')
     print(json.dumps(result, indent=2))
