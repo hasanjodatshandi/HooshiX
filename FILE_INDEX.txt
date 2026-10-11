@@ -553,8 +553,8 @@ scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/readiness.py
 scripts/production/recover_openbao_initialization.py
-scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_eso_delivery.py
+scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
