@@ -19,7 +19,9 @@ class ScopedAuthTest(unittest.TestCase):
     def test_exact_service_set_and_read_only_paths(self):
         self.assertEqual(set(SERVICE_ACCOUNTS) - {'web-frontend'}, set(auth.SERVICES))
         for name in auth.SERVICES:
-            self.assertEqual(f'path "hooshix/data/production/{name}/*" {{ capabilities = ["read"] }}\n',
+            self.assertEqual(f'path "hooshix/data/production/{name}/*" {{ capabilities = ["read"] }}\n'
+                             'path "auth/token/lookup-self" { capabilities = ["read"] }\n'
+                             'path "auth/token/revoke-self" { capabilities = ["update"] }\n',
                              auth.policy(name))
             role = auth.role(name)
             self.assertEqual(['eso-' + name], role['bound_service_account_names'])
@@ -123,6 +125,39 @@ class ScopedAuthTest(unittest.TestCase):
         with self.assertRaises(host.custody.BootstrapFailed):
             auth.configure(api, 'root-fixture', 'https://api', '-----BEGIN CERTIFICATE-----\nfixture')
         self.assertEqual(1, api.call.call_count)
+
+    def test_only_exact_previous_scoped_policy_can_upgrade_and_reentry_does_not_write(self):
+        certificate = '-----BEGIN CERTIFICATE-----\nfixture'
+        policies = {name: f'path "hooshix/data/production/{name}/*" {{ capabilities = ["read"] }}'
+                    for name in auth.SERVICES}
+        writes = []
+        def request(path, method='GET', data=None, token=None, expected=200):
+            self.assertEqual('root-fixture', token)
+            if path == 'sys/mounts':
+                return {'data': {'hooshix/': {'type': 'kv', 'options': {'version': '2'},
+                                            'description': auth.DESCRIPTION}}}
+            if path == 'sys/auth':
+                return {'data': {auth.MOUNT + '/': {'type': 'kubernetes', 'description': auth.DESCRIPTION}}}
+            if path.endswith('/config'):
+                return {'data': {'kubernetes_host': 'https://api', 'kubernetes_ca_cert': certificate,
+                                'disable_local_ca_jwt': True, 'disable_iss_validation': True}}
+            if path.startswith('sys/policies/acl/hooshix-read-'):
+                name = path.removeprefix('sys/policies/acl/hooshix-read-')
+                if method == 'PUT':
+                    writes.append(name)
+                    policies[name] = data['policy']
+                    return {}
+                return {'data': {'policy': policies[name]}}
+            return {'data': auth.role(path.split('/role/eso-')[1])}
+        api = Mock(call=request)
+        auth.configure(api, 'root-fixture', 'https://api', certificate)
+        self.assertEqual(list(auth.SERVICES), writes)
+        auth.configure(api, 'root-fixture', 'https://api', certificate)
+        self.assertEqual(list(auth.SERVICES), writes)
+        policies[auth.SERVICES[0]] = 'path "*" { capabilities = ["sudo"] }'
+        with self.assertRaises(host.custody.BootstrapFailed):
+            auth.configure(api, 'root-fixture', 'https://api', certificate)
+        self.assertEqual(list(auth.SERVICES), writes)
 
     def test_static_reviewer_or_configuration_drift_stops_before_policy_mutation(self):
         certificate = '-----BEGIN CERTIFICATE-----\nfixture'

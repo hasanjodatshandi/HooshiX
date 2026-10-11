@@ -115,6 +115,12 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
                 'invalid role', 'unable to log in', 'unable to login', '403', '400',
                 'invalidproviderconfig', 'invalidprovidervalidation') if phrase in text]
             print('ESO_STORE_FAILURE=' + json.dumps({'phrases': phrases}), flush=True)
+            logs = k('-n', auth.NAMESPACE, 'logs', 'deployment/' + ACCOUNT, '--tail=100').lower()
+            phrases = [phrase for phrase in ('forbidden', 'cannot get', 'cannot create',
+                'cannot find secrets', 'permission denied', 'i/o timeout', 'x509', 'dial tcp',
+                'connection refused', 'not found', 'invalid role', 'lookup-self', '403', '400',
+                '404', '503', 'audience', 'certificate', 'no such host') if phrase.encode() in logs]
+            print('ESO_PROVIDER_FAILURE=' + json.dumps({'phrases': phrases}), flush=True)
             raise
         obj = external_secret(service)
         apply(obj)

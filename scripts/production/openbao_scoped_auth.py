@@ -24,7 +24,9 @@ def service(value):
 
 def policy(name):
     service(name)
-    return (f'path "hooshix/data/production/{name}/*" {{ capabilities = ["read"] }}\n')
+    return (f'path "hooshix/data/production/{name}/*" {{ capabilities = ["read"] }}\n'
+            'path "auth/token/lookup-self" { capabilities = ["read"] }\n'
+            'path "auth/token/revoke-self" { capabilities = ["update"] }\n')
 
 
 def role(name):
@@ -142,7 +144,11 @@ def configure(api, root, kube_host, kube_ca):
     for name in SERVICES:
         path = 'sys/policies/acl/hooshix-read-' + name
         old = api.call(path, token=root, expected=(200, 404))
-        if not old:
+        previous = f'path "hooshix/data/production/{name}/*" {{ capabilities = ["read"] }}'
+        if old:
+            host.require(old['data']['policy'].strip() in (previous, policy(name).strip()),
+                         'AUTH_POLICY_CONFLICT')
+        if not old or old['data']['policy'].strip() == previous:
             api.call(path, 'PUT', {'policy': policy(name)}, root, 204)
             old = api.call(path, token=root)
         host.require(old['data']['policy'].strip() == policy(name).strip(), 'AUTH_POLICY_CONFLICT')
@@ -163,6 +169,7 @@ def verify(api, root, token_request, api_audiences):
         jwt = token_request(NAMESPACE, 'eso-' + name, [*api_audiences, AUDIENCE])
         response = api.call(login, 'POST', {'role': 'eso-' + name, 'jwt': jwt})['auth']
         token = response['client_token']
+        revoked = False
         try:
             host.require(response['policies'] == ['hooshix-read-' + name]
                          and type(response['lease_duration']) is int
@@ -175,6 +182,8 @@ def verify(api, root, token_request, api_audiences):
                          and capabilities[paths[2]] == ['deny'], 'AUTH_CAPABILITY_SCOPE_FAILED')
             # Read-only empty path may return 404, but never a permission denial.
             api.call(paths[0], token=token, expected=(200, 404))
+            own = api.call('auth/token/lookup-self', token=token)['data']
+            host.require(own['id'] == token, 'AUTH_SELF_LOOKUP_FAILED')
             api.call(paths[1], token=token, expected=403)
             api.call(paths[0], 'POST', {'data': {'value': 'synthetic-denial-probe'}}, token, 403)
             api.call('sys/mounts', token=token, expected=403)
@@ -183,8 +192,11 @@ def verify(api, root, token_request, api_audiences):
             api.call(login, 'POST', {'role': 'eso-' + name, 'jwt': wrong_audience}, expected=403)
             wrong_namespace = token_request('default', 'default', [*api_audiences, AUDIENCE])
             api.call(login, 'POST', {'role': 'eso-' + name, 'jwt': wrong_namespace}, expected=403)
+            api.call('auth/token/revoke-self', 'POST', {}, token, 204)
+            revoked = True
         finally:
-            api.call('auth/token/revoke', 'POST', {'token': token}, root, 204)
+            if not revoked:
+                api.call('auth/token/revoke', 'POST', {'token': token}, root, 204)
         api.call(paths[0], token=token, expected=403)
         results.append({'service': name, 'login': 'Passed', 'own_read_capability': 'Passed',
             'cross_service_write_admin_identity_audience_denial': 'Passed', 'token_revocation': 'Passed'})

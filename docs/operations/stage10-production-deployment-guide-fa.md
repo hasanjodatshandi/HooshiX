@@ -316,7 +316,12 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 استفاده می‌کند؛ init/restart/root revocation تکرار نمی‌شود. هر `eso-<service>`
 فقط خواندن مسیر `hooshix/data/production/<service>/*` را با token حداکثر پنج
 دقیقه دارد. TokenReview واقعی با JWT تازه و audience دقیق، بدون reviewer
-دائمی انجام می‌شود. SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
+دائمی انجام می‌شود. برای ESO، خواندن `auth/token/lookup-self` و لغو همان token
+با `auth/token/revoke-self` نیز لازم است؛ ایجاد، تمدید یا لغو token دیگران
+مجاز نیست و policy پیش‌فرض اضافه نمی‌شود. اجرای مجدد ابزار supervised فقط
+ACL قبلی دقیق همین شش حساب را به این قرارداد ارتقا می‌دهد؛ ACL ناشناخته
+متوقف می‌شود. این ارتقا هنوز روی VPS اجرا نشده است.
+SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
 واقعی هنوز نصب/همگام نشده است. اجرای مالک روی VPS اول `OPENBAO_SCOPED_AUTH=Passed`
 گزارش کرده است؛ رسید عمومی `auth-481ef67e63ce4f7d97e6a6a3c60e562a.json`
 خارج Git نگهداری می‌شود. این نتیجه فقط scoped auth را اثبات می‌کند، نه ESO،
