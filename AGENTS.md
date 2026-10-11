@@ -266,13 +266,15 @@ executed target evidence and mark unavailable target-specific commands explicitl
 This guide is an operator entrypoint, not a replacement for current ADRs or the
 readiness gates. Do not claim an unexecuted step succeeded.
 
-### Owner-managed GitHub wait
+### Autonomous GitHub wait
 
-For long-running GitHub CI/workflows, submit the required work, report the run/PR
-link and current known state, then end the turn. Do not repeatedly poll or wait
-for GitHub completion. The owner will check and announce completion; then verify
-the result once and continue. This changes waiting behavior only: do not waive
-checks, treat unfinished runs as Passed, or merge before required checks succeed.
+For long-running GitHub CI/workflows, continue autonomously and check at spaced
+intervals (normally about five minutes), not rapid repeated polling. Avoid routine
+intermediate CI status reports; report the terminal result and continue the next
+authorized action. Do not end the turn solely to ask the owner to watch CI.
+Stop for genuinely required owner approval or unavailable authority. This changes
+waiting behavior only: do not waive checks, treat unfinished runs as Passed, or
+merge before required checks succeed.
 
 All normal changes follow `docs/engineering/repository-change-workflow.md`.
 
