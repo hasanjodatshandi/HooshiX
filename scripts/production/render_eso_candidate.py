@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import ipaddress
 import json
 import os
 import shutil
@@ -56,6 +57,59 @@ def token_delegation():
          'roleRef': {'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'Role', 'name': name}}]
 
 
+def network(api_addresses):
+    if not 1 <= len(api_addresses) <= 16:
+        raise ValueError('bounded exact API addresses required')
+    addresses = sorted({str(ipaddress.IPv4Address(address)) for address in api_addresses})
+    if any(ipaddress.ip_address(address).is_unspecified or
+           ipaddress.ip_address(address).is_multicast or
+           ipaddress.ip_address(address).is_loopback or
+           ipaddress.ip_address(address).is_link_local for address in addresses):
+        raise ValueError('unicast API addresses required')
+    peers = [{'ipBlock': {'cidr': address + '/32'}} for address in addresses]
+    namespace = lambda name: {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': name}}}
+    selector = lambda name: {'matchLabels': {'app.kubernetes.io/instance': ACCOUNT,
+                                            'app.kubernetes.io/name': name}}
+    port = lambda number: {'protocol': 'TCP', 'port': number}
+    bao = namespace('hooshix-secrets') | {'podSelector': {'matchLabels': {'app.kubernetes.io/name': 'openbao'}}}
+    controller = selector('external-secrets')
+
+    def policy(name, pods, *, ingress=None, egress=None, ns=NAMESPACE):
+        spec = {'podSelector': pods, 'policyTypes': []}
+        for direction, rules in (('Ingress', ingress), ('Egress', egress)):
+            if rules is not None:
+                spec['policyTypes'].append(direction)
+                spec[direction.lower()] = rules
+        return {'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy',
+                'metadata': {'name': name, 'namespace': ns}, 'spec': spec}
+
+    return [policy('hooshix-eso-control-plane', {'matchLabels': {'app.kubernetes.io/instance': ACCOUNT}},
+        ingress=[], egress=[{'to': peers, 'ports': [port(443), port(6443)]},
+            {'to': [namespace('kube-system') | {'podSelector': {'matchLabels': {'k8s-app': 'kube-dns'}}}],
+             'ports': [{'protocol': protocol, 'port': 53} for protocol in ('TCP', 'UDP')]}]),
+        policy('hooshix-eso-webhook-api', selector('external-secrets-webhook'),
+               ingress=[{'from': peers, 'ports': [port(10250)]}]),
+        policy('hooshix-eso-mesh-ca', {'matchLabels': {'app.kubernetes.io/instance': ACCOUNT},
+            'matchExpressions': [{'key': 'app.kubernetes.io/name', 'operator': 'In',
+                                  'values': ['external-secrets', 'external-secrets-cert-controller']}]},
+            egress=[{'to': [namespace('istio-system') | {'podSelector': {'matchLabels': {'app': 'istiod'}}}],
+                     'ports': [port(15012)]}]),
+        policy('hooshix-eso-openbao', controller,
+               egress=[{'to': [bao], 'ports': [port(8200), port(15008)]}]),
+        policy('hooshix-openbao-eso', bao['podSelector'], ns='hooshix-secrets',
+            ingress=[{'from': [namespace(NAMESPACE) | {'podSelector': controller}],
+                      'ports': [port(8200), port(15008)]}])]
+
+
+def authorization():
+    return {'apiVersion': 'security.istio.io/v1', 'kind': 'AuthorizationPolicy',
+        'metadata': {'name': 'hooshix-openbao-eso', 'namespace': 'hooshix-secrets'},
+        'spec': {'selector': {'matchLabels': {'app.kubernetes.io/name': 'openbao'}},
+            'action': 'ALLOW', 'rules': [{'from': [{'source': {'principals': [
+                'prod.sajtech.internal/ns/' + NAMESPACE + '/sa/' + ACCOUNT]}}],
+                'to': [{'operation': {'ports': ['8200']}}]}]}}
+
+
 def validate(items, selected):
     deployments = [item for item in items if item['kind'] == 'Deployment']
     if {item['metadata']['name'] for item in deployments} != {
@@ -63,8 +117,12 @@ def validate(items, selected):
         raise ValueError('exact three ESO workloads required')
     for item in deployments:
         pod = item['spec']['template']['spec']
+        expected_mode = 'none' if item['metadata']['name'] == ACCOUNT + '-webhook' else 'ambient'
+        if item['spec']['template'].get('metadata', {}).get('labels', {}).get(
+                'istio.io/dataplane-mode') != expected_mode:
+            raise ValueError('only the ESO webhook may opt out of Ambient')
         if (item['metadata'].get('namespace') != NAMESPACE or item['spec']['replicas'] != 1
-                or pod.get('serviceAccountName') in (None, '', 'default')
+                or pod.get('serviceAccountName') != item['metadata']['name']
                 or any(pod.get(flag, False) for flag in ('hostNetwork', 'hostPID', 'hostIPC'))
                 or pod.get('initContainers') or pod.get('ephemeralContainers')
                 or any('hostPath' in volume for volume in pod.get('volumes', []))
@@ -145,6 +203,8 @@ def render(chart: Path, helm: str, *, published: bool = False):
     # This official chart has tag-only image templates. Normalize only its exact expected tag.
     for item in items:
         if item['kind'] == 'Deployment':
+            item['spec']['template']['metadata']['labels']['istio.io/dataplane-mode'] = (
+                'none' if item['metadata']['name'] == ACCOUNT + '-webhook' else 'ambient')
             for container in item['spec']['template']['spec']['containers']:
                 if container['image'] != 'ghcr.io/external-secrets/external-secrets:v' + selected['version']:
                     raise ValueError('unexpected upstream ESO image')

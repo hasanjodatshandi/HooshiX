@@ -104,6 +104,11 @@ Production workloads use dedicated ServiceAccounts, Istio Ambient STRICT mTLS, C
 
 Default ServiceAccount is prohibited for application workloads. Single-server cannot disable Ambient/NetworkPolicy to save capacity.
 
+ADR-0002 authorizes only the ESO admission webhook Pod to opt out of Ambient for
+verified API-server HTTPS callbacks with exact API-only NetworkPolicy ingress.
+ESO controller/cert-controller and OpenBao retain Ambient STRICT and exact identity
+authorization. This is not an application, namespace-wide or public-route exception.
+
 ## 8. Public edge/client-address trust
 
 ```text

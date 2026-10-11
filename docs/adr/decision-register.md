@@ -7,7 +7,7 @@ This register identifies current effective ADRs. ADR identifiers are stable afte
 | ADR | Current decision area |
 | --- | --- |
 | ADR-0001 | dedicated Caddy/Coraza edge WAF |
-| ADR-0002 | production Istio trust/enrollment |
+| ADR-0002 | production Istio trust/enrollment; bounded ESO API-callback webhook opt-out |
 | ADR-0003 | Git/Buf schema governance without runtime Schema Registry |
 | ADR-0004 | initial cold disaster recovery |
 | ADR-0005 | production SLO classes/error budgets |

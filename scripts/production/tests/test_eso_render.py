@@ -1,6 +1,7 @@
 """Credential-free ESO rendering keeps namespace and six-identity boundaries."""
 import copy
 import hashlib
+import json
 import subprocess
 import sys
 import unittest
@@ -33,7 +34,8 @@ class ESORenderTest(unittest.TestCase):
                     '--enable-push-secret-reconciler=false']}
             self.items.append({'kind': 'Deployment', 'metadata': {
                 'name': target.ACCOUNT + suffix, 'namespace': target.NAMESPACE},
-                'spec': {'replicas': 1, 'template': {'spec': {
+                'spec': {'replicas': 1, 'template': {'metadata': {'labels': {
+                    'istio.io/dataplane-mode': 'none' if suffix == '-webhook' else 'ambient'}}, 'spec': {
                     'serviceAccountName': target.ACCOUNT + suffix, 'containers': [container]}}}})
         self.items.extend(target.token_delegation())
         self.items.append({'kind': 'ValidatingWebhookConfiguration', 'metadata': {'name': 'probe'},
@@ -50,7 +52,8 @@ class ESORenderTest(unittest.TestCase):
 
     def test_reject_workload_drift(self):
         for location, key, value in [('pod', 'hostNetwork', True),
-                ('pod', 'serviceAccountName', 'default'), ('container', 'image', 'eso:latest'),
+                ('pod', 'serviceAccountName', 'default'), ('pod', 'serviceAccountName', 'foreign'),
+                ('container', 'image', 'eso:latest'),
                 ('container', 'resources', {}), ('container', 'readinessProbe', {}),
                 ('security', 'runAsUser', 0), ('security', 'allowPrivilegeEscalation', True)]:
             items = copy.deepcopy(self.items)
@@ -60,6 +63,48 @@ class ESORenderTest(unittest.TestCase):
             destination[key] = value
             with self.subTest(key=key), self.assertRaises(ValueError):
                 target.validate(items, self.selected)
+
+    def test_only_webhook_has_explicit_ambient_opt_out(self):
+        for index in range(3):
+            for mode in (None, 'sidecar', 'ambient' if index == 1 else 'none'):
+                items = copy.deepcopy(self.items)
+                labels = items[index]['spec']['template']['metadata']['labels']
+                if mode is None:
+                    labels.pop('istio.io/dataplane-mode')
+                else:
+                    labels['istio.io/dataplane-mode'] = mode
+                with self.subTest(index=index, mode=mode), self.assertRaises(ValueError):
+                    target.validate(items, self.selected)
+
+    def test_network_keeps_webhook_api_only_and_openbao_controller_only(self):
+        policies = {item['metadata']['name']: item for item in target.network({'10.43.0.1', '188.240.196.151'})}
+        webhook = policies['hooshix-eso-webhook-api']['spec']
+        self.assertEqual({'matchLabels': {'app.kubernetes.io/instance': target.ACCOUNT,
+            'app.kubernetes.io/name': 'external-secrets-webhook'}}, webhook['podSelector'])
+        self.assertEqual([{'from': [{'ipBlock': {'cidr': '10.43.0.1/32'}},
+            {'ipBlock': {'cidr': '188.240.196.151/32'}}], 'ports': [
+                {'protocol': 'TCP', 'port': 10250}]}], webhook['ingress'])
+        common = policies['hooshix-eso-control-plane']['spec']
+        self.assertEqual([], common['ingress'])
+        self.assertNotIn('openbao', json.dumps(common))
+        self.assertNotIn('10250', json.dumps(common['egress']))
+        controller = policies['hooshix-eso-openbao']['spec']
+        self.assertEqual('external-secrets', controller['podSelector']['matchLabels']['app.kubernetes.io/name'])
+        self.assertEqual([8200, 15008], [p['port'] for p in controller['egress'][0]['ports']])
+        ingress = policies['hooshix-openbao-eso']['spec']['ingress'][0]
+        self.assertEqual(controller['podSelector'], ingress['from'][0]['podSelector'])
+        self.assertEqual({'matchLabels': {'kubernetes.io/metadata.name': target.NAMESPACE}},
+                         ingress['from'][0]['namespaceSelector'])
+        self.assertEqual(['prod.sajtech.internal/ns/platform-apps/sa/hooshix-eso'],
+            target.authorization()['spec']['rules'][0]['from'][0]['source']['principals'])
+        self.assertEqual(['8200'], target.authorization()['spec']['rules'][0]['to'][0]['operation']['ports'])
+
+    def test_network_rejects_unbounded_or_non_unicast_api_input(self):
+        for addresses in ([], ['0.0.0.0'], ['::1'], ['127.0.0.1'], ['169.254.169.254'],
+                          ['224.0.0.1'], ['10.43.0.0/16'], ['kubernetes.default.svc'],
+                          ['10.0.0.' + str(n) for n in range(1, 18)]):
+            with self.subTest(addresses=addresses), self.assertRaises(ValueError):
+                target.network(addresses)
 
     def test_reject_boundary_rbac_and_secret_drift(self):
         for modify in (
@@ -123,6 +168,10 @@ class ESORenderTest(unittest.TestCase):
         self.assertEqual(2, runner.call_count)
         self.assertTrue(all(item['spec']['template']['spec']['containers'][0]['image'] ==
             selected['image'] for item in rendered if item['kind'] == 'Deployment'))
+        for item in rendered:
+            if item['kind'] == 'Deployment':
+                self.assertEqual('none' if item['metadata']['name'].endswith('-webhook') else 'ambient',
+                                 item['spec']['template']['metadata']['labels']['istio.io/dataplane-mode'])
         local = next(item for item in rendered if item['kind'] == 'Role'
                      and item['metadata']['name'] == name)
         self.assertEqual(target.NAMESPACE, local['metadata']['namespace'])

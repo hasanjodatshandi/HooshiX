@@ -400,6 +400,26 @@ capabilityها حذف می‌شوند، filesystem فقط‌خواندنی و se
 `RuntimeDefault` است. منابع هر container: request برابر `50m/64Mi` و limit
 برابر `500m/256Mi`، با فضای موقت `16Mi/64Mi`؛ liveness/readiness الزامی است.
 
+استثنای مصوب ADR-0002 فقط روی Podِ `hooshix-eso-webhook` است:
+`istio.io/dataplane-mode=none`. controller و cert-controller صریحاً برچسب
+`ambient` دارند؛ namespace، STRICT و default-deny تغییر نمی‌کنند. دلیل استثنا
+callbackِ HTTPS از API کلاسترِ خارج mesh است. webhook همچنان گواهی serving و
+CA bundle معتبر، `failurePolicy=Fail` و timeout پنج‌ثانیه‌ای دارد؛ هیچ Service
+عمومی یا TLS نامعتبر مجاز نیست. `network(api_addresses)` در همان renderer پنج
+NetworkPolicy محدود می‌سازد: API/DNS برای ESO، فقط APIهای دقیق `/32` روی 10250
+برای ingress webhook، کنترل‌پلین Istio روی 15012 برای دو workload Ambient، و
+8200/15008 فقط از controller به OpenBao. `authorization()` تنها principal
+`prod.sajtech.internal/ns/platform-apps/sa/hooshix-eso` را روی OpenBao/8200 مجاز
+می‌کند. نشانی‌ها از Service و EndpointSliceهای API همان کلاستر گرفته شوند، نه
+از سرور اول کپی شوند؛ source واقعی callback باید در آزمون Calico تأیید شود.
+ترافیک health خود node ممکن است از قواعد معمول NetworkPolicy مستثنا باشد؛
+این قاعده به‌تنهایی احراز هویت API یا شاهد جلوگیری از دسترسی host نیست.
+
+این منابع هنوز مجوز apply روی VPS نیستند. آزمون runner تحویل شش هویت را اجرا
+می‌کند، اما آزمون ترکیبی Calico/Ambient/admission و نصب هدف باید تکمیل شود.
+برچسب webhook را به namespace یا دو Deployment دیگر تعمیم ندهید؛ cert-controller
+همچنان داخل mesh است. rollback نباید STRICT را به PERMISSIVE تبدیل کند.
+
 controller فقط `platform-apps` را پردازش می‌کند؛ cluster stores و push secrets
 خاموش‌اند و CRD/مجوز ClusterGenerator صادر نمی‌شود. مجوز ساخت TokenRequest فقط برای شش
 `eso-<service>` موجود است. دسترسی Secret مربوط به cert-controller نیز به

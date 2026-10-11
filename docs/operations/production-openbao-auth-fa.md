@@ -43,6 +43,14 @@ SecretStoreهای namespace-scoped، CA عمومی ConfigMap و role/SA مشخص
 نصب ESO باید RBAC ساخت TokenRequest را فقط به نام‌های همین حساب‌ها محدود کند،
 نه همهٔ ServiceAccountها؛ دسترسی شبکه/mesh آن جداگانه آزموده خواهد شد.
 
+طبق استثنای مصوب ADR-0002، فقط webhookِ ESO از Ambient خارج می‌شود تا callback
+HTTPSِ API کلاستر برقرار باشد؛ controller و cert-controller داخل Ambient و STRICT
+می‌مانند. ingress webhook فقط APIهای دقیق روی 10250 است؛ مسیر OpenBao/8200 و
+HBONE/15008 فقط برای controllerِ `hooshix-eso` و principal همان حساب مجاز است.
+TLS، RBAC، namespace default-deny و تحویل شش هویت مستقل حفظ می‌شوند. این انتخاب
+به معنی نصب یا تأیید آزمون mesh روی VPS نیست؛ مراحل قابل‌تکرار در
+[راهنمای Stage10](stage10-production-deployment-guide-fa.md#آمادهسازی-manifest-محدود-eso-بدون-نصب) است.
+
 ## اجرای روی VPS فعلی، فقط بعد از merge و CI موفق
 
 این ابزار مخصوص VPS فعلی و alias `hooshix-server` است؛ روی نصب دوم قبل از
