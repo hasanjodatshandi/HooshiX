@@ -49,6 +49,9 @@ class ESORenderTest(unittest.TestCase):
         self.assertEqual(['create'], role['rules'][0]['verbs'])
         self.assertFalse(target.values()['rbac']['serviceAccountTokenCreate'])
         self.assertFalse(target.values()['installCRDs'])
+        self.assertEqual(target.ACCOUNT + '-webhook', target.values()['webhook']['serviceAccount']['name'])
+        self.assertEqual(target.ACCOUNT + '-cert-controller',
+                         target.values()['certController']['serviceAccount']['name'])
 
     def test_reject_workload_drift(self):
         for location, key, value in [('pod', 'hostNetwork', True),

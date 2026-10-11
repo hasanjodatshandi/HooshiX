@@ -40,8 +40,10 @@ def values():
         'concurrent': 1, 'log': {'level': 'warn'},
         'livenessProbe': {'enabled': True}, 'readinessProbe': {'enabled': True},
         'webhook': {'resources': resources, 'failurePolicy': 'Fail',
+                    'serviceAccount': {'name': ACCOUNT + '-webhook'},
                     'replicaCount': 1, 'livenessProbe': {'enabled': True}},
         'certController': {'resources': resources, 'replicaCount': 1,
+                           'serviceAccount': {'name': ACCOUNT + '-cert-controller'},
                            'enablePartialCache': True,
                            'livenessProbe': {'enabled': True}}}
 
