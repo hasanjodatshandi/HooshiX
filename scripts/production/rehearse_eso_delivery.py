@@ -102,8 +102,20 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
         path = 'hooshix/data/production/' + service + '/commissioning-probe'
         api.call(path, 'POST', {'data': {'value': value}}, root)
         apply(auth.store(service, audiences))
-        k('-n', auth.NAMESPACE, 'wait', '--for=condition=Ready',
-          'secretstore/hooshix-' + service, '--timeout=60s', timeout=70)
+        print('ESO_DELIVERY_STEP=store-' + service, flush=True)
+        try:
+            k('-n', auth.NAMESPACE, 'wait', '--for=condition=Ready',
+              'secretstore/hooshix-' + service, '--timeout=60s', timeout=70)
+        except RehearsalFailed:
+            status = json.loads(k('-n', auth.NAMESPACE, 'get', 'secretstore/hooshix-' + service,
+                                  '-o', 'json')).get('status', {})
+            text = json.dumps(status).lower()
+            phrases = [phrase for phrase in ('forbidden', 'cannot get', 'cannot create',
+                'permission denied', 'i/o timeout', 'x509', 'connection refused', 'not found',
+                'invalid role', 'unable to log in', 'unable to login', '403', '400',
+                'invalidproviderconfig', 'invalidprovidervalidation') if phrase in text]
+            print('ESO_STORE_FAILURE=' + json.dumps({'phrases': phrases}), flush=True)
+            raise
         obj = external_secret(service)
         apply(obj)
         k('-n', auth.NAMESPACE, 'wait', '--for=condition=Ready',
