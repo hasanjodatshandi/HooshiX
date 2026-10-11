@@ -213,8 +213,8 @@ def publish(directory, env):
         print('PATCHED_PUBLICATION_STEP=' + component + '-visibility', flush=True)
         visibility = run(['gh', 'api', 'users/hasanjodatshandi/packages/container/'
             + package.replace('/', '%2F'), '--jq', '.visibility']).strip()
-        # Owner approval is limited to the fixed ESO package above.
-        allowed = ('private', 'public') if component == 'eso' else ('private',)
+        # Owner approval is limited to the fixed ESO and OpenBao packages above.
+        allowed = ('private', 'public') if component in ('eso', 'openbao') else ('private',)
         if visibility not in allowed:
             print('PATCHED_PACKAGE_VISIBILITY=Rejected; unapproved visibility', flush=True)
             raise ValueError('approved candidate package visibility required')
