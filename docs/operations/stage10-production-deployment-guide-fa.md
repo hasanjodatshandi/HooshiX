@@ -22,7 +22,7 @@ Stageهای قبلی ساخت/آزمون محصول‌اند و برای نصب 
 
 ## وضعیت پوشش فعلی
 
-پایهٔ بررسی‌شده: `main@467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`، ۲۰۲۶-۱۰-۱۰.
+پایهٔ بررسی‌شده: `main@c40349adecdb3c216b07c3fe72fe7c570f5aacfe`، ۲۰۲۶-۱۰-۱۱.
 این SHA مرجع این ویرایش است، نه الزام استفادهٔ دائمی از نسخهٔ قدیمی.
 سرور اول OpenBao نصب‌شده، initialized و unsealed دارد؛ recovery ایزولهٔ محلی
 با سهم‌های اصلی `Passed` است. تأیید نسخه/retention مقصد backup، scheduler ساعتی،
@@ -320,12 +320,14 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 با `auth/token/revoke-self` نیز لازم است؛ ایجاد، تمدید یا لغو token دیگران
 مجاز نیست و policy پیش‌فرض اضافه نمی‌شود. اجرای مجدد ابزار supervised فقط
 ACL قبلی دقیق همین شش حساب را به این قرارداد ارتقا می‌دهد؛ ACL ناشناخته
-متوقف می‌شود. این ارتقا هنوز روی VPS اجرا نشده است.
+متوقف می‌شود. این ارتقا روی VPS اول با همین نسخهٔ بررسی‌شده اجرا و آزموده شده است.
 SecretStore فقط قرارداد آماده‌شده است؛ ESO یا secret
 واقعی هنوز نصب/همگام نشده است. اجرای مالک روی VPS اول `OPENBAO_SCOPED_AUTH=Passed`
-گزارش کرده است؛ رسید عمومی `auth-481ef67e63ce4f7d97e6a6a3c60e562a.json`
+گزارش کرده است؛ رسید عمومی `auth-6ae8b0c63752493fab47c6ad55500e6a.json`
 خارج Git نگهداری می‌شود. این نتیجه فقط scoped auth را اثبات می‌کند، نه ESO،
-تحویل اسرار، audit خارج میزبان یا آمادگی Production.
+تحویل اسرار، audit خارج میزبان یا آمادگی Production. رسید جدید برای هر شش
+هویت، login، خواندن مسیر خود، رد دسترسی خارج از محدوده و لغو token را
+`Passed` ثبت کرده است؛ دسترسی عمومی همچنان `CLOSED` است.
 بستهٔ فعلی به سرور اول bind است؛ برای نصب دوم، داده‌های مرحلهٔ ۱ لازم‌اند.
 
 آزمون disposable نیز همان قاعدهٔ خروجی محدود TokenReview را با IPهای API همان
@@ -377,6 +379,18 @@ upstream این نسخه را با Kubernetes `1.36` تست می‌کند؛ سا
 مرجع سازگاری: [سیاست پشتیبانی نسخهٔ 2.12.0](https://github.com/external-secrets/external-secrets/blob/v2.12.0/docs/introduction/stability-support.md).
 
 ### آماده‌سازی manifest محدود ESO، بدون نصب
+
+پیش از انتخاب مسیر اتصال ESO به mesh موجودِ سرور اول، وضعیت واقعی دو
+DaemonSet شبکه و Deployment کنترل‌پلین خوانده شود؛ این دستور نه نصب می‌کند،
+نه credential می‌خواند و نه OpenBao را تغییر می‌دهد:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl get deployments,daemonsets -n istio-system -o wide'
+```
+
+هر workload موجود باید Ready باشد و image آن با نصب بررسی‌شدهٔ همان سرور
+مطابقت داشته باشد. این inventory شاهد نصب ESO یا آزمون اتصال آن نیست؛ از
+روی موفقیت آزمون runner نباید وضعیت فعلی mesh روی VPS را حدس زد.
 
 `scripts/production/render_eso_candidate.py` chart دارای checksum مصوب را با
 Helm `4.2.4` برای Kubernetes `1.35.6` render می‌کند. خروجی عمومی فاقد credential

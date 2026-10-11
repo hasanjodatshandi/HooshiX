@@ -92,9 +92,10 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 در `/home/coder/.local/share/hooshix-openbao-auth/` است. فقط نتیجهٔ عمومی را
 بفرستید؛ token، رمز، shares، ciphertext یا فایل credential نفرستید.
 
-اجرای مالک روی VPS اول با source `467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`
+اجرای مالک روی VPS اول با source `c40349adecdb3c216b07c3fe72fe7c570f5aacfe`
 نتیجهٔ `Passed` گزارش کرده است؛ رسید عمومی
-`auth-481ef67e63ce4f7d97e6a6a3c60e562a.json` خارج Git است. root حفظ شده و ESO
+`auth-6ae8b0c63752493fab47c6ad55500e6a.json` خارج Git است. ارتقای ACL برای
+عملیات محدود token خود و آزمون‌های هر شش هویت `Passed` است. root حفظ شده و ESO
 نصب نشده است. این شاهد جای آزمون مستقل نصب دوم را نمی‌گیرد.
 
 ## کاربرد و مرحلهٔ بعد
