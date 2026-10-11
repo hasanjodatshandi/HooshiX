@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from datetime import datetime, timezone
@@ -32,6 +33,25 @@ def pin():
             or selected['production_promotion'] != BLOCKED):
         raise ValueError('reviewed immutable blocked ESO candidate required')
     return selected
+
+
+def published_pin():
+    """Select a reviewed published candidate for rendering, never authorize deployment."""
+    selected = pin()
+    candidate = selected['published_security_candidate']
+    recipe = ROOT / 'infrastructure/production/release/patched-platform-sources.json'
+    if (not re.fullmatch(r'ghcr\.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private'
+                        r'@sha256:[a-f0-9]{64}', candidate['image'])
+            or not re.fullmatch(r'[a-f0-9]{40}', candidate['repository_revision'])
+            or not re.fullmatch(r'[1-9][0-9]{0,19}', candidate['publication_run_id'])
+            or candidate['recipe_sha256'] != hashlib.sha256(recipe.read_bytes()).hexdigest()
+            or candidate['provenance_kind'] != 'patched-upstream-source-build'
+            or candidate['production_promotion'] != 'Not verified'):
+        raise ValueError('reviewed unpublished-to-production ESO candidate required')
+    # Upstream manifest index/size are not metadata for the rebuilt image.
+    return {'version': selected['version'], 'platform': selected['platform'],
+            'chart': selected['chart'], 'image': candidate['image'],
+            'production_promotion': selected['production_promotion']}
 
 
 def validate(directory: Path, revision: str, now: datetime):

@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from openbao_scoped_auth import NAMESPACE, SERVICES
-from verify_eso_artifact import pin
+from verify_eso_artifact import pin, published_pin
 
 ACCOUNT = 'hooshix-eso'
 BOUND = 16 * 1024 * 1024
@@ -118,8 +118,8 @@ def validate(items, selected):
         raise ValueError('exact delivery token delegation required')
 
 
-def render(chart: Path, helm: str):
-    selected = pin()
+def render(chart: Path, helm: str, *, published: bool = False):
+    selected = published_pin() if published else pin()
     if chart.is_symlink() or not chart.is_file() or chart.stat().st_size > BOUND:
         raise ValueError('bounded regular official chart required')
     if hashlib.sha256(chart.read_bytes()).hexdigest() != selected['chart']['sha256']:
@@ -173,12 +173,14 @@ def render(chart: Path, helm: str):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--chart', type=Path, required=True)
+    parser.add_argument('--published-candidate', action='store_true',
+                        help='render the reviewed published security digest; not deployment approval')
     args = parser.parse_args()
     try:
         helm = shutil.which('helm')
         if not helm:
             raise ValueError('Helm required')
-        result = render(args.chart, os.path.abspath(helm))
+        result = render(args.chart, os.path.abspath(helm), published=args.published_candidate)
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError, yaml.YAMLError):
         parser.exit(1, 'ESO_RENDER=Failed; no cluster writes or installation\n')
     print(json.dumps(result, indent=2))

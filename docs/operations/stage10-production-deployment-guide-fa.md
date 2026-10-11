@@ -408,6 +408,30 @@ python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz
 نصب تکمیل شوند. render، readiness یا موفقیت runtime را ثابت نمی‌کند. چون این
 مرحله فقط فایل عمومی موقت تولید می‌کند، rollback روی سرور لازم نیست.
 
+برای آماده‌سازی نصب با تصویر اصلاح‌شدهٔ منتشرشده، به‌جای تصویر upstream،
+دستور render را با گزینهٔ ثابت زیر اجرا کنید:
+
+```bash
+python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz" \
+  --published-candidate > "$chart_dir/scoped-published-candidate.json"
+```
+
+این گزینه تصویر دلخواه نمی‌گیرد؛ فقط `published_security_candidate` در
+`eso-image.json` را انتخاب می‌کند. digest انتخاب‌شده به انتشار موفق
+[38137708512](https://github.com/hasanjodatshandi/HooshiX/actions/runs/38137708512)
+روی revision `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` و recipe ثابت bind است.
+تصویر ESO و هر سه workload برابر
+`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:961e047189afbfcc2a5ce58468f7205fc94a14eab45bf5eacbfa8fa4b839e397`
+خواهد بود. بدون این گزینه، render تصویر upstream را برای بررسی پایه حفظ
+می‌کند؛ آن خروجی را با candidate اصلاح‌شده اشتباه نگیرید.
+
+این انتخاب هنوز نصب یا promotion نیست. scan تازه، امضا/provenance همان digest،
+admission، CRDها، شبکه/mTLS و آزمون native تحویل شش هویت پیش از apply لازم‌اند.
+متادیتای اندازه/index upstream به تصویر بازسازی‌شده نسبت داده نمی‌شود؛
+checksum chart، مرز namespace، RBAC و محدودیت منابع بدون تغییر می‌مانند.
+job بررسی ESO هر دو render را جدا در artifact عمومی نگه می‌دارد؛ هیچ‌کدام
+بدون تکمیل گیت‌های نصب، desired state فعال روی VPS نیستند.
+
 ### ساخت candidate امنیتی از سورس رسمی
 
 recipe ثابت `infrastructure/production/release/patched-platform-sources.json`

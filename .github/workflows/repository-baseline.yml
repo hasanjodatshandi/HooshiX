@@ -266,6 +266,9 @@ jobs:
           PATH="$tools/linux-amd64:$PATH" PYTHONPATH="$RUNNER_TEMP/eso-yaml" \
             python3 scripts/production/render_eso_candidate.py --chart "$RUNNER_TEMP/eso-artifact/chart.tgz" \
             > "$RUNNER_TEMP/eso-artifact/scoped-candidate.json"
+          PATH="$tools/linux-amd64:$PATH" PYTHONPATH="$RUNNER_TEMP/eso-yaml" \
+            python3 scripts/production/render_eso_candidate.py --chart "$RUNNER_TEMP/eso-artifact/chart.tgz" \
+            --published-candidate > "$RUNNER_TEMP/eso-artifact/scoped-published-candidate.json"
       - name: Retain public evidence including failed scans; never sign or deploy
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

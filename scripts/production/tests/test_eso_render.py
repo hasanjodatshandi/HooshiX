@@ -79,6 +79,12 @@ class ESORenderTest(unittest.TestCase):
                 target.validate(items, self.selected)
 
     def test_official_render_normalizes_digest_and_scopes_cert_secret_role(self):
+        self.check_official_render(published=False)
+
+    def test_published_render_uses_exact_security_candidate_for_all_three_workloads(self):
+        self.check_official_render(published=True)
+
+    def check_official_render(self, *, published):
         upstream = copy.deepcopy(self.items[:3])
         for item in upstream:
             item['spec']['template']['spec']['containers'][0]['image'] = (
@@ -91,16 +97,18 @@ class ESORenderTest(unittest.TestCase):
             {'kind': 'ClusterRoleBinding', 'metadata': {'name': name}, 'roleRef': {
                 'kind': 'ClusterRole', 'name': name}, 'subjects': []}, self.items[-1]])
         selected = copy.deepcopy(self.selected)
+        if published:
+            selected['image'] = target.published_pin()['image']
         selected['chart']['sha256'] = hashlib.sha256(b'chart').hexdigest()
         results = [subprocess.CompletedProcess([], 0, stdout=b'v4.2.4+test'),
             subprocess.CompletedProcess([], 0, stdout=yaml.safe_dump_all(upstream).encode())]
-        with patch.object(target, 'pin', return_value=selected), \
+        with patch.object(target, 'published_pin' if published else 'pin', return_value=selected), \
                 patch.object(Path, 'is_symlink', return_value=False), \
                 patch.object(Path, 'is_file', return_value=True), \
                 patch.object(Path, 'stat', return_value=SimpleNamespace(st_size=5)), \
                 patch.object(Path, 'read_bytes', return_value=b'chart'), \
                 patch.object(target.subprocess, 'run', side_effect=results) as runner:
-            rendered = target.render(Path('chart.tgz'), '/reviewed/helm')['items']
+            rendered = target.render(Path('chart.tgz'), '/reviewed/helm', published=published)['items']
         self.assertEqual(2, runner.call_count)
         self.assertTrue(all(item['spec']['template']['spec']['containers'][0]['image'] ==
             selected['image'] for item in rendered if item['kind'] == 'Deployment'))
