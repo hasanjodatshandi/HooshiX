@@ -67,8 +67,24 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
                 'ports': [{'protocol': 'TCP', 'port': 8200}]}]}})
     apply(manifest)
     for name in (ACCOUNT + '-cert-controller', ACCOUNT + '-webhook', ACCOUNT):
-        k('-n', auth.NAMESPACE, 'rollout', 'status', 'deployment/' + name,
-          '--timeout=180s', timeout=190)
+        print('ESO_DELIVERY_STEP=rollout-' + name, flush=True)
+        try:
+            k('-n', auth.NAMESPACE, 'rollout', 'status', 'deployment/' + name,
+              '--timeout=180s', timeout=190)
+        except RehearsalFailed:
+            pods = json.loads(k('-n', auth.NAMESPACE, 'get', 'pods', '-l',
+                'app.kubernetes.io/instance=' + ACCOUNT, '-o', 'json'))['items']
+            for pod in pods:
+                logs = k('-n', auth.NAMESPACE, 'logs', pod['metadata']['name'], '--tail=100')
+                phrases = [phrase for phrase in ('forbidden', 'cannot list', 'cannot get',
+                    'permission denied', 'i/o timeout', 'x509', 'connection refused',
+                    'OOMKilled', 'failed to sync', 'no matches for kind') if phrase.encode() in logs]
+                reasons = [reason for status in pod.get('status', {}).get('containerStatuses', [])
+                    for state in (status.get('state', {}), status.get('lastState', {}))
+                    for entry in state.values() for reason in ('OOMKilled', 'CrashLoopBackOff',
+                        'ImagePullBackOff', 'ErrImagePull', 'Error') if entry.get('reason') == reason]
+                print('ESO_DELIVERY_FAILURE=' + json.dumps({'phrases': phrases, 'reasons': reasons}), flush=True)
+            raise
     pods = json.loads(k('-n', auth.NAMESPACE, 'get', 'pods', '-l',
                         'app.kubernetes.io/instance=' + ACCOUNT, '-o', 'json'))['items']
     image = published_pin()['image']
