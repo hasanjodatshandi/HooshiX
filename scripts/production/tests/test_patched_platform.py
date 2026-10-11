@@ -126,7 +126,7 @@ class PatchedPlatformTest(unittest.TestCase):
             if argv[0] == 'git':
                 return 'b' * 40
             if argv[0] == 'gh':
-                return 'public' if any(name in argv[2] for name in ('platform-eso-v2-', 'platform-openbao-')) else 'private'
+                return 'public'
             if argv[0] == 'cosign':
                 self.assertEqual(4, scanned.call_count)
                 if any(arg.endswith('.wrong') for arg in argv):
@@ -152,7 +152,7 @@ class PatchedPlatformTest(unittest.TestCase):
             result = target.publish(Path('unused'), {})
         self.assertEqual('Passed', result['publication'])
         self.assertEqual('Not verified', result['production_promotion'])
-        self.assertEqual({'eso': 'public', 'openbao': 'public', 'istiod': 'private', 'cni': 'private'},
+        self.assertEqual({'eso': 'public', 'openbao': 'public', 'istiod': 'public', 'cni': 'public'},
                          result['registry_visibility'])
         self.assertEqual({component: repository + '@sha256:' + 'c' * 64
             for component, repository in repositories.items()}, result['images'])
@@ -182,7 +182,7 @@ class PatchedPlatformTest(unittest.TestCase):
             self.assertFalse(any(argv[0] in ('syft', 'grype', 'cosign') for argv in commands))
 
     def test_public_visibility_exception_cannot_reach_other_components(self):
-        for rejected in ('istiod', 'cni'):
+        for rejected in ('application',):
             commands = []
             def fake_run(argv, **kwargs):
                 commands.append(argv)
@@ -197,6 +197,7 @@ class PatchedPlatformTest(unittest.TestCase):
                 return {'source': {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'c' * 64,
                     'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}}
             with self.subTest(component=rejected), \
+                    patch.object(target, 'COMPONENTS', (*target.COMPONENTS, rejected)), \
                     patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
                     patch.object(target, 'recipe', return_value=self.selected), \
                     patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
