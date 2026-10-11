@@ -446,12 +446,13 @@ gh workflow run production-release.yml --ref main \
 انتشار، تمام چهار تصویر را می‌سازد و اسکن می‌کند؛ سپس به packageهای
 `platform-eso-v2-patched-private` برای ESO و
 `platform-<openbao|istiod|cni>-patched-private` برای بقیه، در GHCR همان حساب می‌فرستد.
-با تأیید security-owner، فقط مقصد ثابت ESO یعنی
-`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private` می‌تواند
+با تأیید security-owner، فقط دو مقصد ثابت ESO و OpenBao یعنی
+`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private` و
+`ghcr.io/hasanjodatshandi/hooshix/platform-openbao-patched-private` می‌توانند
 Public یا Private باشد؛ پسوند نام، اثبات خصوصی‌بودن نیست. visibility واقعی
-در `publication.json` ثبت می‌شود. OpenBao، istiod و CNI در این مسیر انتشار
+در `publication.json` ثبت می‌شود. istiod و CNI در این مسیر انتشار
 همچنان باید Private باشند؛ این استثنا شامل تصاویر برنامه یا package دیگر نیست.
-عمومی‌بودن ESO هیچ گیت digest، اسکن High/Critical، امضا، provenance، SBOM،
+عمومی‌بودن این دو تصویر هیچ گیت digest، اسکن High/Critical، امضا، provenance، SBOM،
 admission یا آزمون native را حذف نمی‌کند و دسترسی عمومی سرویس روی VPS نمی‌سازد.
 visibility مستقل از مخزن است.
 package عمومی `platform-eso-patched-private` مقصد این انتشار نیست؛ آن را برای
