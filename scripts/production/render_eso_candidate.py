@@ -103,9 +103,13 @@ def validate(items, selected):
                 if item['kind'] == 'ClusterRole' and (
                         item['metadata']['name'] != ACCOUNT + '-cert-controller'
                         or rule['resources'] not in (['customresourcedefinitions'],
-                                                    ['validatingwebhookconfigurations'])
+                                                    ['validatingwebhookconfigurations'], ['endpointslices'])
                         or not set(rule['verbs']) <= {'get', 'list', 'watch', 'update', 'patch'}):
                     raise ValueError('only certificate metadata cluster permissions allowed')
+                if item['kind'] == 'ClusterRole' and rule['resources'] == ['endpointslices'] and (
+                        rule['apiGroups'] != ['discovery.k8s.io']
+                        or rule['verbs'] != ['get', 'list', 'watch']):
+                    raise ValueError('only read-only endpoint discovery allowed')
                 if 'serviceaccounts/token' in rule['resources']:
                     if item != token_delegation()[0]:
                         raise ValueError('only exact six-account TokenRequest delegation allowed')
@@ -159,6 +163,9 @@ def render(chart: Path, helm: str, *, published: bool = False):
             local['rules'] = [rule for rule in item['rules']
                               if rule['apiGroups'] in ([''], ['discovery.k8s.io'], ['coordination.k8s.io'])]
             item['rules'] = [rule for rule in item['rules'] if rule not in local['rules']]
+            # shortcut: upstream cert readiness uses an unscoped informer; remove when its cache can be namespace-bound.
+            item['rules'].append({'apiGroups': ['discovery.k8s.io'], 'resources': ['endpointslices'],
+                                  'verbs': ['get', 'list', 'watch']})
             items.append(local)
         if item['kind'] == 'ClusterRoleBinding' and item['metadata']['name'] == cert_name:
             local = copy.deepcopy(item)

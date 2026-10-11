@@ -78,6 +78,17 @@ class ESORenderTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 target.validate(items, self.selected)
 
+    def test_cert_endpoint_cache_read_only_does_not_allow_secret_or_endpoint_mutation(self):
+        rule = {'apiGroups': ['discovery.k8s.io'], 'resources': ['endpointslices'],
+                'verbs': ['get', 'list', 'watch']}
+        items = copy.deepcopy(self.items) + [{'kind': 'ClusterRole', 'metadata': {
+            'name': target.ACCOUNT + '-cert-controller'}, 'rules': [rule]}]
+        target.validate(items, self.selected)
+        for verbs in (['get', 'list', 'watch', 'update'], ['*'], ['patch']):
+            rule['verbs'] = verbs
+            with self.assertRaises(ValueError):
+                target.validate(items, self.selected)
+
     def test_official_render_normalizes_digest_and_scopes_cert_secret_role(self):
         self.check_official_render(published=False)
 

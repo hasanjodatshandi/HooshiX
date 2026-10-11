@@ -48,7 +48,8 @@ class ESODeliveryTest(unittest.TestCase):
                 return json.dumps({'data': {'value': base64.b64encode(value.encode()).decode()}}).encode()
             return b''
         crds = b'\n---\n'.join(json.dumps({'metadata': {'name': name}}).encode() for name in (
-            'externalsecrets.external-secrets.io', 'secretstores.external-secrets.io'))
+            'externalsecrets.external-secrets.io', 'secretstores.external-secrets.io',
+            'generatorstates.generators.external-secrets.io'))
         api = Mock(call=api_call)
         with patch.object(delivery, 'render', return_value={'kind': 'List', 'items': []}):
             result = delivery.rehearse(kube, lambda check: self.assertTrue(check()),

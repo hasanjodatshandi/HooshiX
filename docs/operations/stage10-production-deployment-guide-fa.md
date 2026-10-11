@@ -385,7 +385,10 @@ controller فقط `platform-apps` را پردازش می‌کند؛ cluster stor
 خاموش‌اند و CRD/مجوز ClusterGenerator صادر نمی‌شود. مجوز ساخت TokenRequest فقط برای شش
 `eso-<service>` موجود است. دسترسی Secret مربوط به cert-controller نیز به
 همین namespace محدود است؛ مجوزهای cluster فقط metadata گواهی CRD/webhook
-را پوشش می‌دهند. webhookها فقط همین namespace را انتخاب می‌کنند، با
+و خواندن `EndpointSlice` با `get/list/watch` را پوشش می‌دهند. مورد آخر برای
+cache داخلی readiness گواهی‌ساز نسخهٔ مصوب لازم است؛ اجازهٔ تغییر EndpointSlice
+یا خواندن Secret سایر namespaceها نمی‌دهد. با پشتیبانی upstream از cache محدود
+به namespace، این مجوز metadata حذف شود. webhookها فقط همین namespace را انتخاب می‌کنند، با
 `failurePolicy=Fail` و timeout پنج‌ثانیه‌ای. نقش‌های view/edit اضافی حذف می‌شوند.
 
 در checkout همین تغییر، با Helm مصوب و PyYAML موجود، بدون VPS یا credential:
@@ -428,15 +431,18 @@ python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz
 این انتخاب هنوز نصب یا promotion نیست. scan تازه، امضا/provenance همان digest،
 admission، CRDها، شبکه/mTLS و آزمون native تحویل شش هویت پیش از apply لازم‌اند.
 متادیتای اندازه/index upstream به تصویر بازسازی‌شده نسبت داده نمی‌شود؛
-checksum chart، مرز namespace، RBAC و محدودیت منابع بدون تغییر می‌مانند.
+checksum chart، مرز Secret namespace و محدودیت منابع حفظ می‌شوند؛ استثنای
+خواندن metadataِ EndpointSlice فقط برای گواهی‌ساز طبق توضیح بالا است.
 job بررسی ESO هر دو render را جدا در artifact عمومی نگه می‌دارد؛ هیچ‌کدام
 بدون تکمیل گیت‌های نصب، desired state فعال روی VPS نیستند.
 
 ### آزمون native تحویل ESO در کلاستر موقت
 
 job اجباری `OpenBao Kubernetes foundation` همان chart دارای checksum و
-Helm `4.2.4` را برای تصویر اصلاح‌شده استفاده می‌کند. دو CRD مستقل
-`SecretStore` و `ExternalSecret` نصب می‌شوند؛ حساب‌ها و issuer کلاستر موقت
+Helm `4.2.4` را برای تصویر اصلاح‌شده استفاده می‌کند. سه CRD مستقل
+`SecretStore`، `ExternalSecret` و `GeneratorState` داخلی نصب می‌شوند؛
+ClusterSecretStore، ClusterExternalSecret و PushSecret نصب یا فعال نمی‌شوند.
+حساب‌ها و issuer کلاستر موقت
 به OpenBao ساختگی متصل‌اند و هیچ credential یا Root واقعی وارد CI نمی‌شود.
 هر شش هویت باید مقدار مخصوص سرویس خود را دریافت و پس از تغییر آن به‌روز کنند؛
 خواندن مسیر سرویس دیگر نباید Secret بسازد. حذف ExternalSecret باید Secret

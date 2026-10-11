@@ -32,10 +32,12 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
     crds = run([helm, 'template', ACCOUNT, str(chart), '--namespace', auth.NAMESPACE,
         '--kube-version', '1.35.6', '--set', 'installCRDs=true', '--set', 'fullnameOverride=' + ACCOUNT,
         '--show-only', 'templates/crds/externalsecret.yaml',
+        '--show-only', 'templates/crds/generatorstate.yaml',
         '--show-only', 'templates/crds/secretstore.yaml'], timeout=60, bound=BOUND)
     items = [item for item in yaml.safe_load_all(crds) if item]
-    expected = {'externalsecrets.external-secrets.io', 'secretstores.external-secrets.io'}
-    if len(items) != 2 or {item['metadata']['name'] for item in items} != expected:
+    expected = {'externalsecrets.external-secrets.io', 'secretstores.external-secrets.io',
+                'generatorstates.generators.external-secrets.io'}
+    if len(items) != 3 or {item['metadata']['name'] for item in items} != expected:
         raise RehearsalFailed('exact namespace-scoped CRDs required')
 
     def apply(value):
