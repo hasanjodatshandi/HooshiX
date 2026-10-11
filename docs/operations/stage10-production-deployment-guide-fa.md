@@ -451,7 +451,7 @@ gh workflow run production-release.yml --ref main \
 `ghcr.io/hasanjodatshandi/hooshix/platform-openbao-patched-private`،
 `ghcr.io/hasanjodatshandi/hooshix/platform-istiod-patched-private` و
 `ghcr.io/hasanjodatshandi/hooshix/platform-cni-patched-private` می‌توانند
-Public یا Private باشد؛ پسوند نام، اثبات خصوصی‌بودن نیست. visibility واقعی
+Public یا Private باشند؛ پسوند نام، اثبات خصوصی‌بودن نیست. visibility واقعی
 در `publication.json` ثبت می‌شود. این استثنا شامل تصاویر برنامه یا package دیگر نیست.
 عمومی‌بودن این چهار تصویر هیچ گیت digest، اسکن High/Critical، امضا، provenance، SBOM،
 admission یا آزمون native را حذف نمی‌کند و دسترسی عمومی سرویس روی VPS نمی‌سازد.
