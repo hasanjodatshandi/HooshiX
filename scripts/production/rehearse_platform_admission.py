@@ -491,7 +491,10 @@ class Staging:
         if self.upgrade_plan is not None:
             import upgrade_mesh_security as upgrade
             def adapter(*args, body=None, **options):
-                return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+                try:
+                    return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+                except RehearsalFailed as error:
+                    raise commissioning.custody.BootstrapFailed('NATIVE_FIXTURE_OPERATION_FAILED') from error
             def get(kind, name, namespace=None):
                 scope = ['-n', namespace] if namespace else []
                 raw = k(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json')

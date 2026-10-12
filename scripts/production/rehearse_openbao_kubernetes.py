@@ -56,9 +56,16 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
             # Never print response text after private fixture state is generated.
             markers = [marker for marker in ('Forbidden', 'Invalid', 'already exists',
                 'failed to compile', 'undeclared reference', 'no matches', 'not found',
-                'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM')
+                'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM',
+                'platform source build identity rejected',
+                'platform bootstrap identity/security exception rejected',
+                'no such overload', 'no such key', 'context deadline exceeded')
                 if marker.encode() in (result.stderr or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
+            print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
+                'expected_exit': expected, 'exit': result.returncode,
+                'stdout_bytes': len(result.stdout), 'required_error_present':
+                required_error is None or required_error in (result.stderr or b'')}), flush=True)
         raise RehearsalFailed("Kubernetes fixture command failed")
     return result.stdout
 
