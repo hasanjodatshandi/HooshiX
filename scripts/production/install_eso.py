@@ -99,6 +99,15 @@ def desired_fields_match(actual, expected):
     return rendered_fields_match(actual, expected)
 
 
+def established_crd(name, kube):
+    deadline = time.monotonic() + 30
+    # Read bounded status instead of retaining the full CRD in a watch stream.
+    while kube('get', 'crd', name, '-o',
+            'jsonpath={.status.conditions[?(@.type=="Established")].status}', timeout=10).strip() != b'True':
+        require(time.monotonic() < deadline, 'ESO_CRD_ESTABLISHMENT_TIMEOUT')
+        time.sleep(1)
+
+
 def execute(plan, *, kube=host.kube):
     require(plan.get('schema_version') == 1 and plan.get('installation_id') == 'hooshix-production'
             and plan.get('profile') == 'production-single-server'
@@ -219,7 +228,7 @@ def execute(plan, *, kube=host.kube):
             kube('create', '-f', '-', body=obj) if obj['kind'] != 'CustomResourceDefinition' else kube(
                 'apply', '--server-side', '--field-manager=' + MANAGER, '-f', '-', body=obj)
         if obj['kind'] == 'CustomResourceDefinition':
-            kube('wait', '--for=condition=Established', 'crd/' + obj['metadata']['name'], '--timeout=30s', timeout=40)
+            established_crd(obj['metadata']['name'], kube)
     for name in ACCOUNTS:
         deployment = next(obj for obj in plan['manifest']['items'] if obj['kind'] == 'Deployment'
                           and obj['metadata']['name'] == name)

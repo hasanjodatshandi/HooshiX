@@ -685,6 +685,8 @@ rule نوع Cluster از خروجی حذف می‌شود، چون namespaceSelec
 می‌شود؛ بازسازی شیء یا تغییر تنظیمات بررسی‌شده پذیرفته نمی‌شود.
 در بازاجرا، حذف فهرست خالی ingress/egress توسط API فقط وقتی معادل منع کامل
 محسوب می‌شود که همان جهت در policyTypes صریحاً باقی مانده باشد.
+پیش از ساخت منابع ESO، وضعیت Established هر CRD از پاسخ کوچک status خوانده
+می‌شود؛ مهلت محدود است و فقط مقدار True اجازهٔ ادامه می‌دهد.
 Root، intermediate، TLS موجود، داده/PVC و workload OpenBao، mesh، SSH و ایمیل
 تغییر نمی‌کنند. OpenBao باید از قبل unsealed و شش هویت scoped آماده باشند؛
 نشست VNC قابل ورود و نشست دوم SSH مستقل باز بمانند. هیچ init یا root revocation
