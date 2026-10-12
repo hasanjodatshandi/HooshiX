@@ -491,6 +491,10 @@ job بررسی ESO هر دو render را جدا در artifact عمومی نگه 
 
 ### آزمون native تحویل ESO در کلاستر موقت
 
+نصب هدف ESO مرحله‌ای مستقل از init/unseal است؛ از هویت‌های محدود موجود استفاده
+می‌کند و نباید Root، CA، PVC یا دادهٔ OpenBao را تغییر دهد. بستهٔ نصب تنها
+پس از آزمون ترکیبی امضا، Calico، Ambient و تحویل شش هویت قابل استفاده است.
+
 job اجباری `OpenBao Kubernetes foundation` همان chart دارای checksum و
 Helm `4.2.4` را برای تصویر اصلاح‌شده استفاده می‌کند. سه CRD مستقل
 `SecretStore`، `ExternalSecret` و `GeneratorState` داخلی نصب می‌شوند؛
