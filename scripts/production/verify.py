@@ -38,13 +38,15 @@ REQUIRED_INPUTS = {
 REQUIRED_FILES = (
     "README.md", "profile.json", "platform-contracts.json",
     "release-manifest.schema.json", "release-tools.env", "host/access-policy.json",
-    "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "network/trust-policy.json",
+    "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "data/postgresql-images.json", "network/trust-policy.json",
     "observability/observability-policy.json", "recovery/recovery-policy.json",
     "release/release-policy.json", "secrets/secrets-policy.json", "gitops/application.yaml",
 )
 REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/verify_release.py", ROOT / "scripts/production/readiness.py",
     ROOT / "scripts/production/prepare_human_sshd_candidate.py",
+    ROOT / "scripts/production/verify_postgresql_artifacts.py",
+    ROOT / ".github/workflows/postgresql-artifacts.yml",
     ROOT / "scripts/production/render_gitops.py", ROOT / "scripts/production/release_supply_chain.sh",
     ROOT / "scripts/production/build_provenance.py", ROOT / "scripts/production/install_release_tools.sh",
     ROOT / ".github/workflows/production-release.yml",

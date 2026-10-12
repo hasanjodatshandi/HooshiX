@@ -4,6 +4,13 @@ Owner: Platform Reliability. Current authority: ADR-0019/0027/0034/0037/0042.
 This is the credential-free ownership component of the **single-server** CNPG
 baseline, not a complete cluster installer or production promotion approval.
 
+The four official operator/operand/plugin/sidecar inputs and upstream manifest
+checksums are pinned in `infrastructure/production/data/postgresql-images.json`.
+`scripts/production/verify_postgresql_artifacts.py` verifies their blocked
+candidate scans; `.github/workflows/postgresql-artifacts.yml` runs the exact
+four-image gate without credentials or target writes. This does not sign,
+publish or approve installation. See the Persian Stage10 guide for local usage.
+
 ```bash
 python3 scripts/production/render_postgresql_ownership.py --candidate
 python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_ownership.py'

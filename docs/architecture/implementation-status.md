@@ -21,6 +21,16 @@ signed data-image adoption, durable data storage, real credential delivery,
 destination installation, service migration compatibility and physical recovery
 remain `Not run`/`Not verified`. This is a component, not a complete data installer.
 
+PostgreSQL artifact preparation now records four blocked official amd64 inputs:
+CNPG operator 1.30.0, CNPG-compatible minimal PostgreSQL 18.4, and Barman Cloud
+0.13.0 plugin/sidecar. `verify_postgresql_artifacts.py` reuses the existing
+digest-bound SBOM/fresh Grype gate and checks image labels and current data-policy
+versions. Credential-free PR/push/manual CI scans all four inputs without
+publishing or installing. Scan evidence does not establish upstream build
+provenance, signatures, admission, staging, backup or production readiness.
+All four must clear the live gate before signed candidate publication or adoption;
+no data operator or PostgreSQL instance has been installed by this preparation.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical

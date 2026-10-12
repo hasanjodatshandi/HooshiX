@@ -761,6 +761,47 @@ PostgreSQL، اپراتور Barman Cloud و sidecar آن. نسخه‌های مص
 SBOM و اسکن تازه داشته باشند؛ سپس از مسیر انتشار مصوب امضا و در محیط مستقل
 آزمایش شوند. این آماده‌سازی نصب روی VPS یا تأیید backup خارج میزبان نیست.
 
+pinهای `linux/amd64` و checksum manifestهای رسمی در
+`infrastructure/production/data/postgresql-images.json` قرار دارند. این catalog
+فعلاً مسدود برای promotion است؛ از tag متغیر یا تصویر fixture برای نصب استفاده
+نکنید. چهار جزء عبارت‌اند از `operator`، `postgresql`، `barman-plugin` و
+`barman-sidecar`. تصویر minimal PostgreSQL مخصوص CNPG انتخاب شده است؛ ابزار
+backup در sidecar جداست و نباید در تصویر برنامه یا دیتابیس دوباره نصب شود.
+
+آزمون عمومی بدون credential:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_artifacts.py'
+```
+
+در checkout تمیز بررسی‌شده، برای اسکن محلی تصویر رسمی؛ این دستورات روی VPS
+اجرا نمی‌شوند، نیاز به sudo، توکن GHCR، رمز Root یا custody ندارند:
+
+```bash
+scan_root=$(mktemp -d)
+scripts/production/install_release_tools.sh "$scan_root/tools"
+export PATH="$scan_root/tools:$PATH"
+export SYFT_GOLANG_CAPTURE_SYMBOLS=all
+export GRYPE_DB_AUTO_UPDATE=false GRYPE_DB_VALIDATE_AGE=true
+export GRYPE_DB_MAX_ALLOWED_BUILT_AGE=120h
+(for component in operator postgresql barman-plugin barman-sidecar; do
+   python3 scripts/production/verify_postgresql_artifacts.py --scan \
+     --component "$component" --revision "$(git rev-parse HEAD)" \
+     --evidence-dir "$scan_root/$component" || exit 1
+ done)
+```
+
+اسکن هر جزء پوشهٔ تازهٔ مستقل می‌خواهد و SBOM، database و findingهای عمومی را
+همان‌جا نگه می‌دارد. `scan: Passed` فقط با تطابق digest/platform/label، SBOM
+غیرخالی و database معتبر حداکثر پنج‌روزه و نبود High/Critical تولید می‌شود.
+خروجی شکست اجازهٔ انتشار/نصب نیست؛ دورزدن finding یا `--only-fixed` مجاز نیست.
+workflow `PostgreSQL candidate artifacts` همین چهار اسکن را در PR/push مربوط
+یا اجرای دستی، بدون credential و با حداکثر دو job هم‌زمان اجرا می‌کند.
+receipt اسکن، signature/provenance، staging، deployment و promotion را صریحاً
+`Not verified` نگه می‌دارد. checksum manifest برای بستهٔ بعدی است؛ این verifier
+manifest را روی cluster apply یا برای نصب مجاز نمی‌کند. منبع ثبت‌شدهٔ label
+تصویر و commit tag لزوماً یکی نیستند؛ هیچ ادعای build provenance از tag نمی‌شود.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS
