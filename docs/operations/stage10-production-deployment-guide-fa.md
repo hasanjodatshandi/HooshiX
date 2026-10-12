@@ -593,6 +593,75 @@ OpenBao بازسازی‌شده و انقضای JIT روی runner است؛ ای�
 آسیب‌پذیری تصویر فعلی VPS را ثابت نمی‌کنند. برای هر تغییر بعدی و merge، نتیجهٔ
 CI مربوط به SHA دقیق جدید لازم است؛ پس از merge نیز baseline همان main کنترل شود.
 
+### ارتقای محدود امنیتی mesh موجود
+
+ارتقای `istiod` و `istio-cni-node` با تأیید مالک آماده می‌شود. نسخهٔ Istio
+همان `1.30.5` می‌ماند؛ فقط دو تصویر source-patched امضاشده پس از آزمون native
+انتخاب می‌شوند. این مسیر نصب اولیه نیست: ztunnel، CA، OpenBao و داده‌های آن،
+SSH، ایمیل و storage نباید تغییر کنند. اجرای دوبارهٔ `commission_platform.py`
+برای این ارتقا مجاز نیست. تا دریافت شاهد اجرای مقصد، وضعیت ارتقا **Not verified**
+است؛ سبزشدن baseline به‌تنهایی شاهد تعویض تصویر VPS نیست.
+
+مرجع انتخاب candidate، `infrastructure/istio/security-upgrade.json` است؛
+این فایل pins upstream/chart را عوض نمی‌کند. publication شمارهٔ `38137708512`
+به revision دقیق `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` متصل است. سازنده
+پیش از تحویل بسته، اجرای موفق workflow انتشار روی main و scan تازهٔ همان
+digestها را کنترل می‌کند. هر تصویر، policy مستقل source-build با signer/issuer
+دقیق، provenance شامل recipe، سورس، Go، module locks و invocation، و SBOM
+امضاشده دارد. policy قدیمی ztunnel و OpenBao حفظ می‌شود.
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p test_mesh_security_upgrade.py
+python3 scripts/production/render_mesh_security_upgrade.py --publication /absolute/public-artifact-directory
+```
+
+renderer تنها JSON عمومی تولید می‌کند؛ اجرای آن نصب نیست. workflow
+`Platform commissioning staging` با `mesh_security_upgrade=true` روی runner
+موقت، نسخهٔ نصب‌شدهٔ قبلی را بازسازی می‌کند، OpenBao آزمایشی را initialized
+و unsealed می‌کند و داده/هویت آزمایشی می‌سازد؛ سپس مسیر image-only را اجرا
+می‌کند. استفاده از predecessor در این fixture، تأیید scan یا مجوز نصب تصویر
+آسیب‌پذیر روی سرور جدید نیست. receipt این مسیر scope مستقل
+`Disposable Calico/Ambient initialized-store mesh security upgrade` دارد و
+بستهٔ bootstrap اولیه نمی‌تواند آن را شاهد نصب اولیه محسوب کند.
+
+روی مقصد، ابتدا native dry-run امضا و security boundary باید موفق شوند؛
+پیش‌بررسی تمام فیلدهای renderشده و تعداد/ترتیب عناصر را حفظ می‌کند؛
+فقط فیلدهای پیش‌فرض افزوده‌شده توسط API در mapها پذیرفته می‌شوند.
+Quantity رشته‌ای API با مقدار عددی همان resource مقایسه می‌شود و
+حذف `EnvVar.value` خالی با مقدار خالی معادل است؛ مقدار غیرخالی پذیرفته نمی‌شود.
+سپس JSON Patch با شرط resourceVersion و تصویر قبلی، فقط فیلد image دو
+workload را تغییر می‌دهد. UID و سایر specها، metadata گواهی، ztunnel و
+StatefulSet/PVC/Pod OpenBao قبل/بعد مقایسه می‌شوند. پس از rollout، boundary
+فقط digestهای جدید و ztunnel ثابت را می‌پذیرد؛ digest قبلی دو جزء رد می‌شود.
+در شکست، داده یا workload حذف و init تکرار نمی‌شود؛ وضعیت جزئی حفظ شود و
+با شاهد همان plan بررسی و resume شود. rollback خودکار به تصویر آسیب‌پذیر
+وجود ندارد. نصب مقصد تا بررسی CI و بستهٔ عملیاتی مجاز **Not run** است.
+
+بعد از merge و baseline موفق main، از checkout تمیزِ همان main بسته بسازید؛
+شمارهٔ workflow staging موفق همین تغییر را جایگزین `<staging-run>` کنید:
+
+```bash
+python3 scripts/production/build_mesh_security_upgrade_bundle.py \
+  --staging-run <staging-run> \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-mesh-security-upgrade
+```
+
+مسیر output باید تازه و خارج Git باشد. بسته فقط کد/plan عمومی دارد، نه Root،
+کلید، token یا share. builder، tree دقیق staging را با main، checks اجباری،
+digestها و تازگی شاهد بررسی می‌کند. با VNC قابل ورود و نشست مستقل SSH باز:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-mesh-security-upgrade\run-mesh-security-upgrade.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-mesh-security-upgrade\run-mesh-security-upgrade.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo در prompt محلی لازم است؛ رمز custody/Root/CA و token جدید GHCR
+لازم نیست. رجیستری از Secret موجود استفاده می‌کند. `MESH_SECURITY_UPGRADE=Passed`
+و receipt عمومی کنار بسته، شاهد اجرای مقصد هستند. بسته و receipt را نگه دارید؛
+در اجرا‌ی ناموفق، replay همان bundle فقط پس از بررسی وضعیت جزئی مجاز است.
+این عملیات کوتاه ممکن است دسترسی mesh را حین rollout ناپایدار کند؛ reboot،
+حذف PVC، init، ارتقای ztunnel یا OpenBao بخشی از این فرمان نیست.
+
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
 1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.

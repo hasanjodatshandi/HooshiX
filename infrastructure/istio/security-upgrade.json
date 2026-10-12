@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "publication_run": "38137708512",
+  "publication_attempt": 1,
+  "predecessor_import_revision": "ffc299093b965450e4ef433a2d8392a01c404e0c",
+  "repository_revision": "fa7fbbe3a20be6ba99459209cfb6087d2fecba24",
+  "recipe_sha256": "a1980938b7e303ff72fba1d0f9f452ea7bce6c4a0642faa3ca2283bb606c8db1",
+  "module_files_sha256": {
+    "go.mod": "ffbe18d6089721ced80c7f3f6c72774f6590e861dcaa3665475555c51f7f34a6",
+    "go.sum": "9cfa3021984d1fbac30d9697a3e443facfb838db74e36aed85ff8359600a26fe"
+  },
+  "images": {
+    "istiod": "ghcr.io/hasanjodatshandi/hooshix/platform-istiod-patched-private@sha256:3114d37f86969e4b70fd608bb13864046d80309cb4728175edc2bc33c9eca242",
+    "cni": "ghcr.io/hasanjodatshandi/hooshix/platform-cni-patched-private@sha256:703a72d3853bc9cdbc2c0bf0a835319b8c466546e768caa1b9bba70431f18ab5"
+  },
+  "production_promotion": "Not verified"
+}

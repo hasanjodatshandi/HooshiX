@@ -41,7 +41,18 @@ def git(*args):
     return result.stdout.decode().strip()
 
 
-def check_staging(record, receipt, revision):
+def check_staging(record, receipt, revision, *, mesh_security_upgrade=False):
+    checks = CHECKS
+    scope = 'Disposable Calico/Ambient/Kyverno signed platform staging'
+    if mesh_security_upgrade:
+        import render_mesh_security_upgrade as upgrade
+        scope = 'Disposable Calico/Ambient initialized-store mesh security upgrade'
+        checks = CHECKS | {'image_only_mesh_upgrade_initialized_bao_preserved',
+                          'source_identity_istiod_positive_negative', 'source_identity_cni_positive_negative'}
+        expected = {name: value['image'] for name, value in admission.mesh_publication.targets().items()}
+        expected.update(upgrade.pin()['images'])
+        if receipt.get('upgrade_publication') != upgrade.pin() or receipt.get('mesh_images') != expected:
+            raise ValueError('exact tested source upgrade images required')
     if (record.get('path') != WORKFLOW or record.get('status') != 'completed'
             or record.get('conclusion') != 'success'
             or record.get('repository', {}).get('full_name') != publication.REPOSITORY
@@ -49,8 +60,8 @@ def check_staging(record, receipt, revision):
             or record.get('event') not in ('pull_request', 'workflow_dispatch')
             or not re.fullmatch(r'[a-f0-9]{40}', record.get('head_sha', ''))
             or receipt.get('revision') != record['head_sha']
-            or receipt.get('scope') != 'Disposable Calico/Ambient/Kyverno signed platform staging'
-            or set(receipt.get('platform_checks', {})) != CHECKS
+            or receipt.get('scope') != scope
+            or set(receipt.get('platform_checks', {})) != checks
             or set(receipt.get('checks', {})) != FOUNDATION
             or any(v != 'Passed' for v in receipt['platform_checks'].values())
             or any(v != 'Passed' for v in receipt['checks'].values())
@@ -62,7 +73,7 @@ def check_staging(record, receipt, revision):
         raise ValueError('fresh staging required')
 
 
-def staged_receipt(run_id, directory, revision):
+def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False):
     if not re.fullmatch(r'[1-9][0-9]{0,19}', run_id):
         raise ValueError('numeric staging run required')
     record = json.loads(publication.run(['api', 'repos/' + publication.REPOSITORY + '/actions/runs/' + run_id]))
@@ -79,7 +90,7 @@ def staged_receipt(run_id, directory, revision):
             or not files[0].is_file() or files[0].stat().st_size > 32768:
         raise ValueError('bounded public staging receipt required')
     receipt = json.loads(files[0].read_bytes())
-    check_staging(record, receipt, revision)
+    check_staging(record, receipt, revision, mesh_security_upgrade=mesh_security_upgrade)
     return receipt
 
 

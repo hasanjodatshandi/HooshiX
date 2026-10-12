@@ -42,13 +42,13 @@ class OpenBaoKubernetesTest(unittest.TestCase):
                     rehearsal.runner_paths(tools, receipt)
 
     def test_command_is_native_bounded_and_keeps_secret_input_out_of_argv_and_logs(self):
-        result = Mock(returncode=0, stdout=b"private-response")
+        result = Mock(returncode=0, stdout=b"private-response", stderr=b"")
         with patch.object(subprocess, "run", return_value=result) as native:
             self.assertEqual(b"private-response", rehearsal.run(["kubectl", "apply", "-f", "-"], data=b"private-input"))
             arguments, options = native.call_args
             self.assertNotIn(b"private-input", arguments[0])
             self.assertEqual(b"private-input", options["input"])
-            self.assertEqual(subprocess.DEVNULL, options["stderr"])
+            self.assertEqual(subprocess.PIPE, options["stderr"])
             self.assertNotIn("shell", options)
             self.assertNotIn("KUBECONFIG", options["env"])
             with self.assertRaises(rehearsal.RehearsalFailed):
@@ -57,6 +57,16 @@ class OpenBaoKubernetesTest(unittest.TestCase):
             self.assertEqual(b"private-response", rehearsal.run(["kubectl"], expected=2))
             with self.assertRaises(rehearsal.RehearsalFailed):
                 rehearsal.run(["kubectl"])
+
+    def test_post_secret_failure_logs_only_fixed_classification(self):
+        result = Mock(returncode=1, stdout=b'', stderr=b'Forbidden private-token ::error::')
+        output = io.StringIO()
+        with patch.object(subprocess, 'run', return_value=result), contextlib.redirect_stdout(output):
+            with self.assertRaises(rehearsal.RehearsalFailed):
+                rehearsal.run(['kubectl'])
+        self.assertIn('Forbidden', output.getvalue())
+        self.assertNotIn('private-token', output.getvalue())
+        self.assertNotIn('::error::', output.getvalue())
 
     def test_failed_partial_cluster_creation_is_cleaned_without_reading_operator_state(self):
         with tempfile.TemporaryDirectory() as temp:

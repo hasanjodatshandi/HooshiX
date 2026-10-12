@@ -48,14 +48,14 @@ def policy_ready(k, policy):
         raise
 
 
-def admission_result(k, pod, wait, *, expected=0, message=None):
+def admission_result(k, pod, wait, *, expected=0, message=None, public_schema=True):
     # Policy Ready reports webhook configuration, not an updated cache generation.
     # Poll the harmless server-side dry-run while the reviewed policy converges.
     # Success still requires the exact denial reason, never just any HTTP error.
     def converged():
         try:
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(pod).encode(),
-              expected=expected, public_schema=True, required_error=message)
+              expected=expected, public_schema=public_schema, required_error=message)
             return True
         except RehearsalFailed:
             return False
@@ -207,10 +207,26 @@ def tuf_trust_boundary(k, pod, policy, wait):
 
 
 class Staging:
-    def __init__(self, directory: Path):
+    def __init__(self, directory: Path, *, mesh_security_upgrade: bool = False):
         now = datetime.now(timezone.utc)
-        self.mesh_receipt = admission.publication(directory / "mesh/receipt.json", "mesh", now)
-        self.bao_receipt = admission.publication(directory / "openbao/receipt.json", "openbao", now)
+        self.upgrade_plan = None
+        if mesh_security_upgrade:
+            import render_mesh_security_upgrade as upgrade
+            if os.environ.get('GITHUB_ACTIONS') != 'true':
+                raise ValueError('legacy reconstruction is disposable CI only')
+            upgrade.validate_publication(directory, now)
+            self.upgrade_plan = upgrade.render()
+            # Reconstruct installed predecessors ONLY in the disposable fixture;
+            # no scan/promotion success is fabricated for these older bytes.
+            self.mesh_receipt = {'repository_revision': upgrade.pin()['predecessor_import_revision'],
+                                 'components': admission.mesh_publication.targets()}
+            bao_pin = json.loads(admission.BAO_PIN.read_bytes())
+            self.bao_receipt = {'image': bao_pin['import_provenance']['image'],
+                'provenance_kind': 'unchanged-upstream-import',
+                'repository_revision': bao_pin['import_provenance']['revision']}
+        else:
+            self.mesh_receipt = admission.publication(directory / "mesh/receipt.json", "mesh", now)
+            self.bao_receipt = admission.publication(directory / "openbao/receipt.json", "openbao", now)
         self.plan = admission.render(self.mesh_receipt, self.bao_receipt, mesh.candidate())
         # Only kind's host CNI paths differ. Production source/render is not changed.
         replacements = {"/var/lib/rancher/k3s/data/current/bin/": "/opt/cni/bin",
@@ -228,6 +244,20 @@ class Staging:
                             volume["hostPath"]["path"] = replacements[source]
                 self.pods[pod["serviceAccountName"]] = pod
         self.plan["admission"]["items"][0] = admission.hardening("istio-system", self.pods)
+        if self.upgrade_plan is not None:
+            old = copy.deepcopy(self.pods)
+            new = copy.deepcopy(old)
+            for change in self.upgrade_plan['changes']:
+                account = 'istiod' if change['component'] == 'istiod' else 'istio-cni'
+                change['expected_pod'] = old[account]
+                new[account]['containers'][0]['image'] = change['after']
+            self.upgrade_plan['boundary_before'] = admission.hardening('istio-system', old)
+            self.upgrade_plan['boundary_after'] = admission.hardening('istio-system', new)
+            transition = copy.deepcopy(self.upgrade_plan['boundary_after'])
+            transition['spec']['validations'][0]['expression'] = '(' + self.upgrade_plan[
+                'boundary_before']['spec']['validations'][0]['expression'] + ') || (' + transition[
+                'spec']['validations'][0]['expression'] + ')'
+            self.upgrade_plan['boundary_transition'] = transition
         self.checks = {}
 
     def setup(self, k, run, directory: Path, wait):
@@ -331,6 +361,10 @@ class Staging:
                 "name": account, "namespace": "istio-system"}})
         print("PLATFORM_STEP=admission-audit", flush=True)
         apply(k, self.plan["admission_prerequisites"])
+        if self.upgrade_plan is not None:
+            for policy in self.upgrade_plan['source_policies']:
+                k('create', '--dry-run=server', '-f', '-', data=json.dumps(policy).encode(),
+                  public_schema=True)
         # Validate exact boundary in Audit first; nothing is promoted by this step.
         for policy in self.plan["admission"]["items"]:
             audit = copy.deepcopy(policy)
@@ -453,7 +487,58 @@ class Staging:
         result["items"][-1]["spec"]["volumeClaimTemplates"][0]["spec"]["storageClassName"] = storage_class
         return result
 
-    def network(self, k, wait):
+    def security_upgrade(self, k, wait):
+        if self.upgrade_plan is not None:
+            import upgrade_mesh_security as upgrade
+            def adapter(*args, body=None, **options):
+                try:
+                    return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+                except RehearsalFailed as error:
+                    raise commissioning.custody.BootstrapFailed('NATIVE_FIXTURE_OPERATION_FAILED') from error
+            def get(kind, name, namespace=None):
+                scope = ['-n', namespace] if namespace else []
+                raw = k(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json')
+                return json.loads(raw) if raw.strip() else None
+            print('PLATFORM_STEP=initialized-bao-preserving-mesh-upgrade', flush=True)
+            upgrade.execute(self.upgrade_plan, get=get, kube=adapter)
+            self.checks['image_only_mesh_upgrade_initialized_bao_preserved'] = 'Passed'
+            for change in self.upgrade_plan['changes']:
+                self.mesh_receipt['components'][change['component']]['image'] = change['after']
+            # Exercise actual signed source identity, not only Pod schema.
+            for component in ('istiod', 'cni'):
+                import render_mesh_security_upgrade as renderer
+                original = renderer.source_policy(component)
+                # Combine checks for independent negatives after bounded production checks.
+                apply(k, original)
+                policy_ready(k, original)
+                account = 'istiod' if component == 'istiod' else 'istio-cni'
+                pod = copy.deepcopy(self.pods[account])
+                pod['containers'][0]['image'] = self.mesh_receipt['components'][component]['image']
+                test = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
+                    'name': 'source-upgrade-probe', 'namespace': 'istio-system'}, 'spec': pod}
+                admission_result(k, test, wait, public_schema=False)
+                for field in ('wrong_signer', 'missing_sbom', 'component', 'go_version',
+                              'recipe_sha256', 'repository_revision'):
+                    bad = copy.deepcopy(original)
+                    message = b'platform source build identity rejected'
+                    if field == 'wrong_signer':
+                        bad['spec']['attestors'][0]['cosign']['keyless']['identities'][0]['subject'] = 'https://wrong.invalid'
+                        message = b'platform image signature verification failed'
+                    elif field == 'missing_sbom':
+                        bad['spec']['attestations'][1]['intoto']['type'] = 'https://missing.invalid/sbom'
+                        message = b'platform signed SBOM verification failed'
+                    else:
+                        expected = renderer.predicate(component)
+                        expected['buildDefinition']['externalParameters'][field] = 'wrong'
+                        bad['spec']['validations'][2]['expression'] = renderer.provenance_expression(expected)
+                    try:
+                        apply(k, bad)
+                        admission_result(k, test, wait, expected=1, message=message, public_schema=False)
+                    finally:
+                        apply(k, original)
+                k('delete', original['kind'], original['metadata']['name'])
+                self.checks['source_identity_' + component + '_positive_negative'] = 'Passed'
+    def network(self, k, wait, *, sealed=True):
         # Temporary, precise fixture edge only. Production stays default deny.
         print("PLATFORM_STEP=ambient-network", flush=True)
         apply(k, {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {
@@ -514,7 +599,7 @@ class Staging:
 
                 state = wait(terminated, seconds=60)
                 output = k("-n", "hooshix-secrets", "logs", label)
-                # CLI here only runs status on a sealed, uninitialized fixture.
+                # Status only: no credentials, both predecessor and upgraded mesh.
                 # Classify fixed public errors; never print raw workload logs.
                 causes = [name for name in ('lookup', 'i/o timeout', 'connection refused', 'x509',
                                            'permission denied', 'EOF', 'no such file', 'context deadline', 'too many arguments')
@@ -522,7 +607,7 @@ class Staging:
                 print('PLATFORM_NETWORK_RESULT=' + json.dumps({'probe': label, 'exit_code': state['exitCode'],
                       'error_classes': causes}), flush=True)
                 if label == "mtls-positive":
-                    if state["exitCode"] != 2 or json.loads(output).get("sealed") is not True:
+                    if state["exitCode"] != (2 if sealed else 0) or json.loads(output).get("sealed") is not sealed:
                         raise ValueError("authorized Ambient API probe failed")
                 elif state["exitCode"] != 1:
                     raise ValueError("plaintext/wrong identity was not denied")

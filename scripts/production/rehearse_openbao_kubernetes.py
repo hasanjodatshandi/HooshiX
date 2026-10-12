@@ -43,7 +43,7 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
         required_error: bytes | None = None) -> bytes:
     # Native argv only. Secret input/output stays in memory, never diagnostics.
     result = subprocess.run(args, input=data, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE if public_schema else subprocess.DEVNULL,
+                            stderr=subprocess.PIPE,
                             timeout=timeout, check=False,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
     if (result.returncode != expected or len(result.stdout) > bound or
@@ -52,6 +52,20 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
             # Only public schema input, before TLS/Secret/init. Escape CI controls and bound output.
             print("OPENBAO_PUBLIC_SCHEMA_ERROR=" + json.dumps(
                 (result.stderr or b"")[:4096].decode("utf-8", errors="replace")), flush=True)
+        else:
+            # Never print response text after private fixture state is generated.
+            markers = [marker for marker in ('Forbidden', 'Invalid', 'already exists',
+                'failed to compile', 'undeclared reference', 'no matches', 'not found',
+                'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM',
+                'platform source build identity rejected',
+                'platform bootstrap identity/security exception rejected',
+                'no such overload', 'no such key', 'context deadline exceeded')
+                if marker.encode() in (result.stderr or b'')]
+            print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
+            print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
+                'expected_exit': expected, 'exit': result.returncode,
+                'stdout_bytes': len(result.stdout), 'required_error_present':
+                required_error is None or required_error in (result.stderr or b'')}), flush=True)
         raise RehearsalFailed("Kubernetes fixture command failed")
     return result.stdout
 
@@ -102,7 +116,7 @@ def ca_import_fixture(k):
 
 
 def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
-             eso_chart: Path | None = None) -> None:
+             eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False) -> None:
     runner_paths(tools, receipt)
     if eso_chart is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
@@ -115,7 +129,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         if platform_directory.is_symlink() or not platform_directory.resolve(strict=True).is_relative_to(root):
             raise RehearsalFailed("runner-owned publication directory required")
         from rehearse_platform_admission import Staging, admission_result
-        platform = Staging(platform_directory)
+        platform = Staging(platform_directory, mesh_security_upgrade=mesh_security_upgrade)
+    elif mesh_security_upgrade:
+        raise RehearsalFailed('mesh upgrade requires platform fixture')
     pin = pins()
     step("tools")
     for tool, key in (("kind", "KIND_LINUX_AMD64_SHA256"),
@@ -368,6 +384,12 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 reader = client.call("auth/token/create", "POST", {"policies": ["fixture-reader"],
                     "no_default_policy": True, "ttl": "5m", "explicit_max_ttl": "5m"}, token)["auth"]["client_token"]
                 client.call("fixture/data/value", "POST", {"data": {"value": "denied"}}, reader, 403)
+                if mesh_security_upgrade:
+                    platform.security_upgrade(k, wait)
+                    platform.network(k, wait, sealed=False)
+                    client.wait_health(200)
+                    if client.call('fixture/data/value', token=reader)['data']['data']['value'] != canary:
+                        raise RehearsalFailed('mesh upgrade changed initialized OpenBao data or identity')
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -430,6 +452,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             "production_target": "Not verified: K3s paths, imported owner CA and guarded 8GiB PV not exercised",
             "ca_secret_reconcile": "Not applicable: foundation job owns separate conflict fixture"})
         result["checks"].pop("ca_secret_create_reconcile_conflict")
+        if mesh_security_upgrade:
+            result['scope'] = 'Disposable Calico/Ambient initialized-store mesh security upgrade'
+            result['upgrade_publication'] = platform.upgrade_plan['publication']
     else:
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
         if eso_chart is not None:
@@ -447,10 +472,12 @@ def main() -> int:
     parser.add_argument("--tools-dir", type=Path, required=True)
     parser.add_argument("--receipt", type=Path, required=True)
     parser.add_argument("--platform-publications", type=Path)
+    parser.add_argument('--mesh-security-upgrade', action='store_true')
     parser.add_argument("--eso-chart", type=Path)
     args = parser.parse_args()
     try:
-        rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart)
+        rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart,
+                 mesh_security_upgrade=args.mesh_security_upgrade)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):
