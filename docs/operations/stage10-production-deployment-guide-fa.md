@@ -633,6 +633,31 @@ StatefulSet/PVC/Pod OpenBao قبل/بعد مقایسه می‌شوند. پس ا�
 با شاهد همان plan بررسی و resume شود. rollback خودکار به تصویر آسیب‌پذیر
 وجود ندارد. نصب مقصد تا بررسی CI و بستهٔ عملیاتی مجاز **Not run** است.
 
+بعد از merge و baseline موفق main، از checkout تمیزِ همان main بسته بسازید؛
+شمارهٔ workflow staging موفق همین تغییر را جایگزین `<staging-run>` کنید:
+
+```bash
+python3 scripts/production/build_mesh_security_upgrade_bundle.py \
+  --staging-run <staging-run> \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-mesh-security-upgrade
+```
+
+مسیر output باید تازه و خارج Git باشد. بسته فقط کد/plan عمومی دارد، نه Root،
+کلید، token یا share. builder، tree دقیق staging را با main، checks اجباری،
+digestها و تازگی شاهد بررسی می‌کند. با VNC قابل ورود و نشست مستقل SSH باز:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-mesh-security-upgrade\run-mesh-security-upgrade.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-mesh-security-upgrade\run-mesh-security-upgrade.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo در prompt محلی لازم است؛ رمز custody/Root/CA و token جدید GHCR
+لازم نیست. رجیستری از Secret موجود استفاده می‌کند. `MESH_SECURITY_UPGRADE=Passed`
+و receipt عمومی کنار بسته، شاهد اجرای مقصد هستند. بسته و receipt را نگه دارید؛
+در اجرا‌ی ناموفق، replay همان bundle فقط پس از بررسی وضعیت جزئی مجاز است.
+این عملیات کوتاه ممکن است دسترسی mesh را حین rollout ناپایدار کند؛ reboot،
+حذف PVC، init، ارتقای ztunnel یا OpenBao بخشی از این فرمان نیست.
+
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 
 1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.

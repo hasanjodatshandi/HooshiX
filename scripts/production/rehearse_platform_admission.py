@@ -510,18 +510,26 @@ class Staging:
                 test = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
                     'name': 'source-upgrade-probe', 'namespace': 'istio-system'}, 'spec': pod}
                 admission_result(k, test, wait)
-                for field in ('component', 'go_version', 'recipe_sha256', 'repository_revision'):
+                for field in ('wrong_signer', 'missing_sbom', 'component', 'go_version',
+                              'recipe_sha256', 'repository_revision'):
                     bad = copy.deepcopy(original)
-                    expected = renderer.predicate(component)
-                    expected['buildDefinition']['externalParameters'][field] = 'wrong'
-                    bad['spec']['validations'][2]['expression'] = (
-                        'variables.provenanceVerified && images.containers.map(image, '
-                        'extractPayload(image, attestations.provenance).predicate == '
-                        + admission.literal(expected) + ').all(e, e)')
+                    message = b'platform source build identity rejected'
+                    if field == 'wrong_signer':
+                        bad['spec']['attestors'][0]['cosign']['keyless']['identities'][0]['subject'] = 'https://wrong.invalid'
+                        message = b'platform image signature verification failed'
+                    elif field == 'missing_sbom':
+                        bad['spec']['attestations'][1]['intoto']['type'] = 'https://missing.invalid/sbom'
+                        message = b'platform signed SBOM verification failed'
+                    else:
+                        expected = renderer.predicate(component)
+                        expected['buildDefinition']['externalParameters'][field] = 'wrong'
+                        bad['spec']['validations'][2]['expression'] = (
+                            'variables.provenanceVerified && images.containers.map(image, '
+                            'extractPayload(image, attestations.provenance).predicate == '
+                            + admission.literal(expected) + ').all(e, e)')
                     try:
                         apply(k, bad)
-                        admission_result(k, test, wait, expected=1,
-                                         message=b'platform source build identity rejected')
+                        admission_result(k, test, wait, expected=1, message=message)
                     finally:
                         apply(k, original)
                 k('delete', original['kind'], original['metadata']['name'])

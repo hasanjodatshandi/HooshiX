@@ -21,6 +21,7 @@ def pin() -> dict:
     if (value.get('schema_version') != 1 or set(value.get('images', {})) != set(COMPONENTS)
             or value.get('production_promotion') != 'Not verified'
             or not re.fullmatch(r'[a-f0-9]{40}', value.get('repository_revision', ''))
+            or not re.fullmatch(r'[a-f0-9]{40}', value.get('predecessor_import_revision', ''))
             or not re.fullmatch(r'[1-9][0-9]{0,19}', value.get('publication_run', ''))
             or type(value.get('publication_attempt')) is not int
             or not 1 <= value['publication_attempt'] <= 1000

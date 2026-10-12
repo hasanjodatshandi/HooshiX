@@ -2,7 +2,9 @@
 import copy
 import json
 import sys
+import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -120,6 +122,132 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
         pod = resources[('deployment', 'istiod', target.NAMESPACE)]['spec']['template']['spec']
         self.assertEqual(renderer.pin()['images']['istiod'], pod['containers'][0]['image'])
         self.assertFalse(any('delete' in c[0] or 'init' in c[0] for c in calls))
+
+    def test_replaced_or_modified_workload_after_preflight_is_not_patched(self):
+        for field in ('uid', 'spec'):
+            resources, calls, get, kube = self.fixture()
+            reads = 0
+            def drifting(kind, name, namespace=None):
+                nonlocal reads
+                if kind == 'deployment' and name == 'istiod':
+                    reads += 1
+                    if reads == 2:
+                        resource = resources[(kind, name, namespace)]
+                        resource['metadata']['resourceVersion'] = '42'
+                        if field == 'uid':
+                            resource['metadata']['uid'] = 'replacement-istiod'
+                        else:
+                            resource['spec']['template']['spec']['containers'][0]['command'] = ['changed']
+                return get(kind, name, namespace)
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'changed after preflight'):
+                target.execute(self.plan, get=drifting, kube=kube)
+            self.assertFalse(any(c[0][:3] == ('-n', target.NAMESPACE, 'patch') for c in calls))
+
+    def test_upgrade_staging_cannot_authorize_initial_commissioning(self):
+        import build_platform_commissioning_bundle as bundle
+        from datetime import datetime, timezone
+        revision = 'a' * 40
+        record = {'path': bundle.WORKFLOW, 'status': 'completed', 'conclusion': 'success',
+            'repository': {'full_name': bundle.publication.REPOSITORY},
+            'head_repository': {'full_name': bundle.publication.REPOSITORY},
+            'event': 'pull_request', 'head_sha': revision}
+        receipt = {'revision': revision, 'scope': 'Disposable Calico/Ambient initialized-store mesh security upgrade',
+            'upgrade_publication': renderer.pin(), 'mesh_images': {
+                **{n: v['image'] for n, v in renderer.admission.mesh_publication.targets().items()},
+                **renderer.pin()['images']}, 'observed_at': datetime.now(timezone.utc).isoformat(),
+            'checks': {name: 'Passed' for name in bundle.FOUNDATION},
+            'platform_checks': {name: 'Passed' for name in bundle.CHECKS | {
+                'image_only_mesh_upgrade_initialized_bao_preserved',
+                'source_identity_istiod_positive_negative', 'source_identity_cni_positive_negative'}}}
+        with patch.object(bundle, 'git', return_value='same-tree'):
+            bundle.check_staging(record, receipt, revision, mesh_security_upgrade=True)
+            with self.assertRaises(ValueError):
+                bundle.check_staging(record, receipt, revision)
+            receipt['mesh_images']['ztunnel'] = 'changed'
+            with self.assertRaises(ValueError):
+                bundle.check_staging(record, receipt, revision, mesh_security_upgrade=True)
+
+    def test_public_scan_validates_embedded_fixed_binaries_and_fresh_database(self):
+        now = datetime(2026, 10, 12, tzinfo=timezone.utc)
+        selected = renderer.pin()
+        files = {'publication.json': {'schema_version': 1, 'publication': 'Passed',
+            'provenance_kind': 'patched-upstream-source-build',
+            'repository_revision': selected['repository_revision'], 'images': selected['images']}}
+        for component in renderer.COMPONENTS:
+            digest = 'sha256:' + 'a' * 64
+            receipt = {'schema_version': 1, 'component': component, 'image_config_digest': digest,
+                'scan': 'Passed', 'recipe_sha256': selected['recipe_sha256'],
+                'provenance_kind': 'patched-upstream-source-build', 'production_promotion': 'Not verified',
+                'module_files_sha256': selected['module_files_sha256']}
+            image = selected['images'][component]
+            labels = {'io.hooshix.provenance.kind': receipt['provenance_kind'],
+                'io.hooshix.source.revision': renderer.build.recipe()['sources']['istio']['revision'],
+                'io.hooshix.recipe.sha256': selected['recipe_sha256']}
+            files[component] = {'receipt.json': receipt, 'source-provenance.json': renderer.predicate(component),
+                'syft.json': {'source': {'type': 'image', 'metadata': {
+                    'imageID': digest, 'manifestDigest': image.split('@')[1], 'repoDigests': [image],
+                    'os': 'linux', 'architecture': 'amd64', 'labels': labels}}, 'artifacts': [
+                    {'name': 'stdlib', 'version': 'go1.26.9', 'locations': [
+                        {'path': p} for p in renderer.build.BINARIES[component].values()]},
+                    {'name': 'golang.org/x/net', 'version': 'v0.60.0'}]},
+                'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
+                'grype.json': {'matches': []}, 'database.json': {'valid': True, 'error': None,
+                    'schemaVersion': '6.0.0', 'built': now.isoformat()}}
+        original = copy.deepcopy(files)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def save():
+                for name, data in files.items():
+                    if name == 'publication.json':
+                        (root / name).write_text(json.dumps(data))
+                    else:
+                        (root / name).mkdir(exist_ok=True)
+                        for filename, value in data.items():
+                            (root / name / filename).write_text(json.dumps(value))
+            save()
+            renderer.validate_publication(root, now)
+            for fault in ('component', 'old-toolchain', 'missing-binary', 'high', 'stale'):
+                files = copy.deepcopy(original)
+                part = files['cni']
+                if fault == 'component':
+                    part['source-provenance.json']['buildDefinition']['externalParameters']['component'] = 'istiod'
+                elif fault == 'old-toolchain':
+                    part['syft.json']['artifacts'][0]['version'] = 'go1.26.7'
+                elif fault == 'missing-binary':
+                    part['syft.json']['artifacts'][0]['locations'].pop()
+                elif fault == 'high':
+                    part['grype.json']['matches'] = [{'vulnerability': {'severity': 'High'}}]
+                else:
+                    part['database.json']['built'] = (now - timedelta(days=6)).isoformat()
+                save()
+                with self.subTest(fault=fault), self.assertRaises(ValueError):
+                    renderer.validate_publication(root, now)
+
+    def test_bundle_requires_reviewed_main_and_exact_staging_and_no_private_material(self):
+        import build_mesh_security_upgrade_bundle as bundle
+        revision = 'a' * 40
+        def git(*args):
+            if args[0] == 'status':
+                return ''
+            if args[0] == 'ls-remote':
+                return revision + '\trefs/heads/main'
+            return revision
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'public-bundle'
+            with patch.object(bundle.original, 'git', side_effect=git), \
+                    patch.object(bundle.original, 'staged_receipt', return_value={
+                        'observed_at': datetime.now(timezone.utc).isoformat()}) as staging, \
+                    patch.object(bundle.publication, 'download') as download:
+                manifest = bundle.build(output, '12345')
+                self.assertTrue(staging.call_args.kwargs['mesh_security_upgrade'])
+                download.assert_called_once()
+                plan = json.loads((output / 'plan.json').read_bytes())
+                self.assertEqual('Passed', plan['staging']['result'])
+                self.assertEqual(set(bundle.SOURCES) | {bundle.WRAPPER, 'plan.json'}, set(manifest['files']))
+                self.assertFalse(any(suffix in name for name in manifest['files']
+                                     for suffix in ('.pem', '.pgp', 'credentials', 'encrypted')))
+                with self.assertRaises(ValueError):
+                    bundle.build(output, '12345')
 
     def test_publication_bound_to_authenticated_exact_run(self):
         import verify_mesh_security_publication as download

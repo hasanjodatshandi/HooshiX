@@ -10,6 +10,8 @@ on:
       - scripts/production/render_platform_admission.py
       - scripts/production/render_mesh_security_upgrade.py
       - scripts/production/upgrade_mesh_security.py
+      - scripts/production/build_mesh_security_upgrade_bundle.py
+      - scripts/production/run-mesh-security-upgrade.ps1
       - scripts/production/verify_mesh_security_publication.py
       - scripts/production/tests/test_mesh_security_upgrade.py
       - scripts/production/verify_platform_publication_run.py
@@ -71,6 +73,15 @@ jobs:
               --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
               --output "$RUNNER_TEMP/platform-publications"
           fi
+      - name: Parse public operator wrapper without target execution
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-mesh-security-upgrade.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'MESH_OPERATOR_WRAPPER_SYNTAX_FAILED' }
       - name: Install pinned disposable fixture tools and YAML parser
         run: |
           set -euo pipefail

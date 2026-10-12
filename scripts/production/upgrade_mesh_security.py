@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fcntl
 import hashlib
 import json
 import os
 import re
 import resource
+import stat
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import commission_platform as host
@@ -174,11 +177,27 @@ def main():
                 and args.plan.stat().st_size <= host.PLAN_BOUND, 'bounded regular upgrade plan required')
         data = args.plan.read_bytes()
         require(hashlib.sha256(data).hexdigest() == args.sha256, 'reviewed plan hash mismatch')
+        plan = json.loads(data)
+        evidence = plan['staging']
+        observed = datetime.fromisoformat(evidence['observed_at'])
+        age = (datetime.now(timezone.utc) - observed).total_seconds() if observed.tzinfo else -1
+        require(evidence.get('result') == 'Passed' and 0 <= age <= 5 * 86400
+                and re.fullmatch(r'[a-f0-9]{40}', evidence.get('source_revision', ''))
+                and re.fullmatch(r'[1-9][0-9]{0,19}', evidence.get('run_id', '')),
+                'fresh reviewed staging required')
         host.kernel_audit()
         services = host.snapshot_services()
-        result = execute(json.loads(data))
+        with os.fdopen(os.open('/run/lock/hooshix-mesh-security-upgrade.lock',
+                              os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'r+b') as lock:
+            info = os.fstat(lock.fileno())
+            require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_nlink == 1
+                    and stat.S_IMODE(info.st_mode) == 0o600, 'safe single-operator lock required')
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            host.native(['/usr/sbin/auditctl', '-m', 'HooshiX mesh security upgrade plan=' + args.sha256])
+            result = execute(plan)
         require(host.snapshot_services() == services, 'preserved host service changed')
         host.kernel_audit()
+        result['plan_sha256'] = args.sha256
         print(json.dumps(result, separators=(',', ':')))
     except (ValueError, KeyError, TypeError, OSError, host.custody.BootstrapFailed):
         print('MESH_SECURITY_UPGRADE=Failed; partial state preserved; no automatic rollback')

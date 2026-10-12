@@ -355,6 +355,7 @@ infrastructure/istio/namespaces.yaml
 infrastructure/istio/pins.env
 infrastructure/istio/platform-apps-waypoint-networkpolicy.yaml
 infrastructure/istio/platform-apps-waypoint.yaml
+infrastructure/istio/security-upgrade.json
 infrastructure/kind/README.md
 infrastructure/kind/cluster.yaml
 infrastructure/kind/pins.env
@@ -518,6 +519,7 @@ scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
+scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_provenance.py
@@ -563,6 +565,7 @@ scripts/production/release_supply_chain.sh
 scripts/production/render_eso_candidate.py
 scripts/production/render_gitops.py
 scripts/production/render_mesh_candidate.py
+scripts/production/render_mesh_security_upgrade.py
 scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
 scripts/production/render_platform_admission.py
@@ -574,6 +577,7 @@ scripts/production/run-guard-maintenance.ps1
 scripts/production/run-host-inspection.ps1
 scripts/production/run-intermediate-csr.ps1
 scripts/production/run-intermediate-import.ps1
+scripts/production/run-mesh-security-upgrade.ps1
 scripts/production/run-openbao-storage.ps1
 scripts/production/run-platform-commissioning.ps1
 scripts/production/test_jit_systemd_expiry.py
@@ -592,6 +596,7 @@ scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_mesh_publication.py
+scripts/production/tests/test_mesh_security_upgrade.py
 scripts/production/tests/test_offline_ca.ps1
 scripts/production/tests/test_openbao_activation.py
 scripts/production/tests/test_openbao_artifact.py
@@ -618,9 +623,11 @@ scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_target_storage_guard.py
 scripts/production/tests/test_verify.py
 scripts/production/upgrade_kyverno.py
+scripts/production/upgrade_mesh_security.py
 scripts/production/verify.py
 scripts/production/verify_eso_artifact.py
 scripts/production/verify_host_audit.py
+scripts/production/verify_mesh_security_publication.py
 scripts/production/verify_openbao_artifact.py
 scripts/production/verify_platform_publication_run.py
 scripts/production/verify_release.py
