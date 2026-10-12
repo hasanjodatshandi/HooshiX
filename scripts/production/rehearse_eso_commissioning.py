@@ -32,6 +32,9 @@ def rehearse(k, wait, run, chart, helm, api, root, ca, audiences, addresses):
             if 'get' in args:
                 index = args.index('get')
                 print('ESO_FIXTURE_FAILED_GET=' + json.dumps(list(args[index + 1:index + 3])), flush=True)
+            if verb == 'wait':
+                resource = next((value for value in args if '/' in value and not value.startswith('-')), '')
+                print('ESO_FIXTURE_FAILED_WAIT=' + json.dumps(resource), flush=True)
             raise host.custody.BootstrapFailed('NATIVE_ESO_FIXTURE_OPERATION_FAILED') from error
 
     try:

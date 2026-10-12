@@ -194,7 +194,7 @@ def execute(plan, *, kube=host.kube):
                 {'op': 'replace', 'path': '/spec/matchConstraints/namespaceSelector', 'value': SELECTOR}]))
     for policy in plan['policies']:
         kube('apply', '--server-side', '--field-manager=' + MANAGER, '-f', '-', body=policy)
-        kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true', policy['kind'] + '/' +
+        kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true', policy['kind'].lower() + '/' +
              policy['metadata']['name'], '--timeout=60s', timeout=75)
     # Reuse only existing owned read-only pull credentials, in memory; never prompt or output them.
     host.write_registry_secret(NAMESPACE, pull['data']['.dockerconfigjson'], kube_call=kube)
