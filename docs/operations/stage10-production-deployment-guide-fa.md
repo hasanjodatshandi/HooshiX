@@ -625,6 +625,8 @@ renderer تنها JSON عمومی تولید می‌کند؛ اجرای آن ن�
 بستهٔ bootstrap اولیه نمی‌تواند آن را شاهد نصب اولیه محسوب کند.
 
 روی مقصد، ابتدا native dry-run امضا و security boundary باید موفق شوند؛
+پیش‌بررسی تمام فیلدهای renderشده و تعداد/ترتیب عناصر را حفظ می‌کند؛
+فقط فیلدهای پیش‌فرض افزوده‌شده توسط API در mapها پذیرفته می‌شوند.
 سپس JSON Patch با شرط resourceVersion و تصویر قبلی، فقط فیلد image دو
 workload را تغییر می‌دهد. UID و سایر specها، metadata گواهی، ztunnel و
 StatefulSet/PVC/Pod OpenBao قبل/بعد مقایسه می‌شوند. پس از rollout، boundary

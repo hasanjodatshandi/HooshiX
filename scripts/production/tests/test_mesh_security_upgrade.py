@@ -102,6 +102,19 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
         mutations = [c for c in calls if 'patch' in c[0] or c[0][0] in ('create', 'apply', 'delete')]
         self.assertTrue(all('--dry-run=server' in c[0] for c in mutations))
 
+    def test_api_added_nested_defaults_preserve_rendered_constraints(self):
+        expected = {'ports': [{'containerPort': 15012}], 'env': [
+            {'name': 'POD_NAME', 'valueFrom': {'fieldRef': {'fieldPath': 'metadata.name'}}}]}
+        actual = copy.deepcopy(expected)
+        actual['ports'][0]['protocol'] = 'TCP'
+        actual['env'][0]['valueFrom']['fieldRef']['apiVersion'] = 'v1'
+        self.assertTrue(target.rendered_fields_match(actual, expected))
+        actual['ports'][0]['containerPort'] = 22
+        self.assertFalse(target.rendered_fields_match(actual, expected))
+        actual = copy.deepcopy(expected)
+        actual['env'].append({'name': 'UNREVIEWED', 'value': 'true'})
+        self.assertFalse(target.rendered_fields_match(actual, expected))
+
     def test_predecessor_boundary_privilege_and_image_drift_fail_before_writes(self):
         for field in ('image', 'securityContext', 'command'):
             resources, calls, get, kube = self.fixture()

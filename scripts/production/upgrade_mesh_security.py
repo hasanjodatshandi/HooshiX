@@ -28,6 +28,18 @@ def require(value, message):
         raise ValueError(message)
 
 
+def rendered_fields_match(actual, expected):
+    """Retain every rendered field while accepting API-added map defaults."""
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(
+            key in actual and rendered_fields_match(actual[key], value)
+            for key, value in expected.items())
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) == len(expected) and all(
+            rendered_fields_match(left, right) for left, right in zip(actual, expected))
+    return actual == expected
+
+
 def replace_policy(value, *, get, kube, previous=None):
     kind, name = value['kind'], value['metadata']['name']
     before = get(kind, name)
@@ -118,9 +130,9 @@ def execute(plan, *, get=host.get, kube=host.kube):
         selected['containers'][0]['image'] = pod['containers'][0]['image']
         for key, value in selected.items():
             if key == 'containers':
-                require(all(pod[key][0].get(k) == v for k, v in value[0].items()), 'mesh container drift')
+                require(rendered_fields_match(pod[key], value), 'mesh container drift')
             else:
-                require(pod.get(key) == value, 'mesh pod drift')
+                require(rendered_fields_match(pod.get(key), value), 'mesh pod drift')
         current[change['component']] = resource
     boundary = get('ValidatingPolicy', BOUNDARY)
     require(boundary is not None and boundary['spec'] in [plan[key]['spec'] for key in (
