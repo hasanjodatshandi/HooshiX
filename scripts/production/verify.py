@@ -16,8 +16,8 @@ EXPECTED = {
     "platform.kubernetes": "1.35.6", "platform.k3s": "v1.35.6+k3s1",
     "platform.calico": "3.32.1", "platform.istio_ambient": "1.30.5",
     "platform.kyverno": "1.19.1", "platform.argocd": "3.4.2",
-    "postgresql.postgresql": "18.4", "postgresql.cloudnativepg": "1.30.0",
-    "postgresql.barman_plugin": "0.13.0", "postgresql.cert_manager": "1.20.3",
+    "postgresql.postgresql": "18.6", "postgresql.cloudnativepg": "1.30.1",
+    "postgresql.barman_plugin": "0.15.1", "postgresql.cert_manager": "1.20.3",
     "redis.version": "8.2.8", "kafka.version": "4.2.1", "secrets.openbao": "2.6.4",
     "secrets.external_secrets_operator": "2.12.0", "edge.traefik": "3.7.10",
     "edge.traefik_chart": "41.2.0", "edge.gateway_api": "1.5.1",
@@ -39,13 +39,14 @@ REQUIRED_FILES = (
     "README.md", "profile.json", "platform-contracts.json",
     "release-manifest.schema.json", "release-tools.env", "host/access-policy.json",
     "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "data/postgresql-images.json", "network/trust-policy.json",
-    "observability/observability-policy.json", "recovery/recovery-policy.json",
+    "data/postgresql-source-builds.json", "observability/observability-policy.json", "recovery/recovery-policy.json",
     "release/release-policy.json", "secrets/secrets-policy.json", "gitops/application.yaml",
 )
 REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/verify_release.py", ROOT / "scripts/production/readiness.py",
     ROOT / "scripts/production/prepare_human_sshd_candidate.py",
     ROOT / "scripts/production/verify_postgresql_artifacts.py",
+    ROOT / "scripts/production/build_postgresql_candidates.py",
     ROOT / ".github/workflows/postgresql-artifacts.yml",
     ROOT / "scripts/production/render_gitops.py", ROOT / "scripts/production/release_supply_chain.sh",
     ROOT / "scripts/production/build_provenance.py", ROOT / "scripts/production/install_release_tools.sh",
@@ -148,6 +149,8 @@ def validate_static_contracts(profile: dict) -> list[str]:
     secrets = load_json(PRODUCTION/"secrets/secrets-policy.json")
     release = load_json(PRODUCTION/"release/release-policy.json")
     schema = load_json(PRODUCTION/"release-manifest.schema.json")
+    for key, data_key in (("postgresql", "version"), ("cloudnativepg", "cloudnativepg"), ("barman_plugin", "barman_plugin")):
+        add(errors, platform.get("postgresql", {}).get(key) == data.get("postgresql", {}).get(data_key), "production PostgreSQL platform/data version drift: " + key)
     combined = {"platform":platform.get("platform",{}),"admission":platform.get("admission",{}),"gitops":platform.get("gitops",{}),"postgresql":data.get("postgresql",{}),"redis":data.get("redis",{}),"kafka":data.get("kafka",{}),"secrets":{"openbao":secrets.get("openbao",{}).get("version"),"external_secrets_operator":secrets.get("external_secrets_operator",{}).get("version")},"edge":platform.get("edge",{}),"observability":platform.get("observability",{}),"release":platform.get("release",{})}
     crosswalk = {"platform.kubernetes":"platform.kubernetes","platform.k3s":"platform.k3s","platform.calico":"platform.calico","platform.istio_ambient":"platform.istio_ambient","platform.kyverno":"admission.kyverno","platform.argocd":"gitops.argocd","postgresql.postgresql":"postgresql.version","postgresql.cloudnativepg":"postgresql.cloudnativepg","postgresql.barman_plugin":"postgresql.barman_plugin","redis.version":"redis.version","kafka.version":"kafka.version","secrets.openbao":"secrets.openbao","secrets.external_secrets_operator":"secrets.external_secrets_operator","edge.traefik":"edge.traefik","edge.traefik_chart":"edge.traefik_chart","edge.gateway_api":"edge.gateway_api","observability.otel_collector":"observability.otel_collector","observability.prometheus":"observability.prometheus","observability.alertmanager":"observability.alertmanager","observability.loki":"observability.loki","observability.tempo":"observability.tempo","observability.grafana":"observability.grafana","supply_chain.syft":"release.syft","supply_chain.grype":"release.grype","supply_chain.cosign":"release.cosign"}
     for profile_path, contract_path in crosswalk.items(): add(errors, get(profile,profile_path) == get(combined,contract_path), f"production contract drift: {profile_path} != {contract_path}")

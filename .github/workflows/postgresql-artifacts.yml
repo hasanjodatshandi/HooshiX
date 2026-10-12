@@ -5,17 +5,20 @@ on:
       - '.github/workflows/postgresql-artifacts.yml'
       - 'infrastructure/production/data/**'
       - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/build_postgresql_candidates.py'
       - 'scripts/production/publish_mesh_candidate.py'
       - 'scripts/production/verify_openbao_artifact.py'
       - 'scripts/production/install_release_tools.sh'
       - 'infrastructure/production/release-tools.env'
       - 'scripts/production/tests/test_postgresql_artifacts.py'
+      - 'scripts/production/tests/test_postgresql_source_builds.py'
   push:
     branches: [main]
     paths:
       - '.github/workflows/postgresql-artifacts.yml'
       - 'infrastructure/production/data/**'
       - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/build_postgresql_candidates.py'
       - 'scripts/production/publish_mesh_candidate.py'
       - 'scripts/production/verify_openbao_artifact.py'
       - 'scripts/production/install_release_tools.sh'
@@ -30,7 +33,7 @@ jobs:
   scan:
     name: PostgreSQL artifact ${{ matrix.component }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -53,14 +56,21 @@ jobs:
           set -euo pipefail
           scripts/production/install_release_tools.sh "$RUNNER_TEMP/postgresql-tools"
           echo "$RUNNER_TEMP/postgresql-tools" >> "$GITHUB_PATH"
-      - name: Scan exact upstream candidate without credentials
+      - name: Build or scan exact final candidate without credentials
         env:
           COMPONENT: ${{ matrix.component }}
         run: |
           set -euo pipefail
-          python3 scripts/production/verify_postgresql_artifacts.py --scan \
-            --component "$COMPONENT" --revision "$GITHUB_SHA" \
-            --evidence-dir "$RUNNER_TEMP/postgresql-evidence" > "$RUNNER_TEMP/postgresql-receipt.json"
+          if [ "$COMPONENT" = postgresql ]; then
+            python3 scripts/production/verify_postgresql_artifacts.py --scan \
+              --component "$COMPONENT" --revision "$GITHUB_SHA" \
+              --evidence-dir "$RUNNER_TEMP/postgresql-evidence" > "$RUNNER_TEMP/postgresql-receipt.json"
+          else
+            timeout 180 grype db update
+            python3 scripts/production/build_postgresql_candidates.py \
+              --component "$COMPONENT" --directory "$RUNNER_TEMP/postgresql-evidence" \
+              > "$RUNNER_TEMP/postgresql-receipt.json"
+          fi
       - name: Preserve bounded public scan evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -68,6 +78,7 @@ jobs:
           name: postgresql-${{ matrix.component }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/postgresql-evidence/*json
+            ${{ runner.temp }}/postgresql-evidence/Dockerfile
             ${{ runner.temp }}/postgresql-receipt.json
           retention-days: 30
           if-no-files-found: error

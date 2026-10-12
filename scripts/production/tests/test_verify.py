@@ -7,6 +7,18 @@ import verify
 class ProductionProfileTest(unittest.TestCase):
     def setUp(self):self.profile=json.loads(verify.PROFILE.read_text(encoding="utf-8"))
     def test_repository_profile_passes(self):self.assertEqual([],verify.validate_repository())
+    def test_postgresql_platform_versions_cannot_drift_from_data_policy(self):
+        original_load = verify.load_json
+        for key in ("postgresql", "cloudnativepg", "barman_plugin"):
+            with self.subTest(key=key):
+                def changed_load(path):
+                    data = original_load(path)
+                    if path == verify.PRODUCTION / "platform-contracts.json":
+                        data["postgresql"][key] = "obsolete"
+                    return data
+                with patch.object(verify, "load_json", changed_load):
+                    self.assertIn("production PostgreSQL platform/data version drift: " + key,
+                                  verify.validate_static_contracts(self.profile))
     def test_existing_root_approval_cannot_expand_scope_or_forge_evidence(self):
         original_load = verify.load_json
         authority_path = verify.ROOT / "scripts/production/offline-ca/root-authority.json"

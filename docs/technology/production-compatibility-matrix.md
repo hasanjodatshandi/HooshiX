@@ -26,10 +26,10 @@ This matrix records production technology combinations that must remain compatib
 | `production-ha` Kubernetes | kubeadm-compatible 1.35.6 | current HA control-plane/worker topology |
 | Istio | 1.30.5 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |
 | Calico | 3.32.1 | Kubernetes 1.35; K3s custom CNI; HBONE/health policy tests |
-| CloudNativePG | 1.30.0 | Kubernetes 1.35/PostgreSQL 18; one shared instance in single-server, dedicated clusters in HA |
-| PostgreSQL | 18.4 | CNPG support; distinct service DB/roles/Flyway/RLS; shared physical only in single-server |
+| CloudNativePG | 1.30.1 | Kubernetes 1.35/PostgreSQL 18; one shared instance in single-server, dedicated clusters in HA; rebuilt artifact tests required |
+| PostgreSQL | 18.6 | CNPG support; distinct service DB/roles/Flyway/RLS; shared physical only in single-server; 18.4 SQL fixture is not 18.6 compatibility evidence |
 | PostgreSQL JDBC | 42.7.13 | fixed security line; locks must not regress below 42.7.12 |
-| Barman Cloud plugin | 0.13.0 | selected CNPG WAL/PITR integration |
+| Barman Cloud plugin | 0.15.1 | selected CNPG WAL/PITR integration; plugin/sidecar artifact and recovery gates required |
 | cert-manager | 1.20.3 | compatible with Kubernetes 1.35 |
 | Kafka | 4.2.1 / Spring Kafka 4.1.0 / LZ4 Java 1.11.4 | Spring Kafka/client compatibility; LZ4 1.11.4 overrides the vulnerable transitive version and fixes GHSA-343h-94h5-c4wr/GHSA-gm45-99xc-r7wv/GHSA-mcr4-qmvw-px4g; single combined RF1 in single-server; RF3/minISR2 HA |
 | Redis | 8.2.8 | single-server TLS/ACL/noeviction/AOF; HA Sentinel; ADR-0024 common-clock/cardinality/exact-IP semantics |

@@ -8,7 +8,14 @@ The four official operator/operand/plugin/sidecar inputs and upstream manifest
 checksums are pinned in `infrastructure/production/data/postgresql-images.json`.
 `scripts/production/verify_postgresql_artifacts.py` verifies their blocked
 candidate scans; `.github/workflows/postgresql-artifacts.yml` runs the exact
-four-image gate without credentials or target writes. This does not sign,
+four-image gate without credentials or target writes. Go components use
+`build_postgresql_candidates.py` and the integrity-pinned
+`data/postgresql-source-builds.json`: operator 1.30.1 rebuilds both embedded
+architectures, Barman 0.15.1 rebuilds the plugin/sidecar manager, and the static
+plugin uses the pinned non-root distroless base rather than UBI. The sidecar keeps
+its Python/Barman runtime; its OS findings still block the final gate. The
+PostgreSQL 18.6 minimal operand remains independently scanned and blocked. No
+source input is treated as an unchanged imported final image. This does not sign,
 publish or approve installation. See the Persian Stage10 guide for local usage.
 
 ```bash

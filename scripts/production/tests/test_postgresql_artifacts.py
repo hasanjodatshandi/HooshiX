@@ -1,6 +1,7 @@
 """PostgreSQL artifact gates never substitute for installation evidence."""
 import copy
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -26,7 +27,13 @@ class PostgreSQLArtifactTest(unittest.TestCase):
         return {'syft.json': {'source': {'type': 'image', 'metadata': {
             'manifestDigest': pin['image'].split('@')[1], 'os': 'linux',
             'architecture': 'amd64', 'repoDigests': [pin['image']],
-            'labels': pin['image_labels']}}, 'artifacts': [{}]},
+            'labels': pin['image_labels']}}, 'artifacts': [{}], 'descriptor': {
+                'name': 'syft', 'version': '1.51.0', 'configuration': {
+                'search': {'scope': 'squashed'}, 'catalogers': {
+                'requested': {'default': ['image', 'file']}, 'used': [
+                    'go-module-binary-cataloger', 'binary-classifier-cataloger',
+                    'python-installed-package-cataloger', 'dpkg-db-cataloger',
+                    'rpm-db-cataloger', 'elf-binary-package-cataloger']}}}},
             'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
             'grype.json': {'matches': []},
             'database.json': {'valid': True, 'schemaVersion': '6', 'built': self.now.isoformat()}}
@@ -61,7 +68,7 @@ class PostgreSQLArtifactTest(unittest.TestCase):
         for key, value in [('image', 'ghcr.io/other/cnpg@sha256:' + 'a' * 64),
                 ('image', 'ghcr.io/cloudnative-pg/cloudnative-pg:latest'),
                 ('index_digest', 'sha256:bad'), ('compressed_bytes', True),
-                ('version', '1.30.1'), ('source_revision', 'main'), ('image_labels', {})]:
+                ('version', '1.30.2'), ('source_revision', 'main'), ('image_labels', {})]:
             selected = copy.deepcopy(self.selected)
             selected['components']['operator'][key] = value
             cases.append(selected)
@@ -99,6 +106,53 @@ class PostgreSQLArtifactTest(unittest.TestCase):
             self.files['grype.json']['matches'] = [{'vulnerability': {'severity': severity}}]
             with self.subTest(severity=severity), self.assertRaises(ValueError):
                 self.validate()
+
+    def test_suppressed_high_critical_or_invalid_schema_cannot_pass(self):
+        for ignored in ([{'vulnerability': {'severity': 'Critical'}}],
+                        [{'vulnerability': {'severity': 'High'}}],
+                        [{'vulnerability': {'severity': 'invalid'}}], None, {}):
+            self.files['grype.json']['ignoredMatches'] = ignored
+            with self.subTest(ignored=ignored), self.assertRaises(ValueError):
+                self.validate()
+
+    def test_excluded_or_restricted_inventory_cannot_pass(self):
+        original = copy.deepcopy(self.files)
+        for mutate in (
+                lambda c: c.update(exclude=['/venv/**']),
+                lambda c: c['catalogers']['requested'].update(select=['go-module-binary-cataloger']),
+                lambda c: c['catalogers'].update(used=['go-module-binary-cataloger']),
+                lambda c: c['search'].update(scope='unknown')):
+            self.files = copy.deepcopy(original)
+            mutate(self.files['syft.json']['descriptor']['configuration'])
+            with self.assertRaises(ValueError): self.validate()
+
+    def test_live_scan_isolates_config_environment_and_preserves_threshold_failure(self):
+        with tempfile.TemporaryDirectory() as parent:
+            directory = Path(parent)
+            files = self.evidence('operator')
+            def execute(argv, **kwargs):
+                environment = kwargs['env']
+                self.assertNotIn('SYFT_EXCLUDE', environment)
+                self.assertNotIn('SYFT_DEFAULT_CATALOGERS', environment)
+                self.assertNotIn('GRYPE_IGNORE', environment)
+                if argv[1] == 'version':
+                    return subprocess.CompletedProcess(argv, 0, stdout='1.51.0' if argv[0] == 'syft' else '0.117.0')
+                self.assertIn('--config', argv)
+                if argv[:2] == ['grype', 'db']:
+                    return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(files['database.json']))
+                if argv[:2] == ['syft', 'scan']:
+                    self.assertEqual(2, argv.count('--override-default-catalogers'))
+                    (directory / 'syft.json').write_text(json.dumps(files['syft.json']))
+                    return subprocess.CompletedProcess(argv, 0)
+                self.assertIn('--fail-on', argv)
+                return subprocess.CompletedProcess(argv, 2, stdout=json.dumps({'matches': [
+                    {'vulnerability': {'severity': 'Critical'}}]}))
+            with patch.dict(os.environ, {'SYFT_EXCLUDE': '/venv/**', 'SYFT_DEFAULT_CATALOGERS': 'go',
+                                          'GRYPE_IGNORE': 'critical'}), \
+                    patch.object(target.subprocess, 'run', side_effect=execute), self.assertRaises(subprocess.CalledProcessError):
+                target.scan_inventory(directory, 'reviewed-image', 'registry')
+            self.assertEqual('Critical', json.loads((directory / 'grype.json').read_text())['matches'][0]['vulnerability']['severity'])
+            self.assertFalse((directory / 'receipt.json').exists())
 
     def test_invalid_component_or_revision_cannot_launch_tools_or_create_directory(self):
         with tempfile.TemporaryDirectory() as parent:

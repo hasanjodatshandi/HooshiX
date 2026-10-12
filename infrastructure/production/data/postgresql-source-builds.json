@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "production_promotion": "blocked-until-supply-chain-staging-and-recovery-evidence",
+  "go_version": "1.26.9",
+  "builder": "docker.io/library/golang@sha256:bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff",
+  "modules": {
+    "golang.org/x/net": "v0.60.0",
+    "golang.org/x/crypto": "v0.57.0",
+    "golang.org/x/sys": "v0.48.0",
+    "golang.org/x/term": "v0.46.0",
+    "golang.org/x/text": "v0.42.0"
+  },
+  "plugin_runtime": "gcr.io/distroless/static-debian13@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3",
+  "sources": {
+    "operator": {
+      "repository": "cloudnative-pg/cloudnative-pg",
+      "revision": "2a35abb4628f209d149825ef3c38011e0701ff2f",
+      "archive_sha256": "c4ebb2fc69572825fb67bff43fbff32cb00791f4e3bbd1ae02835cb25fbc2be0"
+    },
+    "barman": {
+      "repository": "cloudnative-pg/plugin-barman-cloud",
+      "revision": "6216b7dd552f389952d3de77712d9522a79d9548",
+      "archive_sha256": "36741b0f0935114c2ae757719ffdaa94be87e69ea946ceb5fdd54502a569f0a8"
+    }
+  }
+}

@@ -35,9 +35,9 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 + LZ4 Java 1.11.4 | ADR-0015 profile-aware durability; direct constraint overrides Kafka Clients transitive 1.10.1 and fixes GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv and GHSA-mcr4-qmvw-px4g ([upstream security release](https://github.com/yawkat/lz4-java/releases/tag/v1.11.4)); service locks/checksums and CI compatibility tests required |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
-| Database | PostgreSQL 18.4 | profile-aware mutable relational persistence |
-| PostgreSQL operator | CloudNativePG 1.30.0 | ADR-0019/0034 |
-| PostgreSQL backup | Barman Cloud CNPG-I plugin 0.13.0 | WAL/PITR model |
+| Database | PostgreSQL 18.6 | profile-aware mutable relational persistence; final artifact gate required |
+| PostgreSQL operator | CloudNativePG 1.30.1 | ADR-0019/0034; fixed-source artifact gate required |
+| PostgreSQL backup | Barman Cloud CNPG-I plugin 0.15.1 | WAL/PITR model; plugin and sidecar gated together |
 | Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 |
 | PostgreSQL JDBC | 42.7.13 | must not regress below security-fixed line 42.7.12 |
 | Migration | Flyway 12.4.0 | sole mutable relational schema-change mechanism |
@@ -121,7 +121,7 @@ non-HA host/node maintenance/failure may stop complete platform
 PostgreSQL:
 
 ```text
-1 CloudNativePG cluster / 1 PostgreSQL 18.4 instance
+1 CloudNativePG cluster / 1 PostgreSQL 18.6 instance
 separate DB/runtime role/migration role/Flyway per owning service
 forced RLS where applicable
 continuous WAL + daily base backup + encrypted off-site PITR

@@ -22,19 +22,23 @@ destination installation, service migration compatibility and physical recovery
 remain `Not run`/`Not verified`. This is a component, not a complete data installer.
 
 PostgreSQL artifact preparation now records four blocked official amd64 inputs:
-CNPG operator 1.30.0, CNPG-compatible minimal PostgreSQL 18.4, and Barman Cloud
-0.13.0 plugin/sidecar. `verify_postgresql_artifacts.py` reuses the existing
+CNPG operator 1.30.1, CNPG-compatible minimal PostgreSQL 18.6, and Barman Cloud
+0.15.1 plugin/sidecar. `verify_postgresql_artifacts.py` reuses the existing
 digest-bound SBOM/fresh Grype gate and checks image labels and current data-policy
-versions. Credential-free PR/push/manual CI scans all four inputs without
-publishing or installing. Scan evidence does not establish upstream build
+versions. Credential-free PR/push/manual CI scans all four final candidates without
+publishing or installing. The three Go components use the checksum-pinned
+`build_postgresql_candidates.py` source recipe with Go 1.26.9 and x/net 0.60.0.
+Both operator manager architectures are replaced, and the static Barman plugin
+uses the pinned non-root distroless base. The sidecar's Python/Barman runtime
+is retained, not silently removed. Final source scan and native manager smoke
+remain `Not verified`; the selected PostgreSQL 18.6 and Barman 0.15.1 runtime
+base packages still fail the High/Critical gate. Scan evidence does not establish upstream build
 provenance, signatures, admission, staging, backup or production readiness.
 All four must clear the live gate before signed candidate publication or adoption;
 no data operator or PostgreSQL instance has been installed by this preparation.
-The exact four inputs fail the fresh High/Critical gate in
-[artifact run 38292526462](https://github.com/hasanjodatshandi/HooshiX/actions/runs/38292526462)
-at `3287857ddb59ea4d941dbb91960258f97437dcb3`. The database is valid and built
+Current selected upstream input scans use a valid database built
 2026-10-12; the scanned amd64 manifest digests match the catalog. Some base-package
-findings have no vendor fix recorded. Current artifact eligibility is `Failed`,
+findings have no vendor fix recorded. Current complete-set artifact eligibility is `Failed`,
 not a transport failure or an installation success. A reviewed security replacement
 or source/base rebuild and fresh compatibility/scan evidence are required; the
 existing ESO/OpenBao/mesh target remains unchanged.

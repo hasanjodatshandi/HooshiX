@@ -768,21 +768,35 @@ pinهای `linux/amd64` و checksum manifestهای رسمی در
 `barman-sidecar`. تصویر minimal PostgreSQL مخصوص CNPG انتخاب شده است؛ ابزار
 backup در sidecar جداست و نباید در تصویر برنامه یا دیتابیس دوباره نصب شود.
 
-وضعیت فعلی این چهار ورودی: eligibility اسکن `Failed` است؛ catalog دارای
+نسخه‌های انتخاب‌شده CNPG 1.30.1، PostgreSQL 18.6 و plugin/sidecar Barman 0.15.1
+هستند؛ تغییر هم‌زمان نسخه‌ها در profile، data-policy و platform-contracts کنترل
+می‌شود. fixture قدیمی 18.4 فقط آزمون SQL است و شاهد سازگاری 18.6 نیست.
+
+وضعیت فعلی مجموعهٔ چهار artifact: eligibility اسکن `Failed` است؛ catalog دارای
 findingهای High/Critical، از جمله بسته‌های پایه بدون fix ثبت‌شده، است. این
 digestها را نصب نکنید. قدم بعدی، تغییر امنیتی بررسی‌شدهٔ نسخه/منبع/تصویر پایه
 با حفظ قرارداد CNPG و backup، سپس اسکن و آزمون سازگاری artifact نهایی است؛ صرف
-جدیدتر بودن tag یا حذف findingهای بدون fix، مجوز نصب نمی‌دهد. نسخه‌های مؤثر
-تا تصویب تغییر هماهنگ، همان `data-policy.json` و Technology Baseline می‌مانند.
+جدیدتر بودن tag یا حذف findingهای بدون fix، مجوز نصب نمی‌دهد.
+
+ابزار `build_postgresql_candidates.py` سه جزء Go را از source رسمی دارای commit
+و checksum ثابت در `data/postgresql-source-builds.json`، با Go 1.26.9 و x/net
+0.60.0 می‌سازد. هر دو manager داخل تصویر CNPG، حتی باینری arm64 همراه تصویر
+amd64، جایگزین می‌شوند. plugin استاتیک روی پایهٔ distroless ثابت و با همان UID
+65532 و entrypoint ساخته می‌شود؛ sidecar همان Python/Barman و UID 26 را حفظ
+می‌کند. بسته‌های پایهٔ sidecar و operand همچنان گیت مستقل دارند و اصلاح Go
+آن‌ها را تأیید نمی‌کند. این‌ها candidate با provenance مجزای source-build
+هستند، نه import بدون تغییر؛ امضا، reconcile، WAL/PITR و promotion هنوز
+`Not verified` است.
 
 آزمون عمومی بدون credential:
 
 ```bash
-python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_artifacts.py'
+python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql*.py'
 ```
 
-در checkout تمیز بررسی‌شده، برای اسکن محلی تصویر رسمی؛ این دستورات روی VPS
-اجرا نمی‌شوند، نیاز به sudo، توکن GHCR، رمز Root یا custody ندارند:
+در checkout تمیز بررسی‌شده، برای ساخت/اسکن محلی candidate نهایی، Docker محلی
+با Unix socket و ظرفیت build کافی لازم است؛ این دستورات روی VPS اجرا نمی‌شوند
+و نیاز به sudo، توکن GHCR، رمز Root یا custody ندارند. Docker remote مجاز نیست:
 
 ```bash
 scan_root=$(mktemp -d)
@@ -791,10 +805,16 @@ export PATH="$scan_root/tools:$PATH"
 export SYFT_GOLANG_CAPTURE_SYMBOLS=all
 export GRYPE_DB_AUTO_UPDATE=false GRYPE_DB_VALIDATE_AGE=true
 export GRYPE_DB_MAX_ALLOWED_BUILT_AGE=120h
+grype db update
 (for component in operator postgresql barman-plugin barman-sidecar; do
-   python3 scripts/production/verify_postgresql_artifacts.py --scan \
-     --component "$component" --revision "$(git rev-parse HEAD)" \
-     --evidence-dir "$scan_root/$component" || exit 1
+   if [ "$component" = postgresql ]; then
+     python3 scripts/production/verify_postgresql_artifacts.py --scan \
+       --component "$component" --revision "$(git rev-parse HEAD)" \
+       --evidence-dir "$scan_root/$component" || exit 1
+   else
+     python3 scripts/production/build_postgresql_candidates.py \
+       --component "$component" --directory "$scan_root/$component" || exit 1
+   fi
  done)
 ```
 
@@ -802,7 +822,16 @@ export GRYPE_DB_MAX_ALLOWED_BUILT_AGE=120h
 همان‌جا نگه می‌دارد. `scan: Passed` فقط با تطابق digest/platform/label، SBOM
 غیرخالی و database معتبر حداکثر پنج‌روزه و نبود High/Critical تولید می‌شود.
 خروجی شکست اجازهٔ انتشار/نصب نیست؛ دورزدن finding یا `--only-fixed` مجاز نیست.
-workflow `PostgreSQL candidate artifacts` همین چهار اسکن را در PR/push مربوط
+پیکربندی scanner از تنظیمات شخصی جداست: exclude و انتخاب محدود cataloger پذیرفته
+نمی‌شود و High/Critical موجود در `ignoredMatches` هم باعث شکست است. inventory
+Go، Python و بسته‌های سیستم‌عامل باید با scanner ثابت کامل باقی بماند.
+در source-build، config digest محلی و همهٔ executableهای Go نیز کنترل می‌شوند؛
+اجرای `--help` با کاربر non-root، filesystem فقط‌خواندنی، بدون شبکه و با منابع
+محدود، فقط سلامت entrypoint است، نه تست reconcile یا recovery. تصویر محلی را
+روی VPS push یا نصب نکنید؛ artifact نهایی هنوز باید از مسیر انتشار مصوب عبور
+کند. برای پایش جداگانهٔ ورودی رسمی، `verify_postgresql_artifacts.py --scan` با
+هر کدام از چهار component قابل اجراست و findingهای upstream را پنهان نمی‌کند.
+workflow `PostgreSQL candidate artifacts` همین چهار گیت نهایی را در PR/push مربوط
 یا اجرای دستی، بدون credential و با حداکثر دو job هم‌زمان اجرا می‌کند.
 receipt اسکن، signature/provenance، staging، deployment و promotion را صریحاً
 `Not verified` نگه می‌دارد. checksum manifest برای بستهٔ بعدی است؛ این verifier
