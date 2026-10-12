@@ -10,6 +10,7 @@ import os
 import re
 import resource
 import stat
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +25,7 @@ MANAGER = 'hooshix-mesh-security-upgrade'
 def require(value, message):
     if not value:
         # Messages are fixed source literals, never API responses or credentials.
-        print('MESH_UPGRADE_CHECK_FAILED=' + message.upper().replace(' ', '_'), flush=True)
+        print('MESH_UPGRADE_CHECK_FAILED=' + message.upper().replace(' ', '_'), file=sys.stderr, flush=True)
         raise ValueError(message)
 
 
@@ -48,7 +49,7 @@ def rendered_fields_match(actual, expected, path=()):
 
 def replace_policy(value, *, get, kube, previous=None):
     kind, name = value['kind'], value['metadata']['name']
-    print('MESH_UPGRADE_POLICY=' + name, flush=True)
+    print('MESH_UPGRADE_POLICY=' + name, file=sys.stderr, flush=True)
     before = get(kind, name)
     if before is None:
         require(previous is None, 'required policy is absent')
@@ -221,7 +222,7 @@ def main():
         result['plan_sha256'] = args.sha256
         print(json.dumps(result, separators=(',', ':')))
     except (ValueError, KeyError, TypeError, OSError, host.custody.BootstrapFailed):
-        print('MESH_SECURITY_UPGRADE=Failed; partial state preserved; no automatic rollback')
+        print('MESH_SECURITY_UPGRADE=Failed; partial state preserved; no automatic rollback', file=sys.stderr)
         return 1
     return 0
 

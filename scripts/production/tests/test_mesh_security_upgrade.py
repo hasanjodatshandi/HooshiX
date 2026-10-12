@@ -1,11 +1,14 @@
 """Limited source upgrade preserves initialized-store and original bootstrap contracts."""
 import copy
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -113,6 +116,44 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
         self.assertFalse(any('patch' in c[0] for c in calls))
         mutations = [c for c in calls if 'patch' in c[0] or c[0][0] in ('create', 'apply', 'delete')]
         self.assertTrue(all('--dry-run=server' in c[0] for c in mutations))
+
+    def test_main_stdout_is_only_json_and_diagnostics_use_stderr(self):
+        plan = copy.deepcopy(self.plan)
+        plan['staging'] = {'result': 'Passed', 'source_revision': 'a' * 40,
+                           'run_id': '123', 'observed_at': datetime.now(timezone.utc).isoformat()}
+        execute = target.execute
+        info = SimpleNamespace(st_mode=target.stat.S_IFREG | 0o600, st_uid=0, st_nlink=1)
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'plan.json'
+            path.write_text(json.dumps(plan))
+            digest = target.hashlib.sha256(path.read_bytes()).hexdigest()
+            for valid in (True, False):
+                _, _, get, kube = self.fixture()
+                stdout, stderr = io.StringIO(), io.StringIO()
+                args = ['upgrade_mesh_security.py', '--plan', str(path), '--sha256', digest if valid else '0' * 64]
+                with self.subTest(valid=valid), redirect_stdout(stdout), redirect_stderr(stderr), \
+                        patch.object(sys, 'argv', args), \
+                        patch.object(target.resource, 'setrlimit'), \
+                        patch.object(target.os, 'getuid', return_value=0), \
+                        patch.object(target.os, 'open', return_value=42), \
+                        patch.object(target.os, 'fdopen'), \
+                        patch.object(target.os, 'fstat', return_value=info), \
+                        patch.object(target.fcntl, 'flock'), \
+                        patch.object(target.host, 'kernel_audit'), \
+                        patch.object(target.host, 'snapshot_services', return_value={'preserved': True}), \
+                        patch.object(target.host, 'native'), \
+                        patch.object(target, 'execute', side_effect=lambda p: execute(p, get=get, kube=kube)):
+                    self.assertEqual(0 if valid else 1, target.main())
+                if valid:
+                    receipt = json.loads(stdout.getvalue())
+                    self.assertEqual('Passed', receipt['mesh_security_upgrade'])
+                    self.assertEqual(digest, receipt['plan_sha256'])
+                    self.assertEqual('Preserved', receipt['openbao_ca_ztunnel_storage'])
+                    self.assertEqual(8, stderr.getvalue().count('MESH_UPGRADE_POLICY='))
+                else:
+                    self.assertEqual('', stdout.getvalue())
+                    self.assertIn('MESH_UPGRADE_CHECK_FAILED=REVIEWED_PLAN_HASH_MISMATCH', stderr.getvalue())
+                    self.assertIn('MESH_SECURITY_UPGRADE=Failed', stderr.getvalue())
 
     def test_api_added_nested_defaults_preserve_rendered_constraints(self):
         expected = {'ports': [{'containerPort': 15012}], 'env': [
