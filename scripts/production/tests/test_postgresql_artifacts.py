@@ -126,6 +126,10 @@ class PostgreSQLArtifactTest(unittest.TestCase):
             mutate(self.files['syft.json']['descriptor']['configuration'])
             with self.assertRaises(ValueError): self.validate()
 
+    def test_equivalent_default_cataloger_order_passes_without_weakening_selection(self):
+        self.files['syft.json']['descriptor']['configuration']['catalogers']['requested']['default'] = ['file', 'image']
+        self.assertEqual('Passed', self.validate()['scan'])
+
     def test_live_scan_isolates_config_environment_and_preserves_threshold_failure(self):
         with tempfile.TemporaryDirectory() as parent:
             directory = Path(parent)

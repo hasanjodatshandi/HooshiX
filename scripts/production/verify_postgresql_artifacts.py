@@ -38,13 +38,15 @@ def require_complete_inventory(syft):
     descriptor = syft['descriptor']
     config = descriptor['configuration']
     catalogers = config['catalogers']
+    requested = catalogers['requested']
     required = {'go-module-binary-cataloger', 'binary-classifier-cataloger',
                 'python-installed-package-cataloger', 'dpkg-db-cataloger',
                 'rpm-db-cataloger', 'elf-binary-package-cataloger'}
     if (descriptor['name'] != 'syft' or descriptor['version'] != '1.51.0'
             or config.get('exclude') not in (None, [])
             or config['search']['scope'] != 'squashed'
-            or catalogers['requested'] != {'default': ['image', 'file']}
+            or set(requested) != {'default'} or not isinstance(requested['default'], list)
+            or sorted(requested['default']) != ['file', 'image']
             or not isinstance(catalogers['used'], list) or not required <= set(catalogers['used'])):
         raise ValueError('complete pinned image inventory without exclusions required')
 
