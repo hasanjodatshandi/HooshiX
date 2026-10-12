@@ -22,11 +22,12 @@ Stageهای قبلی ساخت/آزمون محصول‌اند و برای نصب 
 
 ## وضعیت پوشش فعلی
 
-پایهٔ بررسی‌شده: `main@c40349adecdb3c216b07c3fe72fe7c570f5aacfe`، ۲۰۲۶-۱۰-۱۱.
+پایهٔ بررسی‌شده: `main@5fcaca8540875d742e4194ab215054610d872e9b`، ۲۰۲۶-۱۰-۱۲.
 این SHA مرجع این ویرایش است، نه الزام استفادهٔ دائمی از نسخهٔ قدیمی.
 سرور اول OpenBao نصب‌شده، initialized و unsealed دارد؛ recovery ایزولهٔ محلی
 با سهم‌های اصلی `Passed` است. تأیید نسخه/retention مقصد backup، scheduler ساعتی،
-ESO، JIT کامل، داده‌ها و برنامه‌های Production هنوز کامل نشده‌اند.
+نصب ESO و Ready بودن شش SecretStore روی مقصد `Passed` است؛ تحویل اسرار واقعی،
+JIT کامل، داده‌ها و برنامه‌های Production هنوز کامل نشده‌اند.
 Stage10 و Production readiness همچنان `Not verified` هستند.
 
 | مرحله | وضعیت سرور اول | تکرار برای نصب دوم |
@@ -40,7 +41,8 @@ Stage10 و Production readiness همچنان `Not verified` هستند.
 | snapshot | ciphertext/hash Passed؛ نسخهٔ باکت Not verified | مقصد و شواهد مستقل |
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
-| ESO/JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
+| ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
+| JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
 
