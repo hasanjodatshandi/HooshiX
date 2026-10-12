@@ -658,6 +658,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 فقط رمز sudo در prompt محلی لازم است؛ رمز custody/Root/CA و token جدید GHCR
 لازم نیست. رجیستری از Secret موجود استفاده می‌کند. `MESH_SECURITY_UPGRADE=Passed`
 و receipt عمومی کنار بسته، شاهد اجرای مقصد هستند. بسته و receipt را نگه دارید؛
+خروجی stdout ابزار ارتقا فقط یک شیء JSON عمومی است؛ پیام‌های پیشرفت و خطا
+به stderr می‌روند و داخل receipt ذخیره نمی‌شوند. wrapper همان JSON را دقیق
+اعتبارسنجی می‌کند؛ متن غیر JSON شاهد موفقیت نیست.
 در اجرا‌ی ناموفق، replay همان bundle فقط پس از بررسی وضعیت جزئی مجاز است.
 این عملیات کوتاه ممکن است دسترسی mesh را حین rollout ناپایدار کند؛ reboot،
 حذف PVC، init، ارتقای ztunnel یا OpenBao بخشی از این فرمان نیست.
