@@ -55,18 +55,34 @@ def predicate(component: str) -> dict:
                          + str(identity['publication_attempt'])}}}
 
 
+def exact_payload(path: str, value) -> str:
+    """Compare heterogeneous JSON structurally without CEL map type inference."""
+    if isinstance(value, dict):
+        return path + '.size() == ' + str(len(value)) + ''.join(
+            ' && (' + exact_payload(path + '[' + admission.literal(key) + ']', child) + ')'
+            for key, child in value.items())
+    if isinstance(value, list):
+        return path + '.size() == ' + str(len(value)) + ''.join(
+            ' && (' + exact_payload(path + '[' + str(index) + ']', child) + ')'
+            for index, child in enumerate(value))
+    return path + ' == ' + admission.literal(value)
+
+
+def provenance_expression(expected: dict) -> str:
+    return ('variables.provenanceVerified && images.containers.map(image, '
+            'extractPayload(image, attestations.provenance).predicate).map(payload, '
+            + exact_payload('payload', expected)
+            + ').all(e, e)')
+
+
 def source_policy(component: str) -> dict:
-    # Verified attestation payloads are JSON maps, not typed Kubernetes objects.
-    # Exact map equality binds every source/build field, including module locks.
     expected = predicate(component)
     result = admission.image_policy('istio-system', [pin()['images'][component]],
                                     pin()['repository_revision'])
     result['metadata']['name'] = 'hooshix-mesh-source-' + component
     result['spec']['validations'][2] = admission.validation(
         'platform source build identity rejected',
-        'variables.provenanceVerified && images.containers.map(image, '
-        'extractPayload(image, attestations.provenance).predicate == '
-        + admission.literal(expected) + ').all(e, e)')
+        provenance_expression(expected))
     return result
 
 

@@ -31,7 +31,9 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
             self.assertEqual(renderer.build.base_image(component), params['runtime_base'])
             policy = renderer.source_policy(component)
             expression = policy['spec']['validations'][2]['expression']
-            self.assertIn(renderer.admission.literal(expected), expression)
+            self.assertEqual(renderer.provenance_expression(expected), expression)
+            self.assertIn('["module_files_sha256"]["go.mod"] == ', expression)
+            self.assertIn('["internalParameters"].size() == 0', expression)
             self.assertTrue(expression.startswith('variables.provenanceVerified && '))
             self.assertNotIn('gitRevision', expression)
             self.assertNotIn('messageExpression', policy['spec']['validations'][2])

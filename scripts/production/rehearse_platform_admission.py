@@ -361,6 +361,10 @@ class Staging:
                 "name": account, "namespace": "istio-system"}})
         print("PLATFORM_STEP=admission-audit", flush=True)
         apply(k, self.plan["admission_prerequisites"])
+        if self.upgrade_plan is not None:
+            for policy in self.upgrade_plan['source_policies']:
+                k('create', '--dry-run=server', '-f', '-', data=json.dumps(policy).encode(),
+                  public_schema=True)
         # Validate exact boundary in Audit first; nothing is promoted by this step.
         for policy in self.plan["admission"]["items"]:
             audit = copy.deepcopy(policy)
@@ -523,10 +527,7 @@ class Staging:
                     else:
                         expected = renderer.predicate(component)
                         expected['buildDefinition']['externalParameters'][field] = 'wrong'
-                        bad['spec']['validations'][2]['expression'] = (
-                            'variables.provenanceVerified && images.containers.map(image, '
-                            'extractPayload(image, attestations.provenance).predicate == '
-                            + admission.literal(expected) + ').all(e, e)')
+                        bad['spec']['validations'][2]['expression'] = renderer.provenance_expression(expected)
                     try:
                         apply(k, bad)
                         admission_result(k, test, wait, expected=1, message=message)
