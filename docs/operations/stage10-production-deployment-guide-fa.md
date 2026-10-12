@@ -686,7 +686,7 @@ rule نوع Cluster از خروجی حذف می‌شود، چون namespaceSelec
 در بازاجرا، حذف فهرست خالی ingress/egress توسط API فقط وقتی معادل منع کامل
 محسوب می‌شود که همان جهت در policyTypes صریحاً باقی مانده باشد.
 نبود hostNetwork در پاسخ API معادل false است؛ مقدار true همچنان drift مردود است.
-پیش از ساخت منابع ESO، وضعیت Established هر CRD از پاسخ کوچک status خوانده
+در نصب و آزمون مستقل زیرساخت، پیش از ساخت منابع ESO، وضعیت Established هر CRD از پاسخ کوچک status خوانده
 می‌شود؛ مهلت محدود است و فقط مقدار True اجازهٔ ادامه می‌دهد.
 Root، intermediate، TLS موجود، داده/PVC و workload OpenBao، mesh، SSH و ایمیل
 تغییر نمی‌کنند. OpenBao باید از قبل unsealed و شش هویت scoped آماده باشند؛

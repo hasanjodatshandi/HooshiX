@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 
 import openbao_scoped_auth as auth
+from install_eso import established_crd
 from rehearse_openbao_recovery import RehearsalFailed
 from render_eso_candidate import ACCOUNT, BOUND, network, render
 from verify_eso_artifact import published_pin
@@ -47,8 +48,8 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
     if not installed:
         for item in items:
             apply(item)
-            k('wait', '--for=condition=Established', 'crd/' + item['metadata']['name'],
-              '--timeout=30s', timeout=40)
+            print('ESO_DELIVERY_STEP=crd-' + item['metadata']['name'], flush=True)
+            established_crd(item['metadata']['name'], k)
         for policy in network(addresses):
             apply(policy)
         apply(manifest)
