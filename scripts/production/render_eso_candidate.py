@@ -180,7 +180,11 @@ def validate(items, selected):
         if item['kind'] == 'ValidatingWebhookConfiguration':
             for webhook in item['webhooks']:
                 if (webhook['failurePolicy'] != 'Fail' or webhook['timeoutSeconds'] != 5
-                        or webhook.get('namespaceSelector') != SELECTOR):
+                        or webhook.get('namespaceSelector') != SELECTOR
+                        or not webhook.get('rules')
+                        or any(rule.get('scope') != 'Namespaced'
+                               or not set(rule['resources']) <= {'secretstores', 'externalsecrets'}
+                               for rule in webhook['rules'])):
                     raise ValueError('fail-closed bounded ESO webhooks required')
     if not all(item in items for item in token_delegation()):
         raise ValueError('exact delivery token delegation required')
@@ -216,6 +220,9 @@ def render(chart: Path, helm: str, *, published: bool = False):
                     raise ValueError('unexpected upstream ESO image')
                 container['image'] = selected['image']
         if item['kind'] == 'ValidatingWebhookConfiguration':
+            # namespaceSelector never limits cluster-scoped admission requests.
+            item['webhooks'] = [webhook for webhook in item['webhooks']
+                if all(rule.get('scope') == 'Namespaced' for rule in webhook.get('rules', []))]
             for webhook in item['webhooks']:
                 webhook['namespaceSelector'] = copy.deepcopy(SELECTOR)
     items.extend(token_delegation())
@@ -241,6 +248,24 @@ def render(chart: Path, helm: str, *, published: bool = False):
             items.append(local)
     validate(items, selected)
     return {'apiVersion': 'v1', 'kind': 'List', 'items': items}
+
+
+def crds(chart: Path, helm: str):
+    # Render first to enforce the same chart and tool integrity boundary.
+    render(chart, helm, published=True)
+    result = subprocess.run([helm, 'template', ACCOUNT, str(chart), '--namespace', NAMESPACE,
+        '--kube-version', '1.35.6', '--set', 'installCRDs=true', '--set', 'fullnameOverride=' + ACCOUNT,
+        *[arg for name in ('externalsecret', 'generatorstate', 'secretstore')
+          for arg in ('--show-only', 'templates/crds/' + name + '.yaml')]],
+        check=True, capture_output=True, timeout=60)
+    if len(result.stdout) > BOUND:
+        raise ValueError('bounded scoped CRDs required')
+    items = [item for item in yaml.safe_load_all(result.stdout) if item]
+    if len(items) != 3 or {item['metadata']['name'] for item in items} != {
+            'externalsecrets.external-secrets.io', 'secretstores.external-secrets.io',
+            'generatorstates.generators.external-secrets.io'}:
+        raise ValueError('exact scoped CRDs required')
+    return items
 
 
 def main():

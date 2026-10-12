@@ -269,14 +269,22 @@ def registry_credentials():
         write_registry_secret(ns, data)
 
 
-def write_registry_secret(namespace, data):
-    require(namespace in ('kyverno', 'istio-system', 'hooshix-secrets'), 'REGISTRY_NAMESPACE_REJECTED')
+def write_registry_secret(namespace, data, *, kube_call=None):
+    require(namespace in ('kyverno', 'istio-system', 'hooshix-secrets', 'platform-apps'), 'REGISTRY_NAMESPACE_REJECTED')
+    call = kube if kube_call is None else kube_call
     value = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {
         'name': 'hooshix-ghcr-read', 'namespace': namespace, 'labels': LABELS},
         'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': data}}
-    existing = get('secret', 'hooshix-ghcr-read', namespace)
+    if kube_call is None:
+        existing = get('secret', 'hooshix-ghcr-read', namespace)
+    else:
+        raw = call('-n', namespace, 'get', 'secret', 'hooshix-ghcr-read', '--ignore-not-found', '-o', 'json')
+        existing = json.loads(raw) if raw.strip() else None
     if existing is None:
-        create(value)
+        if kube_call is None:
+            create(value)
+        else:
+            call('create', '-f', '-', body=value)
         return
     metadata = existing.get('metadata', {})
     require(metadata.get('name') == 'hooshix-ghcr-read' and metadata.get('namespace') == namespace
@@ -292,7 +300,7 @@ def write_registry_secret(namespace, data):
     # field. Update ONLY this owned Secret, preserving other fields and the
     # observed resourceVersion; stale updates fail without force or retry.
     existing['data'] = value['data']
-    kube('replace', '--field-manager=' + MANAGER, '-f', '-', body=existing)
+    call('replace', '--field-manager=' + MANAGER, '-f', '-', body=existing)
 
 
 def tls_secret(public_directory, revision):

@@ -35,6 +35,8 @@ class ESODeliveryTest(unittest.TestCase):
             requests.append(args)
             if data:
                 applied.append(json.loads(data))
+            if 'jsonpath={.status.conditions}' in args:
+                return b'[{"type":"Established","status":"True"}]'
             if 'pods' in args:
                 return json.dumps({'items': pods}).encode()
             if 'logs' in args:
@@ -67,6 +69,7 @@ class ESODeliveryTest(unittest.TestCase):
                 self.assertNotIn('0.0.0.0/0', json.dumps(obj))
                 self.assertNotIn('"ingress": [{}]', json.dumps(obj))
         self.assertEqual(6, len([obj for obj in applied if obj.get('kind') == 'SecretStore']))
+        self.assertEqual(3, len([args for args in requests if 'jsonpath={.status.conditions}' in args]))
 
     def test_native_log_leak_and_cross_service_delivery_fail_closed(self):
         for options in ({'leak': True}, {'leaked_secret': True}):

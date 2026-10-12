@@ -46,6 +46,8 @@ def published_pin():
             or not re.fullmatch(r'[1-9][0-9]{0,19}', candidate['publication_run_id'])
             or candidate['recipe_sha256'] != hashlib.sha256(recipe.read_bytes()).hexdigest()
             or candidate['provenance_kind'] != 'patched-upstream-source-build'
+            or set(candidate['module_files_sha256']) != {'go.mod', 'go.sum'}
+            or any(not re.fullmatch(r'[a-f0-9]{64}', v) for v in candidate['module_files_sha256'].values())
             or candidate['production_promotion'] != 'Not verified'):
         raise ValueError('reviewed unpublished-to-production ESO candidate required')
     # Upstream manifest index/size are not metadata for the rebuilt image.

@@ -29,7 +29,8 @@ from render_openbao_local_storage import candidate as local_storage_candidate
 
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
-                   "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
+                   "signed-ambient-eso-commissioning", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -54,7 +55,10 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 (result.stderr or b"")[:4096].decode("utf-8", errors="replace")), flush=True)
         else:
             # Never print response text after private fixture state is generated.
-            markers = [marker for marker in ('Forbidden', 'Invalid', 'already exists',
+            markers = [marker for marker in ('Forbidden', 'Invalid', 'NotFound', 'already exists',
+                "the server doesn't have a resource type", 'could not find the requested resource',
+                'test failed', 'testing value', 'conflict with',
+                'no matching resources found', 'resource type', 'jsonpath', 'is not supported',
                 'failed to compile', 'undeclared reference', 'no matches', 'not found',
                 'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM',
                 'platform source build identity rejected',
@@ -120,11 +124,13 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
     runner_paths(tools, receipt)
     if eso_chart is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
-        if (platform_directory is not None or eso_chart.is_symlink()
+        if (eso_chart.is_symlink()
                 or not eso_chart.resolve(strict=True).is_relative_to(runtime)):
-            raise RehearsalFailed('ESO requires owned disposable foundation paths')
+            raise RehearsalFailed('ESO requires owned disposable fixture paths')
     platform = None
     if platform_directory is not None:
+        if eso_chart is not None and not mesh_security_upgrade:
+            raise RehearsalFailed('signed ESO staging requires the reviewed patched mesh')
         root = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
         if platform_directory.is_symlink() or not platform_directory.resolve(strict=True).is_relative_to(root):
             raise RehearsalFailed("runner-owned publication directory required")
@@ -166,7 +172,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         schema_only = True
 
         def k(*args: str, data: bytes | None = None, timeout: int = 30, expected: int = 0,
-              public_schema: bool = False, required_error: bytes | None = None) -> bytes:
+              public_schema: bool = False, required_error: bytes | None = None, output_bound=None) -> bytes:
             if public_schema and not schema_only:
                 raise RehearsalFailed("schema diagnostics disabled after secret generation")
             # Three independently bounded 30s verification webhooks may run
@@ -175,7 +181,8 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             command_deadline = max(timeout, 135) if platform is not None else timeout
             return run([kubectl, "--kubeconfig", str(kubeconfig), "--context", "kind-" + name,
                         "--request-timeout=" + request_deadline, *args], data=data, timeout=command_deadline, expected=expected,
-                       public_schema=public_schema, required_error=required_error)
+                       public_schema=public_schema, required_error=required_error,
+                       **({'bound': output_bound} if output_bound is not None else {}))
 
         def get(kind_name: str, resource: str):
             return json.loads(k("-n", NAMESPACE, "get", kind_name, resource, "-o", "json"))
@@ -326,7 +333,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 step("unseal")
                 keys, token = initialize(client)
                 k("-n", NAMESPACE, "wait", "--for=condition=Ready", "pod/openbao-0", "--timeout=60s", timeout=70)
-                if platform is None:
+                if platform is None or eso_chart is not None:
                     step("scoped-auth")
                     def auth_kube(*args, data=None, expected=0, operation):
                         return k(*args, data=data, expected=expected)
@@ -370,7 +377,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                         scoped_logs = k('-n', NAMESPACE, 'logs', 'openbao-0', '--tail=-1')
                         if any(value.encode() in scoped_logs for value in scoped_private):
                             raise RehearsalFailed('scoped authentication container log leak')
-                        if eso_chart is not None:
+                        if eso_chart is not None and platform is None:
                             step('eso-delivery')
                             from rehearse_eso_delivery import rehearse as delivery
                             eso_result = delivery(k, wait, run, eso_chart, str(tools / 'helm'),
@@ -382,7 +389,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 client.call("sys/policies/acl/fixture-reader", "PUT", {"policy":
                     'path "fixture/data/value" { capabilities = ["read"] }'}, token, 204)
                 reader = client.call("auth/token/create", "POST", {"policies": ["fixture-reader"],
-                    "no_default_policy": True, "ttl": "5m", "explicit_max_ttl": "5m"}, token)["auth"]["client_token"]
+                    # Synthetic one-path read-only canary survives the bounded combined fixture.
+                    # Actual six Kubernetes-auth identities retain their independent <=300s gate.
+                    "no_default_policy": True, "ttl": "20m", "explicit_max_ttl": "20m"}, token)["auth"]["client_token"]
                 client.call("fixture/data/value", "POST", {"data": {"value": "denied"}}, reader, 403)
                 if mesh_security_upgrade:
                     platform.security_upgrade(k, wait)
@@ -390,6 +399,11 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     client.wait_health(200)
                     if client.call('fixture/data/value', token=reader)['data']['data']['value'] != canary:
                         raise RehearsalFailed('mesh upgrade changed initialized OpenBao data or identity')
+                if eso_chart is not None and platform is not None:
+                    step('signed-ambient-eso-commissioning')
+                    from rehearse_eso_commissioning import rehearse as commissioning
+                    eso_result = commissioning(k, wait, run, eso_chart, str(tools / 'helm'),
+                        api, token, cert.read_text(), audiences, addresses)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -455,6 +469,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         if mesh_security_upgrade:
             result['scope'] = 'Disposable Calico/Ambient initialized-store mesh security upgrade'
             result['upgrade_publication'] = platform.upgrade_plan['publication']
+        if eso_chart is not None:
+            result['scope'] = 'Disposable Calico/Ambient initialized-store ESO commissioning'
+            result['eso_commissioning'] = eso_result
     else:
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
         if eso_chart is not None:
