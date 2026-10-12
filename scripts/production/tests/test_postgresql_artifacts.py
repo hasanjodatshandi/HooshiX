@@ -25,7 +25,7 @@ class PostgreSQLArtifactTest(unittest.TestCase):
     def evidence(self, component):
         pin = self.selected['components'][component]
         return {'syft.json': {'source': {'type': 'image', 'metadata': {
-            'manifestDigest': pin['image'].split('@')[1], 'os': 'linux',
+            'manifestDigest': pin['image'].split('@')[1], 'imageID': 'sha256:' + 'a' * 64, 'os': 'linux',
             'architecture': 'amd64', 'repoDigests': [pin['image']],
             'labels': pin['image_labels']}}, 'artifacts': [{}], 'descriptor': {
                 'name': 'syft', 'version': '1.51.0', 'configuration': {
@@ -35,7 +35,7 @@ class PostgreSQLArtifactTest(unittest.TestCase):
                     'python-installed-package-cataloger', 'dpkg-db-cataloger',
                     'rpm-db-cataloger', 'elf-binary-package-cataloger']}}}},
             'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
-            'grype.json': {'matches': []},
+            'grype.json': {'source': {'target': {'imageID': 'sha256:' + 'a' * 64}}, 'matches': []},
             'database.json': {'valid': True, 'schemaVersion': '6', 'built': self.now.isoformat()}}
 
     def validate(self):
@@ -129,6 +129,10 @@ class PostgreSQLArtifactTest(unittest.TestCase):
     def test_equivalent_default_cataloger_order_passes_without_weakening_selection(self):
         self.files['syft.json']['descriptor']['configuration']['catalogers']['requested']['default'] = ['file', 'image']
         self.assertEqual('Passed', self.validate()['scan'])
+
+    def test_foreign_scan_configuration_cannot_pass_matching_upstream_manifest(self):
+        self.files['grype.json']['source']['target']['imageID'] = 'sha256:' + 'b' * 64
+        with self.assertRaises(ValueError): self.validate()
 
     def test_live_scan_isolates_config_environment_and_preserves_threshold_failure(self):
         with tempfile.TemporaryDirectory() as parent:

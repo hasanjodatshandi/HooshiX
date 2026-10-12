@@ -126,7 +126,10 @@ def validate(directory: Path, component: str, revision: str, now: datetime):
         raise ValueError('known component and exact Git revision required')
     pin = pins()['components'][component]
     require_unsuppressed_scan(load(directory / 'grype.json'))
-    require_complete_inventory(load(directory / 'syft.json'))
+    inventory = load(directory / 'syft.json')
+    require_complete_inventory(inventory)
+    if load(directory / 'grype.json')['source']['target']['imageID'] != inventory['source']['metadata']['imageID']:
+        raise ValueError('scanner report must bind the exact inventoried configuration')
     result = validate_scan(directory, pin['image'], now)
     labels = load(directory / 'syft.json')['source']['metadata']['labels']
     if any(labels.get(key) != value for key, value in pin['image_labels'].items()):

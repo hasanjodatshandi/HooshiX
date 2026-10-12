@@ -788,6 +788,17 @@ amd64، جایگزین می‌شوند. plugin استاتیک روی پایهٔ 
 هستند، نه import بدون تغییر؛ امضا، reconcile، WAL/PITR و promotion هنوز
 `Not verified` است.
 
+اپراتورِ source-build با config digest
+`sha256:099cf443b4f8aa84413a40daf0087ab7f6139cfe75d20dd868bf636c7e2cb103`
+در ساخت محلی اسکن کامل بدون finding یا ignored match و آزمون entrypoint محدود
+را گذرانده است. این نتیجه مخصوص همین config است؛ نصب و سازگاری CNPG یا تأیید
+سه جزء دیگر نیست. برای هر ساخت جدید، scanner و smoke باید دوباره اجرا شوند.
+در runtimeهای منتخب، [libxml2 در Debian 13](https://security-tracker.debian.org/tracker/CVE-2026-6653)
+و [Python 3.13 در Debian 13](https://security-tracker.debian.org/tracker/CVE-2026-19445)
+هنوز در tracker رسمی vulnerable هستند؛ تغییر Go یا تازه‌بودن tag این مرز را
+برطرف نمی‌کند. رفع کامل نیاز به runtime اصلاح‌شده و آزمون سازگاری دارد، نه
+خاموش‌کردن گیت یا حذف گزارش بسته‌ها.
+
 آزمون عمومی بدون credential:
 
 ```bash
@@ -826,6 +837,8 @@ grype db update
 نمی‌شود و High/Critical موجود در `ignoredMatches` هم باعث شکست است. inventory
 Go، Python و بسته‌های سیستم‌عامل باید با scanner ثابت کامل باقی بماند.
 در source-build، config digest محلی و همهٔ executableهای Go نیز کنترل می‌شوند؛
+شناسهٔ engine ممکن است OCI index باشد؛ receipt آن را از config digest داخل SBOM
+جدا نگه می‌دارد و گزارش Grype باید همان config را اسکن کرده باشد.
 اجرای `--help` با کاربر non-root، filesystem فقط‌خواندنی، بدون شبکه و با منابع
 محدود، فقط سلامت entrypoint است، نه تست reconcile یا recovery. تصویر محلی را
 روی VPS push یا نصب نکنید؛ artifact نهایی هنوز باید از مسیر انتشار مصوب عبور

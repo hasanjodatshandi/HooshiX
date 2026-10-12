@@ -93,12 +93,14 @@ def validate_local(directory, component, image_id, now):
         ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json'))
     require_complete_inventory(syft)
     metadata = syft['source']['metadata']
-    if (syft['source']['type'] != 'image' or metadata['imageID'] != image_id
+    if (syft['source']['type'] != 'image' or metadata['userInput'] != image_id
+            or not re.fullmatch(r'sha256:[a-f0-9]{64}', metadata['imageID'])
             or metadata['os'] != 'linux' or metadata['architecture'] != 'amd64'
             or metadata['labels'].get('io.hooshix.provenance.kind') != 'patched-upstream-source-build'
             or metadata['labels'].get('io.hooshix.source.revision') != source['revision']
             or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
-            or report['source']['target']['imageID'] != image_id
+            or report['source']['target']['imageID'] != metadata['imageID']
+            or report['source']['target']['userInput'] != image_id
             or not cdx.get('components') or cdx.get('bomFormat') != 'CycloneDX'):
         raise ValueError('exact built configuration, provenance and SBOM required')
     built = datetime.fromisoformat(db['built'].replace('Z', '+00:00'))
@@ -118,7 +120,8 @@ def validate_local(directory, component, image_id, now):
             or any(item['version'] != MODULES['golang.org/x/net'] for item in net)):
         raise ValueError('every embedded Go executable and network dependency must be fixed')
     return {'schema_version': 1, 'component': component, 'scan': 'Passed',
-        'image_config_digest': image_id, 'provenance_kind': 'patched-upstream-source-build',
+        'image_config_digest': metadata['imageID'], 'local_engine_digest': image_id,
+        'provenance_kind': 'patched-upstream-source-build',
         'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
         'staging': 'Not verified', 'signature_provenance': 'Not verified',
         'deployment': 'Not verified', 'production_promotion': 'Not verified'}

@@ -30,8 +30,12 @@ publishing or installing. The three Go components use the checksum-pinned
 `build_postgresql_candidates.py` source recipe with Go 1.26.9 and x/net 0.60.0.
 Both operator manager architectures are replaced, and the static Barman plugin
 uses the pinned non-root distroless base. The sidecar's Python/Barman runtime
-is retained, not silently removed. Final source scan and native manager smoke
-remain `Not verified`; the selected PostgreSQL 18.6 and Barman 0.15.1 runtime
+is retained, not silently removed. The exact locally rebuilt operator configuration
+`sha256:099cf443b4f8aa84413a40daf0087ab7f6139cfe75d20dd868bf636c7e2cb103`
+passes the complete pinned Syft/Grype inventory with zero matches or ignored
+matches and the restricted native manager entrypoint smoke. Both embedded
+managers contain Go 1.26.9 and x/net 0.60.0. Barman final source-build evidence
+remains `Not verified`; the selected PostgreSQL 18.6 and Barman 0.15.1 runtime
 base packages still fail the High/Critical gate. Scan evidence does not establish upstream build
 provenance, signatures, admission, staging, backup or production readiness.
 All four must clear the live gate before signed candidate publication or adoption;

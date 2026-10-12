@@ -21,7 +21,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
     def evidence(self, component):
         source = self.selected['sources']['operator' if component == 'operator' else 'barman']
         return {'syft.json': {'source': {'type': 'image', 'metadata': {
-            'imageID': self.image, 'os': 'linux', 'architecture': 'amd64', 'labels': {
+            'imageID': self.image, 'userInput': self.image, 'os': 'linux', 'architecture': 'amd64', 'labels': {
             'io.hooshix.provenance.kind': 'patched-upstream-source-build',
             'io.hooshix.source.revision': source['revision'],
             'io.hooshix.recipe.sha256': hashlib.sha256(target.RECIPE.read_bytes()).hexdigest()}}},
@@ -34,7 +34,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             'artifacts': [{'name': 'stdlib', 'version': 'go1.26.9', 'locations': [{'path': destination}]}
                           for destination in target.BINARIES[component].values()] +
                          [{'name': 'golang.org/x/net', 'version': 'v0.60.0'}]},
-            'grype.json': {'source': {'target': {'imageID': self.image}}, 'matches': []},
+            'grype.json': {'source': {'target': {'imageID': self.image, 'userInput': self.image}}, 'matches': []},
             'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
             'database.json': {'valid': True, 'schemaVersion': '6', 'built': self.now.isoformat()}}
 
@@ -110,6 +110,8 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         original = self.evidence('operator')
         for mutate in (
                 lambda e: e['grype.json']['source']['target'].update(imageID='sha256:' + 'b' * 64),
+                lambda e: e['syft.json']['source']['metadata'].update(userInput='sha256:' + 'b' * 64),
+                lambda e: e['grype.json']['source']['target'].update(userInput='sha256:' + 'b' * 64),
                 lambda e: e['syft.json']['source']['metadata'].update(architecture='arm64'),
                 lambda e: e['syft.json']['source']['metadata']['labels'].clear(),
                 lambda e: e['database.json'].update(built=(self.now - timedelta(days=6)).isoformat()),
@@ -118,6 +120,15 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             evidence = copy.deepcopy(original)
             mutate(evidence)
             with self.assertRaises(ValueError): self.validate('operator', evidence)
+
+    def test_containerd_engine_index_is_not_mislabeled_as_configuration_digest(self):
+        evidence = self.evidence('operator')
+        configuration = 'sha256:' + 'c' * 64
+        evidence['syft.json']['source']['metadata']['imageID'] = configuration
+        evidence['grype.json']['source']['target']['imageID'] = configuration
+        result = self.validate('operator', evidence)
+        self.assertEqual(self.image, result['local_engine_digest'])
+        self.assertEqual(configuration, result['image_config_digest'])
 
     def test_recipe_rejects_unreviewed_builder_modules_runtime_and_source(self):
         cases = [self.selected | {'builder': 'golang:latest'}, self.selected | {'plugin_runtime': 'scratch'},
