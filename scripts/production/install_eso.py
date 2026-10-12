@@ -89,6 +89,10 @@ def probe(value, kube, *, expected=0, reason=None):
 
 
 def desired_fields_match(actual, expected):
+    if expected['kind'] == 'Deployment':
+        actual = copy.deepcopy(actual)
+        if expected['spec']['template']['spec'].get('hostNetwork') is False:
+            actual['spec']['template']['spec'].setdefault('hostNetwork', False)
     if expected['kind'] == 'NetworkPolicy':
         actual = copy.deepcopy(actual)
         for direction in ('ingress', 'egress'):

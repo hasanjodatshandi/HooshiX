@@ -27,6 +27,14 @@ class ESOCommissioningTest(unittest.TestCase):
             {'spec': {'args': ['private-value']}}, {'spec': {'args': ['public-desired']}}))
         self.assertEqual('spec.missing', target.mismatched_path({'spec': {}}, {'spec': {'missing': True}}))
 
+    def test_omitted_host_network_is_false_not_an_allowed_host_network(self):
+        expected = {'kind': 'Deployment', 'spec': {'template': {'spec': {'hostNetwork': False}}}}
+        actual = copy.deepcopy(expected)
+        del actual['spec']['template']['spec']['hostNetwork']
+        self.assertTrue(target.desired_fields_match(actual, expected))
+        actual['spec']['template']['spec']['hostNetwork'] = True
+        self.assertFalse(target.desired_fields_match(actual, expected))
+
     def test_crd_requires_positive_status_with_finite_deadline(self):
         with patch.object(target.time, 'monotonic', side_effect=[0, 31]):
             with self.assertRaisesRegex(ValueError, 'ESO_CRD_ESTABLISHMENT_TIMEOUT'):
