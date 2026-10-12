@@ -731,6 +731,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 پیام پیشرفت به stderr و فقط JSON به stdout می‌رود. وضعیت Production و تحویل
 اسرار واقعی همچنان `Not verified` است؛ public access همچنان `CLOSED` می‌ماند.
 
+شاهد نصب اول در ۲۰۲۶-۱۰-۱۲:
+`hooshix-eso-commissioning-d6ca935be93a41cc915dcdd93267519b.json` از اجرای
+bundle بررسی‌شدهٔ `main@5fcaca8540875d742e4194ab215054610d872e9b`،
+`ESO_INSTALLATION=Passed` و شش SecretStore Ready را ثبت کرد. plan SHA-256 برابر
+`49d2b04c59b2e52f306b1bbf6d6596492a01d475b695b01ed2c7e855df894196`
+است. نتیجهٔ سرور دوم باید مستقل تولید شود؛ نصب اول را تکرار نکنید.
+
 نصب در namespace دارای برنامه/ExternalSecret فعال، مالکیت خارجی یا drift متوقف
 می‌شود؛ adopt اجباری، force ownership یا حذف منبع وجود ندارد. در شکست، منابع
 نصب‌شده حفظ می‌شوند؛ قبل از تکرار، علت و state جزئی را بررسی کنید. داده یا PVC
@@ -745,9 +752,54 @@ ExternalSecret همگام می‌شود؛ reload/restart مصرف‌کننده �
 می‌شود و ESO به‌تنهایی آن را تضمین نمی‌کند. نام Store/Secret و وضعیت Ready قابل
 بررسی‌اند؛ `kubectl get secret -o yaml/json` یا خروجی مقدار را برای گزارش نفرستید.
 
-پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
+### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
-1. ESO؛ استفاده از شش هویت محدود موجود و تحویل اسرار مستقل هر سرویس.
+این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS
+هنوز Not run است**. فقط پنج سرویس دارای دادهٔ relational متغیر دیتابیس دارند:
+`authorization`، `conversation`، `identity`، `notification` و `web_bff`.
+Compromised Password دیتابیس PostgreSQL نمی‌گیرد. یک cluster فیزیکی با یک instance
+مطابق ADR-0042 باقی می‌ماند؛ دیتابیس، role و Flyway هر سرویس جداست.
+
+از checkout بررسی‌شده اجرا کنید؛ خروجی عمومی است و credential تولید نمی‌کند:
+
+```bash
+python3 scripts/production/render_postgresql_ownership.py --candidate
+python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_ownership.py'
+python3 scripts/production/test_postgresql_isolation_native.py --disposable
+```
+
+فرمان سوم فقط fixture Docker با تصویر digest ثابت PostgreSQL 18.4، بدون شبکه و
+پورت میزبان می‌سازد و پس از آزمون همان container/volume موقت را حذف می‌کند.
+خروجی مورد انتظار `native_database_isolation: Passed` است؛ ۴۰ اتصال سرویس دیگر
+رد می‌شوند. نقش runtime به migration تبدیل نمی‌شود، DDL/TEMP ندارد و دادهٔ
+tenant دیگر یا context باقی‌مانده پس از commit/rollback را نمی‌بیند. این نتیجه
+شاهد reconcile اپراتور، migration واقعی برنامه، PITR یا ظرفیت سرور نیست.
+
+خروجی renderer شامل ده DatabaseRole، پنج Database و پنج ConfigMap عمومی SQL در
+`platform-data` برای cluster `postgresql` است. سیاست حذف DB/role صریحاً `retain`
+است؛ SQL هیچ داده‌ای حذف نمی‌کند و owner یا role غیرمنتظره را adopt نمی‌کند.
+ConfigMap SQL را خودکار اجرا نمی‌کند. دستور apply مستقل روی VPS نزنید؛ بستهٔ
+کامل داده باید ابتدا operator/image امضاشده، storage/guard مستقل، TLS و
+NetworkPolicy/mesh، budget منابع/connection و backup/restore مصوب را فراهم کند.
+
+پیش‌نیاز اسرار: ده Secret مستقل نوع `kubernetes.io/basic-auth` در `platform-data`
+با نام `<service>-db-runtime` و `<service>-db-migration` و کلیدهای username/password
+لازم است. username برابر نام role تولیدشده است؛ password فقط در OpenBao و
+projection مجاز می‌ماند. Secret برنامه در `platform-apps` projection جداست؛ مرز
+namespace به‌خاطر این کار باز نمی‌شود و ESO موجود خودکار مجوز namespace جدید
+نمی‌گیرد. مقدار واقعی را در چت، Git، argv، log یا Helm values نگذارید.
+
+در commissioning کامل: نخست readiness نقش‌ها/credential، سپس دیتابیس و owner،
+بعد SQL همان دیتابیس و آزمون مستقل اتصال/مجوز مقصد بررسی می‌شود. PUBLIC CONNECT
+با ساخت دیتابیس خودبه‌خود حذف نمی‌شود. SQL عمومی/پیش‌فرض‌های ناامن را لغو می‌کند،
+runtime را به DML دیتابیس خودش محدود می‌کند و جدول‌ها را به Flyway سرویس می‌سپارد.
+CONNECT جدید با revoke بسته می‌شود؛ نشست موجود خودکار قطع نمی‌شود، پس cutover
+مقصد جداگانه لازم است. migrationهای اجراشده تغییر نمی‌کنند.
+جزئیات فنی و ترتیب dependencyها: [جزء PostgreSQL](../../deploy/postgresql/README.md).
+
+پس از آن ادامهٔ مشترک:
+
+1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
 2. دسترسی عملیاتی محدود، backup ساعتی، recovery و audit امن خارج میزبان؛ root
    اولیه فقط پس از جایگزین معتبر و آزمون recovery لغو شود.
 3. JIT واقعی: expiry/revoke/disconnect، سپس حذف دسترسی دائمی با مسیر نجات کارا.
