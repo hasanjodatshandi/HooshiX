@@ -679,6 +679,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 این مرحله فقط سه Deployment اپراتور/وب‌هوک/گواهی‌ساز ESO و شش SecretStore
 `hooshix-<service>` را در `platform-apps` نصب می‌کند. CRDهای namespace-scoped،
 RBAC محدود، NetworkPolicy و مجوز mTLS مربوط نیز جزو همین bootstrap هستند.
+وب‌هوک‌ها فقط SecretStore/ExternalSecret همان namespace را اعتبارسنجی می‌کنند؛
+rule نوع Cluster از خروجی حذف می‌شود، چون namespaceSelector آن را محدود نمی‌کند.
 Root، intermediate، TLS موجود، داده/PVC و workload OpenBao، mesh، SSH و ایمیل
 تغییر نمی‌کنند. OpenBao باید از قبل unsealed و شش هویت scoped آماده باشند؛
 نشست VNC قابل ورود و نشست دوم SSH مستقل باز بمانند. هیچ init یا root revocation

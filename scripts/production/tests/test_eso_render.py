@@ -40,6 +40,7 @@ class ESORenderTest(unittest.TestCase):
         self.items.extend(target.token_delegation())
         self.items.append({'kind': 'ValidatingWebhookConfiguration', 'metadata': {'name': 'probe'},
             'webhooks': [{'failurePolicy': 'Fail', 'timeoutSeconds': 5,
+                          'rules': [{'scope': 'Namespaced', 'resources': ['secretstores']}],
                           'namespaceSelector': copy.deepcopy(target.SELECTOR)}]})
 
     def test_valid_candidate_and_exact_six_identity_tokenrequest(self):
@@ -52,6 +53,12 @@ class ESORenderTest(unittest.TestCase):
         self.assertEqual(target.ACCOUNT + '-webhook', target.values()['webhook']['serviceAccount']['name'])
         self.assertEqual(target.ACCOUNT + '-cert-controller',
                          target.values()['certController']['serviceAccount']['name'])
+
+    def test_namespace_selector_does_not_authorize_cluster_scoped_webhooks(self):
+        items = copy.deepcopy(self.items)
+        items[-1]['webhooks'][0]['rules'][0]['scope'] = 'Cluster'
+        with self.assertRaises(ValueError):
+            target.validate(items, self.selected)
 
     def test_reject_workload_drift(self):
         for location, key, value in [('pod', 'hostNetwork', True),
@@ -170,6 +177,9 @@ class ESORenderTest(unittest.TestCase):
              'verbs': ['get', 'list', 'watch']}]},
             {'kind': 'ClusterRoleBinding', 'metadata': {'name': name}, 'roleRef': {
                 'kind': 'ClusterRole', 'name': name}, 'subjects': []}, self.items[-1]])
+        blocked = copy.deepcopy(upstream[-1]['webhooks'][0])
+        blocked['rules'] = [{'scope': 'Cluster', 'resources': ['clustersecretstores']}]
+        upstream[-1]['webhooks'].append(blocked)
         selected = copy.deepcopy(self.selected)
         if published:
             selected['image'] = target.published_pin()['image']
@@ -186,6 +196,8 @@ class ESORenderTest(unittest.TestCase):
         self.assertEqual(2, runner.call_count)
         self.assertTrue(all(item['spec']['template']['spec']['containers'][0]['image'] ==
             selected['image'] for item in rendered if item['kind'] == 'Deployment'))
+        self.assertEqual(1, len(next(item for item in rendered
+                                    if item['kind'] == 'ValidatingWebhookConfiguration')['webhooks']))
         for item in rendered:
             if item['kind'] == 'Deployment':
                 self.assertEqual('none' if item['metadata']['name'].endswith('-webhook') else 'ambient',

@@ -180,7 +180,11 @@ def validate(items, selected):
         if item['kind'] == 'ValidatingWebhookConfiguration':
             for webhook in item['webhooks']:
                 if (webhook['failurePolicy'] != 'Fail' or webhook['timeoutSeconds'] != 5
-                        or webhook.get('namespaceSelector') != SELECTOR):
+                        or webhook.get('namespaceSelector') != SELECTOR
+                        or not webhook.get('rules')
+                        or any(rule.get('scope') != 'Namespaced'
+                               or not set(rule['resources']) <= {'secretstores', 'externalsecrets'}
+                               for rule in webhook['rules'])):
                     raise ValueError('fail-closed bounded ESO webhooks required')
     if not all(item in items for item in token_delegation()):
         raise ValueError('exact delivery token delegation required')
@@ -216,6 +220,9 @@ def render(chart: Path, helm: str, *, published: bool = False):
                     raise ValueError('unexpected upstream ESO image')
                 container['image'] = selected['image']
         if item['kind'] == 'ValidatingWebhookConfiguration':
+            # namespaceSelector never limits cluster-scoped admission requests.
+            item['webhooks'] = [webhook for webhook in item['webhooks']
+                if all(rule.get('scope') == 'Namespaced' for rule in webhook.get('rules', []))]
             for webhook in item['webhooks']:
                 webhook['namespaceSelector'] = copy.deepcopy(SELECTOR)
     items.extend(token_delegation())
