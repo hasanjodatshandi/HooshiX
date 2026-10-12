@@ -24,6 +24,10 @@ def rehearse(k, wait, run, chart, helm, api, root, ca, audiences, addresses):
         try:
             return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
         except RehearsalFailed as error:
+            # Only public resource identifiers; never body, token arguments or response text.
+            if 'get' in args:
+                index = args.index('get')
+                print('ESO_FIXTURE_FAILED_GET=' + json.dumps(list(args[index + 1:index + 3])), flush=True)
             raise host.custody.BootstrapFailed('NATIVE_ESO_FIXTURE_OPERATION_FAILED') from error
 
     result = install_eso.execute(plan, kube=adapter)
