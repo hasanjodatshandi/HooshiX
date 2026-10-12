@@ -57,6 +57,7 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
             # Never print response text after private fixture state is generated.
             markers = [marker for marker in ('Forbidden', 'Invalid', 'NotFound', 'already exists',
                 "the server doesn't have a resource type", 'could not find the requested resource',
+                'test failed', 'testing value', 'conflict with',
                 'failed to compile', 'undeclared reference', 'no matches', 'not found',
                 'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM',
                 'platform source build identity rejected',

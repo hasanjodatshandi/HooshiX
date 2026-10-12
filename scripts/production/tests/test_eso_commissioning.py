@@ -49,7 +49,7 @@ class ESOCommissioningTest(unittest.TestCase):
             'type': 'kubernetes.io/dockerconfigjson', 'data': {'.dockerconfigjson': 'synthetic-pull-value'}}
         states[key(pull)] = pull
         for name in ('hooshix-istio-system-bootstrap-boundary', 'hooshix-hooshix-secrets-bootstrap-boundary'):
-            obj = {'kind': 'ValidatingPolicy', 'metadata': {'name': name, 'resourceVersion': '1'},
+            obj = {'kind': 'ValidatingPolicy', 'metadata': {'name': name, 'uid': 'owned-' + name, 'resourceVersion': '1'},
                    'spec': {'matchConstraints': {'namespaceSelector': copy.deepcopy(target.OLD_SELECTOR)}}}
             states[key(obj)] = obj
         def kube(*args, body=None, **options):
@@ -110,6 +110,10 @@ class ESOCommissioningTest(unittest.TestCase):
         self.assertEqual(6, len([key for key in states if key[1] == 'secretstore']))
         self.assertNotIn('synthetic-pull-value', json.dumps([args for args, _, _ in calls]))
         self.assertNotIn('--force', json.dumps([args for args, _, _ in calls]))
+        for args, _, _ in calls:
+            if 'patch' in args:
+                changes = json.loads(args[args.index('-p') + 1])
+                self.assertEqual(['/metadata/uid', '/spec'], [item['path'] for item in changes if item['op'] == 'test'])
         self.assertFalse(any('delete' in args or 'exec' in args for args, _, _ in calls))
         for store in (obj for key, obj in states.items() if key[1] == 'secretstore'):
             self.assertEqual(['api', 'hooshix-openbao'], store['spec']['provider']['vault'][

@@ -26,6 +26,9 @@ def rehearse(k, wait, run, chart, helm, api, root, ca, audiences, addresses):
             return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
         except RehearsalFailed as error:
             # Only public resource identifiers; never body, token arguments or response text.
+            verb = next((value for value in ('get', 'create', 'patch', 'apply', 'wait', 'rollout')
+                         if value in args), 'other')
+            print('ESO_FIXTURE_FAILED_OPERATION=' + verb, flush=True)
             if 'get' in args:
                 index = args.index('get')
                 print('ESO_FIXTURE_FAILED_GET=' + json.dumps(list(args[index + 1:index + 3])), flush=True)

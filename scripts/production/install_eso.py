@@ -188,7 +188,8 @@ def execute(plan, *, kube=host.kube):
     for old in boundaries:
         if old['spec']['matchConstraints']['namespaceSelector'] != SELECTOR:
             kube('patch', 'validatingpolicy', old['metadata']['name'], '--type=json', '-p', json.dumps([
-                {'op': 'test', 'path': '/metadata/resourceVersion', 'value': old['metadata']['resourceVersion']},
+                # Status reconciliation changes resourceVersion, not the reviewed spec or identity.
+                {'op': 'test', 'path': '/metadata/uid', 'value': old['metadata']['uid']},
                 {'op': 'test', 'path': '/spec', 'value': old['spec']},
                 {'op': 'replace', 'path': '/spec/matchConstraints/namespaceSelector', 'value': SELECTOR}]))
     for policy in plan['policies']:

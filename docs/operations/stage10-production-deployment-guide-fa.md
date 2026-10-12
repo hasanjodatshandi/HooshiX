@@ -681,6 +681,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 RBAC محدود، NetworkPolicy و مجوز mTLS مربوط نیز جزو همین bootstrap هستند.
 وب‌هوک‌ها فقط SecretStore/ExternalSecret همان namespace را اعتبارسنجی می‌کنند؛
 rule نوع Cluster از خروجی حذف می‌شود، چون namespaceSelector آن را محدود نمی‌کند.
+افزودن namespace به مرزهای پذیرش قبلی فقط با آزمون اتمی UID و کل spec انجام
+می‌شود؛ بازسازی شیء یا تغییر تنظیمات بررسی‌شده پذیرفته نمی‌شود.
 Root، intermediate، TLS موجود، داده/PVC و workload OpenBao، mesh، SSH و ایمیل
 تغییر نمی‌کنند. OpenBao باید از قبل unsealed و شش هویت scoped آماده باشند؛
 نشست VNC قابل ورود و نشست دوم SSH مستقل باز بمانند. هیچ init یا root revocation
