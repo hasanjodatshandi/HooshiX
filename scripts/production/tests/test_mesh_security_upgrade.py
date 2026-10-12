@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import render_mesh_security_upgrade as renderer
+import rehearse_platform_admission as staging
 import upgrade_mesh_security as target
 
 
@@ -42,6 +43,15 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
         for key in ('boundary_before', 'boundary_after'):
             self.assertIn(renderer.admission.mesh_publication.targets()['ztunnel']['image'],
                           self.plan[key]['spec']['validations'][0]['expression'])
+
+    def test_post_initialization_probe_never_requests_raw_schema_diagnostics(self):
+        calls = []
+        def kube(*args, **options):
+            calls.append(options)
+            return b''
+        staging.admission_result(kube, {'kind': 'Pod'}, lambda check, **_: check(),
+                                 public_schema=False)
+        self.assertFalse(calls[0]['public_schema'])
 
     def fixture(self):
         resources = {}

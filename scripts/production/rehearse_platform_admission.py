@@ -48,14 +48,14 @@ def policy_ready(k, policy):
         raise
 
 
-def admission_result(k, pod, wait, *, expected=0, message=None):
+def admission_result(k, pod, wait, *, expected=0, message=None, public_schema=True):
     # Policy Ready reports webhook configuration, not an updated cache generation.
     # Poll the harmless server-side dry-run while the reviewed policy converges.
     # Success still requires the exact denial reason, never just any HTTP error.
     def converged():
         try:
             k("apply", "--dry-run=server", "-f", "-", data=json.dumps(pod).encode(),
-              expected=expected, public_schema=True, required_error=message)
+              expected=expected, public_schema=public_schema, required_error=message)
             return True
         except RehearsalFailed:
             return False
@@ -516,7 +516,7 @@ class Staging:
                 pod['containers'][0]['image'] = self.mesh_receipt['components'][component]['image']
                 test = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
                     'name': 'source-upgrade-probe', 'namespace': 'istio-system'}, 'spec': pod}
-                admission_result(k, test, wait)
+                admission_result(k, test, wait, public_schema=False)
                 for field in ('wrong_signer', 'missing_sbom', 'component', 'go_version',
                               'recipe_sha256', 'repository_revision'):
                     bad = copy.deepcopy(original)
@@ -533,7 +533,7 @@ class Staging:
                         bad['spec']['validations'][2]['expression'] = renderer.provenance_expression(expected)
                     try:
                         apply(k, bad)
-                        admission_result(k, test, wait, expected=1, message=message)
+                        admission_result(k, test, wait, expected=1, message=message, public_schema=False)
                     finally:
                         apply(k, original)
                 k('delete', original['kind'], original['metadata']['name'])
