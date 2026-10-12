@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 
 import commission_platform as host
 import install_eso
@@ -30,8 +31,13 @@ def rehearse(k, wait, run, chart, helm, api, root, ca, audiences, addresses):
                 print('ESO_FIXTURE_FAILED_GET=' + json.dumps(list(args[index + 1:index + 3])), flush=True)
             raise host.custody.BootstrapFailed('NATIVE_ESO_FIXTURE_OPERATION_FAILED') from error
 
-    result = install_eso.execute(plan, kube=adapter)
-    install_eso.execute(plan, kube=adapter)  # Real idempotent owned-object reconciliation.
+    try:
+        result = install_eso.execute(plan, kube=adapter)
+        install_eso.execute(plan, kube=adapter)  # Real idempotent owned-object reconciliation.
+    except ValueError as error:
+        if re.fullmatch(r'ESO_[A-Z_]{1,80}', str(error)):
+            print('ESO_FIXTURE_CHECK_FAILED=' + str(error), flush=True)
+        raise
     original = renderer.source_policy()
     # Test the signed payload itself, not just digest/Pod schema.
     apply(k, original)
