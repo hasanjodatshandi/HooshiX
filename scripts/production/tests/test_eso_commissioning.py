@@ -26,7 +26,7 @@ class ESOCommissioningTest(unittest.TestCase):
         with patch.object(target.time, 'monotonic', side_effect=[0, 31]):
             with self.assertRaisesRegex(ValueError, 'ESO_CRD_ESTABLISHMENT_TIMEOUT'):
                 target.established_crd('owned-crd', lambda *args, **kw: b'[]')
-        responses = iter([b'', b'[{"type":"Established","status":"True"}]'])
+        responses = iter([b'', b'null', b'[{"type":"Established","status":"True"}]'])
         with patch.object(target.time, 'sleep'):
             target.established_crd('owned-crd', lambda *args, **kw: next(responses))
         with self.assertRaisesRegex(ValueError, 'ESO_CRD_STATUS_REJECTED'):

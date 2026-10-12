@@ -105,6 +105,8 @@ def established_crd(name, kube):
     while True:
         raw = kube('get', 'crd', name, '-o', 'jsonpath={.status.conditions}', timeout=10).strip()
         conditions = json.loads(raw) if raw else []
+        if conditions is None:
+            conditions = []
         require(isinstance(conditions, list) and len(conditions) <= 16
                 and all(isinstance(item, dict) for item in conditions), 'ESO_CRD_STATUS_REJECTED')
         if any(item.get('type') == 'Established' and item.get('status') == 'True' for item in conditions):
