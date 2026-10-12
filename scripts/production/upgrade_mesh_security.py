@@ -23,6 +23,8 @@ MANAGER = 'hooshix-mesh-security-upgrade'
 
 def require(value, message):
     if not value:
+        # Messages are fixed source literals, never API responses or credentials.
+        print('MESH_UPGRADE_CHECK_FAILED=' + message.upper().replace(' ', '_'), flush=True)
         raise ValueError(message)
 
 
