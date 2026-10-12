@@ -43,8 +43,6 @@ def exercise(container: str) -> None:
     for database in DATABASES:
         migration, runtime = f'{database}_migration', f'{database}_runtime'
         sql(database, isolation_sql(database))
-        sql(database, "CREATE FUNCTION public.later_boundary() RETURNS integer LANGUAGE sql AS 'SELECT 8';",
-            migration)
         sql(database, '''
 CREATE TABLE public.boundary_fixture (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   tenant_id text NOT NULL, payload text NOT NULL);
@@ -61,6 +59,8 @@ CREATE FUNCTION public.boundary_function() RETURNS integer LANGUAGE sql AS 'SELE
                       'GRANT EXECUTE ON FUNCTIONS TO PUBLIC;')
         # Replay must preserve rows, owner and forced RLS after service migrations.
         sql(database, isolation_sql(database))
+        sql(database, "CREATE FUNCTION public.later_boundary() RETURNS integer LANGUAGE sql AS 'SELECT 8';",
+            migration)
         if sql(database, 'SELECT count(*) FROM public.boundary_fixture;') != '2':
             raise RuntimeError('ownership replay altered fixture data')
         if sql(database, f"SELECT has_table_privilege('{runtime}', 'public.boundary_fixture', 'TRUNCATE');") != 'f':
