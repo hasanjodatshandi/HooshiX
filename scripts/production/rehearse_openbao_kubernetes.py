@@ -29,7 +29,8 @@ from render_openbao_local_storage import candidate as local_storage_candidate
 
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
-                   "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
+                   "signed-ambient-eso-commissioning", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -385,7 +386,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 client.call("sys/policies/acl/fixture-reader", "PUT", {"policy":
                     'path "fixture/data/value" { capabilities = ["read"] }'}, token, 204)
                 reader = client.call("auth/token/create", "POST", {"policies": ["fixture-reader"],
-                    "no_default_policy": True, "ttl": "5m", "explicit_max_ttl": "5m"}, token)["auth"]["client_token"]
+                    # Synthetic one-path read-only canary survives the bounded combined fixture.
+                    # Actual six Kubernetes-auth identities retain their independent <=300s gate.
+                    "no_default_policy": True, "ttl": "20m", "explicit_max_ttl": "20m"}, token)["auth"]["client_token"]
                 client.call("fixture/data/value", "POST", {"data": {"value": "denied"}}, reader, 403)
                 if mesh_security_upgrade:
                     platform.security_upgrade(k, wait)

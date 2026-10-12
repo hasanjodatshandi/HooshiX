@@ -18,6 +18,7 @@ import build_eso_commissioning_bundle as operator_bundle
 import install_eso as target
 import openbao_scoped_auth as auth
 import render_eso_commissioning as renderer
+import rehearse_openbao_kubernetes as fixture
 
 
 class ESOCommissioningTest(unittest.TestCase):
@@ -196,6 +197,14 @@ class ESOCommissioningTest(unittest.TestCase):
         self.assertIn('file=sys.stderr, flush=True', source)
         self.assertNotIn('initialize(', source)
         self.assertNotIn('revoke-self', source)
+
+    def test_all_native_fixture_steps_are_registered(self):
+        import ast
+        tree = ast.parse(Path(fixture.__file__).read_text())
+        steps = {node.args[0].value for node in ast.walk(tree) if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Name) and node.func.id == 'step'
+                 and node.args and isinstance(node.args[0], ast.Constant)}
+        self.assertLessEqual(steps, fixture.STEPS)
 
 
 if __name__ == '__main__':
