@@ -243,6 +243,24 @@ def render(chart: Path, helm: str, *, published: bool = False):
     return {'apiVersion': 'v1', 'kind': 'List', 'items': items}
 
 
+def crds(chart: Path, helm: str):
+    # Render first to enforce the same chart and tool integrity boundary.
+    render(chart, helm, published=True)
+    result = subprocess.run([helm, 'template', ACCOUNT, str(chart), '--namespace', NAMESPACE,
+        '--kube-version', '1.35.6', '--set', 'installCRDs=true', '--set', 'fullnameOverride=' + ACCOUNT,
+        *[arg for name in ('externalsecret', 'generatorstate', 'secretstore')
+          for arg in ('--show-only', 'templates/crds/' + name + '.yaml')]],
+        check=True, capture_output=True, timeout=60)
+    if len(result.stdout) > BOUND:
+        raise ValueError('bounded scoped CRDs required')
+    items = [item for item in yaml.safe_load_all(result.stdout) if item]
+    if len(items) != 3 or {item['metadata']['name'] for item in items} != {
+            'externalsecrets.external-secrets.io', 'secretstores.external-secrets.io',
+            'generatorstates.generators.external-secrets.io'}:
+        raise ValueError('exact scoped CRDs required')
+    return items
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--chart', type=Path, required=True)

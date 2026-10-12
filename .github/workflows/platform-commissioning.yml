@@ -16,6 +16,9 @@ on:
       - scripts/production/tests/test_mesh_security_upgrade.py
       - scripts/production/verify_platform_publication_run.py
       - scripts/production/commission_platform.py
+      - scripts/production/*eso*.py
+      - scripts/production/run-eso-commissioning.ps1
+      - scripts/production/tests/test_eso*.py
       - scripts/production/platform_image_egress.py
       - scripts/production/upgrade_kyverno.py
       - scripts/production/build_platform_commissioning_bundle.py
@@ -28,6 +31,10 @@ on:
     inputs:
       mesh_security_upgrade:
         description: Rehearse limited source-patched mesh upgrade preserving initialized OpenBao
+        type: boolean
+        default: true
+      eso_commissioning:
+        description: Rehearse namespace-scoped signed ESO on the patched Ambient mesh
         type: boolean
         default: true
       mesh_run:
@@ -82,6 +89,10 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-mesh-security-upgrade.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'MESH_OPERATOR_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-eso-commissioning.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'ESO_OPERATOR_WRAPPER_SYNTAX_FAILED' }
       - name: Install pinned disposable fixture tools and YAML parser
         run: |
           set -euo pipefail
@@ -100,6 +111,7 @@ jobs:
             c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 \
             "$RUNNER_TEMP/platform-tools/helm.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/platform-tools/helm.tar.gz" -C "$RUNNER_TEMP/platform-tools" linux-amd64/helm
+          install -m 0700 "$RUNNER_TEMP/platform-tools/linux-amd64/helm" "$RUNNER_TEMP/platform-tools/helm"
           chmod 0700 "$RUNNER_TEMP/platform-tools/kind" "$RUNNER_TEMP/platform-tools/kubectl"
           echo "$RUNNER_TEMP/platform-tools/linux-amd64" >> "$GITHUB_PATH"
           python3 -m pip install --disable-pip-version-check --no-deps --only-binary=:all: \
@@ -107,6 +119,17 @@ jobs:
           PyYAML @ https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc
           REQUIREMENTS
           echo "PYTHONPATH=$RUNNER_TEMP/platform-yaml" >> "$GITHUB_ENV"
+      - name: Prepare pinned ESO chart and verify exact published source evidence
+        if: ${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            https://github.com/external-secrets/external-secrets/releases/download/helm-chart-2.12.0/external-secrets-2.12.0.tgz \
+            -o "$RUNNER_TEMP/platform-tools/eso-chart.tgz"
+          printf '%s  %s\n' 4b584136b7311c0af8c8719d377cc5b1a7ef12c2de18f1fdb30614eab75bdeb3 \
+            "$RUNNER_TEMP/platform-tools/eso-chart.tgz" | sha256sum --check --strict
+          python3 -c 'import os,sys; from pathlib import Path; sys.path.insert(0,"scripts/production"); import render_eso_commissioning as eso; eso.validate_publication(Path(os.environ["RUNNER_TEMP"])/"platform-publications")'
       - name: Verify pinned Kyverno upstream release signatures
         run: |
           set -euo pipefail
@@ -135,6 +158,9 @@ jobs:
           options=()
           if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
             options+=(--mesh-security-upgrade)
+          fi
+          if [[ '${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}' == 'true' ]]; then
+            options+=(--eso-chart "$RUNNER_TEMP/platform-tools/eso-chart.tgz")
           fi
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/platform-tools" \

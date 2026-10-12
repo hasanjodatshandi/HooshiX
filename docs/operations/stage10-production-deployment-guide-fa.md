@@ -363,9 +363,9 @@ artifact است، نه امضا، نصب، تحویل secret یا آماده‌�
 python3 -m unittest discover -s scripts/production/tests -p test_eso_artifact.py
 ```
 
-تا انتشار امضاشده، آزمون native تحویل شش هویت و بستهٔ نصب بازبینی‌شده آماده
-نشده‌اند، دستور نصب ESO روی VPS وجود ندارد. نصب بعدی باید namespace-scoped
-باشد، cluster stores/push secrets و TokenRequest عمومی را غیرفعال کند؛ فقط
+نصب ESO از بستهٔ عمومیِ وابسته به staging ترکیبی موفق انجام می‌شود؛ روش آن
+در بخش «نصب محدود ESO روی OpenBao موجود» آمده است. نصب namespace-scoped
+است، cluster stores/push secrets و TokenRequest عمومی را غیرفعال می‌کند؛ فقط
 TokenRequest شش حساب `eso-<service>` مجاز است. ingress OpenBao و شبکه/mesh ESO
 به‌طور مستقل و محدود آزموده می‌شوند. این مرحله root را لغو نمی‌کند.
 
@@ -673,6 +673,66 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 در اجرا‌ی ناموفق، replay همان bundle فقط پس از بررسی وضعیت جزئی مجاز است.
 این عملیات کوتاه ممکن است دسترسی mesh را حین rollout ناپایدار کند؛ reboot،
 حذف PVC، init، ارتقای ztunnel یا OpenBao بخشی از این فرمان نیست.
+
+### نصب محدود ESO روی OpenBao موجود
+
+این مرحله فقط سه Deployment اپراتور/وب‌هوک/گواهی‌ساز ESO و شش SecretStore
+`hooshix-<service>` را در `platform-apps` نصب می‌کند. CRDهای namespace-scoped،
+RBAC محدود، NetworkPolicy و مجوز mTLS مربوط نیز جزو همین bootstrap هستند.
+Root، intermediate، TLS موجود، داده/PVC و workload OpenBao، mesh، SSH و ایمیل
+تغییر نمی‌کنند. OpenBao باید از قبل unsealed و شش هویت scoped آماده باشند؛
+نشست VNC قابل ورود و نشست دوم SSH مستقل باز بمانند. هیچ init یا root revocation
+در این فرمان وجود ندارد. بسته به نصب اول bind است؛ برای سرور دوم ابتدا pin و
+CA/شناسه‌های همان نصب باید در تغییر بازبینی‌شده مستقل آماده شوند.
+
+job `Signed Calico Ambient Kyverno OpenBao staging` همین ابزار نصب را روی
+Calico/Ambient واقعی اجرا می‌کند و بازاجرای بدون drift، digest runtime، امضا،
+provenance دقیق recipe/module/revision، SBOM و رد signer/payload جعلی را می‌سنجد.
+تحویل و چرخش شش مقدار ساختگی، رد خواندن مسیر سرویس دیگر، حذف Secret دارای
+مالک و نبود مقادیر در log نیز لازم‌اند. فقط receipt عمومی پس از حذف fixture
+باقی می‌ماند. این شاهد جای اجرای K3s مقصد یا capacity کامل را نمی‌گیرد.
+
+پس از merge و baseline موفق، از checkout تمیز main با Helm مصوب `4.2.4`
+و chart دارای checksum ثبت‌شده در `eso-image.json` بسته بسازید؛ staging-run
+باید اجرای موفق ترکیبی همین tree باشد، نه آزمون foundation یا mesh تنها:
+
+```bash
+python3 scripts/production/build_eso_commissioning_bundle.py \
+  --staging-run <staging-run> --chart <external-secrets-2.12.0.tgz> \
+  --helm <helm-4.2.4> \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-eso-commissioning
+```
+
+builder انتشار protected-main، اسکن پنج‌روزه، predicate و digest دقیق و tree
+staging را اعتبارسنجی می‌کند. output باید تازه و خارج Git باشد؛ فقط source/plan
+عمومی دارد. token یا Root/custody در این پوشه قرار ندهید. روی Windows:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-eso-commissioning\run-eso-commissioning.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-eso-commissioning\run-eso-commissioning.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo را در همان پنجره وارد کنید؛ GHCR token و رمز custody/Root/CA
+لازم نیست. ابزار credential خواندنِ متعلق به نصب را فقط در حافظه به namespace
+جدید منتقل می‌کند؛ توکن روی argv، log یا receipt نوشته نمی‌شود. API IP و audience
+از همان کلاستر کشف می‌شوند؛ شبکهٔ عمومی باز نمی‌شود. سه Pod و شش SecretStore
+باید Ready شوند؛ `ESO_INSTALLATION=Passed` و JSON عمومی کنار bundle شاهد مقصدند.
+پیام پیشرفت به stderr و فقط JSON به stdout می‌رود. وضعیت Production و تحویل
+اسرار واقعی همچنان `Not verified` است؛ public access همچنان `CLOSED` می‌ماند.
+
+نصب در namespace دارای برنامه/ExternalSecret فعال، مالکیت خارجی یا drift متوقف
+می‌شود؛ adopt اجباری، force ownership یا حذف منبع وجود ندارد. در شکست، منابع
+نصب‌شده حفظ می‌شوند؛ قبل از تکرار، علت و state جزئی را بررسی کنید. داده یا PVC
+OpenBao را پاک نکنید. نصب موفق شاهد backup خارج میزبان یا آماده‌بودن JIT نیست.
+
+کاربرد روزمره: manifest هر سرویس به SecretStore خودش `hooshix-<service>` اشاره
+می‌کند، `creationPolicy: Owner` دارد و فقط کلید `production/<service>/<name>`
+را از mount `hooshix` می‌خواند. مقدار واقعی فقط با هویت عملیاتی مجاز وارد
+OpenBao می‌شود؛ نه Git، Helm values یا CI. منابع برنامه از مسیر GitOps مصوب
+تحویل می‌شوند، نه فرمان bootstrap. تغییر مقدار طبق refreshInterval همان
+ExternalSecret همگام می‌شود؛ reload/restart مصرف‌کننده طبق قرارداد سرویس انجام
+می‌شود و ESO به‌تنهایی آن را تضمین نمی‌کند. نام Store/Secret و وضعیت Ready قابل
+بررسی‌اند؛ `kubectl get secret -o yaml/json` یا خروجی مقدار را برای گزارش نفرستید.
 
 پس از آن ادامهٔ مشترک به ترتیب وابستگی‌ها:
 

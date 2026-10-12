@@ -27,7 +27,8 @@ def external_secret(service: str, *, denied: bool = False):
             'remoteRef': {'key': 'production/' + remote + '/commissioning-probe', 'property': 'value'}}]}}
 
 
-def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audiences, addresses):
+def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audiences, addresses,
+             *, installed=False):
     manifest = render(chart, helm, published=True)
     crds = run([helm, 'template', ACCOUNT, str(chart), '--namespace', auth.NAMESPACE,
         '--kube-version', '1.35.6', '--set', 'installCRDs=true', '--set', 'fullnameOverride=' + ACCOUNT,
@@ -43,13 +44,14 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
     def apply(value):
         k('apply', '--server-side', '-f', '-', data=json.dumps(value).encode(), timeout=60)
 
-    for item in items:
-        apply(item)
-        k('wait', '--for=condition=Established', 'crd/' + item['metadata']['name'],
-          '--timeout=30s', timeout=40)
-    for policy in network(addresses):
-        apply(policy)
-    apply(manifest)
+    if not installed:
+        for item in items:
+            apply(item)
+            k('wait', '--for=condition=Established', 'crd/' + item['metadata']['name'],
+              '--timeout=30s', timeout=40)
+        for policy in network(addresses):
+            apply(policy)
+        apply(manifest)
     for name in (ACCOUNT + '-cert-controller', ACCOUNT + '-webhook', ACCOUNT):
         print('ESO_DELIVERY_STEP=rollout-' + name, flush=True)
         try:
@@ -75,15 +77,17 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
     if len(pods) != 3 or any(pod['spec']['containers'][0]['image'] != image or
             not pod['status']['containerStatuses'][0]['imageID'].endswith(image.split('@')[1]) for pod in pods):
         raise RehearsalFailed('native ESO digest mismatch')
-    apply({'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {
-        'name': 'hooshix-openbao-ca', 'namespace': auth.NAMESPACE}, 'data': {'ca.crt': ca}})
+    if not installed:
+        apply({'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {
+            'name': 'hooshix-openbao-ca', 'namespace': auth.NAMESPACE}, 'data': {'ca.crt': ca}})
     values = []
     for service in auth.SERVICES:
         value = 'ci-eso-only-' + uuid.uuid4().hex
         values.append(value)
         path = 'hooshix/data/production/' + service + '/commissioning-probe'
         api.call(path, 'POST', {'data': {'value': value}}, root)
-        apply(auth.store(service, audiences))
+        if not installed:
+            apply(auth.store(service, audiences))
         print('ESO_DELIVERY_STEP=store-' + service, flush=True)
         try:
             k('-n', auth.NAMESPACE, 'wait', '--for=condition=Ready',
