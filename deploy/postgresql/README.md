@@ -1,0 +1,74 @@
+# PostgreSQL service ownership component
+
+Owner: Platform Reliability. Current authority: ADR-0019/0027/0034/0037/0042.
+This is the credential-free ownership component of the **single-server** CNPG
+baseline, not a complete cluster installer or production promotion approval.
+
+```bash
+python3 scripts/production/render_postgresql_ownership.py --candidate
+python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_ownership.py'
+python3 scripts/production/test_postgresql_isolation_native.py --disposable
+```
+
+The last command creates only a Docker fixture with no network or published ports,
+using the existing immutable PostgreSQL 18.4 staging image. It removes only that
+container and its anonymous volume. Synthetic trust authentication is never a
+production configuration. The test covers all 40 cross-service connection
+denials, runtime DDL/role negatives, forced RLS, transaction-local context after
+commit/rollback, own-service DML, monitoring isolation, and non-destructive replay.
+It does not exercise CNPG reconciliation, real application migrations or recovery.
+
+The renderer emits 10 CNPG 1.30 `DatabaseRole` resources, five `Database` resources
+and five immutable ConfigMaps containing public SQL. It makes no network requests
+and does not read or generate credentials. Resources target
+`platform-data/postgresql`; database/role deletion policy is explicitly `retain`.
+The five databases are `authorization`, `conversation`, `identity`, `notification`
+and `web_bff`. Compromised Password remains outside mutable PostgreSQL scope.
+Business schema changes remain owned by each service's immutable Flyway history.
+
+## Commissioning dependency contract
+
+Do **not** apply this candidate directly to the VPS. The reviewed complete data
+bundle must first supply the signed CNPG/operator/database/Barman image evidence,
+durable storage guard, finite capacity/pool budgets, TLS and network/mesh isolation,
+and the approved backup/restore path. Actual PostgreSQL commissioning is `Not run`.
+ParsPack deferral is not off-host backup or production-readiness evidence.
+
+1. Supply 10 independent, namespace-local `kubernetes.io/basic-auth` Secrets from
+   the existing OpenBao authority. Their names are `<service>-db-runtime` and
+   `<service>-db-migration`, with `username` equal to the declared PostgreSQL role
+   and a distinct `password`. No plaintext belongs in Git, Helm values, argv or
+   logs. Existing application Secrets in `platform-apps` are separate projections;
+   Kubernetes cannot reference a Secret in another namespace. Existing ESO scoped
+   access does **not** authorize new identities in `platform-data` automatically.
+2. Reconcile DatabaseRoles and verify success/password readiness before creating
+   Databases; verify each database's expected migration owner. Do not reconcile the
+   same role through both `DatabaseRole` and `Cluster.spec.managed.roles`.
+3. The supervised complete bootstrap executes each ConfigMap's `isolation.sql`
+   against **that database** with the bounded maintenance identity. A ConfigMap
+   does not execute SQL. Public/cross-service privileges are revoked, runtime gets
+   own-schema DML only, and future migration-owned objects inherit scoped grants.
+   Unsafe role attributes/memberships or unexpected ownership stop the transaction
+   before grants change; no role adoption, owner rewrite, data deletion or retry
+   loop is attempted. Existing runtime sessions require a separate controlled
+   cutover: revoking CONNECT does not disconnect established sessions.
+4. Run independent destination privilege negatives and service Flyway/RLS tests
+   before any application traffic. Restrict `pg_hba`, mesh and NetworkPolicy to
+   approved identities and explicit service endpoints; SQL grants alone do not
+   establish those controls. Role ceilings/global pool reserve need measured
+   complete-stack evidence and are not invented by this ownership renderer.
+
+`cnpg_metrics_exporter`, when present, receives explicit CONNECT, but no application
+table grants. PUBLIC function EXECUTE is revoked globally for future functions
+created by each migration role, not only per-schema (PostgreSQL defaults require
+that scope). Database creation by itself does not revoke PUBLIC CONNECT; the SQL
+step and its independent verification are mandatory before opening applications.
+
+Removing the Kubernetes role/database manifest must never drop a production role
+or database. Reversible GitOps changes are not a database downgrade. Credential
+rotation, PITR and service-specific logical recovery remain separate supervised
+operations under the owning runbooks.
+
+Vendor API references: [role management](https://cloudnative-pg.io/docs/1.30/declarative_role_management/),
+[database management](https://cloudnative-pg.io/docs/1.30/declarative_database_management/),
+[monitoring](https://cloudnative-pg.io/docs/1.30/monitoring/).

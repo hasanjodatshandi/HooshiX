@@ -42,7 +42,7 @@ jobs:
   repository-structure:
     name: Repository structure verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,6 +104,12 @@ jobs:
 
       - name: Render isolated OpenBao candidate without secrets or cluster access
         run: python3 scripts/production/render_openbao_candidate.py --candidate --storage-class ci-review-only > /dev/null
+
+      - name: Verify PostgreSQL ownership on isolated disposable PostgreSQL 18.4
+        run: |
+          set -euo pipefail
+          python3 scripts/production/render_postgresql_ownership.py --candidate > /dev/null
+          python3 scripts/production/test_postgresql_isolation_native.py --disposable
 
       - name: Verify native JIT expiry on disposable runner
         run: sudo env GITHUB_ACTIONS=true python3 scripts/production/test_jit_systemd_expiry.py --system

@@ -2,6 +2,25 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+Current Stage10 target, 2026-10-12: the owner-run ESO receipt
+`hooshix-eso-commissioning-d6ca935be93a41cc915dcdd93267519b.json` binds reviewed
+`main@5fcaca8540875d742e4194ab215054610d872e9b` and plan SHA-256
+`49d2b04c59b2e52f306b1bbf6d6596492a01d475b695b01ed2c7e855df894196`.
+ESO installation and six SecretStores Ready are `Passed`; application secret
+materialization, root revocation, JIT and production readiness remain `Not verified`.
+This target evidence supersedes earlier pre-install ESO statements below.
+Do not reinstall ESO or treat provider backup/audit deferral as passing evidence.
+
+The credential-free PostgreSQL ownership component is implemented at
+`scripts/production/render_postgresql_ownership.py` and documented under
+`deploy/postgresql/README.md`. It emits CNPG 1.30 role/database retention contracts
+and transaction-bounded public privilege SQL for five service databases. Native
+PostgreSQL 18.4 tests exercise 40 cross-service CONNECT denials, runtime DDL/role
+denials, forced RLS/context reset and non-destructive replay. CNPG reconciliation,
+signed data-image adoption, durable data storage, real credential delivery,
+destination installation, service migration compatibility and physical recovery
+remain `Not run`/`Not verified`. This is a component, not a complete data installer.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical
@@ -10,8 +29,9 @@ credential-free candidate for three restricted workloads in `platform-apps`,
 with TokenRequest delegated only for the six existing delivery accounts and
 certificate-controller Secret permissions confined to that namespace. Rendering
 is not installation or Kubernetes-version compatibility evidence. Signature/provenance,
-native scoped delivery, ESO installation and application secret materialization
-remain `Not verified`; no target mutation or additional root use occurs here.
+native scoped delivery and target installation are now evidenced by the later
+combined staging/target receipts; application secret materialization remains
+`Not verified`. Artifact preparation itself performs no target mutation or root use.
 
 Owner-approved source-security candidates retain ESO 2.12.0, OpenBao 2.6.4
 and Istio 1.30.5 product versions while rebuilding their Go executables with
@@ -43,14 +63,14 @@ Stage 10 scoped-auth continuation: supervised tooling now prepares six dedicated
 policies, five-minute OpenBao tokens and client-JWT Kubernetes TokenReview without
 a static reviewer token or OpenBao restart. Only `create tokenreviews` is granted
 to those six accounts. Namespaced ESO SecretStore contracts use a public CA and
-fresh TokenRequest audiences; ESO is not installed and actual secret delivery,
-root revocation and JIT remain `Not verified`.
+fresh TokenRequest audiences; target ESO installation is now `Passed`, while
+actual application secret delivery, root revocation and JIT remain `Not verified`.
 Owner-run target scoped-auth returned `OPENBAO_SCOPED_AUTH=Passed` on source
 `467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`, with public receipt
 `auth-481ef67e63ce4f7d97e6a6a3c60e562a.json` retained outside Git. The owner
 confirmed an empty `platform-apps` before adding its required Ambient label;
 existing Restricted/v1.35 labels were preserved. Root remains preserved and
-ESO is not installed. This is owner-reported target evidence, not independent
+ESO installation is separately evidenced above. Scoped-auth is owner-reported target evidence, not independent
 off-host-audit, secret-delivery or Production-readiness evidence.
 Native Kubernetes CI coverage exercises the production adapter using synthetic
 canaries; its result is run-specific, not VPS/ESO/mesh evidence. Operator entrypoint:
