@@ -43,6 +43,14 @@ SecretStoreهای namespace-scoped، CA عمومی ConfigMap و role/SA مشخص
 نصب ESO باید RBAC ساخت TokenRequest را فقط به نام‌های همین حساب‌ها محدود کند،
 نه همهٔ ServiceAccountها؛ دسترسی شبکه/mesh آن جداگانه آزموده خواهد شد.
 
+طبق استثنای مصوب ADR-0002، فقط webhookِ ESO از Ambient خارج می‌شود تا callback
+HTTPSِ API کلاستر برقرار باشد؛ controller و cert-controller داخل Ambient و STRICT
+می‌مانند. ingress webhook فقط APIهای دقیق روی 10250 است؛ مسیر OpenBao/8200 و
+HBONE/15008 فقط برای controllerِ `hooshix-eso` و principal همان حساب مجاز است.
+TLS، RBAC، namespace default-deny و تحویل شش هویت مستقل حفظ می‌شوند. این انتخاب
+به معنی نصب یا تأیید آزمون mesh روی VPS نیست؛ مراحل قابل‌تکرار در
+[راهنمای Stage10](stage10-production-deployment-guide-fa.md#آمادهسازی-manifest-محدود-eso-بدون-نصب) است.
+
 ## اجرای روی VPS فعلی، فقط بعد از merge و CI موفق
 
 این ابزار مخصوص VPS فعلی و alias `hooshix-server` است؛ روی نصب دوم قبل از
@@ -92,9 +100,10 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 در `/home/coder/.local/share/hooshix-openbao-auth/` است. فقط نتیجهٔ عمومی را
 بفرستید؛ token، رمز، shares، ciphertext یا فایل credential نفرستید.
 
-اجرای مالک روی VPS اول با source `467acaed9a2c56ad6e5f14d08659ebb3c3362ed3`
+اجرای مالک روی VPS اول با source `c40349adecdb3c216b07c3fe72fe7c570f5aacfe`
 نتیجهٔ `Passed` گزارش کرده است؛ رسید عمومی
-`auth-481ef67e63ce4f7d97e6a6a3c60e562a.json` خارج Git است. root حفظ شده و ESO
+`auth-6ae8b0c63752493fab47c6ad55500e6a.json` خارج Git است. ارتقای ACL برای
+عملیات محدود token خود و آزمون‌های هر شش هویت `Passed` است. root حفظ شده و ESO
 نصب نشده است. این شاهد جای آزمون مستقل نصب دوم را نمی‌گیرد.
 
 ## کاربرد و مرحلهٔ بعد

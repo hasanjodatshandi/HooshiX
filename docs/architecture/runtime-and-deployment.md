@@ -59,6 +59,11 @@ Waypoints are absent by default unless an explicit L7 need is measured/reviewed.
 
 Single-server Ambient is benchmark-gated. If it cannot fit the validated capacity envelope, add host capacity or approve a reviewed security architecture; do not silently disable mTLS/workload identity.
 
+The only ESO Pod enrollment exception is the API-callback webhook in ADR-0002.
+Controller/cert-controller remain enrolled; namespace STRICT and default-deny remain
+unchanged. The exact ESO manifest and network boundary are rendered by
+`scripts/production/render_eso_candidate.py`; rendering is not target installation evidence.
+
 ### Narrow network-node exception
 
 For HooshiX Stage 10, the security-owner explicitly approved this scope on 2026-10-05;

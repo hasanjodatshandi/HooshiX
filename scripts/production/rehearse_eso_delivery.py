@@ -10,7 +10,7 @@ import yaml
 
 import openbao_scoped_auth as auth
 from rehearse_openbao_recovery import RehearsalFailed
-from render_eso_candidate import ACCOUNT, BOUND, render
+from render_eso_candidate import ACCOUNT, BOUND, network, render
 from verify_eso_artifact import published_pin
 
 
@@ -47,26 +47,8 @@ def rehearse(k, wait, run, chart: Path, helm: str, api, root: str, ca: str, audi
         apply(item)
         k('wait', '--for=condition=Established', 'crd/' + item['metadata']['name'],
           '--timeout=30s', timeout=40)
-    selector = {'matchLabels': {'app.kubernetes.io/instance': ACCOUNT}}
-    namespace = lambda name: {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': name}}}
-    api_peers = [{'ipBlock': {'cidr': address + '/32'}} for address in sorted(addresses)]
-    apply({'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy',
-        'metadata': {'name': 'eso-fixture-edges', 'namespace': auth.NAMESPACE},
-        'spec': {'podSelector': selector, 'policyTypes': ['Ingress', 'Egress'],
-            'ingress': [{'from': api_peers + [{'podSelector': selector}],
-                         'ports': [{'protocol': 'TCP', 'port': 10250}]}],
-            'egress': [{'to': api_peers, 'ports': [{'protocol': 'TCP', 'port': p} for p in (443, 6443)]},
-                {'to': [namespace('kube-system') | {'podSelector': {'matchLabels': {'k8s-app': 'kube-dns'}}}],
-                 'ports': [{'protocol': p, 'port': 53} for p in ('TCP', 'UDP')]},
-                {'to': [namespace('hooshix-secrets') | {'podSelector': {'matchLabels': {'app.kubernetes.io/name': 'openbao'}}}],
-                 'ports': [{'protocol': 'TCP', 'port': 8200}]},
-                {'to': [{'podSelector': selector}], 'ports': [{'protocol': 'TCP', 'port': 10250}]}]}})
-    apply({'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy',
-        'metadata': {'name': 'eso-fixture-ingress', 'namespace': 'hooshix-secrets'},
-        'spec': {'podSelector': {'matchLabels': {'app.kubernetes.io/name': 'openbao'}}, 'policyTypes': ['Ingress'],
-            'ingress': [{'from': [namespace(auth.NAMESPACE) | {'podSelector': {'matchLabels': {
-                'app.kubernetes.io/instance': ACCOUNT, 'app.kubernetes.io/name': 'external-secrets'}}}],
-                'ports': [{'protocol': 'TCP', 'port': 8200}]}]}})
+    for policy in network(addresses):
+        apply(policy)
     apply(manifest)
     for name in (ACCOUNT + '-cert-controller', ACCOUNT + '-webhook', ACCOUNT):
         print('ESO_DELIVERY_STEP=rollout-' + name, flush=True)

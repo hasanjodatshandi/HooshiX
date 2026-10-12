@@ -50,6 +50,29 @@ Enrollment is explicit/opt-in:
 
 Production application workloads use dedicated ServiceAccounts. Kubernetes `default` ServiceAccount is prohibited for application workloads.
 
+### Owner-approved ESO admission webhook boundary (2026-10-11)
+
+Only the `hooshix-eso-webhook` Deployment in `platform-apps` may set the Pod label
+`istio.io/dataplane-mode=none`. The Kubernetes API admission caller is outside
+Ambient; its callback uses verified HTTPS and the chart-managed serving certificate
+and CA bundle, not an unauthenticated application path. Calico ingress selects only
+that webhook and exact API endpoint addresses on TCP/10250; it grants no Pod-wide,
+namespace-wide or public ingress. Kubernetes node-local health traffic remains
+subject to the CNI's host-health semantics; NetworkPolicy is not an API identity proof.
+The webhook retains `failurePolicy=Fail`, a five-second callback deadline,
+namespace-scoped selection and the approved immutable ESO image.
+
+The ESO controller and cert-controller explicitly remain Ambient. Namespace STRICT
+and default-deny policies are unchanged; only the dedicated ESO controller identity
+may reach OpenBao TCP/8200, with bounded NetworkPolicy HBONE/15008 allowance.
+No cert-controller opt-out, sidecar injection, PERMISSIVE/DISABLE policy, root/privilege
+exception, public route, or new application egress is authorized. Render validation
+rejects an opt-out on either other ESO workload. Native positive/negative callback,
+identity, certificate and delivery tests remain required before target promotion.
+
+References: [Istio Ambient selection](https://istio.io/latest/docs/ambient/usage/add-workloads/)
+and [Ambient NetworkPolicy](https://istio.io/latest/docs/ambient/usage/networkpolicy/).
+
 ### Authorization
 
 STRICT mTLS authenticates workload identity; least-privilege `AuthorizationPolicy` controls permitted communication. NetworkPolicy and native datastore authentication remain independent controls.
