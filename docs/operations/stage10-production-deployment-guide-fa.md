@@ -768,6 +768,13 @@ pinهای `linux/amd64` و checksum manifestهای رسمی در
 `barman-sidecar`. تصویر minimal PostgreSQL مخصوص CNPG انتخاب شده است؛ ابزار
 backup در sidecar جداست و نباید در تصویر برنامه یا دیتابیس دوباره نصب شود.
 
+وضعیت فعلی این چهار ورودی: eligibility اسکن `Failed` است؛ catalog دارای
+findingهای High/Critical، از جمله بسته‌های پایه بدون fix ثبت‌شده، است. این
+digestها را نصب نکنید. قدم بعدی، تغییر امنیتی بررسی‌شدهٔ نسخه/منبع/تصویر پایه
+با حفظ قرارداد CNPG و backup، سپس اسکن و آزمون سازگاری artifact نهایی است؛ صرف
+جدیدتر بودن tag یا حذف findingهای بدون fix، مجوز نصب نمی‌دهد. نسخه‌های مؤثر
+تا تصویب تغییر هماهنگ، همان `data-policy.json` و Technology Baseline می‌مانند.
+
 آزمون عمومی بدون credential:
 
 ```bash

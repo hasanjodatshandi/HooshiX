@@ -30,6 +30,14 @@ publishing or installing. Scan evidence does not establish upstream build
 provenance, signatures, admission, staging, backup or production readiness.
 All four must clear the live gate before signed candidate publication or adoption;
 no data operator or PostgreSQL instance has been installed by this preparation.
+The exact four inputs fail the fresh High/Critical gate in
+[artifact run 38292526462](https://github.com/hasanjodatshandi/HooshiX/actions/runs/38292526462)
+at `3287857ddb59ea4d941dbb91960258f97437dcb3`. The database is valid and built
+2026-10-12; the scanned amd64 manifest digests match the catalog. Some base-package
+findings have no vendor fix recorded. Current artifact eligibility is `Failed`,
+not a transport failure or an installation success. A reviewed security replacement
+or source/base rebuild and fresh compatibility/scan evidence are required; the
+existing ESO/OpenBao/mesh target remains unchanged.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
