@@ -25,8 +25,8 @@ Stageهای قبلی ساخت/آزمون محصول‌اند و برای نصب 
 پایهٔ بررسی‌شده: `main@5fcaca8540875d742e4194ab215054610d872e9b`، ۲۰۲۶-۱۰-۱۲.
 این SHA مرجع این ویرایش است، نه الزام استفادهٔ دائمی از نسخهٔ قدیمی.
 سرور اول OpenBao نصب‌شده، initialized و unsealed دارد؛ recovery ایزولهٔ محلی
-با سهم‌های اصلی `Passed` است. تأیید نسخه/retention مقصد backup، scheduler ساعتی،
-نصب ESO و Ready بودن شش SecretStore روی مقصد `Passed` است؛ تحویل اسرار واقعی،
+با سهم‌های اصلی `Passed` است. نصب ESO و Ready بودن شش SecretStore روی مقصد
+`Passed` است. تأیید نسخه/retention مقصد backup، scheduler ساعتی، تحویل اسرار واقعی،
 JIT کامل، داده‌ها و برنامه‌های Production هنوز کامل نشده‌اند.
 Stage10 و Production readiness همچنان `Not verified` هستند.
 
