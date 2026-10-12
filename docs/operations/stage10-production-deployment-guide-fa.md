@@ -752,6 +752,15 @@ ExternalSecret همگام می‌شود؛ reload/restart مصرف‌کننده �
 می‌شود و ESO به‌تنهایی آن را تضمین نمی‌کند. نام Store/Secret و وضعیت Ready قابل
 بررسی‌اند؛ `kubectl get secret -o yaml/json` یا خروجی مقدار را برای گزارش نفرستید.
 
+### مرز نصب PostgreSQL و artifactهای آن
+
+نصب داده به چهار artifact مستقل نیاز دارد: اپراتور CloudNativePG، تصویر minimal
+PostgreSQL، اپراتور Barman Cloud و sidecar آن. نسخه‌های مصوب در
+`infrastructure/production/data/data-policy.json` مرجع هستند؛ تصویر Docker آزمایشی
+تست SQL، جای تصویر سازگار با CNPG را نمی‌گیرد. هر چهار تصویر باید digest ثابت،
+SBOM و اسکن تازه داشته باشند؛ سپس از مسیر انتشار مصوب امضا و در محیط مستقل
+آزمایش شوند. این آماده‌سازی نصب روی VPS یا تأیید backup خارج میزبان نیست.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS
