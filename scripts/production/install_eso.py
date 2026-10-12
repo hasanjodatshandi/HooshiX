@@ -88,6 +88,17 @@ def probe(value, kube, *, expected=0, reason=None):
             time.sleep(3)
 
 
+def desired_fields_match(actual, expected):
+    if expected['kind'] == 'NetworkPolicy':
+        actual = copy.deepcopy(actual)
+        for direction in ('ingress', 'egress'):
+            # The API omits empty rule lists; explicit policyTypes still isolates that direction.
+            if (expected['spec'].get(direction) == []
+                    and direction.capitalize() in actual['spec'].get('policyTypes', [])):
+                actual['spec'].setdefault(direction, [])
+    return rendered_fields_match(actual, expected)
+
+
 def execute(plan, *, kube=host.kube):
     require(plan.get('schema_version') == 1 and plan.get('installation_id') == 'hooshix-production'
             and plan.get('profile') == 'production-single-server'
@@ -158,7 +169,9 @@ def execute(plan, *, kube=host.kube):
                     old['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == MANAGER),
                     'ESO_RESOURCE_OWNERSHIP_CONFLICT')
             if obj['kind'] != 'Secret':
-                require(rendered_fields_match(old, obj), 'ESO_RESOURCE_DRIFT_PRESERVED')
+                if not desired_fields_match(old, obj):
+                    print('ESO_DRIFT_RESOURCE=' + obj['kind'] + '/' + obj['metadata']['name'], file=sys.stderr)
+                    require(False, 'ESO_RESOURCE_DRIFT_PRESERVED')
         existing.append(bool(old))
     for policy in plan['policies']:
         policy['metadata'].setdefault('labels', {})['app.kubernetes.io/managed-by'] = MANAGER

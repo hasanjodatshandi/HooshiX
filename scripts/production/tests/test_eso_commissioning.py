@@ -22,6 +22,17 @@ import rehearse_openbao_kubernetes as fixture
 
 
 class ESOCommissioningTest(unittest.TestCase):
+    def test_network_rule_omission_retains_explicit_deny_direction(self):
+        expected = renderer.eso.network(['10.43.0.1'])[0]
+        actual = copy.deepcopy(expected)
+        del actual['spec']['ingress']
+        self.assertTrue(target.desired_fields_match(actual, expected))
+        actual['spec']['policyTypes'].remove('Ingress')
+        self.assertFalse(target.desired_fields_match(actual, expected))
+        actual = copy.deepcopy(expected)
+        actual['spec']['ingress'] = [{}]
+        self.assertFalse(target.desired_fields_match(actual, expected))
+
     def fixture(self):
         pods = {name: {'serviceAccountName': name, 'containers': [{'image': renderer.published_pin()['image']}]}
                 for name in target.ACCOUNTS}

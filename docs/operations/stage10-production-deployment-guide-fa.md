@@ -683,6 +683,8 @@ RBAC محدود، NetworkPolicy و مجوز mTLS مربوط نیز جزو همی
 rule نوع Cluster از خروجی حذف می‌شود، چون namespaceSelector آن را محدود نمی‌کند.
 افزودن namespace به مرزهای پذیرش قبلی فقط با آزمون اتمی UID و کل spec انجام
 می‌شود؛ بازسازی شیء یا تغییر تنظیمات بررسی‌شده پذیرفته نمی‌شود.
+در بازاجرا، حذف فهرست خالی ingress/egress توسط API فقط وقتی معادل منع کامل
+محسوب می‌شود که همان جهت در policyTypes صریحاً باقی مانده باشد.
 Root، intermediate، TLS موجود، داده/PVC و workload OpenBao، mesh، SSH و ایمیل
 تغییر نمی‌کنند. OpenBao باید از قبل unsealed و شش هویت scoped آماده باشند؛
 نشست VNC قابل ورود و نشست دوم SSH مستقل باز بمانند. هیچ init یا root revocation
