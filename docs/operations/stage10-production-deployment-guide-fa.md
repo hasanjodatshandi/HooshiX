@@ -599,8 +599,12 @@ CI مربوط به SHA دقیق جدید لازم است؛ پس از merge نی�
 همان `1.30.5` می‌ماند؛ فقط دو تصویر source-patched امضاشده پس از آزمون native
 انتخاب می‌شوند. این مسیر نصب اولیه نیست: ztunnel، CA، OpenBao و داده‌های آن،
 SSH، ایمیل و storage نباید تغییر کنند. اجرای دوبارهٔ `commission_platform.py`
-برای این ارتقا مجاز نیست. تا دریافت شاهد اجرای مقصد، وضعیت ارتقا **Not verified**
-است؛ سبزشدن baseline به‌تنهایی شاهد تعویض تصویر VPS نیست.
+برای این ارتقا مجاز نیست. روی VPS اول، receipt مقصد با plan بررسی‌شدهٔ main
+`351802f1ba55aa11ca5c11740c038e575dc996bf` و digestهای همین pin، نتیجهٔ
+`mesh_security_upgrade=Passed` و `openbao_ca_ztunnel_storage=Preserved` دارد.
+این شاهد ارتقای همان مقصد است، نه آمادگی Production یا نصب ESO؛ روی سرور
+دیگر اجرای مستقل و receipt همان سرور لازم است. سبزشدن baseline به‌تنهایی
+شاهد تعویض تصویر VPS نیست.
 
 مرجع انتخاب candidate، `infrastructure/istio/security-upgrade.json` است؛
 این فایل pins upstream/chart را عوض نمی‌کند. publication شمارهٔ `38137708512`
@@ -635,7 +639,8 @@ StatefulSet/PVC/Pod OpenBao قبل/بعد مقایسه می‌شوند. پس ا�
 فقط digestهای جدید و ztunnel ثابت را می‌پذیرد؛ digest قبلی دو جزء رد می‌شود.
 در شکست، داده یا workload حذف و init تکرار نمی‌شود؛ وضعیت جزئی حفظ شود و
 با شاهد همان plan بررسی و resume شود. rollback خودکار به تصویر آسیب‌پذیر
-وجود ندارد. نصب مقصد تا بررسی CI و بستهٔ عملیاتی مجاز **Not run** است.
+وجود ندارد. روی مقصد جدید، تا اجرای بستهٔ مجاز و دریافت receipt مستقل،
+ارتقا **Not verified** می‌ماند.
 
 بعد از merge و baseline موفق main، از checkout تمیزِ همان main بسته بسازید؛
 شمارهٔ workflow staging موفق همین تغییر را جایگزین `<staging-run>` کنید:
