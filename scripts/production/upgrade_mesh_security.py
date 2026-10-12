@@ -28,15 +28,21 @@ def require(value, message):
         raise ValueError(message)
 
 
-def rendered_fields_match(actual, expected):
+def rendered_fields_match(actual, expected, path=()):
     """Retain every rendered field while accepting API-added map defaults."""
     if isinstance(expected, dict):
         return isinstance(actual, dict) and all(
-            key in actual and rendered_fields_match(actual[key], value)
+            (key not in actual and key == 'value' and value == ''
+             and len(path) >= 2 and path[-2] == 'env') or (
+                key in actual and rendered_fields_match(actual[key], value, (*path, key)))
             for key, value in expected.items())
     if isinstance(expected, list):
         return isinstance(actual, list) and len(actual) == len(expected) and all(
-            rendered_fields_match(left, right) for left, right in zip(actual, expected))
+            rendered_fields_match(left, right, (*path, index))
+            for index, (left, right) in enumerate(zip(actual, expected)))
+    # Kubernetes Quantity is serialized as a string; empty EnvVar.value is omitted.
+    if len(path) >= 3 and path[-3] == 'resources' and path[-2] in ('limits', 'requests'):
+        return str(actual) == str(expected)
     return actual == expected
 
 

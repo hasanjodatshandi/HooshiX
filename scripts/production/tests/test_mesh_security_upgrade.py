@@ -114,6 +114,14 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
         actual = copy.deepcopy(expected)
         actual['env'].append({'name': 'UNREVIEWED', 'value': 'true'})
         self.assertFalse(target.rendered_fields_match(actual, expected))
+        expected = {'resources': {'limits': {'cpu': 1}}, 'env': [{'name': 'PLATFORM', 'value': ''}]}
+        actual = {'resources': {'limits': {'cpu': '1'}}, 'env': [{'name': 'PLATFORM'}]}
+        self.assertTrue(target.rendered_fields_match(actual, expected))
+        actual['env'][0]['value'] = 'unexpected'
+        self.assertFalse(target.rendered_fields_match(actual, expected))
+        actual['env'][0].pop('value')
+        actual['resources']['limits']['cpu'] = '2'
+        self.assertFalse(target.rendered_fields_match(actual, expected))
 
     def test_predecessor_boundary_privilege_and_image_drift_fail_before_writes(self):
         for field in ('image', 'securityContext', 'command'):
