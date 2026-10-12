@@ -43,7 +43,7 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
         required_error: bytes | None = None) -> bytes:
     # Native argv only. Secret input/output stays in memory, never diagnostics.
     result = subprocess.run(args, input=data, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE if public_schema else subprocess.DEVNULL,
+                            stderr=subprocess.PIPE,
                             timeout=timeout, check=False,
                             env={"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LC_ALL": "C"})
     if (result.returncode != expected or len(result.stdout) > bound or
@@ -52,6 +52,13 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
             # Only public schema input, before TLS/Secret/init. Escape CI controls and bound output.
             print("OPENBAO_PUBLIC_SCHEMA_ERROR=" + json.dumps(
                 (result.stderr or b"")[:4096].decode("utf-8", errors="replace")), flush=True)
+        else:
+            # Never print response text after private fixture state is generated.
+            markers = [marker for marker in ('Forbidden', 'Invalid', 'already exists',
+                'failed to compile', 'undeclared reference', 'no matches', 'not found',
+                'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM')
+                if marker.encode() in (result.stderr or b'')]
+            print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
         raise RehearsalFailed("Kubernetes fixture command failed")
     return result.stdout
 

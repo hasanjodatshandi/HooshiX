@@ -48,6 +48,7 @@ def rendered_fields_match(actual, expected, path=()):
 
 def replace_policy(value, *, get, kube, previous=None):
     kind, name = value['kind'], value['metadata']['name']
+    print('MESH_UPGRADE_POLICY=' + name, flush=True)
     before = get(kind, name)
     if before is None:
         require(previous is None, 'required policy is absent')
