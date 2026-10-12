@@ -99,6 +99,19 @@ def desired_fields_match(actual, expected):
     return rendered_fields_match(actual, expected)
 
 
+def mismatched_path(actual, expected, path=()):
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        for key, value in expected.items():
+            child = (*path, key)
+            if key not in actual or not rendered_fields_match(actual[key], value, child):
+                return mismatched_path(actual.get(key), value, child)
+    if isinstance(expected, list) and isinstance(actual, list) and len(actual) == len(expected):
+        for index, (left, right) in enumerate(zip(actual, expected)):
+            if not rendered_fields_match(left, right, (*path, index)):
+                return mismatched_path(left, right, (*path, index))
+    return '.'.join(map(str, path))
+
+
 def established_crd(name, kube):
     deadline = time.monotonic() + 30
     # Read bounded status instead of retaining the full CRD in a watch stream.
@@ -189,6 +202,7 @@ def execute(plan, *, kube=host.kube):
             if obj['kind'] != 'Secret':
                 if not desired_fields_match(old, obj):
                     print('ESO_DRIFT_RESOURCE=' + obj['kind'] + '/' + obj['metadata']['name'], file=sys.stderr)
+                    print('ESO_DRIFT_FIELD=' + mismatched_path(old, obj), file=sys.stderr)
                     require(False, 'ESO_RESOURCE_DRIFT_PRESERVED')
         existing.append(bool(old))
     for policy in plan['policies']:

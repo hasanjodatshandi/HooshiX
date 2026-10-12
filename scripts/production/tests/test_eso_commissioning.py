@@ -22,6 +22,11 @@ import rehearse_openbao_kubernetes as fixture
 
 
 class ESOCommissioningTest(unittest.TestCase):
+    def test_drift_diagnostic_reports_path_not_values(self):
+        self.assertEqual('spec.args.0', target.mismatched_path(
+            {'spec': {'args': ['private-value']}}, {'spec': {'args': ['public-desired']}}))
+        self.assertEqual('spec.missing', target.mismatched_path({'spec': {}}, {'spec': {'missing': True}}))
+
     def test_crd_requires_positive_status_with_finite_deadline(self):
         with patch.object(target.time, 'monotonic', side_effect=[0, 31]):
             with self.assertRaisesRegex(ValueError, 'ESO_CRD_ESTABLISHMENT_TIMEOUT'):
