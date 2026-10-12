@@ -8,6 +8,10 @@ on:
       - scripts/production/rehearse_platform_admission.py
       - scripts/production/render_mesh_candidate.py
       - scripts/production/render_platform_admission.py
+      - scripts/production/render_mesh_security_upgrade.py
+      - scripts/production/upgrade_mesh_security.py
+      - scripts/production/verify_mesh_security_publication.py
+      - scripts/production/tests/test_mesh_security_upgrade.py
       - scripts/production/verify_platform_publication_run.py
       - scripts/production/commission_platform.py
       - scripts/production/platform_image_egress.py
@@ -20,6 +24,10 @@ on:
       - infrastructure/production/secrets/**
   workflow_dispatch:
     inputs:
+      mesh_security_upgrade:
+        description: Rehearse limited source-patched mesh upgrade preserving initialized OpenBao
+        type: boolean
+        default: true
       mesh_run:
         description: Successful reviewed-main Production release mesh publication run
         required: true
@@ -55,10 +63,14 @@ jobs:
           OPENBAO_RUN: ${{ inputs.openbao_run || '37611729931' }}
         run: |
           set -euo pipefail
-          install -d -m 0700 "$RUNNER_TEMP/platform-publications"
-          python3 scripts/production/verify_platform_publication_run.py \
-            --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
-            --output "$RUNNER_TEMP/platform-publications"
+          if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
+            python3 scripts/production/verify_mesh_security_publication.py --output "$RUNNER_TEMP/platform-publications"
+          else
+            install -d -m 0700 "$RUNNER_TEMP/platform-publications"
+            python3 scripts/production/verify_platform_publication_run.py \
+              --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
+              --output "$RUNNER_TEMP/platform-publications"
+          fi
       - name: Install pinned disposable fixture tools and YAML parser
         run: |
           set -euo pipefail
@@ -109,10 +121,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          options=()
+          if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
+            options+=(--mesh-security-upgrade)
+          fi
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/platform-tools" \
             --platform-publications "$RUNNER_TEMP/platform-publications" \
-            --receipt "$RUNNER_TEMP/platform-staging-receipt.json"
+            --receipt "$RUNNER_TEMP/platform-staging-receipt.json" "${options[@]}"
       - name: Retain content-free evidence only after private fixture cleanup
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -242,6 +242,11 @@ def bounded_image_policies(namespace: str, images: list[str], revision: str) -> 
     # image, provenance and SBOM verification separate bounded webhook calls;
     # a cold registry with multiple attestations can exceed one combined call.
     complete = image_policy(namespace, images, revision)
+    return split_image_policy(complete)
+
+
+def split_image_policy(complete: dict) -> list[dict]:
+    """Preserve all checks while bounding each signature/attestation webhook."""
     result = []
     for suffix, indexes, attestation in (("signature", [0], None),
                                          ("provenance", [1, 2], "provenance"),
@@ -257,7 +262,7 @@ def bounded_image_policies(namespace: str, images: list[str], revision: str) -> 
     return result
 
 
-def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
+def mesh_workloads(images: dict[str, str], mesh_candidate: dict) -> tuple[dict, dict]:
     if (mesh_candidate.get("installation_id") != "hooshix-production"
             or mesh_candidate.get("profile") != "production-single-server"
             or [s["component"] for s in mesh_candidate["stages"]] != list(mesh.COMPONENTS)):
@@ -274,7 +279,7 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
                 raise ValueError("exact upstream template required")
             if component in ("cni", "ztunnel"):
                 mesh.validate_node_exception(component, pod, mesh.pins())
-            pod["containers"][0]["image"] = mesh_receipt["components"][component]["image"]
+            pod["containers"][0]["image"] = images[component]
             pod["imagePullSecrets"] = [{"name": PULL_SECRET}]
             if component == "cni":
                 pod["containers"][0]["securityContext"]["allowPrivilegeEscalation"] = False
@@ -295,6 +300,12 @@ def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
             # narrowly approved root network components. No Unconfined fallback.
             pod.setdefault("securityContext", {})["seccompProfile"] = {"type": "RuntimeDefault"}
             pods[pod["serviceAccountName"]] = pod
+    return candidate, pods
+
+
+def render(mesh_receipt: dict, bao_receipt: dict, mesh_candidate: dict) -> dict:
+    candidate, pods = mesh_workloads(
+        {name: record['image'] for name, record in mesh_receipt['components'].items()}, mesh_candidate)
     openbao = bao.candidate("hooshix-openbao-local")
     bao_pod = openbao["items"][-1]["spec"]["template"]["spec"]
     bao_pod["containers"][0]["image"] = bao_receipt["image"]

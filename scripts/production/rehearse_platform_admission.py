@@ -207,10 +207,26 @@ def tuf_trust_boundary(k, pod, policy, wait):
 
 
 class Staging:
-    def __init__(self, directory: Path):
+    def __init__(self, directory: Path, *, mesh_security_upgrade: bool = False):
         now = datetime.now(timezone.utc)
-        self.mesh_receipt = admission.publication(directory / "mesh/receipt.json", "mesh", now)
-        self.bao_receipt = admission.publication(directory / "openbao/receipt.json", "openbao", now)
+        self.upgrade_plan = None
+        if mesh_security_upgrade:
+            import render_mesh_security_upgrade as upgrade
+            if os.environ.get('GITHUB_ACTIONS') != 'true':
+                raise ValueError('legacy reconstruction is disposable CI only')
+            upgrade.validate_publication(directory, now)
+            self.upgrade_plan = upgrade.render()
+            # Reconstruct installed predecessors ONLY in the disposable fixture;
+            # no scan/promotion success is fabricated for these older bytes.
+            self.mesh_receipt = {'repository_revision': upgrade.pin()['predecessor_import_revision'],
+                                 'components': admission.mesh_publication.targets()}
+            bao_pin = json.loads(admission.BAO_PIN.read_bytes())
+            self.bao_receipt = {'image': bao_pin['import_provenance']['image'],
+                'provenance_kind': 'unchanged-upstream-import',
+                'repository_revision': bao_pin['import_provenance']['revision']}
+        else:
+            self.mesh_receipt = admission.publication(directory / "mesh/receipt.json", "mesh", now)
+            self.bao_receipt = admission.publication(directory / "openbao/receipt.json", "openbao", now)
         self.plan = admission.render(self.mesh_receipt, self.bao_receipt, mesh.candidate())
         # Only kind's host CNI paths differ. Production source/render is not changed.
         replacements = {"/var/lib/rancher/k3s/data/current/bin/": "/opt/cni/bin",
@@ -228,6 +244,20 @@ class Staging:
                             volume["hostPath"]["path"] = replacements[source]
                 self.pods[pod["serviceAccountName"]] = pod
         self.plan["admission"]["items"][0] = admission.hardening("istio-system", self.pods)
+        if self.upgrade_plan is not None:
+            old = copy.deepcopy(self.pods)
+            new = copy.deepcopy(old)
+            for change in self.upgrade_plan['changes']:
+                account = 'istiod' if change['component'] == 'istiod' else 'istio-cni'
+                change['expected_pod'] = old[account]
+                new[account]['containers'][0]['image'] = change['after']
+            self.upgrade_plan['boundary_before'] = admission.hardening('istio-system', old)
+            self.upgrade_plan['boundary_after'] = admission.hardening('istio-system', new)
+            transition = copy.deepcopy(self.upgrade_plan['boundary_after'])
+            transition['spec']['validations'][0]['expression'] = '(' + self.upgrade_plan[
+                'boundary_before']['spec']['validations'][0]['expression'] + ') || (' + transition[
+                'spec']['validations'][0]['expression'] + ')'
+            self.upgrade_plan['boundary_transition'] = transition
         self.checks = {}
 
     def setup(self, k, run, directory: Path, wait):
@@ -453,7 +483,50 @@ class Staging:
         result["items"][-1]["spec"]["volumeClaimTemplates"][0]["spec"]["storageClassName"] = storage_class
         return result
 
-    def network(self, k, wait):
+    def security_upgrade(self, k, wait):
+        if self.upgrade_plan is not None:
+            import upgrade_mesh_security as upgrade
+            def adapter(*args, body=None, **options):
+                return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+            def get(kind, name, namespace=None):
+                scope = ['-n', namespace] if namespace else []
+                raw = k(*scope, 'get', kind, name, '--ignore-not-found', '-o', 'json')
+                return json.loads(raw) if raw.strip() else None
+            print('PLATFORM_STEP=initialized-bao-preserving-mesh-upgrade', flush=True)
+            upgrade.execute(self.upgrade_plan, get=get, kube=adapter)
+            self.checks['image_only_mesh_upgrade_initialized_bao_preserved'] = 'Passed'
+            for change in self.upgrade_plan['changes']:
+                self.mesh_receipt['components'][change['component']]['image'] = change['after']
+            # Exercise actual signed source identity, not only Pod schema.
+            for component in ('istiod', 'cni'):
+                import render_mesh_security_upgrade as renderer
+                original = renderer.source_policy(component)
+                # Combine checks for independent negatives after bounded production checks.
+                apply(k, original)
+                policy_ready(k, original)
+                account = 'istiod' if component == 'istiod' else 'istio-cni'
+                pod = copy.deepcopy(self.pods[account])
+                pod['containers'][0]['image'] = self.mesh_receipt['components'][component]['image']
+                test = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {
+                    'name': 'source-upgrade-probe', 'namespace': 'istio-system'}, 'spec': pod}
+                admission_result(k, test, wait)
+                for field in ('component', 'go_version', 'recipe_sha256', 'repository_revision'):
+                    bad = copy.deepcopy(original)
+                    expected = renderer.predicate(component)
+                    expected['buildDefinition']['externalParameters'][field] = 'wrong'
+                    bad['spec']['validations'][2]['expression'] = (
+                        'variables.provenanceVerified && images.containers.map(image, '
+                        'extractPayload(image, attestations.provenance).predicate == '
+                        + admission.literal(expected) + ').all(e, e)')
+                    try:
+                        apply(k, bad)
+                        admission_result(k, test, wait, expected=1,
+                                         message=b'platform source build identity rejected')
+                    finally:
+                        apply(k, original)
+                k('delete', original['kind'], original['metadata']['name'])
+                self.checks['source_identity_' + component + '_positive_negative'] = 'Passed'
+    def network(self, k, wait, *, sealed=True):
         # Temporary, precise fixture edge only. Production stays default deny.
         print("PLATFORM_STEP=ambient-network", flush=True)
         apply(k, {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {
@@ -514,7 +587,7 @@ class Staging:
 
                 state = wait(terminated, seconds=60)
                 output = k("-n", "hooshix-secrets", "logs", label)
-                # CLI here only runs status on a sealed, uninitialized fixture.
+                # Status only: no credentials, both predecessor and upgraded mesh.
                 # Classify fixed public errors; never print raw workload logs.
                 causes = [name for name in ('lookup', 'i/o timeout', 'connection refused', 'x509',
                                            'permission denied', 'EOF', 'no such file', 'context deadline', 'too many arguments')
@@ -522,7 +595,7 @@ class Staging:
                 print('PLATFORM_NETWORK_RESULT=' + json.dumps({'probe': label, 'exit_code': state['exitCode'],
                       'error_classes': causes}), flush=True)
                 if label == "mtls-positive":
-                    if state["exitCode"] != 2 or json.loads(output).get("sealed") is not True:
+                    if state["exitCode"] != (2 if sealed else 0) or json.loads(output).get("sealed") is not sealed:
                         raise ValueError("authorized Ambient API probe failed")
                 elif state["exitCode"] != 1:
                     raise ValueError("plaintext/wrong identity was not denied")
