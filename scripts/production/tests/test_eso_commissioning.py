@@ -25,8 +25,12 @@ class ESOCommissioningTest(unittest.TestCase):
     def test_crd_requires_positive_status_with_finite_deadline(self):
         with patch.object(target.time, 'monotonic', side_effect=[0, 31]):
             with self.assertRaisesRegex(ValueError, 'ESO_CRD_ESTABLISHMENT_TIMEOUT'):
-                target.established_crd('owned-crd', lambda *args, **kw: b'False')
-        target.established_crd('owned-crd', lambda *args, **kw: b'True')
+                target.established_crd('owned-crd', lambda *args, **kw: b'[]')
+        responses = iter([b'', b'[{"type":"Established","status":"True"}]'])
+        with patch.object(target.time, 'sleep'):
+            target.established_crd('owned-crd', lambda *args, **kw: next(responses))
+        with self.assertRaisesRegex(ValueError, 'ESO_CRD_STATUS_REJECTED'):
+            target.established_crd('owned-crd', lambda *args, **kw: b'{}')
 
     def test_network_rule_omission_retains_explicit_deny_direction(self):
         expected = renderer.eso.network(['10.43.0.1'])[0]
@@ -102,8 +106,8 @@ class ESOCommissioningTest(unittest.TestCase):
                 if value is None:
                     return b''
                 if '-o' in args and args[args.index('-o') + 1].startswith('jsonpath='):
-                    if 'Established' in args[args.index('-o') + 1]:
-                        return b'True'
+                    if '.status.conditions' in args[args.index('-o') + 1]:
+                        return b'[{"type":"Established","status":"True"}]'
                     return ('uid:' + value['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by', '')).encode()
                 return json.dumps(value).encode()
             if 'create' in args and 'token' in args:

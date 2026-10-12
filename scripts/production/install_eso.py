@@ -102,8 +102,13 @@ def desired_fields_match(actual, expected):
 def established_crd(name, kube):
     deadline = time.monotonic() + 30
     # Read bounded status instead of retaining the full CRD in a watch stream.
-    while kube('get', 'crd', name, '-o',
-            'jsonpath={.status.conditions[?(@.type=="Established")].status}', timeout=10).strip() != b'True':
+    while True:
+        raw = kube('get', 'crd', name, '-o', 'jsonpath={.status.conditions}', timeout=10).strip()
+        conditions = json.loads(raw) if raw else []
+        require(isinstance(conditions, list) and len(conditions) <= 16
+                and all(isinstance(item, dict) for item in conditions), 'ESO_CRD_STATUS_REJECTED')
+        if any(item.get('type') == 'Established' and item.get('status') == 'True' for item in conditions):
+            return
         require(time.monotonic() < deadline, 'ESO_CRD_ESTABLISHMENT_TIMEOUT')
         time.sleep(1)
 
