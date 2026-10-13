@@ -1011,6 +1011,25 @@ CNPG reconciliation، admission، staging، physical recovery یا نصب مقص
 `5098b00b5591eafa7a39b98a8b9117d40a65d948a7758e35adcc28fe331f81e6`.
 این شاهد native همان digestهاست؛ CNPG/admission/PITR/نصب مقصد را موفق اعلام نمی‌کند.
 
+### تصاویر وابستگی TLS: cert-manager
+
+برای Barman 0.15.1، cert-manager 1.20.3 همان وابستگی baseline پروژه است؛
+اضافه‌کردن آن Root آفلاین HooshiX یا CA موجود Istio را جایگزین نمی‌کند.
+security-owner انتشار `Public` یا `Private` را فقط برای سه مقصد ثابت زیر، زیر
+`ghcr.io/hasanjodatshandi/hooshix/` تأیید کرده است:
+
+- `platform-cert-manager-controller`
+- `platform-cert-manager-cainjector`
+- `platform-cert-manager-webhook`
+
+این مجوز فقط visibility تصاویر متن‌باز زیرساخت است؛ شامل acmesolver، startup
+job، package دیگر، تصاویر محصول، اسرار یا بازکردن سرویس نیست. اسکن کامل تازه،
+امضا، provenance، signed SBOM و گیت‌های پذیرش و نصب همچنان الزامی‌اند.
+نصب cert-manager روی VPS هنوز **Not run** است؛ tooling و روش نهایی انتشار در
+همین بخش پس از تکمیل بررسی مربوط به همین تغییر ثبت می‌شود.
+
+مرجع وابستگی: [نصب Barman 0.15.1](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
+
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 
 برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell
