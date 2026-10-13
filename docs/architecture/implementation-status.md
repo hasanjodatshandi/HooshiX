@@ -111,9 +111,24 @@ The protected `cert-manager-candidate` dispatcher publishes only controller,
 cainjector and webhook destinations under the owner's explicit three-package
 public/private exception. It requires whole-set registry scans before signing,
 then exact signature/SLSA/CycloneDX verification via the existing release helper.
-Publication, target installation, certificate issuance, admission and staging
-remain `Not run`/`Not verified` until their own executed receipts exist. It does
-not alter application private-only policy, the offline Root, Istio CA or VPS.
+Protected publication `38409447796:1` on
+`main@c5dd3c0012139e7969606bc074f207adebd65d26` completed with `Passed` for all
+three signatures/exact SLSA/CycloneDX payloads and actual public visibility
+within that limited exception. `cert-manager-images.json` separately binds the
+published set and public receipt SHA256
+`b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8`, preserving
+the source recipe and its provenance hash. `verify_published_cert_manager.py`
+independently verifies every exact registry scan/signature/attestation and signer
+negative before pulling those same three digests for restricted help-only smoke.
+It never builds, pushes, signs, installs or connects to the VPS. Target installation,
+certificate issuance, admission and staging remain `Not run`/`Not verified` until
+their own executed receipts exist. Application private-only policy, the offline
+Root, Istio CA and VPS remain unchanged.
+Independent execution at `2026-10-13T14:36:06.181297+00:00` passed the complete
+published signature/SLSA/CycloneDX set, wrong-signer controls and restricted native
+entrypoints. Public acceptance receipt SHA256 is
+`7855cf84fe2a8bbde40474ab872d91f0d83ed657b2b320f66768599b02dc8c8b`.
+Certificate issuance/API behavior and target readiness are not established by help.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
