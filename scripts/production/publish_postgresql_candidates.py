@@ -114,8 +114,11 @@ def publish(directory, env):
         private_package(component)
         folder = directory / component / 'registry'
         folder.mkdir(mode=0o700)
-        scan_inventory(folder, target, 'registry')
-        image = published_image(repository(component), load(folder / 'syft.json')['source'],
+        (folder / 'scanner-config.json').write_text('{}\n')
+        run(['syft', 'scan', target, '--from', 'registry', '--platform', 'linux/amd64',
+             '--config', str(folder / 'scanner-config.json'),
+             '-o', 'syft-json=' + str(folder / 'registry-resolution.json')], timeout=300)
+        image = published_image(repository(component), load(folder / 'registry-resolution.json')['source'],
                                 receipt['image_config_digest'])
         scan_inventory(folder, image, 'registry')
         if published_image(repository(component), load(folder / 'syft.json')['source'],

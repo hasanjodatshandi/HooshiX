@@ -31,6 +31,9 @@ class PostgreSQLPublicationTest(unittest.TestCase):
             calls.append(argv)
             if argv[0] == 'git': return self.revision
             if argv[0] == 'gh': return 'public' if reject == 'public' else 'private'
+            if argv[0] == 'syft':
+                self.write_resolution(Path(argv[-1].removeprefix('syft-json=')), reject)
+                return ''
             self.assertEqual(['docker', '--host', 'unix:///captured.sock'], argv[:3])
             if argv[3] == 'tag': self.assertEqual(self.engine, argv[4])
             return ''
@@ -40,20 +43,12 @@ class PostgreSQLPublicationTest(unittest.TestCase):
             return {'image_config_digest': self.config, 'local_engine_digest': self.engine}
         def scan(folder, image, source):
             scans.append(image)
-            component = folder.parent.name
-            metadata = {'imageID': self.config, 'manifestDigest': 'sha256:' + 'd' * 64,
-                        'os': 'linux', 'architecture': 'amd64',
-                        'repoDigests': [target.repository(component) + '@sha256:' + 'd' * 64]}
-            if reject == 'config': metadata['imageID'] = self.engine
-            if reject == 'manifest' and '@' in image:
-                metadata['manifestDigest'] = 'sha256:' + 'f' * 64
-                metadata['repoDigests'] = [target.repository(component) + '@sha256:' + 'f' * 64]
-            (folder / 'syft.json').write_text(json.dumps({'source': {'type': 'image', 'metadata': metadata}}))
+            self.write_resolution(folder / 'syft.json', reject)
         def validate(folder, component, image, now, config):
             if reject == 'scan' and component == 'barman-sidecar': raise ValueError('blocked')
             return {'image_config_digest': config, 'scan': 'Passed'}
         def sign(folder, image, predicate):
-            self.assertEqual(8, len(scans))
+            self.assertEqual(4, len(scans))
             signatures.append(image)
             if reject == 'signature': raise ValueError('invalid attestation')
         with patch.object(target, 'run', side_effect=native), \
@@ -75,6 +70,14 @@ class PostgreSQLPublicationTest(unittest.TestCase):
                     self.assertEqual('Not verified', result[name])
                 self.assertEqual(result, json.loads((directory / 'publication.json').read_text()))
         return calls
+
+    def write_resolution(self, path, reject):
+        component = path.parent.parent.name
+        digest = 'sha256:' + ('f' if reject == 'manifest' and path.name == 'syft.json' else 'd') * 64
+        metadata = {'imageID': self.engine if reject == 'config' else self.config,
+                    'manifestDigest': digest, 'os': 'linux', 'architecture': 'amd64',
+                    'repoDigests': [target.repository(component) + '@' + digest]}
+        path.write_text(json.dumps({'source': {'type': 'image', 'metadata': metadata}}))
 
     def test_set_binds_engine_config_and_registry_without_promotion(self):
         with tempfile.TemporaryDirectory() as parent:
