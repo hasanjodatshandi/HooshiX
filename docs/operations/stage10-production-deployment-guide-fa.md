@@ -1028,6 +1028,13 @@ job، package دیگر، تصاویر محصول، اسرار یا بازکرد�
 نصب cert-manager روی VPS هنوز **Not run** است. این بخش فقط candidate انتشار
 می‌سازد، نه نصب TLS، تأیید staging یا readiness تولید.
 
+انتشار محافظت‌شدهٔ کل سه تصویر در run `38409447796`، attempt `1`، از
+`main@c5dd3c0012139e7969606bc074f207adebd65d26` با **Passed** ثبت شده است.
+visibility واقعی فقط همین سه مقصد `public` است و در استثنای محدود بالا قرار دارد.
+SHA-256 فایل عمومی `publication.json`:
+`b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8`.
+این رسید انتشار، به‌تنهایی مجوز نصب یا شاهد TLS/admission/staging نیست.
+
 سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
 runtime هر جزء در `infrastructure/production/data/cert-manager-sources.json`
 ثابت‌اند. باینری هر سه جزء از همان سورس، با `Go 1.26.9`، `x/net 0.60.0` و
