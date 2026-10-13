@@ -1,0 +1,83 @@
+name: PostgreSQL candidate artifacts
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/postgresql-artifacts.yml'
+      - 'infrastructure/production/data/**'
+      - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/build_postgresql_candidates.py'
+      - 'scripts/production/publish_mesh_candidate.py'
+      - 'scripts/production/verify_openbao_artifact.py'
+      - 'scripts/production/install_release_tools.sh'
+      - 'infrastructure/production/release-tools.env'
+      - 'scripts/production/tests/test_postgresql_artifacts.py'
+      - 'scripts/production/tests/test_postgresql_source_builds.py'
+      - 'scripts/production/test_postgresql_isolation_native.py'
+      - 'scripts/production/render_postgresql_ownership.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/postgresql-artifacts.yml'
+      - 'infrastructure/production/data/**'
+      - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/build_postgresql_candidates.py'
+      - 'scripts/production/publish_mesh_candidate.py'
+      - 'scripts/production/verify_openbao_artifact.py'
+      - 'scripts/production/install_release_tools.sh'
+      - 'infrastructure/production/release-tools.env'
+      - 'scripts/production/test_postgresql_isolation_native.py'
+      - 'scripts/production/render_postgresql_ownership.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: postgresql-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scan:
+    name: PostgreSQL artifact ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        component: [operator, postgresql, barman-plugin, barman-sidecar]
+    env:
+      SYFT_GOLANG_CAPTURE_SYMBOLS: all
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+      SYFT_CHECK_FOR_APP_UPDATE: 'false'
+    steps:
+      - name: Check out candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install integrity-pinned scanners
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/postgresql-tools"
+          echo "$RUNNER_TEMP/postgresql-tools" >> "$GITHUB_PATH"
+      - name: Build or scan exact final candidate without credentials
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          timeout 180 grype db update
+          python3 scripts/production/build_postgresql_candidates.py \
+            --component "$COMPONENT" --directory "$RUNNER_TEMP/postgresql-evidence" --export-image \
+            > "$RUNNER_TEMP/postgresql-receipt.json"
+      - name: Preserve bounded public scan evidence even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: postgresql-${{ matrix.component }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/postgresql-evidence/*json
+            ${{ runner.temp }}/postgresql-evidence/Dockerfile
+            ${{ runner.temp }}/postgresql-evidence/candidate-image.tar
+            ${{ runner.temp }}/postgresql-receipt.json
+          retention-days: 30
+          if-no-files-found: error

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "platform": "linux/amd64",
+  "production_promotion": "blocked-until-supply-chain-staging-and-recovery-evidence",
+  "components": {
+    "operator": {
+      "version": "1.30.1",
+      "image": "ghcr.io/cloudnative-pg/cloudnative-pg@sha256:b0f9805bd5f98592e7320b5ea624dd10a7a6ef8e477df5650655c94f0b242497",
+      "index_digest": "sha256:923c267ec29636db3bee20f993d0ec4973fa22998e1adad37da79e4d32b5bc07",
+      "compressed_bytes": 38497693,
+      "source_revision": "2a35abb4628f209d149825ef3c38011e0701ff2f",
+      "image_labels": {"org.opencontainers.image.version": "1.30.1", "org.opencontainers.image.revision": "2a35abb46"},
+      "manifest": {
+        "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/releases/cnpg-1.30.1.yaml",
+        "sha256": "37237f145d8138256ea25ae830f87759255665ff08f8d552fdd8224a5ec032fb"
+      }
+    },
+    "postgresql": {
+      "version": "18.6",
+      "image": "ghcr.io/cloudnative-pg/postgresql@sha256:e5fffed938c8b55b41d9a6a88a47424d46f90aa15d807aa60348b85ea5bd498f",
+      "index_digest": "sha256:c9be7f221a05b18fe65259d9136affbabe3b39ad91c3b68f8f2f990a45f35f38",
+      "compressed_bytes": 82606366,
+      "source_revision": "61cde9a280f722b52f5306c44207541de05be343",
+      "image_labels": {"org.opencontainers.image.version": "18.6", "org.opencontainers.image.revision": "61cde9a280f722b52f5306c44207541de05be343"}
+    },
+    "barman-plugin": {
+      "version": "0.15.1",
+      "image": "ghcr.io/cloudnative-pg/plugin-barman-cloud@sha256:e982a3b8813703e5c0e58c49aef7e15fe41bbe396c949c480627bda6a3a067b9",
+      "index_digest": "sha256:c75acad19a36e8176cfe2885761ff1b836c6ef977d7257e298c99a28b5c302ef",
+      "compressed_bytes": 43664647,
+      "source_revision": "b3f01943b83e7975e01233fc613cb5f0941b57d1",
+      "upstream_tag_revision": "6216b7dd552f389952d3de77712d9522a79d9548",
+      "image_labels": {"org.opencontainers.image.revision": "b3f01943b83e7975e01233fc613cb5f0941b57d1"},
+      "manifest": {
+        "url": "https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.15.1/manifest.yaml",
+        "sha256": "8f377ff4a7d0d3f74fc64b0f7ac4f449fc38ca9e83a40107cca2f9315a9bd920"
+      }
+    },
+    "barman-sidecar": {
+      "version": "0.15.1",
+      "image": "ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar@sha256:eb61ec74fddfcadc956fa49d99306daf9d6ec84b59594b183614037e2b5a5785",
+      "index_digest": "sha256:2287a793a804db751edd0d07d44cd549e357677e98a800eb12e2cf7c0d53f9b0",
+      "compressed_bytes": 109402525,
+      "upstream_tag_revision": "6216b7dd552f389952d3de77712d9522a79d9548",
+      "image_labels": {"io.k8s.display-name": "CloudNativePG Barman plugin"}
+    }
+  }
+}

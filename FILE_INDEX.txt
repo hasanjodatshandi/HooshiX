@@ -8,6 +8,7 @@
 .github/workflows/offline-ca.yml
 .github/workflows/patched-platform-source.yml
 .github/workflows/platform-commissioning.yml
+.github/workflows/postgresql-artifacts.yml
 .github/workflows/production-release.yml
 .github/workflows/production-vulnerability-rescan.yml
 .github/workflows/repository-baseline.yml
@@ -375,6 +376,8 @@ infrastructure/observability/pins.env
 infrastructure/observability/prometheus.yaml
 infrastructure/production/README.md
 infrastructure/production/data/data-policy.json
+infrastructure/production/data/postgresql-images.json
+infrastructure/production/data/postgresql-source-builds.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json
 infrastructure/production/host/audit.rules
@@ -524,6 +527,7 @@ scripts/production/build_eso_commissioning_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
+scripts/production/build_postgresql_candidates.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
 scripts/production/commission_platform.py
@@ -624,7 +628,9 @@ scripts/production/tests/test_patched_platform.py
 scripts/production/tests/test_platform_admission.py
 scripts/production/tests/test_platform_commissioning.py
 scripts/production/tests/test_platform_publication_run.py
+scripts/production/tests/test_postgresql_artifacts.py
 scripts/production/tests/test_postgresql_ownership.py
+scripts/production/tests/test_postgresql_source_builds.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_readiness.py
@@ -640,6 +646,7 @@ scripts/production/verify_host_audit.py
 scripts/production/verify_mesh_security_publication.py
 scripts/production/verify_openbao_artifact.py
 scripts/production/verify_platform_publication_run.py
+scripts/production/verify_postgresql_artifacts.py
 scripts/production/verify_release.py
 scripts/production/verify_storage_guard.py
 services/authorization-service/.dockerignore

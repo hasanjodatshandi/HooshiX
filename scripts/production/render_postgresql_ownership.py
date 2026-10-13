@@ -83,7 +83,7 @@ COMMIT;
 def render() -> dict:
     policy = json.loads((ROOT / 'infrastructure/production/data/data-policy.json').read_text())
     selected = policy['postgresql']
-    if (selected['cloudnativepg'] != '1.30.0' or selected['version'] != '18.4'
+    if (selected['cloudnativepg'] != '1.30.1' or selected['version'] != '18.6'
             or selected['instances'] != 1 or selected['physical_clusters'] != 1
             or selected['distinct_service_databases'] is not True
             or selected['runtime_migration_role_isolation'] is not True):

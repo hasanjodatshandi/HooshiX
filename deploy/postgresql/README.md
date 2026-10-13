@@ -4,6 +4,22 @@ Owner: Platform Reliability. Current authority: ADR-0019/0027/0034/0037/0042.
 This is the credential-free ownership component of the **single-server** CNPG
 baseline, not a complete cluster installer or production promotion approval.
 
+The four official operator/operand/plugin/sidecar inputs and upstream manifest
+checksums are pinned in `infrastructure/production/data/postgresql-images.json`.
+`scripts/production/verify_postgresql_artifacts.py` verifies their blocked
+candidate scans; `.github/workflows/postgresql-artifacts.yml` runs the exact
+four-image gate without credentials or target writes. Go components use
+`build_postgresql_candidates.py` and the integrity-pinned
+`data/postgresql-source-builds.json`: operator 1.30.1 rebuilds both embedded
+architectures, Barman 0.15.1 rebuilds the plugin/sidecar manager, and the static
+plugin uses the pinned non-root distroless base rather than UBI. The sidecar keeps
+the hash-locked Barman 3.20.1 requirements, rebuilt for Python 3.14.8 on pinned
+Alpine 3.24.2. The PostgreSQL 18.6 candidate uses the pinned official Alpine
+operand plus exact fixed OpenSSL/zlib packages and a valid UID/GID 26 account.
+Both remain blocked until final scan/native compatibility/recovery gates pass. No
+source input is treated as an unchanged imported final image. This does not sign,
+publish or approve installation. See the Persian Stage10 guide for local usage.
+
 ```bash
 python3 scripts/production/render_postgresql_ownership.py --candidate
 python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_ownership.py'
