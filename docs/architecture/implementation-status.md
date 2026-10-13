@@ -130,6 +130,18 @@ entrypoints. Public acceptance receipt SHA256 is
 `7855cf84fe2a8bbde40474ab872d91f0d83ed657b2b320f66768599b02dc8c8b`.
 Certificate issuance/API behavior and target readiness are not established by help.
 
+Internal cert-manager commissioning tooling now renders only three signed
+components in `cnpg-system`, with restricted namespace Roles, exact cainjector
+webhook updates, internal-only Issuers and the ADR-0002 webhook-only Ambient
+exception. A supervised installer preserves mesh/OpenBao/ESO/storage, validates
+protected audit/secrets encryption and tests verified API callbacks without
+creating a public TLS route. The disposable staging extension requires native
+issuance/rotation/hostname, RBAC/issuer/source/signer/SBOM negatives and idempotent
+reconciliation before the exact-main public bundle may be built. Native staging,
+bundle construction and target installation remain `Not run` until their own
+executed evidence is recorded. Barman runtime/PITR and Production readiness remain
+`Not verified`; the provider deferral is not a passing gate.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical
@@ -851,7 +863,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
-| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 installed and initialized/unsealed Shamir 3/2; encrypted snapshot and scoped-auth bootstrap tooling implemented; ESO not installed | Target installation/TLS/PVC, custody recovery/unseal and operator-local isolated snapshot recovery Passed; custody distribution owner-attested; cloud version/retention, target scoped auth, hourly backup, ESO and root revocation Not verified |
+| OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 initialized/unsealed Shamir 3/2; ESO 2.12.0 installed with six SecretStores Ready under the exact owner-run receipt above | Target installation/TLS/PVC, custody recovery/unseal, operator-local isolated snapshot recovery and reported ESO installation Passed; custody distribution owner-attested; application secret materialization, cloud version/retention/hourly backup, JIT and root revocation Not verified |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Cross-service CI/security/supply-chain release gates | DESIGNED | Stage 10 seven-artifact source merged; protected head and merged-main CI PASSED | Semgrep/OSV/Gitleaks-capable service workflows plus frontend Semgrep/OSV/image/Helm gates are present; Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation cover all seven application release components. PR #142 head runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed; real production release/rescan/admission execution remains NOT VERIFIED |
 | OpenTelemetry Collector | DESIGNED under ADR-0044 | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | three-node local Collector DaemonSet, bounded queues/privacy config, exact read-only pod-log hostPath, metrics, and OTLP integration PASSED |

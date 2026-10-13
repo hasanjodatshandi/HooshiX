@@ -64,6 +64,14 @@ Controller/cert-controller remain enrolled; namespace STRICT and default-deny re
 unchanged. The exact ESO manifest and network boundary are rendered by
 `scripts/production/render_eso_candidate.py`; rendering is not target installation evidence.
 
+ADR-0002 also permits only the cert-manager API-callback webhook Pod in
+`cnpg-system` outside Ambient. `render_cert_manager_candidate.py` renders the
+three signed certificate components, restricted namespace-local Roles, internal
+issuer policy, exact webhook update permissions and API-only callback networking.
+Controller/cainjector remain Ambient. No ACME/ClusterIssuer/application TLS,
+existing Root/CA mutation or certificate key is part of that public plan.
+Native issuance/admission and target installation require separate executed evidence.
+
 ### Narrow network-node exception
 
 For HooshiX Stage 10, the security-owner explicitly approved this scope on 2026-10-05;

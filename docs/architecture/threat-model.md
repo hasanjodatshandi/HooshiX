@@ -289,6 +289,14 @@ Required: server-side BFF state, secure cookies, HMAC locators, rotation/revocat
 
 Required: SA/mTLS/NetworkPolicy/Istio + DB/Redis/Kafka/OpenBao/provider/telemetry least privilege.
 
+ADR-0002's cert-manager API-callback exception does not grant certificate-controller
+access to application Secrets or project Root material. Certificate Roles remain
+in `cnpg-system`; cainjector has cluster webhook metadata read but exact-name update
+only. External issuers/ACME/ClusterIssuer and controller/cainjector Ambient opt-out
+are denied. API-only HTTPS ingress and fail-closed admission remain independent
+controls. Native wrong-identity/RBAC/issuer/network/certificate tests are required;
+namespace scoping does not protect certificate material against host/root compromise.
+
 ### TM-11 Telemetry injection/exfiltration
 
 Attacker sends crafted headers/inputs causing high-cardinality attributes, log injection, PII/secret export, or trace-baggage authority confusion.

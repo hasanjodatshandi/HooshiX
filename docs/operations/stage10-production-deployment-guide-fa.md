@@ -1126,14 +1126,66 @@ admission و staging را ثابت نمی‌کند. خطای جزئی receipt م
 
 #### محدودهٔ commissioning گواهی داخلی دیتابیس
 
-نصب بعدی cert-manager فقط برای TLS داخلی control plane دیتابیس در
+ابزار cert-manager فقط برای TLS داخلی control plane دیتابیس در
 `cnpg-system` آماده می‌شود؛ صدور TLS عمومی `hooshix.com`، ACME، ClusterIssuer
 و گواهی برنامه‌ها خارج از این محدوده‌اند. با تأیید مالک، فقط Pod وب‌هوک
 cert-manager می‌تواند خارج از Ambient باشد؛ controller و cainjector داخل
 Ambient می‌مانند. callback باید HTTPS معتبر، `failurePolicy=Fail` و ingress
 محدود به IPهای دقیق کشف‌شدهٔ API سرور داشته باشد. این تأیید، شاهد اجرای نصب
-نیست: آماده‌سازی manifest، آزمون native و نصب VPS هنوز **Not run** هستند.
+نیست: renderer و ابزار نصب آماده‌اند؛ آزمون native و نصب VPS هنوز **Not run** هستند.
 Root/CA موجود، OpenBao، ESO و storage نباید در این عملیات تغییر کنند.
+
+`render_cert_manager_candidate.py` فقط manifest رسمی hash-bound نسخهٔ `1.20.3`
+و سه digest منتشرشده را مصرف می‌کند. سه CRD namespaced مربوط به Certificate،
+CertificateRequest و Issuer آماده می‌شوند؛ ClusterIssuer و ACME/solver فعال
+نمی‌شوند. Roleهای certificate در `cnpg-system` باقی می‌مانند. cainjector فقط
+metadata وب‌هوک‌ها را در سطح کلاستر می‌خواند و فقط تنظیمات `cert-manager-webhook`
+را می‌تواند تغییر دهد؛ گسترش به وب‌هوک Barman بعداً به نام‌های دقیق محدود می‌شود.
+این CA داخلی وب‌هوک، Root پروژه یا intermediate مش نیست.
+
+بعد از **Passed** شدن آزمون native کل بسته روی commit نهایی `main`، بستهٔ عمومی
+خارج از Git ساخته می‌شود. دستور زیر فقط قالب راهنماست؛ شناسهٔ run را از اجرای
+موفق همان tree دریافت کنید و تا قبل از وجود آن اجرا نکنید:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main -f mesh_security_upgrade=true \
+  -f eso_commissioning=true -f cert_manager_commissioning=true
+# Wait for the exact reviewed main's successful native receipt before building.
+python3 scripts/production/build_cert_manager_commissioning_bundle.py \
+  --staging-run <successful-platform-staging-run-id> \
+  --manifest <verified-official-cert-manager.yaml> \
+  --evidence-dir <verified-public-cert-manager-publication-directory> \
+  --output <new-outside-git-public-bundle-directory>
+```
+
+builder به `main` تمیز، Git tree یکسان با CI، رسید تازهٔ حداکثر پنج‌روزه،
+امضای واقعی سه digest، provenance/SBOM، callback HTTPS، آزمون signer/source غلط،
+صدور/تعویض گواهی و hostname غلط، رد issuer خارجی و دسترسی namespace دیگر نیاز دارد.
+نبودن شواهد مجوز تولید بسته نیست. کلیدهای آزمون فقط در کلاستر دورریختنی CI ساخته
+می‌شوند؛ Root واقعی یا private keyها وارد CI نمی‌شوند. آزمون گواهی داخلی، اجرای
+واقعی Barman یا backup پارس‌پک را Passed نمی‌کند.
+
+بستهٔ معتبر را در Downloads ویندوز نگه دارید. ابتدا wrapper همان بسته را با
+`-ValidateOnly` اجرا کنید. برای نصب، VNC نجات و نشست دوم SSH باز بمانند، سپس:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-cert-manager-commissioning.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo را در پنجرهٔ محلی وارد کنید؛ PAT، رمز Root یا custody لازم نیست.
+ابزار hash فایل‌ها، audit محافظت‌شده و Metadata-only API audit، encryption
+اسرار K3s، مالکیت/عدم drift مقصد و حالت OpenBao/mesh/ESO را بررسی می‌کند.
+IPهای API روی خود مقصد کشف می‌شوند؛ address placeholder داخل plan مجوز شبکه نیست.
+Namespace محدود، hardening، امضا/attestation و default-deny پیش از Podها اعمال
+می‌شوند. هیچ public route، دسترسی دائم جدید، تغییر SSH/ایمیل یا allocation دیتابیس
+ایجاد نمی‌شود. رسید عمومی موفق باید `CERT_MANAGER_INSTALLATION=Passed`،
+`api_callback_tls=Passed`، `external_issuer_denied=Passed` و حفظ اجزای قبلی را
+ثبت کند؛ این هنوز مجوز ترافیک محصول نیست.
+
+در خطای جزئی، state و فایل عمومی حفظ می‌شوند؛ retry، حذف CRD/Secret، rollback
+خودکار یا ساخت مجدد کلید انجام نمی‌شود. رسید بدون نتیجه یا نصب جزئی را Passed
+فرض نکنید. TLS و تغییر namespace در سرور دوم باید دوباره با مقصد همان سرور
+آزموده شوند؛ رسید VPS اول مجوز استفادهٔ کورکورانه روی سرور دیگر نیست.
 
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 

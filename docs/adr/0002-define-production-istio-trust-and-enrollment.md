@@ -73,6 +73,45 @@ identity, certificate and delivery tests remain required before target promotion
 References: [Istio Ambient selection](https://istio.io/latest/docs/ambient/usage/add-workloads/)
 and [Ambient NetworkPolicy](https://istio.io/latest/docs/ambient/usage/networkpolicy/).
 
+### Owner-approved internal cert-manager webhook boundary (2026-10-13)
+
+For the database control-plane TLS dependency, only the `cert-manager-webhook`
+Deployment in `cnpg-system` may set `istio.io/dataplane-mode=none`. The API-server
+callback remains verified HTTPS, `failurePolicy=Fail`, five-second bounded and
+namespace-scoped. Calico ingress selects only that Pod on TCP/10250 from exact
+discovered API endpoints. Node-local health traffic follows the existing CNI host
+semantics; an IP rule is not cryptographic API identity proof.
+
+The cert-manager controller and cainjector remain explicitly Ambient, with
+namespace STRICT, dedicated non-root ServiceAccounts, default-deny networking,
+fixed signed images, exact source provenance and signed SBOM admission. This is
+not a controller, namespace-wide, application, CNPG/Barman webhook or public-route
+opt-out. No PERMISSIVE/DISABLE, sidecar, privilege or host mount is authorized.
+
+The initial certificate controllers operate only in `cnpg-system` for internal
+CA/self-signed Issuers. ClusterIssuers, ACME/solver, ingress/Gateway, external
+issuers and Kubernetes CSR controllers are disabled. Namespace Roles bound Secret
+access; cainjector can read webhook metadata cluster-wide but may update only
+`cert-manager-webhook` configurations. Other injector targets require their own
+reviewed exact-name extension. Fail-closed admission pins callback service, rules,
+namespace selection and `failurePolicy=Fail` while allowing CA-bundle injection;
+the injector cannot weaken its own callback boundary. Pods use an exact one-hour
+projected API token; executable arguments, environment and mounts are admission-bound.
+The serving CA is distinct control-plane TLS
+material; it does not replace or modify the offline Root, Istio intermediate,
+OpenBao TLS or application secret authority. Root material is never imported.
+
+Render and live admission tests must reject wrong image/signer/source/SBOM,
+wrong account, widened controller scope, controller/cainjector opt-out, external
+issuer and unapproved webhook Secret writes. Verified callback TLS, internal
+issuance/renewal, RBAC/network negatives and existing CA/OpenBao/ESO/storage
+preservation are required before a supervised target bundle is usable.
+
+References: [controller namespace scope](https://cert-manager.io/docs/cli/controller/),
+[cainjector scope](https://cert-manager.io/docs/installation/best-practice/) and
+the immutable source/manifest in `cert-manager-sources.json`. Approval and render
+are not executed installation, certificate or Production-readiness evidence.
+
 ### Authorization
 
 STRICT mTLS authenticates workload identity; least-privilege `AuthorizationPolicy` controls permitted communication. NetworkPolicy and native datastore authentication remain independent controls.
