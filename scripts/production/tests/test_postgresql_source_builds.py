@@ -25,6 +25,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             'imageID': self.image, 'userInput': self.image, 'os': 'linux', 'architecture': 'amd64', 'labels': {
             'io.hooshix.provenance.kind': target.provenance(component),
             'io.hooshix.source.revision': source['revision'],
+            'org.opencontainers.image.source': 'https://github.com/hasanjodatshandi/HooshiX',
             'io.hooshix.recipe.sha256': hashlib.sha256(target.RECIPE.read_bytes()).hexdigest()}}},
             'descriptor': {'name': 'syft', 'version': '1.51.0', 'configuration': {
                 'search': {'scope': 'squashed'}, 'catalogers': {

@@ -20,6 +20,17 @@ Both remain blocked until final scan/native compatibility/recovery gates pass. N
 source input is treated as an unchanged imported final image. This does not sign,
 publish or approve installation. See the Persian Stage10 guide for local usage.
 
+The separate `publish_postgresql_candidates.py` path publishes this complete
+source/runtime set only via protected `production-release.yml` on `main`, dispatch
+kind `postgresql-candidate`. Fresh registry digest scans precede all signing;
+private package visibility and exact source/runtime SLSA/CycloneDX/signature
+verification are mandatory. `publication.json` reports all four images only after
+whole-set success, retaining staging/admission/deployment/promotion as
+`Not verified`. This does not import the blocked official inputs unchanged or
+inherit the older platform packages' public visibility exception. See the
+[Stage10 guide](../../docs/operations/stage10-production-deployment-guide-fa.md)
+for dispatch and evidence retrieval; do not supply VPS/Root/custody credentials.
+
 ```bash
 python3 scripts/production/render_postgresql_ownership.py --candidate
 python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_ownership.py'

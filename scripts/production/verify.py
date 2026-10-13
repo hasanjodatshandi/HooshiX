@@ -47,6 +47,7 @@ REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/prepare_human_sshd_candidate.py",
     ROOT / "scripts/production/verify_postgresql_artifacts.py",
     ROOT / "scripts/production/build_postgresql_candidates.py",
+    ROOT / "scripts/production/publish_postgresql_candidates.py",
     ROOT / ".github/workflows/postgresql-artifacts.yml",
     ROOT / "scripts/production/render_gitops.py", ROOT / "scripts/production/release_supply_chain.sh",
     ROOT / "scripts/production/build_provenance.py", ROOT / "scripts/production/install_release_tools.sh",

@@ -81,7 +81,8 @@ def dockerfile(component, selected):
                  f'RUN apk add --no-cache {runtime_packages} && '
                  'adduser -D -H -u 26 -G tape -s /sbin/nologin cnpg',
                  'USER 26:26', 'ENTRYPOINT ["/usr/local/bin/postgres"]', 'CMD []']
-        lines += [f'LABEL io.hooshix.provenance.kind="{provenance(component)}"',
+        lines += ['LABEL org.opencontainers.image.source="https://github.com/hasanjodatshandi/HooshiX"',
+                  f'LABEL io.hooshix.provenance.kind="{provenance(component)}"',
                   f'LABEL io.hooshix.source.revision="{source["revision"]}"',
                   f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(RECIPE.read_bytes()).hexdigest()}"']
         return '\n'.join(lines) + '\n'
@@ -127,15 +128,23 @@ def dockerfile(component, selected):
     for destination in BINARIES[component].values():
         lines.append(f'COPY --from=build --chmod=0555 /out/{Path(destination).name} {destination}')
     lines += ['COPY --from=build /out/*.sha256 /out/*.json /out/*.buildinfo /usr/share/hooshix-source-build/',
+        'LABEL org.opencontainers.image.source="https://github.com/hasanjodatshandi/HooshiX"',
         'LABEL io.hooshix.provenance.kind="patched-upstream-source-build"',
         f'LABEL io.hooshix.source.revision="{source["revision"]}"',
         f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(RECIPE.read_bytes()).hexdigest()}"']
     return '\n'.join(lines) + '\n'
 
 
-def validate_local(directory, component, image_id, now):
-    if component not in COMPONENTS or not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
-        raise ValueError('known component and exact configuration required')
+def validate_inventory(directory, component, image_id, now, expected_config_digest=None):
+    if component not in COMPONENTS:
+        raise ValueError('known component required')
+    if expected_config_digest is None:
+        immutable = re.fullmatch(r'sha256:[a-f0-9]{64}', image_id)
+    else:
+        immutable = (re.fullmatch(r'[a-z0-9./_-]+@sha256:[a-f0-9]{64}', image_id)
+                     and re.fullmatch(r'sha256:[a-f0-9]{64}', expected_config_digest))
+    if not immutable:
+        raise ValueError('known component and immutable identity required')
     selected = recipe()
     source = selected['sources'][source_key(component)]
     syft, cdx, report, db = (load(directory / name) for name in
@@ -148,6 +157,8 @@ def validate_local(directory, component, image_id, now):
             or metadata['labels'].get('io.hooshix.provenance.kind') != provenance(component)
             or metadata['labels'].get('io.hooshix.source.revision') != source['revision']
             or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
+            or metadata['labels'].get('org.opencontainers.image.source') != 'https://github.com/hasanjodatshandi/HooshiX'
+            or expected_config_digest is not None and metadata['imageID'] != expected_config_digest
             or report['source']['target']['imageID'] != metadata['imageID']
             or report['source']['target']['userInput'] != image_id
             or not cdx.get('components') or cdx.get('bomFormat') != 'CycloneDX'):
@@ -182,20 +193,32 @@ def validate_local(directory, component, image_id, now):
             or any(item['version'] != MODULES['golang.org/x/net'] for item in net)):
         raise ValueError('every embedded Go executable and network dependency must be fixed')
     return {'schema_version': 1, 'component': component, 'scan': 'Passed',
-        'image_config_digest': metadata['imageID'], 'local_engine_digest': image_id,
+        'image_config_digest': metadata['imageID'],
+        ('local_engine_digest' if expected_config_digest is None else 'registry_image'): image_id,
         'provenance_kind': provenance(component),
         'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
         'staging': 'Not verified', 'signature_provenance': 'Not verified',
         'deployment': 'Not verified', 'production_promotion': 'Not verified'}
 
 
-def build(component, directory, export_image=False):
-    if component not in COMPONENTS:
-        raise ValueError('known component required')
-    selected = recipe()
+def validate_local(directory, component, image_id, now):
+    return validate_inventory(directory, component, image_id, now)
+
+
+def local_endpoint():
     endpoint = json.loads(run(['docker', 'context', 'inspect', '--format', '{{json .Endpoints.docker.Host}}']))
     if not endpoint.startswith('unix://') or not os.environ.get('DOCKER_HOST', 'unix://').startswith('unix://'):
         raise ValueError('local Unix-socket Docker required; no remote daemon')
+    return endpoint
+
+
+def build(component, directory, export_image=False, *, docker_host=None):
+    if component not in COMPONENTS:
+        raise ValueError('known component required')
+    selected = recipe()
+    endpoint = local_endpoint() if docker_host is None else docker_host
+    if not endpoint.startswith('unix://'):
+        raise ValueError('captured local Unix-socket Docker required')
     directory.mkdir(mode=0o700)  # Never reuse prior success or evidence.
     source = selected['sources'][source_key(component)]
     url = f"https://codeload.github.com/{source['repository']}/tar.gz/{source['revision']}"

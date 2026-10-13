@@ -64,6 +64,20 @@ scan eligibility is `Passed` for the tested candidates, not publication/admissio
 staging/target eligibility. Fresh exact-release compatibility/scan evidence is required; the
 existing ESO/OpenBao/mesh target remains unchanged.
 
+The protected `Production release evidence` workflow now provides the
+`postgresql-candidate` dispatch through `publish_postgresql_candidates.py`.
+It builds the complete reviewed set, preserves local/config/registry identity
+separation, requires fresh complete unsuppressed registry scans for all four
+digests before signing, and verifies exact SLSA/CycloneDX predicates and signer
+identity with a wrong-signer negative plus a fresh positive control. All four
+fixed PostgreSQL package destinations must remain private; older platform public
+exceptions do not apply. It uses only ephemeral protected-CI package/OIDC
+credentials and never installs on the VPS. A successful `publication.json` is
+emitted only after whole-set verification; partial pushes remain unapproved.
+Live publication, exact published-digest staging/admission and target installation
+are `Not verified` until their separate executed evidence exists. The ParsPack
+off-host backup/audit deferral remains `Not verified` and is not retried here.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical
