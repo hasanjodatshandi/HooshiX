@@ -910,6 +910,11 @@ gh run download RUN_ID --name postgresql-publication-RUN_ID-1 --dir /path/outsid
 - `platform-postgresql-barman-plugin-private`
 - `platform-postgresql-barman-sidecar-private`
 
+محیط `production-release` تأیید مالک را می‌خواهد. اگر run در وضعیت
+`Waiting for review` بود، مالک در صفحهٔ همان run گزینهٔ `Review deployments`
+و سپس تأیید محیط را انجام می‌دهد. rule را حذف یا bypass نکنید؛ انتظار تأیید،
+خطای build نیست و اجرای تکراری لازم ندارد.
+
 workflow از توکن موقت `GITHUB_TOKEN` و هویت امضاکنندهٔ موجود
 `production-release.yml@refs/heads/main` استفاده می‌کند. توکن شخصی، Secret VPS،
 کلید Root و credential باکت را وارد نکنید. فایل موقت login در پایان حذف می‌شود؛
