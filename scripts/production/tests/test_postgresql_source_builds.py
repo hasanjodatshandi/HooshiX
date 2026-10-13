@@ -1,6 +1,7 @@
 """Fixed-source candidates retain every executable and the final vulnerability gate."""
 import copy
 import hashlib
+import json
 import sys
 import tempfile
 import unittest
@@ -186,6 +187,47 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                     artifacts.append({'name': name, 'version': 'old'})
                 with self.subTest(component=component, change=change), self.assertRaises(ValueError):
                     self.validate(component, evidence)
+
+    def test_export_pins_endpoint_and_build_identity_and_never_precedes_scan(self):
+        payload = b'public-source-fixture'
+        selected = copy.deepcopy(self.selected)
+        selected['sources']['postgresql']['archive_sha256'] = hashlib.sha256(payload).hexdigest()
+        for export, rejected in ((False, False), (True, False), (True, True)):
+            with self.subTest(export=export, rejected=rejected), tempfile.TemporaryDirectory() as parent:
+                directory = Path(parent) / 'candidate'
+                scanned = []
+                def native(argv, **kwargs):
+                    if argv[:3] == ['docker', 'context', 'inspect']:
+                        return '"unix:///captured.sock"'
+                    self.assertEqual(['docker', '--host', 'unix:///captured.sock'], argv[:3])
+                    if argv[3] == 'build':
+                        (directory / 'image-id.txt').write_text(self.image)
+                    if argv[3:5] == ['image', 'inspect']:
+                        self.assertEqual(self.image, argv[-1])
+                        return json.dumps({'User': '26:26', 'Entrypoint': ['/usr/local/bin/postgres'], 'Cmd': []})
+                    if argv[3:5] == ['image', 'save']:
+                        self.assertTrue(scanned)
+                        self.assertEqual(self.image, argv[-1])
+                        (directory / 'candidate-image.tar').write_bytes(b'bounded-image')
+                    return ''
+                with patch.object(target, 'recipe', return_value=selected), \
+                        patch.object(target.urllib.request, 'urlopen') as fetch, \
+                        patch.object(target, 'run', side_effect=native), \
+                        patch.object(target, 'scan_inventory', side_effect=lambda *a, **kw: scanned.append(kw)), \
+                        patch.object(target, 'validate_local', side_effect=ValueError('blocked') if rejected else None,
+                                     return_value={'scan': 'Passed'}), \
+                        patch('test_postgresql_isolation_native.exercise_candidate') as exercise:
+                    fetch.return_value.__enter__.return_value.read.return_value = payload
+                    if rejected:
+                        with self.assertRaises(ValueError): target.build('postgresql', directory, export)
+                        self.assertFalse((directory / 'receipt.json').exists())
+                        exercise.assert_not_called()
+                    else:
+                        receipt = target.build('postgresql', directory, export)
+                        exercise.assert_called_once_with(self.image, docker_host='unix:///captured.sock')
+                        self.assertEqual(export, 'image_archive_sha256' in receipt)
+                    self.assertEqual([{'docker_host': 'unix:///captured.sock'}], scanned)
+                    self.assertEqual(export and not rejected, (directory / 'candidate-image.tar').exists())
 
 
 if __name__ == '__main__':
