@@ -13,6 +13,7 @@ on:
           - mesh-candidate
           - patched-platform-candidate
           - postgresql-candidate
+          - cert-manager-candidate
       release_manifest_path:
         description: Tracked reviewed production release manifest under deploy/releases/production
         required: false
@@ -151,10 +152,10 @@ jobs:
           rm -f -- "$RUNNER_TEMP/docker-config/config.json"
 
   openbao-candidate:
-    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate')
+    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate')
     runs-on: ubuntu-24.04
     environment: production-release
-    timeout-minutes: ${{ (inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate') && 180 || 35 }}
+    timeout-minutes: ${{ (inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate') && 180 || 35 }}
     permissions:
       contents: read
       actions: read
@@ -195,7 +196,7 @@ jobs:
           printf '%s' "$GHCR_TOKEN" | timeout 30 docker --config "$RUNNER_TEMP/docker-config" \
             login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           chmod 0600 "$RUNNER_TEMP/docker-config/config.json"
-      - name: Import scan sign and verify unchanged private candidate
+      - name: Build or import scan sign and verify reviewed infrastructure candidates
         env:
           GH_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/docker-config
@@ -214,6 +215,10 @@ jobs:
               python3 scripts/production/publish_postgresql_candidates.py \
                 --directory "$RUNNER_TEMP/postgresql-release-evidence"
               ;;
+            cert-manager-candidate)
+              python3 scripts/production/publish_cert_manager_candidates.py \
+                --directory "$RUNNER_TEMP/cert-manager-release-evidence"
+              ;;
             *) exit 1 ;;
           esac
       - name: Remove temporary registry authentication
@@ -226,10 +231,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/${{ inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
+            ${{ runner.temp }}/${{ inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
             !${{ runner.temp }}/patched-release-evidence/**/source.tar.gz
             !${{ runner.temp }}/postgresql-release-evidence/**/source.tar.gz
+            !${{ runner.temp }}/cert-manager-release-evidence/**/source.tar.gz
           retention-days: 30
           if-no-files-found: error

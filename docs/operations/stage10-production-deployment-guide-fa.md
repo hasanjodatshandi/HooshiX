@@ -1011,6 +1011,73 @@ CNPG reconciliation، admission، staging، physical recovery یا نصب مقص
 `5098b00b5591eafa7a39b98a8b9117d40a65d948a7758e35adcc28fe331f81e6`.
 این شاهد native همان digestهاست؛ CNPG/admission/PITR/نصب مقصد را موفق اعلام نمی‌کند.
 
+### تصاویر وابستگی TLS: cert-manager
+
+برای Barman 0.15.1، cert-manager 1.20.3 همان وابستگی baseline پروژه است؛
+اضافه‌کردن آن Root آفلاین HooshiX یا CA موجود Istio را جایگزین نمی‌کند.
+security-owner انتشار `Public` یا `Private` را فقط برای سه مقصد ثابت زیر، زیر
+`ghcr.io/hasanjodatshandi/hooshix/` تأیید کرده است:
+
+- `platform-cert-manager-controller`
+- `platform-cert-manager-cainjector`
+- `platform-cert-manager-webhook`
+
+این مجوز فقط visibility تصاویر متن‌باز زیرساخت است؛ شامل acmesolver، startup
+job، package دیگر، تصاویر محصول، اسرار یا بازکردن سرویس نیست. اسکن کامل تازه،
+امضا، provenance، signed SBOM و گیت‌های پذیرش و نصب همچنان الزامی‌اند.
+نصب cert-manager روی VPS هنوز **Not run** است. این بخش فقط candidate انتشار
+می‌سازد، نه نصب TLS، تأیید staging یا readiness تولید.
+
+سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
+runtime هر جزء در `infrastructure/production/data/cert-manager-sources.json`
+ثابت‌اند. باینری هر سه جزء از همان سورس، با `Go 1.26.9`، `x/net 0.60.0` و
+`gRPC-Go 1.83.2` بازسازی می‌شود؛ نسخهٔ محصول تغییر نمی‌کند. provenance آن
+`patched-upstream-source-build` است، نه import بدون تغییر. ماژول ریشه و ماژول
+جداگانهٔ هر `cmd` با checksum database و `go mod verify` بررسی می‌شوند؛
+`go mod tidy` در همان ماژول جزء، فایل‌های قفل را پیش از build readonly همگام می‌کند؛
+buildinfo و hash چهار فایل go.mod/go.sum در تصویر نهایی نگه داشته می‌شود.
+
+برای ساخت و اسکن بدون credential روی میزبان توسعه، از checkout مربوط به
+تغییر و ابزارهای checksum-pinned پروژه استفاده کنید. پوشهٔ خروجی باید تازه و
+خارج از Git باشد؛ این فرمان هیچ تصویر یا فایل production را منتشر نمی‌کند:
+
+```bash
+scripts/production/install_release_tools.sh /tmp/hooshix-cert-manager-tools
+export PATH=/tmp/hooshix-cert-manager-tools:$PATH
+python3 scripts/production/build_cert_manager_candidates.py \
+  --component controller --directory /tmp/hooshix-cert-manager-controller-evidence
+```
+
+برای `cainjector` و `webhook` نیز component و پوشهٔ تازهٔ مستقل را جایگزین کنید.
+Docker باید endpoint محلی Unix داشته باشد. اجرای محدود `--help` فقط entrypoint
+را می‌آزماید؛ صحت Kubernetes، صدور گواهی یا نسخهٔ سرویس را ثابت نمی‌کند.
+workflow `Cert-manager candidate artifacts` همین build/scan را برای هر سه جزء
+در PR و main، بدون token نوشتن registry یا OIDC اجرا می‌کند.
+
+پس از merge و موفقیت baseline همان SHA روی main، انتشار فقط از workflow
+محافظت‌شده انجام می‌شود؛ تأیید واقعی owner در environment `production-release`
+همچنان لازم است:
+
+```bash
+gh workflow run production-release.yml --ref main -f release_kind=cert-manager-candidate
+```
+
+در GitHub Actions، همان run را باز و در صورت درخواست `Review deployments`،
+فقط environment `production-release` را بررسی/تأیید کنید؛ dispatch را تکرار
+نکنید. این workflow فقط token موقت همان repository و OIDC با signer ثابت
+استفاده می‌کند؛ هیچ PAT یا secret مقصد را در فرمان/چت وارد نکنید.
+artifact `cert-manager-publication-<run-id>-<attempt>` را پس از موفقیت دریافت
+کنید. `publication.json` فقط زمانی موفق نوشته می‌شود که کل سه تصویر ساخته،
+اسکن محلی و registry تازه و کامل شده، سپس امضا و SLSA/CycloneDX دقیق هر digest
+و signer درست/غلط بررسی شده باشند. receipt شامل manifest/config جداگانه و
+visibility واقعی است. خطای جزئی مجوز مصرف تصویر یا replay خودکار نیست.
+تصاویر محصول همچنان private-only هستند؛ این مسیر نه VPS را تغییر می‌دهد و
+نه گیت پذیرش، staging، recovery یا defer باکت پارس‌پک را موفق فرض می‌کند.
+مصرف این digestها در نصب فقط پس از بررسی مستقل امضا/attestation، admission
+مثبت و منفی، صدور TLS و بررسی compatibility با Barman مجاز خواهد بود.
+
+مرجع وابستگی: [نصب Barman 0.15.1](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
+
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 
 برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell

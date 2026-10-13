@@ -1,0 +1,71 @@
+name: Cert-manager candidate artifacts
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cert-manager-artifacts.yml'
+      - 'infrastructure/production/data/cert-manager-sources.json'
+      - 'scripts/production/build_cert_manager_candidates.py'
+      - 'scripts/production/publish_cert_manager_candidates.py'
+      - 'scripts/production/build_postgresql_candidates.py'
+      - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/publish_openbao_candidate.py'
+      - 'scripts/production/install_release_tools.sh'
+      - 'infrastructure/production/release-tools.env'
+      - 'scripts/production/tests/test_cert_manager_candidates.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cert-manager-artifacts.yml'
+      - 'infrastructure/production/data/cert-manager-sources.json'
+      - 'scripts/production/build_cert_manager_candidates.py'
+      - 'scripts/production/publish_cert_manager_candidates.py'
+      - 'scripts/production/build_postgresql_candidates.py'
+      - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/publish_openbao_candidate.py'
+      - 'scripts/production/install_release_tools.sh'
+      - 'infrastructure/production/release-tools.env'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cert-manager-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scan:
+    name: Cert-manager artifact ${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        component: [controller, cainjector, webhook]
+    steps:
+      - name: Check out candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install integrity-pinned scanners
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/cert-manager-tools"
+          echo "$RUNNER_TEMP/cert-manager-tools" >> "$GITHUB_PATH"
+      - name: Build and scan final candidate without credentials
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          python3 scripts/production/build_cert_manager_candidates.py \
+            --component "$COMPONENT" --directory "$RUNNER_TEMP/cert-manager-evidence" \
+            > "$RUNNER_TEMP/cert-manager-receipt.json"
+      - name: Preserve public scan evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cert-manager-${{ matrix.component }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/cert-manager-evidence/*json
+            ${{ runner.temp }}/cert-manager-evidence/Dockerfile
+            ${{ runner.temp }}/cert-manager-receipt.json
+          retention-days: 30
+          if-no-files-found: error

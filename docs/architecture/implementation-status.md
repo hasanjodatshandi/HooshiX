@@ -101,6 +101,20 @@ staging/admission, physical recovery and target installation remain `Not verifie
 until their separate executed evidence exists. The ParsPack
 off-host backup/audit deferral remains `Not verified` and is not retried here.
 
+Cert-manager 1.20.3 candidate preparation pins the official source archive,
+release manifest and three amd64 runtime inputs in `cert-manager-sources.json`.
+`build_cert_manager_candidates.py` rebuilds the root/nested component modules
+with Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.2, preserving product version and
+honest patched-source provenance. Credential-free candidate CI requires complete
+fresh unsuppressed final-image scans and a restricted help-only entrypoint smoke.
+The protected `cert-manager-candidate` dispatcher publishes only controller,
+cainjector and webhook destinations under the owner's explicit three-package
+public/private exception. It requires whole-set registry scans before signing,
+then exact signature/SLSA/CycloneDX verification via the existing release helper.
+Publication, target installation, certificate issuance, admission and staging
+remain `Not run`/`Not verified` until their own executed receipts exist. It does
+not alter application private-only policy, the offline Root, Istio CA or VPS.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical

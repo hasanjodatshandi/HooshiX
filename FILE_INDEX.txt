@@ -1,6 +1,7 @@
 .editorconfig
 .gitattributes
 .github/workflows/authorization-service.yml
+.github/workflows/cert-manager-artifacts.yml
 .github/workflows/compromised-password-service.yml
 .github/workflows/conversation-service.yml
 .github/workflows/identity-service.yml
@@ -375,6 +376,7 @@ infrastructure/observability/networkpolicy.yaml
 infrastructure/observability/pins.env
 infrastructure/observability/prometheus.yaml
 infrastructure/production/README.md
+infrastructure/production/data/cert-manager-sources.json
 infrastructure/production/data/data-policy.json
 infrastructure/production/data/postgresql-images.json
 infrastructure/production/data/postgresql-source-builds.json
@@ -523,6 +525,7 @@ scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
+scripts/production/build_cert_manager_candidates.py
 scripts/production/build_eso_commissioning_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
@@ -558,6 +561,7 @@ scripts/production/platform_image_egress.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/provision_openbao_storage.py
+scripts/production/publish_cert_manager_candidates.py
 scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/publish_postgresql_candidates.py
@@ -594,6 +598,7 @@ scripts/production/run-openbao-storage.ps1
 scripts/production/run-platform-commissioning.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_postgresql_isolation_native.py
+scripts/production/tests/test_cert_manager_candidates.py
 scripts/production/tests/test_eso_artifact.py
 scripts/production/tests/test_eso_commissioning.py
 scripts/production/tests/test_eso_delivery.py
