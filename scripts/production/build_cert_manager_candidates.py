@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import subprocess
+import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,7 +62,7 @@ def dockerfile(component, selected):
         'tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src',
         f'RUN test "$(go env GOVERSION)" = go1.26.9 && go get {modules} && go mod verify',
         f'WORKDIR /src/cmd/{component}',
-        f'RUN go get {modules} && go mod verify',
+        f'RUN go get {modules} && go mod tidy && go mod verify',
         f"RUN mkdir /out && go build -trimpath -buildvcs=false -mod=readonly -ldflags '{flags}' "
         f'-o /out/{component} . && go mod verify && go version -m /out/{component} > /out/{component}.buildinfo',
         'WORKDIR /src',
@@ -172,7 +173,7 @@ def build(component, directory, *, docker_host=None):
             if phrase in (error.stderr or ''):
                 reason = category
                 break
-        print('CERT_MANAGER_BUILD_FAILURE=' + reason, flush=True)
+        print('CERT_MANAGER_BUILD_FAILURE=' + reason, file=sys.stderr, flush=True)
         raise
     engine = identity.read_text().strip()
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', engine): raise ValueError('immutable engine identity required')
