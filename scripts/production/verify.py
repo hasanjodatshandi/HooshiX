@@ -39,7 +39,7 @@ REQUIRED_FILES = (
     "README.md", "profile.json", "platform-contracts.json",
     "release-manifest.schema.json", "release-tools.env", "host/access-policy.json",
     "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "data/postgresql-images.json", "network/trust-policy.json",
-    "data/postgresql-source-builds.json", "data/cert-manager-sources.json", "observability/observability-policy.json", "recovery/recovery-policy.json",
+    "data/postgresql-source-builds.json", "data/cert-manager-sources.json", "data/cert-manager-images.json", "observability/observability-policy.json", "recovery/recovery-policy.json",
     "release/release-policy.json", "secrets/secrets-policy.json", "gitops/application.yaml",
 )
 REQUIRED_SCRIPTS = (
@@ -50,6 +50,7 @@ REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/publish_postgresql_candidates.py",
     ROOT / "scripts/production/build_cert_manager_candidates.py",
     ROOT / "scripts/production/publish_cert_manager_candidates.py",
+    ROOT / "scripts/production/verify_published_cert_manager.py",
     ROOT / ".github/workflows/cert-manager-artifacts.yml",
     ROOT / ".github/workflows/postgresql-artifacts.yml",
     ROOT / "scripts/production/render_gitops.py", ROOT / "scripts/production/release_supply_chain.sh",

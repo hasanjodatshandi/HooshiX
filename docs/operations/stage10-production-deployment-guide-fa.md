@@ -1028,6 +1028,13 @@ job، package دیگر، تصاویر محصول، اسرار یا بازکرد�
 نصب cert-manager روی VPS هنوز **Not run** است. این بخش فقط candidate انتشار
 می‌سازد، نه نصب TLS، تأیید staging یا readiness تولید.
 
+انتشار محافظت‌شدهٔ کل سه تصویر در run `38409447796`، attempt `1`، از
+`main@c5dd3c0012139e7969606bc074f207adebd65d26` با **Passed** ثبت شده است.
+visibility واقعی فقط همین سه مقصد `public` است و در استثنای محدود بالا قرار دارد.
+SHA-256 فایل عمومی `publication.json`:
+`b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8`.
+این رسید انتشار، به‌تنهایی مجوز نصب یا شاهد TLS/admission/staging نیست.
+
 سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
 runtime هر جزء در `infrastructure/production/data/cert-manager-sources.json`
 ثابت‌اند. باینری هر سه جزء از همان سورس، با `Go 1.26.9`، `x/net 0.60.0` و
@@ -1075,6 +1082,45 @@ visibility واقعی است. خطای جزئی مجوز مصرف تصویر ی�
 نه گیت پذیرش، staging، recovery یا defer باکت پارس‌پک را موفق فرض می‌کند.
 مصرف این digestها در نصب فقط پس از بررسی مستقل امضا/attestation، admission
 مثبت و منفی، صدور TLS و بررسی compatibility با Barman مجاز خواهد بود.
+
+#### پذیرش مستقل تصاویر منتشرشده
+
+`infrastructure/production/data/cert-manager-images.json` مجموعهٔ دقیق منتشرشده،
+SHA-256 رسید و recipe را ثبت می‌کند؛ فایل source recipe تغییر نمی‌کند تا hash
+provenance معتبر بماند. از داخل checkout پروژه، artifact عمومی همان run را در
+پوشهٔ تازهٔ خارج از Git دریافت و پذیرش مستقل را اجرا کنید:
+
+```bash
+gh run download 38409447796 --name cert-manager-publication-38409447796-1 \
+  --dir /tmp/hooshix-cert-manager-published-evidence
+scripts/production/install_release_tools.sh /tmp/hooshix-cert-manager-verification-tools
+export PATH=/tmp/hooshix-cert-manager-verification-tools:$PATH
+python3 scripts/production/verify_published_cert_manager.py \
+  --evidence-dir /tmp/hooshix-cert-manager-published-evidence \
+  --output-dir /tmp/hooshix-cert-manager-published-acceptance
+```
+
+پوشه‌های evidence و acceptance باید تازه باشند. هیچ PAT، رمز sudo، کلید Root
+یا رمز custody درخواست نمی‌شود. ابزار ابتدا hash رسید، کل سه تصویر، inventory
+کامل و scan تازهٔ registry را بررسی می‌کند؛ سپس امضا، SLSA دقیق و CycloneDX
+امضاشده را مستقیماً از registry تأیید می‌کند. signer غلط باید رد و signer درست
+دوباره پذیرفته شود. TUF با trust پیش‌فرض داخلی Cosign و mirror رسمی Sigstore
+در cache تازهٔ همان output استفاده می‌شود؛ cache یا trust میزبان تغییر نمی‌کند.
+بعد از تأیید امضای کل مجموعه، فقط همان سه digest pull و با non-root، شبکهٔ
+خاموش، filesystem فقط‌خواندنی و محدودیت منابع `--help` اجرا می‌شوند.
+
+اجرای مستقل روی میزبان توسعه در `2026-10-13T14:36:06Z`، امضا/SLSA/SBOM،
+رد signer غلط و smoke محدود هر سه digest را با **Passed** ثبت کرده است.
+SHA-256 رسید عمومی `acceptance.json`:
+`7855cf84fe2a8bbde40474ab872d91f0d83ed657b2b320f66768599b02dc8c8b`.
+این شاهد همان bytes منتشرشده است، نه صدور TLS یا نصب مقصد.
+
+خروجی موفق `CERT_MANAGER_PUBLISHED_ACCEPTANCE=Passed` و `acceptance.json` است؛
+نه build، push، sign، نصب یا اتصال به VPS. این smoke، صدور گواهی، API readiness،
+admission و staging را ثابت نمی‌کند. خطای جزئی receipt موفق نمی‌سازد؛ پوشهٔ
+قبلی و شواهد موجود حذف نمی‌شوند و retry خودکار وجود ندارد. رسید/scan منقضی
+یا مجموعهٔ ناقص را Passed فرض نکنید. نصب بعدی باید دقیقاً همین digestها را پس
+از شواهد جداگانهٔ TLS/admission/staging مصرف کند، نه تصویر دوباره‌ساخته‌شده.
 
 مرجع وابستگی: [نصب Barman 0.15.1](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
 
