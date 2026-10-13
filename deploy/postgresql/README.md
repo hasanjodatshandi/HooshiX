@@ -34,6 +34,19 @@ remain private-only and all integrity/admission gates are unchanged. See the
 [Stage10 guide](../../docs/operations/stage10-production-deployment-guide-fa.md)
 for dispatch and evidence retrieval; do not supply VPS/Root/custody credentials.
 
+Protected publication `38382418665:1` on `5b0c547e27c5f89d5ec76186defa112739b64f3c`
+is complete. The exact four-image set, actual public visibility, publication
+receipt hash, recipe and configuration identities are bound in the existing
+catalog's `published_security_candidate`. The upstream `components` remain source
+inputs, not deployment selections. `verify_published_postgresql.py` verifies this
+whole set independently against registry signatures and exact SLSA/CycloneDX
+payloads, revalidates the downloaded scan's freshness, and runs network-isolated
+native entrypoints and PostgreSQL ownership on the same pulled digests. It does
+not rescan images, rebuild, publish or install. A fresh output directory prevents
+stale success receipts; any partial failure leaves no `acceptance.json` success.
+The Persian guide contains the reproducible invocation. Native smoke alone never
+marks CNPG reconciliation, physical recovery, admission or promotion as Passed.
+
 ```bash
 python3 scripts/production/render_postgresql_ownership.py --candidate
 python3 -m unittest discover -s scripts/production/tests -p 'test_postgresql_ownership.py'

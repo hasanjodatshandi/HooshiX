@@ -18,7 +18,7 @@ and transaction-bounded public privilege SQL for five service databases. Native
 PostgreSQL 18.4 tests exercise 40 cross-service CONNECT denials, runtime DDL/role
 denials, forced RLS/context reset and non-destructive replay. Disposable CNPG
 1.30.1/PostgreSQL 18.6 reconciliation and synthetic physical recovery are verified
-below. Signed data-image adoption, durable target data storage, real credential
+below. Signed data-image candidate selection is now pinned below; durable target data storage, real credential
 delivery, destination installation and service migration compatibility remain
 `Not run`/`Not verified`. This is a component, not a complete data installer.
 
@@ -77,8 +77,28 @@ fail closed. Application packages remain private-only; signer, scans, provenance
 SBOM, admission and promotion gates are unchanged. It uses only ephemeral protected-CI package/OIDC
 credentials and never installs on the VPS. A successful `publication.json` is
 emitted only after whole-set verification; partial pushes remain unapproved.
-Live publication, exact published-digest staging/admission and target installation
-are `Not verified` until their separate executed evidence exists. The ParsPack
+Protected run `38382418665`, attempt 1, on
+`main@5b0c547e27c5f89d5ec76186defa112739b64f3c` completed whole-set publication and
+signature/provenance/SBOM verification with `Passed`. All four fixed packages
+report actual public visibility within that explicit infrastructure-only exception.
+`postgresql-images.json/published_security_candidate` binds the exact publication
+receipt hash, source recipe and distinct manifest/config identities, without
+changing the upstream source catalog or blocked promotion state.
+`verify_published_postgresql.py` independently revalidates the bounded public
+artifact scan freshness/inventory, registry signature and exact SLSA/CycloneDX
+payloads before pulling those same digests for restricted native smoke and the
+volatile five-database/RLS fixture. Independent execution at
+`2026-10-13T11:37:24.406024+00:00` passed all four signatures/exact attestations,
+wrong-signer controls, native entrypoints and the five-database/RLS fixture;
+public acceptance receipt SHA256 is
+`5098b00b5591eafa7a39b98a8b9117d40a65d948a7758e35adcc28fe331f81e6`.
+It never builds, pushes, signs, connects to a VPS or grants installation authority.
+The owner's read-only target inventory records 15986 MiB RAM, 11942 MiB available,
+120575 MiB free on `/`, the Ready single node and only the existing bound OpenBao
+8GiB PV/PVC; no PostgreSQL allocation/storage class is present. This is planning
+input, not complete-stack headroom evidence. Live exact published-digest CNPG
+staging/admission, physical recovery and target installation remain `Not verified`
+until their separate executed evidence exists. The ParsPack
 off-host backup/audit deferral remains `Not verified` and is not retried here.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/

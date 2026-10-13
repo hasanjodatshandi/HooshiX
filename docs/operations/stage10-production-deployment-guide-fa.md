@@ -954,6 +954,85 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 مرجع رفتار: [انتشار GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)،
 [امضای digest و بررسی هویت Cosign](https://github.com/sigstore/cosign).
 
+### پذیرش مجموعهٔ منتشرشدهٔ PostgreSQL
+
+اجرای محافظت‌شدهٔ `38382418665`، attempt `1` روی
+`main@5b0c547e27c5f89d5ec76186defa112739b64f3c` انتشار هر چهار تصویر را با
+`publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
+واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
+این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
+promotion هنوز شواهد مستقل می‌خواهند. receipt عمومی و digestها در مرحلهٔ پذیرش
+بررسی می‌شوند؛ هیچ رمز VPS، custody، کلید Root یا credential باکت لازم نیست.
+مجموعهٔ انتخاب‌شده در `published_security_candidate` فایل
+`infrastructure/production/data/postgresql-images.json` ثبت شده است. ورودی‌های
+upstream همان فایل همچنان ورودی ساخت هستند، نه جایگزین این چهار digest نهایی.
+
+artifact همان اجرا را بیرون Git دانلود کنید و روی میزبان توسعه با Docker محلی
+Unix و ابزارهای integrity-pinned اجرا کنید؛ این فرمان VPS را متصل نمی‌کند:
+
+```bash
+gh run download 38382418665 --name postgresql-publication-38382418665-1 --dir /path/outside-repo/postgresql-publication
+bash scripts/production/install_release_tools.sh /path/outside-repo/release-tools
+PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_published_postgresql.py \
+  --evidence-dir /path/outside-repo/postgresql-publication \
+  --output-dir /path/outside-repo/postgresql-acceptance-new
+```
+
+مسیرها نمونه‌اند؛ هر بار پوشهٔ خروجی تازه انتخاب کنید. ابزار ابتدا hash receipt،
+کل مجموعه، manifest/config، inventory کامل و سن کمتر از ۵ روز دیتابیس Grype
+artifact را بررسی می‌کند؛ این بازخوانی scan موجود است، نه اسکن تازهٔ image.
+برای trust فقط mirror رسمی مصوب `https://sigstore.github.io/root-signing` را با
+ریشهٔ embedded خود Cosign و cache تازه زیر پوشهٔ خروجی initialize می‌کند. root
+جایگزین، staging trust یا skip verification ندارد؛ تنظیمات trust محیط و cache
+شخصی شما وارد آزمون نمی‌شوند. این Sigstore trust با Root آفلاین HooshiX متفاوت است.
+سپس امضا و SLSA/CycloneDX را مستقل از رجیستری با signer دقیق CI بررسی می‌کند؛
+هویت اشتباه باید رد و کنترل مثبت دوباره موفق شود. هیچ `sign`، `attest`، push،
+rebuild، sudo یا خواندن credential Production انجام نمی‌شود.
+
+پس از تأیید هر چهار تصویر، همان digestها pull می‌شوند. engine ID محلی با config
+و manifest اشتباه گرفته نمی‌شود. entrypointهای non-root و Python/Barman تحت
+read-only، بدون شبکه، capabilities یا پورت میزبان و با منابع محدود آزمایش
+می‌شوند. PostgreSQL 18.6 با tmpfs موقت، پنج دیتابیس، ۴۰ منع اتصال بین‌سرویسی و
+forced RLS/context اجرا می‌شود؛ container همان آزمون در پایان حذف می‌شود.
+تصاویر pullشده برای آزمون بعدی باقی می‌مانند.
+
+خروجی مورد انتظار `POSTGRESQL_PUBLISHED_ACCEPTANCE=Passed` و فایل عمومی
+`acceptance.json` در پوشهٔ تازه است. فقط native smoke/SQL را ثابت می‌کند، نه
+CNPG reconciliation، admission، staging، physical recovery یا نصب مقصد.
+شکست جزئی receipt موفق تولید نمی‌کند؛ inputها و شواهد موجود پاک نمی‌شوند.
+اگر scan منقضی بود، آن را Passed فرض نکنید؛ بازاسکن و بررسی انتشار مربوط به
+همین digestها لازم است. موفقیت این بخش گیت‌های نصب یا defer پارس‌پک را دور نمی‌زند.
+
+مرجع trust و cache: [Cosign 3.0.6 initialize](https://github.com/sigstore/cosign/blob/v3.0.6/cmd/cosign/cli/initialize/init.go).
+
+اجرای مستقل روی میزبان توسعه در `2026-10-13T11:37:24Z`، بررسی امضا/SLSA/SBOM،
+رد signer اشتباه، entrypointهای هر چهار digest و fixture پنج دیتابیس را با
+`Passed` ثبت کرده است. SHA-256 رسید عمومی:
+`5098b00b5591eafa7a39b98a8b9117d40a65d948a7758e35adcc28fe331f81e6`.
+این شاهد native همان digestهاست؛ CNPG/admission/PITR/نصب مقصد را موفق اعلام نمی‌کند.
+
+### اطلاعات مقصد پیش از تخصیص storage دیتابیس
+
+برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell
+این فرمان‌های فقط‌خواندنی را اجرا کنید؛ فقط آخری رمز sudo را همان‌جا می‌خواهد:
+
+```powershell
+ssh.exe hooshix-server 'free -m'
+ssh.exe hooshix-server 'df -BM /'
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl --request-timeout=15s get nodes,pv,pvc,storageclasses --all-namespaces -o wide'
+```
+
+خروجی capacity/storage عمومی را برای انتخاب اندازه و binding مقصد نگه دارید؛
+این فرمان‌ها allocation، تغییر فایل یا restart ندارند. PV هشت‌گیگابایتی OpenBao
+به PostgreSQL تعلق ندارد و نباید reuse یا جابه‌جا شود. فضای خالی اعلام‌شده فقط
+مبنای برنامه‌ریزی است، نه شواهد complete-stack headroom، I/O، backup یا DR.
+تا اندازه و guard مستقلِ دادهٔ مقصد مشخص نیست، دستور install/apply دیتابیس نزنید.
+snapshot فقط‌خواندنی مقصد در ۲۰۲۶-۱۰-۱۳: RAM برابر ۱۵۹۸۶ MiB، available برابر
+۱۱۹۴۲ MiB، فضای آزاد `/` برابر ۱۲۰۵۷۵ MiB و node `hooshix-production-1`، Ready
+است. تنها PV/PVC موجود مربوط به OpenBao و Bound است؛ storage class دیگری برای
+PostgreSQL وجود ندارد. این اعداد انتخاب فضای مستقل را راهنمایی می‌کنند، نه
+تأیید ظرفیت بار نهایی محصول یا اندازهٔ ثابت برای سرور دیگر.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS

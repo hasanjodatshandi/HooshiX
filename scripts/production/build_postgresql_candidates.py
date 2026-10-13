@@ -212,6 +212,26 @@ def local_endpoint():
     return endpoint
 
 
+def native_entrypoint(component, image_id, endpoint):
+    """Restricted smoke for the same immutable bytes built or pulled by the caller."""
+    if (component not in COMPONENTS or not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id)
+            or not endpoint.startswith('unix://')):
+        raise ValueError('known component, immutable engine identity and local Docker required')
+    runtime = ['docker', '--host', endpoint, 'run', '--rm', '--network', 'none', '--read-only',
+               '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+               '--memory', '256m', '--cpus', '1', '--pids-limit', '64']
+    run(runtime + [image_id, '--version' if component == 'postgresql' else '--help'], timeout=30)
+    if component == 'barman-sidecar':
+        version = run(runtime + ['--entrypoint', 'python3', image_id, '-c',
+                                 'import platform; print(platform.python_version())'], timeout=30).strip()
+        if version != recipe()['python_version']:
+            raise ValueError('exact fixed Python interpreter required')
+        run(runtime + ['--entrypoint', '/venv/bin/pip', image_id, 'check'], timeout=30)
+        for command in ('barman-cloud-backup', 'barman-cloud-wal-archive',
+                        'barman-cloud-restore', 'barman-cloud-wal-restore'):
+            run(runtime + ['--entrypoint', '/venv/bin/' + command, image_id, '--help'], timeout=30)
+
+
 def build(component, directory, export_image=False, *, docker_host=None):
     if component not in COMPONENTS:
         raise ValueError('known component required')
@@ -242,20 +262,7 @@ def build(component, directory, export_image=False, *, docker_host=None):
     if (config.get('User') != expected_user or config.get('Entrypoint') != entrypoint
             or component in ('postgresql', 'barman-sidecar') and config.get('Cmd') not in (None, [])):
         raise ValueError('non-root identity and native manager entrypoint required')
-    run(['docker', '--host', endpoint, 'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
-         '--security-opt', 'no-new-privileges',
-         '--memory', '256m', '--cpus', '1', '--pids-limit', '64', image_id,
-         '--version' if component == 'postgresql' else '--help'], timeout=30)
-    if component == 'barman-sidecar':
-        runtime = ['docker', '--host', endpoint, 'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
-                   '--security-opt', 'no-new-privileges', '--memory', '256m', '--cpus', '1', '--pids-limit', '64']
-        python_version = run(runtime + ['--entrypoint', 'python3', image_id, '-c',
-                                       'import platform; print(platform.python_version())'], timeout=30).strip()
-        if python_version != selected['python_version']:
-            raise ValueError('exact fixed Python interpreter required')
-        run(runtime + ['--entrypoint', '/venv/bin/pip', image_id, 'check'], timeout=30)
-        for command in ('barman-cloud-backup', 'barman-cloud-wal-archive', 'barman-cloud-restore', 'barman-cloud-wal-restore'):
-            run(runtime + ['--entrypoint', '/venv/bin/' + command, image_id, '--help'], timeout=30)
+    native_entrypoint(component, image_id, endpoint)
     # Entrypoint smoke is not Kubernetes reconciliation, backup or recovery evidence.
     scan_inventory(directory, image_id, 'docker', docker_host=endpoint)
     receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc))
