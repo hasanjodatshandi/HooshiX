@@ -162,6 +162,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
                 self.assertEqual(value['spec'], patch_[1]['value'])
                 value['spec']['matchConstraints']['namespaceSelector'] = patch_[-1]['value']
             if args[0] in ('apply', 'create') and '--dry-run=server' not in args:
+                if args[0] == 'create' and key(body) in states:
+                    raise ValueError('already exists')
                 states[key(body)] = copy.deepcopy(body)
             return b''
         return plan, states, calls, kube

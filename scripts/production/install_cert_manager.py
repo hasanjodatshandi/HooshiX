@@ -103,6 +103,7 @@ def execute(plan, *, kube=host.kube):
                 kube('apply', '--server-side', '--field-manager=' + MANAGER, '-f', '-', body=obj)
             else:
                 kube('create', '-f', '-', body=obj)
+            exists[key] = True
 
     create(plan['namespace'])
     for obj in plan['crds']:
