@@ -772,9 +772,9 @@ backup در sidecar جداست و نباید در تصویر برنامه یا �
 هستند؛ تغییر هم‌زمان نسخه‌ها در profile، data-policy و platform-contracts کنترل
 می‌شود. fixture قدیمی 18.4 فقط آزمون SQL است و شاهد سازگاری 18.6 نیست.
 
-وضعیت فعلی مجموعهٔ چهار artifact: eligibility اسکن `Failed` است؛ catalog دارای
-findingهای High/Critical، از جمله بسته‌های پایه بدون fix ثبت‌شده، است. این
-digestها را نصب نکنید. قدم بعدی، تغییر امنیتی بررسی‌شدهٔ نسخه/منبع/تصویر پایه
+وضعیت فعلی مجموعهٔ چهار artifact: eligibility اسکن `Failed` است؛ operand و
+runtime sidecar دارای findingهای High/Critical، از جمله بسته‌های پایه بدون fix
+ثبت‌شده، هستند. این digestها را نصب نکنید. قدم بعدی، تغییر امنیتی بررسی‌شدهٔ تصویر پایه
 با حفظ قرارداد CNPG و backup، سپس اسکن و آزمون سازگاری artifact نهایی است؛ صرف
 جدیدتر بودن tag یا حذف findingهای بدون fix، مجوز نصب نمی‌دهد.
 
@@ -846,6 +846,21 @@ Go، Python و بسته‌های سیستم‌عامل باید با scanner ث�
 هر کدام از چهار component قابل اجراست و findingهای upstream را پنهان نمی‌کند.
 workflow `PostgreSQL candidate artifacts` همین چهار گیت نهایی را در PR/push مربوط
 یا اجرای دستی، بدون credential و با حداکثر دو job هم‌زمان اجرا می‌کند.
+
+نتیجهٔ نهایی candidate
+`d29005dcc077fea5f8b68748a63b4fcc586c1a0a` در run `38324640942`:
+
+| جزء | build/scan نهایی | مرز نتیجه |
+| --- | --- | --- |
+| اپراتور CNPG | `Passed` | هر دو باینری اصلاح‌شده و entrypoint محدود؛ reconcile هنوز `Not verified` |
+| Barman plugin | `Passed` | runtime استاتیک اصلاح‌شده و entrypoint محدود؛ backup هنوز `Not verified` |
+| PostgreSQL | `Failed` | گیت بسته‌های سیستم‌عامل؛ مجوز نصب ندارد |
+| Barman sidecar | `Failed` | Go اصلاح‌شده است؛ Python و بسته‌های پایه هنوز گیت را رد می‌کنند |
+
+CI اصلی مخزن و آزمون وب برای همان candidate موفق‌اند؛ این نتیجه جای دو گیت
+شکست‌خورده یا نصب روی مقصد را نمی‌گیرد. برای تغییر runtime operand/sidecar،
+locale، UID/GID، نسخهٔ Python و dependencyهای Barman باید مشخص و با آزمون
+واقعی SQL، CNPG و WAL/PITR بررسی شوند؛ صرف تعویض نام تصویر مجاز نیست.
 receipt اسکن، signature/provenance، staging، deployment و promotion را صریحاً
 `Not verified` نگه می‌دارد. checksum manifest برای بستهٔ بعدی است؛ این verifier
 manifest را روی cluster apply یا برای نصب مجاز نمی‌کند. منبع ثبت‌شدهٔ label

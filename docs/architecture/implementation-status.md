@@ -34,8 +34,12 @@ is retained, not silently removed. The exact locally rebuilt operator configurat
 `sha256:099cf443b4f8aa84413a40daf0087ab7f6139cfe75d20dd868bf636c7e2cb103`
 passes the complete pinned Syft/Grype inventory with zero matches or ignored
 matches and the restricted native manager entrypoint smoke. Both embedded
-managers contain Go 1.26.9 and x/net 0.60.0. Barman final source-build evidence
-remains `Not verified`; the selected PostgreSQL 18.6 and Barman 0.15.1 runtime
+managers contain Go 1.26.9 and x/net 0.60.0. On candidate
+`d29005dcc077fea5f8b68748a63b4fcc586c1a0a`, artifact run `38324640942` passes
+the final operator and Barman plugin source builds/scans/native entrypoint checks;
+the final PostgreSQL and Barman sidecar runtime scans fail. The sidecar's Go fix
+is present, but its Python/OS packages are not thereby fixed. Repository baseline
+`38324641009` and web E2E `38324640987` pass that exact candidate. The selected PostgreSQL 18.6 and Barman 0.15.1 runtime
 base packages still fail the High/Critical gate. Scan evidence does not establish upstream build
 provenance, signatures, admission, staging, backup or production readiness.
 All four must clear the live gate before signed candidate publication or adoption;
