@@ -64,7 +64,11 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM',
                 'platform source build identity rejected',
                 'platform bootstrap identity/security exception rejected',
-                'no such overload', 'no such key', 'context deadline exceeded')
+                'no such overload', 'no such key', 'context deadline exceeded',
+                'service "cert-manager-webhook" not found',
+                'secrets "cert-manager-webhook-ca" not found',
+                'the server could not find the requested resource',
+                'no endpoints available for service', 'certificate signed by unknown authority')
                 if marker.encode() in (result.stderr or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
             print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
