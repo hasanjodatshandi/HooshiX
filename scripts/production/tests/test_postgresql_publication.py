@@ -1,11 +1,13 @@
 """Protected whole-set publication must not grant deployment or weaken registry gates."""
 import copy
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -119,6 +121,26 @@ class PostgreSQLPublicationTest(unittest.TestCase):
                     with self.assertRaises(subprocess.CalledProcessError):
                         target.private_package('operator', allow_missing=True)
                 with self.assertRaises(subprocess.CalledProcessError): target.private_package('operator')
+
+    def test_public_operator_destination_is_not_reused_or_exempted(self):
+        self.assertEqual({
+            'operator': 'hooshix/platform-postgresql-operator-v2-private',
+            'postgresql': 'hooshix/platform-postgresql-postgresql-private',
+            'barman-plugin': 'hooshix/platform-postgresql-barman-plugin-private',
+            'barman-sidecar': 'hooshix/platform-postgresql-barman-sidecar-private'}, target.PACKAGES)
+        guide = (target.RECIPE.parents[3] / 'docs/operations/stage10-production-deployment-guide-fa.md').read_text()
+        for package in target.PACKAGES.values():
+            self.assertIn('`' + package.removeprefix('hooshix/') + '`', guide)
+
+    def test_visibility_failure_exposes_only_fixed_actionable_metadata(self):
+        for value, category in (('public', 'public'), ('internal', 'internal'),
+                                ('untrusted-value-do-not-print', 'invalid')):
+            output = io.StringIO()
+            with patch.object(target, 'run', return_value=value), redirect_stdout(output), \
+                    self.assertRaises(ValueError):
+                target.private_package('operator')
+            self.assertEqual('POSTGRESQL_PACKAGE_VISIBILITY=Rejected; component=operator; '
+                             f'actual={category}; required=private\n', output.getvalue())
 
     def test_registry_inventory_requires_exact_config_and_reference(self):
         fixture = fixtures.PostgreSQLSourceBuildTest()
