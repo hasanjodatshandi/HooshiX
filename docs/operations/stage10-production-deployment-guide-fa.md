@@ -905,7 +905,7 @@ gh run download RUN_ID --name postgresql-publication-RUN_ID-1 --dir /path/outsid
 هر چهار مقصد `private` باشد. مقصدهای ثابت زیر همگی زیر
 `ghcr.io/hasanjodatshandi/hooshix/` هستند:
 
-- `platform-postgresql-operator-private`
+- `platform-postgresql-operator-v2-private`
 - `platform-postgresql-postgresql-private`
 - `platform-postgresql-barman-plugin-private`
 - `platform-postgresql-barman-sidecar-private`
@@ -922,6 +922,12 @@ workflow از توکن موقت `GITHUB_TOKEN` و هویت امضاکنندهٔ 
 private بودن package نیست؛ ابزار آن را قبل از push، بعد از push و بعد از امضا
 بررسی می‌کند. package جدید طبق رفتار GHCR خصوصی ایجاد می‌شود؛ 401/403 هرگز
 به‌عنوان نبود package پذیرفته نمی‌شود. تغییر visibility خودکار مجاز نیست.
+
+package عمومی قابل برگشت به private نیست. برای چنین مقصدی، package تازه و
+بررسی‌شده با نام ثابت انتخاب می‌شود؛ مقصد عمومی قبلی حذف یا adopt نمی‌شود و
+برای نصب یا امضا معتبر نیست. package تازه نیز باید پس از ایجاد واقعاً `private`
+باشد؛ پسوند `private` به‌تنهایی تضمین نیست. پیام `POSTGRESQL_PACKAGE_VISIBILITY`
+نام جزء و وضعیت محدودشده را نشان می‌دهد؛ در صورت رد، run را بی‌تغییر تکرار نکنید.
 
 ابزار `publish_postgresql_candidates.py` همهٔ buildها و native smokeهای موجود را
 پیش از push اجرا می‌کند، config محلی را با manifest واقعی رجیستری تطبیق می‌دهد و
