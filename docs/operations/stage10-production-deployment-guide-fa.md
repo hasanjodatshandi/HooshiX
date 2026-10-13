@@ -1124,6 +1124,17 @@ admission و staging را ثابت نمی‌کند. خطای جزئی receipt م
 
 مرجع وابستگی: [نصب Barman 0.15.1](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
 
+#### محدودهٔ commissioning گواهی داخلی دیتابیس
+
+نصب بعدی cert-manager فقط برای TLS داخلی control plane دیتابیس در
+`cnpg-system` آماده می‌شود؛ صدور TLS عمومی `hooshix.com`، ACME، ClusterIssuer
+و گواهی برنامه‌ها خارج از این محدوده‌اند. با تأیید مالک، فقط Pod وب‌هوک
+cert-manager می‌تواند خارج از Ambient باشد؛ controller و cainjector داخل
+Ambient می‌مانند. callback باید HTTPS معتبر، `failurePolicy=Fail` و ingress
+محدود به IPهای دقیق کشف‌شدهٔ API سرور داشته باشد. این تأیید، شاهد اجرای نصب
+نیست: آماده‌سازی manifest، آزمون native و نصب VPS هنوز **Not run** هستند.
+Root/CA موجود، OpenBao، ESO و storage نباید در این عملیات تغییر کنند.
+
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 
 برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell
