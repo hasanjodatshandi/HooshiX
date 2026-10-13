@@ -103,7 +103,13 @@ OpenBao TLS or application secret authority. Root material is never imported.
 
 Render and live admission tests must reject wrong image/signer/source/SBOM,
 wrong account, widened controller scope, controller/cainjector opt-out, external
-issuer and unapproved webhook Secret writes. Verified callback TLS, internal
+issuer and unapproved webhook Secret writes. The supervised installer creates
+only an EMPTY, owned serving-CA destination with direct-injection annotation;
+the webhook has exact-name update/read/watch and no Secret create privilege.
+Existing private material is neither read nor replaced by the installer. This
+uses the pinned upstream DynamicAuthority existing-Secret update path. Required
+Kyverno report aggregation adds read-only Issuer/webhook-configuration metadata,
+never cluster Secret access or a reporting/admission bypass. Verified callback TLS, internal
 issuance/renewal, RBAC/network negatives and existing CA/OpenBao/ESO/storage
 preservation are required before a supervised target bundle is usable.
 

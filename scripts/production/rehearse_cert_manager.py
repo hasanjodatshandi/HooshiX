@@ -155,7 +155,7 @@ def rehearse(k, wait, run, manifest, platform):
         'namespace': renderer.NAMESPACE}, 'type': 'Opaque'}
     k('create', '--dry-run=server', '-f', '-',
       '--as=system:serviceaccount:cnpg-system:cert-manager-webhook', data=json.dumps(denied).encode(),
-      expected=1, required_error=b'cert-manager webhook may write only its serving CA')
+      expected=1, required_error=b'forbidden')
     result['rbac_issuer_scope_negative'] = 'Passed'
     apply(k, issuer)
     ca = object_('Certificate', 'hooshix-cert-manager-probe-ca', {'isCA': True,

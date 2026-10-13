@@ -131,7 +131,8 @@ entrypoints. Public acceptance receipt SHA256 is
 Certificate issuance/API behavior and target readiness are not established by help.
 
 Internal cert-manager commissioning tooling now renders only three signed
-components in `cnpg-system`, with restricted namespace Roles, exact cainjector
+components in `cnpg-system`, with restricted namespace Roles, an empty owned
+serving-CA destination and update-only webhook Secret privilege, exact cainjector
 webhook updates, internal-only Issuers and the ADR-0002 webhook-only Ambient
 exception. A supervised installer preserves mesh/OpenBao/ESO/storage, validates
 protected audit/secrets encryption and tests verified API callbacks without

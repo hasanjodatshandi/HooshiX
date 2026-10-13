@@ -48,6 +48,13 @@ def resource(kind, name, *, namespaced=True, **fields):
         'labels': {'app.kubernetes.io/managed-by': MANAGER}}, **fields}
 
 
+def serving_secret():
+    # Empty owned destination only; the webhook generates/rotates its key by exact-name UPDATE.
+    obj = resource('Secret', 'cert-manager-webhook-ca', type='Opaque')
+    obj['metadata']['annotations'] = {'cert-manager.io/allow-direct-injection': 'true'}
+    return obj
+
+
 def permissions():
     read = ['get', 'list', 'watch']
     write = ['create', 'update', 'patch', 'delete']
@@ -61,8 +68,7 @@ def permissions():
         rule('', ['secrets'], [*read, *write]), rule('', ['events'], ['create', 'patch'])]),
         resource('Role', ACCOUNTS['cainjector'], rules=[rule('', ['secrets'], read)]),
         resource('Role', ACCOUNTS['webhook'], rules=[
-            rule('', ['secrets'], [*read, 'update'], resourceNames=['cert-manager-webhook-ca']),
-            rule('', ['secrets'], ['create'])]),
+            rule('', ['secrets'], [*read, 'update'], resourceNames=['cert-manager-webhook-ca'])]),
         resource('ClusterRole', ACCOUNTS['cainjector'], namespaced=False, rules=[
             rule('admissionregistration.k8s.io', ['mutatingwebhookconfigurations',
                  'validatingwebhookconfigurations'], read),
@@ -79,7 +85,12 @@ def permissions():
             subjects=[{'kind': 'ServiceAccount', 'name': role['metadata']['name'], 'namespace': NAMESPACE}],
             roleRef={'apiGroup': 'rbac.authorization.k8s.io', 'kind': role['kind'],
                      'name': role['metadata']['name']}))
-    return [*roles, *bindings]
+    reports = resource('ClusterRole', 'hooshix-cert-manager-report-reader', namespaced=False, rules=[
+        rule('cert-manager.io', ['issuers'], read),
+        rule('admissionregistration.k8s.io', ['mutatingwebhookconfigurations',
+                                           'validatingwebhookconfigurations'], read)])
+    reports['metadata']['labels']['rbac.kyverno.io/aggregate-to-reports-controller'] = 'true'
+    return [*roles, *bindings, reports]
 
 
 def arguments(component):
@@ -155,15 +166,6 @@ def policies(pods, callbacks):
     issuers['spec']['matchConstraints']['resourceRules'] = [{'apiGroups': ['cert-manager.io'],
         'apiVersions': ['v1'], 'operations': ['CREATE', 'UPDATE'], 'resources': ['issuers'], 'scope': 'Namespaced'}]
     result.append(issuers)
-    serving = admission.policy('ValidatingPolicy', 'hooshix-cert-manager-serving-secret', NAMESPACE,
-        [admission.validation('cert-manager webhook may write only its serving CA',
-             'object.metadata.namespace != "cnpg-system" || request.userInfo.username != '
-             '"system:serviceaccount:cnpg-system:cert-manager-webhook" || '
-             'object.metadata.name == "cert-manager-webhook-ca"')])
-    serving['spec']['matchConstraints']['namespaceSelector'] = copy.deepcopy(BOUNDARY_SELECTOR)
-    serving['spec']['matchConstraints']['resourceRules'] = [{'apiGroups': [''], 'apiVersions': ['v1'],
-        'operations': ['CREATE', 'UPDATE'], 'resources': ['secrets'], 'scope': 'Namespaced'}]
-    result.append(serving)
     validations = []
     for obj in callbacks:
         hook = obj['webhooks'][0]
@@ -220,8 +222,8 @@ def validate(plan):
             raise ValueError('exact source image, scope and resource limits required')
     if [item for item in items if item['kind'] in ('Role', 'ClusterRole', 'RoleBinding', 'ClusterRoleBinding')] != permissions():
         raise ValueError('exact namespace-scoped permission set required')
-    if any(item['kind'] == 'Secret' for item in items):
-        raise ValueError('no certificate private material in public plans')
+    if [item for item in items if item['kind'] == 'Secret'] != [serving_secret()]:
+        raise ValueError('only the exact EMPTY serving destination may enter public plans')
     for item in items:
         if item['kind'] in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration'):
             for hook in item['webhooks']:
@@ -296,7 +298,7 @@ def render(manifest, addresses):
                         'operations': ['CREATE', 'UPDATE'], 'resources': ['certificates', 'certificaterequests',
                             'certificaterequests/approval', 'issuers'], 'scope': 'Namespaced'}]
             objects.append(obj)
-    objects.extend(permissions())
+    objects.extend([serving_secret(), *permissions()])
     for obj in [*crds, *objects]:
         obj['metadata'].setdefault('labels', {})['app.kubernetes.io/managed-by'] = MANAGER
     ns = resource('Namespace', NAMESPACE, namespaced=False)

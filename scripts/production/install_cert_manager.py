@@ -56,8 +56,12 @@ def execute(plan, *, kube=host.kube):
     def read(obj):
         meta = obj['metadata']
         scope = ['-n', meta['namespace']] if 'namespace' in meta else []
-        raw = kube(*scope, 'get', obj['kind'], meta['name'], '--ignore-not-found', '-o', 'json',
+        output = ('jsonpath={.metadata.uid}:{.metadata.labels.app\\.kubernetes\\.io/managed-by}'
+                  if obj['kind'] == 'Secret' else 'json')
+        raw = kube(*scope, 'get', obj['kind'], meta['name'], '--ignore-not-found', '-o', output,
                    output_bound=host.CRD_BOUND if obj['kind'] == 'CustomResourceDefinition' else host.BOUND)
+        if obj['kind'] == 'Secret':
+            return {'metadata': {'labels': {'app.kubernetes.io/managed-by': raw.decode().split(':', 1)[-1]}}} if raw.strip() else None
         return json.loads(raw) if raw.strip() else None
 
     # Inspect every destination before any write; never adopt foreign/changed state.
@@ -68,7 +72,7 @@ def execute(plan, *, kube=host.kube):
         exists[key] = bool(old)
         if old:
             require(old['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == MANAGER
-                    and desired_fields_match(old, obj), 'CERT_MANAGER_OWNERSHIP_OR_DRIFT_CONFLICT')
+                    and (obj['kind'] == 'Secret' or desired_fields_match(old, obj)), 'CERT_MANAGER_OWNERSHIP_OR_DRIFT_CONFLICT')
             if obj['kind'] == 'Deployment':
                 pod = old['spec']['template']['spec']
                 context = pod.get('securityContext', {})
@@ -107,6 +111,9 @@ def execute(plan, *, kube=host.kube):
         established_crd(obj['metadata']['name'], kube)
     for obj in [plan['strict'], *networks]:
         create(obj)
+    # Reporting metadata is aggregated before policy readiness; no Secret read is granted.
+    create(next(obj for obj in items if obj['kind'] == 'ClusterRole'
+                and obj['metadata']['name'] == 'hooshix-cert-manager-report-reader'))
     for old in boundaries:
         if old['spec']['matchConstraints']['namespaceSelector'] != SELECTOR:
             kube('patch', 'validatingpolicy', old['metadata']['name'], '--type=json', '-p', json.dumps([

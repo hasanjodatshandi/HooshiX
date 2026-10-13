@@ -66,7 +66,7 @@ class CertManagerCommissioningTest(unittest.TestCase):
         self.assertEqual(target.CRDS, {r['metadata']['name'] for r in plan['crds']})
         self.assertEqual('Not verified', plan['certificate_issuance'])
         self.assertEqual('Not verified', plan['deployment'])
-        self.assertNotIn('Secret', [o['kind'] for o in plan['manifest']['items']])
+        self.assertEqual([target.serving_secret()], [o for o in plan['manifest']['items'] if o['kind'] == 'Secret'])
         self.assertEqual({'mtls': {'mode': 'STRICT'}}, plan['strict']['spec'])
         with patch.object(target, 'recipe', return_value=self.source): target.validate(plan)
 
@@ -151,6 +151,9 @@ class CertManagerCommissioningTest(unittest.TestCase):
                                 'imageID': pod['containers'][0]['image']}]}})
                     return json.dumps({'items': pods}).encode()
                 value = states.get((kind, args[i + 2]))
+                if kind == 'secret' and value:
+                    self.assertIn('jsonpath={.metadata.uid}', ' '.join(args))
+                    return ('owned:' + installer.MANAGER).encode()
                 return json.dumps(value).encode() if value else b''
             if args[0] == 'patch':
                 value = states[(args[1].lower(), args[2])]
@@ -178,9 +181,11 @@ class CertManagerCommissioningTest(unittest.TestCase):
         for args, body, _ in calls:
             self.assertNotIn('delete', args)
             self.assertNotIn('--force-conflicts', args)
-            self.assertFalse('get' in args and 'secret' in args)
+            if 'get' in args and 'Secret' in args:
+                self.assertIn('jsonpath={.metadata.uid}', ' '.join(args))
         writes = [body for args, body, _ in calls if body and '--dry-run=server' not in args]
-        self.assertFalse(any(o['kind'] in ('Secret', 'PersistentVolume', 'PersistentVolumeClaim', 'SecretStore') for o in writes))
+        self.assertFalse(any(o['kind'] in ('PersistentVolume', 'PersistentVolumeClaim', 'SecretStore') for o in writes))
+        self.assertTrue(all(not o.get('data') and not o.get('stringData') for o in writes if o['kind'] == 'Secret'))
         self.assertTrue(all(o['metadata'].get('namespace', target.NAMESPACE) == target.NAMESPACE for o in writes))
 
     def test_partial_create_and_changed_existing_selector_are_preserved(self):
