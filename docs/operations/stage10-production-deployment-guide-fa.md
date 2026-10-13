@@ -954,6 +954,16 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 مرجع رفتار: [انتشار GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)،
 [امضای digest و بررسی هویت Cosign](https://github.com/sigstore/cosign).
 
+### پذیرش مجموعهٔ منتشرشدهٔ PostgreSQL
+
+اجرای محافظت‌شدهٔ `38382418665`، attempt `1` روی
+`main@5b0c547e27c5f89d5ec76186defa112739b64f3c` انتشار هر چهار تصویر را با
+`publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
+واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
+این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
+promotion هنوز شواهد مستقل می‌خواهند. receipt عمومی و digestها در مرحلهٔ پذیرش
+بررسی می‌شوند؛ هیچ رمز VPS، custody، کلید Root یا credential باکت لازم نیست.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS
