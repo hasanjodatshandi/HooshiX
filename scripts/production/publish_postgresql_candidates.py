@@ -18,8 +18,10 @@ from verify_openbao_artifact import load
 from verify_postgresql_artifacts import scan_inventory
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
 
-PACKAGES = {component: 'hooshix/platform-postgresql-' + component + '-private'
-            for component in COMPONENTS}
+PACKAGES = {'operator': 'hooshix/platform-postgresql-operator-v2-private',
+            'postgresql': 'hooshix/platform-postgresql-postgresql-private',
+            'barman-plugin': 'hooshix/platform-postgresql-barman-plugin-private',
+            'barman-sidecar': 'hooshix/platform-postgresql-barman-sidecar-private'}
 BUILD_TYPE = 'https://github.com/hasanjodatshandi/HooshiX/postgresql-candidate-build/v1'
 
 
@@ -37,6 +39,9 @@ def private_package(component, *, allow_missing=False):
             return
         raise
     if visibility != 'private':
+        actual = visibility if visibility in ('public', 'internal') else 'invalid'
+        print(f'POSTGRESQL_PACKAGE_VISIBILITY=Rejected; component={component}; '
+              f'actual={actual}; required=private', flush=True)
         raise ValueError('private PostgreSQL package required; no public exception')
 
 
