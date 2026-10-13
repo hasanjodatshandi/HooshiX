@@ -889,6 +889,54 @@ restore نیست؛ این‌ها در مرحلهٔ پذیرش مقصد جداگ�
 چهار package باید خصوصی بماند و استثنای عمومی‌بودن packageهای قدیمی را به ارث
 نمی‌برد. اجرای انتشار به رمز VPS، کلید Root یا فایل custody نیاز ندارد.
 
+پس از merge تغییر بررسی‌شده و موفقیت `repository-baseline.yml` برای SHA دقیق
+`main`، از checkout به‌روز با دسترسی GitHub مالک اجرا کنید:
+
+```bash
+gh workflow run production-release.yml --ref main -f release_kind=postgresql-candidate
+gh run list --workflow production-release.yml --event workflow_dispatch --limit 5
+# RUN_ID را از اجرای همین فرمان انتخاب کنید؛ artifactها عمومی از نظر محتوا هستند، نه دسترسی.
+gh run download RUN_ID --name postgresql-publication-RUN_ID-1 --dir /path/outside-repo/postgresql-publication
+```
+
+اگر attempt غیر از ۱ بود، نام artifact را مطابق همان attempt انتخاب کنید. منتظر
+نتیجهٔ نهایی run بمانید؛ `publication.json` فقط بعد از موفقیت هر چهار جزء تولید
+می‌شود. مقدار `publication` و `signature_provenance` باید `Passed` و visibility
+هر چهار مقصد `private` باشد. مقصدهای ثابت زیر همگی زیر
+`ghcr.io/hasanjodatshandi/hooshix/` هستند:
+
+- `platform-postgresql-operator-private`
+- `platform-postgresql-postgresql-private`
+- `platform-postgresql-barman-plugin-private`
+- `platform-postgresql-barman-sidecar-private`
+
+workflow از توکن موقت `GITHUB_TOKEN` و هویت امضاکنندهٔ موجود
+`production-release.yml@refs/heads/main` استفاده می‌کند. توکن شخصی، Secret VPS،
+کلید Root و credential باکت را وارد نکنید. فایل موقت login در پایان حذف می‌شود؛
+آرشیو source در artifact خروجی قرار نمی‌گیرد. private بودن مخزن به‌تنهایی شاهد
+private بودن package نیست؛ ابزار آن را قبل از push، بعد از push و بعد از امضا
+بررسی می‌کند. package جدید طبق رفتار GHCR خصوصی ایجاد می‌شود؛ 401/403 هرگز
+به‌عنوان نبود package پذیرفته نمی‌شود. تغییر visibility خودکار مجاز نیست.
+
+ابزار `publish_postgresql_candidates.py` همهٔ buildها و native smokeهای موجود را
+پیش از push اجرا می‌کند، config محلی را با manifest واقعی رجیستری تطبیق می‌دهد و
+دوباره روی digest ثابت SBOM کامل و Grype تازه می‌گیرد. پیش از اولین امضا، اسکن
+هر چهار digest باید موفق باشد. سپس امضای keyless، SLSA v1 و CycloneDX با هویت
+دقیق workflow و محتوای predicate/subject بررسی می‌شوند؛ هویت اشتباه باید رد و
+کنترل مثبت دوباره موفق شود. provenance operand فقط patch روی runtime رسمی
+است، نه ادعای rebuild باینری PostgreSQL. هر manifest/config/engine digest نقش
+جدا دارد؛ برای نصب فقط `images` در receipt نهایی، همراه شواهد پذیرش، معتبر است.
+
+این عملیات نصب، staging، admission مقصد یا promotion نیست و آن چهار نتیجه در
+receipt همچنان `Not verified` می‌مانند. موفقیت انتشار جای آزمون native مستقل
+همان digest و بازیابی واقعی را نمی‌گیرد. اگر مرحله‌ای شکست خورد، imageهای push
+شده و شواهد جزئی برای بررسی حفظ می‌شوند؛ آن‌ها مجموعهٔ مجاز نیستند. حذف، reinit،
+تکرار خودکار یا استفاده از receipt قدیمی انجام نمی‌شود. اجرای بعدی فقط بعد از
+رفع علت مشخص و با پوشهٔ evidence تازه است. defer باکت پارس‌پک دست‌نخورده است.
+
+مرجع رفتار: [انتشار GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)،
+[امضای digest و بررسی هویت Cosign](https://github.com/sigstore/cosign).
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS
