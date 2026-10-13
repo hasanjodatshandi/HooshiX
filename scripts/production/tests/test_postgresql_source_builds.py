@@ -192,8 +192,9 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         payload = b'public-source-fixture'
         selected = copy.deepcopy(self.selected)
         selected['sources']['postgresql']['archive_sha256'] = hashlib.sha256(payload).hexdigest()
-        for export, rejected in ((False, False), (True, False), (True, True)):
-            with self.subTest(export=export, rejected=rejected), tempfile.TemporaryDirectory() as parent:
+        for export, rejected, empty in ((False, False, False), (True, False, False),
+                                        (True, True, False), (True, False, True)):
+            with self.subTest(export=export, rejected=rejected, empty=empty), tempfile.TemporaryDirectory() as parent:
                 directory = Path(parent) / 'candidate'
                 scanned = []
                 def native(argv, **kwargs):
@@ -208,7 +209,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                     if argv[3:5] == ['image', 'save']:
                         self.assertTrue(scanned)
                         self.assertEqual(self.image, argv[-1])
-                        (directory / 'candidate-image.tar').write_bytes(b'bounded-image')
+                        (directory / 'candidate-image.tar').write_bytes(b'' if empty else b'bounded-image')
                     return ''
                 with patch.object(target, 'recipe', return_value=selected), \
                         patch.object(target.urllib.request, 'urlopen') as fetch, \
@@ -218,16 +219,16 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                                      return_value={'scan': 'Passed'}), \
                         patch('test_postgresql_isolation_native.exercise_candidate') as exercise:
                     fetch.return_value.__enter__.return_value.read.return_value = payload
-                    if rejected:
+                    if rejected or empty:
                         with self.assertRaises(ValueError): target.build('postgresql', directory, export)
                         self.assertFalse((directory / 'receipt.json').exists())
-                        exercise.assert_not_called()
+                        if rejected: exercise.assert_not_called()
                     else:
                         receipt = target.build('postgresql', directory, export)
                         exercise.assert_called_once_with(self.image, docker_host='unix:///captured.sock')
                         self.assertEqual(export, 'image_archive_sha256' in receipt)
                     self.assertEqual([{'docker_host': 'unix:///captured.sock'}], scanned)
-                    self.assertEqual(export and not rejected, (directory / 'candidate-image.tar').exists())
+                    self.assertEqual(export and not rejected and not empty, (directory / 'candidate-image.tar').exists())
 
 
 if __name__ == '__main__':

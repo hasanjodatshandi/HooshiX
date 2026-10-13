@@ -250,6 +250,7 @@ def build(component, directory, export_image=False):
         run(['docker', '--host', endpoint, 'image', 'save', '--output', str(archive), image_id], timeout=180)
         size = archive.stat().st_size
         if not 0 < size <= 1024 * 1024 * 1024:
+            archive.unlink()  # Failed exports must not enter the always-uploaded CI evidence.
             raise ValueError('bounded candidate image archive required')
         with archive.open('rb') as stream:
             receipt['image_archive_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()

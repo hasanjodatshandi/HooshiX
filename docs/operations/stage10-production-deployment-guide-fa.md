@@ -776,9 +776,9 @@ candidateهای نهایی operand و sidecar از پایهٔ Alpine 3.24.2 با
 OpenSSL 3.5.9-r0 و zlib 1.3.2-r1 ساخته می‌شوند. operand همان PostgreSQL 18.6
 است؛ sidecar از Python 3.14.8 و Barman 3.20.1 استفاده می‌کند. نسخه و hash تمام
 dependencyهای Barman از lock رسمی همان source بررسی می‌شود؛ نصب بدون hash،
-کاهش سطح گیت یا استفاده از tag متغیر مجاز نیست. eligibility مجموعهٔ جدید و
-CNPG/WAL/PITR هنوز `Not verified` است؛ هیچ digestی صرفاً با تغییر پایه مجوز نصب
-نمی‌گیرد.
+کاهش سطح گیت یا استفاده از tag متغیر مجاز نیست. اسکن مجموعهٔ candidate و آزمون
+مستقل CNPG/WAL/PITR با دادهٔ مصنوعی `Passed` است؛ تأیید انتشار، staging و نصب
+روی VPS هنوز `Not verified` است. هیچ digestی صرفاً با تغییر پایه مجوز نصب نمی‌گیرد.
 
 ابزار `build_postgresql_candidates.py` سه جزء Go را از source رسمی دارای commit
 و checksum ثابت در `data/postgresql-source-builds.json`، با Go 1.26.9 و x/net
@@ -790,8 +790,7 @@ entrypoint صریح دارند؛ runtimeهای Python و PostgreSQL به digest 
 جدا ساخته می‌شوند؛ compiler و headerهای build وارد runtime نمی‌شوند.
 operand دارای provenance مجزای `patched-upstream-runtime-build` است، نه ادعای
 ساخت دوبارهٔ باینری PostgreSQL؛ سه جزء Go `patched-upstream-source-build` هستند.
-امضا، reconcile، WAL/PITR و promotion هنوز
-`Not verified` است.
+امضا، reconcile و WAL/PITR روی مقصد واقعی و promotion هنوز `Not verified` است.
 
 برای هر ساخت جدید، scanner و smoke باید دوباره اجرا شوند. native fixture
 operand پنج دیتابیس، RLS اجباری، context تراکنشی، replay غیرمخرب و منع ۴۰ اتصال
@@ -847,13 +846,40 @@ workflow `PostgreSQL candidate artifacts` همین چهار گیت نهایی ر
 ثبت می‌کند؛ CI تصویر عمومی بدون secret را کنار evidence نگه می‌دارد، نه در
 GHCR یا VPS. انتقال آرشیو مجوز deploy نیست؛ مصرف‌کننده باید SHA-256 آرشیو و
 config digest، labelهای recipe و SBOM را دوباره تطبیق دهد. موفقیت CI جای آزمون
-مقصد را نمی‌گیرد. برای runtime operand/sidecar،
+مقصد را نمی‌گیرد. آرشیو خالی یا بزرگ‌تر از یک GiB حذف می‌شود و receipt موفق
+نمی‌گیرد. هنگام import بین Docker و containerd، شناسهٔ engine ممکن است تغییر کند؛
+از روی نام tag یا شناسهٔ engine فرض نکنید config همان است. hash آرشیو و محتوای
+config باید با receipt/SBOM تطبیق داشته باشد. برای runtime operand/sidecar،
 locale، UID/GID، نسخهٔ Python و dependencyهای Barman باید مشخص و با آزمون
 واقعی SQL، CNPG و WAL/PITR بررسی شوند؛ صرف تعویض نام تصویر مجاز نیست.
 receipt اسکن، signature/provenance، staging، deployment و promotion را صریحاً
 `Not verified` نگه می‌دارد. checksum manifest برای بستهٔ بعدی است؛ این verifier
 manifest را روی cluster apply یا برای نصب مجاز نمی‌کند. منبع ثبت‌شدهٔ label
 تصویر و commit tag لزوماً یکی نیستند؛ هیچ ادعای build provenance از tag نمی‌شود.
+
+مرز نتیجهٔ فعلی candidateهای بررسی‌شده:
+
+| آزمون | نتیجه | مرز شاهد |
+| --- | --- | --- |
+| build، SBOM و Grype هر چهار تصویر | `Passed` | run `38353924447`، commit `0931a1359671adc357a1a7db507d1c38d0948023`؛ بدون High/Critical یا ignored High/Critical |
+| SQL/RLS روی operand 18.6 | `Passed` | پنج دیتابیس، context تراکنشی و replay غیرمخرب؛ fixture موقت و بدون شبکه |
+| reconcile اپراتور و operand | `Passed` | Kubernetes 1.35.5 موقت؛ ده role و پنج Database و منع ۴۰ اتصال احراز هویت‌شدهٔ بین‌سرویسی |
+| Barman base backup، WAL و PITR کل cluster | `Passed` | مقصد S3 مصنوعی RAM-only، restore به cluster جدا، حذف تغییر بعد از نقطه و حفظ دیتابیس اصلی |
+| باکت واقعی، TLS/lock/retention و RPO/RTO مقصد | `Not verified` | آزمون مصنوعی جای شاهد provider و مقصد واقعی نیست |
+
+برای عملیات نهایی، از manifest رسمی دارای checksum، تصویر منتشرشدهٔ ثابت و
+متادیتای major version صریح CNPG استفاده کنید. fixture tagها برای انتقال داخل
+محیط موقت هستند و هرگز مقصد production نیستند. sidecar بومی Barman در
+`initContainers` با `restartPolicy: Always` دیده می‌شود؛ Ready بودن را از condition
+خود Pod و وضعیت sidecar بگیرید، نه فقط شمارش `spec.containers`.
+در بازیابی نام‌دار، `bootstrap.recovery.recoveryTarget` باید `backupID` واقعی
+همان base backup و `targetName` نقطهٔ ساخته‌شده با `pg_create_restore_point()` را
+داشته باشد؛ منبع در `externalClusters` به ObjectStore و `serverName` cluster اصلی
+متصل است. restore همیشه روی cluster جدا انجام می‌شود. آزمون باید محتویات هر پنج
+دیتابیس، منع اتصال بین‌سرویسی و دست‌نخورده‌ماندن cluster اصلی را بررسی کند.
+شاهد فعلی شامل migration واقعی سرویس‌ها، replay حذف داده/erasure و RLS پس از
+restore نیست؛ این‌ها در مرحلهٔ پذیرش مقصد جداگانه لازم‌اند. پس از staging، تصویر
+را دوباره نسازید؛ همان digest امضاشده و آزموده‌شده باید promote شود.
 
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 

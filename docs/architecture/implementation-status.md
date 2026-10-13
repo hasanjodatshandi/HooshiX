@@ -16,10 +16,11 @@ The credential-free PostgreSQL ownership component is implemented at
 `deploy/postgresql/README.md`. It emits CNPG 1.30 role/database retention contracts
 and transaction-bounded public privilege SQL for five service databases. Native
 PostgreSQL 18.4 tests exercise 40 cross-service CONNECT denials, runtime DDL/role
-denials, forced RLS/context reset and non-destructive replay. CNPG reconciliation,
-signed data-image adoption, durable data storage, real credential delivery,
-destination installation, service migration compatibility and physical recovery
-remain `Not run`/`Not verified`. This is a component, not a complete data installer.
+denials, forced RLS/context reset and non-destructive replay. Disposable CNPG
+1.30.1/PostgreSQL 18.6 reconciliation and synthetic physical recovery are verified
+below. Signed data-image adoption, durable target data storage, real credential
+delivery, destination installation and service migration compatibility remain
+`Not run`/`Not verified`. This is a component, not a complete data installer.
 
 PostgreSQL artifact preparation now records four blocked official amd64 inputs:
 CNPG operator 1.30.1, CNPG-compatible minimal PostgreSQL 18.6, and Barman Cloud
@@ -35,18 +36,32 @@ the upstream hash-locked Barman 3.20.1 environment for Python 3.14.8. Both have
 valid UID/GID 26 accounts. Full APK/Python/Go inventory and unsuppressed fresh
 scans remain mandatory. The PostgreSQL native fixture exercises the five-database
 SQL/RLS boundary in volatile non-root network-isolated storage with explicit
-`C.UTF-8`. Four-candidate final CI, CNPG reconciliation and physical recovery
-remain `Not verified`. Successful candidates may be exported as checksum-bound
+`C.UTF-8`. Artifact run `38353924447` on
+`0931a1359671adc357a1a7db507d1c38d0948023` passes all four final builds,
+complete scans and restricted native checks. Repository baseline `38353924292`
+and web E2E `38353924314` pass that candidate. Successful candidates may be exported as checksum-bound
 image archives for isolated tests, not registry/VPS publication. The operand uses
 distinct `patched-upstream-runtime-build` provenance, not a PostgreSQL source
 recompile claim. Scan evidence does not establish upstream build provenance,
-signatures, admission, staging, backup or production readiness.
+signatures, admission, staging or production readiness.
+An isolated Kubernetes 1.35.5 kind fixture separately verifies the rebuilt
+operator/operand, ten reconciled service roles, five databases and 40 authenticated
+cross-database CONNECT denials. The rebuilt Barman plugin/sidecar completes a
+physical base backup, continuous WAL archive and a named whole-cluster PITR restore
+into a separate cluster. All five databases retain their markers and cross-service
+denials; the recovered Identity database excludes the post-target marker, while
+the original database retains it. This uses a synthetic in-memory S3 protocol
+fixture, not the production provider. Off-host durability, provider authentication,
+TLS/retention/lock, actual service Flyway/RLS/erasure recovery and target RPO/RTO
+remain `Not verified`. Native fixture config digests are recorded separately from
+CI engine/manifest identities; no build or retag is a production promotion.
 All four must clear the live gate before signed candidate publication or adoption;
 no data operator or PostgreSQL instance has been installed by this preparation.
 Current selected upstream input scans use a valid database built
 2026-10-12; the scanned amd64 manifest digests match the catalog. Some base-package
 findings have no vendor fix recorded. Current complete-set replacement artifact
-eligibility is `Not verified`. Fresh final compatibility/scan evidence is required; the
+scan eligibility is `Passed` for the tested candidates, not publication/admission/
+staging/target eligibility. Fresh exact-release compatibility/scan evidence is required; the
 existing ESO/OpenBao/mesh target remains unchanged.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
