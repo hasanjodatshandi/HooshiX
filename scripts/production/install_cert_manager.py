@@ -103,6 +103,7 @@ def execute(plan, *, kube=host.kube):
     create(plan['namespace'])
     for obj in plan['crds']:
         create(obj)
+        print('CERT_MANAGER_INSTALL_STEP=crd-' + obj['metadata']['name'], file=sys.stderr, flush=True)
         established_crd(obj['metadata']['name'], kube)
     for obj in [plan['strict'], *networks]:
         create(obj)
@@ -114,6 +115,7 @@ def execute(plan, *, kube=host.kube):
                 {'op': 'replace', 'path': '/spec/matchConstraints/namespaceSelector', 'value': SELECTOR}]))
     for obj in plan['policies']:
         create(obj)
+        print('CERT_MANAGER_INSTALL_STEP=policy-' + obj['metadata']['name'], file=sys.stderr, flush=True)
         kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
              obj['kind'].lower() + '/' + obj['metadata']['name'], '--timeout=60s', timeout=75)
     # RBAC precedes workloads; callbacks only match new namespaced certificate resources.

@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -67,6 +68,14 @@ def rehearse(k, wait, run, manifest, platform):
         try:
             return k(*args, data=json.dumps(body).encode() if body is not None else None, **kw)
         except RehearsalFailed as error:
+            resource = next((a for a in args if re.fullmatch(
+                r'(?:validatingpolicy|imagevalidatingpolicy)/hooshix-[a-z0-9-]+', a)), None)
+            if 'wait' in args and resource:
+                # Compile status of these fixed PUBLIC policies, before any certificate keys exist.
+                print('CERT_MANAGER_PUBLIC_POLICY_FAILURE=' + resource, flush=True)
+                status = k('get', resource, '-o', 'jsonpath={.status}')
+                if len(status) <= 16384:
+                    print('CERT_MANAGER_PUBLIC_POLICY_STATUS=' + json.dumps(json.loads(status)), flush=True)
             raise host.custody.BootstrapFailed('CERT_MANAGER_NATIVE_OPERATION_FAILED') from error
 
     result = installer.execute(plan, kube=adapter)
