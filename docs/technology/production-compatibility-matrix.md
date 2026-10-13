@@ -67,6 +67,13 @@ effective image pins or claim compatibility: rebuilt-image scans, native tests,
 distinct source-build provenance and signed digest/admission adoption remain
 required. Both CNI binaries are rebuilt; ztunnel and waypoint are unchanged.
 
+Cert-manager 1.20.3 has a separate three-component source candidate recipe with
+Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.1. Product version, source commit,
+archive checksum, nested binary modules and official runtime bases remain explicit.
+Help-only smoke is not API/controller compatibility evidence; final signatures,
+signed SBOM, live admission and internal certificate issuance with Barman 0.15.1
+remain required before target adoption. No additional ACME solver image is approved.
+
 ## Upgrade and profile-validation rule
 
 An upgrade or initial profile approval is complete only after the affected set proves, as applicable:
