@@ -15,15 +15,18 @@ from render_postgresql_ownership import DATABASES, isolation_sql, render
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def docker(*argv: str, input_text: str | None = None, timeout: int = 20):
-    return subprocess.run(['docker', *argv], input=input_text, capture_output=True,
+def docker(*argv: str, input_text: str | None = None, timeout: int = 20, docker_host: str | None = None):
+    prefix = ['docker'] if docker_host is None else ['docker', '--host', docker_host]
+    if docker_host is not None and not docker_host.startswith('unix://'):
+        raise RuntimeError('local Unix-socket Docker required')
+    return subprocess.run([*prefix, *argv], input=input_text, capture_output=True,
                           text=True, timeout=timeout, check=False)
 
 
-def exercise(container: str) -> None:
+def exercise(container: str, docker_host: str | None = None) -> None:
     def sql(database, statement, user='postgres', denied=None):
         result = docker('exec', '-i', container, 'psql', '-XAtq', '-v', 'ON_ERROR_STOP=1',
-                        '-U', user, '-d', database, input_text=statement)
+                        '-U', user, '-d', database, input_text=statement, docker_host=docker_host)
         if denied is not None:
             if result.returncode == 0 or denied not in result.stderr:
                 raise RuntimeError('expected PostgreSQL boundary denial missing')
@@ -114,6 +117,41 @@ SELECT count(*) FROM public.boundary_fixture;
     sql('identity', isolation_sql('identity'))
 
 
+def exercise_candidate(image: str, docker_host: str | None = None) -> None:
+    """Test only an immutable local candidate, without network or persistent data."""
+    if docker_host is None:
+        endpoint = docker('context', 'inspect', '--format', '{{json .Endpoints.docker.Host}}')
+        if endpoint.returncode != 0:
+            raise RuntimeError('local Docker endpoint unavailable')
+        docker_host = json.loads(endpoint.stdout)
+    if (not re.fullmatch(r'sha256:[a-f0-9]{64}', image) or not docker_host.startswith('unix://')
+            or not os.environ.get('DOCKER_HOST', 'unix://').startswith('unix://')):
+        raise RuntimeError('immutable local candidate and Unix-socket Docker required')
+    started = docker('run', '-d', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+                     '--security-opt', 'no-new-privileges', '--memory', '512m', '--cpus', '1',
+                     '--pids-limit', '128', '--tmpfs', '/work:rw,noexec,nosuid,size=256m,uid=26,gid=26',
+                     '--tmpfs', '/tmp:rw,noexec,nosuid,size=32m,uid=26,gid=26',
+                     '-e', 'PGHOST=/tmp', '--entrypoint', '/bin/sh', image, '-ec',
+                     'initdb -D /work/data --username=postgres --auth=trust --locale=C.UTF-8 >/dev/null; '
+                     'exec postgres -D /work/data -h "" -k /tmp', timeout=90, docker_host=docker_host)
+    container = started.stdout.strip()
+    if started.returncode != 0 or not re.fullmatch(r'[a-f0-9]{64}', container):
+        raise RuntimeError('disposable candidate failed to start')
+    try:
+        deadline = time.monotonic() + 45
+        while docker('exec', container, 'pg_isready', '-U', 'postgres', docker_host=docker_host).returncode != 0:
+            if time.monotonic() >= deadline:
+                raise RuntimeError('disposable candidate startup exceeded deadline')
+            time.sleep(1)
+        version = docker('exec', container, 'postgres', '--version', docker_host=docker_host)
+        if version.returncode != 0 or version.stdout.strip() != 'postgres (PostgreSQL) 18.6':
+            raise RuntimeError('exact PostgreSQL 18.6 candidate required')
+        exercise(container, docker_host=docker_host)
+    finally:
+        if docker('rm', '-fv', container, docker_host=docker_host).returncode != 0:
+            raise RuntimeError('disposable candidate cleanup failed')
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--disposable', action='store_true', required=True)
@@ -122,24 +160,25 @@ def main() -> None:
     if (endpoint.returncode != 0 or not json.loads(endpoint.stdout).startswith('unix://')
             or not os.environ.get('DOCKER_HOST', 'unix://').startswith('unix://')):
         raise RuntimeError('local Unix-socket Docker required; remote daemons are forbidden')
+    docker_host = json.loads(endpoint.stdout)
     # Reuse the repository's immutable PostgreSQL 18.4 fixture, not a production image selection.
     fixture = (ROOT / 'infrastructure/staging/postgres-bootstrap.yaml').read_text()
     image = re.search(r'image: (postgres:18\.4-bookworm@sha256:[a-f0-9]{64})', fixture).group(1)
     started = docker('run', '-d', '--network', 'none', '--memory', '512m', '--cpus', '1',
                      '--pids-limit', '128', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
-                     image, timeout=180)
+                     image, timeout=180, docker_host=docker_host)
     container = started.stdout.strip()
     if started.returncode != 0 or not re.fullmatch(r'[a-f0-9]{64}', container):
         raise RuntimeError('disposable PostgreSQL failed to start')
     try:
         deadline = time.monotonic() + 45
-        while docker('exec', container, 'pg_isready', '-U', 'postgres').returncode != 0:
+        while docker('exec', container, 'pg_isready', '-U', 'postgres', docker_host=docker_host).returncode != 0:
             if time.monotonic() >= deadline:
                 raise RuntimeError('disposable PostgreSQL startup exceeded deadline')
             time.sleep(1)
-        exercise(container)
+        exercise(container, docker_host=docker_host)
     finally:
-        removed = docker('rm', '-fv', container)
+        removed = docker('rm', '-fv', container, docker_host=docker_host)
         if removed.returncode != 0:
             raise RuntimeError('disposable container/volume cleanup failed')
     print(json.dumps({'schema_version': 1, 'postgresql': '18.4', 'image': image,

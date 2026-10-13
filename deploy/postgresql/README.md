@@ -13,8 +13,10 @@ four-image gate without credentials or target writes. Go components use
 `data/postgresql-source-builds.json`: operator 1.30.1 rebuilds both embedded
 architectures, Barman 0.15.1 rebuilds the plugin/sidecar manager, and the static
 plugin uses the pinned non-root distroless base rather than UBI. The sidecar keeps
-its Python/Barman runtime; its OS findings still block the final gate. The
-PostgreSQL 18.6 minimal operand remains independently scanned and blocked. No
+the hash-locked Barman 3.20.1 requirements, rebuilt for Python 3.14.8 on pinned
+Alpine 3.24.2. The PostgreSQL 18.6 candidate uses the pinned official Alpine
+operand plus exact fixed OpenSSL/zlib packages and a valid UID/GID 26 account.
+Both remain blocked until final scan/native compatibility/recovery gates pass. No
 source input is treated as an unchanged imported final image. This does not sign,
 publish or approve installation. See the Persian Stage10 guide for local usage.
 

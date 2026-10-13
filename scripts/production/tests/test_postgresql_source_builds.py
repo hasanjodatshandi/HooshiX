@@ -19,10 +19,10 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         self.image = 'sha256:' + 'a' * 64
 
     def evidence(self, component):
-        source = self.selected['sources']['operator' if component == 'operator' else 'barman']
+        source = self.selected['sources'][target.source_key(component)]
         return {'syft.json': {'source': {'type': 'image', 'metadata': {
             'imageID': self.image, 'userInput': self.image, 'os': 'linux', 'architecture': 'amd64', 'labels': {
-            'io.hooshix.provenance.kind': 'patched-upstream-source-build',
+            'io.hooshix.provenance.kind': target.provenance(component),
             'io.hooshix.source.revision': source['revision'],
             'io.hooshix.recipe.sha256': hashlib.sha256(target.RECIPE.read_bytes()).hexdigest()}}},
             'descriptor': {'name': 'syft', 'version': '1.51.0', 'configuration': {
@@ -30,10 +30,15 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                 'requested': {'default': ['image', 'file']}, 'used': [
                     'go-module-binary-cataloger', 'binary-classifier-cataloger',
                     'python-installed-package-cataloger', 'dpkg-db-cataloger',
-                    'rpm-db-cataloger', 'elf-binary-package-cataloger']}}},
-            'artifacts': [{'name': 'stdlib', 'version': 'go1.26.9', 'locations': [{'path': destination}]}
-                          for destination in target.BINARIES[component].values()] +
-                         [{'name': 'golang.org/x/net', 'version': 'v0.60.0'}]},
+                    'rpm-db-cataloger', 'apk-db-cataloger', 'elf-binary-package-cataloger']}}},
+            'distro': {'id': 'alpine', 'versionID': '3.24.2'},
+            'artifacts': ([{'name': 'stdlib', 'version': 'go1.26.9', 'locations': [{'path': destination}]}
+                          for destination in target.BINARIES.get(component, {}).values()] +
+                         [{'name': 'golang.org/x/net', 'version': 'v0.60.0'}] if component != 'postgresql' else []) +
+                         [{'name': name, 'version': version, 'type': 'apk'} for name, version in
+                          (self.selected['runtime_packages'] | self.selected['sidecar_packages']).items()] +
+                         [{'name': 'barman', 'version': '3.20.1', 'type': 'python'},
+                          {'name': 'postgresql', 'version': '18.6', 'type': 'binary'}]},
             'grype.json': {'source': {'target': {'imageID': self.image, 'userInput': self.image}}, 'matches': []},
             'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
             'database.json': {'valid': True, 'schemaVersion': '6', 'built': self.now.isoformat()}}
@@ -62,8 +67,16 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         self.assertIn('USER 65532:65532', plugin)
         self.assertNotIn('ubi', plugin)
         sidecar = target.dockerfile('barman-sidecar', self.selected)
-        self.assertIn('FROM ' + target.pins()['components']['barman-sidecar']['image'], sidecar)
-        self.assertNotIn('pip install', sidecar)
+        self.assertIn('FROM ' + self.selected['sidecar_runtime'], sidecar)
+        self.assertIn('--require-hashes', sidecar)
+        self.assertIn('pip check', sidecar)
+        self.assertNotIn(target.pins()['components']['barman-sidecar']['image'], sidecar)
+        postgresql = target.dockerfile('postgresql', self.selected)
+        self.assertIn('FROM ' + self.selected['postgresql_runtime'], postgresql)
+        self.assertIn('USER 26:26', postgresql)
+        self.assertIn('adduser -D -H -u 26', postgresql)
+        self.assertIn('libssl3=3.5.9-r0', postgresql)
+        self.assertIn('patched-upstream-runtime-build', postgresql)
         for generated in (operator, plugin, sidecar):
             self.assertIn('go mod verify', generated)
             self.assertIn('GOTOOLCHAIN=local', generated)
@@ -77,7 +90,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             if alternate == 'old-arm64': artifacts[1]['version'] = 'go1.27.1'
             if alternate == 'missing-arm64': del artifacts[1]
             if alternate == 'old-extra-binary': artifacts.append({'name': 'stdlib', 'version': 'go1.26.6', 'locations': []})
-            if alternate == 'old-net': artifacts[-1]['version'] = 'v0.58.0'
+            if alternate == 'old-net': next(item for item in artifacts if item['name'] == 'golang.org/x/net')['version'] = 'v0.58.0'
             with self.subTest(alternate=alternate), self.assertRaises(ValueError):
                 self.validate('operator', evidence)
 
@@ -133,7 +146,11 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
     def test_recipe_rejects_unreviewed_builder_modules_runtime_and_source(self):
         cases = [self.selected | {'builder': 'golang:latest'}, self.selected | {'plugin_runtime': 'scratch'},
                  self.selected | {'go_version': '1.27.1'}, self.selected | {'production_promotion': 'Passed'},
-                 self.selected | {'modules': target.MODULES | {'golang.org/x/net': 'v0.58.0'}}]
+                 self.selected | {'modules': target.MODULES | {'golang.org/x/net': 'v0.58.0'}},
+                 self.selected | {'sidecar_runtime': 'python:latest'},
+                 self.selected | {'postgresql_runtime': 'postgres:latest'},
+                 self.selected | {'python_version': '3.13.5'},
+                 self.selected | {'runtime_packages': target.RUNTIME_PACKAGES | {'libssl3': '3.5.8-r0'}}]
         for key, value in (('repository', 'other/repository'), ('revision', 'main'), ('archive_sha256', 'bad')):
             selected = copy.deepcopy(self.selected)
             selected['sources']['operator'][key] = value
@@ -151,8 +168,24 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             fetch.assert_not_called()
             self.assertFalse(directory.exists())
             with patch.object(target, 'run') as native, self.assertRaises(ValueError):
-                target.build('postgresql', directory)
+                target.build('unknown', directory)
             native.assert_not_called()
+
+    def test_missing_old_or_duplicate_runtime_inventory_is_rejected(self):
+        for component in ('postgresql', 'barman-sidecar'):
+            for change in ('missing', 'old', 'duplicate', 'wrong-distro', 'old-application'):
+                evidence = self.evidence(component)
+                artifacts = evidence['syft.json']['artifacts']
+                ssl = next(item for item in artifacts if item['name'] == 'libssl3')
+                if change == 'missing': artifacts.remove(ssl)
+                if change == 'old': ssl['version'] = '3.5.8-r0'
+                if change == 'duplicate': artifacts.insert(0, ssl | {'version': '3.5.8-r0'})
+                if change == 'wrong-distro': evidence['syft.json']['distro']['id'] = 'debian'
+                if change == 'old-application':
+                    name = 'postgresql' if component == 'postgresql' else 'barman'
+                    artifacts.append({'name': name, 'version': 'old'})
+                with self.subTest(component=component, change=change), self.assertRaises(ValueError):
+                    self.validate(component, evidence)
 
 
 if __name__ == '__main__':

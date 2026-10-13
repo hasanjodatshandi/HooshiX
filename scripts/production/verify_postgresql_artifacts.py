@@ -41,7 +41,7 @@ def require_complete_inventory(syft):
     requested = catalogers['requested']
     required = {'go-module-binary-cataloger', 'binary-classifier-cataloger',
                 'python-installed-package-cataloger', 'dpkg-db-cataloger',
-                'rpm-db-cataloger', 'elf-binary-package-cataloger'}
+                'rpm-db-cataloger', 'apk-db-cataloger', 'elf-binary-package-cataloger'}
     if (descriptor['name'] != 'syft' or descriptor['version'] != '1.51.0'
             or config.get('exclude') not in (None, [])
             or config['search']['scope'] != 'squashed'
@@ -51,12 +51,17 @@ def require_complete_inventory(syft):
         raise ValueError('complete pinned image inventory without exclusions required')
 
 
-def scan_inventory(directory, image, source):
+def scan_inventory(directory, image, source, docker_host=None):
     if source not in ('docker', 'registry'):
         raise ValueError('known image source required')
     # Do not inherit user scanner config/exclusions or restricted catalogers.
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(('SYFT_', 'GRYPE_'))}
+    if docker_host is not None:
+        if source != 'docker' or not docker_host.startswith('unix://'):
+            raise ValueError('captured local Unix Docker endpoint required')
+        env.pop('DOCKER_CONTEXT', None)
+        env['DOCKER_HOST'] = docker_host
     env.update({'SYFT_GOLANG_CAPTURE_SYMBOLS': 'all', 'SYFT_CHECK_FOR_APP_UPDATE': 'false',
                 'GRYPE_DB_AUTO_UPDATE': 'false', 'GRYPE_DB_VALIDATE_AGE': 'true',
                 'GRYPE_DB_MAX_ALLOWED_BUILT_AGE': '120h', 'GRYPE_CHECK_FOR_APP_UPDATE': 'false'})

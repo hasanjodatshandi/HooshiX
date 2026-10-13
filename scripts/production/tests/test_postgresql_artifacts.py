@@ -33,7 +33,7 @@ class PostgreSQLArtifactTest(unittest.TestCase):
                 'requested': {'default': ['image', 'file']}, 'used': [
                     'go-module-binary-cataloger', 'binary-classifier-cataloger',
                     'python-installed-package-cataloger', 'dpkg-db-cataloger',
-                    'rpm-db-cataloger', 'elf-binary-package-cataloger']}}}},
+                    'rpm-db-cataloger', 'apk-db-cataloger', 'elf-binary-package-cataloger']}}}},
             'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
             'grype.json': {'source': {'target': {'imageID': 'sha256:' + 'a' * 64}}, 'matches': []},
             'database.json': {'valid': True, 'schemaVersion': '6', 'built': self.now.isoformat()}}
@@ -143,6 +143,8 @@ class PostgreSQLArtifactTest(unittest.TestCase):
                 self.assertNotIn('SYFT_EXCLUDE', environment)
                 self.assertNotIn('SYFT_DEFAULT_CATALOGERS', environment)
                 self.assertNotIn('GRYPE_IGNORE', environment)
+                self.assertNotIn('DOCKER_CONTEXT', environment)
+                self.assertEqual('unix:///captured.sock', environment['DOCKER_HOST'])
                 if argv[1] == 'version':
                     return subprocess.CompletedProcess(argv, 0, stdout='1.51.0' if argv[0] == 'syft' else '0.117.0')
                 self.assertIn('--config', argv)
@@ -156,11 +158,20 @@ class PostgreSQLArtifactTest(unittest.TestCase):
                 return subprocess.CompletedProcess(argv, 2, stdout=json.dumps({'matches': [
                     {'vulnerability': {'severity': 'Critical'}}]}))
             with patch.dict(os.environ, {'SYFT_EXCLUDE': '/venv/**', 'SYFT_DEFAULT_CATALOGERS': 'go',
-                                          'GRYPE_IGNORE': 'critical'}), \
+                                          'GRYPE_IGNORE': 'critical', 'DOCKER_CONTEXT': 'remote',
+                                          'DOCKER_HOST': 'tcp://remote:2375'}), \
                     patch.object(target.subprocess, 'run', side_effect=execute), self.assertRaises(subprocess.CalledProcessError):
-                target.scan_inventory(directory, 'reviewed-image', 'registry')
+                target.scan_inventory(directory, 'reviewed-image', 'docker', docker_host='unix:///captured.sock')
             self.assertEqual('Critical', json.loads((directory / 'grype.json').read_text())['matches'][0]['vulnerability']['severity'])
             self.assertFalse((directory / 'receipt.json').exists())
+
+    def test_remote_or_registry_endpoint_override_cannot_launch_scanner(self):
+        with tempfile.TemporaryDirectory() as parent, patch.object(target.subprocess, 'run') as native:
+            for source, endpoint in [('docker', 'tcp://remote:2375'), ('registry', 'unix:///captured.sock')]:
+                with self.subTest(source=source), self.assertRaises(ValueError):
+                    target.scan_inventory(Path(parent), 'reviewed-image', source, docker_host=endpoint)
+            native.assert_not_called()
+            self.assertFalse((Path(parent) / 'scanner-config.json').exists())
 
     def test_invalid_component_or_revision_cannot_launch_tools_or_create_directory(self):
         with tempfile.TemporaryDirectory() as parent:
@@ -189,7 +200,7 @@ class PostgreSQLArtifactTest(unittest.TestCase):
         workflow = (target.ROOT / '.github/workflows/postgresql-artifacts.yml').read_text()
         for required in ('permissions:\n  contents: read', 'persist-credentials: false',
                 'fail-fast: false', 'max-parallel: 2', 'if: ${{ always() }}',
-                '--scan', '120h', 'if-no-files-found: error'):
+                'build_postgresql_candidates.py', 'timeout 180 grype db update', '120h', 'if-no-files-found: error'):
             self.assertIn(required, workflow)
         for component in target.REPOSITORIES:
             self.assertIn(component, workflow)

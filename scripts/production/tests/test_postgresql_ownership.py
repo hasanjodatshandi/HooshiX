@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -70,6 +71,36 @@ class PostgreSQLServiceOwnershipTest(unittest.TestCase):
                 native.main()
             command.assert_called_once_with('context', 'inspect', '--format',
                                             '{{json .Endpoints.docker.Host}}')
+
+    def test_candidate_native_boundary_rejects_remote_or_mutable_images(self):
+        for image, endpoint in [('postgres:latest', 'unix:///var/run/docker.sock'),
+                                ('sha256:' + 'a' * 64, 'ssh://production')]:
+            with patch.object(native, 'docker', return_value=SimpleNamespace(returncode=0,
+                    stdout=json.dumps(endpoint))) as command, self.assertRaises(RuntimeError):
+                native.exercise_candidate(image)
+            self.assertEqual(1, command.call_count)
+
+    def test_candidate_native_failure_cleans_only_its_volatile_container(self):
+        container = 'b' * 64
+        calls = []
+        def execute(*args, **kwargs):
+            calls.append(args)
+            output = ''
+            if args[0] == 'context': output = json.dumps('unix:///var/run/docker.sock')
+            if args[0] == 'run': output = container
+            if args[-2:] == ('postgres', '--version'): output = 'postgres (PostgreSQL) 18.6'
+            return SimpleNamespace(returncode=0, stdout=output)
+        with patch.dict(os.environ, {'DOCKER_HOST': 'unix:///var/run/docker.sock'}), \
+                patch.object(native, 'docker', side_effect=execute), \
+                patch.object(native, 'exercise', side_effect=RuntimeError('synthetic failure')), \
+                self.assertRaisesRegex(RuntimeError, 'synthetic failure'):
+            native.exercise_candidate('sha256:' + 'a' * 64)
+        started = next(args for args in calls if args[0] == 'run')
+        for marker in ('--read-only', '--cap-drop', 'ALL', 'no-new-privileges', '--tmpfs'):
+            self.assertIn(marker, started)
+        self.assertNotIn('-v', started)
+        self.assertEqual('none', started[started.index('--network') + 1])
+        self.assertEqual(('rm', '-fv', container), calls[-1])
 
 
 if __name__ == '__main__':

@@ -12,6 +12,8 @@ on:
       - 'infrastructure/production/release-tools.env'
       - 'scripts/production/tests/test_postgresql_artifacts.py'
       - 'scripts/production/tests/test_postgresql_source_builds.py'
+      - 'scripts/production/test_postgresql_isolation_native.py'
+      - 'scripts/production/render_postgresql_ownership.py'
   push:
     branches: [main]
     paths:
@@ -23,6 +25,8 @@ on:
       - 'scripts/production/verify_openbao_artifact.py'
       - 'scripts/production/install_release_tools.sh'
       - 'infrastructure/production/release-tools.env'
+      - 'scripts/production/test_postgresql_isolation_native.py'
+      - 'scripts/production/render_postgresql_ownership.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -61,16 +65,10 @@ jobs:
           COMPONENT: ${{ matrix.component }}
         run: |
           set -euo pipefail
-          if [ "$COMPONENT" = postgresql ]; then
-            python3 scripts/production/verify_postgresql_artifacts.py --scan \
-              --component "$COMPONENT" --revision "$GITHUB_SHA" \
-              --evidence-dir "$RUNNER_TEMP/postgresql-evidence" > "$RUNNER_TEMP/postgresql-receipt.json"
-          else
-            timeout 180 grype db update
-            python3 scripts/production/build_postgresql_candidates.py \
-              --component "$COMPONENT" --directory "$RUNNER_TEMP/postgresql-evidence" \
-              > "$RUNNER_TEMP/postgresql-receipt.json"
-          fi
+          timeout 180 grype db update
+          python3 scripts/production/build_postgresql_candidates.py \
+            --component "$COMPONENT" --directory "$RUNNER_TEMP/postgresql-evidence" --export-image \
+            > "$RUNNER_TEMP/postgresql-receipt.json"
       - name: Preserve bounded public scan evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -79,6 +77,7 @@ jobs:
           path: |
             ${{ runner.temp }}/postgresql-evidence/*json
             ${{ runner.temp }}/postgresql-evidence/Dockerfile
+            ${{ runner.temp }}/postgresql-evidence/candidate-image.tar
             ${{ runner.temp }}/postgresql-receipt.json
           retention-days: 30
           if-no-files-found: error

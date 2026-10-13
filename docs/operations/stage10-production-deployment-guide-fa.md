@@ -765,39 +765,40 @@ pinهای `linux/amd64` و checksum manifestهای رسمی در
 `infrastructure/production/data/postgresql-images.json` قرار دارند. این catalog
 فعلاً مسدود برای promotion است؛ از tag متغیر یا تصویر fixture برای نصب استفاده
 نکنید. چهار جزء عبارت‌اند از `operator`، `postgresql`، `barman-plugin` و
-`barman-sidecar`. تصویر minimal PostgreSQL مخصوص CNPG انتخاب شده است؛ ابزار
+`barman-sidecar`. ورودی رسمی minimal CNPG برای پایش مستقل نگه داشته می‌شود؛ ابزار
 backup در sidecar جداست و نباید در تصویر برنامه یا دیتابیس دوباره نصب شود.
 
 نسخه‌های انتخاب‌شده CNPG 1.30.1، PostgreSQL 18.6 و plugin/sidecar Barman 0.15.1
 هستند؛ تغییر هم‌زمان نسخه‌ها در profile، data-policy و platform-contracts کنترل
 می‌شود. fixture قدیمی 18.4 فقط آزمون SQL است و شاهد سازگاری 18.6 نیست.
 
-وضعیت فعلی مجموعهٔ چهار artifact: eligibility اسکن `Failed` است؛ operand و
-runtime sidecar دارای findingهای High/Critical، از جمله بسته‌های پایه بدون fix
-ثبت‌شده، هستند. این digestها را نصب نکنید. قدم بعدی، تغییر امنیتی بررسی‌شدهٔ تصویر پایه
-با حفظ قرارداد CNPG و backup، سپس اسکن و آزمون سازگاری artifact نهایی است؛ صرف
-جدیدتر بودن tag یا حذف findingهای بدون fix، مجوز نصب نمی‌دهد.
+candidateهای نهایی operand و sidecar از پایهٔ Alpine 3.24.2 با نسخه‌های ثابت
+OpenSSL 3.5.9-r0 و zlib 1.3.2-r1 ساخته می‌شوند. operand همان PostgreSQL 18.6
+است؛ sidecar از Python 3.14.8 و Barman 3.20.1 استفاده می‌کند. نسخه و hash تمام
+dependencyهای Barman از lock رسمی همان source بررسی می‌شود؛ نصب بدون hash،
+کاهش سطح گیت یا استفاده از tag متغیر مجاز نیست. eligibility مجموعهٔ جدید و
+CNPG/WAL/PITR هنوز `Not verified` است؛ هیچ digestی صرفاً با تغییر پایه مجوز نصب
+نمی‌گیرد.
 
 ابزار `build_postgresql_candidates.py` سه جزء Go را از source رسمی دارای commit
 و checksum ثابت در `data/postgresql-source-builds.json`، با Go 1.26.9 و x/net
 0.60.0 می‌سازد. هر دو manager داخل تصویر CNPG، حتی باینری arm64 همراه تصویر
 amd64، جایگزین می‌شوند. plugin استاتیک روی پایهٔ distroless ثابت و با همان UID
-65532 و entrypoint ساخته می‌شود؛ sidecar همان Python/Barman و UID 26 را حفظ
-می‌کند. بسته‌های پایهٔ sidecar و operand همچنان گیت مستقل دارند و اصلاح Go
-آن‌ها را تأیید نمی‌کند. این‌ها candidate با provenance مجزای source-build
-هستند، نه import بدون تغییر؛ امضا، reconcile، WAL/PITR و promotion هنوز
+65532 و entrypoint ساخته می‌شود. sidecar و operand حساب معتبر UID/GID 26 و
+entrypoint صریح دارند؛ runtimeهای Python و PostgreSQL به digest ثابت pin شده‌اند.
+پوشش APK، Python و همهٔ باینری‌های Go در SBOM الزامی است. Go و Python از هم
+جدا ساخته می‌شوند؛ compiler و headerهای build وارد runtime نمی‌شوند.
+operand دارای provenance مجزای `patched-upstream-runtime-build` است، نه ادعای
+ساخت دوبارهٔ باینری PostgreSQL؛ سه جزء Go `patched-upstream-source-build` هستند.
+امضا، reconcile، WAL/PITR و promotion هنوز
 `Not verified` است.
 
-اپراتورِ source-build با config digest
-`sha256:099cf443b4f8aa84413a40daf0087ab7f6139cfe75d20dd868bf636c7e2cb103`
-در ساخت محلی اسکن کامل بدون finding یا ignored match و آزمون entrypoint محدود
-را گذرانده است. این نتیجه مخصوص همین config است؛ نصب و سازگاری CNPG یا تأیید
-سه جزء دیگر نیست. برای هر ساخت جدید، scanner و smoke باید دوباره اجرا شوند.
-در runtimeهای منتخب، [libxml2 در Debian 13](https://security-tracker.debian.org/tracker/CVE-2026-6653)
-و [Python 3.13 در Debian 13](https://security-tracker.debian.org/tracker/CVE-2026-19445)
-هنوز در tracker رسمی vulnerable هستند؛ تغییر Go یا تازه‌بودن tag این مرز را
-برطرف نمی‌کند. رفع کامل نیاز به runtime اصلاح‌شده و آزمون سازگاری دارد، نه
-خاموش‌کردن گیت یا حذف گزارش بسته‌ها.
+برای هر ساخت جدید، scanner و smoke باید دوباره اجرا شوند. native fixture
+operand پنج دیتابیس، RLS اجباری، context تراکنشی، replay غیرمخرب و منع ۴۰ اتصال
+بین‌سرویسی را روی PostgreSQL 18.6 با locale صریح `C.UTF-8`، بدون شبکه و با
+دادهٔ RAM-only بررسی می‌کند. این آزمون جای reconcile اپراتور، migration واقعی
+سرویس‌ها یا بازیابی فیزیکی را نمی‌گیرد. sidecar باید interpreter دقیق، `pip check`
+و CLIهای backup/WAL/restore را با filesystem فقط‌خواندنی و بدون شبکه بگذراند.
 
 آزمون عمومی بدون credential:
 
@@ -818,14 +819,8 @@ export GRYPE_DB_AUTO_UPDATE=false GRYPE_DB_VALIDATE_AGE=true
 export GRYPE_DB_MAX_ALLOWED_BUILT_AGE=120h
 grype db update
 (for component in operator postgresql barman-plugin barman-sidecar; do
-   if [ "$component" = postgresql ]; then
-     python3 scripts/production/verify_postgresql_artifacts.py --scan \
-       --component "$component" --revision "$(git rev-parse HEAD)" \
-       --evidence-dir "$scan_root/$component" || exit 1
-   else
-     python3 scripts/production/build_postgresql_candidates.py \
-       --component "$component" --directory "$scan_root/$component" || exit 1
-   fi
+   python3 scripts/production/build_postgresql_candidates.py \
+     --component "$component" --directory "$scan_root/$component" || exit 1
  done)
 ```
 
@@ -847,18 +842,12 @@ Go، Python و بسته‌های سیستم‌عامل باید با scanner ث�
 workflow `PostgreSQL candidate artifacts` همین چهار گیت نهایی را در PR/push مربوط
 یا اجرای دستی، بدون credential و با حداکثر دو job هم‌زمان اجرا می‌کند.
 
-نتیجهٔ نهایی candidate
-`d29005dcc077fea5f8b68748a63b4fcc586c1a0a` در run `38324640942`:
-
-| جزء | build/scan نهایی | مرز نتیجه |
-| --- | --- | --- |
-| اپراتور CNPG | `Passed` | هر دو باینری اصلاح‌شده و entrypoint محدود؛ reconcile هنوز `Not verified` |
-| Barman plugin | `Passed` | runtime استاتیک اصلاح‌شده و entrypoint محدود؛ backup هنوز `Not verified` |
-| PostgreSQL | `Failed` | گیت بسته‌های سیستم‌عامل؛ مجوز نصب ندارد |
-| Barman sidecar | `Failed` | Go اصلاح‌شده است؛ Python و بسته‌های پایه هنوز گیت را رد می‌کنند |
-
-CI اصلی مخزن و آزمون وب برای همان candidate موفق‌اند؛ این نتیجه جای دو گیت
-شکست‌خورده یا نصب روی مقصد را نمی‌گیرد. برای تغییر runtime operand/sidecar،
+فقط پس از موفقیت اسکن و آزمون‌های native، گزینهٔ `--export-image` آرشیو همان
+تصویر محلی را برای آزمون مستقل تولید می‌کند. receipt اندازه و SHA-256 آرشیو را
+ثبت می‌کند؛ CI تصویر عمومی بدون secret را کنار evidence نگه می‌دارد، نه در
+GHCR یا VPS. انتقال آرشیو مجوز deploy نیست؛ مصرف‌کننده باید SHA-256 آرشیو و
+config digest، labelهای recipe و SBOM را دوباره تطبیق دهد. موفقیت CI جای آزمون
+مقصد را نمی‌گیرد. برای runtime operand/sidecar،
 locale، UID/GID، نسخهٔ Python و dependencyهای Barman باید مشخص و با آزمون
 واقعی SQL، CNPG و WAL/PITR بررسی شوند؛ صرف تعویض نام تصویر مجاز نیست.
 receipt اسکن، signature/provenance، staging، deployment و promotion را صریحاً

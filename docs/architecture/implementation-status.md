@@ -29,26 +29,24 @@ versions. Credential-free PR/push/manual CI scans all four final candidates with
 publishing or installing. The three Go components use the checksum-pinned
 `build_postgresql_candidates.py` source recipe with Go 1.26.9 and x/net 0.60.0.
 Both operator manager architectures are replaced, and the static Barman plugin
-uses the pinned non-root distroless base. The sidecar's Python/Barman runtime
-is retained, not silently removed. The exact locally rebuilt operator configuration
-`sha256:099cf443b4f8aa84413a40daf0087ab7f6139cfe75d20dd868bf636c7e2cb103`
-passes the complete pinned Syft/Grype inventory with zero matches or ignored
-matches and the restricted native manager entrypoint smoke. Both embedded
-managers contain Go 1.26.9 and x/net 0.60.0. On candidate
-`d29005dcc077fea5f8b68748a63b4fcc586c1a0a`, artifact run `38324640942` passes
-the final operator and Barman plugin source builds/scans/native entrypoint checks;
-the final PostgreSQL and Barman sidecar runtime scans fail. The sidecar's Go fix
-is present, but its Python/OS packages are not thereby fixed. Repository baseline
-`38324641009` and web E2E `38324640987` pass that exact candidate. The selected PostgreSQL 18.6 and Barman 0.15.1 runtime
-base packages still fail the High/Critical gate. Scan evidence does not establish upstream build
-provenance, signatures, admission, staging, backup or production readiness.
+uses the pinned non-root distroless base. The final operand/sidecar candidates
+use Alpine 3.24.2 with exact fixed OpenSSL/zlib packages; the sidecar rebuilds
+the upstream hash-locked Barman 3.20.1 environment for Python 3.14.8. Both have
+valid UID/GID 26 accounts. Full APK/Python/Go inventory and unsuppressed fresh
+scans remain mandatory. The PostgreSQL native fixture exercises the five-database
+SQL/RLS boundary in volatile non-root network-isolated storage with explicit
+`C.UTF-8`. Four-candidate final CI, CNPG reconciliation and physical recovery
+remain `Not verified`. Successful candidates may be exported as checksum-bound
+image archives for isolated tests, not registry/VPS publication. The operand uses
+distinct `patched-upstream-runtime-build` provenance, not a PostgreSQL source
+recompile claim. Scan evidence does not establish upstream build provenance,
+signatures, admission, staging, backup or production readiness.
 All four must clear the live gate before signed candidate publication or adoption;
 no data operator or PostgreSQL instance has been installed by this preparation.
 Current selected upstream input scans use a valid database built
 2026-10-12; the scanned amd64 manifest digests match the catalog. Some base-package
-findings have no vendor fix recorded. Current complete-set artifact eligibility is `Failed`,
-not a transport failure or an installation success. A reviewed security replacement
-or source/base rebuild and fresh compatibility/scan evidence are required; the
+findings have no vendor fix recorded. Current complete-set replacement artifact
+eligibility is `Not verified`. Fresh final compatibility/scan evidence is required; the
 existing ESO/OpenBao/mesh target remains unchanged.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
