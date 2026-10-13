@@ -104,7 +104,7 @@ off-host backup/audit deferral remains `Not verified` and is not retried here.
 Cert-manager 1.20.3 candidate preparation pins the official source archive,
 release manifest and three amd64 runtime inputs in `cert-manager-sources.json`.
 `build_cert_manager_candidates.py` rebuilds the root/nested component modules
-with Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.1, preserving product version and
+with Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.2, preserving product version and
 honest patched-source provenance. Credential-free candidate CI requires complete
 fresh unsuppressed final-image scans and a restricted help-only entrypoint smoke.
 The protected `cert-manager-candidate` dispatcher publishes only controller,

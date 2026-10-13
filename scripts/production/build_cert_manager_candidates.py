@@ -19,7 +19,7 @@ from verify_postgresql_artifacts import (scan_inventory, require_complete_invent
 
 RECIPE = ROOT / 'infrastructure/production/data/cert-manager-sources.json'
 COMPONENTS = ('controller', 'cainjector', 'webhook')
-MODULES = NETWORK_MODULES | {'google.golang.org/grpc': 'v1.83.1'}
+MODULES = NETWORK_MODULES | {'google.golang.org/grpc': 'v1.83.2'}
 BLOCKED = 'blocked-until-signed-digest-admission-native-and-recovery-evidence'
 
 

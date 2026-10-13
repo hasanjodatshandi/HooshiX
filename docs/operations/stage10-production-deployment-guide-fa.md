@@ -1031,7 +1031,7 @@ job، package دیگر، تصاویر محصول، اسرار یا بازکرد�
 سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
 runtime هر جزء در `infrastructure/production/data/cert-manager-sources.json`
 ثابت‌اند. باینری هر سه جزء از همان سورس، با `Go 1.26.9`، `x/net 0.60.0` و
-`gRPC-Go 1.83.1` بازسازی می‌شود؛ نسخهٔ محصول تغییر نمی‌کند. provenance آن
+`gRPC-Go 1.83.2` بازسازی می‌شود؛ نسخهٔ محصول تغییر نمی‌کند. provenance آن
 `patched-upstream-source-build` است، نه import بدون تغییر. ماژول ریشه و ماژول
 جداگانهٔ هر `cmd` با checksum database و `go mod verify` بررسی می‌شوند؛
 `go mod tidy` در همان ماژول جزء، فایل‌های قفل را پیش از build readonly همگام می‌کند؛

@@ -93,7 +93,7 @@ class CertManagerBuildTest(unittest.TestCase):
             for fragment in (f'WORKDIR /src/cmd/{component}', 'GOWORK=off', 'GOTOOLCHAIN=local',
                     'GOSUMDB=sum.golang.org', 'go mod verify', 'sha256sum -c -',
                     'go mod tidy',
-                    'AppVersion=v1.20.3', 'AppGitState=Modified', 'google.golang.org/grpc@v1.83.1',
+                    'AppVersion=v1.20.3', 'AppGitState=Modified', 'google.golang.org/grpc@v1.83.2',
                     f'cmd/{component}/go.sum', f'/app/cmd/{component}/{component}', 'USER 65532:65532'):
                 self.assertIn(fragment, generated)
             self.assertNotIn('latest', generated)
