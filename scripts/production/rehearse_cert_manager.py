@@ -66,6 +66,10 @@ def rehearse(k, wait, run, manifest, platform):
 
     def adapter(*args, body=None, **kw):
         try:
+            if body == {'apiVersion': 'cert-manager.io/v1', 'kind': 'Issuer', 'metadata': {
+                'name': 'hooshix-cert-manager-callback-probe', 'namespace': renderer.NAMESPACE},
+                'spec': {'selfSigned': {}}} and tuple(args) == ('create', '--dry-run=server', '-f', '-'):
+                kw['public_schema'] = True
             return k(*args, data=json.dumps(body).encode() if body is not None else None, **kw)
         except RehearsalFailed as error:
             resource = next((a for a in args if re.fullmatch(

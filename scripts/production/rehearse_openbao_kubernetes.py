@@ -79,6 +79,14 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
     return result.stdout
 
 
+def public_callback_probe(args, data):
+    # This one fixed, key-free dry-run cannot read stored private fixture objects.
+    return (tuple(args) == ('create', '--dry-run=server', '-f', '-') and data is not None
+        and json.loads(data) == {'apiVersion': 'cert-manager.io/v1', 'kind': 'Issuer',
+            'metadata': {'name': 'hooshix-cert-manager-callback-probe', 'namespace': 'cnpg-system'},
+            'spec': {'selfSigned': {}}})
+
+
 def pins() -> dict[str, str]:
     return dict(line.split("=", 1) for line in (ROOT / "infrastructure/kind/pins.env")
                 .read_text().splitlines() if line and not line.startswith("#"))
@@ -185,7 +193,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
 
         def k(*args: str, data: bytes | None = None, timeout: int = 30, expected: int = 0,
               public_schema: bool = False, required_error: bytes | None = None, output_bound=None) -> bytes:
-            if public_schema and not schema_only:
+            if public_schema and not schema_only and not public_callback_probe(args, data):
                 raise RehearsalFailed("schema diagnostics disabled after secret generation")
             # Three independently bounded 30s verification webhooks may run
             # sequentially. Leave room without an indefinite API request.

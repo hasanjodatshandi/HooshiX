@@ -69,6 +69,16 @@ class OpenBaoKubernetesTest(unittest.TestCase):
         self.assertNotIn('private-token', output.getvalue())
         self.assertNotIn('::error::', output.getvalue())
 
+    def test_post_secret_public_diagnostic_is_only_the_fixed_key_free_callback_dry_run(self):
+        args = ('create', '--dry-run=server', '-f', '-')
+        obj = {'apiVersion': 'cert-manager.io/v1', 'kind': 'Issuer', 'metadata': {
+            'name': 'hooshix-cert-manager-callback-probe', 'namespace': 'cnpg-system'}, 'spec': {'selfSigned': {}}}
+        self.assertTrue(rehearsal.public_callback_probe(args, json.dumps(obj).encode()))
+        for wrong in (('get', 'secrets'), ('create', '-f', '-'), ('create', '--dry-run=client', '-f', '-')):
+            self.assertFalse(rehearsal.public_callback_probe(wrong, json.dumps(obj).encode()))
+        obj['spec'] = {'ca': {'secretName': 'private'}}
+        self.assertFalse(rehearsal.public_callback_probe(args, json.dumps(obj).encode()))
+
     def test_failed_partial_cluster_creation_is_cleaned_without_reading_operator_state(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
