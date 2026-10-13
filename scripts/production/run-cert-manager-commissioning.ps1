@@ -41,7 +41,7 @@ sys.argv=['install_cert_manager.py','--plan','$remote/plan.json','--sha256','$pl
 raise SystemExit(sys.modules['install_cert_manager'].main())
 "@
 $numeric = [string]::Join(',', [Text.Encoding]::UTF8.GetBytes($bootstrap))
-Write-Output 'Install only three internal cert-manager components. Root/CA/mesh/OpenBao/ESO/storage/mail/SSH preserved. No public TLS, ACME, initialization or reboot.'
+Write-Output 'Install three internal cert-manager components; bounded pinned Kyverno discovery refresh after new CRDs. Root/CA/mesh/OpenBao/ESO/storage/mail/SSH preserved. No public TLS, ACME, initialization or reboot.'
 Write-Output 'Enter sudo password ONLY here. No GHCR token, Root or custody passphrase required. No recording.'
 & ssh.exe -t -o ConnectTimeout=8 hooshix-server ('umask 077; sudo /usr/bin/python3 -I -c ''exec(bytes([' + $numeric + ']))'' > ' + $report + '; status=$?; exit $status')
 $operationExit = $LASTEXITCODE

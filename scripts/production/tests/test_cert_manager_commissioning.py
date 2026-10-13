@@ -66,6 +66,7 @@ class CertManagerCommissioningTest(unittest.TestCase):
         self.assertEqual(target.CRDS, {r['metadata']['name'] for r in plan['crds']})
         self.assertEqual('Not verified', plan['certificate_issuance'])
         self.assertEqual('Not verified', plan['deployment'])
+        self.assertEqual(target.verifier_images(), plan['verifier_images'])
         self.assertEqual([target.serving_secret()], [o for o in plan['manifest']['items'] if o['kind'] == 'Secret'])
         self.assertEqual({'mtls': {'mode': 'STRICT'}}, plan['strict']['spec'])
         with patch.object(target, 'recipe', return_value=self.source): target.validate(plan)
@@ -73,6 +74,7 @@ class CertManagerCommissioningTest(unittest.TestCase):
     def test_critical_candidate_mutations_are_rejected(self):
         original = self.plan()
         for mutate in (
+            lambda p: p['verifier_images'].update(admission='unapproved:latest'),
             lambda p: p['manifest']['items'].append(target.resource('Secret', 'key', data={'key': 'not-private'})),
             lambda p: p['manifest']['items'][1]['spec'].update(replicas=2),
             lambda p: p['manifest']['items'][1]['spec']['template']['metadata']['labels'].update({'istio.io/dataplane-mode': 'none'}),
@@ -172,9 +174,11 @@ class CertManagerCommissioningTest(unittest.TestCase):
         plan, states, calls, kube = self.stateful()
         with patch.object(installer, 'protected', return_value=['same']), \
                 patch.object(installer, 'addresses', return_value=['10.43.0.1']), \
-                patch.object(installer, 'established_crd'):
+                patch.object(installer, 'established_crd'), \
+                patch.object(installer.host, 'refresh_image_verifiers') as refresh:
             first = installer.execute(plan, kube=kube)
             second = installer.execute(plan, kube=kube)
+        refresh.assert_called_once_with(plan['verifier_images'], kube_client=kube)
         self.assertEqual(first, second)
         self.assertEqual('Passed', first['api_callback_tls'])
         self.assertEqual('Not verified', first['certificate_issuance'])
@@ -198,7 +202,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
             return kube(*args, body=body, **kw)
         with patch.object(installer, 'protected', return_value=['same']), \
                 patch.object(installer, 'addresses', return_value=['10.43.0.1']), \
-                patch.object(installer, 'established_crd'), self.assertRaisesRegex(ValueError, 'native-create-failed'):
+                patch.object(installer, 'established_crd'), \
+                patch.object(installer.host, 'refresh_image_verifiers'), self.assertRaisesRegex(ValueError, 'native-create-failed'):
             installer.execute(plan, kube=failed)
         self.assertIn(('deployment', 'cert-manager'), states)
         self.assertFalse(any('delete' in args for args, _, _ in calls))

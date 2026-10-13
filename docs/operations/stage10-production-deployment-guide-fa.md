@@ -1132,7 +1132,8 @@ admission و staging را ثابت نمی‌کند. خطای جزئی receipt م
 cert-manager می‌تواند خارج از Ambient باشد؛ controller و cainjector داخل
 Ambient می‌مانند. callback باید HTTPS معتبر، `failurePolicy=Fail` و ingress
 محدود به IPهای دقیق کشف‌شدهٔ API سرور داشته باشد. این تأیید، شاهد اجرای نصب
-نیست: renderer و ابزار نصب آماده‌اند؛ آزمون native و نصب VPS هنوز **Not run** هستند.
+نیست: renderer و ابزار نصب آماده‌اند؛ آزمون native به receipt تازه و موفق
+نیاز دارد و نصب VPS هنوز **Not run** است.
 Root/CA موجود، OpenBao، ESO و storage نباید در این عملیات تغییر کنند.
 
 `render_cert_manager_candidate.py` فقط manifest رسمی hash-bound نسخهٔ `1.20.3`
@@ -1149,6 +1150,11 @@ metadata وب‌هوک‌ها را در سطح کلاستر می‌خواند و
 installer در اجرای مجدد فقط metadata مالکیت را می‌خواند و دادهٔ خصوصی موجود
 را بازنویسی نمی‌کند. دسترسی گزارش‌گیری Kyverno فقط read-only برای Issuerها و
 metadata تنظیمات وب‌هوک است؛ دسترسی به Secretهای کلاستر اضافه نمی‌شود.
+
+پس از ثبت CRDهای جدید، دو controller موجود admission/reports در Kyverno با
+همان digestهای pin‌شده rollout محدود می‌شوند تا کش discovery نوع‌های جدید را
+ببیند. UID و Pod spec باید ثابت بمانند؛ policyها حذف یا fail-open نمی‌شوند.
+اجرای مجدد با CRDهای موجود این refresh را تکرار نمی‌کند.
 
 بعد از **Passed** شدن آزمون native کل بسته روی commit نهایی `main`، بستهٔ عمومی
 خارج از Git ساخته می‌شود. دستور زیر فقط قالب راهنماست؛ شناسهٔ run را از اجرای

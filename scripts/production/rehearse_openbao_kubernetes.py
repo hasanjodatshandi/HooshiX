@@ -68,6 +68,7 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 'service "cert-manager-webhook" not found',
                 'secrets "cert-manager-webhook-ca" not found',
                 'the server could not find the requested resource',
+                'resource issuers not found in group cert-manager.io/v1',
                 'no endpoints available for service', 'certificate signed by unknown authority')
                 if marker.encode() in (result.stderr or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
@@ -77,14 +78,6 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 required_error is None or required_error in (result.stderr or b'')}), flush=True)
         raise RehearsalFailed("Kubernetes fixture command failed")
     return result.stdout
-
-
-def public_callback_probe(args, data):
-    # This one fixed, key-free dry-run cannot read stored private fixture objects.
-    return (tuple(args) == ('create', '--dry-run=server', '-f', '-') and data is not None
-        and json.loads(data) == {'apiVersion': 'cert-manager.io/v1', 'kind': 'Issuer',
-            'metadata': {'name': 'hooshix-cert-manager-callback-probe', 'namespace': 'cnpg-system'},
-            'spec': {'selfSigned': {}}})
 
 
 def pins() -> dict[str, str]:
@@ -193,7 +186,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
 
         def k(*args: str, data: bytes | None = None, timeout: int = 30, expected: int = 0,
               public_schema: bool = False, required_error: bytes | None = None, output_bound=None) -> bytes:
-            if public_schema and not schema_only and not public_callback_probe(args, data):
+            if public_schema and not schema_only:
                 raise RehearsalFailed("schema diagnostics disabled after secret generation")
             # Three independently bounded 30s verification webhooks may run
             # sequentially. Leave room without an indefinite API request.

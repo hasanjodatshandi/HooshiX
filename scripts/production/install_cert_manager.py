@@ -105,11 +105,16 @@ def execute(plan, *, kube=host.kube):
                 kube('create', '-f', '-', body=obj)
             exists[key] = True
 
+    refresh_discovery = any(not exists[('CustomResourceDefinition', obj['metadata']['name'])] for obj in plan['crds'])
     create(plan['namespace'])
     for obj in plan['crds']:
         create(obj)
         print('CERT_MANAGER_INSTALL_STEP=crd-' + obj['metadata']['name'], file=sys.stderr, flush=True)
         established_crd(obj['metadata']['name'], kube)
+    if refresh_discovery:
+        # Kyverno's populated discovery cache must see newly established certificate kinds.
+        print('CERT_MANAGER_INSTALL_STEP=verifier-discovery-refresh', file=sys.stderr, flush=True)
+        host.refresh_image_verifiers(plan['verifier_images'], kube_client=kube)
     for obj in [plan['strict'], *networks]:
         create(obj)
     # Reporting metadata is aggregated before policy readiness; no Secret read is granted.

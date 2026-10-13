@@ -129,22 +129,25 @@ def progress(label, revision):
     print('PLATFORM_INSTALL_STEP=' + label, file=sys.stderr, flush=True)
 
 
-def refresh_image_verifiers(images):
+def refresh_image_verifiers(images, *, kube_client=None):
     # sigstore v1.10.9 keeps its first TUF mirror/error in a process singleton.
     # Reset ONLY the two verifier processes after applying repaired policies.
     # No trust-cache files or policies are deleted.
+    client = kube if kube_client is None else kube_client
+    read = get if kube_client is None else lambda kind, name, namespace: json.loads(
+        client('-n', namespace, 'get', kind, name, '-o', 'json'))
     for component in ('admission', 'reports'):
         name = 'kyverno-' + component + '-controller'
-        before = get('deployment', name, 'kyverno')
+        before = read('deployment', name, 'kyverno')
         require(before is not None and all(before['metadata'].get('labels', {}).get(key) == value
                 for key, value in {'app.kubernetes.io/part-of': 'kyverno',
                                    'app.kubernetes.io/instance': 'kyverno'}.items())
                 and before['spec']['template']['spec']['containers'][0]['image'] == images[component],
                 'OWNED_PINNED_IMAGE_VERIFIER_REQUIRED')
-        kube('-n', 'kyverno', 'rollout', 'restart', 'deployment/' + name)
-        kube('-n', 'kyverno', 'rollout', 'status', 'deployment/' + name,
+        client('-n', 'kyverno', 'rollout', 'restart', 'deployment/' + name)
+        client('-n', 'kyverno', 'rollout', 'status', 'deployment/' + name,
              '--timeout=120s', timeout=135)
-        after = get('deployment', name, 'kyverno')
+        after = read('deployment', name, 'kyverno')
         require(after['metadata']['uid'] == before['metadata']['uid']
                 and after['spec']['template']['spec'] == before['spec']['template']['spec']
                 and after['status'].get('availableReplicas', 0) == 1,

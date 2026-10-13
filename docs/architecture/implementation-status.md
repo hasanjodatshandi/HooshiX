@@ -139,8 +139,8 @@ protected audit/secrets encryption and tests verified API callbacks without
 creating a public TLS route. The disposable staging extension requires native
 issuance/rotation/hostname, RBAC/issuer/source/signer/SBOM negatives and idempotent
 reconciliation before the exact-main public bundle may be built. Native staging,
-bundle construction and target installation remain `Not run` until their own
-executed evidence is recorded. Barman runtime/PITR and Production readiness remain
+bundle construction require fresh successful executed receipts; target
+installation remains `Not run`. Barman runtime/PITR and Production readiness remain
 `Not verified`; the provider deferral is not a passing gate.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/

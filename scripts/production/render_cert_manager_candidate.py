@@ -40,6 +40,14 @@ TOKEN = {'name': 'hooshix-api-token', 'projected': {'defaultMode': 420, 'sources
 MOUNT = {'name': 'hooshix-api-token', 'mountPath': '/var/run/secrets/kubernetes.io/serviceaccount', 'readOnly': True}
 
 
+def verifier_images():
+    pins = dict(line.split('=', 1) for line in (Path(__file__).resolve().parents[2]
+        / 'infrastructure/kyverno/pins.env').read_text().splitlines() if line and not line.startswith('#'))
+    return {component: 'reg.kyverno.io/kyverno/' + repository + '@'
+        + pins['KYVERNO_' + component.upper() + '_AMD64_DIGEST']
+        for component, repository in (('admission', 'kyverno'), ('reports', 'reports-controller'))}
+
+
 def resource(kind, name, *, namespaced=True, **fields):
     api = ('rbac.authorization.k8s.io/v1' if kind in ('Role', 'RoleBinding', 'ClusterRole',
            'ClusterRoleBinding') else 'v1')
@@ -193,6 +201,8 @@ def policies(pods, callbacks):
 
 
 def validate(plan):
+    if plan['verifier_images'] != verifier_images():
+        raise ValueError('exact existing verifier images required for bounded discovery refresh')
     items = plan['manifest']['items']
     deployments = [item for item in items if item['kind'] == 'Deployment']
     if len(deployments) != 3 or {d['metadata']['name'] for d in deployments} != set(ACCOUNTS.values()):
@@ -311,7 +321,8 @@ def render(manifest, addresses):
         'namespace': ns, 'crds': crds, 'manifest': {'apiVersion': 'v1', 'kind': 'List', 'items': objects},
         'pods': pods, 'policies': policies(pods, [o for o in objects if o['kind'] in (
             'MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration')]), 'network': network(addresses), 'strict': strict,
-        'images': selected['images'], 'certificate_issuance': 'Not verified', 'deployment': 'Not verified'}
+        'images': selected['images'], 'verifier_images': verifier_images(),
+        'certificate_issuance': 'Not verified', 'deployment': 'Not verified'}
     validate(plan)
     return plan
 
