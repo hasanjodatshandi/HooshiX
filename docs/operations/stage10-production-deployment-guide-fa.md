@@ -1005,6 +1005,12 @@ CNPG reconciliation، admission، staging، physical recovery یا نصب مقص
 
 مرجع trust و cache: [Cosign 3.0.6 initialize](https://github.com/sigstore/cosign/blob/v3.0.6/cmd/cosign/cli/initialize/init.go).
 
+اجرای مستقل روی میزبان توسعه در `2026-10-13T11:37:24Z`، بررسی امضا/SLSA/SBOM،
+رد signer اشتباه، entrypointهای هر چهار digest و fixture پنج دیتابیس را با
+`Passed` ثبت کرده است. SHA-256 رسید عمومی:
+`5098b00b5591eafa7a39b98a8b9117d40a65d948a7758e35adcc28fe331f81e6`.
+این شاهد native همان digestهاست؛ CNPG/admission/PITR/نصب مقصد را موفق اعلام نمی‌کند.
+
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 
 برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell
@@ -1012,7 +1018,7 @@ CNPG reconciliation، admission، staging، physical recovery یا نصب مقص
 
 ```powershell
 ssh.exe hooshix-server 'free -m'
-ssh.exe hooshix-server 'df -BM / /var/lib/rancher/k3s'
+ssh.exe hooshix-server 'df -BM /'
 ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl --request-timeout=15s get nodes,pv,pvc,storageclasses --all-namespaces -o wide'
 ```
 
@@ -1021,6 +1027,11 @@ ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl --request-timeout=15s
 به PostgreSQL تعلق ندارد و نباید reuse یا جابه‌جا شود. فضای خالی اعلام‌شده فقط
 مبنای برنامه‌ریزی است، نه شواهد complete-stack headroom، I/O، backup یا DR.
 تا اندازه و guard مستقلِ دادهٔ مقصد مشخص نیست، دستور install/apply دیتابیس نزنید.
+snapshot فقط‌خواندنی مقصد در ۲۰۲۶-۱۰-۱۳: RAM برابر ۱۵۹۸۶ MiB، available برابر
+۱۱۹۴۲ MiB، فضای آزاد `/` برابر ۱۲۰۵۷۵ MiB و node `hooshix-production-1`، Ready
+است. تنها PV/PVC موجود مربوط به OpenBao و Bound است؛ storage class دیگری برای
+PostgreSQL وجود ندارد. این اعداد انتخاب فضای مستقل را راهنمایی می‌کنند، نه
+تأیید ظرفیت بار نهایی محصول یا اندازهٔ ثابت برای سرور دیگر.
 
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
