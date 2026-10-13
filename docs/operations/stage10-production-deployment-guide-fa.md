@@ -881,13 +881,16 @@ manifest را روی cluster apply یا برای نصب مجاز نمی‌کند
 restore نیست؛ این‌ها در مرحلهٔ پذیرش مقصد جداگانه لازم‌اند. پس از staging، تصویر
 را دوباره نسازید؛ همان digest امضاشده و آزموده‌شده باید promote شود.
 
-### انتشار خصوصی candidateهای PostgreSQL
+### انتشار candidateهای PostgreSQL
 
 انتشار چهار candidate یک مجموعهٔ واحد است و فقط از workflow محافظت‌شدهٔ
 `Production release evidence` روی `main` انجام می‌شود. ساخت و اسکن PR مجوز نصب
-نیست؛ publication، staging و پذیرش مقصد شواهد جداگانه دارند. انتشار جدید این
-چهار package باید خصوصی بماند و استثنای عمومی‌بودن packageهای قدیمی را به ارث
-نمی‌برد. اجرای انتشار به رمز VPS، کلید Root یا فایل custody نیاز ندارد.
+نیست؛ publication، staging و پذیرش مقصد شواهد جداگانه دارند. با تأیید صریح
+security-owner، فقط چهار مقصد ثابت همین بخش می‌توانند `Public` یا `Private`
+باشند. این استثنا محدود به تصاویر متن‌باز زیرساخت است؛ شامل تصاویر محصول،
+اسرار، package دیگر یا بازکردن سرویس روی VPS نیست. امضا، SBOM، اسکن تازه و
+گیت‌های پذیرش بدون تغییر می‌مانند. اجرای انتشار به رمز VPS، کلید Root یا فایل
+custody نیاز ندارد.
 
 پس از merge تغییر بررسی‌شده و موفقیت `repository-baseline.yml` برای SHA دقیق
 `main`، از checkout به‌روز با دسترسی GitHub مالک اجرا کنید:
@@ -901,8 +904,9 @@ gh run download RUN_ID --name postgresql-publication-RUN_ID-1 --dir /path/outsid
 
 اگر attempt غیر از ۱ بود، نام artifact را مطابق همان attempt انتخاب کنید. منتظر
 نتیجهٔ نهایی run بمانید؛ `publication.json` فقط بعد از موفقیت هر چهار جزء تولید
-می‌شود. مقدار `publication` و `signature_provenance` باید `Passed` و visibility
-هر چهار مقصد `private` باشد. مقصدهای ثابت زیر همگی زیر
+می‌شود. مقدار `publication` و `signature_provenance` باید `Passed` باشد؛ visibility
+واقعی هر چهار مقصد در `registry_visibility` ثبت می‌شود و فقط `public` یا `private`
+برای مقصدهای مصوب پذیرفته است. مقصدهای ثابت زیر همگی زیر
 `ghcr.io/hasanjodatshandi/hooshix/` هستند:
 
 - `platform-postgresql-operator-v2-private`
@@ -918,16 +922,18 @@ gh run download RUN_ID --name postgresql-publication-RUN_ID-1 --dir /path/outsid
 workflow از توکن موقت `GITHUB_TOKEN` و هویت امضاکنندهٔ موجود
 `production-release.yml@refs/heads/main` استفاده می‌کند. توکن شخصی، Secret VPS،
 کلید Root و credential باکت را وارد نکنید. فایل موقت login در پایان حذف می‌شود؛
-آرشیو source در artifact خروجی قرار نمی‌گیرد. private بودن مخزن به‌تنهایی شاهد
-private بودن package نیست؛ ابزار آن را قبل از push، بعد از push و بعد از امضا
-بررسی می‌کند. package جدید طبق رفتار GHCR خصوصی ایجاد می‌شود؛ 401/403 هرگز
+آرشیو source در artifact خروجی قرار نمی‌گیرد. visibility package مستقل از مخزن
+و پسوند نام است؛ ابزار آن را قبل از push، بعد از push و بعد از امضا بررسی و ثبت
+می‌کند. `internal` یا وضعیت نامعتبر پذیرفته نیست؛ 401/403 هرگز
 به‌عنوان نبود package پذیرفته نمی‌شود. تغییر visibility خودکار مجاز نیست.
 
-package عمومی قابل برگشت به private نیست. برای چنین مقصدی، package تازه و
-بررسی‌شده با نام ثابت انتخاب می‌شود؛ مقصد عمومی قبلی حذف یا adopt نمی‌شود و
-برای نصب یا امضا معتبر نیست. package تازه نیز باید پس از ایجاد واقعاً `private`
-باشد؛ پسوند `private` به‌تنهایی تضمین نیست. پیام `POSTGRESQL_PACKAGE_VISIBILITY`
-نام جزء و وضعیت محدودشده را نشان می‌دهد؛ در صورت رد، run را بی‌تغییر تکرار نکنید.
+package عمومی قابل برگشت به private نیست؛ این پذیرش محدود اجازهٔ عمومی‌کردن
+تصویر محصول، حذف package یا استفاده از مقصد دیگر نیست. مقصد اپراتور فقط
+`platform-postgresql-operator-v2-private` است؛ نام قدیمیِ بدون `v2` adopt نمی‌شود.
+پیام `POSTGRESQL_PACKAGE_VISIBILITY` نام جزء و وضعیت محدودشده را نشان می‌دهد؛
+در صورت رد، run را بی‌تغییر تکرار نکنید. imageها فقط از source رسمی و runtime
+مصوب ساخته می‌شوند؛ credential CI خارج build context است و هیچ credential
+VPS، دادهٔ کاربر یا source برنامه وارد این چهار تصویر نمی‌شود.
 
 ابزار `publish_postgresql_candidates.py` همهٔ buildها و native smokeهای موجود را
 پیش از push اجرا می‌کند، config محلی را با manifest واقعی رجیستری تطبیق می‌دهد و

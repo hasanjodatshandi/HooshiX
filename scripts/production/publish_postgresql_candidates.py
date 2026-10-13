@@ -29,20 +29,24 @@ def repository(component):
     return 'ghcr.io/hasanjodatshandi/' + PACKAGES[component]
 
 
-def private_package(component, *, allow_missing=False):
+def package_visibility(component, *, allow_missing=False):
+    if component not in COMPONENTS:
+        raise ValueError('unapproved PostgreSQL publication component')
     api = 'users/hasanjodatshandi/packages/container/' + PACKAGES[component].replace('/', '%2F')
     try:
         visibility = run(['gh', 'api', api, '--jq', '.visibility']).strip()
     except subprocess.CalledProcessError as error:
-        # New packages start private. Authentication/permission failures are not absence.
+        # Authentication/permission failures are not absence.
         if allow_missing and '(HTTP 404)' in (error.stderr or ''):
             return
         raise
-    if visibility != 'private':
-        actual = visibility if visibility in ('public', 'internal') else 'invalid'
+    # Owner approval is only for the four fixed infrastructure destinations above.
+    if visibility not in ('private', 'public'):
+        actual = 'internal' if visibility == 'internal' else 'invalid'
         print(f'POSTGRESQL_PACKAGE_VISIBILITY=Rejected; component={component}; '
-              f'actual={actual}; required=private', flush=True)
-        raise ValueError('private PostgreSQL package required; no public exception')
+              f'actual={actual}; required=private-or-public', flush=True)
+        raise ValueError('approved infrastructure package visibility required')
+    return visibility
 
 
 def source_predicate(component, selected, revision, invocation):
@@ -104,19 +108,19 @@ def publish(directory, env):
     directory.mkdir(mode=0o700)  # Never reuse a stale publication/partial attempt.
     selected = recipe()
     for component in COMPONENTS:
-        private_package(component, allow_missing=True)
+        package_visibility(component, allow_missing=True)
     built = {}
     for component in COMPONENTS:
         print('POSTGRESQL_PUBLICATION_STEP=' + component + '-build', flush=True)
         built[component] = build(component, directory / component, docker_host=endpoint)
-    targets, receipts = {}, {}
+    targets, receipts, visibilities = {}, {}, {}
     for component, receipt in built.items():
         print('POSTGRESQL_PUBLICATION_STEP=' + component + '-push-scan', flush=True)
-        private_package(component, allow_missing=True)
+        package_visibility(component, allow_missing=True)
         target = repository(component) + ':candidate-' + revision + '-' + invocation.replace(':', '-')
         run(['docker', '--host', endpoint, 'tag', receipt['local_engine_digest'], target])
         run(['docker', '--host', endpoint, 'push', target], timeout=300)
-        private_package(component)
+        visibilities[component] = package_visibility(component)
         folder = directory / component / 'registry'
         folder.mkdir(mode=0o700)
         (folder / 'scanner-config.json').write_text('{}\n')
@@ -139,11 +143,11 @@ def publish(directory, env):
         sign_and_verify(directory / component / 'registry', image,
                         source_predicate(component, selected, revision, invocation))
     for component in COMPONENTS:
-        private_package(component)
+        visibilities[component] = package_visibility(component)
     result = {'schema_version': 1, 'repository_revision': revision, 'invocation_id': invocation,
         'images': targets, 'image_config_digests': {key: value['image_config_digest'] for key, value in built.items()},
         'provenance_kinds': {key: provenance(key) for key in COMPONENTS},
-        'registry_visibility': {key: 'private' for key in COMPONENTS},
+        'registry_visibility': visibilities,
         'publication': 'Passed', 'signature_provenance': 'Passed',
         'staging': 'Not verified', 'runtime_admission': 'Not verified',
         'deployment': 'Not verified', 'production_promotion': 'Not verified'}
@@ -159,7 +163,7 @@ def main():
         publish(args.directory, dict(os.environ))
     except (ValueError, KeyError, TypeError, OSError, RuntimeError, subprocess.SubprocessError):
         parser.exit(1, 'POSTGRESQL_PUBLICATION=Failed; state retained; no deployment or automatic replay\n')
-    print('POSTGRESQL_PUBLICATION=Passed; private signed candidates only; production Not verified')
+    print('POSTGRESQL_PUBLICATION=Passed; approved signed infrastructure candidates only; production Not verified')
 
 
 if __name__ == '__main__':
