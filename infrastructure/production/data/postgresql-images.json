@@ -2,6 +2,45 @@
   "schema_version": 1,
   "platform": "linux/amd64",
   "production_promotion": "blocked-until-supply-chain-staging-and-recovery-evidence",
+  "published_security_candidate": {
+    "recipe_sha256": "84494b7f034e89f47a5f0a88aaf0d053cd7c587e98010923b389781b8f61c612",
+    "publication_sha256": "638f49f7b5370cac6df1a7d51dc1e72295e66015638fabb6f668ae3f2917c93f",
+    "publication": {
+      "schema_version": 1,
+      "repository_revision": "5b0c547e27c5f89d5ec76186defa112739b64f3c",
+      "invocation_id": "github:38382418665:1",
+      "images": {
+        "operator": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-operator-v2-private@sha256:04bac3c474f9e144c38afdfc8bc79a1a395d5ff53f92d6cbb7678ae95a7bb345",
+        "postgresql": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-postgresql-private@sha256:4f0dca725887fab09f652314b774bfb0b9430eaa818a61cf6e56c360e923edde",
+        "barman-plugin": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-barman-plugin-private@sha256:cf73898591800e6a8be90e95220e465a3525372a830f6490261f668ae9f8d661",
+        "barman-sidecar": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-barman-sidecar-private@sha256:afbf7dfc4a8665f5d90601a7b6c32b308ff20b33c22927c9ebfe68378e6d5398"
+      },
+      "image_config_digests": {
+        "operator": "sha256:235ae879eb36d9e61a26e4676dc5d1b9102353d649e625ca0eea82861dc3ae89",
+        "postgresql": "sha256:5550a3f9982dd62d45c1efa9cb8dcb60da52d4ad3964c5d58a2eaa91d1a45909",
+        "barman-plugin": "sha256:436336ab94838556e58364e044836b6a341c5b650b0ddd94dbfd4b6c1ad8890c",
+        "barman-sidecar": "sha256:eefc9778fa96f89b8d0615f017136c19dbb51689072dfa3b286bee1ab9420ce5"
+      },
+      "provenance_kinds": {
+        "operator": "patched-upstream-source-build",
+        "postgresql": "patched-upstream-runtime-build",
+        "barman-plugin": "patched-upstream-source-build",
+        "barman-sidecar": "patched-upstream-source-build"
+      },
+      "registry_visibility": {
+        "operator": "public",
+        "postgresql": "public",
+        "barman-plugin": "public",
+        "barman-sidecar": "public"
+      },
+      "publication": "Passed",
+      "signature_provenance": "Passed",
+      "staging": "Not verified",
+      "runtime_admission": "Not verified",
+      "deployment": "Not verified",
+      "production_promotion": "Not verified"
+    }
+  },
   "components": {
     "operator": {
       "version": "1.30.1",

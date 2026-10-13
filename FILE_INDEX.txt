@@ -635,6 +635,7 @@ scripts/production/tests/test_postgresql_publication.py
 scripts/production/tests/test_postgresql_source_builds.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py
 scripts/production/tests/test_probe_parspack_audit_bucket.py
+scripts/production/tests/test_published_postgresql.py
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
@@ -649,6 +650,7 @@ scripts/production/verify_mesh_security_publication.py
 scripts/production/verify_openbao_artifact.py
 scripts/production/verify_platform_publication_run.py
 scripts/production/verify_postgresql_artifacts.py
+scripts/production/verify_published_postgresql.py
 scripts/production/verify_release.py
 scripts/production/verify_storage_guard.py
 services/authorization-service/.dockerignore

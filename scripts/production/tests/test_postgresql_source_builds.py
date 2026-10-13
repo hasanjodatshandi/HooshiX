@@ -58,6 +58,34 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             for key in ('deployment', 'staging', 'signature_provenance', 'production_promotion'):
                 self.assertEqual('Not verified', receipt[key])
 
+    def test_shared_native_smoke_retains_restricted_fixed_engine_execution(self):
+        for component in target.COMPONENTS:
+            with patch.object(target, 'run', return_value='3.14.8') as run:
+                target.native_entrypoint(component, self.image, 'unix:///captured.sock')
+            calls = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(7 if component == 'barman-sidecar' else 1, len(calls))
+            for argv in calls:
+                self.assertEqual(['docker', '--host', 'unix:///captured.sock', 'run', '--rm'], argv[:5])
+                self.assertIn(self.image, argv)
+                for flag in ('--read-only', '--cap-drop', 'ALL', '--network', 'none',
+                             '--security-opt', 'no-new-privileges', '--memory', '--cpus', '--pids-limit'):
+                    self.assertIn(flag, argv)
+                self.assertNotIn('--publish', argv)
+                self.assertNotIn('--privileged', argv)
+            if component == 'barman-sidecar':
+                self.assertEqual(4, sum(any(value.startswith('/venv/bin/barman-cloud-') for value in argv)
+                                        for argv in calls))
+
+    def test_shared_native_smoke_rejects_mutable_or_remote_execution_and_wrong_python(self):
+        for component, image, endpoint in (('unknown', self.image, 'unix:///captured.sock'),
+                ('postgresql', 'postgres:latest', 'unix:///captured.sock'),
+                ('operator', self.image, 'tcp://remote.invalid:2375')):
+            with patch.object(target, 'run') as run, self.assertRaises(ValueError):
+                target.native_entrypoint(component, image, endpoint)
+            run.assert_not_called()
+        with patch.object(target, 'run', return_value='3.13.5'), self.assertRaises(ValueError):
+            target.native_entrypoint('barman-sidecar', self.image, 'unix:///captured.sock')
+
     def test_both_operator_architectures_rebuilt_and_no_vulnerable_plugin_base(self):
         operator = target.dockerfile('operator', self.selected)
         for arch in ('amd64', 'arm64'):
