@@ -23,11 +23,14 @@ publish or approve installation. See the Persian Stage10 guide for local usage.
 The separate `publish_postgresql_candidates.py` path publishes this complete
 source/runtime set only via protected `production-release.yml` on `main`, dispatch
 kind `postgresql-candidate`. Fresh registry digest scans precede all signing;
-private package visibility and exact source/runtime SLSA/CycloneDX/signature
+approved package visibility and exact source/runtime SLSA/CycloneDX/signature
 verification are mandatory. `publication.json` reports all four images only after
 whole-set success, retaining staging/admission/deployment/promotion as
 `Not verified`. This does not import the blocked official inputs unchanged or
-inherit the older platform packages' public visibility exception. See the
+inherit the older platform packages' public visibility exception: the owner
+separately approved public/private visibility only for the four fixed PostgreSQL
+infrastructure destinations. Actual visibility is recorded; application images
+remain private-only and all integrity/admission gates are unchanged. See the
 [Stage10 guide](../../docs/operations/stage10-production-deployment-guide-fa.md)
 for dispatch and evidence retrieval; do not supply VPS/Root/custody credentials.
 

@@ -27,12 +27,12 @@ class PostgreSQLPublicationTest(unittest.TestCase):
             'GITHUB_SHA': self.revision, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1',
             'RELEASE_KIND': 'postgresql-candidate'}
 
-    def execute(self, directory, *, reject=None):
+    def execute(self, directory, *, reject=None, visibility='private'):
         calls, scans, signatures = [], [], []
         def native(argv, **kwargs):
             calls.append(argv)
             if argv[0] == 'git': return self.revision
-            if argv[0] == 'gh': return 'public' if reject == 'public' else 'private'
+            if argv[0] == 'gh': return 'internal' if reject == 'visibility' else visibility
             if argv[0] == 'syft':
                 self.write_resolution(Path(argv[-1].removeprefix('syft-json=')), reject)
                 return ''
@@ -68,6 +68,7 @@ class PostgreSQLPublicationTest(unittest.TestCase):
                 self.assertEqual(4, len(signatures))
                 self.assertEqual(set(target.COMPONENTS), set(result['images']))
                 self.assertEqual('Passed', result['publication'])
+                self.assertEqual({key: visibility for key in target.COMPONENTS}, result['registry_visibility'])
                 for name in ('staging', 'deployment', 'runtime_admission', 'production_promotion'):
                     self.assertEqual('Not verified', result[name])
                 self.assertEqual(result, json.loads((directory / 'publication.json').read_text()))
@@ -87,7 +88,7 @@ class PostgreSQLPublicationTest(unittest.TestCase):
         self.assertEqual(4, sum(argv[:4] == ['docker', '--host', 'unix:///captured.sock', 'push'] for argv in calls))
 
     def test_partial_failures_never_report_success_or_sign_unclean_set(self):
-        for reject in ('public', 'config', 'manifest', 'scan', 'signature'):
+        for reject in ('visibility', 'config', 'manifest', 'scan', 'signature'):
             with self.subTest(reject=reject), tempfile.TemporaryDirectory() as parent:
                 self.execute(Path(parent) / 'evidence', reject=reject)
 
@@ -112,17 +113,17 @@ class PostgreSQLPublicationTest(unittest.TestCase):
                 target.publish(Path(parent), self.env)
             build.assert_not_called()
 
-    def test_only_actual_404_permits_new_private_package(self):
+    def test_only_actual_404_permits_new_package(self):
         for status in (404, 401, 403):
             failure = subprocess.CalledProcessError(1, ['gh'], stderr=f'gh: failure (HTTP {status})')
             with patch.object(target, 'run', side_effect=failure):
-                if status == 404: target.private_package('operator', allow_missing=True)
+                if status == 404: target.package_visibility('operator', allow_missing=True)
                 else:
                     with self.assertRaises(subprocess.CalledProcessError):
-                        target.private_package('operator', allow_missing=True)
-                with self.assertRaises(subprocess.CalledProcessError): target.private_package('operator')
+                        target.package_visibility('operator', allow_missing=True)
+                with self.assertRaises(subprocess.CalledProcessError): target.package_visibility('operator')
 
-    def test_public_operator_destination_is_not_reused_or_exempted(self):
+    def test_exact_four_destinations_do_not_adopt_old_operator_package(self):
         self.assertEqual({
             'operator': 'hooshix/platform-postgresql-operator-v2-private',
             'postgresql': 'hooshix/platform-postgresql-postgresql-private',
@@ -133,14 +134,30 @@ class PostgreSQLPublicationTest(unittest.TestCase):
             self.assertIn('`' + package.removeprefix('hooshix/') + '`', guide)
 
     def test_visibility_failure_exposes_only_fixed_actionable_metadata(self):
-        for value, category in (('public', 'public'), ('internal', 'internal'),
+        for value, category in (('internal', 'internal'),
                                 ('untrusted-value-do-not-print', 'invalid')):
             output = io.StringIO()
             with patch.object(target, 'run', return_value=value), redirect_stdout(output), \
                     self.assertRaises(ValueError):
-                target.private_package('operator')
+                target.package_visibility('operator')
             self.assertEqual('POSTGRESQL_PACKAGE_VISIBILITY=Rejected; component=operator; '
-                             f'actual={category}; required=private\n', output.getvalue())
+                             f'actual={category}; required=private-or-public\n', output.getvalue())
+
+    def test_owner_approved_public_set_still_requires_all_scans_and_signatures(self):
+        with tempfile.TemporaryDirectory() as parent:
+            self.execute(Path(parent) / 'evidence', visibility='public')
+
+    def test_exception_never_accepts_application_or_arbitrary_package(self):
+        for component in ('application', 'identity-service', 'operator-other', ''):
+            with patch.object(target, 'run') as native, self.assertRaises(ValueError):
+                target.package_visibility(component, allow_missing=True)
+            native.assert_not_called()
+
+    def test_application_release_retains_private_only_gate(self):
+        workflow = (target.RECIPE.parents[3] / '.github/workflows/production-release.yml').read_text()
+        application_job = workflow.split('  openbao-candidate:')[0]
+        self.assertIn('[[ "$visibility" == private ]]', application_job)
+        self.assertIn('Seven private packages required', application_job)
 
     def test_registry_inventory_requires_exact_config_and_reference(self):
         fixture = fixtures.PostgreSQLSourceBuildTest()

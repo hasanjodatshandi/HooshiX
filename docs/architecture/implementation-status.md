@@ -70,8 +70,11 @@ It builds the complete reviewed set, preserves local/config/registry identity
 separation, requires fresh complete unsuppressed registry scans for all four
 digests before signing, and verifies exact SLSA/CycloneDX predicates and signer
 identity with a wrong-signer negative plus a fresh positive control. All four
-fixed PostgreSQL package destinations must remain private; older platform public
-exceptions do not apply. It uses only ephemeral protected-CI package/OIDC
+fixed PostgreSQL infrastructure destinations may be public or private under the
+explicit owner-approved four-package exception recorded in the Stage10 guide.
+Actual visibility is recorded; internal/invalid values and unknown components
+fail closed. Application packages remain private-only; signer, scans, provenance,
+SBOM, admission and promotion gates are unchanged. It uses only ephemeral protected-CI package/OIDC
 credentials and never installs on the VPS. A successful `publication.json` is
 emitted only after whole-set verification; partial pushes remain unapproved.
 Live publication, exact published-digest staging/admission and target installation
