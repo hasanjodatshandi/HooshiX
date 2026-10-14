@@ -1352,6 +1352,77 @@ snapshot فقط‌خواندنی مقصد در ۲۰۲۶-۱۰-۱۳: RAM براب�
 PostgreSQL وجود ندارد. این اعداد انتخاب فضای مستقل را راهنمایی می‌کنند، نه
 تأیید ظرفیت بار نهایی محصول یا اندازهٔ ثابت برای سرور دیگر.
 
+### فضای مستقل ۳۲ GiB برای PostgreSQL
+
+مالک اندازهٔ اولیهٔ این مقصد را **۳۲ GiB** انتخاب کرده است. این مقدار ظرفیت
+خام فایل backing است؛ ظرفیت ext4 قابل استفاده به‌علت metadata و reserve کمتر
+است و PV آینده نباید ظرفیت قابل استفادهٔ اندازه‌گیری‌شده را بیش‌برآورد کند.
+این انتخاب، شواهد I/O یا complete-stack capacity نیست. مسیرهای این گام:
+
+| جزء | مسیر/مشخصات |
+| --- | --- |
+| backing مستقل | `/var/lib/hooshixstorage/postgresql.ext4`، root-only، کاملاً preallocate |
+| mount محدود | `/var/lib/hooshixstorage/postgresql`، ext4، `nosuid,nodev,noexec,noatime` |
+| دادهٔ آینده | `postgresql/data`، UID/GID ثابت `26:26`، خصوصی؛ هنگام unmount روی root ساخته نمی‌شود |
+| guard | `hooshix-postgresql-storage-guard.service`، هویت inode/device/loop/UUID/flags/owner |
+| ترتیب K3s | drop-in مستقل `32-hooshix-postgresql-storage.conf`؛ dependency قبلی OpenBao باقی می‌ماند |
+
+بسته فقط پس از native CI همان tree ساخته می‌شود. CI با filesystem دورریختنی
+۶۴ MiB و UID 26، ENOSPC، remount/persistence، guard، fault، عدم fallback و
+پاک‌سازی همان fixture را می‌آزماید؛ روی VPS fault، reboot یا restart انجام
+نمی‌شود. موتور مشترک در namespace جدا برای PostgreSQL بارگذاری می‌شود؛ defaults
+OpenBao همچنان ۸ GiB و UID 10001 هستند. فایل guard نصب‌شدهٔ OpenBao بازنویسی
+نمی‌شود؛ verifier فقط نسخهٔ قبلی نصب‌شده و نسخهٔ جاری دقیقاً hash-bound را می‌پذیرد.
+
+از `main` تمیز و بررسی‌شده، پس از موفقیت CI:
+
+```bash
+python3 scripts/production/build_postgresql_storage_bundle.py \
+  --native-run <successful-repository-baseline-run> \
+  --output <new-public-bundle-outside-git>
+```
+
+در Windows، نخست بسته را بدون اتصال VPS اعتبارسنجی کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-storage.ps1' -ValidateOnly
+```
+
+با VNC نجات و نشست مستقل دوم SSH باز، همان فرمان را با
+`-RescueAndSecondSessionReady` به‌جای `-ValidateOnly` اجرا کنید. فقط رمز sudo
+همان‌جا لازم است. بسته به hostname فعلی `mail.hooshix.com` و نسخه‌های reviewed
+ابزارهای موجود میزبان bind است؛ روی سرور دوم این binding باید جداگانه در تغییر
+بررسی‌شده تنظیم شود. هیچ package جدیدی نصب نمی‌شود.
+
+پیش از allocation، سرویس‌ها/guard و state عمومی OpenBao و namespace خالی داده
+بررسی می‌شوند. پس از preallocate باید حداقل ۳۰٪ کل filesystem میزبان آزاد بماند.
+فایل/state خارجی یا drift overwrite/format نمی‌شود؛ partial state حفظ می‌شود.
+نتیجهٔ موفق `POSTGRESQL_STORAGE=Passed`، `storage_guard=Passed`،
+`openbao_host_services=Preserved` و `k3s_restart_performed=false` است.
+PV/PVC، PostgreSQL Cluster، password، Barman و backup در این گام **Not run**
+می‌مانند. تا رسید مقصد ثبت نشده، خود installation این گام نیز **Not run** است.
+
+در خرابی آینده، guard جلوی شروع K3s بدون mount معتبر را می‌گیرد و K3s را متوقف
+می‌کند؛ این معادل توقف همهٔ containerهای در حال اجرا نیست. re-arm خودکار ندارد.
+با مسیر نجات، علت mount/UUID/backing/permissions را رفع کنید؛ فایل backing، data
+یا state را حذف/فرمت نکنید و data را روی root نسازید.
+نصاب عادی را به‌جای recovery اجرا نکنید؛ preflight آن K3s فعال می‌خواهد. فقط پس
+از رفع علت و تأیید هویت storage، با sudo در پنجرهٔ محلی و مسیر نجات باز:
+
+```bash
+sudo systemctl start var-lib-hooshixstorage-postgresql.mount
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/postgresql-storage-guard.py --guard-check
+# فقط اگر بررسی بالا exit=0 بود:
+sudo systemctl reset-failed hooshix-postgresql-storage-guard.service
+sudo systemctl start hooshix-postgresql-storage-guard.service
+sudo systemctl start k3s.service
+```
+
+خطای guard مجوز bypass یا شروع اجباری K3s نیست. پس از توقف واقعی K3s، unseal
+OpenBao عملیات جداگانهٔ تحت نظارت و custody قبلی است. recovery مقصد، reboot
+persistence و fault مقصد **Not verified**
+می‌مانند؛ مشکل باکت پارس‌پک نیز در این گام بررسی یا Passed تلقی نمی‌شود.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS

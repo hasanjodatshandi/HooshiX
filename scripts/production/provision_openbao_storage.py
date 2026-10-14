@@ -10,11 +10,13 @@ import time
 from pathlib import Path
 
 SIZE = 8 * 1024**3
+DATA_UID = DATA_GID = 10001
 HOST_NAME = 'mail.hooshix.com'
 BASE = Path('/var/lib/hooshixstorage')
 IMAGE = BASE / 'openbao.ext4'
 MOUNT = BASE / 'openbao'
 STATE = BASE / 'openbao-storage.json'
+LOCK = BASE / 'openbao-storage.lock'
 UNIT_NAME = 'var-lib-hooshixstorage-openbao.mount'
 UNIT = Path('/etc/systemd/system') / UNIT_NAME
 GUARD = BASE / 'openbao-storage-guard.py'
@@ -40,9 +42,9 @@ WantedBy=local-fs.target
 '''
 
 
-def guard_unit(script, mount_unit):
+def guard_unit(script, mount_unit, description='OpenBao'):
     return f'''[Unit]
-Description=HooshiX OpenBao storage identity guard (fail closed)
+Description=HooshiX {description} storage identity guard (fail closed)
 BindsTo={mount_unit}
 After={mount_unit}
 Before=k3s.service
@@ -196,7 +198,7 @@ def verify(state):
 
 def data_owner(path):
     info = path.lstat()
-    require(stat.S_ISDIR(info.st_mode) and info.st_uid == 10001 and info.st_gid == 10001,
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == DATA_UID and info.st_gid == DATA_GID,
             'UNSAFE_DATA_DIRECTORY')
     # Kubelet's fsGroup=10001 may add group rwx; never allow any other principal.
     require(stat.S_IMODE(info.st_mode) in (0o700, 0o770, 0o2770), 'UNSAFE_DATA_MODE')
@@ -331,7 +333,7 @@ def execute(install=False):
             directory.mkdir(mode=0o755)
             os.chmod(directory, 0o755)
         protected(directory, directory=True, mode=0o755)
-    lock_path = BASE / 'openbao-storage.lock'
+    lock_path = LOCK
     descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         protected(lock_path, mode=0o600)
@@ -382,7 +384,7 @@ def install_locked():
     data = MOUNT / 'data'
     if not data.exists() and not data.is_symlink():
         data.mkdir(mode=0o700)
-        os.chown(data, 10001, 10001)
+        os.chown(data, DATA_UID, DATA_GID)
     return verify(state)
 
 

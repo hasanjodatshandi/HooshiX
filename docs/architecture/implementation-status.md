@@ -180,6 +180,16 @@ exception are `Passed`; existing Root/mesh/OpenBao/ESO/cert-manager/storage are
 database instances/credentials, Barman runtime/backup/PITR and Production
 readiness remain `Not run`/`Not verified`; the provider deferral is unchanged.
 
+The owner selected a separate initial 32 GiB PostgreSQL backing filesystem.
+The storage-only tool reuses an isolated copy of the reviewed filesystem engine,
+with UID/GID 26, distinct paths/units/lock and an additive healthy-guard K3s
+dependency. Existing OpenBao defaults and its installed frozen guard stay intact.
+Fresh exact-tree CI must prove the disposable UID-26 filesystem/guard negatives
+before an exact-main owner-local bundle can be issued. No database/PV/credential,
+provider backup, package installation, target fault, K3s restart or reboot belongs
+to this allocation step. Target PostgreSQL storage remains `Not run`; its usable
+capacity and reboot/fault behavior are not production-readiness evidence.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical
