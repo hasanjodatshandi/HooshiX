@@ -133,6 +133,9 @@ class CnpgControlPlaneTest(unittest.TestCase):
         self.assertEqual('Passed', first['cnpg_control_plane'])
         self.assertEqual('Not run', first['database'])
         self.assertEqual('CLOSED', first['public_access'])
+        created = [body['kind'] for args, body, _ in calls if body and args[0] == 'create' and '--dry-run=server' not in args]
+        self.assertLess(created.index('MutatingWebhookConfiguration'), created.index('Deployment'))
+        self.assertLess(created.index('ValidatingWebhookConfiguration'), created.index('Deployment'))
         for args, body, _ in calls:
             self.assertNotIn('delete', args)
             self.assertNotIn('--force-conflicts', args)

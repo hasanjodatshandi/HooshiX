@@ -1260,7 +1260,9 @@ HTTPS، منبع نامجاز، RBAC، مش، امضا/source/SBOM و حفظ ا�
 `WATCH_NAMESPACE=platform-data` و Role داده در همان namespace است؛ دسترسی
 Secretهای برنامه، Root یا namespaceهای دیگر داده نمی‌شود. خود controller، CA
 مستقل وب‌هوکش را در namespace کنترل‌پلین تولید می‌کند؛ مجوز CREATE Secret در
-RBAC محدودیت نام ندارد، اما خواندن/ویرایش Secret موجود به نام‌های خودش محدود است.
+RBAC محدودیت نام ندارد، اما خواندن/ویرایش Secret موجود به `cnpg-ca-secret`،
+`cnpg-webhook-cert` و نام configuration خودش محدود است. دسترسی read-only به
+Deployment/Service/EndpointSlice همان namespace فقط برای مالکیت CA و کشف plugin است.
 فقط دو تنظیم وب‌هوک CNPG قابل patch هستند. این کنترل‌پلین مورداعتماد است، نه
 حساب runtime برنامه. پیش از هر write، state خارجی یا تغییرکرده متوقف می‌شود؛
 اجرای مجدد state خود ابزار را نگه می‌دارد و هیچ حذف/rollback خودکاری ندارد.

@@ -131,13 +131,12 @@ def execute(plan, *, kube=host.kube):
         kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
              obj['kind'].lower() + '/' + obj['metadata']['name'], '--timeout=60s', timeout=75)
     for obj in plan['objects']:
-        if obj['kind'] not in ('Namespace', 'Deployment', 'MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration'):
+        if obj['kind'] not in ('Namespace', 'Deployment'):
             create(obj)
+    # CNPG's own PKI setup patches these before it becomes Ready; data is still empty/closed.
     print('CNPG_INSTALL_STEP=controller-rollout', file=sys.stderr, flush=True)
     create(next(o for o in plan['objects'] if o['kind'] == 'Deployment'))
     kube('-n', NAMESPACE, 'rollout', 'status', 'deployment/' + DEPLOYMENT, '--timeout=180s', timeout=195)
-    for obj in plan['objects']:
-        if obj['kind'] in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration'): create(obj)
     probe(cluster_probe(), kube)
     verify_callbacks(plan, kube)
     pods = json.loads(kube('-n', NAMESPACE, 'get', 'pods', '-l', 'app.kubernetes.io/name=cloudnative-pg', '-o', 'json'))['items']

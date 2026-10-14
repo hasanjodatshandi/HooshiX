@@ -46,9 +46,12 @@ def permissions(original):
     own = [
         {'apiGroups': [''], 'resources': ['secrets'], 'verbs': ['create']},
         {'apiGroups': [''], 'resources': ['secrets'], 'verbs': ['get', 'update', 'patch'],
-         'resourceNames': ['cnpg-webhook-cert', 'cnpg-controller-manager-config']},
+         'resourceNames': ['cnpg-ca-secret', 'cnpg-webhook-cert', 'cnpg-controller-manager-config']},
         {'apiGroups': [''], 'resources': ['configmaps'], 'verbs': ['get', 'list', 'watch'],
          'resourceNames': ['cnpg-controller-manager-config', 'cnpg-default-monitoring']},
+        {'apiGroups': ['apps'], 'resources': ['deployments'], 'verbs': ['get', 'list', 'watch']},
+        {'apiGroups': ['discovery.k8s.io'], 'resources': ['endpointslices'], 'verbs': ['get', 'list', 'watch']},
+        {'apiGroups': [''], 'resources': ['services'], 'verbs': ['get', 'list', 'watch']},
     ]
     cluster = [
         {'apiGroups': [''], 'resources': ['nodes'], 'verbs': ['get', 'list', 'watch']},
