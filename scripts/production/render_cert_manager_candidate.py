@@ -22,6 +22,8 @@ ACCOUNTS = {'controller': 'cert-manager', 'cainjector': 'cert-manager-cainjector
             'webhook': 'cert-manager-webhook'}
 CRDS = {'certificates.cert-manager.io', 'certificaterequests.cert-manager.io',
         'issuers.cert-manager.io'}
+ISSUERS = ('hooshix-database-selfsigned', 'hooshix-database-ca')
+SIGNERS = ['issuers.cert-manager.io/' + NAMESPACE + '.' + name for name in ISSUERS]
 SELECTOR = {'matchLabels': {'kubernetes.io/metadata.name': NAMESPACE}}
 BOUNDARY_SELECTOR = {'matchExpressions': [{'key': 'kubernetes.io/metadata.name', 'operator': 'In',
     'values': ['istio-system', 'hooshix-secrets', 'platform-apps', NAMESPACE]}]}
@@ -72,8 +74,9 @@ def permissions():
         rule('cert-manager.io', ['issuers', 'certificates', 'certificaterequests'], [*read, *write]),
         rule('cert-manager.io', ['issuers/status', 'certificates/status',
              'certificaterequests/status', 'certificaterequests/approval'], ['update', 'patch']),
-        rule('cert-manager.io', ['signers'], ['approve'], resourceNames=['issuers.cert-manager.io/*']),
         rule('', ['secrets'], [*read, *write]), rule('', ['events'], ['create', 'patch'])]),
+        resource('ClusterRole', ACCOUNTS['controller'], namespaced=False, rules=[
+            rule('cert-manager.io', ['signers'], ['approve'], resourceNames=SIGNERS)]),
         resource('Role', ACCOUNTS['cainjector'], rules=[rule('', ['secrets'], read)]),
         resource('Role', ACCOUNTS['webhook'], rules=[
             rule('', ['secrets'], [*read, 'update'], resourceNames=['cert-manager-webhook-ca'])]),
@@ -308,7 +311,7 @@ def render(manifest, addresses):
                 if obj['kind'] == 'ValidatingWebhookConfiguration':
                     hook['rules'] = [{'apiGroups': ['cert-manager.io'], 'apiVersions': ['v1'],
                         'operations': ['CREATE', 'UPDATE'], 'resources': ['certificates', 'certificaterequests',
-                            'certificaterequests/approval', 'issuers'], 'scope': 'Namespaced'}]
+                            'certificaterequests/status', 'issuers'], 'scope': 'Namespaced'}]
             objects.append(obj)
     objects.extend([serving_secret(), *permissions()])
     for obj in [*crds, *objects]:

@@ -106,6 +106,15 @@ class CertManagerCommissioningTest(unittest.TestCase):
 
     def test_scoped_permissions_and_source_admission(self):
         plan = self.plan()
+        approver = next(p for p in target.permissions() if p['kind'] == 'ClusterRole'
+                        and p['metadata']['name'] == target.ACCOUNTS['controller'])
+        self.assertEqual([{'apiGroups': ['cert-manager.io'], 'resources': ['signers'],
+            'verbs': ['approve'], 'resourceNames': target.SIGNERS}], approver['rules'])
+        self.assertTrue(all(name.startswith('issuers.cert-manager.io/cnpg-system.') and '*' not in name
+                            for name in target.SIGNERS))
+        callback = next(p for p in plan['manifest']['items'] if p['kind'] == 'ValidatingWebhookConfiguration')
+        self.assertIn('certificaterequests/status', callback['webhooks'][0]['rules'][0]['resources'])
+        self.assertNotIn('certificaterequests/approval', callback['webhooks'][0]['rules'][0]['resources'])
         for obj in target.permissions():
             if obj['kind'] == 'ClusterRole':
                 self.assertNotIn('secrets', json.dumps(obj))

@@ -144,7 +144,7 @@ def rehearse(k, wait, run, manifest, platform):
         return {'apiVersion': 'cert-manager.io/v1', 'kind': kind,
                 'metadata': {'name': name, 'namespace': renderer.NAMESPACE}, 'spec': spec}
 
-    issuer = object_('Issuer', 'hooshix-cert-manager-probe-selfsigned', {'selfSigned': {}})
+    issuer = object_('Issuer', renderer.ISSUERS[0], {'selfSigned': {}})
     admission_result(k, issuer, wait, public_schema=False)
     external = object_('Issuer', 'hooshix-cert-manager-probe-external', {'acme': {
         'server': 'https://unapproved.invalid/directory', 'privateKeySecretRef': {'name': 'unapproved'}}})
@@ -158,6 +158,14 @@ def rehearse(k, wait, run, manifest, platform):
             if k('auth', 'can-i', 'get', 'secrets', '-n', namespace, '--as=' + identity,
                  expected=1).strip() != b'no':
                 raise RehearsalFailed('cross-namespace certificate Secret access accepted')
+    identity = 'system:serviceaccount:' + renderer.NAMESPACE + ':' + renderer.ACCOUNTS['controller']
+    for signer in [*renderer.SIGNERS, 'issuers.cert-manager.io/platform-apps.foreign', 'issuers.cert-manager.io/*']:
+        review = {'apiVersion': 'authorization.k8s.io/v1', 'kind': 'SubjectAccessReview', 'spec': {
+            'user': identity, 'groups': ['system:serviceaccounts', 'system:serviceaccounts:cnpg-system', 'system:authenticated'],
+            'resourceAttributes': {'group': 'cert-manager.io', 'resource': 'signers', 'verb': 'approve', 'name': signer}}}
+        answer = json.loads(k('create', '-f', '-', '-o', 'json', data=json.dumps(review).encode()))
+        if answer['status']['allowed'] != (signer in renderer.SIGNERS):
+            raise RehearsalFailed('certificate signer approval scope mismatch')
     if k('auth', 'can-i', 'patch', 'validatingwebhookconfigurations/other-webhook',
          '--as=system:serviceaccount:cnpg-system:cert-manager-cainjector', expected=1).strip() != b'no':
         raise RehearsalFailed('foreign webhook patch accepted')
@@ -176,7 +184,7 @@ def rehearse(k, wait, run, manifest, platform):
     apply(k, ca)
     k('-n', renderer.NAMESPACE, 'wait', '--for=condition=Ready', 'certificate/' + ca['metadata']['name'],
       '--timeout=120s', timeout=135)
-    signing = object_('Issuer', 'hooshix-cert-manager-probe-ca', {'ca': {'secretName': ca['spec']['secretName']}})
+    signing = object_('Issuer', renderer.ISSUERS[1], {'ca': {'secretName': ca['spec']['secretName']}})
     apply(k, signing)
     k('-n', renderer.NAMESPACE, 'wait', '--for=condition=Ready', 'issuer/' + signing['metadata']['name'],
       '--timeout=60s', timeout=75)

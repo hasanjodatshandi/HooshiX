@@ -1144,6 +1144,14 @@ metadata وب‌هوک‌ها را در سطح کلاستر می‌خواند و
 را می‌تواند تغییر دهد؛ گسترش به وب‌هوک Barman بعداً به نام‌های دقیق محدود می‌شود.
 این CA داخلی وب‌هوک، Root پروژه یا intermediate مش نیست.
 
+تأیید CertificateRequest طبق API رسمی از طریق منبع مجازی `signers` در سطح
+کلاستر بررسی می‌شود. فقط حساب controller مجوز `approve` برای دو Issuer دقیق
+`cnpg-system/hooshix-database-selfsigned` و `cnpg-system/hooshix-database-ca` دارد؛
+این ClusterRole دسترسی به Secret یا Issuerهای namespace دیگر نمی‌دهد.
+callback معتبر و fail-closed شامل `certificaterequests/status` هم هست تا
+تغییر وضعیت Approved/Denied از بررسی مجوز عبور کند. Issuerهای پایدار و
+گواهی‌های Barman در مرحلهٔ نصب دیتابیس ساخته خواهند شد، نه این نصب ابزار.
+
 فقط یک Secret **خالی** و دارای مالکیت مشخص برای مقصد CA وب‌هوک ساخته می‌شود؛
 هیچ کلید یا رمز در plan نیست. وب‌هوک خودش کلید را داخل Kubernetes تولید/تعویض
 می‌کند و فقط مجوز update/read/watch همان نام را دارد، نه create Secret.

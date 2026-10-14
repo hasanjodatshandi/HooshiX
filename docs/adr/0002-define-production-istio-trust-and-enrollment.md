@@ -97,6 +97,12 @@ reviewed exact-name extension. Fail-closed admission pins callback service, rule
 namespace selection and `failurePolicy=Fail` while allowing CA-bundle injection;
 the injector cannot weaken its own callback boundary. Pods use an exact one-hour
 projected API token; executable arguments, environment and mounts are admission-bound.
+The upstream approval webhook checks the virtual `signers` resource at cluster
+scope. A controller-only ClusterRole grants `approve` solely for
+`issuers.cert-manager.io/cnpg-system.hooshix-database-selfsigned` and
+`issuers.cert-manager.io/cnpg-system.hooshix-database-ca`; no wildcard, foreign
+namespace or Secret access is granted. Validating callbacks cover the actual
+`certificaterequests/status` endpoint, including approval transitions.
 The serving CA is distinct control-plane TLS
 material; it does not replace or modify the offline Root, Istio intermediate,
 OpenBao TLS or application secret authority. Root material is never imported.
