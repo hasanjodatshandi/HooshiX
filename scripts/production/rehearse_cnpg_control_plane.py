@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import traceback
 
 import install_cnpg_control_plane as installer
 import render_cnpg_control_plane as renderer
@@ -86,7 +87,11 @@ def rehearse(k, wait, manifest, cert_manifest, platform):
     try:
         result = installer.execute(plan, kube=adapter)
         installer.execute(plan, kube=adapter)
-    except (RehearsalFailed, ValueError):
+    except (RehearsalFailed, ValueError, KeyError, IndexError) as error:
+        # Locations and exception types only; never exception messages or frame locals.
+        frames = [{'function': frame.name, 'line': frame.lineno} for frame in traceback.extract_tb(error.__traceback__)
+                  if frame.filename.endswith(('/install_cnpg_control_plane.py', '/rehearse_cnpg_control_plane.py'))]
+        print('CNPG_FIXED_FAILURE=' + json.dumps({'type': type(error).__name__, 'frames': frames}), flush=True)
         try:
             pods = json.loads(k('-n', renderer.NAMESPACE, 'get', 'pods', '-l',
                 'app.kubernetes.io/name=cloudnative-pg', '-o', 'json'))['items']
