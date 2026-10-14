@@ -34,20 +34,25 @@ def guard_rehearsal(root, image, volume, mount_name, size):
     storage.create_file(source, Path(storage.__file__).read_bytes())
     wrapper = (f'import runpy,sys\nfrom pathlib import Path\nn=runpy.run_path({str(source)!r})\n'
                "n=n['check_mount'].__globals__\n"
+               f"n['DATA_UID']=n['DATA_GID']={storage.DATA_UID}\n"
                f"n['guard_check']=lambda:n['check_mount'](Path({str(image)!r}),"
                f'Path({str(volume)!r}),Path({str(state)!r}),{size})\n'
                f"n['guard_check']() if sys.argv[1]=='--guard-check' else n['guard_loop'](Path({str(script)!r}))\n")
     storage.create_file(script, wrapper.encode())
     guard_name = root.name + '-guard.service'
+    existing_name = root.name + '-existing.service'
     dummy_name = root.name + '-dependent.service'
     guard_unit = Path('/etc/systemd/system') / guard_name
+    existing_unit = Path('/etc/systemd/system') / existing_name
     dummy_unit = Path('/etc/systemd/system') / dummy_name
     created = []
     existing_bind = root / 'existing-bind'
     missing_bind = root / 'new-bind'
     try:
         for path, text in ((guard_unit, storage.guard_unit(script, mount_name)),
-                           (dummy_unit, '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')):
+                           (existing_unit, '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n'),
+                           (dummy_unit, f'[Unit]\nBindsTo={existing_name}\nAfter={existing_name}\n'
+                            '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')):
             storage.create_file(path, text.encode())
             created.append(path)
         storage.run(['/usr/bin/systemd-analyze', 'verify', str(guard_unit), str(dummy_unit)])
@@ -59,11 +64,11 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         storage.require(storage.run(['/usr/bin/systemctl', 'is-active', guard_name]) == 'active',
                         'GUARD_STARTUP_FAILED')
         # Mirror installer integration: attach a healthy guard to an already running service.
-        dummy_unit.write_text(f'[Unit]\nBindsTo={guard_name}\nAfter={guard_name}\n'
+        dummy_unit.write_text(f'[Unit]\nBindsTo={existing_name} {guard_name}\nAfter={existing_name} {guard_name}\n'
                               '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')
         storage.run(['/usr/bin/systemctl', 'daemon-reload'])
-        storage.require(guard_name in storage.run(['/usr/bin/systemctl', 'show', dummy_name,
-                         '--property=BindsTo', '--value']).split(), 'LIVE_BIND_NOT_LOADED')
+        storage.require({guard_name, existing_name} <= set(storage.run(['/usr/bin/systemctl', 'show', dummy_name,
+                         '--property=BindsTo', '--value']).split()), 'LIVE_BIND_NOT_LOADED')
         storage.run(['/usr/bin/mount', '-o', 'remount,ro', str(volume)])
         wait_inactive(dummy_name)
         wait_inactive(guard_name)
@@ -112,8 +117,8 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         if child == 0:
             try:
                 os.setgroups([])
-                os.setgid(10001)
-                os.setuid(10001)
+                os.setgid(storage.DATA_GID)
+                os.setuid(storage.DATA_UID)
                 (volume / 'data').mkdir()
             except PermissionError:
                 os._exit(0)
@@ -164,15 +169,15 @@ def rehearse():
         os.chmod(volume, 0o755)
         data = volume / 'data'
         data.mkdir(mode=0o700)
-        os.chown(data, 10001, 10001)
+        os.chown(data, storage.DATA_UID, storage.DATA_GID)
         marker = data / 'marker'
         # No secret fixture: persistence marker only, owned by the intended runtime UID.
         child = os.fork()
         if child == 0:
             try:
                 os.setgroups([])
-                os.setgid(10001)
-                os.setuid(10001)
+                os.setgid(storage.DATA_GID)
+                os.setuid(storage.DATA_UID)
                 marker.write_bytes(b'HooshiX-storage-fixture')
                 chunk = bytes(1024**2)
                 filled = 0
@@ -208,7 +213,7 @@ def rehearse():
         storage.require({'rw', 'nodev', 'nosuid', 'noexec', 'noatime'} <= set(mount['options'].split(',')),
                         'OPTIONS_TEST_FAILED')
         guard_checks = guard_rehearsal(root, image, volume, name, size)
-        result = {'schema_version': 1, 'fixture_bytes': size, 'enospc_nonroot': 'Passed',
+        result = {'schema_version': 1, 'fixture_bytes': size, 'runtime_uid': storage.DATA_UID, 'enospc_nonroot': 'Passed',
                   'reserved_size': 'Passed', 'systemd_remount_persistence': 'Passed',
                   'mount_options': 'Passed', 'guard_checks': guard_checks, 'target_vps': 'Not verified',
                   'reboot_persistence': 'Not verified', 'production_readiness': 'Not verified'}
@@ -229,5 +234,16 @@ def rehearse():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ci', required=True, action='store_true')
-    parser.parse_args()
-    print(json.dumps(rehearse(), sort_keys=True))
+    parser.add_argument('--postgresql', action='store_true')
+    args = parser.parse_args()
+    core = Path(storage.__file__).read_bytes()
+    if args.postgresql:
+        import provision_postgresql_storage as postgresql
+        storage = postgresql.storage(core)
+        storage.require(storage.SIZE == 32 * 1024**3 and storage.DATA_UID == storage.DATA_GID == 26,
+                        'POSTGRESQL_PROFILE_REQUIRED')
+    result = rehearse()
+    if args.postgresql:
+        result.update(profile='postgresql-32gib', source_sha256=hashlib.sha256(
+            Path(postgresql.__file__).read_bytes()).hexdigest(), core_sha256=hashlib.sha256(core).hexdigest())
+    print(json.dumps(result, sort_keys=True))

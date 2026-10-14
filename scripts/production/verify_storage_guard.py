@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SOURCE = Path('/var/lib/hooshixstorage/openbao-storage-guard.py')
-SOURCE_SHA256 = '2f061f547c5db602d1e7da3caa70c5c138e377b96a5948be9a2ae331a4f00933'
+SOURCE_SHA256 = '0913fdac77ea00a7c9419fdf03ad2c9cec3dd216f00cc9a05d7bc8f2d2ec5a90'
+PREVIOUS_SOURCE_SHA256 = '2f061f547c5db602d1e7da3caa70c5c138e377b96a5948be9a2ae331a4f00933'
 RECOVERY = 'hooshix-storage-maintenance-recovery'
 K3S = 'k3s.service'
 PRESERVED = ('ssh.service', 'caddy.service', 'nginx.service', 'postfix.service',
@@ -32,7 +33,7 @@ def load_storage():
         raise ValueError('UNSAFE_INSTALLED_SOURCE')
     with SOURCE.open('rb') as stream:
         content = stream.read(32769)
-    if len(content) > 32768 or hashlib.sha256(content).hexdigest() != SOURCE_SHA256:
+    if len(content) > 32768 or hashlib.sha256(content).hexdigest() not in (SOURCE_SHA256, PREVIOUS_SOURCE_SHA256):
         raise ValueError('INSTALLED_SOURCE_REVIEW_REQUIRED')
     namespace = {'__name__': 'hooshix_verified_storage'}
     exec(compile(content, str(SOURCE), 'exec'), namespace)

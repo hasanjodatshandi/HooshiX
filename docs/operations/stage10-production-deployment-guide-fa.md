@@ -1316,7 +1316,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-cnp
 فقط رمز sudo همان‌جا لازم است. رسید موفق `CNPG_CONTROL_PLANE=Passed` شامل
 HTTPS callback، پیکربندی پورت و حفظ mesh/OpenBao/ESO/cert-manager/storage است؛
 `database=Not run`، `barman_runtime=Not run` و `public_access=CLOSED` می‌مانند.
-صدور بسته/اجرای VPS هنوز **Not run** است تا رسید همان عملیات ثبت شود.
+در این نصب، بستهٔ `main@22054cdcf3aa9681474ebe02fb47633792c3a6c5` با آزمون
+native موفق `38548698802` و validation ویندوز ساخته و روی VPS اجرا شده است.
+رسید `hooshix-cnpg-bd35b5199b3842999b0432d8980b4855.json` با SHA256
+`530c0c57bf246438b217b7d5d070858f6fc5fc962fc978e04368eead1ca1d5d6`
+و plan با SHA256
+`d5faea9362152ce11cd7905ea947be81a41ffa03266051858d2976eff67eb640`
+تطبیق دارد: controller و HTTPS callback و مرز پورت، **Passed**؛ اجزای قبلی،
+**Preserved**؛ دسترسی عمومی، **CLOSED**. این نتیجه فقط برای همین مقصد/بسته است؛
+روی سرور دوم باید رسید مستقل همان اجرا گرفته شود. دیتابیس، فضای مستقل داده
+و Barman هنوز **Not run** هستند؛ مرحلهٔ بعد تعیین اندازه و guard مستقل
+storage PostgreSQL است، نه اجرای دوبارهٔ کنترل‌پلین.
 بعد از افزودن controller، بستهٔ قدیمی cert-manager را دوباره اجرا نکنید؛ آن
 بسته عمداً namespace دارای workload جدید را به‌عنوان scope قدیمی نمی‌پذیرد.
 
@@ -1341,6 +1351,77 @@ snapshot فقط‌خواندنی مقصد در ۲۰۲۶-۱۰-۱۳: RAM براب�
 است. تنها PV/PVC موجود مربوط به OpenBao و Bound است؛ storage class دیگری برای
 PostgreSQL وجود ندارد. این اعداد انتخاب فضای مستقل را راهنمایی می‌کنند، نه
 تأیید ظرفیت بار نهایی محصول یا اندازهٔ ثابت برای سرور دیگر.
+
+### فضای مستقل ۳۲ GiB برای PostgreSQL
+
+مالک اندازهٔ اولیهٔ این مقصد را **۳۲ GiB** انتخاب کرده است. این مقدار ظرفیت
+خام فایل backing است؛ ظرفیت ext4 قابل استفاده به‌علت metadata و reserve کمتر
+است و PV آینده نباید ظرفیت قابل استفادهٔ اندازه‌گیری‌شده را بیش‌برآورد کند.
+این انتخاب، شواهد I/O یا complete-stack capacity نیست. مسیرهای این گام:
+
+| جزء | مسیر/مشخصات |
+| --- | --- |
+| backing مستقل | `/var/lib/hooshixstorage/postgresql.ext4`، root-only، کاملاً preallocate |
+| mount محدود | `/var/lib/hooshixstorage/postgresql`، ext4، `nosuid,nodev,noexec,noatime` |
+| دادهٔ آینده | `postgresql/data`، UID/GID ثابت `26:26`، خصوصی؛ هنگام unmount روی root ساخته نمی‌شود |
+| guard | `hooshix-postgresql-storage-guard.service`، هویت inode/device/loop/UUID/flags/owner |
+| ترتیب K3s | drop-in مستقل `32-hooshix-postgresql-storage.conf`؛ dependency قبلی OpenBao باقی می‌ماند |
+
+بسته فقط پس از native CI همان tree ساخته می‌شود. CI با filesystem دورریختنی
+۶۴ MiB و UID 26، ENOSPC، remount/persistence، guard، fault، عدم fallback و
+پاک‌سازی همان fixture را می‌آزماید؛ روی VPS fault، reboot یا restart انجام
+نمی‌شود. موتور مشترک در namespace جدا برای PostgreSQL بارگذاری می‌شود؛ defaults
+OpenBao همچنان ۸ GiB و UID 10001 هستند. فایل guard نصب‌شدهٔ OpenBao بازنویسی
+نمی‌شود؛ verifier فقط نسخهٔ قبلی نصب‌شده و نسخهٔ جاری دقیقاً hash-bound را می‌پذیرد.
+
+از `main` تمیز و بررسی‌شده، پس از موفقیت CI:
+
+```bash
+python3 scripts/production/build_postgresql_storage_bundle.py \
+  --native-run <successful-repository-baseline-run> \
+  --output <new-public-bundle-outside-git>
+```
+
+در Windows، نخست بسته را بدون اتصال VPS اعتبارسنجی کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-storage.ps1' -ValidateOnly
+```
+
+با VNC نجات و نشست مستقل دوم SSH باز، همان فرمان را با
+`-RescueAndSecondSessionReady` به‌جای `-ValidateOnly` اجرا کنید. فقط رمز sudo
+همان‌جا لازم است. بسته به hostname فعلی `mail.hooshix.com` و نسخه‌های reviewed
+ابزارهای موجود میزبان bind است؛ روی سرور دوم این binding باید جداگانه در تغییر
+بررسی‌شده تنظیم شود. هیچ package جدیدی نصب نمی‌شود.
+
+پیش از allocation، سرویس‌ها/guard و state عمومی OpenBao و namespace خالی داده
+بررسی می‌شوند. پس از preallocate باید حداقل ۳۰٪ کل filesystem میزبان آزاد بماند.
+فایل/state خارجی یا drift overwrite/format نمی‌شود؛ partial state حفظ می‌شود.
+نتیجهٔ موفق `POSTGRESQL_STORAGE=Passed`، `storage_guard=Passed`،
+`openbao_host_services=Preserved` و `k3s_restart_performed=false` است.
+PV/PVC، PostgreSQL Cluster، password، Barman و backup در این گام **Not run**
+می‌مانند. تا رسید مقصد ثبت نشده، خود installation این گام نیز **Not run** است.
+
+در خرابی آینده، guard جلوی شروع K3s بدون mount معتبر را می‌گیرد و K3s را متوقف
+می‌کند؛ این معادل توقف همهٔ containerهای در حال اجرا نیست. re-arm خودکار ندارد.
+با مسیر نجات، علت mount/UUID/backing/permissions را رفع کنید؛ فایل backing، data
+یا state را حذف/فرمت نکنید و data را روی root نسازید.
+نصاب عادی را به‌جای recovery اجرا نکنید؛ preflight آن K3s فعال می‌خواهد. فقط پس
+از رفع علت و تأیید هویت storage، با sudo در پنجرهٔ محلی و مسیر نجات باز:
+
+```bash
+sudo systemctl start var-lib-hooshixstorage-postgresql.mount
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/postgresql-storage-guard.py --guard-check
+# فقط اگر بررسی بالا exit=0 بود:
+sudo systemctl reset-failed hooshix-postgresql-storage-guard.service
+sudo systemctl start hooshix-postgresql-storage-guard.service
+sudo systemctl start k3s.service
+```
+
+خطای guard مجوز bypass یا شروع اجباری K3s نیست. پس از توقف واقعی K3s، unseal
+OpenBao عملیات جداگانهٔ تحت نظارت و custody قبلی است. recovery مقصد، reboot
+persistence و fault مقصد **Not verified**
+می‌مانند؛ مشکل باکت پارس‌پک نیز در این گام بررسی یا Passed تلقی نمی‌شود.
 
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
