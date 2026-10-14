@@ -42,6 +42,20 @@ def protected(kube):
     return result
 
 
+def safe_pod(pod):
+    if any(pod.get(k) for k in ('hostNetwork', 'hostPID', 'hostIPC', 'shareProcessNamespace',
+            'initContainers', 'ephemeralContainers')) or len(pod.get('containers', [])) != 1:
+        return False
+    context = pod.get('securityContext', {})
+    c = pod['containers'][0]
+    security = c.get('securityContext', {})
+    return (not context.get('sysctls') and not context.get('windowsOptions') and not c.get('envFrom')
+        and not security.get('privileged') and not security.get('capabilities', {}).get('add')
+        and security.get('procMount', 'Default') == 'Default' and not security.get('windowsOptions')
+        and not any('hostPath' in v for v in pod.get('volumes', []))
+        and not any(v.get('subPath') or v.get('subPathExpr') for v in c.get('volumeMounts', [])))
+
+
 def verify_callbacks(plan, kube):
     for obj in plan['objects']:
         if obj['kind'] not in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration'):
@@ -100,6 +114,24 @@ def execute(plan, *, kube=host.kube):
                 'field': mismatched_path(old, obj)}), file=sys.stderr, flush=True)
         require(not old or (old['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == MANAGER
                 and desired_fields_match(old, obj)), 'CNPG_FOREIGN_OR_CHANGED_STATE_PRESERVED')
+        if old and obj['kind'] == 'Deployment':
+            require(safe_pod(old['spec']['template']['spec']), 'CNPG_EXTRA_PRIVILEGE_PRESERVED_NOT_ADOPTED')
+        if old and obj['kind'] == 'NetworkPolicy':
+            spec = copy.deepcopy(old['spec'])
+            for direction in ('ingress', 'egress'):
+                if obj['spec'].get(direction) == []: spec.setdefault(direction, [])
+            require(spec == obj['spec'], 'CNPG_NETWORK_SECURITY_DRIFT')
+        if old and obj['kind'] in ('PeerAuthentication', 'AuthorizationPolicy'):
+            require(old['spec'] == obj['spec'] and old['metadata'].get('annotations', {}).get('istio.io/dry-run')
+                in (None, 'false'), 'CNPG_MESH_SECURITY_DRIFT')
+        if old and obj['kind'] in ('ValidatingPolicy', 'ImageValidatingPolicy'):
+            require(not old['spec'].get('matchConditions')
+                and not old['spec']['matchConstraints'].get('excludeResourceRules')
+                and old['spec']['matchConstraints'].get('namespaceSelector')
+                    == obj['spec']['matchConstraints'].get('namespaceSelector'), 'CNPG_ADMISSION_SCOPE_DRIFT')
+        if old and obj['kind'] == 'CustomResourceDefinition':
+            require(old['spec'].get('conversion', {}).get('strategy', 'None')
+                == obj['spec'].get('conversion', {}).get('strategy', 'None'), 'CNPG_CRD_CONVERSION_DRIFT')
     old = json.loads(kube('get', 'validatingpolicy', plan['boundary']['metadata']['name'], '-o', 'json'))
     require(old['spec'] in (plan['previous_boundary']['spec'], plan['boundary']['spec']), 'CNPG_EXISTING_BOUNDARY_CONFLICT')
     data = kube('-n', DATA_NAMESPACE, 'get', 'pods,pvc', '--ignore-not-found', '-o', 'json')
@@ -140,7 +172,11 @@ def execute(plan, *, kube=host.kube):
     probe(cluster_probe(), kube)
     verify_callbacks(plan, kube)
     pods = json.loads(kube('-n', NAMESPACE, 'get', 'pods', '-l', 'app.kubernetes.io/name=cloudnative-pg', '-o', 'json'))['items']
+    deployment = next(o for o in plan['objects'] if o['kind'] == 'Deployment')
     require(len(pods) == 1 and pods[0]['spec']['serviceAccountName'] == 'cnpg-manager'
+        and safe_pod(pods[0]['spec']) and desired_fields_match(
+            {'kind': 'Deployment', 'spec': {'template': pods[0]}},
+            {'kind': 'Deployment', 'spec': {'template': deployment['spec']['template']}})
         and pods[0]['spec']['containers'][0]['image'] == plan['images']['operator']
         and pods[0]['status']['containerStatuses'][0]['ready']
         and pods[0]['status']['containerStatuses'][0]['imageID'].endswith(plan['images']['operator'].split('@')[1]),

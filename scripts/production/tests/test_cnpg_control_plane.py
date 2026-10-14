@@ -107,7 +107,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
                 if kind == 'pods':
                     d = states[('deployment', renderer.NAMESPACE, renderer.DEPLOYMENT)]
                     pod = copy.deepcopy(d['spec']['template']['spec'])
-                    return json.dumps({'items': [{'spec': pod, 'status': {'containerStatuses': [{
+                    return json.dumps({'items': [{'metadata': d['spec']['template']['metadata'], 'spec': pod, 'status': {'containerStatuses': [{
                         'ready': True, 'imageID': pod['containers'][0]['image']}]}}]}).encode()
                 value = states.get((kind, scope, args[i + 2]))
                 return json.dumps(value).encode() if value else b''
@@ -143,7 +143,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
                 self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'PersistentVolume', 'PersistentVolumeClaim'))
 
     def test_foreign_or_changed_state_and_wider_port_stop_before_writes(self):
-        for mutate in ('foreign', 'port', 'boundary'):
+        for mutate in ('foreign', 'port', 'boundary', 'privilege', 'network-selector'):
             p, states, calls, k = self.stateful()
             if mutate == 'foreign':
                 d = copy.deepcopy(next(o for o in p['objects'] if o['kind'] == 'Deployment'))
@@ -152,6 +152,14 @@ class CnpgControlPlaneTest(unittest.TestCase):
             if mutate == 'port': p['peer_authentication']['spec']['portLevelMtls']['8080'] = {'mode': 'PERMISSIVE'}
             if mutate == 'boundary':
                 states[('validatingpolicy', None, p['boundary']['metadata']['name'])]['spec'] = {}
+            if mutate == 'privilege':
+                d = copy.deepcopy(next(o for o in p['objects'] if o['kind'] == 'Deployment'))
+                d['spec']['template']['spec']['containers'][0]['securityContext']['privileged'] = True
+                states[('deployment', renderer.NAMESPACE, renderer.DEPLOYMENT)] = d
+            if mutate == 'network-selector':
+                o = copy.deepcopy(p['network'][-1])
+                o['spec']['podSelector'] = {'matchLabels': {'skip': 'true'}}
+                states[('networkpolicy', renderer.DATA_NAMESPACE, o['metadata']['name'])] = o
             with patch.object(installer, 'protected', return_value=[]), \
                     patch.object(installer, 'addresses', return_value=['10.43.0.1']), self.assertRaises(ValueError):
                 installer.execute(p, kube=k)

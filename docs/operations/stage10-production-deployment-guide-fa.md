@@ -1266,6 +1266,8 @@ Deployment/Service/EndpointSlice همان namespace فقط برای مالکیت
 فقط دو تنظیم وب‌هوک CNPG قابل patch هستند. این کنترل‌پلین مورداعتماد است، نه
 حساب runtime برنامه. پیش از هر write، state خارجی یا تغییرکرده متوقف می‌شود؛
 اجرای مجدد state خود ابزار را نگه می‌دارد و هیچ حذف/rollback خودکاری ندارد.
+drift اضافی selector/پورت شبکه، mesh، شرط‌های حذف admission یا privilege حتی با
+label مالکیت صحیح پذیرفته نمی‌شود؛ Pod زنده هم با plan محدود تطبیق داده می‌شود.
 
 namespace خالی `platform-data` با restricted/Ambient، NetworkPolicy پیش‌فرض بسته
 و policy رد همهٔ Podها آماده می‌شود. ImageCatalog فقط metadata عمومی digest
