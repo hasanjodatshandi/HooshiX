@@ -21,6 +21,9 @@ on:
       - scripts/production/run-cert-manager-commissioning.ps1
       - scripts/production/tests/test_eso*.py
       - scripts/production/*cert_manager*.py
+      - scripts/production/*cnpg*.py
+      - scripts/production/run-cnpg-control-plane.ps1
+      - scripts/production/tests/test_cnpg_control_plane.py
       - scripts/production/tests/test_cert_manager_commissioning.py
       - infrastructure/production/data/cert-manager*.json
       - scripts/production/platform_image_egress.py
@@ -43,6 +46,10 @@ on:
         default: true
       cert_manager_commissioning:
         description: Rehearse three signed internal cert-manager components with scoped TLS and webhook exception
+        type: boolean
+        default: false
+      cnpg_control_plane:
+        description: Rehearse the signed namespace-scoped CNPG controller without a database instance
         type: boolean
         default: false
       mesh_run:
@@ -105,6 +112,10 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-cert-manager-commissioning.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'CERT_MANAGER_OPERATOR_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-cnpg-control-plane.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'CNPG_OPERATOR_WRAPPER_SYNTAX_FAILED' }
       - name: Install pinned disposable fixture tools and YAML parser
         run: |
           set -euo pipefail
@@ -163,7 +174,7 @@ jobs:
               "ghcr.io/kyverno/signatures@${pair#*:}" > /dev/null
           done
       - name: Prepare exact internal cert-manager manifest and published acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -180,6 +191,23 @@ jobs:
           export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
           python3 scripts/production/verify_published_cert_manager.py \
             --evidence-dir "$RUNNER_TEMP/cert-manager-publication" --output-dir "$RUNNER_TEMP/cert-manager-acceptance"
+      - name: Prepare exact CNPG manifest and published data-set acceptance
+        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/releases/cnpg-1.30.1.yaml \
+            -o "$RUNNER_TEMP/platform-tools/cnpg.yaml"
+          printf '%s  %s\n' 37237f145d8138256ea25ae830f87759255665ff08f8d552fdd8224a5ec032fb \
+            "$RUNNER_TEMP/platform-tools/cnpg.yaml" | sha256sum --check --strict
+          gh run download 38382418665 --repo hasanjodatshandi/HooshiX \
+            --name postgresql-publication-38382418665-1 --dir "$RUNNER_TEMP/postgresql-publication"
+          export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
+          python3 scripts/production/verify_published_postgresql.py \
+            --evidence-dir "$RUNNER_TEMP/postgresql-publication" --output-dir "$RUNNER_TEMP/postgresql-acceptance"
       - name: Rehearse exact private images with real Calico Ambient and fail-closed Kyverno
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -192,8 +220,11 @@ jobs:
           if [[ '${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}' == 'true' ]]; then
             options+=(--eso-chart "$RUNNER_TEMP/platform-tools/eso-chart.tgz")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane }}' == 'true' ]]; then
             options+=(--cert-manager-manifest "$RUNNER_TEMP/platform-tools/cert-manager.yaml")
+          fi
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane }}' == 'true' ]]; then
+            options+=(--cnpg-manifest "$RUNNER_TEMP/platform-tools/cnpg.yaml")
           fi
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/platform-tools" \

@@ -304,6 +304,16 @@ are denied. API-only HTTPS ingress and fail-closed admission remain independent
 controls. Native wrong-identity/RBAC/issuer/network/certificate tests are required;
 namespace scoping does not protect certificate material against host/root compromise.
 
+CNPG's owner-approved 9443-only mesh exception retains the controller's Ambient
+identity and other-port STRICT policy. API-only HTTPS/Fail, exact-source ingress,
+wrong-source network and non-callback mesh identity tests are independent gates.
+The operator's watched namespace is `platform-data`; unrelated application Secret
+access and unrelated webhook updates are denied. Its own namespace needs Secret
+creation for its serving CA; RBAC cannot constrain the name on CREATE, but existing
+Secret reads/patches are exact-name. This is a trusted control-plane capability,
+not an application credential grant. No data Pod is admitted by this initial
+controller bootstrap; complete data commissioning has its own boundary/recovery gates.
+
 ### TM-11 Telemetry injection/exfiltration
 
 Attacker sends crafted headers/inputs causing high-cardinality attributes, log injection, PII/secret export, or trace-baggage authority confusion.

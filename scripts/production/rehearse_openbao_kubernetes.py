@@ -30,7 +30,7 @@ from render_openbao_local_storage import candidate as local_storage_candidate
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
-                   "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning",
+                   "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane",
                    "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
@@ -127,8 +127,13 @@ def ca_import_fixture(k):
 
 def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
              eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False,
-             cert_manager_manifest: Path | None = None) -> None:
+             cert_manager_manifest: Path | None = None, cnpg_manifest: Path | None = None) -> None:
     runner_paths(tools, receipt)
+    if cnpg_manifest is not None:
+        runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
+        if (cert_manager_manifest is None or cnpg_manifest.is_symlink()
+                or not cnpg_manifest.resolve(strict=True).is_relative_to(runtime)):
+            raise RehearsalFailed('CNPG requires the owned certificate and Ambient fixture')
     if cert_manager_manifest is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
         if (platform_directory is None or eso_chart is None or not mesh_security_upgrade
@@ -421,6 +426,10 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     step('signed-ambient-cert-manager-commissioning')
                     from rehearse_cert_manager import rehearse as certificates
                     cert_manager_result = certificates(k, wait, run, cert_manager_manifest, platform)
+                if cnpg_manifest is not None:
+                    step('signed-ambient-cnpg-control-plane')
+                    from rehearse_cnpg_control_plane import rehearse as cnpg
+                    cnpg_result = cnpg(k, wait, cnpg_manifest, cert_manager_manifest, platform)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -492,6 +501,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         if cert_manager_manifest is not None:
             result['scope'] = 'Disposable Calico/Ambient initialized-store internal cert-manager commissioning'
             result['cert_manager_commissioning'] = cert_manager_result
+        if cnpg_manifest is not None:
+            result['scope'] = 'Disposable Calico/Ambient initialized-store CNPG control plane'
+            result['cnpg_control_plane'] = cnpg_result
     else:
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
         if eso_chart is not None:
@@ -512,10 +524,12 @@ def main() -> int:
     parser.add_argument('--mesh-security-upgrade', action='store_true')
     parser.add_argument("--eso-chart", type=Path)
     parser.add_argument('--cert-manager-manifest', type=Path)
+    parser.add_argument('--cnpg-manifest', type=Path)
     args = parser.parse_args()
     try:
         rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart,
-                 mesh_security_upgrade=args.mesh_security_upgrade, cert_manager_manifest=args.cert_manager_manifest)
+                 mesh_security_upgrade=args.mesh_security_upgrade, cert_manager_manifest=args.cert_manager_manifest,
+                 cnpg_manifest=args.cnpg_manifest)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):

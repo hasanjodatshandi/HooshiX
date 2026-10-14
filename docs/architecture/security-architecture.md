@@ -120,6 +120,14 @@ Virtual signer approval is cluster-scoped only for the two ADR-0002
 `cnpg-system` issuer names; no wildcard or foreign namespace is authorized, and
 the HTTPS callback validates CertificateRequest status/approval transitions.
 
+The owner-approved CNPG controller exception in ADR-0002 is port-specific, not
+Pod opt-out: only internal 9443 permits non-mesh API access, still with verified
+HTTPS, fail-closed callbacks and exact API-source network/authorization rules.
+Other ports remain STRICT. Mutable operator permissions bind only `platform-data`;
+own-namespace TLS/config access is bounded and cluster Secret access is absent.
+Data Pods remain admission-denied until the complete data/image/secret/storage
+boundary is commissioned. Rendered tooling is not executed target evidence.
+
 ## 8. Public edge/client-address trust
 
 ```text

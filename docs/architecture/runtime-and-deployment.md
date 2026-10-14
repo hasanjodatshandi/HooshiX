@@ -72,6 +72,13 @@ Controller/cainjector remain Ambient. No ACME/ClusterIssuer/application TLS,
 existing Root/CA mutation or certificate key is part of that public plan.
 Native issuance/admission and target installation require separate executed evidence.
 
+ADR-0002's CNPG exception keeps `cnpg-controller-manager` inside Ambient with
+workload-default STRICT, permitting non-mesh API callers only on port 9443 with
+verified application HTTPS/Fail and API-source NetworkPolicy/authorization.
+`render_cnpg_control_plane.py` and its supervised bundle install only the signed,
+namespace-scoped controller. `platform-data` remains default-deny and Pod admission
+closed until separate complete data commissioning; no database/PVC is created.
+
 ### Narrow network-node exception
 
 For HooshiX Stage 10, the security-owner explicitly approved this scope on 2026-10-05;

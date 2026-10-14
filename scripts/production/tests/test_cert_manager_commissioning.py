@@ -300,6 +300,24 @@ class CertManagerCommissioningTest(unittest.TestCase):
                 wrong['cert_manager_commissioning'][name] = 'Not verified'
                 with self.assertRaises(ValueError): bundle.check_staging(record, wrong, revision,
                     mesh_security_upgrade=True, eso_commissioning=True, cert_manager_commissioning=True)
+            from verify_published_postgresql import candidate as postgres
+            receipt['scope'] = 'Disposable Calico/Ambient initialized-store CNPG control plane'
+            checks = ('cnpg_control_plane', 'api_callback_tls', 'callback_configuration',
+                'ambient_callback_port_scope', 'idempotent_reconciliation', 'data_namespace_closed',
+                'source_identity_positive_negative', 'wrong_source_webhook_network', 'rbac_namespace_negative',
+                'non_callback_strict_mtls', 'container_key_log_markers')
+            receipt['cnpg_control_plane'] = {**dict.fromkeys(checks, 'Passed'),
+                'images': {'operator': postgres()['publication']['images']['operator']},
+                'root_mesh_openbao_eso_cert_manager_storage': 'Preserved', 'database': 'Not run',
+                'barman_runtime': 'Not run', 'public_access': 'CLOSED'}
+            bundle.check_staging(record, receipt, revision, mesh_security_upgrade=True,
+                eso_commissioning=True, cert_manager_commissioning=True, cnpg_control_plane=True)
+            for name in checks:
+                wrong = copy.deepcopy(receipt)
+                wrong['cnpg_control_plane'][name] = 'Not verified'
+                with self.assertRaises(ValueError): bundle.check_staging(record, wrong, revision,
+                    mesh_security_upgrade=True, eso_commissioning=True, cert_manager_commissioning=True,
+                    cnpg_control_plane=True)
 
 
 if __name__ == '__main__':

@@ -1025,8 +1025,8 @@ security-owner انتشار `Public` یا `Private` را فقط برای سه م
 این مجوز فقط visibility تصاویر متن‌باز زیرساخت است؛ شامل acmesolver، startup
 job، package دیگر، تصاویر محصول، اسرار یا بازکردن سرویس نیست. اسکن کامل تازه،
 امضا، provenance، signed SBOM و گیت‌های پذیرش و نصب همچنان الزامی‌اند.
-نصب cert-manager روی VPS هنوز **Not run** است. این بخش فقط candidate انتشار
-می‌سازد، نه نصب TLS، تأیید staging یا readiness تولید.
+این بخش فقط candidate انتشار می‌سازد، نه نصب TLS یا readiness تولید؛ نتیجهٔ
+نصب اجراشدهٔ VPS در بخش commissioning پایین ثبت شده است.
 
 انتشار محافظت‌شدهٔ کل سه تصویر در run `38409447796`، attempt `1`، از
 `main@c5dd3c0012139e7969606bc074f207adebd65d26` با **Passed** ثبت شده است.
@@ -1147,8 +1147,8 @@ configهای دیگر و تغییر همین configها توسط controller/webh
 cert-manager می‌تواند خارج از Ambient باشد؛ controller و cainjector داخل
 Ambient می‌مانند. callback باید HTTPS معتبر، `failurePolicy=Fail` و ingress
 محدود به IPهای دقیق کشف‌شدهٔ API سرور داشته باشد. این تأیید، شاهد اجرای نصب
-نیست: renderer و ابزار نصب آماده‌اند؛ آزمون native به receipt تازه و موفق
-نیاز دارد و نصب VPS هنوز **Not run** است.
+نیست: نصب هر سرور به receipt تازه و موفق native و نتیجهٔ مستقل همان مقصد
+نیاز دارد؛ رسید اجراشدهٔ این VPS در انتهای همین بخش ثبت شده است.
 Root/CA موجود، OpenBao، ESO و storage نباید در این عملیات تغییر کنند.
 
 `render_cert_manager_candidate.py` فقط manifest رسمی hash-bound نسخهٔ `1.20.3`
@@ -1225,6 +1225,100 @@ Namespace محدود، hardening، امضا/attestation و default-deny پیش �
 خودکار یا ساخت مجدد کلید انجام نمی‌شود. رسید بدون نتیجه یا نصب جزئی را Passed
 فرض نکنید. TLS و تغییر namespace در سرور دوم باید دوباره با مقصد همان سرور
 آزموده شوند؛ رسید VPS اول مجوز استفادهٔ کورکورانه روی سرور دیگر نیست.
+
+#### نتیجهٔ نصب فعلی
+
+نصب owner-local روی VPS در ۲۰۲۶-۱۰-۱۴ با `CERT_MANAGER_INSTALLATION=Passed`
+ثبت شد. رسید عمومی `hooshix-cert-manager-d938a90a2e0742418392e05a79b7040b.json`
+در همان پوشهٔ Downloads بسته باقی می‌ماند؛ SHA-256 آن:
+`ac1bebc8be527d9f6f4695f49714ac4e645f6f7aa3e0b95f8c77b2a0c3b3fee7`.
+این رسید به plan با hash
+`8d45e8d84cfa976b44d3d3bf31594c8872517503cd85da05c133d372343236d1`
+و سه digest دقیق بستهٔ `main@f43b46dc3020dc291e274a878e4fe915a7bc5881`
+متصل است. HTTPS callback، رد Issuer خارجی و پیکربندی callback، **Passed**؛
+Root/mesh/OpenBao/ESO/storage، **Preserved**؛ دسترسی عمومی، **CLOSED** است.
+آزمون native همان tree در run `38511372244` شامل صدور/تعویض گواهی، hostname
+غلط، RBAC، شبکه و source/signature/SBOM **Passed** است. این با صدور گواهی
+کاربردی روی VPS فرق دارد: `certificate_issuance` مقصد، Barman/PITR و readiness
+کل تولید همچنان **Not verified** هستند. نصب cert-manager را دوباره اجرا نکنید؛
+قدم بعدی آماده‌سازی CNPG/PostgreSQL/Barman طبق پیش‌نیازهای زیر است.
+
+### مرز کنترل‌پلین CNPG پیش از ساخت دیتابیس
+
+مالک فقط برای وب‌هوک `cnpg-system/cnpg-controller-manager` در ۲۰۲۶-۱۰-۱۴
+استثنای پورت داخلی `9443` را تأیید کرده است: Pod داخل Ambient می‌ماند و حالت
+پیش‌فرض STRICT است؛ فقط mesh-mTLS همین پورت می‌تواند PERMISSIVE باشد تا API
+سرورِ خارج مش وصل شود. HTTPS با گواهی/hostname معتبر، `failurePolicy=Fail` و
+NetworkPolicy فقط از IPهای دقیق کشف‌شدهٔ API الزامی‌اند. پورت عمومی، خروج
+کل Pod از Ambient، DISABLE یا تغییر حالت پورت‌های دیگر مجاز نیست.
+این تأیید هنوز شاهد نصب یا آزمون نیست؛ بستهٔ مقصد فقط پس از آزمون native
+HTTPS، منبع نامجاز، RBAC، مش، امضا/source/SBOM و حفظ اجزای قبلی صادر می‌شود.
+نصب controller به‌تنهایی نصب PostgreSQL/Barman یا تخصیص فضای داده نیست.
+
+ابزار `render_cnpg_control_plane.py` فقط manifest رسمی hash-bound CNPG `1.30.1`
+و همان تصویر منتشرشدهٔ امضاشده را مصرف می‌کند؛ نسخه یا تصویر تازه نمی‌سازد.
+`WATCH_NAMESPACE=platform-data` و Role داده در همان namespace است؛ دسترسی
+Secretهای برنامه، Root یا namespaceهای دیگر داده نمی‌شود. خود controller، CA
+مستقل وب‌هوکش را در namespace کنترل‌پلین تولید می‌کند؛ مجوز CREATE Secret در
+RBAC محدودیت نام ندارد، اما خواندن/ویرایش Secret موجود به `cnpg-ca-secret`،
+`cnpg-webhook-cert` و نام configuration خودش محدود است. دسترسی read-only به
+Deployment/Service/EndpointSlice همان namespace فقط برای مالکیت CA و کشف plugin است.
+فقط دو تنظیم وب‌هوک CNPG قابل patch هستند. این کنترل‌پلین مورداعتماد است، نه
+حساب runtime برنامه. پیش از هر write، state خارجی یا تغییرکرده متوقف می‌شود؛
+اجرای مجدد state خود ابزار را نگه می‌دارد و هیچ حذف/rollback خودکاری ندارد.
+drift اضافی selector/پورت شبکه، mesh، شرط‌های حذف admission یا privilege حتی با
+label مالکیت صحیح پذیرفته نمی‌شود؛ Pod زنده هم با plan محدود تطبیق داده می‌شود.
+CA/Secret وب‌هوکِ ازقبل‌موجود فقط با ownerReference همان Deployment خود ابزار
+پذیرفته می‌شود؛ این بررسی metadata-only است و کلید موجود خوانده یا adopt نمی‌شود.
+
+namespace خالی `platform-data` با restricted/Ambient، NetworkPolicy پیش‌فرض بسته
+و policy رد همهٔ Podها آماده می‌شود. ImageCatalog فقط metadata عمومی digest
+پیشنهادی PostgreSQL است. هیچ Cluster، DB، PVC، credential یا اتصال عمومی ساخته
+نمی‌شود؛ policy بستهٔ داده تا commissioning کامل storage/secret/data حذف نمی‌شود.
+
+تولید plan عمومی، بدون اجرای مقصد:
+
+```bash
+python3 scripts/production/render_cnpg_control_plane.py \
+  --manifest <verified-cnpg-1.30.1.yaml> \
+  --cert-manager-manifest <verified-cert-manager-1.20.3.yaml> \
+  --api-address <exact-api-ip>
+```
+
+برای ساخت رسید تازه، workflow همین گام را روی `main` بررسی‌شده اجرا کنید؛
+دستور فقط CI دورریختنی است و به VPS وصل نمی‌شود:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main \
+  -f mesh_security_upgrade=true -f eso_commissioning=true \
+  -f cert_manager_commissioning=true -f cnpg_control_plane=true
+```
+
+بعد از موفقیت native CI همان tree و merge، از `main` تمیز بستهٔ خارج Git بسازید:
+
+```bash
+python3 scripts/production/build_cnpg_control_plane_bundle.py \
+  --staging-run <successful-cnpg-platform-run> \
+  --manifest <verified-cnpg-1.30.1.yaml> \
+  --cert-manager-manifest <verified-cert-manager-1.20.3.yaml> \
+  --evidence-dir <verified-postgresql-publication-directory> \
+  --output <new-public-bundle-outside-git>
+```
+
+این قالب تا وجود رسید موفق قابل استفادهٔ نصب نیست. builder امضا/attestation و
+مجموعهٔ کامل تصاویر را مستقل می‌سنجد. wrapper بسته را نخست با `-ValidateOnly`
+اعتبارسنجی کنید؛ با VNC نجات و نشست دوم SSH باز، نصب owner-local چنین است:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-cnpg-control-plane.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo همان‌جا لازم است. رسید موفق `CNPG_CONTROL_PLANE=Passed` شامل
+HTTPS callback، پیکربندی پورت و حفظ mesh/OpenBao/ESO/cert-manager/storage است؛
+`database=Not run`، `barman_runtime=Not run` و `public_access=CLOSED` می‌مانند.
+صدور بسته/اجرای VPS هنوز **Not run** است تا رسید همان عملیات ثبت شود.
+بعد از افزودن controller، بستهٔ قدیمی cert-manager را دوباره اجرا نکنید؛ آن
+بسته عمداً namespace دارای workload جدید را به‌عنوان scope قدیمی نمی‌پذیرد.
 
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 

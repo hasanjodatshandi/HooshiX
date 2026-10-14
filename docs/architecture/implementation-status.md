@@ -138,18 +138,37 @@ exception. A supervised installer preserves mesh/OpenBao/ESO/storage, validates
 protected audit/secrets encryption and tests verified API callbacks without
 creating a public TLS route. The disposable staging extension requires native
 issuance/rotation/hostname, RBAC/issuer/source/signer/SBOM negatives and idempotent
-reconciliation before the exact-main public bundle may be built. Native staging,
-bundle construction require fresh successful executed receipts; target
-installation remains `Not run`. Barman runtime/PITR and Production readiness remain
+reconciliation before the exact-main public bundle may be built. Native staging
+run `38511372244` passed for the tree merged as
+`f43b46dc3020dc291e274a878e4fe915a7bc5881`; both merged-main baseline and web E2E
+passed. The exact-main public bundle passed independent published-image acceptance
+and Windows validation. The owner's 2026-10-14 VPS execution reports
+`CERT_MANAGER_INSTALLATION=Passed`, verified HTTPS/external-issuer denial and
+preserved existing components, with public access CLOSED. Public target receipt
+`hooshix-cert-manager-d938a90a2e0742418392e05a79b7040b.json` has SHA256
+`ac1bebc8be527d9f6f4695f49714ac4e645f6f7aa3e0b95f8c77b2a0c3b3fee7`
+and matches the bundle's exact image set and plan hash. Target application
+certificate issuance, Barman runtime/PITR and Production readiness remain
 `Not verified`; the provider deferral is not a passing gate.
 
 The owner accepted standard cert-manager cainjector trust on 2026-10-14:
 exact-name RBAC bounds writes to the two `cert-manager-webhook` configurations,
 not their fields. Kubernetes 1.35.6 exempts their changes from API-based admission
 webhooks; compromised-injector field immutability is not claimed. Commissioning
-checks the HTTPS/Fail callback configuration and real RBAC negatives. Fresh native
-evidence is still required before bundle construction; target installation and
-Production readiness remain `Not verified`.
+checks the HTTPS/Fail callback configuration and real RBAC negatives; their native
+gate passed in that run. This does not claim continuous field-immutability or
+overall Production readiness.
+
+The next CNPG controller bootstrap pins the existing published 1.30.1 operator,
+retains Ambient/default STRICT with the owner-approved API-only 9443 exception,
+and limits mutable data RBAC/watch scope to `platform-data`. Its empty data
+namespace is default-deny and Pod admission closed; an image catalog is public
+candidate metadata, not a database deployment. Renderer, supervised installer,
+native CI extension and exact-main public bundle require the full prior platform
+gate plus callback/source/RBAC/network/non-callback-mTLS/idempotence evidence.
+No database instance, data allocation, Barman runtime or credential delivery is
+performed here. Target controller deployment remains `Not run` pending successful
+native evidence and owner-local execution.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
