@@ -527,6 +527,7 @@ scripts/production/bootstrap_intermediate_csr.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
 scripts/production/build_cert_manager_candidates.py
+scripts/production/build_cert_manager_commissioning_bundle.py
 scripts/production/build_eso_commissioning_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
@@ -538,6 +539,7 @@ scripts/production/commission_platform.py
 scripts/production/import_intermediate_ca.py
 scripts/production/inspect_host.py
 scripts/production/install_audit_prerequisite.py
+scripts/production/install_cert_manager.py
 scripts/production/install_eso.py
 scripts/production/install_release_tools.sh
 scripts/production/jit_broker.py
@@ -568,6 +570,7 @@ scripts/production/publish_openbao_candidate.py
 scripts/production/publish_postgresql_candidates.py
 scripts/production/readiness.py
 scripts/production/recover_openbao_initialization.py
+scripts/production/rehearse_cert_manager.py
 scripts/production/rehearse_eso_commissioning.py
 scripts/production/rehearse_eso_delivery.py
 scripts/production/rehearse_import_referrers.py
@@ -576,6 +579,7 @@ scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
 scripts/production/rehearse_platform_admission.py
 scripts/production/release_supply_chain.sh
+scripts/production/render_cert_manager_candidate.py
 scripts/production/render_eso_candidate.py
 scripts/production/render_eso_commissioning.py
 scripts/production/render_gitops.py
@@ -589,6 +593,7 @@ scripts/production/repair_import_referrers.py
 scripts/production/restore_openbao_isolated.py
 scripts/production/rollback_human_sshd_candidate.sh
 scripts/production/run-audit-prerequisite.ps1
+scripts/production/run-cert-manager-commissioning.ps1
 scripts/production/run-eso-commissioning.ps1
 scripts/production/run-guard-maintenance.ps1
 scripts/production/run-host-inspection.ps1
@@ -600,6 +605,7 @@ scripts/production/run-platform-commissioning.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_postgresql_isolation_native.py
 scripts/production/tests/test_cert_manager_candidates.py
+scripts/production/tests/test_cert_manager_commissioning.py
 scripts/production/tests/test_eso_artifact.py
 scripts/production/tests/test_eso_commissioning.py
 scripts/production/tests/test_eso_delivery.py

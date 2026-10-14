@@ -336,6 +336,10 @@ class PlatformCommissioningTest(unittest.TestCase):
                 patch.object(host, 'kube') as kube:
             host.refresh_image_verifiers(images)
         self.assertEqual(4, len(kube.call_args_list))
+        responses = iter([json.dumps(d).encode() for d in deployments for _ in range(2)])
+        client = Mock(side_effect=lambda *args, **kw: next(responses) if 'get' in args else b'')
+        host.refresh_image_verifiers(images, kube_client=client)
+        self.assertEqual(8, client.call_count)
         for index, component in enumerate(images):
             name = 'deployment/kyverno-' + component + '-controller'
             self.assertEqual(('-n', 'kyverno', 'rollout', 'restart', name), kube.call_args_list[2 * index].args)

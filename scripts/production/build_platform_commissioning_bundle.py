@@ -41,7 +41,8 @@ def git(*args):
     return result.stdout.decode().strip()
 
 
-def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso_commissioning=False):
+def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso_commissioning=False,
+                  cert_manager_commissioning=False):
     checks = CHECKS
     scope = 'Disposable Calico/Ambient/Kyverno signed platform staging'
     if mesh_security_upgrade:
@@ -66,6 +67,20 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
                 or any(delivery.get(key) != 'Passed' for key in ('six_identity_delivery_rotation',
                     'cross_service_denial', 'owned_secret_cleanup', 'container_log_privacy'))):
             raise ValueError('exact signed Ambient ESO installation and native delivery required')
+    if cert_manager_commissioning:
+        from verify_published_cert_manager import candidate
+        scope = 'Disposable Calico/Ambient initialized-store internal cert-manager commissioning'
+        certificates = receipt.get('cert_manager_commissioning', {})
+        if (not eso_commissioning or certificates.get('images') != candidate()['publication']['images']
+                or certificates.get('root_mesh_openbao_eso_storage') != 'Preserved'
+                or certificates.get('callback_trust_boundary') != 'owner-accepted-exact-name-rbac'
+                or any(certificates.get(key) != 'Passed' for key in ('cert_manager_installation',
+                    'api_callback_tls', 'external_issuer_denied', 'idempotent_reconciliation',
+                    'source_identity_positive_negative', 'rbac_issuer_scope_negative',
+                    'certificate_issuance', 'certificate_rotation_hostname_negative',
+                    'wrong_source_webhook_network', 'container_key_log_markers',
+                    'callback_configuration', 'callback_rbac_boundary'))):
+            raise ValueError('exact internal TLS, restricted authority and signed certificate images required')
     if (record.get('path') != WORKFLOW or record.get('status') != 'completed'
             or record.get('conclusion') != 'success'
             or record.get('repository', {}).get('full_name') != publication.REPOSITORY
@@ -86,7 +101,8 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
         raise ValueError('fresh staging required')
 
 
-def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, eso_commissioning=False):
+def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, eso_commissioning=False,
+                   cert_manager_commissioning=False):
     if not re.fullmatch(r'[1-9][0-9]{0,19}', run_id):
         raise ValueError('numeric staging run required')
     record = json.loads(publication.run(['api', 'repos/' + publication.REPOSITORY + '/actions/runs/' + run_id]))
@@ -104,7 +120,7 @@ def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, 
         raise ValueError('bounded public staging receipt required')
     receipt = json.loads(files[0].read_bytes())
     check_staging(record, receipt, revision, mesh_security_upgrade=mesh_security_upgrade,
-                  eso_commissioning=eso_commissioning)
+                  eso_commissioning=eso_commissioning, cert_manager_commissioning=cert_manager_commissioning)
     return receipt
 
 

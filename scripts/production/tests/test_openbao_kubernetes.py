@@ -59,12 +59,13 @@ class OpenBaoKubernetesTest(unittest.TestCase):
                 rehearsal.run(["kubectl"])
 
     def test_post_secret_failure_logs_only_fixed_classification(self):
-        result = Mock(returncode=1, stdout=b'', stderr=b'Forbidden private-token ::error::')
+        result = Mock(returncode=1, stdout=b'', stderr=b'Forbidden service "cert-manager-webhook" not found private-token ::error::')
         output = io.StringIO()
         with patch.object(subprocess, 'run', return_value=result), contextlib.redirect_stdout(output):
             with self.assertRaises(rehearsal.RehearsalFailed):
                 rehearsal.run(['kubectl'])
         self.assertIn('Forbidden', output.getvalue())
+        self.assertIn('cert-manager-webhook', output.getvalue())
         self.assertNotIn('private-token', output.getvalue())
         self.assertNotIn('::error::', output.getvalue())
 

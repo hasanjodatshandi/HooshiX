@@ -30,7 +30,8 @@ from render_openbao_local_storage import candidate as local_storage_candidate
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
-                   "signed-ambient-eso-commissioning", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning",
+                   "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -63,7 +64,12 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 'timed out', 'failed to evaluate', 'signature', 'provenance', 'SBOM',
                 'platform source build identity rejected',
                 'platform bootstrap identity/security exception rejected',
-                'no such overload', 'no such key', 'context deadline exceeded')
+                'no such overload', 'no such key', 'context deadline exceeded',
+                'service "cert-manager-webhook" not found',
+                'secrets "cert-manager-webhook-ca" not found',
+                'the server could not find the requested resource',
+                'resource issuers not found in group cert-manager.io/v1',
+                'no endpoints available for service', 'certificate signed by unknown authority')
                 if marker.encode() in (result.stderr or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
             print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
@@ -120,8 +126,15 @@ def ca_import_fixture(k):
 
 
 def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
-             eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False) -> None:
+             eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False,
+             cert_manager_manifest: Path | None = None) -> None:
     runner_paths(tools, receipt)
+    if cert_manager_manifest is not None:
+        runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
+        if (platform_directory is None or eso_chart is None or not mesh_security_upgrade
+                or cert_manager_manifest.is_symlink()
+                or not cert_manager_manifest.resolve(strict=True).is_relative_to(runtime)):
+            raise RehearsalFailed('cert-manager requires the owned Calico/Ambient/ESO fixture')
     if eso_chart is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
         if (eso_chart.is_symlink()
@@ -404,6 +417,10 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     from rehearse_eso_commissioning import rehearse as commissioning
                     eso_result = commissioning(k, wait, run, eso_chart, str(tools / 'helm'),
                         api, token, cert.read_text(), audiences, addresses)
+                if cert_manager_manifest is not None:
+                    step('signed-ambient-cert-manager-commissioning')
+                    from rehearse_cert_manager import rehearse as certificates
+                    cert_manager_result = certificates(k, wait, run, cert_manager_manifest, platform)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -472,6 +489,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         if eso_chart is not None:
             result['scope'] = 'Disposable Calico/Ambient initialized-store ESO commissioning'
             result['eso_commissioning'] = eso_result
+        if cert_manager_manifest is not None:
+            result['scope'] = 'Disposable Calico/Ambient initialized-store internal cert-manager commissioning'
+            result['cert_manager_commissioning'] = cert_manager_result
     else:
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
         if eso_chart is not None:
@@ -491,10 +511,11 @@ def main() -> int:
     parser.add_argument("--platform-publications", type=Path)
     parser.add_argument('--mesh-security-upgrade', action='store_true')
     parser.add_argument("--eso-chart", type=Path)
+    parser.add_argument('--cert-manager-manifest', type=Path)
     args = parser.parse_args()
     try:
         rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart,
-                 mesh_security_upgrade=args.mesh_security_upgrade)
+                 mesh_security_upgrade=args.mesh_security_upgrade, cert_manager_manifest=args.cert_manager_manifest)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):

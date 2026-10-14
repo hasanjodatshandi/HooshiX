@@ -1124,6 +1124,108 @@ admission و staging را ثابت نمی‌کند. خطای جزئی receipt م
 
 مرجع وابستگی: [نصب Barman 0.15.1](https://cloudnative-pg.io/plugin-barman-cloud/docs/installation/).
 
+#### محدودهٔ commissioning گواهی داخلی دیتابیس
+
+**مرز اعتماد تأییدشدهٔ مالک در ۲۰۲۶-۱۰-۱۴:** Kubernetes `1.35.6` درخواست تغییر
+`MutatingWebhookConfiguration` و `ValidatingWebhookConfiguration` را از
+admission webhookها معاف می‌کند. بنابراین policy وب‌هوکی Kyverno نمی‌تواند
+تغییر `failurePolicy` این منابع را متوقف کند. محدودکردن RBAC cainjector به
+دو config، دسترسی به configهای دیگر را می‌بندد، اما محدودیت فیلدی داخل همان
+دو config ایجاد نمی‌کند. مالک این مرز اعتماد نصب استاندارد را پذیرفته است؛
+در صورت نفوذ به cainjector، تغییر failurePolicy/service/rules همان دو config
+ممکن است. ابزار در نصب و اجرای مجدد، پیکربندی HTTPS/Fail را بررسی می‌کند؛
+این بررسی محافظت پیوسته در برابر نفوذ نیست. آزمون واقعی RBAC باید تغییر
+configهای دیگر و تغییر همین configها توسط controller/webhook را رد کند.
+برای نام دیگر، `kubectl auth can-i` با هویت cainjector باید `no` برگرداند؛
+برای config موجود، PATCH آزمایشی با هویت controller/webhook باید Forbidden شود.
+بستهٔ هدف همچنان به receipt تازه و موفق تمام آزمون‌های native وابسته است.
+مرجع: [رفتار API سرور نسخهٔ دقیق](https://github.com/kubernetes/kubernetes/blob/v1.35.6/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go).
+
+ابزار cert-manager فقط برای TLS داخلی control plane دیتابیس در
+`cnpg-system` آماده می‌شود؛ صدور TLS عمومی `hooshix.com`، ACME، ClusterIssuer
+و گواهی برنامه‌ها خارج از این محدوده‌اند. با تأیید مالک، فقط Pod وب‌هوک
+cert-manager می‌تواند خارج از Ambient باشد؛ controller و cainjector داخل
+Ambient می‌مانند. callback باید HTTPS معتبر، `failurePolicy=Fail` و ingress
+محدود به IPهای دقیق کشف‌شدهٔ API سرور داشته باشد. این تأیید، شاهد اجرای نصب
+نیست: renderer و ابزار نصب آماده‌اند؛ آزمون native به receipt تازه و موفق
+نیاز دارد و نصب VPS هنوز **Not run** است.
+Root/CA موجود، OpenBao، ESO و storage نباید در این عملیات تغییر کنند.
+
+`render_cert_manager_candidate.py` فقط manifest رسمی hash-bound نسخهٔ `1.20.3`
+و سه digest منتشرشده را مصرف می‌کند. سه CRD namespaced مربوط به Certificate،
+CertificateRequest و Issuer آماده می‌شوند؛ ClusterIssuer و ACME/solver فعال
+نمی‌شوند. Roleهای certificate در `cnpg-system` باقی می‌مانند. cainjector فقط
+metadata وب‌هوک‌ها را در سطح کلاستر می‌خواند و فقط تنظیمات `cert-manager-webhook`
+را می‌تواند تغییر دهد؛ گسترش به وب‌هوک Barman بعداً به نام‌های دقیق محدود می‌شود.
+این CA داخلی وب‌هوک، Root پروژه یا intermediate مش نیست.
+
+تأیید CertificateRequest طبق API رسمی از طریق منبع مجازی `signers` در سطح
+کلاستر بررسی می‌شود. فقط حساب controller مجوز `approve` برای دو Issuer دقیق
+`cnpg-system/hooshix-database-selfsigned` و `cnpg-system/hooshix-database-ca` دارد؛
+این ClusterRole دسترسی به Secret یا Issuerهای namespace دیگر نمی‌دهد.
+callback معتبر و fail-closed شامل `certificaterequests/status` هم هست تا
+تغییر وضعیت Approved/Denied از بررسی مجوز عبور کند. Issuerهای پایدار و
+گواهی‌های Barman در مرحلهٔ نصب دیتابیس ساخته خواهند شد، نه این نصب ابزار.
+namespaceSelector داخل callback فقط `cnpg-system` است. پیکربندی مطلوب service،
+rules، selector و Fail در commissioning بررسی می‌شود؛ این محدودیت فیلدی RBAC
+یا policy محافظ تغییر webhook configuration نیست.
+
+فقط یک Secret **خالی** و دارای مالکیت مشخص برای مقصد CA وب‌هوک ساخته می‌شود؛
+هیچ کلید یا رمز در plan نیست. وب‌هوک خودش کلید را داخل Kubernetes تولید/تعویض
+می‌کند و فقط مجوز update/read/watch همان نام را دارد، نه create Secret.
+installer در اجرای مجدد فقط metadata مالکیت را می‌خواند و دادهٔ خصوصی موجود
+را بازنویسی نمی‌کند. دسترسی گزارش‌گیری Kyverno فقط read-only برای Issuerها
+است؛ دسترسی به Secretهای کلاستر اضافه نمی‌شود.
+
+پس از ثبت CRDهای جدید، دو controller موجود admission/reports در Kyverno با
+همان digestهای pin‌شده rollout محدود می‌شوند تا کش discovery نوع‌های جدید را
+ببیند. UID و Pod spec باید ثابت بمانند؛ policyها حذف یا fail-open نمی‌شوند.
+اجرای مجدد با CRDهای موجود این refresh را تکرار نمی‌کند.
+
+بعد از **Passed** شدن آزمون native کل بسته روی commit نهایی `main`، بستهٔ عمومی
+خارج از Git ساخته می‌شود. دستور زیر فقط قالب راهنماست؛ شناسهٔ run را از اجرای
+موفق همان tree دریافت کنید و تا قبل از وجود آن اجرا نکنید:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main -f mesh_security_upgrade=true \
+  -f eso_commissioning=true -f cert_manager_commissioning=true
+# Wait for the exact reviewed main's successful native receipt before building.
+python3 scripts/production/build_cert_manager_commissioning_bundle.py \
+  --staging-run <successful-platform-staging-run-id> \
+  --manifest <verified-official-cert-manager.yaml> \
+  --evidence-dir <verified-public-cert-manager-publication-directory> \
+  --output <new-outside-git-public-bundle-directory>
+```
+
+builder به `main` تمیز، Git tree یکسان با CI، رسید تازهٔ حداکثر پنج‌روزه،
+امضای واقعی سه digest، provenance/SBOM، callback HTTPS، آزمون signer/source غلط،
+صدور/تعویض گواهی و hostname غلط، رد issuer خارجی و دسترسی namespace دیگر نیاز دارد.
+نبودن شواهد مجوز تولید بسته نیست. کلیدهای آزمون فقط در کلاستر دورریختنی CI ساخته
+می‌شوند؛ Root واقعی یا private keyها وارد CI نمی‌شوند. آزمون گواهی داخلی، اجرای
+واقعی Barman یا backup پارس‌پک را Passed نمی‌کند.
+
+بستهٔ معتبر را در Downloads ویندوز نگه دارید. ابتدا wrapper همان بسته را با
+`-ValidateOnly` اجرا کنید. برای نصب، VNC نجات و نشست دوم SSH باز بمانند، سپس:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-cert-manager-commissioning.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo را در پنجرهٔ محلی وارد کنید؛ PAT، رمز Root یا custody لازم نیست.
+ابزار hash فایل‌ها، audit محافظت‌شده و Metadata-only API audit، encryption
+اسرار K3s، مالکیت/عدم drift مقصد و حالت OpenBao/mesh/ESO را بررسی می‌کند.
+IPهای API روی خود مقصد کشف می‌شوند؛ address placeholder داخل plan مجوز شبکه نیست.
+Namespace محدود، hardening، امضا/attestation و default-deny پیش از Podها اعمال
+می‌شوند. هیچ public route، دسترسی دائم جدید، تغییر SSH/ایمیل یا allocation دیتابیس
+ایجاد نمی‌شود. رسید عمومی موفق باید `CERT_MANAGER_INSTALLATION=Passed`،
+`api_callback_tls=Passed`، `external_issuer_denied=Passed` و حفظ اجزای قبلی را
+ثبت کند؛ این هنوز مجوز ترافیک محصول نیست.
+
+در خطای جزئی، state و فایل عمومی حفظ می‌شوند؛ retry، حذف CRD/Secret، rollback
+خودکار یا ساخت مجدد کلید انجام نمی‌شود. رسید بدون نتیجه یا نصب جزئی را Passed
+فرض نکنید. TLS و تغییر namespace در سرور دوم باید دوباره با مقصد همان سرور
+آزموده شوند؛ رسید VPS اول مجوز استفادهٔ کورکورانه روی سرور دیگر نیست.
+
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 
 برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell

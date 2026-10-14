@@ -104,10 +104,21 @@ Production workloads use dedicated ServiceAccounts, Istio Ambient STRICT mTLS, C
 
 Default ServiceAccount is prohibited for application workloads. Single-server cannot disable Ambient/NetworkPolicy to save capacity.
 
-ADR-0002 authorizes only the ESO admission webhook Pod to opt out of Ambient for
+ADR-0002 authorizes only the ESO and internal cert-manager admission webhook Pods to opt out of Ambient for
 verified API-server HTTPS callbacks with exact API-only NetworkPolicy ingress.
 ESO controller/cert-controller and OpenBao retain Ambient STRICT and exact identity
 authorization. This is not an application, namespace-wide or public-route exception.
+The cert-manager controller/cainjector remain Ambient; initial certificate authority
+is namespace-bound to `cnpg-system` internal CA/self-signed issuers with no ACME,
+ClusterIssuer, application secret access or existing Root/mesh CA replacement.
+Serving-CA writes and cainjector updates retain exact resource-name boundaries.
+The owner accepted the ADR-0002 standard cainjector trust boundary: those two
+webhook configurations are not field-immutable against injector compromise.
+Commissioning/reentry checks HTTPS/Fail configuration and native RBAC denial for
+other names and other component accounts; this is not continuous tamper protection.
+Virtual signer approval is cluster-scoped only for the two ADR-0002
+`cnpg-system` issuer names; no wildcard or foreign namespace is authorized, and
+the HTTPS callback validates CertificateRequest status/approval transitions.
 
 ## 8. Public edge/client-address trust
 
