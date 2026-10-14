@@ -143,6 +143,14 @@ bundle construction require fresh successful executed receipts; target
 installation remains `Not run`. Barman runtime/PITR and Production readiness remain
 `Not verified`; the provider deferral is not a passing gate.
 
+The cert-manager commissioning PR is not target-usable: Kubernetes 1.35.6
+exempts webhook configuration changes from API-based admission webhooks, so
+the proposed Kyverno callback-immutability control cannot enforce its negative
+test. Exact-name cainjector RBAC does not constrain fields within those names.
+An owner-reviewed replacement control or explicit acceptance of that standard
+cert-manager trust boundary is required before merge/bundle/target installation;
+callback protection and Production readiness remain `Not verified`.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical

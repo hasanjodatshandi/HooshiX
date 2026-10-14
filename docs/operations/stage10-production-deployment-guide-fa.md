@@ -1126,6 +1126,17 @@ admission و staging را ثابت نمی‌کند. خطای جزئی receipt م
 
 #### محدودهٔ commissioning گواهی داخلی دیتابیس
 
+**مانع فعلی قبل از نصب هدف:** Kubernetes `1.35.6` درخواست تغییر
+`MutatingWebhookConfiguration` و `ValidatingWebhookConfiguration` را از
+admission webhookها معاف می‌کند. بنابراین policy وب‌هوکی Kyverno نمی‌تواند
+تغییر `failurePolicy` این منابع را متوقف کند. محدودکردن RBAC cainjector به
+دو config، دسترسی به configهای دیگر را می‌بندد، اما محدودیت فیلدی داخل همان
+دو config ایجاد نمی‌کند. تا انتخاب و مرور کنترل جایگزین یا پذیرش صریح این
+محدودیتِ نصب استاندارد، شرط محافظت callback **Not verified** است؛ بستهٔ نصب
+هدف صادر نمی‌شود و PR commissioning نباید merge شود. این محدودیت را با
+حذف آزمون منفی، Passed فرض‌کردن یا تغییر خودسرانهٔ نسخهٔ کلاستر دور نزنید.
+مرجع: [رفتار API سرور نسخهٔ دقیق](https://github.com/kubernetes/kubernetes/blob/v1.35.6/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go).
+
 ابزار cert-manager فقط برای TLS داخلی control plane دیتابیس در
 `cnpg-system` آماده می‌شود؛ صدور TLS عمومی `hooshix.com`، ACME، ClusterIssuer
 و گواهی برنامه‌ها خارج از این محدوده‌اند. با تأیید مالک، فقط Pod وب‌هوک
