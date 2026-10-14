@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import commission_platform as host
-from install_eso import addresses, desired_fields_match, established_crd, preserved, probe, require as eso_require
+from install_eso import addresses, desired_fields_match, established_crd, mismatched_path, preserved, probe, require as eso_require
 
 NAMESPACE = 'cnpg-system'
 MANAGER = 'hooshix-cert-manager-commissioning'
@@ -79,6 +79,10 @@ def execute(plan, *, kube=host.kube):
         key = (obj['kind'], obj['metadata']['name'])
         exists[key] = bool(old)
         if old:
+            if obj['kind'] != 'Secret' and not desired_fields_match(old, obj):
+                print('CERT_MANAGER_PUBLIC_DRIFT=' + json.dumps({
+                    'kind': obj['kind'], 'name': obj['metadata']['name'],
+                    'field': mismatched_path(old, obj)}), file=sys.stderr, flush=True)
             require(old['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == MANAGER
                     and (obj['kind'] == 'Secret' or desired_fields_match(old, obj)), 'CERT_MANAGER_OWNERSHIP_OR_DRIFT_CONFLICT')
             if obj['kind'] == 'Deployment':
