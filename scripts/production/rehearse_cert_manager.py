@@ -17,7 +17,7 @@ from rehearse_platform_admission import admission_result, apply, policy_ready
 from upgrade_mesh_security import replace_policy
 
 
-def network_negative(k, wait, platform):
+def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webhook', port=10250):
     name = 'cert-manager-wrong-source'
     boundary_name = 'hooshix-hooshix-secrets-bootstrap-boundary'
     previous = json.loads(k('get', 'validatingpolicy', boundary_name, '-o', 'json'))
@@ -29,10 +29,10 @@ def network_negative(k, wait, platform):
     pod['volumes'] = [{'name': 'tls', 'secret': {'secretName': 'openbao-server-tls',
         'defaultMode': 288, 'items': [{'key': 'ca.crt', 'path': 'ca.crt'}]}}]
     target = json.loads(k('-n', renderer.NAMESPACE, 'get', 'pods', '-l',
-        'app.kubernetes.io/name=webhook', '-o', 'json'))['items'][0]['status']['podIP']
+        selector, '-o', 'json'))['items'][0]['status']['podIP']
     container = pod['containers'][0]
     container.update(name='probe', command=['/usr/bin/bao', 'status', '-format=json',
-        '-address=https://' + target + ':10250', '-ca-cert=/openbao/tls/ca.crt'], args=[],
+        '-address=https://' + target + ':' + str(port), '-ca-cert=/openbao/tls/ca.crt'], args=[],
         volumeMounts=[{'name': 'tls', 'mountPath': '/openbao/tls', 'readOnly': True}])
     for field in ('startupProbe', 'readinessProbe', 'livenessProbe'): container.pop(field, None)
     bounded = admission.hardening('hooshix-secrets', {'openbao': platform.plan['openbao']['items'][-1]['spec']['template']['spec'],
@@ -41,7 +41,7 @@ def network_negative(k, wait, platform):
     egress = {'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy', 'metadata': {
         'name': name, 'namespace': 'hooshix-secrets'}, 'spec': {'podSelector': {
         'matchLabels': {'hooshix-cert-manager-probe': name}}, 'policyTypes': ['Egress'], 'egress': [{
-        'to': [{'ipBlock': {'cidr': target + '/32'}}], 'ports': [{'protocol': 'TCP', 'port': 10250}]}]}}
+        'to': [{'ipBlock': {'cidr': target + '/32'}}], 'ports': [{'protocol': 'TCP', 'port': port}]}]}}
     try:
         replace_policy(bounded, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
                        kube=k, previous=original)

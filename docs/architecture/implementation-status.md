@@ -159,6 +159,17 @@ checks the HTTPS/Fail callback configuration and real RBAC negatives; their nati
 gate passed in that run. This does not claim continuous field-immutability or
 overall Production readiness.
 
+The next CNPG controller bootstrap pins the existing published 1.30.1 operator,
+retains Ambient/default STRICT with the owner-approved API-only 9443 exception,
+and limits mutable data RBAC/watch scope to `platform-data`. Its empty data
+namespace is default-deny and Pod admission closed; an image catalog is public
+candidate metadata, not a database deployment. Renderer, supervised installer,
+native CI extension and exact-main public bundle require the full prior platform
+gate plus callback/source/RBAC/network/non-callback-mTLS/idempotence evidence.
+No database instance, data allocation, Barman runtime or credential delivery is
+performed here. Target controller deployment remains `Not run` pending successful
+native evidence and owner-local execution.
+
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
 final source-candidate SBOM and fresh Grype evidence, rejecting High/Critical

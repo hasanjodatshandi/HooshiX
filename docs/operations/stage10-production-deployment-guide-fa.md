@@ -1255,6 +1255,56 @@ NetworkPolicy فقط از IPهای دقیق کشف‌شدهٔ API الزامی�
 HTTPS، منبع نامجاز، RBAC، مش، امضا/source/SBOM و حفظ اجزای قبلی صادر می‌شود.
 نصب controller به‌تنهایی نصب PostgreSQL/Barman یا تخصیص فضای داده نیست.
 
+ابزار `render_cnpg_control_plane.py` فقط manifest رسمی hash-bound CNPG `1.30.1`
+و همان تصویر منتشرشدهٔ امضاشده را مصرف می‌کند؛ نسخه یا تصویر تازه نمی‌سازد.
+`WATCH_NAMESPACE=platform-data` و Role داده در همان namespace است؛ دسترسی
+Secretهای برنامه، Root یا namespaceهای دیگر داده نمی‌شود. خود controller، CA
+مستقل وب‌هوکش را در namespace کنترل‌پلین تولید می‌کند؛ مجوز CREATE Secret در
+RBAC محدودیت نام ندارد، اما خواندن/ویرایش Secret موجود به نام‌های خودش محدود است.
+فقط دو تنظیم وب‌هوک CNPG قابل patch هستند. این کنترل‌پلین مورداعتماد است، نه
+حساب runtime برنامه. پیش از هر write، state خارجی یا تغییرکرده متوقف می‌شود؛
+اجرای مجدد state خود ابزار را نگه می‌دارد و هیچ حذف/rollback خودکاری ندارد.
+
+namespace خالی `platform-data` با restricted/Ambient، NetworkPolicy پیش‌فرض بسته
+و policy رد همهٔ Podها آماده می‌شود. ImageCatalog فقط metadata عمومی digest
+پیشنهادی PostgreSQL است. هیچ Cluster، DB، PVC، credential یا اتصال عمومی ساخته
+نمی‌شود؛ policy بستهٔ داده تا commissioning کامل storage/secret/data حذف نمی‌شود.
+
+تولید plan عمومی، بدون اجرای مقصد:
+
+```bash
+python3 scripts/production/render_cnpg_control_plane.py \
+  --manifest <verified-cnpg-1.30.1.yaml> \
+  --cert-manager-manifest <verified-cert-manager-1.20.3.yaml> \
+  --api-address <exact-api-ip>
+```
+
+بعد از موفقیت native CI همان tree و merge، از `main` تمیز بستهٔ خارج Git بسازید:
+
+```bash
+python3 scripts/production/build_cnpg_control_plane_bundle.py \
+  --staging-run <successful-cnpg-platform-run> \
+  --manifest <verified-cnpg-1.30.1.yaml> \
+  --cert-manager-manifest <verified-cert-manager-1.20.3.yaml> \
+  --evidence-dir <verified-postgresql-publication-directory> \
+  --output <new-public-bundle-outside-git>
+```
+
+این قالب تا وجود رسید موفق قابل استفادهٔ نصب نیست. builder امضا/attestation و
+مجموعهٔ کامل تصاویر را مستقل می‌سنجد. wrapper بسته را نخست با `-ValidateOnly`
+اعتبارسنجی کنید؛ با VNC نجات و نشست دوم SSH باز، نصب owner-local چنین است:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-cnpg-control-plane.ps1' -RescueAndSecondSessionReady
+```
+
+فقط رمز sudo همان‌جا لازم است. رسید موفق `CNPG_CONTROL_PLANE=Passed` شامل
+HTTPS callback، پیکربندی پورت و حفظ mesh/OpenBao/ESO/cert-manager/storage است؛
+`database=Not run`، `barman_runtime=Not run` و `public_access=CLOSED` می‌مانند.
+صدور بسته/اجرای VPS هنوز **Not run** است تا رسید همان عملیات ثبت شود.
+بعد از افزودن controller، بستهٔ قدیمی cert-manager را دوباره اجرا نکنید؛ آن
+بسته عمداً namespace دارای workload جدید را به‌عنوان scope قدیمی نمی‌پذیرد.
+
 ### اطلاعات مقصد پیش از تخصیص storage دیتابیس
 
 برای انتخاب اندازهٔ فضای مستقل PostgreSQL، از دستگاه اپراتور در PowerShell
