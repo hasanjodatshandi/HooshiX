@@ -8,7 +8,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import provision_openbao_storage as original
@@ -67,6 +67,8 @@ class PostgresqlStorageTest(unittest.TestCase):
 
     def test_new_guard_and_owner_operation_preserve_existing_services(self):
         s = Mock()
+        s.MOUNT = MagicMock()
+        (s.MOUNT / 'data').iterdir.return_value = iter([])
         s.GUARD, s.GUARD_UNIT, s.K3S_DROPIN = [Mock() for _ in range(3)]
         for path in (s.GUARD, s.GUARD_UNIT, s.K3S_DROPIN):
             path.exists.return_value = path.is_symlink.return_value = False
@@ -88,6 +90,20 @@ class PostgresqlStorageTest(unittest.TestCase):
         with patch.object(pg, 'storage', return_value=s), patch.object(pg, 'preserved', return_value={}):
             with self.assertRaises(ValueError): pg.execute(self.core, self.own, True)
         s.execute.assert_not_called()
+
+    def test_existing_data_is_retained_and_guard_binding_is_not_installed(self):
+        s = Mock()
+        s.MOUNT = MagicMock()
+        (s.MOUNT / 'data').iterdir.return_value = iter(['existing-database'])
+        s.GUARD, s.GUARD_UNIT, s.K3S_DROPIN = [Mock() for _ in range(3)]
+        for path in (s.GUARD, s.GUARD_UNIT, s.K3S_DROPIN):
+            path.exists.return_value = path.is_symlink.return_value = False
+        s.GUARD_TEXT, s.DROPIN_TEXT = 'guard', 'dependency'
+        s.require.side_effect = lambda value, code: None if value else (_ for _ in ()).throw(ValueError(code))
+        with patch.object(pg, 'storage', return_value=s), patch.object(pg, 'preserved', return_value={}):
+            with self.assertRaisesRegex(ValueError, 'POSTGRESQL_DATA_ALREADY_PRESENT'):
+                pg.execute(self.core, self.own, True)
+        s.install_guard.assert_not_called()
 
     def test_no_format_or_mount_if_preservation_preflight_fails(self):
         s = Mock()

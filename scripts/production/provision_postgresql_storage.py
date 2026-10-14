@@ -93,6 +93,7 @@ def execute(core, own, approved=False):
                 s.protected(path, mode=0o600)
                 s.require(path.read_bytes() == content, 'POSTGRESQL_GUARD_INSTALL_CONFLICT')
         s.execute(True)
+        s.require(not any((s.MOUNT / 'data').iterdir()), 'POSTGRESQL_DATA_ALREADY_PRESENT')
         result = s.install_guard(guard_source(core, own))
         s.require('hooshix-openbao-storage-guard.service' in s.run(['/usr/bin/systemctl',
             'show', 'k3s.service', '--property=BindsTo', '--value']).split(), 'OPENBAO_BINDING_MISSING')
