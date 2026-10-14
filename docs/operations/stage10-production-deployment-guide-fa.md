@@ -1268,6 +1268,8 @@ Deployment/Service/EndpointSlice همان namespace فقط برای مالکیت
 اجرای مجدد state خود ابزار را نگه می‌دارد و هیچ حذف/rollback خودکاری ندارد.
 drift اضافی selector/پورت شبکه، mesh، شرط‌های حذف admission یا privilege حتی با
 label مالکیت صحیح پذیرفته نمی‌شود؛ Pod زنده هم با plan محدود تطبیق داده می‌شود.
+CA/Secret وب‌هوکِ ازقبل‌موجود فقط با ownerReference همان Deployment خود ابزار
+پذیرفته می‌شود؛ این بررسی metadata-only است و کلید موجود خوانده یا adopt نمی‌شود.
 
 namespace خالی `platform-data` با restricted/Ambient، NetworkPolicy پیش‌فرض بسته
 و policy رد همهٔ Podها آماده می‌شود. ImageCatalog فقط metadata عمومی digest

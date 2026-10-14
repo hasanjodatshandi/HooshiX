@@ -194,6 +194,19 @@ class CnpgControlPlaneTest(unittest.TestCase):
         self.assertEqual([b'forbidden', b'cannot list', b'secrets'],
             failure_classes(b'Forbidden: cannot list secrets private-token=DO_NOT_PRINT'))
 
+    def test_foreign_generated_ca_is_never_read_or_adopted(self):
+        p, states, calls, k = self.stateful()
+        def foreign(*args, **kwargs):
+            if 'secret' in args and 'get' in args:
+                self.assertTrue(args[-1].startswith('jsonpath={.metadata.uid}'))
+                return b'foreign:Deployment,foreign,foreign-uid,true;'
+            return k(*args, **kwargs)
+        with patch.object(installer, 'protected', return_value=[]), \
+                patch.object(installer, 'addresses', return_value=['10.43.0.1']), self.assertRaisesRegex(
+                    ValueError, 'CNPG_FOREIGN_GENERATED_CA_PRESERVED'):
+            installer.execute(p, kube=foreign)
+        self.assertFalse(any(args[0] in ('create', 'apply', 'patch') for args, _, _ in calls))
+
 
 if __name__ == '__main__':
     unittest.main()

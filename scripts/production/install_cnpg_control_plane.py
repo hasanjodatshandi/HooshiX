@@ -100,6 +100,7 @@ def execute(plan, *, kube=host.kube):
     require(not any(o['kind'] in ('Secret', 'Cluster', 'Database', 'DatabaseRole',
             'PersistentVolume', 'PersistentVolumeClaim') for o in objects), 'CNPG_DATA_OR_CREDENTIAL_WRITE_REJECTED')
     exists = {}
+    controller_uid = None
     for obj in objects:
         meta = obj['metadata']
         scope = ['-n', meta['namespace']] if 'namespace' in meta else []
@@ -116,6 +117,7 @@ def execute(plan, *, kube=host.kube):
                 and desired_fields_match(old, obj)), 'CNPG_FOREIGN_OR_CHANGED_STATE_PRESERVED')
         if old and obj['kind'] == 'Deployment':
             require(safe_pod(old['spec']['template']['spec']), 'CNPG_EXTRA_PRIVILEGE_PRESERVED_NOT_ADOPTED')
+            controller_uid = old['metadata'].get('uid')
         if old and obj['kind'] == 'NetworkPolicy':
             spec = copy.deepcopy(old['spec'])
             for direction in ('ingress', 'egress'):
@@ -132,6 +134,13 @@ def execute(plan, *, kube=host.kube):
         if old and obj['kind'] == 'CustomResourceDefinition':
             require(old['spec'].get('conversion', {}).get('strategy', 'None')
                 == obj['spec'].get('conversion', {}).get('strategy', 'None'), 'CNPG_CRD_CONVERSION_DRIFT')
+    for name in ('cnpg-ca-secret', 'cnpg-webhook-cert'):
+        # CNPG owns generated keys; inspect owner metadata only, never the Secret body.
+        raw = kube('-n', NAMESPACE, 'get', 'secret', name, '--ignore-not-found', '-o',
+            'jsonpath={.metadata.uid}:{range .metadata.ownerReferences[*]}{.kind},{.name},{.uid},{.controller};{end}')
+        expected = ('Deployment,' + DEPLOYMENT + ',' + str(controller_uid) + ',true;').encode()
+        require(not raw.strip() or controller_uid and raw.partition(b':')[2] == expected,
+                'CNPG_FOREIGN_GENERATED_CA_PRESERVED')
     old = json.loads(kube('get', 'validatingpolicy', plan['boundary']['metadata']['name'], '-o', 'json'))
     require(old['spec'] in (plan['previous_boundary']['spec'], plan['boundary']['spec']), 'CNPG_EXISTING_BOUNDARY_CONFLICT')
     data = kube('-n', DATA_NAMESPACE, 'get', 'pods,pvc', '--ignore-not-found', '-o', 'json')
