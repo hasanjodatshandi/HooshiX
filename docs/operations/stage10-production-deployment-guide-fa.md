@@ -1431,6 +1431,55 @@ OpenBao عملیات جداگانهٔ تحت نظارت و custody قبلی اس
 persistence و fault مقصد **Not verified**
 می‌مانند؛ مشکل باکت پارس‌پک نیز در این گام بررسی یا Passed تلقی نمی‌شود.
 
+### رزرو LocalPV بدون ساخت دیتابیس
+
+برای همان backing خام ۳۲ GiB، ظرفیت اعلامی LocalPV برابر **۲۹ GiB** است؛ این
+ظرفیت از available ثبت‌شده کمتر است و ext4 metadata/reserve را ظرفیت برنامه
+حساب نمی‌کند. filesystem دوباره تخصیص/فرمت نمی‌شود. منابع فقط این دو هستند:
+
+- StorageClass غیردیفالت `hooshix-postgresql-local`، بدون provisioner خودکار،
+  `WaitForFirstConsumer`، `Retain` و بدون expansion خودکار؛
+- PV به نام `hooshix-postgresql-local-29gib` با مسیر data قبلی، nodeAffinity فقط
+  `hooshix-production-1`، RWO و claimRef رزروشده برای `platform-data/postgresql-1`.
+
+هیچ PVC، Cluster، Pod، password، backup یا Barman ساخته نمی‌شود. نام رزرو برای
+instance اول Cluster آیندهٔ `postgresql` است؛ commissioning کامل داده باید
+همین binding را مصرف و مستقل تأیید کند، نه PVC دیگر یا storage پیش‌فرض.
+نصب PV هم به‌معنای Bound شدن PVC یا آماده‌شدن دیتابیس نیست.
+
+نمایش manifest عمومی، بدون اتصال سرور:
+
+```bash
+python3 scripts/production/install_postgresql_local_volume.py
+```
+
+builder فقط از main تمیز و با native evidence تازهٔ همان tree اجرا می‌شود؛
+baseline هم guard/filesystem قبلی و هم API واقعی رزرو، conflict، رد claim
+نامجاز، mount روی node صحیح، persistence و Retain را در kind دورریختنی می‌آزماید:
+
+```bash
+python3 scripts/production/build_postgresql_local_volume_bundle.py \
+  --native-run <successful-repository-baseline-run> \
+  --output <new-public-bundle-outside-git>
+```
+
+در Windows، wrapper را نخست با `-ValidateOnly` بررسی کنید؛ سپس با VNC نجات و
+نشست دوم مستقل SSH باز، فقط رمز sudo همان‌جا:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-local-volume.ps1' -RescueAndSecondSessionReady
+```
+
+ابزار hash دقیق guard نصب‌شده، mount/هویت/UID، فضای قابل‌استفاده، dependency هر
+دو guard، audit، node و namespace خالی را پیش از رزرو بررسی می‌کند. هر دو منبع
+قبل از اولین write از نظر state خارجی/drift بررسی می‌شوند؛ overwrite، adopt،
+force، delete یا retry خودکار وجود ندارد. در شکست جزئی، منابع/data نگه داشته
+می‌شوند. نتیجهٔ موفق `POSTGRESQL_LOCAL_VOLUME=Passed` است؛ `pvc`، `database` و
+`barman_runtime` هنوز **Not run** هستند. اجرای مقصد این گام تا رسید مستقل
+**Not run** است. PV به دیسک/ماشین دیگری قابل انتقال کورکورانه نیست؛ روی سرور
+دوم binding و native/target evidence مستقل لازم است. پس از وجود داده، rollback
+به معنای حذف PV/PVC یا پاک‌سازی filesystem نیست؛ recovery تحت نظارت انجام شود.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS

@@ -534,6 +534,7 @@ scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_postgresql_candidates.py
+scripts/production/build_postgresql_local_volume_bundle.py
 scripts/production/build_postgresql_storage_bundle.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
@@ -544,6 +545,7 @@ scripts/production/install_audit_prerequisite.py
 scripts/production/install_cert_manager.py
 scripts/production/install_cnpg_control_plane.py
 scripts/production/install_eso.py
+scripts/production/install_postgresql_local_volume.py
 scripts/production/install_release_tools.sh
 scripts/production/jit_broker.py
 scripts/production/jit_runtime.py
@@ -583,6 +585,7 @@ scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
 scripts/production/rehearse_platform_admission.py
+scripts/production/rehearse_postgresql_local_volume.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_cert_manager_candidate.py
 scripts/production/render_cnpg_control_plane.py
@@ -609,6 +612,7 @@ scripts/production/run-intermediate-import.ps1
 scripts/production/run-mesh-security-upgrade.ps1
 scripts/production/run-openbao-storage.ps1
 scripts/production/run-platform-commissioning.ps1
+scripts/production/run-postgresql-local-volume.ps1
 scripts/production/run-postgresql-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_postgresql_isolation_native.py
@@ -651,6 +655,7 @@ scripts/production/tests/test_platform_admission.py
 scripts/production/tests/test_platform_commissioning.py
 scripts/production/tests/test_platform_publication_run.py
 scripts/production/tests/test_postgresql_artifacts.py
+scripts/production/tests/test_postgresql_local_volume.py
 scripts/production/tests/test_postgresql_ownership.py
 scripts/production/tests/test_postgresql_publication.py
 scripts/production/tests/test_postgresql_source_builds.py

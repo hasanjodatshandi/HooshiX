@@ -195,6 +195,12 @@ Raw size is 34359738368 bytes; measured available space is 31764869120 bytes.
 UID 26, mount and guard passed; OpenBao/host services were preserved without a
 K3s restart. Kubernetes storage reservation, database and Barman remain `Not run`;
 target reboot/fault behavior and production readiness remain `Not verified`.
+The guarded LocalPV reservation tooling exposes 29 GiB, not the raw 32 GiB,
+with fixed node affinity, Retain and the reserved future `platform-data/postgresql-1`
+claim. It creates only a non-default static StorageClass and PV after both guards,
+available capacity, audit and empty-data boundary checks; no PVC/database is
+created. Exact-tree CI filesystem and real Kubernetes mount/retention evidence
+are required before an owner-local bundle is issued. Target reservation is `Not run`.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces

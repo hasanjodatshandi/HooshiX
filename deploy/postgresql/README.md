@@ -71,6 +71,14 @@ Business schema changes remain owned by each service's immutable Flyway history.
 
 ## Commissioning dependency contract
 
+The owner-local 32 GiB filesystem/guard foundation is installed on the current
+VPS. `install_postgresql_local_volume.py` prepares only the static 29 GiB LocalPV
+reservation (ext4 usable capacity is less than backing size), with Retain,
+WaitForFirstConsumer and exact node/first-instance claim binding. It does not
+create a PVC, database or Barman component. The Stage10 guide contains its
+exact-tree native evidence builder, owner-local invocation and recovery boundary.
+Target reservation remains `Not run` until its own public receipt is verified.
+
 Do **not** apply this candidate directly to the VPS. The reviewed complete data
 bundle must first supply the signed CNPG/operator/database/Barman image evidence,
 durable storage guard, finite capacity/pool budgets, TLS and network/mesh isolation,

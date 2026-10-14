@@ -386,10 +386,12 @@ jobs:
         run: |
           $tokens = $null
           $parseErrors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-postgresql-storage.ps1'),
-            [ref]$tokens, [ref]$parseErrors)
-          if ($parseErrors.Count -ne 0) { throw 'POSTGRESQL_STORAGE_WRAPPER_SYNTAX_FAILED' }
+          foreach ($name in @('run-postgresql-storage.ps1', 'run-postgresql-local-volume.ps1')) {
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $env:GITHUB_WORKSPACE ('scripts/production/' + $name)),
+              [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -ne 0) { throw 'POSTGRESQL_STORAGE_WRAPPER_SYNTAX_FAILED' }
+          }
       - name: Retain public PostgreSQL storage evidence only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
