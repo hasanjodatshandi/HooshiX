@@ -50,7 +50,7 @@ def build(output, run_id):
     api = 'repos/hasanjodatshandi/HooshiX/actions/runs/' + run_id
     record = json.loads(gh(['api', api]))
     name = 'postgresql-storage-' + run_id + '-' + str(record['run_attempt'])
-    matches = [a for a in json.loads(gh(['api', api + '/artifacts']))['artifacts'] if a['name'] == name]
+    matches = [a for a in json.loads(gh(['api', api + '/artifacts?per_page=100']))['artifacts'] if a['name'] == name]
     if len(matches) != 1 or matches[0]['expired'] or not 0 < matches[0]['size_in_bytes'] <= 16384:
         raise ValueError('exact bounded native artifact required')
     with tempfile.TemporaryDirectory(prefix='hooshix-pg-storage-public-') as t:

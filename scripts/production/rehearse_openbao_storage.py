@@ -40,15 +40,18 @@ def guard_rehearsal(root, image, volume, mount_name, size):
                f"n['guard_check']() if sys.argv[1]=='--guard-check' else n['guard_loop'](Path({str(script)!r}))\n")
     storage.create_file(script, wrapper.encode())
     guard_name = root.name + '-guard.service'
+    existing_name = root.name + '-existing.service'
     dummy_name = root.name + '-dependent.service'
     guard_unit = Path('/etc/systemd/system') / guard_name
+    existing_unit = Path('/etc/systemd/system') / existing_name
     dummy_unit = Path('/etc/systemd/system') / dummy_name
     created = []
     existing_bind = root / 'existing-bind'
     missing_bind = root / 'new-bind'
     try:
         for path, text in ((guard_unit, storage.guard_unit(script, mount_name)),
-                           (dummy_unit, f'[Unit]\nBindsTo={mount_name}\nAfter={mount_name}\n'
+                           (existing_unit, '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n'),
+                           (dummy_unit, f'[Unit]\nBindsTo={existing_name}\nAfter={existing_name}\n'
                             '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')):
             storage.create_file(path, text.encode())
             created.append(path)
@@ -61,10 +64,10 @@ def guard_rehearsal(root, image, volume, mount_name, size):
         storage.require(storage.run(['/usr/bin/systemctl', 'is-active', guard_name]) == 'active',
                         'GUARD_STARTUP_FAILED')
         # Mirror installer integration: attach a healthy guard to an already running service.
-        dummy_unit.write_text(f'[Unit]\nBindsTo={mount_name} {guard_name}\nAfter={mount_name} {guard_name}\n'
+        dummy_unit.write_text(f'[Unit]\nBindsTo={existing_name} {guard_name}\nAfter={existing_name} {guard_name}\n'
                               '[Service]\nType=exec\nExecStart=/usr/bin/sleep infinity\nRestart=no\n')
         storage.run(['/usr/bin/systemctl', 'daemon-reload'])
-        storage.require({guard_name, mount_name} <= set(storage.run(['/usr/bin/systemctl', 'show', dummy_name,
+        storage.require({guard_name, existing_name} <= set(storage.run(['/usr/bin/systemctl', 'show', dummy_name,
                          '--property=BindsTo', '--value']).split()), 'LIVE_BIND_NOT_LOADED')
         storage.run(['/usr/bin/mount', '-o', 'remount,ro', str(volume)])
         wait_inactive(dummy_name)
