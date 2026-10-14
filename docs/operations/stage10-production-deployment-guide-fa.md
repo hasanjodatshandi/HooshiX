@@ -1151,6 +1151,9 @@ metadata وب‌هوک‌ها را در سطح کلاستر می‌خواند و
 callback معتبر و fail-closed شامل `certificaterequests/status` هم هست تا
 تغییر وضعیت Approved/Denied از بررسی مجوز عبور کند. Issuerهای پایدار و
 گواهی‌های Barman در مرحلهٔ نصب دیتابیس ساخته خواهند شد، نه این نصب ابزار.
+policy محافظ تنظیمات وب‌هوک، cluster-scoped است و با نام/نوع دقیق همان دو
+config انتخاب می‌شود؛ روی خود policy namespaceSelector قرار نمی‌گیرد.
+namespaceSelector داخل callback همچنان فقط `cnpg-system` است و تغییر نمی‌کند.
 
 فقط یک Secret **خالی** و دارای مالکیت مشخص برای مقصد CA وب‌هوک ساخته می‌شود؛
 هیچ کلید یا رمز در plan نیست. وب‌هوک خودش کلید را داخل Kubernetes تولید/تعویض

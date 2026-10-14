@@ -194,8 +194,8 @@ def policies(pods, callbacks):
             + ' && (' + admission.scalar_tree('object.webhooks[0].clientConfig.service', hook['clientConfig']['service']) + '))')
         validations.append(admission.validation('cert-manager callback security is immutable; CA injection only', condition))
     locked = admission.policy('ValidatingPolicy', 'hooshix-cert-manager-callback-security', NAMESPACE, validations)
-    # Namespace selectors do NOT scope cluster resources. The exact object-name guards do.
-    locked['spec']['matchConstraints']['namespaceSelector'] = copy.deepcopy(BOUNDARY_SELECTOR)
+    # Cluster webhook configs have no namespace; scope this policy by exact name/kind guards.
+    locked['spec']['matchConstraints'].pop('namespaceSelector')
     locked['spec']['matchConstraints']['resourceRules'] = [{'apiGroups': ['admissionregistration.k8s.io'],
         'apiVersions': ['v1'], 'operations': ['CREATE', 'UPDATE'],
         'resources': ['mutatingwebhookconfigurations', 'validatingwebhookconfigurations'], 'scope': 'Cluster'}]

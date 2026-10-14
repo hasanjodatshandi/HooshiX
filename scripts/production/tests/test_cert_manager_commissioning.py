@@ -115,6 +115,11 @@ class CertManagerCommissioningTest(unittest.TestCase):
         callback = next(p for p in plan['manifest']['items'] if p['kind'] == 'ValidatingWebhookConfiguration')
         self.assertIn('certificaterequests/status', callback['webhooks'][0]['rules'][0]['resources'])
         self.assertNotIn('certificaterequests/approval', callback['webhooks'][0]['rules'][0]['resources'])
+        locked = next(p for p in plan['policies'] if p['metadata']['name'].endswith('-callback-security'))
+        self.assertNotIn('namespaceSelector', locked['spec']['matchConstraints'])
+        self.assertEqual('Cluster', locked['spec']['matchConstraints']['resourceRules'][0]['scope'])
+        self.assertTrue(all('object.metadata.name != "cert-manager-webhook"' in rule['expression']
+                            for rule in locked['spec']['validations']))
         for obj in target.permissions():
             if obj['kind'] == 'ClusterRole':
                 self.assertNotIn('secrets', json.dumps(obj))
