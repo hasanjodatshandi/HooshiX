@@ -96,10 +96,8 @@ def permissions():
             subjects=[{'kind': 'ServiceAccount', 'name': role['metadata']['name'], 'namespace': NAMESPACE}],
             roleRef={'apiGroup': 'rbac.authorization.k8s.io', 'kind': role['kind'],
                      'name': role['metadata']['name']}))
-    reports = resource('ClusterRole', 'hooshix-cert-manager-report-reader', namespaced=False, rules=[
-        rule('cert-manager.io', ['issuers'], read),
-        rule('admissionregistration.k8s.io', ['mutatingwebhookconfigurations',
-                                           'validatingwebhookconfigurations'], read)])
+    reports = resource('ClusterRole', 'hooshix-cert-manager-report-reader', namespaced=False,
+                       rules=[rule('cert-manager.io', ['issuers'], read)])
     reports['metadata']['labels']['rbac.kyverno.io/aggregate-to-reports-controller'] = 'true'
     return [*roles, *bindings, reports]
 
@@ -138,7 +136,7 @@ def network(addresses):
     return [*base, mesh]
 
 
-def policies(pods, callbacks):
+def policies(pods):
     selected = candidate()['publication']
     if any(value != 'public' for value in selected['registry_visibility'].values()):
         raise ValueError('this credential-free internal candidate requires the three approved public packages')
@@ -177,33 +175,12 @@ def policies(pods, callbacks):
     issuers['spec']['matchConstraints']['resourceRules'] = [{'apiGroups': ['cert-manager.io'],
         'apiVersions': ['v1'], 'operations': ['CREATE', 'UPDATE'], 'resources': ['issuers'], 'scope': 'Namespaced'}]
     result.append(issuers)
-    validations = []
-    for obj in callbacks:
-        hook = obj['webhooks'][0]
-        condition = ('object.metadata.name != "cert-manager-webhook" || request.kind.kind != '
-            + admission.literal(obj['kind']) + ' || (object.webhooks.size() == 1'
-            + ' && object.metadata.annotations["cert-manager.io/inject-ca-from-secret"] == '
-            + admission.literal(NAMESPACE + '/cert-manager-webhook-ca')
-            + ' && !has(object.webhooks[0].clientConfig.url)'
-            + ' && (!has(object.webhooks[0].matchConditions) || object.webhooks[0].matchConditions.size() == 0)'
-            + ' && object.webhooks[0].namespaceSelector.matchLabels == ' + admission.literal(SELECTOR['matchLabels'])
-            + ' && (!has(object.webhooks[0].namespaceSelector.matchExpressions) || '
-            + 'object.webhooks[0].namespaceSelector.matchExpressions.size() == 0)'
-            + ' && (' + ' && '.join(admission.scalar_tree('object.webhooks[0].' + field, value)
-                 for field, value in hook.items() if field not in ('clientConfig', 'namespaceSelector')) + ')'
-            + ' && (' + admission.scalar_tree('object.webhooks[0].clientConfig.service', hook['clientConfig']['service']) + '))')
-        validations.append(admission.validation('cert-manager callback security is immutable; CA injection only', condition))
-    locked = admission.policy('ValidatingPolicy', 'hooshix-cert-manager-callback-security', NAMESPACE, validations)
-    # Cluster webhook configs have no namespace; scope this policy by exact name/kind guards.
-    locked['spec']['matchConstraints'].pop('namespaceSelector')
-    locked['spec']['matchConstraints']['resourceRules'] = [{'apiGroups': ['admissionregistration.k8s.io'],
-        'apiVersions': ['v1'], 'operations': ['CREATE', 'UPDATE'],
-        'resources': ['mutatingwebhookconfigurations', 'validatingwebhookconfigurations'], 'scope': 'Cluster'}]
-    result.append(locked)
     return result
 
 
 def validate(plan):
+    if plan['callback_trust_boundary'] != 'owner-accepted-exact-name-rbac':
+        raise ValueError('explicit owner-accepted injector trust boundary required')
     if plan['verifier_images'] != verifier_images():
         raise ValueError('exact existing verifier images required for bounded discovery refresh')
     items = plan['manifest']['items']
@@ -245,8 +222,7 @@ def validate(plan):
                         or hook['clientConfig']['service']['namespace'] != NAMESPACE
                         or any(rule.get('scope') != 'Namespaced' for rule in hook['rules'])):
                     raise ValueError('namespace-bound fail-closed HTTPS callback required')
-    callbacks = [o for o in items if o['kind'] in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration')]
-    if plan['policies'] != policies(plan['pods'], callbacks) or plan['strict']['spec'] != {'mtls': {'mode': 'STRICT'}}:
+    if plan['policies'] != policies(plan['pods']) or plan['strict']['spec'] != {'mtls': {'mode': 'STRICT'}}:
         raise ValueError('exact fail-closed policies required')
 
 
@@ -324,8 +300,8 @@ def render(manifest, addresses):
         'spec': {'mtls': {'mode': 'STRICT'}}}
     plan = {'schema_version': 1, 'installation_id': 'hooshix-production', 'profile': 'production-single-server',
         'namespace': ns, 'crds': crds, 'manifest': {'apiVersion': 'v1', 'kind': 'List', 'items': objects},
-        'pods': pods, 'policies': policies(pods, [o for o in objects if o['kind'] in (
-            'MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration')]), 'network': network(addresses), 'strict': strict,
+        'pods': pods, 'policies': policies(pods), 'network': network(addresses), 'strict': strict,
+        'callback_trust_boundary': 'owner-accepted-exact-name-rbac',
         'images': selected['images'], 'verifier_images': verifier_images(),
         'certificate_issuance': 'Not verified', 'deployment': 'Not verified'}
     validate(plan)

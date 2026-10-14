@@ -73,11 +73,13 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
         certificates = receipt.get('cert_manager_commissioning', {})
         if (not eso_commissioning or certificates.get('images') != candidate()['publication']['images']
                 or certificates.get('root_mesh_openbao_eso_storage') != 'Preserved'
+                or certificates.get('callback_trust_boundary') != 'owner-accepted-exact-name-rbac'
                 or any(certificates.get(key) != 'Passed' for key in ('cert_manager_installation',
                     'api_callback_tls', 'external_issuer_denied', 'idempotent_reconciliation',
                     'source_identity_positive_negative', 'rbac_issuer_scope_negative',
                     'certificate_issuance', 'certificate_rotation_hostname_negative',
-                    'wrong_source_webhook_network', 'container_key_log_markers', 'callback_security_negative'))):
+                    'wrong_source_webhook_network', 'container_key_log_markers',
+                    'callback_configuration', 'callback_rbac_boundary'))):
             raise ValueError('exact internal TLS, restricted authority and signed certificate images required')
     if (record.get('path') != WORKFLOW or record.get('status') != 'completed'
             or record.get('conclusion') != 'success'

@@ -1126,15 +1126,17 @@ admission و staging را ثابت نمی‌کند. خطای جزئی receipt م
 
 #### محدودهٔ commissioning گواهی داخلی دیتابیس
 
-**مانع فعلی قبل از نصب هدف:** Kubernetes `1.35.6` درخواست تغییر
+**مرز اعتماد تأییدشدهٔ مالک در ۲۰۲۶-۱۰-۱۴:** Kubernetes `1.35.6` درخواست تغییر
 `MutatingWebhookConfiguration` و `ValidatingWebhookConfiguration` را از
 admission webhookها معاف می‌کند. بنابراین policy وب‌هوکی Kyverno نمی‌تواند
 تغییر `failurePolicy` این منابع را متوقف کند. محدودکردن RBAC cainjector به
 دو config، دسترسی به configهای دیگر را می‌بندد، اما محدودیت فیلدی داخل همان
-دو config ایجاد نمی‌کند. تا انتخاب و مرور کنترل جایگزین یا پذیرش صریح این
-محدودیتِ نصب استاندارد، شرط محافظت callback **Not verified** است؛ بستهٔ نصب
-هدف صادر نمی‌شود و PR commissioning نباید merge شود. این محدودیت را با
-حذف آزمون منفی، Passed فرض‌کردن یا تغییر خودسرانهٔ نسخهٔ کلاستر دور نزنید.
+دو config ایجاد نمی‌کند. مالک این مرز اعتماد نصب استاندارد را پذیرفته است؛
+در صورت نفوذ به cainjector، تغییر failurePolicy/service/rules همان دو config
+ممکن است. ابزار در نصب و اجرای مجدد، پیکربندی HTTPS/Fail را بررسی می‌کند؛
+این بررسی محافظت پیوسته در برابر نفوذ نیست. آزمون واقعی RBAC باید تغییر
+configهای دیگر و تغییر همین configها توسط controller/webhook را رد کند.
+بستهٔ هدف همچنان به receipt تازه و موفق تمام آزمون‌های native وابسته است.
 مرجع: [رفتار API سرور نسخهٔ دقیق](https://github.com/kubernetes/kubernetes/blob/v1.35.6/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go).
 
 ابزار cert-manager فقط برای TLS داخلی control plane دیتابیس در
@@ -1162,18 +1164,16 @@ metadata وب‌هوک‌ها را در سطح کلاستر می‌خواند و
 callback معتبر و fail-closed شامل `certificaterequests/status` هم هست تا
 تغییر وضعیت Approved/Denied از بررسی مجوز عبور کند. Issuerهای پایدار و
 گواهی‌های Barman در مرحلهٔ نصب دیتابیس ساخته خواهند شد، نه این نصب ابزار.
-policy محافظ تنظیمات وب‌هوک، cluster-scoped است و با نام/نوع دقیق همان دو
-config انتخاب می‌شود؛ روی خود policy namespaceSelector قرار نمی‌گیرد.
-namespaceSelector داخل callback همچنان فقط `cnpg-system` است و تغییر نمی‌کند.
-نوع منبع از `request.kind.kind` در درخواست admission گرفته می‌شود، نه فیلد
-اختیاری `object.kind`؛ بنابراین محافظ تنظیمات در PATCH هم فعال می‌ماند.
+namespaceSelector داخل callback فقط `cnpg-system` است. پیکربندی مطلوب service،
+rules، selector و Fail در commissioning بررسی می‌شود؛ این محدودیت فیلدی RBAC
+یا policy محافظ تغییر webhook configuration نیست.
 
 فقط یک Secret **خالی** و دارای مالکیت مشخص برای مقصد CA وب‌هوک ساخته می‌شود؛
 هیچ کلید یا رمز در plan نیست. وب‌هوک خودش کلید را داخل Kubernetes تولید/تعویض
 می‌کند و فقط مجوز update/read/watch همان نام را دارد، نه create Secret.
 installer در اجرای مجدد فقط metadata مالکیت را می‌خواند و دادهٔ خصوصی موجود
-را بازنویسی نمی‌کند. دسترسی گزارش‌گیری Kyverno فقط read-only برای Issuerها و
-metadata تنظیمات وب‌هوک است؛ دسترسی به Secretهای کلاستر اضافه نمی‌شود.
+را بازنویسی نمی‌کند. دسترسی گزارش‌گیری Kyverno فقط read-only برای Issuerها
+است؛ دسترسی به Secretهای کلاستر اضافه نمی‌شود.
 
 پس از ثبت CRDهای جدید، دو controller موجود admission/reports در Kyverno با
 همان digestهای pin‌شده rollout محدود می‌شوند تا کش discovery نوع‌های جدید را

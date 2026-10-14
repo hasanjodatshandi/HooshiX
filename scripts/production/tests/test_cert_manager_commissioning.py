@@ -76,6 +76,7 @@ class CertManagerCommissioningTest(unittest.TestCase):
     def test_critical_candidate_mutations_are_rejected(self):
         original = self.plan()
         for mutate in (
+            lambda p: p.update(callback_trust_boundary='field-immutable'),
             lambda p: p['verifier_images'].update(admission='unapproved:latest'),
             lambda p: p['manifest']['items'].append(target.resource('Secret', 'key', data={'key': 'not-private'})),
             lambda p: p['manifest']['items'][1]['spec'].update(replicas=2),
@@ -115,13 +116,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
         callback = next(p for p in plan['manifest']['items'] if p['kind'] == 'ValidatingWebhookConfiguration')
         self.assertIn('certificaterequests/status', callback['webhooks'][0]['rules'][0]['resources'])
         self.assertNotIn('certificaterequests/approval', callback['webhooks'][0]['rules'][0]['resources'])
-        locked = next(p for p in plan['policies'] if p['metadata']['name'].endswith('-callback-security'))
-        self.assertNotIn('namespaceSelector', locked['spec']['matchConstraints'])
-        self.assertEqual('Cluster', locked['spec']['matchConstraints']['resourceRules'][0]['scope'])
-        self.assertTrue(all('object.metadata.name != "cert-manager-webhook"' in rule['expression']
-                            for rule in locked['spec']['validations']))
-        self.assertTrue(all('request.kind.kind != ' in rule['expression'] and 'object.kind' not in rule['expression']
-                            for rule in locked['spec']['validations']))
+        self.assertFalse(any(p['metadata']['name'].endswith('-callback-security') for p in plan['policies']))
+        self.assertEqual('owner-accepted-exact-name-rbac', plan['callback_trust_boundary'])
         for obj in target.permissions():
             if obj['kind'] == 'ClusterRole':
                 self.assertNotIn('secrets', json.dumps(obj))
@@ -199,6 +195,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
         refresh.assert_called_once_with(plan['verifier_images'], kube_client=kube)
         self.assertEqual(first, second)
         self.assertEqual('Passed', first['api_callback_tls'])
+        self.assertEqual('Passed', first['callback_configuration'])
+        self.assertEqual('owner-accepted-exact-name-rbac', first['callback_trust_boundary'])
         self.assertEqual('Not verified', first['certificate_issuance'])
         for name in installer.BOUNDARIES:
             self.assertEqual(installer.SELECTOR, states[('validatingpolicy', name)]['spec']['matchConstraints']['namespaceSelector'])
@@ -211,6 +209,24 @@ class CertManagerCommissioningTest(unittest.TestCase):
         self.assertFalse(any(o['kind'] in ('PersistentVolume', 'PersistentVolumeClaim', 'SecretStore') for o in writes))
         self.assertTrue(all(not o.get('data') and not o.get('stringData') for o in writes if o['kind'] == 'Secret'))
         self.assertTrue(all(o['metadata'].get('namespace', target.NAMESPACE) == target.NAMESPACE for o in writes))
+
+    def test_callback_configuration_detects_drift_without_claiming_admission_lock(self):
+        plan = self.plan()
+        callbacks = [o for o in plan['manifest']['items'] if o['kind'].endswith('WebhookConfiguration')]
+        for mutate in (
+            lambda h: h.update(failurePolicy='Ignore'),
+            lambda h: h.update(namespaceSelector={}),
+            lambda h: h.update(rules=[]),
+            lambda h: h.update(matchConditions=[{'name': 'skip', 'expression': 'false'}]),
+            lambda h: h.update(objectSelector={'matchLabels': {'skip': 'true'}}),
+            lambda h: h['clientConfig']['service'].update(name='other'),
+            lambda h: h['clientConfig'].update(url='https://other.invalid')):
+            for kind in (o['kind'] for o in callbacks):
+                state = {o['kind']: copy.deepcopy(o) for o in callbacks}
+                mutate(state[kind]['webhooks'][0])
+                def kube(*args): return json.dumps(state[args[1]]).encode()
+                with self.assertRaisesRegex(ValueError, 'CERT_MANAGER_CALLBACK_'):
+                    installer.verify_callbacks(plan, kube)
 
     def test_partial_create_and_changed_existing_selector_are_preserved(self):
         plan, states, calls, kube = self.stateful()
@@ -262,8 +278,9 @@ class CertManagerCommissioningTest(unittest.TestCase):
         certs = {k: 'Passed' for k in ('cert_manager_installation', 'api_callback_tls', 'external_issuer_denied',
             'idempotent_reconciliation', 'source_identity_positive_negative', 'rbac_issuer_scope_negative',
             'certificate_issuance', 'certificate_rotation_hostname_negative',
-            'wrong_source_webhook_network', 'container_key_log_markers', 'callback_security_negative')}
-        certs.update(images=target.candidate()['publication']['images'], root_mesh_openbao_eso_storage='Preserved')
+            'wrong_source_webhook_network', 'container_key_log_markers', 'callback_configuration', 'callback_rbac_boundary')}
+        certs.update(images=target.candidate()['publication']['images'], root_mesh_openbao_eso_storage='Preserved',
+                     callback_trust_boundary='owner-accepted-exact-name-rbac')
         receipt = {'revision': revision, 'scope': 'Disposable Calico/Ambient initialized-store internal cert-manager commissioning',
             'upgrade_publication': eso.mesh.pin(), 'mesh_images': {**{n: v['image'] for n, v in eso.admission.mesh_publication.targets().items()},
                                                                   **eso.mesh.pin()['images']},
@@ -277,7 +294,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
             bundle.check_staging(record, receipt, revision, mesh_security_upgrade=True,
                                  eso_commissioning=True, cert_manager_commissioning=True)
             for name in ('certificate_issuance', 'certificate_rotation_hostname_negative', 'rbac_issuer_scope_negative',
-                         'wrong_source_webhook_network', 'container_key_log_markers', 'callback_security_negative'):
+                         'wrong_source_webhook_network', 'container_key_log_markers', 'callback_configuration',
+                         'callback_rbac_boundary', 'callback_trust_boundary'):
                 wrong = copy.deepcopy(receipt)
                 wrong['cert_manager_commissioning'][name] = 'Not verified'
                 with self.assertRaises(ValueError): bundle.check_staging(record, wrong, revision,

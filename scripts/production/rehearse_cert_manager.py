@@ -130,12 +130,17 @@ def rehearse(k, wait, run, manifest, platform):
     result['source_identity_positive_negative'] = 'Passed'
     print('CERT_MANAGER_REHEARSAL_STEP=callback-boundary', flush=True)
     for kind in ('mutatingwebhookconfiguration', 'validatingwebhookconfiguration'):
+        identity = '--as=system:serviceaccount:cnpg-system:cert-manager-cainjector'
         k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
-            {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Ignore'}]), expected=1,
-            required_error=b'cert-manager callback security is immutable')
-        k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
-            {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Fail'}]))
-    result['callback_security_negative'] = 'Passed'
+            {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Fail'}]), identity)
+        k('patch', kind, 'other-webhook', '--dry-run=server', '--type=json', '-p', '[]', identity,
+          expected=1, required_error=b'forbidden')
+        for account in ('cert-manager', 'cert-manager-webhook'):
+            k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
+                {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Ignore'}]),
+                '--as=system:serviceaccount:cnpg-system:' + account, expected=1, required_error=b'forbidden')
+    installer.verify_callbacks(plan, adapter)
+    result['callback_rbac_boundary'] = 'Passed'
     print('CERT_MANAGER_REHEARSAL_STEP=wrong-source-network', flush=True)
     network_negative(k, wait, platform)
     result['wrong_source_webhook_network'] = 'Passed'

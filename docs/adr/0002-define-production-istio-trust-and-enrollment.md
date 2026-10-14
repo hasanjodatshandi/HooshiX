@@ -93,9 +93,14 @@ CA/self-signed Issuers. ClusterIssuers, ACME/solver, ingress/Gateway, external
 issuers and Kubernetes CSR controllers are disabled. Namespace Roles bound Secret
 access; cainjector can read webhook metadata cluster-wide but may update only
 `cert-manager-webhook` configurations. Other injector targets require their own
-reviewed exact-name extension. Fail-closed admission pins callback service, rules,
-namespace selection and `failurePolicy=Fail` while allowing CA-bundle injection;
-the injector cannot weaken its own callback boundary. Pods use an exact one-hour
+reviewed exact-name extension. On 2026-10-14 the owner accepted the standard
+cainjector trust boundary: exact-name RBAC limits the two writable webhook
+configurations, not their fields. Kubernetes 1.35.6 exempts these configurations
+from API-based admission webhooks; a compromised injector could weaken its own
+callbacks. Commissioning/reentry verifies callback service, rules, namespace
+selection and `failurePolicy=Fail`, but is not continuous tamper prevention.
+Native RBAC tests must reject other configuration names and controller/webhook
+writes to either configuration. Pods use an exact one-hour
 projected API token; executable arguments, environment and mounts are admission-bound.
 The upstream approval webhook checks the virtual `signers` resource at cluster
 scope. A controller-only ClusterRole grants `approve` solely for
@@ -114,7 +119,7 @@ only an EMPTY, owned serving-CA destination with direct-injection annotation;
 the webhook has exact-name update/read/watch and no Secret create privilege.
 Existing private material is neither read nor replaced by the installer. This
 uses the pinned upstream DynamicAuthority existing-Secret update path. Required
-Kyverno report aggregation adds read-only Issuer/webhook-configuration metadata,
+Kyverno report aggregation adds read-only Issuer metadata,
 never cluster Secret access or a reporting/admission bypass. Verified callback TLS, internal
 issuance/renewal, RBAC/network negatives and existing CA/OpenBao/ESO/storage
 preservation are required before a supervised target bundle is usable.

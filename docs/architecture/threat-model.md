@@ -294,7 +294,12 @@ access to application Secrets or project Root material. Certificate Roles remain
 in `cnpg-system`; virtual signer approval has only the two exact ADR-0002
 issuer names at cluster scope and the status webhook guards approval changes.
 Cainjector has cluster webhook metadata read but exact-name update
-only. External issuers/ACME/ClusterIssuer and controller/cainjector Ambient opt-out
+only. The owner accepts that a compromised cainjector can change fields, including
+failurePolicy/service/rules, within those two configurations. Kubernetes 1.35.6
+exempts their changes from API-based admission webhooks, so commissioning checks
+are not continuous prevention of that compromise. Native RBAC negatives bound
+other names and deny controller/webhook configuration writes.
+External issuers/ACME/ClusterIssuer and controller/cainjector Ambient opt-out
 are denied. API-only HTTPS ingress and fail-closed admission remain independent
 controls. Native wrong-identity/RBAC/issuer/network/certificate tests are required;
 namespace scoping does not protect certificate material against host/root compromise.

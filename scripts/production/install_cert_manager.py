@@ -46,10 +46,27 @@ def protected(kube):
     return result
 
 
+def verify_callbacks(plan, kube):
+    # Configuration check, not an admission lock: the owner accepts exact-name injector writes.
+    for obj in plan['manifest']['items']:
+        if obj['kind'] not in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration'):
+            continue
+        current = json.loads(kube('get', obj['kind'], obj['metadata']['name'], '-o', 'json'))
+        require(desired_fields_match(current, obj), 'CERT_MANAGER_CALLBACK_CONFIGURATION_DRIFT')
+        hook = current['webhooks'][0]
+        expected = obj['webhooks'][0]
+        require(not hook.get('matchConditions') and not hook.get('objectSelector')
+                and hook['namespaceSelector'] == expected['namespaceSelector']
+                and hook['rules'] == expected['rules'] and not hook['clientConfig'].get('url')
+                and hook['clientConfig']['service'] == expected['clientConfig']['service'],
+                'CERT_MANAGER_CALLBACK_SCOPE_DRIFT')
+
+
 def execute(plan, *, kube=host.kube):
     print('CERT_MANAGER_INSTALL_STEP=ownership-preflight', file=sys.stderr, flush=True)
     require(plan.get('schema_version') == 1 and plan.get('installation_id') == 'hooshix-production'
             and plan.get('profile') == 'production-single-server'
+            and plan.get('callback_trust_boundary') == 'owner-accepted-exact-name-rbac'
             and set(plan['pods']) == set(ACCOUNTS), 'CERT_MANAGER_BOUNDED_PLAN_REQUIRED')
     before = protected(kube)
     items = copy.deepcopy(plan['manifest']['items'])
@@ -171,6 +188,7 @@ def execute(plan, *, kube=host.kube):
     external['spec'] = {'acme': {'server': 'https://unapproved.invalid/directory',
                                 'privateKeySecretRef': {'name': 'unapproved'}}}
     probe(external, kube, expected=1, reason=b'only internal CA or self-signed issuers allowed')
+    verify_callbacks(plan, kube)
     print('CERT_MANAGER_INSTALL_STEP=runtime-verification', file=sys.stderr, flush=True)
     pods = json.loads(kube('-n', NAMESPACE, 'get', 'pods', '-l',
                           'app.kubernetes.io/instance=cert-manager', '-o', 'json'))['items']
@@ -187,7 +205,8 @@ def execute(plan, *, kube=host.kube):
                 'CERT_MANAGER_RUNTIME_DIGEST_MISMATCH')
     require(protected(kube) == before, 'CERT_MANAGER_PROTECTED_STATE_CHANGED')
     return {'schema_version': 1, 'cert_manager_installation': 'Passed', 'images': plan['images'],
-        'api_callback_tls': 'Passed', 'external_issuer_denied': 'Passed',
+        'api_callback_tls': 'Passed', 'external_issuer_denied': 'Passed', 'callback_configuration': 'Passed',
+        'callback_trust_boundary': 'owner-accepted-exact-name-rbac',
         'root_mesh_openbao_eso_storage': 'Preserved', 'certificate_issuance': 'Not verified',
         'public_access': 'CLOSED', 'production_readiness': 'Not verified'}
 

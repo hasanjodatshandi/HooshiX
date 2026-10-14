@@ -51,6 +51,7 @@ if ($operationExit -ne 0) { throw 'CERT_MANAGER_FAILED_PARTIAL_STATE_PRESERVED; 
 $receipt = Get-Content -LiteralPath $localReport -Raw | ConvertFrom-Json
 if ($receipt.cert_manager_installation -cne 'Passed' -or $receipt.plan_sha256 -cne $planHash -or
     $receipt.api_callback_tls -cne 'Passed' -or $receipt.external_issuer_denied -cne 'Passed' -or
+    $receipt.callback_configuration -cne 'Passed' -or $receipt.callback_trust_boundary -cne 'owner-accepted-exact-name-rbac' -or
     $receipt.root_mesh_openbao_eso_storage -cne 'Preserved' -or $receipt.public_access -cne 'CLOSED' -or
     $receipt.production_readiness -cne 'Not verified') { throw 'CERT_MANAGER_RECEIPT_REJECTED' }
 Write-Output 'CERT_MANAGER_INSTALLATION=Passed; internal control-plane TLS only; Barman/data/applications and production readiness Not verified'
