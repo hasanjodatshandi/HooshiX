@@ -14,6 +14,7 @@ import render_cert_manager_candidate as renderer
 import render_platform_admission as admission
 from rehearse_openbao_recovery import RehearsalFailed
 from rehearse_platform_admission import admission_result, apply, policy_ready
+from upgrade_mesh_security import replace_policy
 
 
 def network_negative(k, wait, platform):
@@ -42,7 +43,8 @@ def network_negative(k, wait, platform):
         'matchLabels': {'hooshix-cert-manager-probe': name}}, 'policyTypes': ['Egress'], 'egress': [{
         'to': [{'ipBlock': {'cidr': target + '/32'}}], 'ports': [{'protocol': 'TCP', 'port': 10250}]}]}}
     try:
-        apply(k, bounded)
+        replace_policy(bounded, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
+                       kube=k, previous=original)
         apply(k, egress)
         apply(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': name, 'namespace': 'hooshix-secrets',
             'labels': {'hooshix-cert-manager-probe': name, 'istio.io/dataplane-mode': 'none'}}, 'spec': pod})
@@ -57,7 +59,8 @@ def network_negative(k, wait, platform):
     finally:
         k('-n', 'hooshix-secrets', 'delete', 'pod', name, '--ignore-not-found', '--timeout=30s', timeout=40)
         k('-n', 'hooshix-secrets', 'delete', 'networkpolicy', name, '--ignore-not-found')
-        apply(k, original)
+        replace_policy(original, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
+                       kube=k, previous=bounded)
         policy_ready(k, original)
 
 
@@ -81,6 +84,7 @@ def rehearse(k, wait, run, manifest, platform):
     result = installer.execute(plan, kube=adapter)
     installer.execute(plan, kube=adapter)
     result['idempotent_reconciliation'] = 'Passed'
+    print('CERT_MANAGER_REHEARSAL_STEP=pod-admission', flush=True)
     deployments = [o for o in plan['manifest']['items'] if o['kind'] == 'Deployment']
     for obj in deployments:
         pod = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': 'cert-manager-native-probe',
@@ -98,6 +102,7 @@ def rehearse(k, wait, run, manifest, platform):
             if change == 'mutable-image': wrong['spec']['containers'][0]['image'] = 'unapproved.invalid/image:latest'
             admission_result(k, wrong, wait, expected=1, public_schema=False)
     # Same digest, deliberately wrong trust/evidence; restore the policy even on failure.
+    print('CERT_MANAGER_REHEARSAL_STEP=source-identity', flush=True)
     for original in [p for p in plan['policies'] if p['kind'] == 'ImageValidatingPolicy']:
         p = copy.deepcopy(original)
         suffix = p['metadata']['name'].rsplit('-', 1)[1]
@@ -113,14 +118,17 @@ def rehearse(k, wait, run, manifest, platform):
             p['spec']['validations'][1]['expression'] = p['spec']['validations'][1]['expression'].replace(
                 renderer.candidate()['publication']['repository_revision'], '0' * 40)
         try:
-            apply(k, p)
+            replace_policy(p, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
+                           kube=k, previous=original)
             policy_ready(k, p)
             admission_result(k, test, wait, expected=1, public_schema=False)
         finally:
-            apply(k, original)
+            replace_policy(original, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
+                           kube=k, previous=p)
             policy_ready(k, original)
         admission_result(k, test, wait, public_schema=False)
     result['source_identity_positive_negative'] = 'Passed'
+    print('CERT_MANAGER_REHEARSAL_STEP=callback-boundary', flush=True)
     for kind in ('mutatingwebhookconfiguration', 'validatingwebhookconfiguration'):
         k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
             {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Ignore'}]), expected=1,
@@ -128,6 +136,7 @@ def rehearse(k, wait, run, manifest, platform):
         k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
             {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Fail'}]))
     result['callback_security_negative'] = 'Passed'
+    print('CERT_MANAGER_REHEARSAL_STEP=wrong-source-network', flush=True)
     network_negative(k, wait, platform)
     result['wrong_source_webhook_network'] = 'Passed'
 
@@ -142,6 +151,7 @@ def rehearse(k, wait, run, manifest, platform):
     admission_result(k, external, wait, expected=1,
                      message=b'only internal CA or self-signed issuers allowed', public_schema=False)
     # RBAC is an independent guard, not inferred from a deny-only image policy.
+    print('CERT_MANAGER_REHEARSAL_STEP=rbac', flush=True)
     for account in renderer.ACCOUNTS.values():
         identity = 'system:serviceaccount:' + renderer.NAMESPACE + ':' + account
         for namespace in ('platform-apps', 'istio-system', 'hooshix-secrets'):
@@ -157,6 +167,7 @@ def rehearse(k, wait, run, manifest, platform):
       '--as=system:serviceaccount:cnpg-system:cert-manager-webhook', data=json.dumps(denied).encode(),
       expected=1, required_error=b'forbidden')
     result['rbac_issuer_scope_negative'] = 'Passed'
+    print('CERT_MANAGER_REHEARSAL_STEP=issuance-rotation', flush=True)
     apply(k, issuer)
     ca = object_('Certificate', 'hooshix-cert-manager-probe-ca', {'isCA': True,
         'commonName': 'HooshiX disposable internal TLS test', 'secretName': 'hooshix-cert-manager-probe-ca',
