@@ -159,7 +159,7 @@ checks the HTTPS/Fail callback configuration and real RBAC negatives; their nati
 gate passed in that run. This does not claim continuous field-immutability or
 overall Production readiness.
 
-The next CNPG controller bootstrap pins the existing published 1.30.1 operator,
+The installed CNPG controller bootstrap pins the existing published 1.30.1 operator,
 retains Ambient/default STRICT with the owner-approved API-only 9443 exception,
 and limits mutable data RBAC/watch scope to `platform-data`. Its empty data
 namespace is default-deny and Pod admission closed; an image catalog is public
@@ -167,8 +167,18 @@ candidate metadata, not a database deployment. Renderer, supervised installer,
 native CI extension and exact-main public bundle require the full prior platform
 gate plus callback/source/RBAC/network/non-callback-mTLS/idempotence evidence.
 No database instance, data allocation, Barman runtime or credential delivery is
-performed here. Target controller deployment remains `Not run` pending successful
-native evidence and owner-local execution.
+performed here. Exact-tree native staging run `38548698802` passed before PR 215
+merged as `22054cdcf3aa9681474ebe02fb47633792c3a6c5`; merged-main baseline and web
+E2E also passed. The owner's VPS execution reports `CNPG_CONTROL_PLANE=Passed`.
+Public receipt `hooshix-cnpg-bd35b5199b3842999b0432d8980b4855.json`, SHA256
+`530c0c57bf246438b217b7d5d070858f6fc5fc962fc978e04368eead1ca1d5d6`, matches
+that bundle's exact operator digest and plan SHA256
+`d5faea9362152ce11cd7905ea947be81a41ffa03266051858d2976eff67eb640`.
+Verified HTTPS callbacks, callback configuration and the bounded Ambient port
+exception are `Passed`; existing Root/mesh/OpenBao/ESO/cert-manager/storage are
+`Preserved`, with public access `CLOSED`. Independent PostgreSQL data storage,
+database instances/credentials, Barman runtime/backup/PITR and Production
+readiness remain `Not run`/`Not verified`; the provider deferral is unchanged.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces

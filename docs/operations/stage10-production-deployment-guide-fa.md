@@ -1316,7 +1316,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-cnp
 فقط رمز sudo همان‌جا لازم است. رسید موفق `CNPG_CONTROL_PLANE=Passed` شامل
 HTTPS callback، پیکربندی پورت و حفظ mesh/OpenBao/ESO/cert-manager/storage است؛
 `database=Not run`، `barman_runtime=Not run` و `public_access=CLOSED` می‌مانند.
-صدور بسته/اجرای VPS هنوز **Not run** است تا رسید همان عملیات ثبت شود.
+در این نصب، بستهٔ `main@22054cdcf3aa9681474ebe02fb47633792c3a6c5` با آزمون
+native موفق `38548698802` و validation ویندوز ساخته و روی VPS اجرا شده است.
+رسید `hooshix-cnpg-bd35b5199b3842999b0432d8980b4855.json` با SHA256
+`530c0c57bf246438b217b7d5d070858f6fc5fc962fc978e04368eead1ca1d5d6`
+و plan با SHA256
+`d5faea9362152ce11cd7905ea947be81a41ffa03266051858d2976eff67eb640`
+تطبیق دارد: controller و HTTPS callback و مرز پورت، **Passed**؛ اجزای قبلی،
+**Preserved**؛ دسترسی عمومی، **CLOSED**. این نتیجه فقط برای همین مقصد/بسته است؛
+روی سرور دوم باید رسید مستقل همان اجرا گرفته شود. دیتابیس، فضای مستقل داده
+و Barman هنوز **Not run** هستند؛ مرحلهٔ بعد تعیین اندازه و guard مستقل
+storage PostgreSQL است، نه اجرای دوبارهٔ کنترل‌پلین.
 بعد از افزودن controller، بستهٔ قدیمی cert-manager را دوباره اجرا نکنید؛ آن
 بسته عمداً namespace دارای workload جدید را به‌عنوان scope قدیمی نمی‌پذیرد.
 
