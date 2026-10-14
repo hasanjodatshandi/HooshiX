@@ -55,7 +55,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
             objects.append({'apiVersion': 'admissionregistration.k8s.io/v1', 'kind': kind,
                 'metadata': {'name': name}, 'webhooks': [{'name': 'cluster.cnpg.io', 'rules': [{
                     'apiGroups': ['postgresql.cnpg.io'], 'apiVersions': ['v1'], 'operations': ['CREATE'], 'resources': ['clusters']}],
-                    'clientConfig': {'service': {'namespace': renderer.NAMESPACE, 'name': 'cnpg-webhook-service', 'port': 443}}}]})
+                    'clientConfig': {'service': {'namespace': renderer.NAMESPACE, 'name': 'cnpg-webhook-service'}}}]})
         objects.append({'apiVersion': 'v1', 'kind': 'Service', 'metadata': {
             'name': 'cnpg-webhook-service', 'namespace': renderer.NAMESPACE},
             'spec': {'selector': {'app.kubernetes.io/name': 'cloudnative-pg'},
@@ -125,6 +125,10 @@ class CnpgControlPlaneTest(unittest.TestCase):
             if args[0] in ('create', 'apply') and '--dry-run=server' not in args:
                 if args[0] == 'create' and key(body) in states: raise ValueError('duplicate create')
                 states[key(body)] = copy.deepcopy(body)
+                if body['kind'] in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration'):
+                    for hook in states[key(body)]['webhooks']:
+                        hook['clientConfig']['service'].setdefault('port', 443)
+                        for rule in hook['rules']: rule.setdefault('scope', '*')
             return b''
         return plan, states, calls, kube
 

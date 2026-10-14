@@ -166,6 +166,9 @@ def render(manifest, cert_manifest, addresses):
         for hook in d['webhooks']:
             hook.update(failurePolicy='Fail', timeoutSeconds=5,
                         namespaceSelector={'matchLabels': {'kubernetes.io/metadata.name': DATA_NAMESPACE}})
+            hook['clientConfig']['service']['port'] = 443
+            for rule in hook['rules']:
+                rule['scope'] = 'Namespaced'
     objects.extend(callbacks)
     for d in [*crds, *objects]:
         d['metadata'].setdefault('labels', {})['app.kubernetes.io/managed-by'] = MANAGER
