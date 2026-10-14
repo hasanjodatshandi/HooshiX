@@ -133,8 +133,9 @@ def rehearse(k, wait, run, manifest, platform):
         identity = '--as=system:serviceaccount:cnpg-system:cert-manager-cainjector'
         k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
             {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Fail'}]), identity)
-        k('patch', kind, 'other-webhook', '--dry-run=server', '--type=json', '-p', '[]', identity,
-          expected=1, required_error=b'forbidden')
+        # kubectl patch GETs first; ask authorization directly for an absent foreign name.
+        if k('auth', 'can-i', 'patch', kind + 's/other-webhook', identity, expected=1).strip() != b'no':
+            raise RehearsalFailed('foreign webhook patch accepted')
         for account in ('cert-manager', 'cert-manager-webhook'):
             k('patch', kind, 'cert-manager-webhook', '--dry-run=server', '--type=json', '-p', json.dumps([
                 {'op': 'replace', 'path': '/webhooks/0/failurePolicy', 'value': 'Ignore'}]),
@@ -171,9 +172,6 @@ def rehearse(k, wait, run, manifest, platform):
         answer = json.loads(k('create', '-f', '-', '-o', 'json', data=json.dumps(review).encode()))
         if answer['status']['allowed'] != (signer in renderer.SIGNERS):
             raise RehearsalFailed('certificate signer approval scope mismatch')
-    if k('auth', 'can-i', 'patch', 'validatingwebhookconfigurations/other-webhook',
-         '--as=system:serviceaccount:cnpg-system:cert-manager-cainjector', expected=1).strip() != b'no':
-        raise RehearsalFailed('foreign webhook patch accepted')
     denied = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {'name': 'unapproved-serving-ca',
         'namespace': renderer.NAMESPACE}, 'type': 'Opaque'}
     k('create', '--dry-run=server', '-f', '-',

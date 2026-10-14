@@ -1136,6 +1136,8 @@ admission webhookها معاف می‌کند. بنابراین policy وب‌ه�
 ممکن است. ابزار در نصب و اجرای مجدد، پیکربندی HTTPS/Fail را بررسی می‌کند؛
 این بررسی محافظت پیوسته در برابر نفوذ نیست. آزمون واقعی RBAC باید تغییر
 configهای دیگر و تغییر همین configها توسط controller/webhook را رد کند.
+برای نام دیگر، `kubectl auth can-i` با هویت cainjector باید `no` برگرداند؛
+برای config موجود، PATCH آزمایشی با هویت controller/webhook باید Forbidden شود.
 بستهٔ هدف همچنان به receipt تازه و موفق تمام آزمون‌های native وابسته است.
 مرجع: [رفتار API سرور نسخهٔ دقیق](https://github.com/kubernetes/kubernetes/blob/v1.35.6/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go).
 
