@@ -1400,7 +1400,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-pos
 نتیجهٔ موفق `POSTGRESQL_STORAGE=Passed`، `storage_guard=Passed`،
 `openbao_host_services=Preserved` و `k3s_restart_performed=false` است.
 PV/PVC، PostgreSQL Cluster، password، Barman و backup در این گام **Not run**
-می‌مانند. تا رسید مقصد ثبت نشده، خود installation این گام نیز **Not run** است.
+می‌مانند. نصب storage روی همین VPS در ۲۰۲۶-۱۰-۱۴ **Passed** است؛ رسید
+`hooshix-postgresql-storage-6e009bff12524585bddb9ab5fd27e4fd.json` با SHA256
+`9d1c00c1fff319fd7d53906f7a76590348d3385a9ab6d5ff189d448bc7c89d94`
+با بستهٔ `main@d35a31e3f80717b70309d4f9597ddeca6eef0d9d` تطبیق دارد.
+backing برابر ۳۴۳۵۹۷۳۸۳۶۸ بایت، filesystem برابر ۳۳۵۰۱۷۵۷۴۴۰ بایت و available
+برابر ۳۱۷۶۴۸۶۹۱۲۰ بایت است؛ UID برابر 26، guard **Passed** و restart برابر false
+است. OpenBao و سرویس‌های میزبان **Preserved** هستند. این بسته را دوباره برای
+allocation اجرا نکنید. گام Kubernetes باید ظرفیت امن کمتر از فضای قابل استفاده
+را به‌صورت LocalPV با Retain رزرو کند؛ خود دیتابیس و Barman هنوز نصب نشده‌اند.
 
 در خرابی آینده، guard جلوی شروع K3s بدون mount معتبر را می‌گیرد و K3s را متوقف
 می‌کند؛ این معادل توقف همهٔ containerهای در حال اجرا نیست. re-arm خودکار ندارد.
