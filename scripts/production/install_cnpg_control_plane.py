@@ -52,8 +52,16 @@ def safe_pod(pod):
     return (not context.get('sysctls') and not context.get('windowsOptions') and not c.get('envFrom')
         and not security.get('privileged') and not security.get('capabilities', {}).get('add')
         and security.get('procMount', 'Default') == 'Default' and not security.get('windowsOptions')
+        and not any(p.get('hostPort') for p in c.get('ports', []))
         and not any('hostPath' in v for v in pod.get('volumes', []))
         and not any(v.get('subPath') or v.get('subPathExpr') for v in c.get('volumeMounts', [])))
+
+
+def private_service(obj):
+    spec = obj['spec']
+    return (spec.get('type', 'ClusterIP') == 'ClusterIP' and not spec.get('externalIPs')
+        and not spec.get('externalName') and not spec.get('loadBalancerIP')
+        and not any(p.get('nodePort') for p in spec['ports']))
 
 
 def verify_callbacks(plan, kube):
@@ -118,6 +126,8 @@ def execute(plan, *, kube=host.kube):
         if old and obj['kind'] == 'Deployment':
             require(safe_pod(old['spec']['template']['spec']), 'CNPG_EXTRA_PRIVILEGE_PRESERVED_NOT_ADOPTED')
             controller_uid = old['metadata'].get('uid')
+        if old and obj['kind'] == 'Service':
+            require(private_service(old), 'CNPG_PUBLIC_SERVICE_DRIFT')
         if old and obj['kind'] == 'NetworkPolicy':
             spec = copy.deepcopy(old['spec'])
             for direction in ('ingress', 'egress'):
@@ -178,6 +188,8 @@ def execute(plan, *, kube=host.kube):
     print('CNPG_INSTALL_STEP=controller-rollout', file=sys.stderr, flush=True)
     create(next(o for o in plan['objects'] if o['kind'] == 'Deployment'))
     kube('-n', NAMESPACE, 'rollout', 'status', 'deployment/' + DEPLOYMENT, '--timeout=180s', timeout=195)
+    require(private_service(json.loads(kube('-n', NAMESPACE, 'get', 'service', 'cnpg-webhook-service', '-o', 'json'))),
+            'CNPG_PUBLIC_SERVICE_DRIFT')
     probe(cluster_probe(), kube)
     verify_callbacks(plan, kube)
     pods = json.loads(kube('-n', NAMESPACE, 'get', 'pods', '-l', 'app.kubernetes.io/name=cloudnative-pg', '-o', 'json'))['items']

@@ -56,6 +56,10 @@ class CnpgControlPlaneTest(unittest.TestCase):
                 'metadata': {'name': name}, 'webhooks': [{'name': 'cluster.cnpg.io', 'rules': [{
                     'apiGroups': ['postgresql.cnpg.io'], 'apiVersions': ['v1'], 'operations': ['CREATE'], 'resources': ['clusters']}],
                     'clientConfig': {'service': {'namespace': renderer.NAMESPACE, 'name': 'cnpg-webhook-service', 'port': 443}}}]})
+        objects.append({'apiVersion': 'v1', 'kind': 'Service', 'metadata': {
+            'name': 'cnpg-webhook-service', 'namespace': renderer.NAMESPACE},
+            'spec': {'selector': {'app.kubernetes.io/name': 'cloudnative-pg'},
+                'ports': [{'port': 443, 'targetPort': 9443}]}})
         self.manifest.write_text(yaml.safe_dump_all(objects))
         self.pins = copy.deepcopy(renderer.pins())
         self.pins['components']['operator']['manifest']['sha256'] = hashlib.sha256(self.manifest.read_bytes()).hexdigest()
@@ -143,7 +147,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
                 self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'PersistentVolume', 'PersistentVolumeClaim'))
 
     def test_foreign_or_changed_state_and_wider_port_stop_before_writes(self):
-        for mutate in ('foreign', 'port', 'boundary', 'privilege', 'network-selector'):
+        for mutate in ('foreign', 'port', 'boundary', 'privilege', 'network-selector', 'external-service'):
             p, states, calls, k = self.stateful()
             if mutate == 'foreign':
                 d = copy.deepcopy(next(o for o in p['objects'] if o['kind'] == 'Deployment'))
@@ -160,6 +164,10 @@ class CnpgControlPlaneTest(unittest.TestCase):
                 o = copy.deepcopy(p['network'][-1])
                 o['spec']['podSelector'] = {'matchLabels': {'skip': 'true'}}
                 states[('networkpolicy', renderer.DATA_NAMESPACE, o['metadata']['name'])] = o
+            if mutate == 'external-service':
+                o = copy.deepcopy(next(o for o in p['objects'] if o['kind'] == 'Service'))
+                o['spec']['externalIPs'] = ['188.240.196.151']
+                states[('service', renderer.NAMESPACE, o['metadata']['name'])] = o
             with patch.object(installer, 'protected', return_value=[]), \
                     patch.object(installer, 'addresses', return_value=['10.43.0.1']), self.assertRaises(ValueError):
                 installer.execute(p, kube=k)

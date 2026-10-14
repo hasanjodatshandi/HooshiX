@@ -1285,6 +1285,15 @@ python3 scripts/production/render_cnpg_control_plane.py \
   --api-address <exact-api-ip>
 ```
 
+برای ساخت رسید تازه، workflow همین گام را روی `main` بررسی‌شده اجرا کنید؛
+دستور فقط CI دورریختنی است و به VPS وصل نمی‌شود:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main \
+  -f mesh_security_upgrade=true -f eso_commissioning=true \
+  -f cert_manager_commissioning=true -f cnpg_control_plane=true
+```
+
 بعد از موفقیت native CI همان tree و merge، از `main` تمیز بستهٔ خارج Git بسازید:
 
 ```bash

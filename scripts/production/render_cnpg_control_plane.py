@@ -153,6 +153,10 @@ def render(manifest, cert_manifest, addresses):
     objects = [data, resource('ServiceAccount', ACCOUNT),
         *permissions(next(d for d in upstream if d['kind'] == 'ClusterRole' and d['metadata']['name'] == ACCOUNT)),
         *[d for d in upstream if d['kind'] == 'Service' and d['metadata']['name'] == 'cnpg-webhook-service'], deployment]
+    services = [o for o in objects if o['kind'] == 'Service']
+    if len(services) != 1:
+        raise ValueError('exact private webhook Service required')
+    services[0]['spec']['type'] = 'ClusterIP'
     objects.append(resource('ImageCatalog', 'hooshix-postgresql-18-candidate', DATA_NAMESPACE,
         apiVersion='postgresql.cnpg.io/v1', spec={'images': [{'major': 18, 'image': selected['images']['postgresql']}]}))
     callbacks = [d for d in upstream if d['kind'] in ('MutatingWebhookConfiguration', 'ValidatingWebhookConfiguration')]
