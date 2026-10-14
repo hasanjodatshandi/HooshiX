@@ -291,7 +291,9 @@ Required: SA/mTLS/NetworkPolicy/Istio + DB/Redis/Kafka/OpenBao/provider/telemetr
 
 ADR-0002's cert-manager API-callback exception does not grant certificate-controller
 access to application Secrets or project Root material. Certificate Roles remain
-in `cnpg-system`; cainjector has cluster webhook metadata read but exact-name update
+in `cnpg-system`; virtual signer approval has only the two exact ADR-0002
+issuer names at cluster scope and the status webhook guards approval changes.
+Cainjector has cluster webhook metadata read but exact-name update
 only. External issuers/ACME/ClusterIssuer and controller/cainjector Ambient opt-out
 are denied. API-only HTTPS ingress and fail-closed admission remain independent
 controls. Native wrong-identity/RBAC/issuer/network/certificate tests are required;

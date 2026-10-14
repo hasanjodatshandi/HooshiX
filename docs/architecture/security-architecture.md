@@ -112,6 +112,9 @@ The cert-manager controller/cainjector remain Ambient; initial certificate autho
 is namespace-bound to `cnpg-system` internal CA/self-signed issuers with no ACME,
 ClusterIssuer, application secret access or existing Root/mesh CA replacement.
 Serving-CA writes and cainjector updates retain exact resource-name boundaries.
+Virtual signer approval is cluster-scoped only for the two ADR-0002
+`cnpg-system` issuer names; no wildcard or foreign namespace is authorized, and
+the HTTPS callback validates CertificateRequest status/approval transitions.
 
 ## 8. Public edge/client-address trust
 
