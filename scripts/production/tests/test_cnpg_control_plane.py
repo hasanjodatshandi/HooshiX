@@ -107,7 +107,8 @@ class CnpgControlPlaneTest(unittest.TestCase):
             scope = args[args.index('-n') + 1] if '-n' in args else None
             if 'get' in args:
                 i = args.index('get'); kind = args[i + 1].lower()
-                if kind in ('pods,pvc', 'clusters.postgresql.cnpg.io'): return b'{"items":[]}'
+                if scope == renderer.DATA_NAMESPACE and kind in ('pods', 'pvc', 'clusters.postgresql.cnpg.io'):
+                    return b'{"items":[]}'
                 if kind == 'pods':
                     d = states[('deployment', renderer.NAMESPACE, renderer.DEPLOYMENT)]
                     pod = copy.deepcopy(d['spec']['template']['spec'])
@@ -137,6 +138,10 @@ class CnpgControlPlaneTest(unittest.TestCase):
         self.assertEqual('Passed', first['cnpg_control_plane'])
         self.assertEqual('Not run', first['database'])
         self.assertEqual('CLOSED', first['public_access'])
+        data_reads = [args for args, _, _ in calls if '-n' in args and args[1] == renderer.DATA_NAMESPACE
+                      and 'get' in args and args[3] in ('pods', 'pvc', 'clusters.postgresql.cnpg.io')]
+        self.assertEqual(['pods', 'pvc', 'clusters.postgresql.cnpg.io'], [args[3] for args in data_reads])
+        self.assertTrue(all('--ignore-not-found' not in args for args in data_reads))
         created = [body['kind'] for args, body, _ in calls if body and args[0] == 'create' and '--dry-run=server' not in args]
         self.assertLess(created.index('MutatingWebhookConfiguration'), created.index('Deployment'))
         self.assertLess(created.index('ValidatingWebhookConfiguration'), created.index('Deployment'))
@@ -145,6 +150,22 @@ class CnpgControlPlaneTest(unittest.TestCase):
             self.assertNotIn('--force-conflicts', args)
             if body is not None and '--dry-run=server' not in args:
                 self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'PersistentVolume', 'PersistentVolumeClaim'))
+
+    def test_existing_data_stops_before_writes(self):
+        for kind in ('pods', 'pvc', 'clusters.postgresql.cnpg.io'):
+            p, states, calls, k = self.stateful()
+            states[('namespace', None, renderer.DATA_NAMESPACE)] = copy.deepcopy(
+                next(o for o in p['objects'] if o['kind'] == 'Namespace'))
+            crd = next(o for o in p['crds'] if o['metadata']['name'] == 'clusters.postgresql.cnpg.io')
+            states[('customresourcedefinition', None, crd['metadata']['name'])] = crd
+            def existing(*args, **kwargs):
+                if args[:4] == ('-n', renderer.DATA_NAMESPACE, 'get', kind):
+                    return b'{"items":[{"metadata":{"name":"existing"}}]}'
+                return k(*args, **kwargs)
+            with patch.object(installer, 'protected', return_value=[]), \
+                    patch.object(installer, 'addresses', return_value=['10.43.0.1']), self.assertRaises(ValueError):
+                installer.execute(p, kube=existing)
+            self.assertFalse(any(args[0] in ('create', 'apply', 'patch') for args, _, _ in calls))
 
     def test_foreign_or_changed_state_and_wider_port_stop_before_writes(self):
         for mutate in ('foreign', 'port', 'boundary', 'privilege', 'network-selector', 'external-service'):

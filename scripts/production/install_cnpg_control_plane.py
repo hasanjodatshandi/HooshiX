@@ -153,11 +153,13 @@ def execute(plan, *, kube=host.kube):
                 'CNPG_FOREIGN_GENERATED_CA_PRESERVED')
     old = json.loads(kube('get', 'validatingpolicy', plan['boundary']['metadata']['name'], '-o', 'json'))
     require(old['spec'] in (plan['previous_boundary']['spec'], plan['boundary']['spec']), 'CNPG_EXISTING_BOUNDARY_CONFLICT')
-    data = kube('-n', DATA_NAMESPACE, 'get', 'pods,pvc', '--ignore-not-found', '-o', 'json')
-    require(not json.loads(data).get('items'), 'CNPG_EXISTING_DATA_WORKLOAD_PRESERVED')
-    if exists[('CustomResourceDefinition', None, 'clusters.postgresql.cnpg.io')]:
-        require(not json.loads(kube('-n', DATA_NAMESPACE, 'get', 'clusters.postgresql.cnpg.io', '-o', 'json')).get('items'),
-                'CNPG_EXISTING_DATA_WORKLOAD_PRESERVED')
+    if exists[('Namespace', None, DATA_NAMESPACE)]:
+        kinds = ['pods', 'pvc']
+        if exists[('CustomResourceDefinition', None, 'clusters.postgresql.cnpg.io')]:
+            kinds.append('clusters.postgresql.cnpg.io')
+        for kind in kinds:
+            require(not json.loads(kube('-n', DATA_NAMESPACE, 'get', kind, '-o', 'json'))['items'],
+                    'CNPG_EXISTING_DATA_WORKLOAD_PRESERVED')
 
     def create(obj):
         if not exists[(obj['kind'], obj['metadata'].get('namespace'), obj['metadata']['name'])]:
