@@ -170,6 +170,8 @@ def main():
     signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(ValueError('RESERVATION_DEADLINE')))
     signal.alarm(180)
     try:
+        source = globals().get('__hooshix_source_bytes__')
+        require(isinstance(source, bytes) and 0 < len(source) <= 32768, 'REVIEWED_BUNDLE_ENTRYPOINT_REQUIRED')
         with os.fdopen(os.open('/var/lib/hooshixstorage/postgresql-storage.lock',
                 os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK), 'r+b') as lock:
             info = os.fstat(lock.fileno())
@@ -177,7 +179,9 @@ def main():
                 and stat.S_IMODE(info.st_mode) == 0o600, 'SAFE_EXISTING_LOCK_REQUIRED')
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             native(['/usr/sbin/auditctl', '-m', 'HooshiX PostgreSQL guarded LocalPV reservation 29GiB'])
-            print(json.dumps(execute(), sort_keys=True))
+            result = execute()
+            result['source_sha256'] = hashlib.sha256(source).hexdigest()
+            print(json.dumps(result, sort_keys=True))
         return 0
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as error:
         reason = str(error) if isinstance(error, ValueError) else 'LOCAL_OPERATION_FAILED'

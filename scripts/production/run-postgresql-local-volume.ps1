@@ -32,7 +32,7 @@ with os.fdopen(os.open('$remote/$source',os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK
  info=os.fstat(stream.fileno()); content=stream.read(32769)
 if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or len(content)>32768 or hashlib.sha256(content).hexdigest()!='$($manifest.files.$source)': raise SystemExit(1)
 sys.argv=['$source','--reserve-approved-volume']
-exec(compile(content,'$source','exec'),{'__name__':'__main__','__file__':'$source'})
+exec(compile(content,'$source','exec'),{'__name__':'__main__','__file__':'$source','__hooshix_source_bytes__':content})
 "@
 $numeric = [string]::Join(',', [Text.Encoding]::UTF8.GetBytes($bootstrap))
 Write-Output 'Reserve existing guarded PostgreSQL storage as a private 29GiB Retain LocalPV. No allocation, format, PVC/database, Barman, credentials, restart or host-service changes. Enter sudo only here.'
@@ -42,7 +42,8 @@ $operationExit = $LASTEXITCODE
 if ($LASTEXITCODE -ne 0) { throw 'PUBLIC_RECEIPT_COPY_FAILED_STATE_PRESERVED' }
 if ($operationExit -ne 0) { throw 'LOCAL_VOLUME_FAILED_STATE_PRESERVED_NO_BLIND_RETRY' }
 $receipt = Get-Content -LiteralPath $localReport -Raw | ConvertFrom-Json
-if ($receipt.postgresql_local_volume -cne 'Passed' -or $receipt.capacity_bytes -ne 31138512896 -or
+if ($receipt.source_sha256 -cne $manifest.files.$source -or
+    $receipt.postgresql_local_volume -cne 'Passed' -or $receipt.capacity_bytes -ne 31138512896 -or
     $receipt.volume -cne 'hooshix-postgresql-local-29gib' -or $receipt.storage_guard -cne 'Passed' -or
     $receipt.node -cne 'hooshix-production-1' -or $receipt.reserved_claim -cne 'platform-data/postgresql-1' -or
     $receipt.openbao_host_services -cne 'Preserved' -or $receipt.database -cne 'Not run' -or $receipt.pvc -cne 'Not run' -or
