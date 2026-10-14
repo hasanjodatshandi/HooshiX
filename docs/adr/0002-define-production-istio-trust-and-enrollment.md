@@ -129,6 +129,26 @@ References: [controller namespace scope](https://cert-manager.io/docs/cli/contro
 the immutable source/manifest in `cert-manager-sources.json`. Approval and render
 are not executed installation, certificate or Production-readiness evidence.
 
+### Owner-approved CNPG API callback port boundary (2026-10-14)
+
+The owner authorizes a workload-selected exception only for container port 9443
+of `cnpg-system/cnpg-controller-manager`: the Pod remains Ambient, its default
+PeerAuthentication remains STRICT, and only that API callback port may use
+PERMISSIVE mesh authentication for the unenrolled Kubernetes API server.
+Application HTTPS with verified certificate/hostname, `failurePolicy=Fail` and
+exact discovered API-source NetworkPolicy ingress remain mandatory. This is not
+plaintext application HTTP, namespace-wide PERMISSIVE, DISABLE, Pod opt-out, a
+public route, or a database/application port exception. Other controller ports
+and outbound mesh identity remain STRICT. Fixed source-signed images, dedicated
+ServiceAccount, bounded namespace RBAC and resources remain mandatory.
+
+Native tests must independently prove verified API HTTPS, blocked wrong-source
+callback access, wrong-identity/default-account and image evidence denial,
+non-callback strict mTLS, idempotence and preservation of existing components
+before issuing a target bundle. Approval alone is not implementation or target
+evidence. No PostgreSQL instance, storage allocation, credential delivery or
+provider backup is authorized as complete by this control-plane gate.
+
 ### Authorization
 
 STRICT mTLS authenticates workload identity; least-privilege `AuthorizationPolicy` controls permitted communication. NetworkPolicy and native datastore authentication remain independent controls.
