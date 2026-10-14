@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import commission_platform as host
-from install_eso import addresses, desired_fields_match, established_crd, preserved, probe, require
+from install_eso import addresses, desired_fields_match, established_crd, preserved, probe, require as eso_require
 
 NAMESPACE = 'cnpg-system'
 MANAGER = 'hooshix-cert-manager-commissioning'
@@ -30,6 +30,13 @@ BOUNDARIES = ('hooshix-istio-system-bootstrap-boundary', 'hooshix-hooshix-secret
               'hooshix-platform-apps-bootstrap-boundary')
 
 
+def require(value, code):
+    if not value:
+        # Only fixed caller-owned invariant identifiers, never actual object values.
+        print('CERT_MANAGER_INVARIANT=' + code, file=sys.stderr, flush=True)
+    eso_require(value, code)
+
+
 def protected(kube):
     result = preserved(kube)
     for account in ('hooshix-eso', 'hooshix-eso-webhook', 'hooshix-eso-cert-controller'):
@@ -40,6 +47,7 @@ def protected(kube):
 
 
 def execute(plan, *, kube=host.kube):
+    print('CERT_MANAGER_INSTALL_STEP=ownership-preflight', file=sys.stderr, flush=True)
     require(plan.get('schema_version') == 1 and plan.get('installation_id') == 'hooshix-production'
             and plan.get('profile') == 'production-single-server'
             and set(plan['pods']) == set(ACCOUNTS), 'CERT_MANAGER_BOUNDED_PLAN_REQUIRED')
@@ -159,6 +167,7 @@ def execute(plan, *, kube=host.kube):
     external['spec'] = {'acme': {'server': 'https://unapproved.invalid/directory',
                                 'privateKeySecretRef': {'name': 'unapproved'}}}
     probe(external, kube, expected=1, reason=b'only internal CA or self-signed issuers allowed')
+    print('CERT_MANAGER_INSTALL_STEP=runtime-verification', file=sys.stderr, flush=True)
     pods = json.loads(kube('-n', NAMESPACE, 'get', 'pods', '-l',
                           'app.kubernetes.io/instance=cert-manager', '-o', 'json'))['items']
     by_account = {pod['spec']['serviceAccountName']: pod for pod in pods}
