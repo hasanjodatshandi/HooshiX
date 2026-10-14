@@ -31,7 +31,7 @@ def upstream():
             'securityContext': {'allowPrivilegeEscalation': False,
                 'capabilities': {'drop': ['ALL']}, 'readOnlyRootFilesystem': True},
             'env': [{'name': 'POD_NAMESPACE', 'valueFrom': {'fieldRef': {'fieldPath': 'metadata.namespace'}}}],
-            'livenessProbe': {'httpGet': {'path': '/livez', 'port': 6080}},
+            'livenessProbe': {'httpGet': {'path': '/livez', 'port': 6080}, 'initialDelaySeconds': 60},
             'readinessProbe': {'httpGet': {'path': '/healthz', 'port': 6080}}}
         items.append({'apiVersion': 'apps/v1', 'kind': 'Deployment', 'metadata': {'name': account},
             'spec': {'template': {'metadata': {'labels': labels}, 'spec': {
@@ -67,6 +67,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
         self.assertEqual('Not verified', plan['certificate_issuance'])
         self.assertEqual('Not verified', plan['deployment'])
         self.assertEqual(target.verifier_images(), plan['verifier_images'])
+        for pod in plan['pods'].values():
+            self.assertNotIn('initialDelaySeconds', pod['containers'][0]['startupProbe'])
         self.assertEqual([target.serving_secret()], [o for o in plan['manifest']['items'] if o['kind'] == 'Secret'])
         self.assertEqual({'mtls': {'mode': 'STRICT'}}, plan['strict']['spec'])
         with patch.object(target, 'recipe', return_value=self.source): target.validate(plan)

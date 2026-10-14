@@ -286,8 +286,10 @@ def render(manifest, addresses):
                                            'timeoutSeconds': 1, 'failureThreshold': 6}
         if component != 'webhook':
             container['readinessProbe'] = copy.deepcopy(container['livenessProbe'])
-        container['startupProbe'] = {**copy.deepcopy(container['livenessProbe']),
-                                     'initialDelaySeconds': 0, 'periodSeconds': 5, 'failureThreshold': 36}
+        # Kubernetes omits zero initialDelaySeconds; omit the inherited delay for stable reentry.
+        container['startupProbe'] = {key: value for key, value in copy.deepcopy(container['livenessProbe']).items()
+                                     if key != 'initialDelaySeconds'}
+        container['startupProbe'].update(periodSeconds=5, failureThreshold=36)
         pod['terminationGracePeriodSeconds'] = 30
         pods[account] = pod
         objects.extend([resource('ServiceAccount', account), obj])
