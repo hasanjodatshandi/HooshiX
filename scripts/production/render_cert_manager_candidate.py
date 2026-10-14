@@ -180,7 +180,7 @@ def policies(pods, callbacks):
     validations = []
     for obj in callbacks:
         hook = obj['webhooks'][0]
-        condition = ('object.metadata.name != "cert-manager-webhook" || object.kind != '
+        condition = ('object.metadata.name != "cert-manager-webhook" || request.kind.kind != '
             + admission.literal(obj['kind']) + ' || (object.webhooks.size() == 1'
             + ' && object.metadata.annotations["cert-manager.io/inject-ca-from-secret"] == '
             + admission.literal(NAMESPACE + '/cert-manager-webhook-ca')

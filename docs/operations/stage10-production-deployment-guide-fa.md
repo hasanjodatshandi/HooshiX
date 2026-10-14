@@ -1154,6 +1154,8 @@ callback معتبر و fail-closed شامل `certificaterequests/status` هم ه
 policy محافظ تنظیمات وب‌هوک، cluster-scoped است و با نام/نوع دقیق همان دو
 config انتخاب می‌شود؛ روی خود policy namespaceSelector قرار نمی‌گیرد.
 namespaceSelector داخل callback همچنان فقط `cnpg-system` است و تغییر نمی‌کند.
+نوع منبع از `request.kind.kind` در درخواست admission گرفته می‌شود، نه فیلد
+اختیاری `object.kind`؛ بنابراین محافظ تنظیمات در PATCH هم فعال می‌ماند.
 
 فقط یک Secret **خالی** و دارای مالکیت مشخص برای مقصد CA وب‌هوک ساخته می‌شود؛
 هیچ کلید یا رمز در plan نیست. وب‌هوک خودش کلید را داخل Kubernetes تولید/تعویض

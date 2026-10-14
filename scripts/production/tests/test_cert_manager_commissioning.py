@@ -120,6 +120,8 @@ class CertManagerCommissioningTest(unittest.TestCase):
         self.assertEqual('Cluster', locked['spec']['matchConstraints']['resourceRules'][0]['scope'])
         self.assertTrue(all('object.metadata.name != "cert-manager-webhook"' in rule['expression']
                             for rule in locked['spec']['validations']))
+        self.assertTrue(all('request.kind.kind != ' in rule['expression'] and 'object.kind' not in rule['expression']
+                            for rule in locked['spec']['validations']))
         for obj in target.permissions():
             if obj['kind'] == 'ClusterRole':
                 self.assertNotIn('secrets', json.dumps(obj))
