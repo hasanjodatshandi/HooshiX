@@ -30,7 +30,7 @@ from render_openbao_local_storage import candidate as local_storage_candidate
 STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "schema-candidate",
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
-                   "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane",
+                   "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
                    "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
@@ -127,8 +127,14 @@ def ca_import_fixture(k):
 
 def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
              eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False,
-             cert_manager_manifest: Path | None = None, cnpg_manifest: Path | None = None) -> None:
+             cert_manager_manifest: Path | None = None, cnpg_manifest: Path | None = None,
+             barman_manifest: Path | None = None) -> None:
     runner_paths(tools, receipt)
+    if barman_manifest is not None:
+        runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
+        if (cnpg_manifest is None or barman_manifest.is_symlink()
+                or not barman_manifest.resolve(strict=True).is_relative_to(runtime)):
+            raise RehearsalFailed('Barman requires the owned CNPG fixture')
     if cnpg_manifest is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
         if (cert_manager_manifest is None or cnpg_manifest.is_symlink()
@@ -436,6 +442,10 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     step('signed-ambient-cnpg-control-plane')
                     from rehearse_cnpg_control_plane import rehearse as cnpg
                     cnpg_result = cnpg(k, wait, cnpg_manifest, cert_manager_manifest, platform)
+                if barman_manifest is not None:
+                    step('signed-ambient-barman-control-plane')
+                    from rehearse_barman_control_plane import rehearse as barman
+                    barman_result = barman(k, wait, barman_manifest, cnpg_manifest, cert_manager_manifest)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -510,6 +520,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         if cnpg_manifest is not None:
             result['scope'] = 'Disposable Calico/Ambient initialized-store CNPG control plane'
             result['cnpg_control_plane'] = cnpg_result
+        if barman_manifest is not None:
+            result['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
+            result['barman_control_plane'] = barman_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
@@ -532,11 +545,12 @@ def main() -> int:
     parser.add_argument("--eso-chart", type=Path)
     parser.add_argument('--cert-manager-manifest', type=Path)
     parser.add_argument('--cnpg-manifest', type=Path)
+    parser.add_argument('--barman-manifest', type=Path)
     args = parser.parse_args()
     try:
         rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart,
                  mesh_security_upgrade=args.mesh_security_upgrade, cert_manager_manifest=args.cert_manager_manifest,
-                 cnpg_manifest=args.cnpg_manifest)
+                 cnpg_manifest=args.cnpg_manifest, barman_manifest=args.barman_manifest)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):

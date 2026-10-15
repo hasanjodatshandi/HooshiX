@@ -233,4 +233,9 @@ def rehearse(k, wait, run, manifest, platform):
     result['container_key_log_markers'] = 'Passed'
     result['production_target'] = 'Not verified'
     result['barman_runtime'] = 'Not run'
+    # Release only this disposable issuance fixture's names before downstream commissioning.
+    for obj in (leaf, signing, ca, issuer):
+        k('-n', renderer.NAMESPACE, 'delete', obj['kind'], obj['metadata']['name'], '--wait=true')
+    for obj in (leaf, ca):
+        k('-n', renderer.NAMESPACE, 'delete', 'secret', obj['spec']['secretName'], '--ignore-not-found')
     return result

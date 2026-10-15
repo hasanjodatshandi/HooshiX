@@ -208,7 +208,13 @@ and successful native baseline `38720511900`. Public receipt
 SHA256 `257e978c56896807c0724cf12a8207fe70022854a8445bc6fabdb8849fd34762`.
 Guards passed and prior host/OpenBao services were preserved; public access is
 closed. No PVC/database/Barman was created. Barman's bounded control-plane trust
-contract is the next prerequisite, not another filesystem allocation.
+contract now permits only owner-approved global list/watch of non-secret
+ObjectStores and Roles/RoleBindings; plugin Secret API and foreign writes remain
+denied. Bounded signed Barman control-plane tooling adds internal leaf TLS,
+CNPG-only port 9090, Ambient STRICT and native positive/negative evidence.
+Target Barman execution, sidecar/data bootstrap, provider backup/PITR and readiness
+remain `Not run`/`Not verified`. Exact sidecar delegation must be bootstrapped
+before data commissioning; no implicit Secret/bind/escalate grant is allowed.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces

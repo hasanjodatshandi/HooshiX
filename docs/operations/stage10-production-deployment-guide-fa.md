@@ -1489,6 +1489,62 @@ PV به دیسک/ماشین دیگری قابل انتقال کورکورانه 
 دوم binding و native/target evidence مستقل لازم است. پس از وجود داده، rollback
 به معنای حذف PV/PVC یا پاک‌سازی filesystem نیست؛ recovery تحت نظارت انجام شود.
 
+### نصب کنترل‌پلین داخلی Barman
+
+این گام بعد از cert-manager، CNPG و رزرو LocalPV انجام می‌شود؛ نه ساخت دیتابیس
+و نه تماس با باکت. تأیید مالک برای تصویر ثابت `Barman 0.15.1` فقط شامل
+`list/watch` سراسری ObjectStore و Role/RoleBinding غیرمحرمانه است. API مربوط
+به Secretها برای هویت `plugin-barman-cloud` ممنوع است؛ نوشتن فقط در
+`platform-data` و فقط Role/RoleBinding به نام `postgresql-barman-cloud` مجاز
+است. `bind` و `escalate` اعطا نمی‌شوند. این انتخاب، metadata غیرمحرمانهٔ سایر
+namespaceها را برای cache قابل مشاهده می‌کند؛ اجازهٔ خواندن مقدار Secret نیست.
+CNPG با هویت جدا فقط `get` روی دو Secret گواهی داخلی Barman دارد. کلیدهای
+همان دو گواهی برای خود Barman به صورت volume فقط‌خواندنی mount می‌شوند.
+
+manifest رسمی و hash ثابت از `postgresql-artifacts.json`/baseline دریافت می‌شود؛
+هیچ `latest`، build تازه یا Root تازه‌ای استفاده نکنید. از main تمیز:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main \
+  -f mesh_security_upgrade=true -f eso_commissioning=true \
+  -f cert_manager_commissioning=true -f cnpg_control_plane=true \
+  -f barman_control_plane=true
+python3 scripts/production/build_barman_control_plane_bundle.py \
+  --staging-run <successful-exact-tree-platform-run> \
+  --manifest <hash-verified-barman-0.15.1.yaml> \
+  --cnpg-manifest <hash-verified-cnpg-1.30.1.yaml> \
+  --cert-manager-manifest <hash-verified-cert-manager-1.20.3.yaml> \
+  --evidence-dir <authenticated-postgresql-publication-directory> \
+  --output <new-public-bundle-outside-git>
+```
+
+builder امضا، SLSA، SBOM و scan دقیق مجموعهٔ قبلی و رسید native تازهٔ همان
+tree را لازم دارد. staging باید علاوه بر rollout و اجرای مجدد، رد image signer/
+provenance/SBOM غلط، Secret API و نوشتن namespace دیگر، نام Role غیرمجاز،
+TLS با client certificate و hostname درست و رد client/hostname غلط و اتصال
+خارج Ambient را ثابت کند. کلیدهای آزمایشی از fixture خارج نمی‌شوند.
+
+در Windows ابتدا همان wrapper با `-ValidateOnly`؛ سپس با VNC نجات و نشست دوم
+مستقل SSH باز، فقط رمز sudo در پنجرهٔ محلی:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-barman-control-plane.ps1' -RescueAndSecondSessionReady
+```
+
+گواهی‌های server/client داخلی leaf هستند؛ Root آفلاین و CA موجود تغییر
+نمی‌کنند. Service فقط `ClusterIP`، شبکه deny-by-default و تمام پورت‌های Barman
+`STRICT` هستند؛ فقط هویت CNPG به 9090 دسترسی دارد. نصب پیش از هر write، مالکیت
+و drift منابع و metadata کلیدهای TLS را بررسی می‌کند؛ adopt/force/delete ندارد.
+در شکست جزئی state را نگه دارید، receipt را بررسی کنید و کورکورانه تکرار نکنید.
+حذف CRD/Secret/volume روش rollback نیست. نتیجهٔ مورد انتظار
+`BARMAN_CONTROL_PLANE=Passed` است؛ **اجرای مقصد هنوز Not run**.
+
+پس از این گام، ساخت دیتابیس/sidecar، credential، WAL و بک‌آپ/restore جداگانه
+لازم است. bootstrap مجاز باید delegation دقیق sidecar را از قبل بسازد؛ Barman
+بدون Secret API نمی‌تواند خودش حق خواندن Secret جدیدی را به Role اضافه کند.
+این وابستگی مجوز اعطای دسترسی بیشتر نیست. مشکل فعلی پارس‌پک همچنان تعویق
+ثبت‌شده و **Not verified** است، نه Passed و نه مجوز لغو Root یا صدور JIT ناامن.
+
 ### آماده‌سازی مالکیت دیتابیس‌های PostgreSQL
 
 این بخش روش نهایی تولید جزء عمومی مالکیت CNPG است؛ **نصب PostgreSQL روی VPS

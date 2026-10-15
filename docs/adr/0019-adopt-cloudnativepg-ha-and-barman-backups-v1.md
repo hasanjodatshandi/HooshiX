@@ -69,6 +69,25 @@ Notification's `DISPATCHING` transaction is durable before external provider I/O
 
 Mandatory controls in both profiles include PostgreSQL TLS, service-scoped least-privilege runtime/migration roles, OpenBao/External Secrets credential delivery, no public database exposure, deny-by-default NetworkPolicy, encrypted backup artifacts, forced tenant RLS where applicable, and JIT audited human privilege.
 
+For the pinned Barman plugin 0.15.1 in `production-single-server`, the owner
+accepts cluster-wide **list/watch only** on non-secret ObjectStores and
+Roles/RoleBindings because the unchanged controller-runtime cache is global.
+The plugin receives no Kubernetes Secret API permissions, cluster-wide writes,
+`bind` or `escalate`. Mutations are confined to `platform-data`, and admission
+restricts Role/RoleBinding creation to `postgresql-barman-cloud`; get/update/patch
+are exact-name scoped. This exposes non-secret metadata across namespaces, not
+Secret values. The operator's own generated TLS keys are mounted read-only.
+CNPG separately receives get-only access to the two exact plugin TLS Secrets.
+All plugin ports remain Ambient STRICT and application TLS is independently
+authenticated; its Service is ClusterIP and only CNPG may call port 9090.
+
+Before data-plane commissioning, the authorized bootstrap must prepare and verify
+the exact sidecar delegation and subjects for approved backup credential refs.
+Kubernetes privilege-escalation prevention remains enabled: a controller without
+Secret rights cannot itself grant a new Secret-reading Role. This dependency
+must not be repaired by silently adding Secret, bind/escalate or global-write
+permissions. Control-plane installation alone proves no backup, WAL or restore.
+
 ## Verification requirements
 
 Both profiles verify database/runtime+migration isolation, connection budgets, WAL/PITR RPO, monthly isolated restore integrity/RTO, quarterly DR, TLS/NetworkPolicy, runtime-role/RLS restrictions, and Notification ambiguity safety where applicable.
