@@ -9,6 +9,10 @@ on:
       - scripts/production/*postgresql*secrets*.py
       - scripts/production/postgresql_secret_delivery.py
       - scripts/production/tests/test_postgresql_secrets.py
+      - scripts/production/*postgresql*quarantine*.py
+      - scripts/production/tests/test_postgresql_quarantine.py
+      - scripts/production/run-postgresql-quarantine.ps1
+      - scripts/production/install_postgresql_local_volume.py
       - scripts/production/rehearsal_probes.py
       - scripts/production/tests/test_rehearsal_probes.py
       - scripts/production/render_mesh_candidate.py
@@ -62,6 +66,10 @@ on:
         default: false
       barman_control_plane:
         description: Rehearse signed internal Barman with owner-approved metadata cache and no Secret API access
+        type: boolean
+        default: false
+      postgresql_quarantine:
+        description: Rehearse only the owner-approved empty closed PostgreSQL quarantine
         type: boolean
         default: false
       mesh_run:
@@ -133,6 +141,10 @@ jobs:
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'CNPG_OPERATOR_WRAPPER_SYNTAX_FAILED' }
           [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-postgresql-quarantine.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'POSTGRESQL_QUARANTINE_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-barman-control-plane.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'BARMAN_OPERATOR_WRAPPER_SYNTAX_FAILED' }
@@ -194,7 +206,7 @@ jobs:
               "ghcr.io/kyverno/signatures@${pair#*:}" > /dev/null
           done
       - name: Prepare exact internal cert-manager manifest and published acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -212,7 +224,7 @@ jobs:
           python3 scripts/production/verify_published_cert_manager.py \
             --evidence-dir "$RUNNER_TEMP/cert-manager-publication" --output-dir "$RUNNER_TEMP/cert-manager-acceptance"
       - name: Prepare exact CNPG manifest and published data-set acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -246,14 +258,17 @@ jobs:
           if [[ '${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}' == 'true' ]]; then
             options+=(--eso-chart "$RUNNER_TEMP/platform-tools/eso-chart.tgz")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}' == 'true' ]]; then
             options+=(--cert-manager-manifest "$RUNNER_TEMP/platform-tools/cert-manager.yaml")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}' == 'true' ]]; then
             options+=(--cnpg-manifest "$RUNNER_TEMP/platform-tools/cnpg.yaml")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.barman_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.barman_control_plane || inputs.postgresql_quarantine }}' == 'true' ]]; then
             options+=(--barman-manifest "$RUNNER_TEMP/platform-tools/barman.yaml")
+          fi
+          if [[ '${{ github.event_name == 'pull_request' || inputs.postgresql_quarantine }}' == 'true' ]]; then
+            options+=(--postgresql-quarantine)
           fi
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/platform-tools" \

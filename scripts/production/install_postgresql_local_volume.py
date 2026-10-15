@@ -101,7 +101,24 @@ def reserve(objects, call=kube):
         require(matches(actual, desired), 'RESERVATION_VERIFICATION_FAILED')
 
 
-def foundation():
+def verify_data(*, initialized=False):
+    info = DATA.lstat()
+    require(stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid) == (26, 26)
+        and stat.S_IMODE(info.st_mode) in (0o700, 0o770, 0o2770), 'GUARDED_DATA_OWNER_REQUIRED')
+    if initialized:
+        pgdata = DATA / 'pgdata'
+        version = pgdata / 'PG_VERSION'
+        require({p.name for p in DATA.iterdir()} == {'pgdata'} and not pgdata.is_symlink()
+            and pgdata.is_dir() and pgdata.stat().st_uid == 26 and not version.is_symlink()
+            and version.is_file() and version.stat().st_size <= 8 and version.read_text().strip() == '18',
+            'EXISTING_POSTGRESQL_18_DATA_REQUIRED')
+    else:
+        require(not any(DATA.iterdir()), 'EMPTY_GUARDED_DATA_REQUIRED')
+    fs = os.statvfs(DATA)
+    require(initialized or fs.f_bavail * fs.f_frsize >= CAPACITY, 'USABLE_CAPACITY_BELOW_RESERVATION')
+
+
+def foundation(*, initialized=False):
     require(os.geteuid() == 0 and os.uname().nodename == 'mail.hooshix.com', 'LOCAL_SUDO_TARGET_REQUIRED')
     for path in (*reversed(GUARD.parents), GUARD):
         info = path.lstat()
@@ -111,11 +128,7 @@ def foundation():
         and GUARD.stat().st_size <= 32768 and hashlib.sha256(GUARD.read_bytes()).hexdigest() == GUARD_SHA256,
         'REVIEWED_INSTALLED_GUARD_REQUIRED')
     native(['/usr/bin/python3', '-I', str(GUARD), '--guard-check'])
-    info = DATA.lstat()
-    require(stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid) == (26, 26)
-        and stat.S_IMODE(info.st_mode) in (0o700, 0o770, 0o2770) and not any(DATA.iterdir()), 'EMPTY_GUARDED_DATA_REQUIRED')
-    fs = os.statvfs(DATA)
-    require(fs.f_bavail * fs.f_frsize >= CAPACITY, 'USABLE_CAPACITY_BELOW_RESERVATION')
+    verify_data(initialized=initialized)
     units = {u: native(['/usr/bin/systemctl', 'show', u, '--property=ActiveState,MainPID']) for u in UNITS}
     require(all(b'ActiveState=active' in units[u].splitlines() for u in UNITS[:6]), 'REQUIRED_SERVICE_NOT_ACTIVE')
     bindings = native(['/usr/bin/systemctl', 'show', 'k3s.service', '--property=BindsTo', '--value']).decode().split()

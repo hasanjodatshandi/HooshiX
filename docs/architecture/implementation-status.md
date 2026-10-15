@@ -23,8 +23,10 @@ Existing root/CA/mesh/OpenBao/application ESO/CNPG/Barman/storage are preserved.
 Public access is CLOSED; database instances/PVCs, provider backup and root
 revocation remain `Not run`. This supersedes earlier credential-delivery
 `Not run` statements, not the separate application-secret or recovery gates.
-The PostgreSQL data-Pod boundary remains closed until reviewed data commissioning;
-provider deferral is not an authorization to bypass that boundary.
+The owner separately approved only an empty commissioning quarantine on
+2026-10-16 under ADR-0042. Its tooling and native gates are in preparation;
+target database installation is still `Not run`. The general data/application
+boundary stays closed and provider deferral is not a backup or readiness waiver.
 
 The credential-free PostgreSQL ownership component is implemented at
 `scripts/production/render_postgresql_ownership.py` and documented under

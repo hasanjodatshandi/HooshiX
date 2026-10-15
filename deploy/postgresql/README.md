@@ -74,7 +74,8 @@ Business schema changes remain owned by each service's immutable Flyway history.
 Credential delivery is a distinct prerequisite: ten exact runtime/migration
 identities in `platform-data`, separate from the existing six application
 identities. The application ESO controller is not implicitly granted another
-namespace. PostgreSQL data Pods remain closed until the complete data bootstrap.
+namespace. PostgreSQL data Pods remain closed except for ADR-0042's explicitly
+owner-approved empty commissioning quarantine described below.
 
 The owner-local 32 GiB filesystem/guard foundation is installed on the current
 VPS. `install_postgresql_local_volume.py` prepares only the static 29 GiB LocalPV
@@ -87,11 +88,23 @@ no PVC/database has been created; the separate Barman controller is installed,
 but its database sidecar and provider backup are not. Other servers require their own binding
 and target receipt.
 
-Do **not** apply this candidate directly to the VPS. The reviewed complete data
+Do **not** apply this ownership candidate directly to the VPS. The reviewed complete data
 bundle must first supply the signed CNPG/operator/database/Barman image evidence,
 durable storage guard, finite capacity/pool budgets, TLS and network/mesh isolation,
 and the approved backup/restore path. Actual PostgreSQL commissioning is `Not run`.
 ParsPack deferral is not off-host backup or production-readiness evidence.
+
+The separate `render_postgresql_quarantine.py` / `install_postgresql_quarantine.py`
+path implements only the owner's 2026-10-16 empty commissioning approval. One
+signed instance uses the existing guarded 29 GiB Retain reservation and existing
+`identity-db-migration` Secret. No five-service ownership reconciliation, Flyway
+or business tables are installed. General TCP SQL is denied in `pg_hba`; the only
+mesh/network ingress is CNPG's internal control endpoint. The public bundle is
+gated by exact-tree signed Ambient/admission/reentry/empty/TLS/denial evidence and
+the separate filesystem/guard native suite. Only owner-local sudo can execute it.
+Unexpected data, claim ownership or configuration stops with state preserved;
+there is no reset, reformat or automatic database rollback. Follow the Persian
+living guide; this is not permission to open application traffic or skip recovery.
 
 1. Supply 10 independent, namespace-local `kubernetes.io/basic-auth` Secrets from
    the existing OpenBao authority. Their names are `<service>-db-runtime` and

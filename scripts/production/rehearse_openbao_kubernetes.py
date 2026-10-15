@@ -128,8 +128,10 @@ def ca_import_fixture(k):
 def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
              eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False,
              cert_manager_manifest: Path | None = None, cnpg_manifest: Path | None = None,
-             barman_manifest: Path | None = None) -> None:
+             barman_manifest: Path | None = None, postgresql_quarantine: bool = False) -> None:
     runner_paths(tools, receipt)
+    if postgresql_quarantine and barman_manifest is None:
+        raise RehearsalFailed('PostgreSQL quarantine requires the owned Barman/credential fixture')
     if barman_manifest is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
         if (cnpg_manifest is None or barman_manifest.is_symlink()
@@ -449,6 +451,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     from rehearse_postgresql_secrets import rehearse as postgresql_secrets
                     pg_secret_result = postgresql_secrets(k, wait, eso_chart, str(tools / 'helm'),
                         api, token, cert.read_text(), audiences, addresses)
+                    if postgresql_quarantine:
+                        from rehearse_postgresql_quarantine import rehearse as quarantine
+                        pg_quarantine_result = quarantine(k, wait, run, eso_chart, str(tools / 'helm'), addresses)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -527,6 +532,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
             result['barman_control_plane'] = barman_result
             result['postgresql_secret_delivery'] = pg_secret_result
+            if postgresql_quarantine: result['postgresql_quarantine'] = pg_quarantine_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
@@ -550,11 +556,13 @@ def main() -> int:
     parser.add_argument('--cert-manager-manifest', type=Path)
     parser.add_argument('--cnpg-manifest', type=Path)
     parser.add_argument('--barman-manifest', type=Path)
+    parser.add_argument('--postgresql-quarantine', action='store_true')
     args = parser.parse_args()
     try:
         rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart,
                  mesh_security_upgrade=args.mesh_security_upgrade, cert_manager_manifest=args.cert_manager_manifest,
-                 cnpg_manifest=args.cnpg_manifest, barman_manifest=args.barman_manifest)
+                 cnpg_manifest=args.cnpg_manifest, barman_manifest=args.barman_manifest,
+                 postgresql_quarantine=args.postgresql_quarantine)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):

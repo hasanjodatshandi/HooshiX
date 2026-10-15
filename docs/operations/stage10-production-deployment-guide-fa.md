@@ -1686,6 +1686,64 @@ root جدید نسازید و re-init نزنید. تغییر credential یا ن�
 manifest، rollback password محسوب نمی‌شود. مشکل deferred پارس‌پک همچنان **Not verified**
 است و در این عملیات نه probe می‌شود و نه موفق فرض می‌شود.
 
+### PostgreSQL خالی و قرنطینه‌شده
+
+مالک در ۲۰۲۶-۱۰-۱۶ فقط این حالت را تأیید کرده است؛ مجوز ورود دادهٔ واقعی یا
+اتصال برنامه نیست. یک instance از همان تصویر امضاشده روی LocalPV موجود ۲۹ GiB
+ساخته می‌شود. CNPG برای bootstrap، دیتابیس خالی `identity` و owner موجود
+`identity_migration` را با ارجاع به Secret `identity-db-migration` می‌سازد؛ هیچ
+جدول، Flyway، پنج دیتابیس برنامه یا نقش اضافی در این گام نصب نمی‌شود. رمز عوض
+نمی‌شود و بسته رمز/توکن/کلید CA نمی‌خواهد. دسترسی عمومی و اتصال TCP برنامه‌ها
+بسته است؛ `pg_hba` حتی اتصال SQL از loopback داخل Pod را رد می‌کند. فقط مدیریت
+داخلی CNPG و مسیر peer محلیِ اپراتور، با احراز هویت مدیریتی موجود، باقی می‌ماند.
+
+این مسیر در `render_postgresql_quarantine.py` تعریف می‌شود. پس از موفقیت آزمون
+واقعی همان درخت Git و تأیید `main`، بستهٔ عمومی بیرون Git ساخته می‌شود:
+
+```bash
+python3 scripts/production/build_postgresql_quarantine_bundle.py \
+  --staging-run <successful-exact-tree-platform-run> \
+  --storage-run <successful-exact-tree-baseline-run> \
+  --chart <checksum-verified-eso-2.12.0.tgz> --helm <pinned-helm> \
+  --evidence-dir <verified-public-postgresql-publication> \
+  --output <new-public-bundle-outside-git>
+```
+
+سازنده، امضا و provenance/SBOM و تازگی شواهد چهار تصویر قبلی، آزمون filesystem
+و guard، bootstrap واقعی CNPG/Ambient، خالی‌بودن، TLS/رد SQL، رد Pod و امضای
+نامعتبر و اجرای دوباره بدون تغییر UIDهای Cluster/PVC/PV را لازم دارد. native
+داخل kind، mount میزبان VPS محسوب نمی‌شود؛ guard روی مقصد جداگانه بررسی می‌شود.
+روی سرور دوم، نام node و رزرو storage باید در تغییر بررسی‌شده به همان نصب
+متصل شود؛ نام سرور اول را به مقصد دیگر apply نکنید.
+
+در Windows ابتدا بدون اتصال به VPS:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-quarantine.ps1' -ValidateOnly
+```
+
+با VNC قابل ورود و نشست دوم SSH باز، فقط رمز sudo را همان‌جا وارد کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-quarantine.ps1' -RescueAndSecondSessionReady
+```
+
+خروجی مقصد `POSTGRESQL_QUARANTINE=Passed` و `PUBLIC_RECEIPT` است؛ تا دریافت و
+تطبیق رسید، نصب مقصد **Not run/Not verified** باقی می‌ماند. `Passed` فقط یعنی
+دیتابیس خالی، حجم Retain درست، TLS و مرز بسته و اجزای قبلی حفظ شده‌اند؛ backup،
+بازیابی، ظرفیت و محصول Production را تأیید نمی‌کند. برای دیدن وضعیت بدون Secret:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl -n platform-data get clusters,pods,pvc'
+```
+
+پس از خطا داده و منابع حفظ می‌شوند. Cluster/PVC/PV، `pgdata` یا Secret را پاک
+نکنید؛ re-init، فرمت، downgrade و rollback خودکار نداریم. پس از بررسی کد عمومی
+خطا، فقط همان بسته و همان UIDها قابل ادامه‌اند. وجود جدول/دیتابیس غیرمنتظره،
+claim خارجی یا تغییر spec باعث توقف می‌شود. خروج از قرنطینه و اتصال برنامه‌ها
+یک تغییر مستقل بعد از backup/restore و isolation/migration معتبر است. مشکل
+پارس‌پک در این مرحله probe یا موفق فرض نمی‌شود؛ root نیز لغو نمی‌شود.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
