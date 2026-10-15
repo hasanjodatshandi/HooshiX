@@ -90,7 +90,8 @@ def webhook_configuration(plan, kube, name, *, commit):
     require(len(hooks) == 1, 'PG_SECRET_EXISTING_WEBHOOK_REQUIRED')
     expected = copy.deepcopy(plan['webhook_contracts'][name])
     for hook in expected: hook.pop('namespaceSelector', None)
-    require(desired_fields_match({'webhooks': hooks}, {'webhooks': expected}),
+    require(desired_fields_match({'kind': 'ValidatingWebhookConfiguration', 'webhooks': hooks},
+                                {'kind': 'ValidatingWebhookConfiguration', 'webhooks': expected}),
             'PG_SECRET_EXACT_WEBHOOK_CONTRACT_REQUIRED')
     for hook in hooks:
         require(hook['failurePolicy'] == 'Fail' and hook['timeoutSeconds'] == 5
