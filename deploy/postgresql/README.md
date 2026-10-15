@@ -71,6 +71,11 @@ Business schema changes remain owned by each service's immutable Flyway history.
 
 ## Commissioning dependency contract
 
+Credential delivery is a distinct prerequisite: ten exact runtime/migration
+identities in `platform-data`, separate from the existing six application
+identities. The application ESO controller is not implicitly granted another
+namespace. PostgreSQL data Pods remain closed until the complete data bootstrap.
+
 The owner-local 32 GiB filesystem/guard foundation is installed on the current
 VPS. `install_postgresql_local_volume.py` prepares only the static 29 GiB LocalPV
 reservation (ext4 usable capacity is less than backing size), with Retain,
