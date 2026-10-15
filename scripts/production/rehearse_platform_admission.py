@@ -16,6 +16,7 @@ import render_mesh_candidate as mesh
 import render_platform_admission as admission
 import upgrade_kyverno
 from rehearse_openbao_recovery import RehearsalFailed
+from rehearsal_probes import independent_probes
 
 
 def pin_file(relative: str) -> dict:
@@ -575,14 +576,16 @@ class Staging:
         pod["volumes"] = [{"name": "tls", "secret": {"secretName": "openbao-server-tls", "defaultMode": 288}}]
         bounded = admission.hardening("hooshix-secrets", {"openbao": self.plan["openbao"]["items"][-1]["spec"]["template"]["spec"],
             "commissioning-probe": pod, "commissioning-wrong": pod})
+        cases = (("mtls-positive", "commissioning-probe", False),
+                 ("wrong-serviceaccount", "commissioning-wrong", False),
+                 ("plaintext-negative", "commissioning-probe", True))
         try:
             apply(k, bounded)
             for name in ("commissioning-probe", "commissioning-wrong"):
                 apply(k, {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {
                     "name": name, "namespace": "hooshix-secrets"}, "automountServiceAccountToken": False})
-            for label, account, plaintext in (("mtls-positive", "commissioning-probe", False),
-                                              ("wrong-serviceaccount", "commissioning-wrong", False),
-                                              ("plaintext-negative", "commissioning-probe", True)):
+            def probe(case):
+                label, account, plaintext = case
                 print('PLATFORM_NETWORK_PROBE=' + label, flush=True)
                 spec = copy.deepcopy(pod)
                 spec["serviceAccountName"] = account
@@ -611,7 +614,14 @@ class Staging:
                         raise ValueError("authorized Ambient API probe failed")
                 elif state["exitCode"] != 1:
                     raise ValueError("plaintext/wrong identity was not denied")
-                self.checks[label.replace("-", "_")] = "Passed"
-                k("-n", "hooshix-secrets", "delete", "pod/" + label, "--timeout=30s", timeout=40)
+                return label.replace("-", "_")
+
+            for label in independent_probes(cases, probe):
+                self.checks[label] = "Passed"
         finally:
-            apply(k, original)
+            try:
+                for label, _, _ in cases:
+                    k("-n", "hooshix-secrets", "delete", "pod/" + label,
+                      "--ignore-not-found", "--timeout=30s", timeout=40)
+            finally:
+                apply(k, original)

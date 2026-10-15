@@ -2,13 +2,18 @@ name: Web BFF service
 
 on:
   workflow_call:
+    inputs:
+      application_tests:
+        description: Full service verification; false only for explicitly isolated platform PRs
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: web-bff-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: web-bff-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   SERVICE_DIR: services/web-bff
@@ -28,6 +33,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
+      - name: Report explicitly unselected service work
+        if: ${{ !inputs.application_tests }}
+        run: echo 'Java service verification Not applicable for isolated platform tooling; repository-wide security gates remain mandatory.'
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -35,6 +43,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Eclipse Temurin 25.0.4
+        if: ${{ inputs.application_tests }}
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
@@ -42,6 +51,7 @@ jobs:
 
 
       - name: Publish HooshiX Protobuf contract package to local Maven cache
+        if: ${{ inputs.application_tests }}
         run: |
           set -euo pipefail
           cd contracts/protobuf-contracts
@@ -49,6 +59,7 @@ jobs:
             --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify Java and Gradle wrapper pins
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: |
           set -euo pipefail
@@ -61,46 +72,59 @@ jobs:
           grep -F 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' gradle/wrapper/gradle-wrapper.properties
 
       - name: Verify Gitleaks image and detection fixtures
+        if: ${{ inputs.application_tests }}
         run: scripts/ci/security/service_security.sh gitleaks-fixtures
       - name: Scan current tree and Git history for secrets
+        if: ${{ inputs.application_tests }}
         run: scripts/ci/security/service_security.sh gitleaks-scan
       - name: Install and verify OSV-Scanner
+        if: ${{ inputs.application_tests }}
         run: scripts/ci/security/service_security.sh osv-install
       - name: Scan locked dependencies for known vulnerabilities
+        if: ${{ inputs.application_tests }}
         run: scripts/ci/security/service_security.sh osv-scan
       - name: Capture Gradle lock baseline
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: cp gradle.lockfile /tmp/web-bff-gradle.lockfile
 
       - name: Verify formatting
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew spotlessCheck --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify unit tests
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew test --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify Redis integration tests
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew integrationTest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify risk-based coverage thresholds
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew jacocoRiskCoverage --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify architecture tests
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew architectureTest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify selective browser-edge mutation thresholds
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew pitest --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Verify SpotBugs and runtime JAR
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: ./gradlew spotbugsMain bootJar --write-locks --dependency-verification strict --no-daemon --no-configuration-cache
 
       - name: Run pinned Semgrep policy
+        if: ${{ inputs.application_tests }}
         run: |
           set -euo pipefail
           docker run --rm \
@@ -122,6 +146,7 @@ jobs:
               services/web-bff/src/main/java
 
       - name: Install and verify Helm
+        if: ${{ inputs.application_tests }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
@@ -132,6 +157,7 @@ jobs:
           /tmp/linux-amd64/helm version --short | grep -F "v${HELM_VERSION}"
 
       - name: Lint and verify hardened Helm render
+        if: ${{ inputs.application_tests }}
         run: |
           set -euo pipefail
           chart="${SERVICE_DIR}/deploy/helm/web-bff"
@@ -141,6 +167,7 @@ jobs:
           python3 "${SERVICE_DIR}/scripts/verify_rendered_manifest.py" /tmp/web-bff-rendered.yaml
 
       - name: Install and verify Prometheus tooling
+        if: ${{ inputs.application_tests }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
@@ -151,12 +178,14 @@ jobs:
           mv "/tmp/prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool" /tmp/promtool
 
       - name: Verify service alert rules and dashboard JSON
+        if: ${{ inputs.application_tests }}
         run: |
           set -euo pipefail
           /tmp/promtool check rules "${SERVICE_DIR}/observability/alerts/web-bff.yaml"
           python3 -m json.tool "${SERVICE_DIR}/observability/grafana/web-bff.json" > /dev/null
 
       - name: Build digest-verified Temurin runtime image
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: |
           set -euo pipefail
@@ -175,6 +204,7 @@ jobs:
           rm -rf .runtime-jdk
 
       - name: Verify generated files are committed
+        if: ${{ inputs.application_tests }}
         working-directory: ${{ env.SERVICE_DIR }}
         run: |
           set -euo pipefail

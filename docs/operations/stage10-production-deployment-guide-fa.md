@@ -1491,6 +1491,26 @@ PV به دیسک/ماشین دیگری قابل انتقال کورکورانه 
 
 ### نصب کنترل‌پلین داخلی Barman
 
+#### اجرای CI مربوط به استقرار
+
+گیت‌های runtime، امضا/provenance/SBOM و بازیابی حذف نمی‌شوند. برای تغییرات
+کاملاً محدود و شناخته‌شدهٔ ابزار نصب، فقط کارهای واقعاً نامرتبط می‌توانند
+`Not applicable` شوند؛ مسیر ناشناخته، تغییر مشترک/امنیتی/CI یا مقایسهٔ نامعتبر
+باید اجرای کامل بخواهد. main و اجرای زمان‌بندی‌شده/دستی همچنان کامل هستند و
+اسکن redacted کل tree/history حتی در PR محدود هم الزامی است. اجرای قدیمی همان
+PR پس از push جدید می‌تواند لغو شود؛ نتیجهٔ لغوشده شاهد استقرار نیست.
+پیش از push، اصلاحات همان واحد کاری را جمع کنید تا کلاستر موقت بی‌جهت
+بارها بازسازی نشود. هیچ cache شامل کلیدها، دیتای fixture یا رسید موفق جایگزین
+آزمون تازه نیست. ابزار ساخت بسته همچنان native evidence تازهٔ همان tree را می‌خواهد.
+انتخاب مسیر در `scripts/ci/select_pr_checks.py` فقط برای allowlist محدود ابزارهای
+Barman/CNPG/storage/cert-manager اعمال می‌شود. نام شش check محافظت‌شده حفظ
+می‌شود؛ کار نامرتبط با پیام `Not applicable` ثبت می‌شود، نه موفقیت جعلی تست
+اجرانشده. خطای انتخاب مسیر، نتیجهٔ ناقص یا skip غیرمنتظره baseline را رد می‌کند.
+probeهای مستقل شبکه/TLS در fixture حداکثر دو‌تایی اجرا می‌شوند؛ تغییر policyها
+ترتیبی باقی می‌ماند و همهٔ آزمون‌های مثبت/منفی و cleanup حفظ می‌شوند.
+
+#### نصب مقصد
+
 این گام بعد از cert-manager، CNPG و رزرو LocalPV انجام می‌شود؛ نه ساخت دیتابیس
 و نه تماس با باکت. تأیید مالک برای تصویر ثابت `Barman 0.15.1` فقط شامل
 `list/watch` سراسری ObjectStore و Role/RoleBinding غیرمحرمانه است. API مربوط
@@ -1538,7 +1558,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-bar
 و drift منابع و metadata کلیدهای TLS را بررسی می‌کند؛ adopt/force/delete ندارد.
 در شکست جزئی state را نگه دارید، receipt را بررسی کنید و کورکورانه تکرار نکنید.
 حذف CRD/Secret/volume روش rollback نیست. نتیجهٔ مورد انتظار
-`BARMAN_CONTROL_PLANE=Passed` است؛ **اجرای مقصد هنوز Not run**.
+`BARMAN_CONTROL_PLANE=Passed` است. اجرای مالک در ۲۰۲۶-۱۰-۱۵ **Passed**:
+main برابر `b624b088f316fa8257b9777bb0fc2d84a081b839`، شاهد native
+`38731557283` و plan با SHA256
+`ffb4478bc5736326ad9752ca534075971bbb1d209e72f2060b815dd1260dfb41`.
+receipt عمومی `hooshix-barman-236cb6299fe54850b24260aea63be35e.json`
+با SHA256 `6a072732effc3c8bc4f229539aee6168c85726b0eab8995bdbbd92ee52a96b2a`
+نصب controller، گواهی‌های داخلی و رد Secret API/نوشتن خارج namespace را تأیید
+می‌کند. CA، mesh، OpenBao، ESO، CNPG، storage و سرویس‌های میزبان حفظ شده‌اند؛
+دسترسی عمومی بسته و دیتابیس/sidecar/provider backup همچنان **Not run** هستند.
 
 پس از این گام، ساخت دیتابیس/sidecar، credential، WAL و بک‌آپ/restore جداگانه
 لازم است. bootstrap مجاز باید delegation دقیق sidecar را از قبل بسازد؛ Barman

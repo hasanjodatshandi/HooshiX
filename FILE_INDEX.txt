@@ -437,10 +437,12 @@ mlops/schemas/evaluation-suite.schema.json
 mlops/schemas/governance-v2.schema.json
 mlops/schemas/governance.schema.json
 mlops/schemas/provider-approval-receipt-v1.schema.json
+scripts/baseline/tests/test_ci_selection.py
 scripts/baseline/tests/test_verify_repository.py
 scripts/baseline/verify_repository.py
 scripts/ci/quality/verify_repository_sources.sh
 scripts/ci/security/service_security.sh
+scripts/ci/select_pr_checks.py
 scripts/context/context_engine.py
 scripts/context/post_merge_checkpoint.py
 scripts/context/tests/test_context_engine.py
@@ -578,6 +580,7 @@ scripts/production/publish_openbao_candidate.py
 scripts/production/publish_postgresql_candidates.py
 scripts/production/readiness.py
 scripts/production/recover_openbao_initialization.py
+scripts/production/rehearsal_probes.py
 scripts/production/rehearse_barman_control_plane.py
 scripts/production/rehearse_cert_manager.py
 scripts/production/rehearse_cnpg_control_plane.py
@@ -671,6 +674,7 @@ scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_published_cert_manager.py
 scripts/production/tests/test_published_postgresql.py
 scripts/production/tests/test_readiness.py
+scripts/production/tests/test_rehearsal_probes.py
 scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_target_storage_guard.py

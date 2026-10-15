@@ -117,7 +117,7 @@ SERVICE_SECURITY_WORKFLOWS = (
     ".github/workflows/web-bff.yml",
 )
 BASELINE_CONVERSATION_MARKERS = (
-    "conversation-security:\n    name: Conversation security suite\n    uses: ./.github/workflows/conversation-service.yml",
+    "conversation-security:\n    needs: ci-scope\n    name: Conversation security suite\n    uses: ./.github/workflows/conversation-service.yml",
     "      - conversation-security",
     "CONVERSATION_RESULT: ${{ needs.conversation-security.result }}",
     'if [ "${CONVERSATION_RESULT}" != \'success\' ]; then',

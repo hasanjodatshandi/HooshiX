@@ -9,6 +9,7 @@ import render_barman_control_plane as renderer
 import render_platform_admission as admission
 from rehearse_cnpg_control_plane import failure_classes
 from rehearse_openbao_recovery import RehearsalFailed
+from rehearsal_probes import independent_probes
 from rehearse_platform_admission import admission_result, apply, policy_ready
 from upgrade_mesh_security import replace_policy
 
@@ -81,16 +82,17 @@ def tls_boundary(k, wait, adapter, plan):
             'selector': {'matchLabels': renderer.LABELS}, 'action': 'ALLOW', 'rules': [{'from': [{'source': {
                 'principals': ['prod.sajtech.internal/ns/' + ns + '/sa/' + account]}}],
                 'to': [{'operation': {'ports': ['9090']}}]}]})]
-    names = []
+    cases = (('positive', 'ambient'), ('no-client', 'ambient'), ('wrong-client', 'ambient'),
+             ('hostname', 'ambient'), ('identity', 'ambient'), ('plaintext', 'none'))
+    names = [name + '-' + mode for mode, _ in cases]
     try:
         replace_policy(boundary, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
                        kube=adapter, previous=plan['boundary'])
         for obj in objects: apply(k, obj)
         for obj in sources: policy_ready(k, obj)
-        for mode, enrollment in (('positive', 'ambient'), ('no-client', 'ambient'), ('wrong-client', 'ambient'),
-                                  ('hostname', 'ambient'), ('identity', 'ambient'), ('plaintext', 'none')):
+        def probe(case):
+            mode, enrollment = case
             name_ = name + '-' + mode
-            names.append(name_)
             spec = copy.deepcopy(pod)
             spec['containers'][0]['args'] = [mode]
             if mode == 'identity': spec['serviceAccountName'] = account + '-denied'
@@ -105,6 +107,7 @@ def tls_boundary(k, wait, adapter, plan):
             if state['exitCode'] != (0 if positive else 1) or logs != (
                     b'BARMAN_TLS=Passed' if positive else b'BARMAN_TLS=Denied'):
                 raise RehearsalFailed('Barman TLS or STRICT identity boundary failed')
+        independent_probes(cases, probe)
     finally:
         for name_ in names: k('-n', ns, 'delete', 'pod', name_, '--ignore-not-found', '--timeout=30s')
         for obj in reversed(objects):

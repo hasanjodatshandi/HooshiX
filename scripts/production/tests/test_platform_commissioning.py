@@ -471,6 +471,23 @@ class PlatformCommissioningTest(unittest.TestCase):
         self.assertEqual(['server', '-config=/openbao/config/server.json'],
                          instance.plan['openbao']['items'][-1]['spec']['template']['spec']['containers'][0]['args'])
 
+    def test_failed_parallel_probe_restores_policy_and_cleans_all_names(self):
+        instance = staging.Staging.__new__(staging.Staging)
+        original = {'kind': 'ValidatingPolicy', 'metadata': {'name': 'original'}}
+        instance.plan = {'openbao': bao.candidate('standard'), 'admission': {'items': [{}, {}, original]}}
+        instance.checks = {}
+        calls = []
+        def kube(*args, **kwargs):
+            calls.append((args, kwargs))
+            return b''
+        with patch.object(staging, 'independent_probes', side_effect=ValueError('fixture failed')), \
+             contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
+            instance.network(kube, lambda check, **_: check())
+        deleted = {args[3] for args, _ in calls if args[:3] == ('-n', 'hooshix-secrets', 'delete')}
+        self.assertEqual({'pod/mtls-positive', 'pod/wrong-serviceaccount', 'pod/plaintext-negative'}, deleted)
+        self.assertEqual(original, json.loads(calls[-1][1]['data']))
+        self.assertEqual({}, instance.checks)
+
     def test_target_admission_requires_exact_denial_and_positive_server_dry_run(self):
         plan = {'mesh': {'stages': [{'manifest': {'items': [{'kind': 'Deployment', 'spec': {
             'template': {'spec': {'serviceAccountName': 'istiod', 'containers': [{'image': 'mesh@sha256:x'}]}}}}]}}]},
