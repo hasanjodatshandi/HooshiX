@@ -6,6 +6,8 @@ on:
       - .github/workflows/platform-commissioning.yml
       - scripts/production/rehearse_openbao_kubernetes.py
       - scripts/production/rehearse_platform_admission.py
+      - scripts/production/rehearsal_probes.py
+      - scripts/production/tests/test_rehearsal_probes.py
       - scripts/production/render_mesh_candidate.py
       - scripts/production/render_platform_admission.py
       - scripts/production/render_mesh_security_upgrade.py
@@ -67,6 +69,10 @@ on:
         description: Successful reviewed-main Production release private OpenBao publication run
         required: true
         default: '37611729931'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

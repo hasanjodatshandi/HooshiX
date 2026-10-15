@@ -212,8 +212,14 @@ contract now permits only owner-approved global list/watch of non-secret
 ObjectStores and Roles/RoleBindings; plugin Secret API and foreign writes remain
 denied. Bounded signed Barman control-plane tooling adds internal leaf TLS,
 CNPG-only port 9090, Ambient STRICT and native positive/negative evidence.
-Target Barman execution, sidecar/data bootstrap, provider backup/PITR and readiness
-remain `Not run`/`Not verified`. Exact sidecar delegation must be bootstrapped
+Owner-local Barman execution on 2026-10-15 is `Passed`, bound to
+`main@b624b088f316fa8257b9777bb0fc2d84a081b839` and native run `38731557283`.
+Public receipt `hooshix-barman-236cb6299fe54850b24260aea63be35e.json` has
+SHA256 `6a072732effc3c8bc4f229539aee6168c85726b0eab8995bdbbd92ee52a96b2a`;
+internal certificates, Secret API denial and foreign-write denial passed.
+Existing CA/mesh/OpenBao/ESO/CNPG/storage were preserved and public access is
+closed. Sidecar/data bootstrap, provider backup/PITR and readiness remain
+`Not run`/`Not verified`. Exact sidecar delegation must be bootstrapped
 before data commissioning; no implicit Secret/bind/escalate grant is allowed.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/

@@ -10,6 +10,7 @@ import render_cnpg_control_plane as renderer
 import render_platform_admission as admission
 from rehearse_cert_manager import network_negative
 from rehearse_openbao_recovery import RehearsalFailed
+from rehearsal_probes import independent_probes
 from rehearse_platform_admission import admission_result, apply, policy_ready
 from upgrade_mesh_security import replace_policy
 
@@ -59,7 +60,7 @@ def strict_negative(k, wait, platform):
         replace_policy(bounded, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
                        kube=k, previous=previous)
         for obj in policies: apply(k, obj)
-        for mode in ('ambient', 'none'):
+        def probe(mode):
             name = label + '-' + mode
             apply(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': name, 'namespace': ns,
                 'labels': {'hooshix-cnpg-probe': label, 'istio.io/dataplane-mode': mode}}, 'spec': pod})
@@ -72,6 +73,7 @@ def strict_negative(k, wait, platform):
             if (state['exitCode'] != 1 or reached != (mode == 'ambient')
                     or mode == 'none' and not any(m in logs for m in (b'eof', b'reset', b'timeout', b'closed'))):
                 raise RehearsalFailed('CNPG non-callback mTLS identity boundary failed')
+        independent_probes(('ambient', 'none'), probe)
     finally:
         for mode in ('ambient', 'none'):
             k('-n', ns, 'delete', 'pod', label + '-' + mode, '--ignore-not-found', '--timeout=30s', timeout=40)

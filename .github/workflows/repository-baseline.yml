@@ -9,10 +9,47 @@ on:
     - cron: '17 3 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
 jobs:
+  ci-scope:
+    name: Fail-closed PR work selection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      application_tests: ${{ steps.scope.outputs.application_tests }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci/select_pr_checks.py --event "$EVENT" --base "$BASE" --head "$HEAD"
+
+  repository-secrets:
+    name: Repository-wide tree and history secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GITLEAKS_VERSION: '8.30.0'
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/ci/security/service_security.sh gitleaks-fixtures
+      - run: scripts/ci/security/service_security.sh gitleaks-scan
+
   contract-quality:
     name: Protobuf contract validation and examples
     runs-on: ubuntu-24.04
@@ -449,28 +486,46 @@ jobs:
           if-no-files-found: error
 
   compromised-password-security:
+    needs: ci-scope
     name: Compromised Password security suite
     uses: ./.github/workflows/compromised-password-service.yml
+    with:
+      application_tests: ${{ needs.ci-scope.outputs.application_tests == 'true' }}
 
   notification-security:
+    needs: ci-scope
     name: Notification security suite
     uses: ./.github/workflows/notification-service.yml
+    with:
+      application_tests: ${{ needs.ci-scope.outputs.application_tests == 'true' }}
 
   identity-security:
+    needs: ci-scope
     name: Identity security suite
     uses: ./.github/workflows/identity-service.yml
+    with:
+      application_tests: ${{ needs.ci-scope.outputs.application_tests == 'true' }}
 
   authorization-security:
+    needs: ci-scope
     name: Authorization security suite
     uses: ./.github/workflows/authorization-service.yml
+    with:
+      application_tests: ${{ needs.ci-scope.outputs.application_tests == 'true' }}
 
   conversation-security:
+    needs: ci-scope
     name: Conversation security suite
     uses: ./.github/workflows/conversation-service.yml
+    with:
+      application_tests: ${{ needs.ci-scope.outputs.application_tests == 'true' }}
 
   web-bff-security:
+    needs: ci-scope
     name: Web BFF security suite
     uses: ./.github/workflows/web-bff.yml
+    with:
+      application_tests: ${{ needs.ci-scope.outputs.application_tests == 'true' }}
 
   offline-ca-security:
     name: Offline CA tooling security suite
@@ -505,6 +560,8 @@ jobs:
     name: Baseline verify
     if: ${{ always() }}
     needs:
+      - ci-scope
+      - repository-secrets
       - contract-quality
       - repository-structure
       - openbao-recovery
@@ -525,6 +582,9 @@ jobs:
     steps:
       - name: Require repository and service verification
         env:
+          SCOPE_RESULT: ${{ needs.ci-scope.result }}
+          APPLICATION_TESTS: ${{ needs.ci-scope.outputs.application_tests }}
+          SECRETS_RESULT: ${{ needs.repository-secrets.result }}
           CONTRACT_RESULT: ${{ needs.contract-quality.result }}
           REPOSITORY_RESULT: ${{ needs.repository-structure.result }}
           OPENBAO_RESULT: ${{ needs.openbao-recovery.result }}
@@ -542,6 +602,14 @@ jobs:
           EDGE_WAF_RESULT: ${{ needs.edge-waf-security.result }}
         run: |
           set -euo pipefail
+          if [ "$SCOPE_RESULT" != success ] || [ "$SECRETS_RESULT" != success ]; then
+            echo 'Work selection or repository-wide secret verification failed.' >&2
+            exit 1
+          fi
+          case "$APPLICATION_TESTS" in
+            true|false) ;;
+            *) echo 'Invalid work selection result.' >&2; exit 1 ;;
+          esac
           if [ "${CONTRACT_RESULT}" != 'success' ]; then
             echo "Protobuf contract quality result: ${CONTRACT_RESULT}" >&2
             exit 1

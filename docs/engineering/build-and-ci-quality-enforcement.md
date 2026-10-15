@@ -33,7 +33,7 @@ Additional gates apply by changed capability. A mandatory check is not changed t
 ### Bounded CI work selection
 
 PRs confined to explicitly classified platform commissioning files may mark
-unchanged Java suites and unchanged platform source rebuilds `Not applicable`.
+unchanged Java suites `Not applicable`.
 The selector must fail closed to full validation for unknown/shared paths,
 missing/invalid comparison evidence or any CI/security-policy change. `main`,
 scheduled and manually dispatched baseline runs retain the full suite. The
@@ -42,10 +42,16 @@ cancelled or unexpectedly skipped required job. Repository-wide redacted
 tree/history secret detection remains blocking even when Java suites are unselected.
 Runtime staging, image signatures/provenance/SBOM, fresh artifact acceptance,
 recovery checks and deployment-evidence freshness are not waived by this routing.
+Artifact security builds/scans remain blocking; this routing does not reuse a
+previous scan or successful CI receipt.
+The six reusable service checks retain their protected check names and run a
+visible `Not applicable` step only when explicitly unselected. Their inputs
+default to full validation; the baseline aggregate still requires every check
+to succeed and rejects missing/failed routing and unexpected skipped jobs.
 
 Superseded runs of the same PR may be cancelled; main and release operations
 must not be cancelled by unrelated PRs. Independent disposable probes may run
-with a fixed small concurrency bound only when they mutate disjoint policies and
+with a fixed small concurrency bound only under an already-stable policy set and
 retain every positive/negative assertion and cleanup. Do not cache private
 fixture state or replace executed evidence with cached success.
 
