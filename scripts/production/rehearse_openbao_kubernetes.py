@@ -446,6 +446,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     step('signed-ambient-barman-control-plane')
                     from rehearse_barman_control_plane import rehearse as barman
                     barman_result = barman(k, wait, barman_manifest, cnpg_manifest, cert_manager_manifest)
+                    from rehearse_postgresql_secrets import rehearse as postgresql_secrets
+                    pg_secret_result = postgresql_secrets(k, wait, eso_chart, str(tools / 'helm'),
+                        api, token, cert.read_text(), audiences, addresses)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
@@ -523,6 +526,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
         if barman_manifest is not None:
             result['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
             result['barman_control_plane'] = barman_result
+            result['postgresql_secret_delivery'] = pg_secret_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'

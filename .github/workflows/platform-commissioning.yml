@@ -6,6 +6,9 @@ on:
       - .github/workflows/platform-commissioning.yml
       - scripts/production/rehearse_openbao_kubernetes.py
       - scripts/production/rehearse_platform_admission.py
+      - scripts/production/*postgresql*secrets*.py
+      - scripts/production/postgresql_secret_delivery.py
+      - scripts/production/tests/test_postgresql_secrets.py
       - scripts/production/rehearsal_probes.py
       - scripts/production/tests/test_rehearsal_probes.py
       - scripts/production/render_mesh_candidate.py

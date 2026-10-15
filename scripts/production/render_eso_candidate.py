@@ -18,7 +18,8 @@ from verify_eso_artifact import pin, published_pin
 
 ACCOUNT = 'hooshix-eso'
 BOUND = 16 * 1024 * 1024
-SELECTOR = {'matchLabels': {'kubernetes.io/metadata.name': NAMESPACE}}
+SELECTOR = {'matchExpressions': [{'key': 'kubernetes.io/metadata.name', 'operator': 'In',
+                                  'values': [NAMESPACE, 'platform-data']}]}
 
 
 def values():

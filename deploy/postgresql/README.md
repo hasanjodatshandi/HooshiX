@@ -71,6 +71,11 @@ Business schema changes remain owned by each service's immutable Flyway history.
 
 ## Commissioning dependency contract
 
+Credential delivery is a distinct prerequisite: ten exact runtime/migration
+identities in `platform-data`, separate from the existing six application
+identities. The application ESO controller is not implicitly granted another
+namespace. PostgreSQL data Pods remain closed until the complete data bootstrap.
+
 The owner-local 32 GiB filesystem/guard foundation is installed on the current
 VPS. `install_postgresql_local_volume.py` prepares only the static 29 GiB LocalPV
 reservation (ext4 usable capacity is less than backing size), with Retain,
@@ -78,7 +83,8 @@ WaitForFirstConsumer and exact node/first-instance claim binding. It does not
 create a PVC, database or Barman component. The Stage10 guide contains its
 exact-tree native evidence builder, owner-local invocation and recovery boundary.
 The current VPS reservation receipt is verified as `Passed` in the Stage10 guide;
-no PVC/database/Barman has been created. Other servers require their own binding
+no PVC/database has been created; the separate Barman controller is installed,
+but its database sidecar and provider backup are not. Other servers require their own binding
 and target receipt.
 
 Do **not** apply this candidate directly to the VPS. The reviewed complete data
@@ -94,6 +100,15 @@ ParsPack deferral is not off-host backup or production-readiness evidence.
    logs. Existing application Secrets in `platform-apps` are separate projections;
    Kubernetes cannot reference a Secret in another namespace. Existing ESO scoped
    access does **not** authorize new identities in `platform-data` automatically.
+   `build_postgresql_secrets_bundle.py` requires exact-tree native proof for a
+   separate namespace-scoped ESO controller using the existing signed image.
+   `bootstrap_postgresql_secrets_operator.py` runs the owner-supervised delivery
+   against existing custody. It creates only missing KV-v2 leaves using CAS=0,
+   never rotates existing values, and rejects foreign resources. Ten exact
+   read-only auth identities, restricted TokenRequest, shared two-namespace
+   API-only ESO validation, source admission, Ambient/STRICT and cross-identity
+   denial are verified. Database Pods remain closed. See the Stage10 guide for
+   bundle validation, local prompts and safe resumption.
 2. Reconcile DatabaseRoles and verify success/password readiness before creating
    Databases; verify each database's expected migration owner. Do not reconcile the
    same role through both `DatabaseRole` and `Cluster.spec.managed.roles`.
