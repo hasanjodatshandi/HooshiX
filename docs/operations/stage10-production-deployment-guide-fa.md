@@ -1520,7 +1520,8 @@ python3 scripts/production/build_barman_control_plane_bundle.py \
 
 builder امضا، SLSA، SBOM و scan دقیق مجموعهٔ قبلی و رسید native تازهٔ همان
 tree را لازم دارد. staging باید علاوه بر rollout و اجرای مجدد، رد image signer/
-provenance/SBOM غلط، Secret API و نوشتن namespace دیگر، نام Role غیرمجاز،
+provenance/SBOM غلط، Secret API و نوشتن namespace دیگر، نام Role غیرمجاز و
+اعطای غیرمستقیم دسترسی Secret از طریق Role،
 TLS با client certificate و hostname درست و رد client/hostname غلط و اتصال
 خارج Ambient را ثابت کند. کلیدهای آزمایشی از fixture خارج نمی‌شوند.
 

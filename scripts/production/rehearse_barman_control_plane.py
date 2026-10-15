@@ -26,7 +26,11 @@ try:
  with socket.create_connection(('barman-cloud.cnpg-system.svc',9090),timeout=8) as sock:
   with ctx.wrap_socket(sock,server_hostname='wrong.invalid' if mode=='hostname' else 'barman-cloud') as tls:
    tls.sendall(b'PRI * HTTP/2.0\\r\\n\\r\\nSM\\r\\n\\r\\n')
-   header=tls.recv(9)
+   header=b''
+   while len(header)<9:
+    part=tls.recv(9-len(header))
+    if not part: break
+    header+=part
    ok=len(header)==9 and header[3]==4
 except (OSError,ssl.SSLError): ok=False
 print('BARMAN_TLS=Passed' if ok else 'BARMAN_TLS=Denied')
@@ -171,6 +175,13 @@ def rehearse(k, wait, manifest, cnpg_manifest, cert_manifest):
     valid = copy.deepcopy(wrong)
     valid['metadata']['name'] = 'postgresql-barman-cloud'
     k('create', '--dry-run=server', '-f', '-', actor, data=json.dumps(valid).encode())
+    escalated = copy.deepcopy(valid)
+    escalated['rules'] = [{'apiGroups': [''], 'resources': ['secrets'], 'verbs': ['get']}]
+    k('create', '--dry-run=server', '-f', '-', actor, data=json.dumps(escalated).encode(),
+      expected=1, required_error=b'forbidden')
+    for ns in (renderer.NAMESPACE, 'platform-data'):
+        k('-n', ns, 'get', 'secret', 'hooshix-no-credential-probe', actor,
+          expected=1, required_error=b'forbidden')
     result['rbac_actual_positive_negative'] = 'Passed'
     tls_boundary(k, wait, adapter, plan)
     result['tls_client_hostname_and_strict_mtls'] = 'Passed'
