@@ -255,7 +255,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             if platform is None:
                 from rehearse_postgresql_local_volume import exercise
                 from verify_published_postgresql import candidate as postgres_candidate
-                local_volume_result = exercise(k, run, wait, kind, name + '-control-plane',
+                local_volume_result = exercise(k, run, wait, name + '-control-plane',
                     postgres_candidate()['publication']['images']['postgresql'])
             step("schema")
             istio = dict(line.split("=", 1) for line in (ROOT / "infrastructure/istio/pins.env")

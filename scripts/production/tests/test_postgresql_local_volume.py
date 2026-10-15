@@ -11,9 +11,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import install_postgresql_local_volume as volume
 import provision_postgresql_storage as storage
 import build_postgresql_local_volume_bundle as bundle
+import rehearse_postgresql_local_volume as fixture
 
 
 class LocalVolumeTest(unittest.TestCase):
+    def test_fixture_uses_digest_pulled_by_cri_not_docker_archive_import(self):
+        run = Mock()
+        kube = Mock(side_effect=ValueError('namespace boundary reached'))
+        with self.assertRaisesRegex(ValueError, 'namespace boundary reached'):
+            fixture.exercise(kube, run, Mock(), 'disposable-control-plane', 'registry.invalid/image@sha256:' + 'a' * 64)
+        self.assertEqual(2, run.call_count)
+        for call in run.call_args_list:
+            self.assertEqual(['docker', 'exec', 'disposable-control-plane'], call.args[0][:3])
+
     def test_reserved_capacity_and_source_are_bound_to_installed_guard(self):
         objects = volume.candidate()
         self.assertEqual(['StorageClass', 'PersistentVolume'], [o['kind'] for o in objects])
