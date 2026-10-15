@@ -30,6 +30,25 @@ contract/schema checks
 
 Additional gates apply by changed capability. A mandatory check is not changed to warning/`ignoreFailures` merely to obtain a green pipeline.
 
+### Bounded CI work selection
+
+PRs confined to explicitly classified platform commissioning files may mark
+unchanged Java suites and unchanged platform source rebuilds `Not applicable`.
+The selector must fail closed to full validation for unknown/shared paths,
+missing/invalid comparison evidence or any CI/security-policy change. `main`,
+scheduled and manually dispatched baseline runs retain the full suite. The
+aggregate gate must distinguish an explicitly unselected job from a failed,
+cancelled or unexpectedly skipped required job. Repository-wide redacted
+tree/history secret detection remains blocking even when Java suites are unselected.
+Runtime staging, image signatures/provenance/SBOM, fresh artifact acceptance,
+recovery checks and deployment-evidence freshness are not waived by this routing.
+
+Superseded runs of the same PR may be cancelled; main and release operations
+must not be cancelled by unrelated PRs. Independent disposable probes may run
+with a fixed small concurrency bound only when they mutate disjoint policies and
+retain every positive/negative assertion and cleanup. Do not cache private
+fixture state or replace executed evidence with cached success.
+
 Gitleaks, Semgrep, Gradle verification, and OSV-Scanner protect different failure classes:
 
 - Semgrep — first-party source SAST/policy;
