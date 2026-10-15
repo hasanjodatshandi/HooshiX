@@ -42,7 +42,7 @@ def git(*args):
 
 
 def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso_commissioning=False,
-                  cert_manager_commissioning=False, cnpg_control_plane=False):
+                  cert_manager_commissioning=False, cnpg_control_plane=False, barman_control_plane=False):
     checks = CHECKS
     scope = 'Disposable Calico/Ambient/Kyverno signed platform staging'
     if mesh_security_upgrade:
@@ -96,6 +96,20 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
                     'wrong_source_webhook_network', 'rbac_namespace_negative', 'non_callback_strict_mtls',
                     'container_key_log_markers'))):
             raise ValueError('exact signed restricted CNPG control plane and native boundaries required')
+    if barman_control_plane:
+        from verify_published_postgresql import candidate
+        scope = 'Disposable Calico/Ambient initialized-store Barman control plane'
+        proof = receipt.get('barman_control_plane', {})
+        expected = {k: candidate()['publication']['images'][k] for k in ('barman-plugin', 'barman-sidecar')}
+        if (not cnpg_control_plane or proof.get('images') != expected
+                or proof.get('root_mesh_openbao_eso_cnpg_storage') != 'Preserved'
+                or proof.get('public_access') != 'CLOSED'
+                or any(proof.get(k) != 'Not run' for k in ('database', 'barman_sidecar', 'provider_backup'))
+                or any(proof.get(k) != 'Passed' for k in ('barman_control_plane', 'internal_certificates',
+                    'secret_api_denied', 'foreign_write_denied', 'idempotent_reconciliation',
+                    'source_identity_positive_negative', 'rbac_actual_positive_negative',
+                    'tls_client_hostname_and_strict_mtls', 'container_key_log_markers'))):
+            raise ValueError('exact signed Barman TLS/cache/authority boundaries required')
     if (record.get('path') != WORKFLOW or record.get('status') != 'completed'
             or record.get('conclusion') != 'success'
             or record.get('repository', {}).get('full_name') != publication.REPOSITORY
@@ -117,7 +131,7 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
 
 
 def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, eso_commissioning=False,
-                   cert_manager_commissioning=False, cnpg_control_plane=False):
+                   cert_manager_commissioning=False, cnpg_control_plane=False, barman_control_plane=False):
     if not re.fullmatch(r'[1-9][0-9]{0,19}', run_id):
         raise ValueError('numeric staging run required')
     record = json.loads(publication.run(['api', 'repos/' + publication.REPOSITORY + '/actions/runs/' + run_id]))
@@ -136,7 +150,7 @@ def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, 
     receipt = json.loads(files[0].read_bytes())
     check_staging(record, receipt, revision, mesh_security_upgrade=mesh_security_upgrade,
                   eso_commissioning=eso_commissioning, cert_manager_commissioning=cert_manager_commissioning,
-                  cnpg_control_plane=cnpg_control_plane)
+                  cnpg_control_plane=cnpg_control_plane, barman_control_plane=barman_control_plane)
     return receipt
 
 

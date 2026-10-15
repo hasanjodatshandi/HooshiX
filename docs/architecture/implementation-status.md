@@ -193,14 +193,28 @@ to this allocation step. Owner-local execution on 2026-10-14 passed, bound to
 `9d1c00c1fff319fd7d53906f7a76590348d3385a9ab6d5ff189d448bc7c89d94`.
 Raw size is 34359738368 bytes; measured available space is 31764869120 bytes.
 UID 26, mount and guard passed; OpenBao/host services were preserved without a
-K3s restart. Kubernetes storage reservation, database and Barman remain `Not run`;
+K3s restart. Database and Barman remain `Not run`;
 target reboot/fault behavior and production readiness remain `Not verified`.
 The guarded LocalPV reservation tooling exposes 29 GiB, not the raw 32 GiB,
 with fixed node affinity, Retain and the reserved future `platform-data/postgresql-1`
 claim. It creates only a non-default static StorageClass and PV after both guards,
 available capacity, audit and empty-data boundary checks; no PVC/database is
 created. Exact-tree CI filesystem and real Kubernetes mount/retention evidence
-are required before an owner-local bundle is issued. Target reservation is `Not run`.
+are required before an owner-local bundle is issued. Owner-local reservation on
+2026-10-15 is `Passed`, bound to `main@507b660ae87904f29a4f8459c6334d4003106be0`
+and successful native baseline `38720511900`. Public receipt
+`hooshix-pg-local-volume-02a76c48b47744bab007cde39b39b4c9.json` has SHA256
+`8f891154b75f4635fbe26932f8f7fc2d986f97b61d3ea62b2e11f96bf94bcd85` and source
+SHA256 `257e978c56896807c0724cf12a8207fe70022854a8445bc6fabdb8849fd34762`.
+Guards passed and prior host/OpenBao services were preserved; public access is
+closed. No PVC/database/Barman was created. Barman's bounded control-plane trust
+contract now permits only owner-approved global list/watch of non-secret
+ObjectStores and Roles/RoleBindings; plugin Secret API and foreign writes remain
+denied. Bounded signed Barman control-plane tooling adds internal leaf TLS,
+CNPG-only port 9090, Ambient STRICT and native positive/negative evidence.
+Target Barman execution, sidecar/data bootstrap, provider backup/PITR and readiness
+remain `Not run`/`Not verified`. Exact sidecar delegation must be bootstrapped
+before data commissioning; no implicit Secret/bind/escalate grant is allowed.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces

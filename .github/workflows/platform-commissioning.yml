@@ -22,6 +22,9 @@ on:
       - scripts/production/tests/test_eso*.py
       - scripts/production/*cert_manager*.py
       - scripts/production/*cnpg*.py
+      - scripts/production/*barman*.py
+      - scripts/production/run-barman-control-plane.ps1
+      - scripts/production/tests/test_barman_control_plane.py
       - scripts/production/run-cnpg-control-plane.ps1
       - scripts/production/tests/test_cnpg_control_plane.py
       - scripts/production/tests/test_cert_manager_commissioning.py
@@ -50,6 +53,10 @@ on:
         default: false
       cnpg_control_plane:
         description: Rehearse the signed namespace-scoped CNPG controller without a database instance
+        type: boolean
+        default: false
+      barman_control_plane:
+        description: Rehearse signed internal Barman with owner-approved metadata cache and no Secret API access
         type: boolean
         default: false
       mesh_run:
@@ -116,6 +123,10 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-cnpg-control-plane.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'CNPG_OPERATOR_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-barman-control-plane.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'BARMAN_OPERATOR_WRAPPER_SYNTAX_FAILED' }
       - name: Install pinned disposable fixture tools and YAML parser
         run: |
           set -euo pipefail
@@ -174,7 +185,7 @@ jobs:
               "ghcr.io/kyverno/signatures@${pair#*:}" > /dev/null
           done
       - name: Prepare exact internal cert-manager manifest and published acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -192,7 +203,7 @@ jobs:
           python3 scripts/production/verify_published_cert_manager.py \
             --evidence-dir "$RUNNER_TEMP/cert-manager-publication" --output-dir "$RUNNER_TEMP/cert-manager-acceptance"
       - name: Prepare exact CNPG manifest and published data-set acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -203,6 +214,12 @@ jobs:
             -o "$RUNNER_TEMP/platform-tools/cnpg.yaml"
           printf '%s  %s\n' 37237f145d8138256ea25ae830f87759255665ff08f8d552fdd8224a5ec032fb \
             "$RUNNER_TEMP/platform-tools/cnpg.yaml" | sha256sum --check --strict
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.15.1/manifest.yaml \
+            -o "$RUNNER_TEMP/platform-tools/barman.yaml"
+          printf '%s  %s\n' 8f377ff4a7d0d3f74fc64b0f7ac4f449fc38ca9e83a40107cca2f9315a9bd920 \
+            "$RUNNER_TEMP/platform-tools/barman.yaml" | sha256sum --check --strict
           gh run download 38382418665 --repo hasanjodatshandi/HooshiX \
             --name postgresql-publication-38382418665-1 --dir "$RUNNER_TEMP/postgresql-publication"
           export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
@@ -220,11 +237,14 @@ jobs:
           if [[ '${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}' == 'true' ]]; then
             options+=(--eso-chart "$RUNNER_TEMP/platform-tools/eso-chart.tgz")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane }}' == 'true' ]]; then
             options+=(--cert-manager-manifest "$RUNNER_TEMP/platform-tools/cert-manager.yaml")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane }}' == 'true' ]]; then
             options+=(--cnpg-manifest "$RUNNER_TEMP/platform-tools/cnpg.yaml")
+          fi
+          if [[ '${{ github.event_name == 'pull_request' || inputs.barman_control_plane }}' == 'true' ]]; then
+            options+=(--barman-manifest "$RUNNER_TEMP/platform-tools/barman.yaml")
           fi
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/platform-tools" \
