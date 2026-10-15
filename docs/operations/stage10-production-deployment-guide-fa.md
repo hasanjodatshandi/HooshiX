@@ -1619,6 +1619,67 @@ CONNECT جدید با revoke بسته می‌شود؛ نشست موجود خود
 مقصد جداگانه لازم است. migrationهای اجراشده تغییر نمی‌کنند.
 جزئیات فنی و ترتیب dependencyها: [جزء PostgreSQL](../../deploy/postgresql/README.md).
 
+### تحویل ده credential مستقل PostgreSQL از OpenBao
+
+این پیش‌نیاز فقط اسرار را آماده می‌کند؛ نصب دیتابیس/PVC/sidecar، backup ارائه‌دهنده
+و لغو root در آن **Not run** است. نتیجهٔ مقصد تا رسید عمومی اجرای محلی **Not verified**
+می‌ماند. Root و گواهی قبلی، شش هویت برنامه و ESO موجود تغییر نمی‌کنند.
+
+یک controller با همان digest امضاشدهٔ ESO فقط `platform-data` را watch می‌کند.
+cache این controller به Secretهای همین namespace دسترسی دارد؛ هیچ namespace دیگر
+یا Secret کلاستر را نمی‌خواند. ده حساب `eso-pg-<database>-<runtime|migration>`، هرکدام
+فقط leaf خودش در `production/postgresql/<database>/<mode>` را می‌خوانند. توکن
+OpenBao حداکثر پنج دقیقه است و فقط lookup/revoke خودش را دارد. TokenRequest
+کنترلر فقط برای همین ده حساب مجاز است؛ JWT API خودش projected و ده‌دقیقه‌ای است.
+همهٔ Podها Ambient/STRICT هستند. وب‌هوک HTTPS/Fail قبلی، بدون تغییر CA یا Pod،
+فقط همین namespace و `platform-apps` را اعتبارسنجی می‌کند؛ وب‌هوک جدید نداریم.
+مرز admission داده فقط همین controller امضاشده را می‌پذیرد و Pod دیتابیس بسته می‌ماند.
+
+از checkout تمیز روی **main دقیق فعلی**، پس از موفقیت native همان tree، بستهٔ عمومی بسازید:
+
+```bash
+python3 scripts/production/build_postgresql_secrets_bundle.py \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-postgresql-secrets-<date> \
+  --staging-run <successful-platform-commissioning-run-id> \
+  --chart <verified-external-secrets-2.12.0.tgz> \
+  --helm <verified-helm-4.2.4>
+python3 scripts/production/bootstrap_postgresql_secrets_operator.py \
+  --bundle /mnt/c/Users/Coder/Downloads/HooshiX-postgresql-secrets-<date> --validate-only
+```
+
+builder علاوه بر شواهد قبلی، تحویل ده Secret، عدم تغییر در اجرای مجدد، آزمون‌های
+رد cross-identity/namespace/audience/write/admin/revoked-token، امضا/provenance/SBOM،
+بسته‌ماندن دیتابیس، حفظ کنترلرهای قبلی و عدم نشت در log را الزام می‌کند.
+مسیر خروجی باید تازه و بیرون Git باشد؛ chart/tool با hashهای catalog فعلی تطبیق دارند.
+اعتبارسنجی محلی به VPS یا custody وصل نمی‌شود.
+
+با VNC قابل ورود و نشست دوم SSH باز، در PowerShell اجرا کنید:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_postgresql_secrets_operator.py --bundle /mnt/c/Users/Coder/Downloads/HooshiX-postgresql-secrets-<date> --custody /home/coder/.local/share/hooshix-openbao-custody/<existing-custody-id> --rescue-and-second-session-ready
+```
+
+فقط `READY`، **رمز موجود custody مربوط به OpenBao** و رمز sudo در ورودی‌های مخفی
+لازم‌اند؛ رمز Root/CA یا GHCR لازم نیست. رمز یا فایل خصوصی را نفرستید. رمزها فقط در
+RAM مصرف می‌شوند. ده password مستقل تصادفی در OpenBao و projection مجاز ESO می‌مانند؛
+هیچ password در bundle/رسید/Git/values/argv ذخیره نمی‌شود. Secretها basic-auth با
+کلیدهای `username`/`password` و نام‌های بخش قبل هستند؛ username دقیقاً role همان سرویس است.
+
+خروجی موفق `POSTGRESQL_SECRET_DELIVERY=Passed` و `PUBLIC_RECEIPT` زیر
+`~/.local/share/hooshix-postgresql-secrets/` است. فقط رسید عمومی را برای ثبت نتیجه بدهید.
+برای مشاهدهٔ وضعیت بدون مقدار Secret:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl -n platform-data get deployments,secretstores,externalsecrets'
+```
+
+اجرای مجدد همان bundle بررسی‌شده، credential موجود را نمی‌چرخاند و منابع خارجی را
+adopt نمی‌کند. پس از شکست، حالت جزئی حفظ می‌شود؛ ابتدا کد عمومی شکست بررسی شود.
+برای ادامه از همان custody و نسخهٔ بررسی‌شده استفاده کنید؛ leaf/Secret/PVC را پاک نکنید،
+root جدید نسازید و re-init نزنید. تغییر credential یا نصب دیتابیس مرحله‌ای جداست؛ حذف
+manifest، rollback password محسوب نمی‌شود. مشکل deferred پارس‌پک همچنان **Not verified**
+است و در این عملیات نه probe می‌شود و نه موفق فرض می‌شود.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

@@ -528,6 +528,8 @@ scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
+scripts/production/bootstrap_postgresql_secrets.py
+scripts/production/bootstrap_postgresql_secrets_operator.py
 scripts/production/build_barman_control_plane_bundle.py
 scripts/production/build_cert_manager_candidates.py
 scripts/production/build_cert_manager_commissioning_bundle.py
@@ -538,6 +540,7 @@ scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_postgresql_candidates.py
 scripts/production/build_postgresql_local_volume_bundle.py
+scripts/production/build_postgresql_secrets_bundle.py
 scripts/production/build_postgresql_storage_bundle.py
 scripts/production/build_provenance.py
 scripts/production/check_human_sshd_candidate.sh
@@ -550,6 +553,7 @@ scripts/production/install_cert_manager.py
 scripts/production/install_cnpg_control_plane.py
 scripts/production/install_eso.py
 scripts/production/install_postgresql_local_volume.py
+scripts/production/install_postgresql_secrets.py
 scripts/production/install_release_tools.sh
 scripts/production/jit_broker.py
 scripts/production/jit_runtime.py
@@ -570,6 +574,7 @@ scripts/production/openbao_snapshot_crypto.py
 scripts/production/parspack_audit_transport.py
 scripts/production/parspack_snapshot_transport.py
 scripts/production/platform_image_egress.py
+scripts/production/postgresql_secret_delivery.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
 scripts/production/provision_openbao_storage.py
@@ -592,6 +597,7 @@ scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
 scripts/production/rehearse_platform_admission.py
 scripts/production/rehearse_postgresql_local_volume.py
+scripts/production/rehearse_postgresql_secrets.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_barman_control_plane.py
 scripts/production/render_cert_manager_candidate.py
@@ -605,6 +611,7 @@ scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
 scripts/production/render_platform_admission.py
 scripts/production/render_postgresql_ownership.py
+scripts/production/render_postgresql_secrets.py
 scripts/production/repair_import_referrers.py
 scripts/production/restore_openbao_isolated.py
 scripts/production/rollback_human_sshd_candidate.sh
@@ -667,6 +674,7 @@ scripts/production/tests/test_postgresql_artifacts.py
 scripts/production/tests/test_postgresql_local_volume.py
 scripts/production/tests/test_postgresql_ownership.py
 scripts/production/tests/test_postgresql_publication.py
+scripts/production/tests/test_postgresql_secrets.py
 scripts/production/tests/test_postgresql_source_builds.py
 scripts/production/tests/test_postgresql_storage.py
 scripts/production/tests/test_prepare_human_sshd_candidate.py

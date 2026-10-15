@@ -179,6 +179,26 @@ the ADR-0030 supervised bootstrap; no hourly root job is introduced.
 
 See the [scoped-auth guide](../operations/production-openbao-auth-fa.md).
 
+PostgreSQL credential delivery adds ten separate `platform-data/eso-pg-<database>-<mode>`
+identities (`runtime`/`migration` for the five mutable service databases). Each
+reads only its exact KV-v2 leaf `production/postgresql/<database>/<mode>`, with
+the same audience, five-minute lifetime and self-only token contract. Existing
+six application roles and their controller's namespace remain unchanged. A
+separate controller using the existing signed ESO digest watches only
+`platform-data`: its Secret access is namespace-wide there, never cluster-wide;
+TokenRequest is restricted to these ten exact accounts. Its projected API JWT
+expires in ten minutes; automatic token mounting is disabled. The existing
+API-only validation webhook serves exactly `platform-apps` and `platform-data`,
+with verified HTTPS/Fail and unchanged CA, Pod enrollment and network ingress.
+No extra webhook or cert-controller is installed. Only the new controller Pod is
+admitted in `platform-data`; database Pods remain closed. Credential creation is
+whole-set preflight plus KV-v2 CAS=0, with no adoption/rotation on reentry. ESO
+projects typed namespace-local basic-auth Secrets; secret values never enter
+public plans, receipts or logs. Native evidence must include delivery, reentry,
+all cross-identity/write/admin denials, revoked tokens, source attestation
+negatives, existing authority preservation and log privacy. This prerequisite
+does not create PostgreSQL, approve provider backup, or revoke root.
+
 ### Existing deployment gates
 
 For this unchanged upstream OpenBao import, `openbao-image.json/import_provenance`

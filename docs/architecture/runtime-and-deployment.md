@@ -64,6 +64,16 @@ Controller/cert-controller remain enrolled; namespace STRICT and default-deny re
 unchanged. The exact ESO manifest and network boundary are rendered by
 `scripts/production/render_eso_candidate.py`; rendering is not target installation evidence.
 
+PostgreSQL credential delivery uses a separate controller scoped exclusively to
+`platform-data`, ten exact read-only OpenBao identities, and namespace-local
+basic-auth Secrets. Its namespace-wide Secret cache is a separate approved trust
+boundary, not extra access for the `platform-apps` controller. Both controllers
+remain Ambient/STRICT. The existing API-only ESO validation webhook covers only
+these two namespaces; its CA/HTTPS/Fail and enrollment exception are unchanged.
+`render_postgresql_secrets.py` allows only this pinned controller through the
+closed data-Pod admission boundary; PostgreSQL Pods remain denied until complete
+data commissioning. No database or off-host backup readiness follows from this step.
+
 ADR-0002 also permits only the cert-manager API-callback webhook Pod in
 `cnpg-system` outside Ambient. `render_cert_manager_candidate.py` renders the
 three signed certificate components, restricted namespace-local Roles, internal
