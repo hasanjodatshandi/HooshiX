@@ -144,6 +144,7 @@ class PostgreSQLSecretsTest(unittest.TestCase):
                 obj['webhooks'] = operations[-1]['value']
             return json.dumps(obj).encode()
         plan = {'webhook_names': ['one', 'two'], 'webhook_selector': renderer.WEBHOOK_SELECTOR,
+                'webhook_contracts': {'one': copy.deepcopy(obj['webhooks']), 'two': copy.deepcopy(obj['webhooks'])},
                 'webhook_previous_selector': obj['webhooks'][0]['namespaceSelector']}
         installer.webhook(plan, kube)
         self.assertEqual(1, sum(c[0] == 'patch' for c in calls))
@@ -155,6 +156,7 @@ class PostgreSQLSecretsTest(unittest.TestCase):
         bad['webhooks'][0]['failurePolicy'] = 'Ignore'
         kube = Mock(side_effect=[json.dumps(good).encode(), json.dumps(bad).encode()])
         plan = {'webhook_names': ['one', 'two'], 'webhook_selector': renderer.WEBHOOK_SELECTOR,
+                'webhook_contracts': {'one': copy.deepcopy(good['webhooks']), 'two': copy.deepcopy(good['webhooks'])},
                 'webhook_previous_selector': good['webhooks'][0]['namespaceSelector']}
         with self.assertRaises(ValueError): installer.webhook(plan, kube)
         self.assertEqual(2, kube.call_count)

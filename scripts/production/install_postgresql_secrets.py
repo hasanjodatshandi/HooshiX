@@ -87,7 +87,11 @@ def verify_auth(api, root, token_request, audiences):
 def webhook_configuration(plan, kube, name, *, commit):
     old = json.loads(kube('get', 'validatingwebhookconfiguration', name, '-o', 'json'))
     hooks = copy.deepcopy(old['webhooks'])
-    require(hooks and len(hooks) <= 8, 'PG_SECRET_EXISTING_WEBHOOK_REQUIRED')
+    require(len(hooks) == 1, 'PG_SECRET_EXISTING_WEBHOOK_REQUIRED')
+    expected = copy.deepcopy(plan['webhook_contracts'][name])
+    for hook in expected: hook.pop('namespaceSelector', None)
+    require(desired_fields_match({'webhooks': hooks}, {'webhooks': expected}),
+            'PG_SECRET_EXACT_WEBHOOK_CONTRACT_REQUIRED')
     for hook in hooks:
         require(hook['failurePolicy'] == 'Fail' and hook['timeoutSeconds'] == 5
             and hook.get('namespaceSelector') in (plan['webhook_previous_selector'], plan['webhook_selector'])
@@ -95,6 +99,8 @@ def webhook_configuration(plan, kube, name, *, commit):
             and hook['clientConfig'].get('service', {}).get('namespace') == 'platform-apps'
             and hook['clientConfig']['service'].get('name') == 'hooshix-eso-webhook'
             and not hook.get('matchConditions')
+            and not hook.get('objectSelector') and hook.get('matchPolicy', 'Equivalent') == 'Equivalent'
+            and hook['clientConfig']['service'].get('port', 443) == 443
             and 'url' not in hook['clientConfig'] and hook.get('rules')
             and all(r.get('scope') == 'Namespaced' and set(r['resources']) <= {'secretstores', 'externalsecrets'}
                     for r in hook['rules']), 'PG_SECRET_WEBHOOK_BOUNDARY_CONFLICT')

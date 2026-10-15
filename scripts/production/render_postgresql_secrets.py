@@ -93,5 +93,6 @@ def render(chart, helm, addresses):
         'previous_boundary': admission.policy('ValidatingPolicy', 'hooshix-platform-data-closed', contract.NAMESPACE,
             [admission.validation('data plane not commissioned', 'false')]),
         'webhook_names': [o['metadata']['name'] for o in hooks], 'webhook_selector': WEBHOOK_SELECTOR,
+        'webhook_contracts': {o['metadata']['name']: o['webhooks'] for o in hooks},
         'webhook_previous_selector': {'matchLabels': {'kubernetes.io/metadata.name': 'platform-apps'}},
         'public_ca_sha256': existing.custody.ROOT_SHA256, 'database': 'Not run'}
