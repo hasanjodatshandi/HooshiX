@@ -150,5 +150,22 @@ class BarmanControlPlaneTest(unittest.TestCase):
         self.manifest.write_text(self.manifest.read_text() + '\n')
         with self.assertRaises(ValueError): self.plan()
 
+    def test_bundle_authenticates_native_scope_and_every_source(self):
+        revision = 'a' * 40
+        with patch.object(builder.original, 'git', side_effect=['', revision, revision + '\trefs/heads/main']), \
+                patch.object(builder.original, 'staged_receipt', return_value={'observed_at': '2026-10-15T00:00:00+00:00'}) as gate, \
+                patch.object(builder, 'verify') as verify, patch.object(renderer, 'render', return_value=self.plan()):
+            output = Path(self.cnpg.tmp.name) / 'bundle'
+            result = builder.build(output, '123', self.manifest, self.cnpg.manifest, self.cnpg.cert_manifest, Path('/public'))
+            self.assertTrue(gate.call_args.kwargs['barman_control_plane'])
+            self.assertTrue(gate.call_args.kwargs['cnpg_control_plane'])
+            verify.assert_called_once()
+            self.assertEqual(set(builder.SOURCES) | {'plan.json', builder.WRAPPER}, set(result['files']))
+            for name, digest in result['files'].items():
+                self.assertEqual(digest, hashlib.sha256((output / name).read_bytes()).hexdigest())
+        with patch.object(builder.original, 'git', return_value='dirty'), self.assertRaises(ValueError):
+            builder.build(Path(self.cnpg.tmp.name) / 'bad', '123', self.manifest, self.cnpg.manifest,
+                          self.cnpg.cert_manifest, Path('/public'))
+
 
 if __name__ == '__main__': unittest.main()

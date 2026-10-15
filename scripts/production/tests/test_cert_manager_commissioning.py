@@ -319,6 +319,23 @@ class CertManagerCommissioningTest(unittest.TestCase):
                     mesh_security_upgrade=True, eso_commissioning=True, cert_manager_commissioning=True,
                     cnpg_control_plane=True)
 
+            receipt['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
+            checks = ('barman_control_plane', 'internal_certificates', 'secret_api_denied',
+                'foreign_write_denied', 'idempotent_reconciliation', 'source_identity_positive_negative',
+                'rbac_actual_positive_negative', 'tls_client_hostname_and_strict_mtls', 'container_key_log_markers')
+            receipt['barman_control_plane'] = {**dict.fromkeys(checks, 'Passed'),
+                'images': {k: postgres()['publication']['images'][k] for k in ('barman-plugin', 'barman-sidecar')},
+                'root_mesh_openbao_eso_cnpg_storage': 'Preserved', 'database': 'Not run',
+                'barman_sidecar': 'Not run', 'provider_backup': 'Not run', 'public_access': 'CLOSED'}
+            bundle.check_staging(record, receipt, revision, mesh_security_upgrade=True, eso_commissioning=True,
+                cert_manager_commissioning=True, cnpg_control_plane=True, barman_control_plane=True)
+            for name in (*checks, 'images', 'provider_backup'):
+                wrong = copy.deepcopy(receipt)
+                wrong['barman_control_plane'][name] = 'Not verified'
+                with self.assertRaises(ValueError): bundle.check_staging(record, wrong, revision,
+                    mesh_security_upgrade=True, eso_commissioning=True, cert_manager_commissioning=True,
+                    cnpg_control_plane=True, barman_control_plane=True)
+
 
 if __name__ == '__main__':
     unittest.main()
