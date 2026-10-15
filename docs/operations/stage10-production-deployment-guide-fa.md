@@ -1622,8 +1622,14 @@ CONNECT جدید با revoke بسته می‌شود؛ نشست موجود خود
 ### تحویل ده credential مستقل PostgreSQL از OpenBao
 
 این پیش‌نیاز فقط اسرار را آماده می‌کند؛ نصب دیتابیس/PVC/sidecar، backup ارائه‌دهنده
-و لغو root در آن **Not run** است. نتیجهٔ مقصد تا رسید عمومی اجرای محلی **Not verified**
-می‌ماند. Root و گواهی قبلی، شش هویت برنامه و ESO موجود تغییر نمی‌کنند.
+و لغو root در آن **Not run** است. اجرای مالک روی VPS فعلی در ۲۰۲۶-۱۰-۱۵ **Passed**:
+main برابر `916aec1db5e0def6f9b64702d27f3fb205142f78`، native برابر `38752407229`،
+و plan با SHA256 `cfcb252397bc62dbbc4c1cb001d55db9d5bf691c371b1614ebddc28f5c1b52b6`.
+رسید عمومی `delivery-770b89f18db64821a1116d2afa972714.json` با SHA256
+`0503017a66a26a9c8fd82434a98f8c9edd835707f568a5780f67af7c58c9b0c9` تحویل ده
+Secret، احراز هویت محدود و رد Secret/TokenRequest خارج محدوده را تأیید می‌کند.
+Root، CA، mesh، OpenBao، ESO برنامه‌ها، CNPG، Barman و storage حفظ شده‌اند؛
+دسترسی عمومی بسته است. این رسید مخصوص همین مقصد است؛ نصب دیگر رسید مستقل می‌خواهد.
 
 یک controller با همان digest امضاشدهٔ ESO فقط `platform-data` را watch می‌کند.
 cache این controller به Secretهای همین namespace دسترسی دارد؛ هیچ namespace دیگر
