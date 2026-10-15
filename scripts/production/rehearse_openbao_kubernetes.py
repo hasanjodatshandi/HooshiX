@@ -251,6 +251,12 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             server = json.loads(k("version", "-o", "json"))["serverVersion"]["gitVersion"]
             if server != "v" + pin["KUBERNETES_VERSION"]:
                 raise RehearsalFailed("fixture API version mismatch")
+            local_volume_result = None
+            if platform is None:
+                from rehearse_postgresql_local_volume import exercise
+                from verify_published_postgresql import candidate as postgres_candidate
+                local_volume_result = exercise(k, run, wait, name + '-control-plane',
+                    postgres_candidate()['publication']['images']['postgresql'])
             step("schema")
             istio = dict(line.split("=", 1) for line in (ROOT / "infrastructure/istio/pins.env")
                          .read_text().splitlines() if line and not line.startswith("#"))
@@ -505,6 +511,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['scope'] = 'Disposable Calico/Ambient initialized-store CNPG control plane'
             result['cnpg_control_plane'] = cnpg_result
     else:
+        result['postgresql_local_volume'] = local_volume_result
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
         if eso_chart is not None:
             result['eso_delivery'] = eso_result

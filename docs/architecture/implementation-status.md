@@ -187,8 +187,20 @@ dependency. Existing OpenBao defaults and its installed frozen guard stay intact
 Fresh exact-tree CI must prove the disposable UID-26 filesystem/guard negatives
 before an exact-main owner-local bundle can be issued. No database/PV/credential,
 provider backup, package installation, target fault, K3s restart or reboot belongs
-to this allocation step. Target PostgreSQL storage remains `Not run`; its usable
-capacity and reboot/fault behavior are not production-readiness evidence.
+to this allocation step. Owner-local execution on 2026-10-14 passed, bound to
+`main@d35a31e3f80717b70309d4f9597ddeca6eef0d9d`; public receipt
+`hooshix-postgresql-storage-6e009bff12524585bddb9ab5fd27e4fd.json` has SHA256
+`9d1c00c1fff319fd7d53906f7a76590348d3385a9ab6d5ff189d448bc7c89d94`.
+Raw size is 34359738368 bytes; measured available space is 31764869120 bytes.
+UID 26, mount and guard passed; OpenBao/host services were preserved without a
+K3s restart. Kubernetes storage reservation, database and Barman remain `Not run`;
+target reboot/fault behavior and production readiness remain `Not verified`.
+The guarded LocalPV reservation tooling exposes 29 GiB, not the raw 32 GiB,
+with fixed node affinity, Retain and the reserved future `platform-data/postgresql-1`
+claim. It creates only a non-default static StorageClass and PV after both guards,
+available capacity, audit and empty-data boundary checks; no PVC/database is
+created. Exact-tree CI filesystem and real Kubernetes mount/retention evidence
+are required before an owner-local bundle is issued. Target reservation is `Not run`.
 
 ESO 2.12.0 artifact preparation pins the official amd64 image and chart by digest/
 checksum as source-build inputs. A blocking credential-free baseline job produces
