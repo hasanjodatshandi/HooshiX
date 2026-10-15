@@ -77,7 +77,9 @@ reservation (ext4 usable capacity is less than backing size), with Retain,
 WaitForFirstConsumer and exact node/first-instance claim binding. It does not
 create a PVC, database or Barman component. The Stage10 guide contains its
 exact-tree native evidence builder, owner-local invocation and recovery boundary.
-Target reservation remains `Not run` until its own public receipt is verified.
+The current VPS reservation receipt is verified as `Passed` in the Stage10 guide;
+no PVC/database/Barman has been created. Other servers require their own binding
+and target receipt.
 
 Do **not** apply this candidate directly to the VPS. The reviewed complete data
 bundle must first supply the signed CNPG/operator/database/Barman image evidence,

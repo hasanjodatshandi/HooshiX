@@ -1475,8 +1475,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-pos
 قبل از اولین write از نظر state خارجی/drift بررسی می‌شوند؛ overwrite، adopt،
 force، delete یا retry خودکار وجود ندارد. در شکست جزئی، منابع/data نگه داشته
 می‌شوند. نتیجهٔ موفق `POSTGRESQL_LOCAL_VOLUME=Passed` است؛ `pvc`، `database` و
-`barman_runtime` هنوز **Not run** هستند. اجرای مقصد این گام تا رسید مستقل
-**Not run** است. PV به دیسک/ماشین دیگری قابل انتقال کورکورانه نیست؛ روی سرور
+`barman_runtime` هنوز **Not run** هستند. اجرای owner-local روی VPS در ۲۰۲۶-۱۰-۱۵
+**Passed** است: بستهٔ `main@507b660ae87904f29a4f8459c6334d4003106be0` از
+native baseline موفق `38720511900` ساخته شد. رسید
+`hooshix-pg-local-volume-02a76c48b47744bab007cde39b39b4c9.json` با SHA256
+`8f891154b75f4635fbe26932f8f7fc2d986f97b61d3ea62b2e11f96bf94bcd85`
+به source با hash
+`257e978c56896807c0724cf12a8207fe70022854a8445bc6fabdb8849fd34762`
+متصل است. ظرفیت ۳۱۱۳۸۵۱۲۸۹۶ بایت و رزرو `platform-data/postgresql-1` تأیید
+شد؛ guard **Passed**، سرویس‌های قبلی **Preserved** و دسترسی عمومی **CLOSED** است.
+این نتیجه نصب PostgreSQL/Barman یا Bound شدن PVC نیست؛ گام بعدی Barman است.
+PV به دیسک/ماشین دیگری قابل انتقال کورکورانه نیست؛ روی سرور
 دوم binding و native/target evidence مستقل لازم است. پس از وجود داده، rollback
 به معنای حذف PV/PVC یا پاک‌سازی filesystem نیست؛ recovery تحت نظارت انجام شود.
 
