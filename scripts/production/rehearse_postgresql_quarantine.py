@@ -103,7 +103,8 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
         obj = {key: pod[key] for key in ('apiVersion', 'kind', 'spec')}
         obj['metadata'] = {key: pod['metadata'][key] for key in ('name', 'namespace', 'labels', 'ownerReferences')}
         admission_result(k, obj, wait, public_schema=False)
-        for mode in ('account', 'image', 'command', 'ambient', 'privilege', 'secret-volume', 'env', 'host-path'):
+        for mode in ('account', 'image', 'command', 'ambient', 'privilege', 'secret-volume', 'env', 'host-path',
+                     'lifecycle', 'exec-probe', 'termination-path'):
             bad = copy.deepcopy(obj)
             if mode == 'account': bad['spec']['serviceAccountName'] = 'default'
             if mode == 'image': bad['spec']['containers'][0]['image'] = bad['spec']['containers'][0]['image'].split('@')[0] + ':latest'
@@ -113,6 +114,9 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
             if mode == 'secret-volume': bad['spec']['volumes'].append({'name': 'foreign', 'secret': {'secretName': 'unapproved'}})
             if mode == 'host-path': bad['spec']['volumes'][0] = {'name': 'pgdata', 'hostPath': {'path': '/etc'}}
             if mode == 'env': bad['spec']['containers'][0]['env'].append({'name': 'PGOPTIONS', 'value': '-c log_statement=all'})
+            if mode == 'lifecycle': bad['spec']['containers'][0]['lifecycle'] = {'postStart': {'exec': {'command': ['/bin/sh']}}}
+            if mode == 'exec-probe': bad['spec']['containers'][0]['readinessProbe'] = {'exec': {'command': ['/bin/sh']}}
+            if mode == 'termination-path': bad['spec']['containers'][0]['terminationMessagePath'] = '/var/run/secrets/kubernetes.io/serviceaccount/token'
             admission_result(k, bad, wait, expected=1, public_schema=False)
     result['pod_contract_positive_negative'] = 'Passed'
     pod = next(p for p in pods if p['metadata']['name'] == 'postgresql-1')

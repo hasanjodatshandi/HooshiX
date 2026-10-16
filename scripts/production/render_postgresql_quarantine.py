@@ -104,6 +104,14 @@ def boundary(previous, images):
             '!has(' + path + '.securityContext.runAsGroup) || ' + path + '.securityContext.runAsGroup == 26',
             '!has(' + path + '.envFrom) || ' + path + '.envFrom.size() == 0',
             '!has(' + path + '.args) || ' + path + '.args.size() == 0',
+            '!has(' + path + '.lifecycle)',
+            path + '.terminationMessagePath == "/dev/termination-log" && ' + path + '.terminationMessagePolicy == "File"',
+            *['!has(' + path + '.' + probe + ') || (has(' + path + '.' + probe + '.httpGet) && '
+              + path + '.' + probe + '.httpGet.port == 8000 && ' + path + '.' + probe + '.httpGet.scheme == "HTTPS" && '
+              + path + '.' + probe + '.httpGet.path in ["/startupz","/readyz","/healthz"] && (!has('
+              + path + '.' + probe + '.httpGet.host) || ' + path + '.' + probe + '.httpGet.host == "") && (!has('
+              + path + '.' + probe + '.httpGet.httpHeaders) || ' + path + '.' + probe + '.httpGet.httpHeaders.size() == 0))'
+              for probe in ('startupProbe', 'readinessProbe', 'livenessProbe')],
             *['has(' + path + '.resources.' + group + ') && ' + path + '.resources.' + group
               + '.size() == 3 && ' + ' && '.join(admission.literal(key) + ' in ' + path + '.resources.' + group
                 + ' && ' + path + '.resources.' + group + '[' + admission.literal(key) + '] == ' + admission.literal(value)

@@ -1712,6 +1712,8 @@ Secretهای `cnpg-system` را به `cnpg-system/cnpg-manager` می‌دهد ت
 initdb و PostgreSQL را هم بررسی می‌کند؛ Secret واقعی مقصد برای این آزمون خوانده نمی‌شود.
 فرمان و probeهای instance، TLS داخلی status را طبق نسخهٔ ثابت CNPG حفظ می‌کنند؛
 هیچ endpoint مدیریتی برای برنامه‌ها یا اینترنت باز نمی‌شود.
+قرارداد Pod اجرای دلخواه از lifecycle/exec-probe و تغییر مسیر termination به فایل
+Secret را هم رد می‌کند؛ فقط probeهای HTTPS داخلی ثابت مجازند.
 پیش‌نیاز CI، اسکن تازهٔ همان inventoryهای تأییدشدهٔ Istio/CNI/ESO با Grype ثابت و
 دیتابیس معتبر حداکثر پنج‌روزه است. گزارش‌ها و hashها به‌صورت artifact عمومی نگه
 داشته می‌شوند؛ digest، SBOM امضاشده، provenance و انتشار اصلی عوض نمی‌شوند.

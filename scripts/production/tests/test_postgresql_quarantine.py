@@ -62,7 +62,7 @@ class QuarantineTest(unittest.TestCase):
         self.assertEqual(before[0]['expression'], after[0]['expression'].split(' || (', 1)[1][:-1])
         source = after[-1]['expression']
         for marker in ('env', 'volumeMounts', 'persistentVolumeClaim', 'hostNetwork', 'hostPath',
-                       'capabilities', 'procMount', 'ephemeralContainers'):
+                       'capabilities', 'procMount', 'ephemeralContainers', 'lifecycle', 'httpGet', 'terminationMessagePath'):
             if marker == 'hostPath':
                 self.assertNotIn('has(v.hostPath)', source)  # Exact volume source allow-list instead.
             else: self.assertIn(marker, source)
