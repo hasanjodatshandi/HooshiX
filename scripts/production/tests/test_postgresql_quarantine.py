@@ -76,6 +76,24 @@ class QuarantineTest(unittest.TestCase):
             self.assertEqual(['Deny'], obj['spec']['validationActions'])
             self.assertFalse(obj['spec'].get('matchConditions'))
 
+    def test_each_source_policy_verifies_its_own_main_or_init_image(self):
+        plan = self.plan()
+        for policy in plan['source_policies']:
+            spec = policy['spec']
+            selected = spec['matchImageReferences'][0]['glob']
+            self.assertIn(selected, plan['images'].values())
+            variable = spec['variables'][0]
+            self.assertEqual('quarantineImages', variable['name'])
+            self.assertEqual('(images.containers + images.?initContainers.orValue([])'
+                ' + images.?ephemeralContainers.orValue([])).filter(image, image == '
+                + admission.literal(selected) + ')', variable['expression'])
+            for check in [*spec['variables'][1:], *spec['validations']]:
+                for field in ('expression', 'messageExpression'):
+                    if field in check:
+                        self.assertNotIn('images.containers', check[field])
+                        if check[field] not in ('variables.provenanceVerified', 'variables.sbomVerified'):
+                            self.assertIn('variables.quarantineImages', check[field])
+
     def fixture(self):
         plan = self.plan()
         state, writes, sql = {}, [], []
@@ -208,6 +226,15 @@ class QuarantineTest(unittest.TestCase):
                 with self.subTest(encoded=output == encoded), self.assertRaisesRegex(ValueError, 'LOG_PRIVACY'):
                     rehearsal.private_logs(kube, [pod], b'public initdb')
         with self.assertRaisesRegex(ValueError, 'LOG_PRIVACY'): rehearsal.private_logs(kube, [], password)
+
+    def test_initdb_log_capture_waits_for_the_main_container_not_only_a_created_pod(self):
+        self.assertFalse(rehearsal.initdb_started({}))
+        for state, started in (({'waiting': {'reason': 'PodInitializing'}}, False),
+                               ({'running': {}}, True), ({'terminated': {'exitCode': 0}}, True)):
+            pod = {'status': {'containerStatuses': [{'name': 'initdb', 'state': state}]}}
+            self.assertEqual(started, rehearsal.initdb_started(pod))
+        self.assertFalse(rehearsal.initdb_started({'status': {'initContainerStatuses': [
+            {'name': 'bootstrap-controller', 'state': {'terminated': {'exitCode': 0}}}]}}))
 
     def test_reentry_rejects_spec_change_and_preserves_identities(self):
         f = self.fixture()

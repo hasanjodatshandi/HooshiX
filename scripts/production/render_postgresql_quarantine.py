@@ -142,7 +142,16 @@ def render(previous, addresses):
         obj['spec'].pop('credentials', None)
         obj['spec']['validations'][2] = admission.validation('PostgreSQL source identity rejected', provenance_expression(
             source_predicate(key, recipe(), published['repository_revision'], published['invocation_id'])))
-        sources += admission.split_image_policy(obj)
+        for part in admission.split_image_policy(obj):
+            # Each policy verifies only its exact image, including the bootstrap init container.
+            for check in [*part['spec']['variables'], *part['spec']['validations']]:
+                for field in ('expression', 'messageExpression'):
+                    if field in check:
+                        check[field] = check[field].replace('images.containers', 'variables.quarantineImages')
+            part['spec']['variables'].insert(0, {'name': 'quarantineImages', 'expression':
+                '(images.containers + images.?initContainers.orValue([]) + images.?ephemeralContainers.orValue([]))'
+                '.filter(image, image == ' + admission.literal(image) + ')'})
+            sources.append(part)
     cnpg = {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': 'cnpg-system'}},
             'podSelector': {'matchLabels': {'app.kubernetes.io/name': 'cloudnative-pg'}}}
     dns = {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': 'kube-system'}},

@@ -17,6 +17,11 @@ from rehearse_platform_admission import admission_result, apply, policy_ready
 from upgrade_mesh_security import replace_policy
 
 
+def initdb_started(pod):
+    return any(s.get('name') == 'initdb' and any(state in s.get('state', {}) for state in ('running', 'terminated'))
+               for s in pod.get('status', {}).get('containerStatuses', []))
+
+
 def private_logs(k, pods, initdb_logs):
     # Disposable credential only; no production Secret read or raw log output.
     secret = json.loads(k('-n', renderer.NAMESPACE, 'get', 'secret', 'identity-db-migration', '-o', 'json'))
@@ -37,8 +42,9 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
         if 'wait' in args and 'cluster/postgresql' in args and initdb_pod is None:
             def initial_pod():
                 pods = json.loads(k('-n', renderer.NAMESPACE, 'get', 'pods', '-l', 'cnpg.io/cluster=postgresql', '-o', 'json'))['items']
-                return next((p for p in pods if p['metadata']['name'].startswith('postgresql-1-initdb-')), None)
-            initdb_pod = wait(initial_pod, seconds=60)
+                return next((p for p in pods if p['metadata']['name'].startswith('postgresql-1-initdb-')
+                    and initdb_started(p)), None)
+            initdb_pod = wait(initial_pod, seconds=180)
             # Keep the synthetic stream in memory before CNPG removes the completed Job Pod.
             initdb_logs = k('-n', renderer.NAMESPACE, 'logs', initdb_pod['metadata']['name'], '-c', 'initdb',
                 '--follow', '--pod-running-timeout=180s', timeout=210)
@@ -88,7 +94,8 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
             print('POSTGRESQL_QUARANTINE_EVENT_CLASSES=' + json.dumps([m for m in (
                 'quarantined PostgreSQL contract rejected', 'failed to evaluate', 'no such key', 'no such overload',
                 'signature', 'PodSecurity', 'Insufficient memory', 'Insufficient cpu', 'volume node affinity conflict',
-                'unbound immediate PersistentVolumeClaims') if m in messages]), flush=True)
+                'unbound immediate PersistentVolumeClaims',
+                *(p['metadata']['name'] for p in plan['source_policies'])) if m in messages]), flush=True)
             raise
     if any(result[k] != again[k] for k in ('cluster_uid', 'pvc_uid', 'volume_uid')):
         raise ValueError('QUARANTINE_REENTRY_REPLACED_DATA_IDENTITY')
@@ -138,7 +145,8 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
         if wrong == original: raise ValueError('QUARANTINE_SOURCE_NEGATIVE_REQUIRED')
         try:
             replace_policy(wrong, get=lambda kind, name: installer.get(adapter, kind, name), kube=adapter, previous=original)
-            admission_result(k, obj, wait, expected=1, public_schema=False)
+            admission_result(k, obj, wait, expected=1,
+                message=original['metadata']['name'].encode(), public_schema=False)
         finally:
             replace_policy(original, get=lambda kind, name: installer.get(adapter, kind, name), kube=adapter, previous=wrong)
             policy_ready(k, original)

@@ -1716,6 +1716,13 @@ initdb و PostgreSQL را هم بررسی می‌کند؛ Secret واقعی مق
 Secret را هم رد می‌کند؛ فقط probeهای HTTPS داخلی ثابت مجازند.
 در Job اولیه، `POD_NAME` نام ثابت Job است و تنها ارجاع env اضافی، کلید `username`
 از Secret موجود `identity-db-migration` است؛ `password` یا Secret دیگری در env مجاز نیست.
+کنترل‌های امضا، provenance و SBOM تصویر اصلی PostgreSQL و تصویر init مربوط به CNPG
+را جداگانه و با digest دقیق همان جزء بررسی می‌کنند؛ تصویر جزء دیگر به verifier
+آن سیاست فرستاده نمی‌شود. پذیرش هر دو Pod واقعی `initdb` و instance و رد signer،
+provenance و SBOM نامعتبر پیش از ساخت بسته الزامی است.
+آزمون حریم خصوصی، log اصلی `initdb` را فقط پس از شروع همان container جمع می‌کند؛
+وجود Pod یا پایان `bootstrap-controller` به‌تنهایی شاهد شروع آن نیست. تست منفی
+امضا/attestation نیز باید نام همان سیاستِ عمداً نامعتبر را در پاسخ ردشدن ببیند.
 پیش‌نیاز CI، اسکن تازهٔ همان inventoryهای تأییدشدهٔ Istio/CNI/ESO با Grype ثابت و
 دیتابیس معتبر حداکثر پنج‌روزه است. گزارش‌ها و hashها به‌صورت artifact عمومی نگه
 داشته می‌شوند؛ digest، SBOM امضاشده، provenance و انتشار اصلی عوض نمی‌شوند.

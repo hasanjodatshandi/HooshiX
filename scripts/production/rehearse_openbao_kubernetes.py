@@ -71,7 +71,8 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 'secrets "cert-manager-webhook-ca" not found',
                 'the server could not find the requested resource',
                 'resource issuers not found in group cert-manager.io/v1',
-                'no endpoints available for service', 'certificate signed by unknown authority')
+                'no endpoints available for service', 'certificate signed by unknown authority',
+                'PodInitializing', 'ContainerCreating', 'waiting to start')
                 if marker.encode() in (result.stderr or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
             print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
