@@ -80,6 +80,27 @@ class PostgreSQLServiceOwnershipTest(unittest.TestCase):
                 native.exercise_candidate(image)
             self.assertEqual(1, command.call_count)
 
+    def test_official_fixture_waits_for_final_tcp_server_before_sql(self):
+        calls, probes = [], []
+        container = 'c' * 64
+        def execute(*args, **_):
+            calls.append(args)
+            if args[0] == 'context': return SimpleNamespace(returncode=0, stdout='"unix:///var/run/docker.sock"')
+            if args[0] == 'run': return SimpleNamespace(returncode=0, stdout=container)
+            if 'pg_isready' in args:
+                self.assertEqual(('exec', container, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'), args)
+                probes.append(args)
+                return SimpleNamespace(returncode=int(len(probes) == 1), stdout='')
+            return SimpleNamespace(returncode=0, stdout='')
+        with patch.object(sys, 'argv', ['fixture', '--disposable']), \
+             patch.dict(os.environ, {'DOCKER_HOST': 'unix:///var/run/docker.sock'}), \
+             patch.object(native, 'docker', side_effect=execute), patch.object(native.time, 'sleep'), \
+             patch.object(native, 'exercise') as exercise:
+            native.main()
+        exercise.assert_called_once_with(container, docker_host='unix:///var/run/docker.sock')
+        self.assertEqual(2, len(probes))
+        self.assertEqual(('rm', '-fv', container), calls[-1])
+
     def test_candidate_native_failure_cleans_only_its_volatile_container(self):
         container = 'b' * 64
         calls = []

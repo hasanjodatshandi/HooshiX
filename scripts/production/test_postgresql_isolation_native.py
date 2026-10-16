@@ -172,7 +172,8 @@ def main() -> None:
         raise RuntimeError('disposable PostgreSQL failed to start')
     try:
         deadline = time.monotonic() + 45
-        while docker('exec', container, 'pg_isready', '-U', 'postgres', docker_host=docker_host).returncode != 0:
+        # The official entrypoint's temporary init server accepts Unix sockets, never TCP.
+        while docker('exec', container, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', docker_host=docker_host).returncode != 0:
             if time.monotonic() >= deadline:
                 raise RuntimeError('disposable PostgreSQL startup exceeded deadline')
             time.sleep(1)

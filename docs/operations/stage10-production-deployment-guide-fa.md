@@ -1592,6 +1592,8 @@ python3 scripts/production/test_postgresql_isolation_native.py --disposable
 
 فرمان سوم فقط fixture Docker با تصویر digest ثابت PostgreSQL 18.4، بدون شبکه و
 پورت میزبان می‌سازد و پس از آزمون همان container/volume موقت را حذف می‌کند.
+پیش از SQL، آمادگی TCP روی loopback داخل container بررسی می‌شود تا فقط سرور
+نهایی آماده باشد، نه سرور موقتِ Unix-socket مرحلهٔ init؛ هیچ پورتی منتشر نمی‌شود.
 خروجی مورد انتظار `native_database_isolation: Passed` است؛ ۴۰ اتصال سرویس دیگر
 رد می‌شوند. نقش runtime به migration تبدیل نمی‌شود، DDL/TEMP ندارد و دادهٔ
 tenant دیگر یا context باقی‌مانده پس از commit/rollback را نمی‌بیند. این نتیجه
