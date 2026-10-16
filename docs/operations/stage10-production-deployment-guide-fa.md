@@ -1714,7 +1714,8 @@ python3 scripts/production/build_postgresql_quarantine_bundle.py \
 
 سازنده، امضا و provenance/SBOM و تازگی شواهد چهار تصویر قبلی، آزمون filesystem
 و guard، bootstrap واقعی CNPG/Ambient، خالی‌بودن، TLS/رد SQL، رد Pod و امضای
-نامعتبر و اجرای دوباره بدون تغییر UIDهای Cluster/PVC/PV را لازم دارد. native
+نامعتبر، رد اتصال از Pod با مبدأ غیرمجاز و اجرای دوباره بدون تغییر UIDهای
+Cluster/PVC/PV را لازم دارد. native
 داخل kind، mount میزبان VPS محسوب نمی‌شود؛ guard روی مقصد جداگانه بررسی می‌شود.
 روی سرور دوم، نام node و رزرو storage باید در تغییر بررسی‌شده به همان نصب
 متصل شود؛ نام سرور اول را به مقصد دیگر apply نکنید.

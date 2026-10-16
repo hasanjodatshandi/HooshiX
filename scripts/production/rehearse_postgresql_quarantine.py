@@ -10,11 +10,12 @@ import install_postgresql_quarantine as installer
 import render_postgresql_quarantine as renderer
 import render_postgresql_secrets as secrets
 from rehearse_openbao_recovery import RehearsalFailed
+from rehearse_cert_manager import network_negative
 from rehearse_platform_admission import admission_result, apply, policy_ready
 from upgrade_mesh_security import replace_policy
 
 
-def rehearse(k, wait, run, chart, helm, addresses):
+def rehearse(k, wait, run, chart, helm, addresses, platform):
     def adapter(*args, body=None, **options):
         return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
     previous = secrets.render(chart, helm, addresses)['boundary']
@@ -100,11 +101,8 @@ def rehearse(k, wait, run, chart, helm, addresses):
             policy_ready(k, original)
         admission_result(k, obj, wait, public_schema=False)
     result['source_identity_positive_negative'] = 'Passed'
-    # No temporary production policy opening: exercise denied service TCP from its own non-loopback source.
-    k('-n', renderer.NAMESPACE, 'exec', 'postgresql-1', '-c', 'postgres', '--', 'psql', '-XAtw',
-        '-d', 'host=postgresql-rw.platform-data.svc dbname=identity user=identity_migration '
-        'sslmode=verify-full sslrootcert=/controller/certificates/server-ca.crt connect_timeout=5',
-        '-c', 'SELECT 1', expected=2, required_error=b'timeout expired')
+    # A different Pod must be the source: self-Pod traffic is not NetworkPolicy isolation evidence.
+    network_negative(k, wait, platform, selector='cnpg.io/cluster=postgresql', port=5432, namespace=renderer.NAMESPACE)
     result['service_sql_network_denied'] = 'Passed'
     result['guard'] = 'Not run'
     result['host_storage_guard'] = 'Not run; disposable node path; separate filesystem guard rehearsal required'

@@ -455,7 +455,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                         api, token, cert.read_text(), audiences, addresses)
                     if postgresql_quarantine:
                         from rehearse_postgresql_quarantine import rehearse as quarantine
-                        pg_quarantine_result = quarantine(k, wait, run, eso_chart, str(tools / 'helm'), addresses)
+                        pg_quarantine_result = quarantine(k, wait, run, eso_chart, str(tools / 'helm'), addresses, platform)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
                 if any(value.encode() in logs for value in (canary, token, reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")

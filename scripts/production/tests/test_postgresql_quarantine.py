@@ -14,6 +14,7 @@ import install_postgresql_quarantine as installer
 import render_platform_admission as admission
 import render_postgresql_quarantine as renderer
 import build_postgresql_quarantine_bundle as bundle
+import rehearse_cert_manager as network_fixture
 
 
 class QuarantineTest(unittest.TestCase):
@@ -178,6 +179,29 @@ class QuarantineTest(unittest.TestCase):
         for op, match in (('In', True), ('NotIn', False), ('Exists', True), ('DoesNotExist', False)):
             self.assertEqual(match, installer.selects({'matchExpressions': [
                 {'key': 'app', 'operator': op, 'values': ['postgresql']}]}, {'app': 'postgresql'}))
+
+    def test_network_negative_uses_a_foreign_pod_without_opening_database_ingress(self):
+        previous = {'apiVersion': 'policies.kyverno.io/v1', 'kind': 'ValidatingPolicy', 'spec': {}}
+        def kube(*args, **_):
+            if 'validatingpolicy' in args: return json.dumps(previous).encode()
+            if 'pods' in args:
+                self.assertEqual('platform-data', args[1])
+                return b'{"items":[{"status":{"podIP":"10.42.0.8"}}]}'
+            if 'pod' in args and 'get' in args:
+                return b'{"status":{"containerStatuses":[{"state":{"terminated":{"exitCode":1}}}]}}'
+            if 'logs' in args: return b'i/o timeout'
+            return b''
+        platform = SimpleNamespace(plan={'openbao': {'items': [{'spec': {'template': {'spec': {
+            'containers': [{}]}}}}]}})
+        with patch.object(network_fixture.admission, 'hardening', return_value={'spec': {'matchConstraints': {}}}), \
+             patch.object(network_fixture, 'replace_policy') as replace, \
+             patch.object(network_fixture, 'policy_ready'), patch.object(network_fixture, 'apply') as apply:
+            network_fixture.network_negative(kube, lambda fn, **_: fn(), platform,
+                namespace='platform-data', selector='cnpg.io/cluster=postgresql', port=5432)
+        objects = [c.args[1] for c in apply.call_args_list]
+        self.assertTrue(all(o['metadata']['namespace'] == 'hooshix-secrets' for o in objects))
+        self.assertEqual('commissioning-probe', objects[1]['spec']['serviceAccountName'])
+        self.assertEqual(2, replace.call_count)
 
     def test_initialized_guard_mode_never_adopts_other_or_incomplete_data(self):
         data, pgdata, version = MagicMock(), MagicMock(), MagicMock()
