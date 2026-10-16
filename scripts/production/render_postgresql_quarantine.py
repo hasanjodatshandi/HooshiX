@@ -25,6 +25,9 @@ ENV = [{'name': k, 'value': v} for k, v in (
     ('NAMESPACE', NAMESPACE), ('CLUSTER_NAME', CLUSTER),
     ('PSQL_HISTORY', '/controller/tmp/.psql_history'), ('PGPORT', '5432'),
     ('PGHOST', '/controller/run'), ('TMPDIR', '/controller/tmp'))]
+INIT_ENV = [{**entry, 'value': 'postgresql-1-initdb'} if entry['name'] == 'POD_NAME' else entry.copy()
+            for entry in ENV] + [{'name': 'APP_USERNAME', 'valueFrom': {'secretKeyRef': {
+                'name': 'identity-db-migration', 'key': 'username', 'optional': False}}}]
 MOUNTS = {'pgdata': ['/var/lib/postgresql/data'], 'scratch-data': ['/run', '/controller'], 'shm': ['/dev/shm']}
 
 
@@ -82,7 +85,8 @@ def boundary(previous, images):
         ')) || (object.spec.containers[0].name == "initdb" && (' + admission.scalar_tree('object.spec.containers[0].command', INIT) + '))',
         'object.spec.initContainers[0].name == "bootstrap-controller" && object.spec.initContainers[0].image == ' +
             admission.literal(images['operator']) + ' && (' + admission.scalar_tree('object.spec.initContainers[0].command', BOOTSTRAP) + ')',
-        admission.scalar_tree('object.spec.containers[0].env', ENV),
+        '(object.spec.containers[0].name == "postgres" && (' + admission.scalar_tree('object.spec.containers[0].env', ENV) +
+        ')) || (object.spec.containers[0].name == "initdb" && (' + admission.scalar_tree('object.spec.containers[0].env', INIT_ENV) + '))',
         '!has(object.spec.initContainers[0].env) || object.spec.initContainers[0].env.size() == 0',
         'has(object.spec.volumes) && object.spec.volumes.size() == 4 && object.spec.volumes.all(v,'
         ' (v.name == "pgdata" && has(v.persistentVolumeClaim) && v.persistentVolumeClaim.claimName == "postgresql-1")'

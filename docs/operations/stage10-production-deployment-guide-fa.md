@@ -1714,11 +1714,15 @@ initdb و PostgreSQL را هم بررسی می‌کند؛ Secret واقعی مق
 هیچ endpoint مدیریتی برای برنامه‌ها یا اینترنت باز نمی‌شود.
 قرارداد Pod اجرای دلخواه از lifecycle/exec-probe و تغییر مسیر termination به فایل
 Secret را هم رد می‌کند؛ فقط probeهای HTTPS داخلی ثابت مجازند.
+در Job اولیه، `POD_NAME` نام ثابت Job است و تنها ارجاع env اضافی، کلید `username`
+از Secret موجود `identity-db-migration` است؛ `password` یا Secret دیگری در env مجاز نیست.
 پیش‌نیاز CI، اسکن تازهٔ همان inventoryهای تأییدشدهٔ Istio/CNI/ESO با Grype ثابت و
 دیتابیس معتبر حداکثر پنج‌روزه است. گزارش‌ها و hashها به‌صورت artifact عمومی نگه
 داشته می‌شوند؛ digest، SBOM امضاشده، provenance و انتشار اصلی عوض نمی‌شوند.
 برای ساخت bundleهای mesh/ESO نیز ابزار Grype ثابت باید در PATH باشد؛ اسکن تازه
 مجوز rebuild، push، تغییر تصویر یا عبور از High/Critical نیست.
+سقف کل آزمون یکپارچهٔ زیرساخت و قرنطینه در CI چهل دقیقه است؛ deadlineهای محدود
+هر عملیات و الزام موفقیت همهٔ کنترل‌ها تغییر نمی‌کنند.
 
 این مسیر در `render_postgresql_quarantine.py` تعریف می‌شود. پس از موفقیت آزمون
 واقعی همان درخت Git و تأیید `main`، بستهٔ عمومی بیرون Git ساخته می‌شود:

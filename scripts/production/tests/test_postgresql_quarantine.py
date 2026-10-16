@@ -33,6 +33,10 @@ class QuarantineTest(unittest.TestCase):
         self.assertFalse(spec['enableSuperuserAccess'])
         self.assertEqual(['host all all all reject'], spec['postgresql']['pg_hba'])
         self.assertEqual(['/controller/manager', 'instance', 'run', '--status-port-tls', '--log-level=info'], renderer.RUN)
+        self.assertEqual('postgresql-1-initdb', renderer.INIT_ENV[1]['value'])
+        self.assertEqual({'name': 'APP_USERNAME', 'valueFrom': {'secretKeyRef': {
+            'name': 'identity-db-migration', 'key': 'username', 'optional': False}}}, renderer.INIT_ENV[-1])
+        self.assertEqual(9, len(renderer.INIT_ENV))
         self.assertEqual('identity-db-migration', spec['bootstrap']['initdb']['secret']['name'])
         for name in ('managed', 'backup', 'plugins', 'env', 'envFrom', 'externalClusters', 'superuserSecret'):
             self.assertNotIn(name, spec)
@@ -62,7 +66,8 @@ class QuarantineTest(unittest.TestCase):
         self.assertEqual(before[0]['expression'], after[0]['expression'].split(' || (', 1)[1][:-1])
         source = after[-1]['expression']
         for marker in ('env', 'volumeMounts', 'persistentVolumeClaim', 'hostNetwork', 'hostPath',
-                       'capabilities', 'procMount', 'ephemeralContainers', 'lifecycle', 'httpGet', 'terminationMessagePath'):
+                       'capabilities', 'procMount', 'ephemeralContainers', 'lifecycle', 'httpGet', 'terminationMessagePath',
+                       'APP_USERNAME', 'secretKeyRef'):
             if marker == 'hostPath':
                 self.assertNotIn('has(v.hostPath)', source)  # Exact volume source allow-list instead.
             else: self.assertIn(marker, source)

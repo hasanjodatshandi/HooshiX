@@ -104,7 +104,7 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
         obj['metadata'] = {key: pod['metadata'][key] for key in ('name', 'namespace', 'labels', 'ownerReferences')}
         admission_result(k, obj, wait, public_schema=False)
         for mode in ('account', 'image', 'command', 'ambient', 'privilege', 'secret-volume', 'env', 'host-path',
-                     'lifecycle', 'exec-probe', 'termination-path'):
+                     'lifecycle', 'exec-probe', 'termination-path', 'username-secret'):
             bad = copy.deepcopy(obj)
             if mode == 'account': bad['spec']['serviceAccountName'] = 'default'
             if mode == 'image': bad['spec']['containers'][0]['image'] = bad['spec']['containers'][0]['image'].split('@')[0] + ':latest'
@@ -117,6 +117,8 @@ def rehearse(k, wait, run, chart, helm, addresses, platform):
             if mode == 'lifecycle': bad['spec']['containers'][0]['lifecycle'] = {'postStart': {'exec': {'command': ['/bin/sh']}}}
             if mode == 'exec-probe': bad['spec']['containers'][0]['readinessProbe'] = {'exec': {'command': ['/bin/sh']}}
             if mode == 'termination-path': bad['spec']['containers'][0]['terminationMessagePath'] = '/var/run/secrets/kubernetes.io/serviceaccount/token'
+            if mode == 'username-secret': bad['spec']['containers'][0]['env'][-1] = {'name': 'APP_USERNAME',
+                'valueFrom': {'secretKeyRef': {'name': 'identity-db-migration', 'key': 'password', 'optional': False}}}
             admission_result(k, bad, wait, expected=1, public_schema=False)
     result['pod_contract_positive_negative'] = 'Passed'
     pod = next(p for p in pods if p['metadata']['name'] == 'postgresql-1')
