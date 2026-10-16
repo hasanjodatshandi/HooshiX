@@ -156,7 +156,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     pv_uid = reserved_volume(kube, old)
     units = guard(initialized=bool(old))
     isolation(plan, kube)
-    objects = [*plan['network'], plan['authorization'], *plan['source_policies']]
+    objects = [plan['catalog'], *plan['network'], plan['authorization'], *plan['source_policies']]
     existing = []
     for obj in objects:
         m = obj['metadata']
@@ -212,6 +212,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
             '-c', 'SELECT 1', expected=2, required_error=marker)
     isolation(plan, kube)
     require(get(kube, 'validatingpolicy', plan['boundary']['metadata']['name'])['spec'] == plan['boundary']['spec']
+        and get(kube, 'imagecatalog', plan['catalog']['metadata']['name'], NS)['spec'] == plan['catalog']['spec']
         and protected(kube) == before and guard(initialized=True) == units, 'PRESERVED_FOUNDATION_CHANGED')
     return {'schema_version': 1, 'postgresql_quarantine': 'Passed', 'images': plan['images'],
         'cluster_uid': current['metadata']['uid'], 'pvc_uid': pvc['metadata']['uid'], 'volume_uid': pv_uid,

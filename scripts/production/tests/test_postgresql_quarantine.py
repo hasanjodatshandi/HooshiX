@@ -33,6 +33,10 @@ class QuarantineTest(unittest.TestCase):
         for name in ('managed', 'backup', 'plugins', 'env', 'envFrom', 'externalClusters', 'superuserSecret'):
             self.assertNotIn(name, spec)
         self.assertEqual({'volumeName': 'hooshix-postgresql-local-29gib'}, spec['storage']['pvcTemplate'])
+        self.assertNotIn('imageName', spec)
+        self.assertEqual({'apiGroup': 'postgresql.cnpg.io', 'kind': 'ImageCatalog',
+                          'name': 'hooshix-postgresql-quarantine', 'major': 18}, spec['imageCatalogRef'])
+        self.assertEqual({'images': [{'major': 18, 'image': p['images']['postgresql']}]}, p['catalog']['spec'])
         self.assertNotIn('5432', json.dumps(p['network']) + json.dumps(p['authorization']))
         self.assertEqual({'operator', 'postgresql'}, set(p['images']))
         self.assertEqual(6, len(p['source_policies']))
@@ -139,7 +143,7 @@ class QuarantineTest(unittest.TestCase):
             self.assertEqual('Not run', first[key])
 
     def test_foreign_or_changed_resources_stop_before_any_write(self):
-        for mode in ('approval', 'cluster', 'late-policy', 'foreign-claim', 'other-cluster', 'additional-access'):
+        for mode in ('approval', 'cluster', 'late-policy', 'foreign-claim', 'other-cluster', 'additional-access', 'catalog'):
             f = self.fixture(); plan, state, writes, *_ = f
             if mode == 'approval': plan['approval'] = 'bypass'
             if mode == 'cluster': state[('cluster', 'platform-data', 'postgresql')] = copy.deepcopy(plan['cluster'])
@@ -148,6 +152,9 @@ class QuarantineTest(unittest.TestCase):
                 state[(obj['kind'].lower(), None, obj['metadata']['name'])] = obj
             if mode == 'foreign-claim': state[('persistentvolumeclaim', 'platform-data', 'foreign')] = {'metadata': {'name': 'foreign'}}
             if mode == 'other-cluster': state[('cluster', 'platform-data', 'other')] = {'metadata': {'name': 'other'}}
+            if mode == 'catalog':
+                obj = copy.deepcopy(plan['catalog']); obj['spec']['images'][0]['major'] = 17
+                state[('imagecatalog', 'platform-data', obj['metadata']['name'])] = obj
             if mode == 'additional-access': state[('networkpolicy', 'platform-data', 'foreign')] = {
                 'metadata': {'name': 'foreign'}, 'spec': {'podSelector': {}, 'ingress': [{}]}}
             with self.subTest(mode=mode), self.assertRaises((ValueError, KeyError)):

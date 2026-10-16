@@ -1691,7 +1691,9 @@ manifest، rollback password محسوب نمی‌شود. مشکل deferred پا�
 مالک در ۲۰۲۶-۱۰-۱۶ فقط این حالت را تأیید کرده است؛ مجوز ورود دادهٔ واقعی یا
 اتصال برنامه نیست. یک instance از همان تصویر امضاشده روی LocalPV موجود ۲۹ GiB
 ساخته می‌شود. CNPG برای bootstrap، دیتابیس خالی `identity` و owner موجود
-`identity_migration` را با ارجاع به Secret `identity-db-migration` می‌سازد؛ هیچ
+`identity_migration` را با ارجاع به Secret `identity-db-migration` می‌سازد.
+یک `ImageCatalog` در همان namespace فقط digest ثابت PostgreSQL و نسخهٔ major برابر ۱۸ را
+به CNPG معرفی می‌کند؛ tag شناور، تصویر تازه یا registry credential جدید ندارد. هیچ
 جدول، Flyway، پنج دیتابیس برنامه یا نقش اضافی در این گام نصب نمی‌شود. رمز عوض
 نمی‌شود و بسته رمز/توکن/کلید CA نمی‌خواهد. دسترسی عمومی و اتصال TCP برنامه‌ها
 بسته است؛ `pg_hba` حتی اتصال SQL از loopback داخل Pod را رد می‌کند. فقط مدیریت
