@@ -5,6 +5,7 @@ import render_platform_admission as admission
 from build_postgresql_candidates import recipe
 from publish_postgresql_candidates import source_predicate
 from render_mesh_security_upgrade import provenance_expression
+from render_cnpg_control_plane import resource as cnpg_resource
 from verify_published_postgresql import candidate
 
 NAMESPACE = 'platform-data'
@@ -36,7 +37,7 @@ def cluster():
     return resource('Cluster', CLUSTER, 'postgresql.cnpg.io/v1', spec={
         'instances': 1, 'imagePullPolicy': 'IfNotPresent',
         'imageCatalogRef': {'apiGroup': 'postgresql.cnpg.io', 'kind': 'ImageCatalog',
-                            'name': 'hooshix-postgresql-quarantine', 'major': 18},
+                            'name': 'hooshix-postgresql-18-candidate', 'major': 18},
         'postgresUID': 26, 'postgresGID': 26, 'enableSuperuserAccess': False, 'logLevel': 'info',
         'resources': copy.deepcopy(RESOURCES),
         'inheritedMetadata': {'labels': {'istio.io/dataplane-mode': 'ambient',
@@ -152,8 +153,8 @@ def render(previous, addresses):
             'prod.sajtech.internal/ns/cnpg-system/sa/cnpg-manager']}}], 'to': [{'operation': {'ports': ['8000']}}]}]})
     return {'schema_version': 1, 'installation_id': 'hooshix-production', 'profile': 'production-single-server',
         'approval': 'owner-approved-empty-quarantine-2026-10-16', 'cluster': cluster(), 'images': images,
-        'catalog': resource('ImageCatalog', 'hooshix-postgresql-quarantine', 'postgresql.cnpg.io/v1',
-                            spec={'images': [{'major': 18, 'image': images['postgresql']}]}),
+        'catalog': cnpg_resource('ImageCatalog', 'hooshix-postgresql-18-candidate', NAMESPACE,
+            apiVersion='postgresql.cnpg.io/v1', spec={'images': [{'major': 18, 'image': images['postgresql']}]}),
         'previous_boundary': previous, 'boundary': boundary(previous, images), 'source_policies': sources,
         'network': networks, 'authorization': authorization, 'application_ingress': 'CLOSED',
         'provider_backup': 'Not run', 'production_readiness': 'Not verified'}

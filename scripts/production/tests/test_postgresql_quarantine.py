@@ -35,7 +35,7 @@ class QuarantineTest(unittest.TestCase):
         self.assertEqual({'volumeName': 'hooshix-postgresql-local-29gib'}, spec['storage']['pvcTemplate'])
         self.assertNotIn('imageName', spec)
         self.assertEqual({'apiGroup': 'postgresql.cnpg.io', 'kind': 'ImageCatalog',
-                          'name': 'hooshix-postgresql-quarantine', 'major': 18}, spec['imageCatalogRef'])
+                          'name': 'hooshix-postgresql-18-candidate', 'major': 18}, spec['imageCatalogRef'])
         self.assertEqual({'images': [{'major': 18, 'image': p['images']['postgresql']}]}, p['catalog']['spec'])
         self.assertNotIn('5432', json.dumps(p['network']) + json.dumps(p['authorization']))
         self.assertEqual({'operator', 'postgresql'}, set(p['images']))
@@ -69,6 +69,9 @@ class QuarantineTest(unittest.TestCase):
             state[key(obj)] = obj
         old = copy.deepcopy(plan['previous_boundary'])
         state[key(old)] = old
+        catalog = copy.deepcopy(plan['catalog'])
+        catalog['metadata'].update(uid='existing-catalog', labels={'app.kubernetes.io/managed-by': 'hooshix-cnpg-control-plane'})
+        state[key(catalog)] = catalog
         ns = {'kind': 'Namespace', 'metadata': {'name': 'platform-data', 'labels': {
             'istio.io/dataplane-mode': 'ambient', 'pod-security.kubernetes.io/enforce': 'restricted'}}}
         state[key(ns)] = ns

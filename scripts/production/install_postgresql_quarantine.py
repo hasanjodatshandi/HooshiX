@@ -124,6 +124,10 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     plan = copy.deepcopy(plan)
     plan['network'][0]['spec']['egress'][0]['to'] = [{'ipBlock': {'cidr': a + '/32'}} for a in addresses(kube)]
     before = protected(kube)
+    catalog = get(kube, 'imagecatalog', plan['catalog']['metadata']['name'], NS)
+    require(catalog and catalog['spec'] == plan['catalog']['spec']
+        and catalog['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == 'hooshix-cnpg-control-plane',
+        'EXISTING_SIGNED_IMAGE_CATALOG_REQUIRED')
     ns = get(kube, 'namespace', NS)['metadata']['labels']
     require(ns.get('istio.io/dataplane-mode') == 'ambient' and ns.get('pod-security.kubernetes.io/enforce') == 'restricted',
             'EXISTING_RESTRICTED_AMBIENT_REQUIRED')
@@ -156,7 +160,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     pv_uid = reserved_volume(kube, old)
     units = guard(initialized=bool(old))
     isolation(plan, kube)
-    objects = [plan['catalog'], *plan['network'], plan['authorization'], *plan['source_policies']]
+    objects = [*plan['network'], plan['authorization'], *plan['source_policies']]
     existing = []
     for obj in objects:
         m = obj['metadata']
@@ -213,6 +217,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     isolation(plan, kube)
     require(get(kube, 'validatingpolicy', plan['boundary']['metadata']['name'])['spec'] == plan['boundary']['spec']
         and get(kube, 'imagecatalog', plan['catalog']['metadata']['name'], NS)['spec'] == plan['catalog']['spec']
+        and get(kube, 'imagecatalog', plan['catalog']['metadata']['name'], NS)['metadata']['uid'] == catalog['metadata']['uid']
         and protected(kube) == before and guard(initialized=True) == units, 'PRESERVED_FOUNDATION_CHANGED')
     return {'schema_version': 1, 'postgresql_quarantine': 'Passed', 'images': plan['images'],
         'cluster_uid': current['metadata']['uid'], 'pvc_uid': pvc['metadata']['uid'], 'volume_uid': pv_uid,

@@ -1692,8 +1692,9 @@ manifest، rollback password محسوب نمی‌شود. مشکل deferred پا�
 اتصال برنامه نیست. یک instance از همان تصویر امضاشده روی LocalPV موجود ۲۹ GiB
 ساخته می‌شود. CNPG برای bootstrap، دیتابیس خالی `identity` و owner موجود
 `identity_migration` را با ارجاع به Secret `identity-db-migration` می‌سازد.
-یک `ImageCatalog` در همان namespace فقط digest ثابت PostgreSQL و نسخهٔ major برابر ۱۸ را
-به CNPG معرفی می‌کند؛ tag شناور، تصویر تازه یا registry credential جدید ندارد. هیچ
+همان `ImageCatalog` موجود `hooshix-postgresql-18-candidate` فقط digest ثابت PostgreSQL
+و نسخهٔ major برابر ۱۸ را به CNPG معرفی می‌کند؛ catalog یا تصویر تازه، tag شناور
+و registry credential جدید ساخته نمی‌شود. هیچ
 جدول، Flyway، پنج دیتابیس برنامه یا نقش اضافی در این گام نصب نمی‌شود. رمز عوض
 نمی‌شود و بسته رمز/توکن/کلید CA نمی‌خواهد. دسترسی عمومی و اتصال TCP برنامه‌ها
 بسته است؛ `pg_hba` حتی اتصال SQL از loopback داخل Pod را رد می‌کند. فقط مدیریت
