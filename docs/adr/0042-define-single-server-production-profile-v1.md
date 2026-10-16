@@ -107,6 +107,14 @@ and mesh allow only the CNPG control edge; general TCP SQL is rejected by
 `pg_hba` even inside the Pod. Local peer administration remains the supervised
 CNPG/owner maintenance path, not an application endpoint.
 
+For this commissioning, the owner also approved CNPG's informer-cache read
+boundary on 2026-10-16: one namespaced Role/RoleBinding grants only `list/watch`
+on Secrets in `cnpg-system` to `cnpg-system/cnpg-manager`. These APIs disclose
+Secret contents, including internal TLS keys, not just metadata. No cluster-wide
+Secret permission, other-namespace read or additional Secret write is granted.
+Existing controller RBAC is retained, and actual foreign-namespace/write denials
+are required before database bootstrap and on reentry.
+
 `render_postgresql_quarantine.py` owns the public desired state. The reviewed
 owner-local bootstrap verifies empty state, TLS, denial boundaries, the existing
 volume/guard and safe reentry. An unexpected cluster, claim, spec or business

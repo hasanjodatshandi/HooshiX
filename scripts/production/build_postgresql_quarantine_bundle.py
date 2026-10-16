@@ -17,7 +17,7 @@ from verify_published_postgresql import candidate, verify
 SOURCES = (*barman.SOURCES[:-1], 'install_postgresql_quarantine.py')
 WRAPPER = 'run-postgresql-quarantine.ps1'
 CHECKS = ('postgresql_quarantine', 'empty_database', 'tls_and_sql_denial',
-          'service_account_scope',
+          'service_account_scope', 'cnpg_secret_cache_scope', 'container_log_privacy',
           'idempotent_reconciliation', 'pod_contract_positive_negative',
           'source_identity_positive_negative', 'service_sql_network_denied')
 

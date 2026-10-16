@@ -96,6 +96,19 @@ def permissions(kube):
                 'QUARANTINE_SERVICE_ACCOUNT_EXTRA_AUTHORITY_REJECTED')
 
 
+def cache_permissions(kube):
+    actor = '--as=system:serviceaccount:cnpg-system:cnpg-manager'
+    for verb in ('list', 'watch'):
+        require(kube('auth', 'can-i', verb, 'secrets', '-n', 'cnpg-system', actor).strip() == b'yes',
+                'APPROVED_CNPG_SECRET_CACHE_READ_REQUIRED')
+        for namespace in ('hooshix-secrets', 'platform-apps'):
+            require(kube('auth', 'can-i', verb, 'secrets', '-n', namespace, actor, expected=1).strip() == b'no',
+                    'FOREIGN_CNPG_SECRET_CACHE_REJECTED')
+    for verb in ('patch', 'update', 'delete'):
+        require(kube('auth', 'can-i', verb, 'secret/hooshix-unapproved-cache-write', '-n', 'cnpg-system',
+            actor, expected=1).strip() == b'no', 'CNPG_SECRET_CACHE_EXTRA_WRITE_REJECTED')
+
+
 def isolation(plan, kube):
     labels = {'cnpg.io/cluster': NAME, 'istio.io/dataplane-mode': 'ambient', 'hooshix.io/commissioning': 'quarantined'}
     for kind, selector, expected in (
@@ -119,6 +132,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     require(plan.get('schema_version') == 1 and plan.get('installation_id') == 'hooshix-production'
         and plan.get('profile') == 'production-single-server'
         and plan.get('approval') == 'owner-approved-empty-quarantine-2026-10-16'
+        and plan.get('cache_approval') == 'owner-approved-cnpg-system-secret-list-watch-2026-10-16'
         and plan.get('application_ingress') == 'CLOSED' and plan.get('provider_backup') == 'Not run'
         and plan.get('production_readiness') == 'Not verified', 'EXACT_EMPTY_QUARANTINE_APPROVAL_REQUIRED')
     plan = copy.deepcopy(plan)
@@ -160,19 +174,22 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     pv_uid = reserved_volume(kube, old)
     units = guard(initialized=bool(old))
     isolation(plan, kube)
-    objects = [*plan['network'], plan['authorization'], *plan['source_policies']]
+    objects = [*plan['cache_rbac'], *plan['network'], plan['authorization'], *plan['source_policies']]
     existing = []
     for obj in objects:
         m = obj['metadata']
         actual = get(kube, obj['kind'], m['name'], m.get('namespace'))
         require(not actual or (actual['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == MANAGER
-            and desired_fields_match(actual, obj) and actual['spec'] == obj['spec']), 'FOREIGN_OR_CHANGED_RESOURCE_PRESERVED')
+            and desired_fields_match(actual, obj)
+            and all(actual.get(k) == obj.get(k) for k in ('spec', 'rules', 'roleRef', 'subjects'))),
+            'FOREIGN_OR_CHANGED_RESOURCE_PRESERVED')
         existing.append(bool(actual))
     previous = get(kube, 'validatingpolicy', plan['boundary']['metadata']['name'])
     require(previous['spec'] in (plan['previous_boundary']['spec'], plan['boundary']['spec']), 'PREVIOUS_DATA_BOUNDARY_CONFLICT')
     print('POSTGRESQL_QUARANTINE_STEP=admission', file=sys.stderr, flush=True)
     for obj, present in zip(objects, existing):
         if not present: kube('create', '-f', '-', body=obj)
+    cache_permissions(kube)
     if previous['spec'] != plan['boundary']['spec']:
         replace_policy(plan['boundary'], get=lambda kind, name: get(kube, kind, name), kube=kube, previous=plan['previous_boundary'])
     for obj in [plan['boundary'], *plan['source_policies']]:
@@ -207,6 +224,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
     require(sql('postgres', "SELECT (SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres') "
         "AND current_setting('ssl')='on'") == b't', 'TLS_AND_NO_SUPERUSER_PASSWORD_REQUIRED')
     permissions(kube)
+    cache_permissions(kube)
     # Read-only loopback TLS verification; pg_hba must still deny SQL, even with a valid server name.
     for hostname, marker in (('postgresql-rw.platform-data.svc', b'pg_hba.conf rejects'),
                               ('wrong.invalid', b'does not match host name')):
@@ -223,6 +241,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation):
         'cluster_uid': current['metadata']['uid'], 'pvc_uid': pvc['metadata']['uid'], 'volume_uid': pv_uid,
         'empty_database': 'Passed', 'tls_and_sql_denial': 'Passed', 'guard': 'Passed',
         'service_account_scope': 'Passed',
+        'cnpg_secret_cache_scope': 'Passed',
         'root_mesh_openbao_eso_cnpg_barman': 'Preserved', 'application_ingress': 'CLOSED',
         'application_migrations': 'Not run', 'provider_backup': 'Not run', 'root_revocation': 'Not run',
         'production_readiness': 'Not verified'}

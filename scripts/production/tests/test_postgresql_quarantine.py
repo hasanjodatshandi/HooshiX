@@ -1,4 +1,5 @@
 """Empty commissioning cannot become a data restore, credential writer or public database."""
+import base64
 import copy
 import json
 import sys
@@ -15,6 +16,7 @@ import render_platform_admission as admission
 import render_postgresql_quarantine as renderer
 import build_postgresql_quarantine_bundle as bundle
 import rehearse_cert_manager as network_fixture
+import rehearse_postgresql_quarantine as rehearsal
 
 
 class QuarantineTest(unittest.TestCase):
@@ -30,6 +32,7 @@ class QuarantineTest(unittest.TestCase):
         self.assertEqual(1, spec['instances'])
         self.assertFalse(spec['enableSuperuserAccess'])
         self.assertEqual(['host all all all reject'], spec['postgresql']['pg_hba'])
+        self.assertEqual(['/controller/manager', 'instance', 'run', '--status-port-tls', '--log-level=info'], renderer.RUN)
         self.assertEqual('identity-db-migration', spec['bootstrap']['initdb']['secret']['name'])
         for name in ('managed', 'backup', 'plugins', 'env', 'envFrom', 'externalClusters', 'superuserSecret'):
             self.assertNotIn(name, spec)
@@ -43,6 +46,14 @@ class QuarantineTest(unittest.TestCase):
         self.assertEqual(6, len(p['source_policies']))
         self.assertEqual('Not verified', p['production_readiness'])
         self.assertNotIn('stringData', json.dumps(p))
+        role, binding = p['cache_rbac']
+        self.assertEqual('owner-approved-cnpg-system-secret-list-watch-2026-10-16', p['cache_approval'])
+        self.assertEqual([{'apiGroups': [''], 'resources': ['secrets'], 'verbs': ['list', 'watch']}], role['rules'])
+        self.assertEqual('Role', role['kind'])
+        self.assertEqual('cnpg-system', role['metadata']['namespace'])
+        self.assertEqual([{'kind': 'ServiceAccount', 'name': 'cnpg-manager', 'namespace': 'cnpg-system'}], binding['subjects'])
+        self.assertEqual({'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'Role',
+                          'name': role['metadata']['name']}, binding['roleRef'])
 
     def test_existing_eso_contract_is_preserved_with_strict_new_contract(self):
         p = self.plan()
@@ -147,7 +158,7 @@ class QuarantineTest(unittest.TestCase):
             self.assertEqual('Not run', first[key])
 
     def test_foreign_or_changed_resources_stop_before_any_write(self):
-        for mode in ('approval', 'cluster', 'late-policy', 'foreign-claim', 'other-cluster', 'additional-access', 'catalog'):
+        for mode in ('approval', 'cluster', 'late-policy', 'foreign-claim', 'other-cluster', 'additional-access', 'catalog', 'cache-binding'):
             f = self.fixture(); plan, state, writes, *_ = f
             if mode == 'approval': plan['approval'] = 'bypass'
             if mode == 'cluster': state[('cluster', 'platform-data', 'postgresql')] = copy.deepcopy(plan['cluster'])
@@ -156,6 +167,10 @@ class QuarantineTest(unittest.TestCase):
                 state[(obj['kind'].lower(), None, obj['metadata']['name'])] = obj
             if mode == 'foreign-claim': state[('persistentvolumeclaim', 'platform-data', 'foreign')] = {'metadata': {'name': 'foreign'}}
             if mode == 'other-cluster': state[('cluster', 'platform-data', 'other')] = {'metadata': {'name': 'other'}}
+            if mode == 'cache-binding':
+                obj = copy.deepcopy(plan['cache_rbac'][1])
+                obj['subjects'].append({'kind': 'ServiceAccount', 'name': 'default', 'namespace': 'cnpg-system'})
+                state[('rolebinding', 'cnpg-system', obj['metadata']['name'])] = obj
             if mode == 'catalog':
                 obj = copy.deepcopy(plan['catalog']); obj['spec']['images'][0]['major'] = 17
                 state[('imagecatalog', 'platform-data', obj['metadata']['name'])] = obj
@@ -164,6 +179,30 @@ class QuarantineTest(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises((ValueError, KeyError)):
                 self.execute(f)
             self.assertEqual([], writes)
+
+    def test_cache_authorization_denials_are_not_inferred_from_role_yaml(self):
+        for mode in ('foreign', 'write', 'missing'):
+            def kube(*args, **options):
+                forbidden = mode == 'foreign' and args[args.index('-n') + 1] == 'hooshix-secrets'
+                forbidden |= mode == 'write' and args[2] == 'patch'
+                if forbidden: return b'yes'
+                return b'no' if options.get('expected') == 1 or mode == 'missing' else b'yes'
+            with self.subTest(mode=mode), self.assertRaises(ValueError): installer.cache_permissions(kube)
+
+    def test_native_database_logs_cannot_expose_plaintext_or_encoded_password(self):
+        password = b'synthetic-private-fixture-only-password'
+        encoded = base64.b64encode(password)
+        pod = {'metadata': {'name': 'postgresql-1'}, 'spec': {
+            'initContainers': [{'name': 'bootstrap-controller'}], 'containers': [{'name': 'postgres'}]}}
+        for output in (b'public startup', password, encoded):
+            def kube(*args):
+                if 'secret' in args: return json.dumps({'data': {'password': encoded.decode()}}).encode()
+                return output
+            if output == b'public startup': rehearsal.private_logs(kube, [pod], b'public initdb')
+            else:
+                with self.subTest(encoded=output == encoded), self.assertRaisesRegex(ValueError, 'LOG_PRIVACY'):
+                    rehearsal.private_logs(kube, [pod], b'public initdb')
+        with self.assertRaisesRegex(ValueError, 'LOG_PRIVACY'): rehearsal.private_logs(kube, [], password)
 
     def test_reentry_rejects_spec_change_and_preserves_identities(self):
         f = self.fixture()

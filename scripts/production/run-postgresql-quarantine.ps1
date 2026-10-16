@@ -52,6 +52,7 @@ $receipt = Get-Content -LiteralPath $localReport -Raw | ConvertFrom-Json
 if ($receipt.postgresql_quarantine -cne 'Passed' -or $receipt.plan_sha256 -cne $planHash -or
     $receipt.empty_database -cne 'Passed' -or $receipt.tls_and_sql_denial -cne 'Passed' -or
     $receipt.guard -cne 'Passed' -or $receipt.service_account_scope -cne 'Passed' -or
+    $receipt.cnpg_secret_cache_scope -cne 'Passed' -or
     $receipt.root_mesh_openbao_eso_cnpg_barman -cne 'Preserved' -or
     $receipt.application_ingress -cne 'CLOSED' -or $receipt.application_migrations -cne 'Not run' -or
     $receipt.provider_backup -cne 'Not run' -or $receipt.root_revocation -cne 'Not run' -or

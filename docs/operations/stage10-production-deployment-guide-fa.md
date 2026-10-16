@@ -1702,6 +1702,17 @@ manifest، rollback password محسوب نمی‌شود. مشکل deferred پا�
 بسته است؛ `pg_hba` حتی اتصال SQL از loopback داخل Pod را رد می‌کند. فقط مدیریت
 داخلی CNPG و مسیر peer محلیِ اپراتور، با احراز هویت مدیریتی موجود، باقی می‌ماند.
 
+طبق تأیید مالک در ۲۰۲۶-۱۰-۱۶، یک Role و RoleBinding مستقل فقط `list/watch` روی
+Secretهای `cnpg-system` را به `cnpg-system/cnpg-manager` می‌دهد تا cache داخلی آن
+کار کند. این مجوز محتوای Secret و کلیدهای TLS داخلی همین namespace را هم می‌خواند،
+نه فقط metadata؛ مجوز نوشتن تازه، دسترسی Secret در namespace دیگر یا ClusterRole
+اضافه نمی‌شود. RBAC قبلی دست‌نخورده است. پیش از bootstrap و در اجرای مجدد، مجوز
+خواندن محدود و رد خواندن namespace خارجی و نوشتن Secret خارج نام‌های قبلی آزموده می‌شود.
+آزمون native فقط با credential مصنوعیِ fixture، نبود رمز خام یا base64 در logهای
+initdb و PostgreSQL را هم بررسی می‌کند؛ Secret واقعی مقصد برای این آزمون خوانده نمی‌شود.
+فرمان و probeهای instance، TLS داخلی status را طبق نسخهٔ ثابت CNPG حفظ می‌کنند؛
+هیچ endpoint مدیریتی برای برنامه‌ها یا اینترنت باز نمی‌شود.
+
 این مسیر در `render_postgresql_quarantine.py` تعریف می‌شود. پس از موفقیت آزمون
 واقعی همان درخت Git و تأیید `main`، بستهٔ عمومی بیرون Git ساخته می‌شود:
 

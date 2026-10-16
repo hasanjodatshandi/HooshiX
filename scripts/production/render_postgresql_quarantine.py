@@ -18,7 +18,7 @@ RESOURCES = {'requests': {'cpu': '500m', 'memory': '512Mi', 'ephemeral-storage':
 INIT = ['/controller/manager', 'instance', 'init', '--initdb-flags',
         '--encoding=UTF8 --lc-collate=C --lc-ctype=C', '--app-db-name', 'identity',
         '--app-user', 'identity_migration', '--log-level=info']
-RUN = ['/controller/manager', 'instance', 'run', '--log-level=info']
+RUN = ['/controller/manager', 'instance', 'run', '--status-port-tls', '--log-level=info']
 BOOTSTRAP = ['/manager', 'bootstrap', '/controller/manager', '--log-level=info']
 ENV = [{'name': k, 'value': v} for k, v in (
     ('PGDATA', '/var/lib/postgresql/data/pgdata'), ('POD_NAME', 'postgresql-1'),
@@ -151,8 +151,15 @@ def render(previous, addresses):
     authorization = resource('AuthorizationPolicy', 'hooshix-postgresql-control-only', 'security.istio.io/v1',
         spec={'selector': SELECTOR, 'action': 'ALLOW', 'rules': [{'from': [{'source': {'principals': [
             'prod.sajtech.internal/ns/cnpg-system/sa/cnpg-manager']}}], 'to': [{'operation': {'ports': ['8000']}}]}]})
+    cache_role = resource('Role', 'hooshix-cnpg-quarantine-cache', 'rbac.authorization.k8s.io/v1',
+        namespace='cnpg-system', rules=[{'apiGroups': [''], 'resources': ['secrets'], 'verbs': ['list', 'watch']}])
+    cache_binding = resource('RoleBinding', 'hooshix-cnpg-quarantine-cache', 'rbac.authorization.k8s.io/v1',
+        namespace='cnpg-system', subjects=[{'kind': 'ServiceAccount', 'name': 'cnpg-manager', 'namespace': 'cnpg-system'}],
+        roleRef={'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'Role', 'name': cache_role['metadata']['name']})
     return {'schema_version': 1, 'installation_id': 'hooshix-production', 'profile': 'production-single-server',
         'approval': 'owner-approved-empty-quarantine-2026-10-16', 'cluster': cluster(), 'images': images,
+        'cache_approval': 'owner-approved-cnpg-system-secret-list-watch-2026-10-16',
+        'cache_rbac': [cache_role, cache_binding],
         'catalog': cnpg_resource('ImageCatalog', 'hooshix-postgresql-18-candidate', NAMESPACE,
             apiVersion='postgresql.cnpg.io/v1', spec={'images': [{'major': 18, 'image': images['postgresql']}]}),
         'previous_boundary': previous, 'boundary': boundary(previous, images), 'source_policies': sources,

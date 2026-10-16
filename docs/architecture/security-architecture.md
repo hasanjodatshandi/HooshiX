@@ -125,8 +125,12 @@ Pod opt-out: only internal 9443 permits non-mesh API access, still with verified
 HTTPS, fail-closed callbacks and exact API-source network/authorization rules.
 Other ports remain STRICT. Mutable operator permissions bind only `platform-data`;
 own-namespace TLS/config access is bounded and cluster Secret access is absent.
-Data Pods remain admission-denied until the complete data/image/secret/storage
-boundary is commissioned. Rendered tooling is not executed target evidence.
+ADR-0042's owner-approved empty quarantine additionally grants only the CNPG
+controller `list/watch` of Secret contents in `cnpg-system` for its informer
+cache, including internal TLS keys; no extra writes or foreign-namespace reads.
+Data Pods otherwise remain admission-denied until the complete data/image/secret/storage
+boundary is commissioned. The quarantine opens no application SQL or real data.
+Rendered tooling is not executed target evidence.
 
 ## 8. Public edge/client-address trust
 
