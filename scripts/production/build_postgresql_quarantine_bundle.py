@@ -26,7 +26,7 @@ def verify_proof(receipt):
     secrets.verify_proof(receipt)
     proof = receipt.get('postgresql_quarantine', {})
     expected = {k: candidate()['publication']['images'][k] for k in ('operator', 'postgresql')}
-    if (proof.get('images') != expected or any(proof.get(k) != 'Passed' for k in CHECKS)
+    if (proof.get('schema_version') != 1 or proof.get('images') != expected or any(proof.get(k) != 'Passed' for k in CHECKS)
         or proof.get('root_mesh_openbao_eso_cnpg_barman') != 'Preserved'
         or proof.get('application_ingress') != 'CLOSED' or proof.get('production_readiness') != 'Not verified'
         or proof.get('guard') != 'Not run'

@@ -32,7 +32,7 @@ class QuarantineTest(unittest.TestCase):
         self.assertEqual('identity-db-migration', spec['bootstrap']['initdb']['secret']['name'])
         for name in ('managed', 'backup', 'plugins', 'env', 'envFrom', 'externalClusters', 'superuserSecret'):
             self.assertNotIn(name, spec)
-        self.assertEqual('hooshix-postgresql-local-29gib', spec['storage']['pvcTemplate']['spec']['volumeName'])
+        self.assertEqual({'volumeName': 'hooshix-postgresql-local-29gib'}, spec['storage']['pvcTemplate'])
         self.assertNotIn('5432', json.dumps(p['network']) + json.dumps(p['authorization']))
         self.assertEqual({'operator', 'postgresql'}, set(p['images']))
         self.assertEqual(6, len(p['source_policies']))

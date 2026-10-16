@@ -42,7 +42,7 @@ def cluster(images):
         'bootstrap': {'initdb': {'database': 'identity', 'owner': 'identity_migration',
             'secret': {'name': 'identity-db-migration'}, 'encoding': 'UTF8', 'localeCollate': 'C', 'localeCType': 'C'}},
         'storage': {'storageClass': 'hooshix-postgresql-local', 'size': '29Gi',
-            'pvcTemplate': {'spec': {'volumeName': 'hooshix-postgresql-local-29gib'}}},
+            'pvcTemplate': {'volumeName': 'hooshix-postgresql-local-29gib'}},
         'affinity': {'enablePodAntiAffinity': False, 'nodeSelector': {'kubernetes.io/hostname': 'hooshix-production-1'}},
         'ephemeralVolumesSizeLimit': {'shm': '128Mi', 'temporaryData': '512Mi'},
         'postgresql': {'parameters': {'max_connections': '100', 'shared_buffers': '256MB',
