@@ -92,6 +92,39 @@ Connection capacity is global for the shared instance. The sum of every applicat
 
 ## 4. PostgreSQL backup, PITR, and restore
 
+### Empty commissioning quarantine
+
+The security owner approved an empty PostgreSQL commissioning quarantine on
+2026-10-16 while the existing provider backup defect is deferred. This is not
+production data acceptance or a backup waiver. Only one signed CNPG instance may
+initialize on the already guarded Retain volume; the initial `identity` database
+contains no business objects. Existing OpenBao credentials are referenced, not
+rotated. No Flyway migration, business data, application/user SQL access, public
+route, root revocation, destructive reset or provider retry is authorized by this
+exception. Namespace Ambient/STRICT, default-deny, finite non-root workload
+hardening and signature/provenance/SBOM admission remain mandatory. NetworkPolicy
+and mesh allow only the CNPG control edge; general TCP SQL is rejected by
+`pg_hba` even inside the Pod. Local peer administration remains the supervised
+CNPG/owner maintenance path, not an application endpoint.
+
+For this commissioning, the owner also approved CNPG's informer-cache read
+boundary on 2026-10-16: one namespaced Role/RoleBinding grants only `list/watch`
+on Secrets in `cnpg-system` to `cnpg-system/cnpg-manager`. These APIs disclose
+Secret contents, including internal TLS keys, not just metadata. No cluster-wide
+Secret permission, other-namespace read or additional Secret write is granted.
+Existing controller RBAC is retained, and actual foreign-namespace/write denials
+are required before database bootstrap and on reentry.
+
+`render_postgresql_quarantine.py` owns the public desired state. The reviewed
+owner-local bootstrap verifies empty state, TLS, denial boundaries, the existing
+volume/guard and safe reentry. An unexpected cluster, claim, spec or business
+object stops the operation with data preserved. Removing this quarantine requires
+a separate reviewed data-commissioning change and all existing provider backup,
+PITR/restore, service isolation/migration and readiness gates before real data or
+application traffic. Backup/readiness remain explicitly `Not verified`.
+
+### Production recovery requirements
+
 `pg_dump + cron` is **not** the production backup strategy.
 
 The single shared CloudNativePG cluster keeps the existing Barman Cloud physical recovery model:

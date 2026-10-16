@@ -9,6 +9,10 @@ on:
       - scripts/production/*postgresql*secrets*.py
       - scripts/production/postgresql_secret_delivery.py
       - scripts/production/tests/test_postgresql_secrets.py
+      - scripts/production/*postgresql*quarantine*.py
+      - scripts/production/tests/test_postgresql_quarantine.py
+      - scripts/production/run-postgresql-quarantine.ps1
+      - scripts/production/install_postgresql_local_volume.py
       - scripts/production/rehearsal_probes.py
       - scripts/production/tests/test_rehearsal_probes.py
       - scripts/production/render_mesh_candidate.py
@@ -64,6 +68,10 @@ on:
         description: Rehearse signed internal Barman with owner-approved metadata cache and no Secret API access
         type: boolean
         default: false
+      postgresql_quarantine:
+        description: Rehearse only the owner-approved empty closed PostgreSQL quarantine
+        type: boolean
+        default: false
       mesh_run:
         description: Successful reviewed-main Production release mesh publication run
         required: true
@@ -85,32 +93,22 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     name: Signed Calico Ambient Kyverno OpenBao staging
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     permissions:
       contents: read
       actions: read
       packages: read
+    env:
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
     steps:
       - name: Check out exact requested source without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Download successful main publications from the exact release workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MESH_RUN: ${{ inputs.mesh_run || '37588183736' }}
-          OPENBAO_RUN: ${{ inputs.openbao_run || '37611729931' }}
-        run: |
-          set -euo pipefail
-          if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
-            python3 scripts/production/verify_mesh_security_publication.py --output "$RUNNER_TEMP/platform-publications"
-          else
-            install -d -m 0700 "$RUNNER_TEMP/platform-publications"
-            python3 scripts/production/verify_platform_publication_run.py \
-              --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
-              --output "$RUNNER_TEMP/platform-publications"
-          fi
       - name: Parse public operator wrapper without target execution
         shell: pwsh
         run: |
@@ -132,6 +130,10 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-cnpg-control-plane.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'CNPG_OPERATOR_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-postgresql-quarantine.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'POSTGRESQL_QUARANTINE_WRAPPER_SYNTAX_FAILED' }
           [void][System.Management.Automation.Language.Parser]::ParseFile(
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-barman-control-plane.ps1'),
             [ref]$tokens, [ref]$parseErrors)
@@ -162,6 +164,37 @@ jobs:
           PyYAML @ https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc
           REQUIREMENTS
           echo "PYTHONPATH=$RUNNER_TEMP/platform-yaml" >> "$GITHUB_ENV"
+      - name: Install existing pinned publication scan tools
+        run: |
+          timeout 300 scripts/production/install_release_tools.sh "$RUNNER_TEMP/publication-tools"
+          echo "$RUNNER_TEMP/publication-tools" >> "$GITHUB_PATH"
+      - name: Download authenticated publications and rescan unchanged source images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MESH_RUN: ${{ inputs.mesh_run || '37588183736' }}
+          OPENBAO_RUN: ${{ inputs.openbao_run || '37611729931' }}
+        run: |
+          set -euo pipefail
+          if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
+            python3 scripts/production/verify_mesh_security_publication.py --output "$RUNNER_TEMP/platform-publications"
+          else
+            install -d -m 0700 "$RUNNER_TEMP/platform-publications"
+            python3 scripts/production/verify_platform_publication_run.py \
+              --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
+              --output "$RUNNER_TEMP/platform-publications"
+          fi
+      - name: Retain public source rescan evidence without credentials
+        if: ${{ always() && (github.event_name == 'pull_request' || inputs.mesh_security_upgrade) }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: platform-publication-rescan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/platform-publications/rescan.json
+            ${{ runner.temp }}/platform-publications/publication.json
+            ${{ runner.temp }}/platform-publications/*/grype.json
+            ${{ runner.temp }}/platform-publications/*/database.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Prepare pinned ESO chart and verify exact published source evidence
         if: ${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}
         run: |
@@ -194,7 +227,7 @@ jobs:
               "ghcr.io/kyverno/signatures@${pair#*:}" > /dev/null
           done
       - name: Prepare exact internal cert-manager manifest and published acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -212,7 +245,7 @@ jobs:
           python3 scripts/production/verify_published_cert_manager.py \
             --evidence-dir "$RUNNER_TEMP/cert-manager-publication" --output-dir "$RUNNER_TEMP/cert-manager-acceptance"
       - name: Prepare exact CNPG manifest and published data-set acceptance
-        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane }}
+        if: ${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -246,14 +279,17 @@ jobs:
           if [[ '${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}' == 'true' ]]; then
             options+=(--eso-chart "$RUNNER_TEMP/platform-tools/eso-chart.tgz")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}' == 'true' ]]; then
             options+=(--cert-manager-manifest "$RUNNER_TEMP/platform-tools/cert-manager.yaml")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine }}' == 'true' ]]; then
             options+=(--cnpg-manifest "$RUNNER_TEMP/platform-tools/cnpg.yaml")
           fi
-          if [[ '${{ github.event_name == 'pull_request' || inputs.barman_control_plane }}' == 'true' ]]; then
+          if [[ '${{ github.event_name == 'pull_request' || inputs.barman_control_plane || inputs.postgresql_quarantine }}' == 'true' ]]; then
             options+=(--barman-manifest "$RUNNER_TEMP/platform-tools/barman.yaml")
+          fi
+          if [[ '${{ github.event_name == 'pull_request' || inputs.postgresql_quarantine }}' == 'true' ]]; then
+            options+=(--postgresql-quarantine)
           fi
           python3 scripts/production/rehearse_openbao_kubernetes.py --ci \
             --tools-dir "$RUNNER_TEMP/platform-tools" \

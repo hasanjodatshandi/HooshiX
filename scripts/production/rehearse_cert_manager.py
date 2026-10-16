@@ -17,7 +17,8 @@ from rehearse_platform_admission import admission_result, apply, policy_ready
 from upgrade_mesh_security import replace_policy
 
 
-def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webhook', port=10250):
+def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webhook', port=10250,
+                     namespace=renderer.NAMESPACE):
     name = 'cert-manager-wrong-source'
     boundary_name = 'hooshix-hooshix-secrets-bootstrap-boundary'
     previous = json.loads(k('get', 'validatingpolicy', boundary_name, '-o', 'json'))
@@ -28,7 +29,7 @@ def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webh
     pod['restartPolicy'] = 'Never'
     pod['volumes'] = [{'name': 'tls', 'secret': {'secretName': 'openbao-server-tls',
         'defaultMode': 288, 'items': [{'key': 'ca.crt', 'path': 'ca.crt'}]}}]
-    target = json.loads(k('-n', renderer.NAMESPACE, 'get', 'pods', '-l',
+    target = json.loads(k('-n', namespace, 'get', 'pods', '-l',
         selector, '-o', 'json'))['items'][0]['status']['podIP']
     container = pod['containers'][0]
     container.update(name='probe', command=['/usr/bin/bao', 'status', '-format=json',

@@ -503,6 +503,10 @@ Helm `4.2.4` را برای تصویر اصلاح‌شده استفاده می‌
 ClusterSecretStore، ClusterExternalSecret و PushSecret نصب یا فعال نمی‌شوند.
 حساب‌ها و issuer کلاستر موقت
 به OpenBao ساختگی متصل‌اند و هیچ credential یا Root واقعی وارد CI نمی‌شود.
+توکن canary فقط‌خواندنی آزمایشی برای هر فاز کراندار و دقیقاً پیش از مصرف همان فاز ساخته
+می‌شود و هرگز بین فازهای طولانی مانند تحویل ESO/PostgreSQL و اثبات restart/PVC
+بازاستفاده نمی‌شود. این قاعده فقط به آزمون CI مربوط است و credential، policy یا TTL
+اپراتور را تغییر نمی‌دهد.
 هر شش هویت باید مقدار مخصوص سرویس خود را دریافت و پس از تغییر آن به‌روز کنند؛
 خواندن مسیر سرویس دیگر نباید Secret بسازد. حذف ExternalSecret باید Secret
 تحت مالکیت آن را حذف کند. مقدارهای آزمایشی نباید در log اپراتور ظاهر شوند.
@@ -1592,6 +1596,8 @@ python3 scripts/production/test_postgresql_isolation_native.py --disposable
 
 فرمان سوم فقط fixture Docker با تصویر digest ثابت PostgreSQL 18.4، بدون شبکه و
 پورت میزبان می‌سازد و پس از آزمون همان container/volume موقت را حذف می‌کند.
+پیش از SQL، آمادگی TCP روی loopback داخل container بررسی می‌شود تا فقط سرور
+نهایی آماده باشد، نه سرور موقتِ Unix-socket مرحلهٔ init؛ هیچ پورتی منتشر نمی‌شود.
 خروجی مورد انتظار `native_database_isolation: Passed` است؛ ۴۰ اتصال سرویس دیگر
 رد می‌شوند. نقش runtime به migration تبدیل نمی‌شود، DDL/TEMP ندارد و دادهٔ
 tenant دیگر یا context باقی‌مانده پس از commit/rollback را نمی‌بیند. این نتیجه
@@ -1622,8 +1628,14 @@ CONNECT جدید با revoke بسته می‌شود؛ نشست موجود خود
 ### تحویل ده credential مستقل PostgreSQL از OpenBao
 
 این پیش‌نیاز فقط اسرار را آماده می‌کند؛ نصب دیتابیس/PVC/sidecar، backup ارائه‌دهنده
-و لغو root در آن **Not run** است. نتیجهٔ مقصد تا رسید عمومی اجرای محلی **Not verified**
-می‌ماند. Root و گواهی قبلی، شش هویت برنامه و ESO موجود تغییر نمی‌کنند.
+و لغو root در آن **Not run** است. اجرای مالک روی VPS فعلی در ۲۰۲۶-۱۰-۱۵ **Passed**:
+main برابر `916aec1db5e0def6f9b64702d27f3fb205142f78`، native برابر `38752407229`،
+و plan با SHA256 `cfcb252397bc62dbbc4c1cb001d55db9d5bf691c371b1614ebddc28f5c1b52b6`.
+رسید عمومی `delivery-770b89f18db64821a1116d2afa972714.json` با SHA256
+`0503017a66a26a9c8fd82434a98f8c9edd835707f568a5780f67af7c58c9b0c9` تحویل ده
+Secret، احراز هویت محدود و رد Secret/TokenRequest خارج محدوده را تأیید می‌کند.
+Root، CA، mesh، OpenBao، ESO برنامه‌ها، CNPG، Barman و storage حفظ شده‌اند؛
+دسترسی عمومی بسته است. این رسید مخصوص همین مقصد است؛ نصب دیگر رسید مستقل می‌خواهد.
 
 یک controller با همان digest امضاشدهٔ ESO فقط `platform-data` را watch می‌کند.
 cache این controller به Secretهای همین namespace دسترسی دارد؛ هیچ namespace دیگر
@@ -1679,6 +1691,97 @@ adopt نمی‌کند. پس از شکست، حالت جزئی حفظ می‌شو
 root جدید نسازید و re-init نزنید. تغییر credential یا نصب دیتابیس مرحله‌ای جداست؛ حذف
 manifest، rollback password محسوب نمی‌شود. مشکل deferred پارس‌پک همچنان **Not verified**
 است و در این عملیات نه probe می‌شود و نه موفق فرض می‌شود.
+
+### PostgreSQL خالی و قرنطینه‌شده
+
+مالک در ۲۰۲۶-۱۰-۱۶ فقط این حالت را تأیید کرده است؛ مجوز ورود دادهٔ واقعی یا
+اتصال برنامه نیست. یک instance از همان تصویر امضاشده روی LocalPV موجود ۲۹ GiB
+ساخته می‌شود. CNPG برای bootstrap، دیتابیس خالی `identity` و owner موجود
+`identity_migration` را با ارجاع به Secret `identity-db-migration` می‌سازد.
+همان `ImageCatalog` موجود `hooshix-postgresql-18-candidate` فقط digest ثابت PostgreSQL
+و نسخهٔ major برابر ۱۸ را به CNPG معرفی می‌کند؛ catalog یا تصویر تازه، tag شناور
+و registry credential جدید ساخته نمی‌شود. هیچ
+جدول، Flyway، پنج دیتابیس برنامه یا نقش اضافی در این گام نصب نمی‌شود. رمز عوض
+نمی‌شود و بسته رمز/توکن/کلید CA نمی‌خواهد. دسترسی عمومی و اتصال TCP برنامه‌ها
+بسته است؛ `pg_hba` حتی اتصال SQL از loopback داخل Pod را رد می‌کند. فقط مدیریت
+داخلی CNPG و مسیر peer محلیِ اپراتور، با احراز هویت مدیریتی موجود، باقی می‌ماند.
+
+طبق تأیید مالک در ۲۰۲۶-۱۰-۱۶، یک Role و RoleBinding مستقل فقط `list/watch` روی
+Secretهای `cnpg-system` را به `cnpg-system/cnpg-manager` می‌دهد تا cache داخلی آن
+کار کند. این مجوز محتوای Secret و کلیدهای TLS داخلی همین namespace را هم می‌خواند،
+نه فقط metadata؛ مجوز نوشتن تازه، دسترسی Secret در namespace دیگر یا ClusterRole
+اضافه نمی‌شود. RBAC قبلی دست‌نخورده است. پیش از bootstrap و در اجرای مجدد، مجوز
+خواندن محدود و رد خواندن namespace خارجی و نوشتن Secret خارج نام‌های قبلی آزموده می‌شود.
+آزمون native فقط با credential مصنوعیِ fixture، نبود رمز خام یا base64 در logهای
+initdb و PostgreSQL را هم بررسی می‌کند؛ Secret واقعی مقصد برای این آزمون خوانده نمی‌شود.
+فرمان و probeهای instance، TLS داخلی status را طبق نسخهٔ ثابت CNPG حفظ می‌کنند؛
+هیچ endpoint مدیریتی برای برنامه‌ها یا اینترنت باز نمی‌شود.
+قرارداد Pod اجرای دلخواه از lifecycle/exec-probe و تغییر مسیر termination به فایل
+Secret را هم رد می‌کند؛ فقط probeهای HTTPS داخلی ثابت مجازند.
+در Job اولیه، `POD_NAME` نام ثابت Job است و تنها ارجاع env اضافی، کلید `username`
+از Secret موجود `identity-db-migration` است؛ `password` یا Secret دیگری در env مجاز نیست.
+کنترل‌های امضا، provenance و SBOM تصویر اصلی PostgreSQL و تصویر init مربوط به CNPG
+را جداگانه و با digest دقیق همان جزء بررسی می‌کنند؛ تصویر جزء دیگر به verifier
+آن سیاست فرستاده نمی‌شود. پذیرش هر دو Pod واقعی `initdb` و instance و رد signer،
+provenance و SBOM نامعتبر پیش از ساخت بسته الزامی است.
+آزمون حریم خصوصی، log اصلی `initdb` را فقط پس از شروع همان container جمع می‌کند؛
+وجود Pod یا پایان `bootstrap-controller` به‌تنهایی شاهد شروع آن نیست. تست منفی
+امضا/attestation نیز باید نام همان سیاستِ عمداً نامعتبر را در پاسخ ردشدن ببیند.
+پیش‌نیاز CI، اسکن تازهٔ همان inventoryهای تأییدشدهٔ Istio/CNI/ESO با Grype ثابت و
+دیتابیس معتبر حداکثر پنج‌روزه است. گزارش‌ها و hashها به‌صورت artifact عمومی نگه
+داشته می‌شوند؛ digest، SBOM امضاشده، provenance و انتشار اصلی عوض نمی‌شوند.
+برای ساخت bundleهای mesh/ESO نیز ابزار Grype ثابت باید در PATH باشد؛ اسکن تازه
+مجوز rebuild، push، تغییر تصویر یا عبور از High/Critical نیست.
+سقف کل آزمون یکپارچهٔ زیرساخت و قرنطینه در CI چهل دقیقه است؛ deadlineهای محدود
+هر عملیات و الزام موفقیت همهٔ کنترل‌ها تغییر نمی‌کنند.
+
+این مسیر در `render_postgresql_quarantine.py` تعریف می‌شود. پس از موفقیت آزمون
+واقعی همان درخت Git و تأیید `main`، بستهٔ عمومی بیرون Git ساخته می‌شود:
+
+```bash
+python3 scripts/production/build_postgresql_quarantine_bundle.py \
+  --staging-run <successful-exact-tree-platform-run> \
+  --storage-run <successful-exact-tree-baseline-run> \
+  --chart <checksum-verified-eso-2.12.0.tgz> --helm <pinned-helm> \
+  --evidence-dir <verified-public-postgresql-publication> \
+  --output <new-public-bundle-outside-git>
+```
+
+سازنده، امضا و provenance/SBOM و تازگی شواهد چهار تصویر قبلی، آزمون filesystem
+و guard، bootstrap واقعی CNPG/Ambient، خالی‌بودن، TLS/رد SQL، رد Pod و امضای
+نامعتبر، رد اتصال از Pod با مبدأ غیرمجاز و اجرای دوباره بدون تغییر UIDهای
+Cluster/PVC/PV را لازم دارد. native
+داخل kind، mount میزبان VPS محسوب نمی‌شود؛ guard روی مقصد جداگانه بررسی می‌شود.
+روی سرور دوم، نام node و رزرو storage باید در تغییر بررسی‌شده به همان نصب
+متصل شود؛ نام سرور اول را به مقصد دیگر apply نکنید.
+
+در Windows ابتدا بدون اتصال به VPS:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-quarantine.ps1' -ValidateOnly
+```
+
+با VNC قابل ورود و نشست دوم SSH باز، فقط رمز sudo را همان‌جا وارد کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '<public-bundle>\run-postgresql-quarantine.ps1' -RescueAndSecondSessionReady
+```
+
+خروجی مقصد `POSTGRESQL_QUARANTINE=Passed` و `PUBLIC_RECEIPT` است؛ تا دریافت و
+تطبیق رسید، نصب مقصد **Not run/Not verified** باقی می‌ماند. `Passed` فقط یعنی
+دیتابیس خالی، حجم Retain درست، TLS و مرز بسته و اجزای قبلی حفظ شده‌اند؛ backup،
+بازیابی، ظرفیت و محصول Production را تأیید نمی‌کند. برای دیدن وضعیت بدون Secret:
+
+```powershell
+ssh.exe -t hooshix-server 'sudo /usr/local/bin/k3s kubectl -n platform-data get clusters,pods,pvc'
+```
+
+پس از خطا داده و منابع حفظ می‌شوند. Cluster/PVC/PV، `pgdata` یا Secret را پاک
+نکنید؛ re-init، فرمت، downgrade و rollback خودکار نداریم. پس از بررسی کد عمومی
+خطا، فقط همان بسته و همان UIDها قابل ادامه‌اند. وجود جدول/دیتابیس غیرمنتظره،
+claim خارجی یا تغییر spec باعث توقف می‌شود. خروج از قرنطینه و اتصال برنامه‌ها
+یک تغییر مستقل بعد از backup/restore و isolation/migration معتبر است. مشکل
+پارس‌پک در این مرحله probe یا موفق فرض نمی‌شود؛ root نیز لغو نمی‌شود.
 
 پس از آن ادامهٔ مشترک:
 

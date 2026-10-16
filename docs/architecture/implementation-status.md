@@ -11,6 +11,23 @@ materialization, root revocation, JIT and production readiness remain `Not verif
 This target evidence supersedes earlier pre-install ESO statements below.
 Do not reinstall ESO or treat provider backup/audit deferral as passing evidence.
 
+Current PostgreSQL credential prerequisite, 2026-10-15: owner-local execution of
+the reviewed `main@916aec1db5e0def6f9b64702d27f3fb205142f78` bundle reports
+`POSTGRESQL_SECRET_DELIVERY=Passed`. Public receipt
+`delivery-770b89f18db64821a1116d2afa972714.json`, SHA256
+`0503017a66a26a9c8fd82434a98f8c9edd835707f568a5780f67af7c58c9b0c9`, binds plan
+`cfcb252397bc62dbbc4c1cb001d55db9d5bf691c371b1614ebddc28f5c1b52b6` and native
+run `38752407229`. Ten distinct namespace-local basic-auth Secrets, ten scoped
+read-only identities and foreign Secret/TokenRequest denials are `Passed`.
+Existing root/CA/mesh/OpenBao/application ESO/CNPG/Barman/storage are preserved.
+Public access is CLOSED; database instances/PVCs, provider backup and root
+revocation remain `Not run`. This supersedes earlier credential-delivery
+`Not run` statements, not the separate application-secret or recovery gates.
+The owner separately approved only an empty commissioning quarantine on
+2026-10-16 under ADR-0042. Its tooling and native gates are in preparation;
+target database installation is still `Not run`. The general data/application
+boundary stays closed and provider deferral is not a backup or readiness waiver.
+
 The credential-free PostgreSQL ownership component is implemented at
 `scripts/production/render_postgresql_ownership.py` and documented under
 `deploy/postgresql/README.md`. It emits CNPG 1.30 role/database retention contracts
@@ -940,7 +957,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
 | WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
-| CloudNativePG/PostgreSQL | DESIGNED | local staging PostgreSQL IMPLEMENTED; production CloudNativePG/Barman NOT PRESENT | local PostgreSQL 18.4 role/database isolation and Flyway evidence PASSED; production CNPG/PITR/restore NOT VERIFIED |
+| CloudNativePG/PostgreSQL | DESIGNED | CNPG/Barman control planes, guarded PostgreSQL storage/Retain LocalPV and ten credential deliveries Passed on target; database instances Not run | exact owner-local receipts above; application migrations, provider backup/PITR/restore, complete-stack capacity and production readiness Not verified |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
 | OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 initialized/unsealed Shamir 3/2; ESO 2.12.0 installed with six SecretStores Ready under the exact owner-run receipt above | Target installation/TLS/PVC, custody recovery/unseal, operator-local isolated snapshot recovery and reported ESO installation Passed; custody distribution owner-attested; application secret materialization, cloud version/retention/hourly backup, JIT and root revocation Not verified |

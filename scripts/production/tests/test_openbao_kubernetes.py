@@ -14,6 +14,50 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import rehearse_openbao_kubernetes as rehearsal
 
 
+class _CanaryApi:
+    """Synthetic OpenBao API that enforces the phase credential's 20-minute maximum.
+
+    It models only the read-only canary contract used by the rehearsal: a token
+    minted by the fixture root, an explicit expiry, one-path read, and denied
+    write. No real credential, server, or cluster is involved.
+    """
+
+    def __init__(self, canary: str):
+        self.canary = canary
+        self.now = 0
+        self.creations = []
+        self.tokens = {"root-fixture": {"expires": None, "write": True}}
+
+    def advance(self, seconds: int) -> None:
+        self.now += seconds
+
+    def call(self, path, method="GET", body=None, token=None, expected=200):
+        if path == "auth/token/create":
+            if token != "root-fixture":
+                raise rehearsal.RehearsalFailed("unexpected fixture create")
+            self.creations.append(dict(body))
+            name = "phase-reader-" + str(len(self.creations))
+            self.tokens[name] = {"expires": self.now + 20 * 60, "write": False}
+            return {"auth": {"client_token": name}}
+        if path != "fixture/data/value":
+            raise rehearsal.RehearsalFailed("unexpected fixture path")
+        entry = self.tokens.get(token)
+        if entry is None:
+            raise rehearsal.RehearsalFailed("unknown fixture token")
+        expired = entry["expires"] is not None and self.now >= entry["expires"]
+        if method == "GET":
+            status = 403 if expired else 200
+            if status != expected:
+                raise rehearsal.RehearsalFailed("fixture API status or size mismatch")
+            return {} if status == 403 else {"data": {"data": {"value": self.canary}}}
+        if method == "POST":
+            status = 200 if entry["write"] and not expired else 403
+            if status != expected:
+                raise rehearsal.RehearsalFailed("fixture API status or size mismatch")
+            return {}
+        raise rehearsal.RehearsalFailed("unexpected fixture method")
+
+
 class OpenBaoKubernetesTest(unittest.TestCase):
     def test_non_runner_and_root_are_denied_before_commands(self):
         for environment, uid in (({}, 1000), ({"GITHUB_ACTIONS": "true", "RUNNER_TEMP": "/tmp"}, 0)):
@@ -68,6 +112,56 @@ class OpenBaoKubernetesTest(unittest.TestCase):
         self.assertIn('cert-manager-webhook', output.getvalue())
         self.assertNotIn('private-token', output.getvalue())
         self.assertNotIn('::error::', output.getvalue())
+
+    def test_phase_reader_is_one_path_read_only_with_explicit_20m_maximum(self):
+        client = _CanaryApi("ci-only-canary")
+        rehearsal.canary_reader(client, "root-fixture")
+        self.assertEqual([{"policies": ["fixture-reader"], "no_default_policy": True,
+                           "ttl": "20m", "explicit_max_ttl": "20m"}], client.creations)
+
+    def test_early_canary_reader_expires_during_long_commissioning(self):
+        # The ACL/mesh-phase reader is bounded to its own phase, exactly as in rehearse.
+        client = _CanaryApi("ci-only-canary")
+        early = rehearsal.canary_reader(client, "root-fixture")
+        rehearsal.read_canary(client, early, "ci-only-canary")  # immediate bounded use passes
+        client.advance(21 * 60)  # lengthy commissioned components outlive the 20m maximum
+        with self.assertRaises(rehearsal.RehearsalFailed):
+            rehearsal.read_canary(client, early, "ci-only-canary")  # stale reuse fails closed
+
+    def test_fresh_reader_is_minted_after_long_commissioning_and_survives_restart(self):
+        client = _CanaryApi("ci-only-canary")
+        early = rehearsal.canary_reader(client, "root-fixture")
+        rehearsal.read_canary(client, early, "ci-only-canary")
+        client.advance(21 * 60)
+        with self.assertRaises(rehearsal.RehearsalFailed):
+            rehearsal.read_canary(client, early, "ci-only-canary")
+        # New independent persistence reader issued after all lengthy components, while the
+        # original API path is alive, and proven against the ORIGINAL canary before Pod delete.
+        fresh = rehearsal.canary_reader(client, "root-fixture")
+        self.assertNotEqual(early, fresh)
+        rehearsal.read_canary(client, fresh, "ci-only-canary")
+        client.advance(90)  # restart + PVC retention must reuse this SAME fresh credential
+        rehearsal.read_canary(client, fresh, "ci-only-canary")
+        self.assertIn(fresh, client.tokens)
+        self.assertEqual(2, len(client.creations))
+
+    def test_canary_proof_fails_closed_against_a_write_capable_credential(self):
+        client = _CanaryApi("ci-only-canary")
+        client.tokens["write-capable"] = {"expires": None, "write": True}
+        with self.assertRaises(rehearsal.RehearsalFailed):
+            rehearsal.read_canary(client, "write-capable", "ci-only-canary")
+
+    def test_canary_failure_never_emits_credential_material(self):
+        output = io.StringIO()
+        client = _CanaryApi("private-canary-value")
+        early = rehearsal.canary_reader(client, "root-fixture")
+        client.advance(21 * 60)
+        with contextlib.redirect_stdout(output), self.assertRaises(rehearsal.RehearsalFailed) as error:
+            rehearsal.read_canary(client, early, "private-canary-value")
+        self.assertNotIn(early, str(error.exception))
+        self.assertNotIn("private-canary-value", str(error.exception))
+        self.assertNotIn(early, output.getvalue())
+        self.assertNotIn("private-canary-value", output.getvalue())
 
     def test_failed_partial_cluster_creation_is_cleaned_without_reading_operator_state(self):
         with tempfile.TemporaryDirectory() as temp:

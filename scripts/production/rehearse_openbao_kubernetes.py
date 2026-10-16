@@ -66,10 +66,13 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 'platform bootstrap identity/security exception rejected',
                 'no such overload', 'no such key', 'context deadline exceeded',
                 'service "cert-manager-webhook" not found',
+                'strict decoding error', 'unknown field', 'spec.storage.pvcTemplate',
+                "Can't use just the image sha", 'invalid version tag',
                 'secrets "cert-manager-webhook-ca" not found',
                 'the server could not find the requested resource',
                 'resource issuers not found in group cert-manager.io/v1',
-                'no endpoints available for service', 'certificate signed by unknown authority')
+                'no endpoints available for service', 'certificate signed by unknown authority',
+                'PodInitializing', 'ContainerCreating', 'waiting to start')
                 if marker.encode() in (result.stderr or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
             print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
@@ -107,6 +110,30 @@ def wait(check, *, seconds: int = 90):
     raise RehearsalFailed("Kubernetes fixture deadline")
 
 
+def canary_reader(client: Client, token: str) -> str:
+    """Mint one one-path read-only canary credential for immediate bounded use.
+
+    The explicit 20-minute maximum is intentionally never extended: callers mint a
+    new phase credential at the start of each phase that consumes one instead of
+    carrying an older credential into a later phase that can outlive it.
+    """
+    reader = client.call("auth/token/create", "POST", {"policies": ["fixture-reader"],
+        # Synthetic one-path read-only canary. Actual six Kubernetes-auth identities
+        # retain their independent <=300s gate.
+        "no_default_policy": True, "ttl": "20m", "explicit_max_ttl": "20m"},
+        token)["auth"]["client_token"]
+    if not reader:
+        raise RehearsalFailed("phase canary credential required")
+    return reader
+
+
+def read_canary(client: Client, reader: str, canary: str) -> None:
+    """Prove one phase credential reads the original canary and cannot write it."""
+    if client.call("fixture/data/value", token=reader)["data"]["data"]["value"] != canary:
+        raise RehearsalFailed("canary readback mismatch")
+    client.call("fixture/data/value", "POST", {"data": {"value": "denied"}}, reader, 403)
+
+
 def ca_import_fixture(k):
     # Real API create/read/reconcile with disposable data; never the operator's CA.
     def native_kube(*args, body=None):
@@ -128,8 +155,10 @@ def ca_import_fixture(k):
 def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
              eso_chart: Path | None = None, *, mesh_security_upgrade: bool = False,
              cert_manager_manifest: Path | None = None, cnpg_manifest: Path | None = None,
-             barman_manifest: Path | None = None) -> None:
+             barman_manifest: Path | None = None, postgresql_quarantine: bool = False) -> None:
     runner_paths(tools, receipt)
+    if postgresql_quarantine and barman_manifest is None:
+        raise RehearsalFailed('PostgreSQL quarantine requires the owned Barman/credential fixture')
     if barman_manifest is not None:
         runtime = Path(os.environ['RUNNER_TEMP']).resolve(strict=True)
         if (cnpg_manifest is None or barman_manifest.is_symlink()
@@ -418,10 +447,9 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 client.call("fixture/data/value", "POST", {"data": {"value": canary}}, token)
                 client.call("sys/policies/acl/fixture-reader", "PUT", {"policy":
                     'path "fixture/data/value" { capabilities = ["read"] }'}, token, 204)
-                reader = client.call("auth/token/create", "POST", {"policies": ["fixture-reader"],
-                    # Synthetic one-path read-only canary survives the bounded combined fixture.
-                    # Actual six Kubernetes-auth identities retain their independent <=300s gate.
-                    "no_default_policy": True, "ttl": "20m", "explicit_max_ttl": "20m"}, token)["auth"]["client_token"]
+                # Synthetic one-path read-only canary scoped to this mesh/ACL phase only.
+                # It is never reused by the later persistence phase.
+                reader = canary_reader(client, token)
                 client.call("fixture/data/value", "POST", {"data": {"value": "denied"}}, reader, 403)
                 if mesh_security_upgrade:
                     platform.security_upgrade(k, wait)
@@ -449,8 +477,18 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     from rehearse_postgresql_secrets import rehearse as postgresql_secrets
                     pg_secret_result = postgresql_secrets(k, wait, eso_chart, str(tools / 'helm'),
                         api, token, cert.read_text(), audiences, addresses)
+                    if postgresql_quarantine:
+                        from rehearse_postgresql_quarantine import rehearse as quarantine
+                        pg_quarantine_result = quarantine(k, wait, run, eso_chart, str(tools / 'helm'), addresses, platform)
+                # The earlier reader may already be past its explicit 20-minute maximum
+                # after the lengthy commissioned components. Mint a fresh independent
+                # read-only credential while this API forward is still alive and prove the
+                # ORIGINAL canary before the Pod is deleted; carry this SAME credential
+                # across the restart/PVC retention proof below.
+                persistence_reader = canary_reader(client, token)
+                read_canary(client, persistence_reader, canary)
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
-                if any(value.encode() in logs for value in (canary, token, reader, *keys)):
+                if any(value.encode() in logs for value in (canary, token, reader, persistence_reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
             finally:
                 stop(process)
@@ -473,14 +511,14 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     client.call("sys/unseal", "PUT", {"key": share})
                 client.wait_health(200)
                 k("-n", NAMESPACE, "wait", "--for=condition=Ready", "pod/openbao-0", "--timeout=60s", timeout=70)
-                if client.call("fixture/data/value", token=reader)["data"]["data"]["value"] != canary:
-                    raise RehearsalFailed("PVC data persistence failed")
+                # The SAME fresh phase credential must survive restart + PVC retention.
+                read_canary(client, persistence_reader, canary)
                 step("revoke")
                 client.call("auth/token/revoke-self", "POST", {}, token, 204)
                 client.call("sys/mounts", token=token, expected=403)
                 step("privacy")
                 logs = k("-n", NAMESPACE, "logs", "openbao-0", "--tail=-1")
-                if any(value.encode() in logs for value in (canary, token, reader, *keys)):
+                if any(value.encode() in logs for value in (canary, token, reader, persistence_reader, *keys)):
                     raise RehearsalFailed("fixture container log leak")
             finally:
                 stop(process)
@@ -527,6 +565,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
             result['barman_control_plane'] = barman_result
             result['postgresql_secret_delivery'] = pg_secret_result
+            if postgresql_quarantine: result['postgresql_quarantine'] = pg_quarantine_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['checks']['scoped_auth_six_identities_acl_audience_revocation'] = 'Passed'
@@ -550,11 +589,13 @@ def main() -> int:
     parser.add_argument('--cert-manager-manifest', type=Path)
     parser.add_argument('--cnpg-manifest', type=Path)
     parser.add_argument('--barman-manifest', type=Path)
+    parser.add_argument('--postgresql-quarantine', action='store_true')
     args = parser.parse_args()
     try:
         rehearse(args.tools_dir, args.receipt, args.platform_publications, args.eso_chart,
                  mesh_security_upgrade=args.mesh_security_upgrade, cert_manager_manifest=args.cert_manager_manifest,
-                 cnpg_manifest=args.cnpg_manifest, barman_manifest=args.barman_manifest)
+                 cnpg_manifest=args.cnpg_manifest, barman_manifest=args.barman_manifest,
+                 postgresql_quarantine=args.postgresql_quarantine)
         return 0
     except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError,
             tarfile.TarError, RehearsalFailed, activation.custody.BootstrapFailed):

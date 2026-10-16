@@ -71,8 +71,11 @@ boundary, not extra access for the `platform-apps` controller. Both controllers
 remain Ambient/STRICT. The existing API-only ESO validation webhook covers only
 these two namespaces; its CA/HTTPS/Fail and enrollment exception are unchanged.
 `render_postgresql_secrets.py` allows only this pinned controller through the
-closed data-Pod admission boundary; PostgreSQL Pods remain denied until complete
-data commissioning. No database or off-host backup readiness follows from this step.
+closed data-Pod admission boundary. ADR-0042's owner-approved empty commissioning
+quarantine permits only the exact signed initdb/instance Pod contracts rendered
+by `render_postgresql_quarantine.py`, not application SQL or business data.
+Complete data commissioning and provider recovery gates still precede production
+data/traffic. Credential delivery alone grants no database or off-host backup readiness.
 
 ADR-0002 also permits only the cert-manager API-callback webhook Pod in
 `cnpg-system` outside Ambient. `render_cert_manager_candidate.py` renders the
