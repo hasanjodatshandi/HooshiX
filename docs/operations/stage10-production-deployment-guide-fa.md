@@ -1783,6 +1783,40 @@ claim خارجی یا تغییر spec باعث توقف می‌شود. خروج 
 یک تغییر مستقل بعد از backup/restore و isolation/migration معتبر است. مشکل
 پارس‌پک در این مرحله probe یا موفق فرض نمی‌شود؛ root نیز لغو نمی‌شود.
 
+#### نتیجهٔ نصب مقصد فعلی، ۲۰۲۶-۱۰-۱۷
+
+نصب توسط مالک روی VPS فعلی **Passed** است؛ نصب را تکرار نکنید. بسته از
+`main@cfa0fbaf21992211ebcffba00eb18dc2ff5c86cf` و شواهد native همان درخت
+`38959679639` و storage baseline برابر `38959679947` ساخته شده است.
+رسید عمومی `hooshix-pg-quarantine-eb528210c83d4920b70343dbf9eb95c6.json` در
+پوشهٔ `C:\Users\Coder\Downloads\HooshiX-postgresql-quarantine-20261017` نگهداری
+می‌شود؛ SHA256 آن:
+
+```text
+d8bf1e01f04cb95d85b3e2fe4a67da3fc94a60df2f69675a4a1ee6ef91f9c5d3
+```
+
+هش plan با بسته تطبیق دارد:
+`d832b8d058dc204763d552f63685abfdd798603710997b52098ad750cdf42be4`.
+تصاویر دقیق اپراتور و PostgreSQL نیز با plan یکسان‌اند. هویت منابع این نصب:
+
+| منبع | UID ثبت‌شده |
+| --- | --- |
+| Cluster | `9e458d94-7677-4cda-935e-6c373be14da2` |
+| PVC | `38be3266-dc70-4a96-9e5a-538b167a7b68` |
+| PV | `c3c4ed30-a547-4bd1-a1af-468afbfba139` |
+
+یک instance خالی و PVC متصل به حجم Retain موجود ساخته شده‌اند. خالی‌بودن،
+TLS/رد SQL، guard، مرز ServiceAccount و cache محدود Secretهای CNPG همگی
+**Passed** هستند؛ root، mesh، OpenBao، ESO، CNPG و Barman حفظ شده‌اند.
+این UIDها شناسهٔ همین مقصدند؛ روی سرور دوم کپی نمی‌شوند. برای ادامهٔ نصب موجود،
+رسید را نگه دارید و از ساخت مجدد Cluster/PVC یا فرمت volume خودداری کنید.
+
+اتصال برنامه‌ها همچنان **CLOSED** است؛ migration، backup ارائه‌دهنده و لغو root
+**Not run** و آمادگی Production **Not verified** هستند. این نتیجه نه مجوز خروج
+از قرنطینه است و نه موفقیت backup/PITR/restore. هیچ probe یا upload دوباره‌ای
+برای اختلال deferred پارس‌پک در این گام انجام نشده است.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
