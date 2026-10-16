@@ -98,27 +98,17 @@ jobs:
       contents: read
       actions: read
       packages: read
+    env:
+      GRYPE_DB_AUTO_UPDATE: 'false'
+      GRYPE_DB_VALIDATE_AGE: 'true'
+      GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 120h
+      GRYPE_CHECK_FOR_APP_UPDATE: 'false'
     steps:
       - name: Check out exact requested source without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Download successful main publications from the exact release workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MESH_RUN: ${{ inputs.mesh_run || '37588183736' }}
-          OPENBAO_RUN: ${{ inputs.openbao_run || '37611729931' }}
-        run: |
-          set -euo pipefail
-          if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
-            python3 scripts/production/verify_mesh_security_publication.py --output "$RUNNER_TEMP/platform-publications"
-          else
-            install -d -m 0700 "$RUNNER_TEMP/platform-publications"
-            python3 scripts/production/verify_platform_publication_run.py \
-              --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
-              --output "$RUNNER_TEMP/platform-publications"
-          fi
       - name: Parse public operator wrapper without target execution
         shell: pwsh
         run: |
@@ -174,6 +164,37 @@ jobs:
           PyYAML @ https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc
           REQUIREMENTS
           echo "PYTHONPATH=$RUNNER_TEMP/platform-yaml" >> "$GITHUB_ENV"
+      - name: Install existing pinned publication scan tools
+        run: |
+          timeout 300 scripts/production/install_release_tools.sh "$RUNNER_TEMP/publication-tools"
+          echo "$RUNNER_TEMP/publication-tools" >> "$GITHUB_PATH"
+      - name: Download authenticated publications and rescan unchanged source images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MESH_RUN: ${{ inputs.mesh_run || '37588183736' }}
+          OPENBAO_RUN: ${{ inputs.openbao_run || '37611729931' }}
+        run: |
+          set -euo pipefail
+          if [[ '${{ github.event_name == 'pull_request' || inputs.mesh_security_upgrade }}' == 'true' ]]; then
+            python3 scripts/production/verify_mesh_security_publication.py --output "$RUNNER_TEMP/platform-publications"
+          else
+            install -d -m 0700 "$RUNNER_TEMP/platform-publications"
+            python3 scripts/production/verify_platform_publication_run.py \
+              --mesh-run "$MESH_RUN" --openbao-run "$OPENBAO_RUN" \
+              --output "$RUNNER_TEMP/platform-publications"
+          fi
+      - name: Retain public source rescan evidence without credentials
+        if: ${{ always() && (github.event_name == 'pull_request' || inputs.mesh_security_upgrade) }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: platform-publication-rescan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/platform-publications/rescan.json
+            ${{ runner.temp }}/platform-publications/publication.json
+            ${{ runner.temp }}/platform-publications/*/grype.json
+            ${{ runner.temp }}/platform-publications/*/database.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Prepare pinned ESO chart and verify exact published source evidence
         if: ${{ github.event_name == 'pull_request' || inputs.eso_commissioning }}
         run: |

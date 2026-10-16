@@ -1712,6 +1712,11 @@ Secretهای `cnpg-system` را به `cnpg-system/cnpg-manager` می‌دهد ت
 initdb و PostgreSQL را هم بررسی می‌کند؛ Secret واقعی مقصد برای این آزمون خوانده نمی‌شود.
 فرمان و probeهای instance، TLS داخلی status را طبق نسخهٔ ثابت CNPG حفظ می‌کنند؛
 هیچ endpoint مدیریتی برای برنامه‌ها یا اینترنت باز نمی‌شود.
+پیش‌نیاز CI، اسکن تازهٔ همان inventoryهای تأییدشدهٔ Istio/CNI/ESO با Grype ثابت و
+دیتابیس معتبر حداکثر پنج‌روزه است. گزارش‌ها و hashها به‌صورت artifact عمومی نگه
+داشته می‌شوند؛ digest، SBOM امضاشده، provenance و انتشار اصلی عوض نمی‌شوند.
+برای ساخت bundleهای mesh/ESO نیز ابزار Grype ثابت باید در PATH باشد؛ اسکن تازه
+مجوز rebuild، push، تغییر تصویر یا عبور از High/Critical نیست.
 
 این مسیر در `render_postgresql_quarantine.py` تعریف می‌شود. پس از موفقیت آزمون
 واقعی همان درخت Git و تأیید `main`، بستهٔ عمومی بیرون Git ساخته می‌شود:

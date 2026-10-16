@@ -333,6 +333,34 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
                 self.assertRaises(ValueError):
             download.download(Path('/does-not-exist'))
 
+    def test_publication_rescans_only_existing_inventories_with_pinned_grype(self):
+        import verify_mesh_security_publication as download
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for component in (*renderer.COMPONENTS, 'eso'):
+                folder = root / component
+                folder.mkdir()
+                (folder / 'syft.json').write_text('immutable inventory')
+                (folder / 'source-provenance.json').write_text('immutable provenance')
+            def command(args, **_):
+                return 'Version: 0.117.0' if args == ['grype', 'version'] else '{"valid":true}'
+            with patch.object(download.upgrade.build, 'run', side_effect=command) as run, \
+                 patch.object(download.upgrade.build, 'scan') as scan:
+                download.refresh_scans(root)
+            self.assertEqual([root / c for c in (*renderer.COMPONENTS, 'eso')], [c.args[0] for c in scan.call_args_list])
+            self.assertTrue(all(c.args[0][0] == 'grype' for c in run.call_args_list))
+            self.assertIn(['grype', 'db', 'update'], [c.args[0] for c in run.call_args_list])
+            for component in (*renderer.COMPONENTS, 'eso'):
+                self.assertEqual('immutable inventory', (root / component / 'syft.json').read_text())
+                self.assertEqual('immutable provenance', (root / component / 'source-provenance.json').read_text())
+            with patch.object(download.upgrade.build, 'run', return_value='Version: 0.1.0'), self.assertRaises(ValueError):
+                download.refresh_scans(root)
+            with patch.object(download.upgrade.build, 'run', side_effect=command), \
+                 patch.object(download.upgrade.build, 'scan', side_effect=ValueError('High severity')), \
+                 self.assertRaisesRegex(ValueError, 'High severity'):
+                download.refresh_scans(root)
+            self.assertFalse((root / 'rescan.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
