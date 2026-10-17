@@ -1876,6 +1876,13 @@ Production یا تعویق پارس‌پک با این نتیجه عبور نک�
 مراجع رسمی: [Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
 و [Redis ACL](https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/).
 
+### انتشار candidate امضاشدهٔ Redis
+
+انتشار Redis گام بعد از آزمون محلی است؛ فقط workflow حفاظت‌شدهٔ `production-release.yml`
+روی `main` اجازهٔ انتشار دارد. مقصد باید private بماند. این مرحله نصب VPS،
+ساخت Secret یا بازکردن اتصال برنامه‌ها نیست. تا تکمیل ابزار و اجرای واقعی،
+انتشار و امضا **Not run** و آمادگی Production **Not verified** هستند.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
