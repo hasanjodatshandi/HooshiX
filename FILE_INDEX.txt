@@ -308,6 +308,7 @@ docs/engineering/documentation-standards.md
 docs/engineering/frontend-coding-standards.md
 docs/engineering/repository-change-workflow.md
 docs/engineering/sql-and-flyway-coding-standards.md
+docs/onboarding/java-onboarding-plan.md
 docs/operations/chaos-engineering-program.md
 docs/operations/incident-response-runbook.md
 docs/operations/production-audit-sink-parspack-fa.md
