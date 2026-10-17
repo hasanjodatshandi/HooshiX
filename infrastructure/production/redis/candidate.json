@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "owner": "platform",
+  "version": "8.2.8",
+  "image": "docker.io/library/redis@sha256:3790f265260957949f41e767efd9b66d5e3f277913b63a56c0183d55a47e7347",
+  "runtime_base": "docker.io/library/alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395",
+  "source_revision": "382bda1c5a98bc0c0376930cf30ffd92eb3c5c18",
+  "source_archive_sha256": "94100f4fb2067b28becdb957d3f56253e322cb3ed800238dfb29e44086bce066",
+  "provenance_kind": "patched-upstream-runtime-build",
+  "platform": "linux/amd64",
+  "production_promotion": "blocked-until-supply-chain-staging-and-recovery-evidence",
+  "application_ingress": "CLOSED",
+  "runtime_users": {
+    "authorization": ["authorization:admin-quota:v1:*"],
+    "identity": ["identity:quota:v1:*"],
+    "webbff": ["web-bff:*"]
+  }
+}

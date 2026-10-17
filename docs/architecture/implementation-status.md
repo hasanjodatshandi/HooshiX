@@ -20,13 +20,25 @@ the reviewed `main@916aec1db5e0def6f9b64702d27f3fb205142f78` bundle reports
 run `38752407229`. Ten distinct namespace-local basic-auth Secrets, ten scoped
 read-only identities and foreign Secret/TokenRequest denials are `Passed`.
 Existing root/CA/mesh/OpenBao/application ESO/CNPG/Barman/storage are preserved.
-Public access is CLOSED; database instances/PVCs, provider backup and root
-revocation remain `Not run`. This supersedes earlier credential-delivery
+Public access is CLOSED; that credential-only operation did not create database
+instances/PVCs or perform provider backup/root revocation. This supersedes earlier credential-delivery
 `Not run` statements, not the separate application-secret or recovery gates.
 The owner separately approved only an empty commissioning quarantine on
-2026-10-16 under ADR-0042. Its tooling and native gates are in preparation;
-target database installation is still `Not run`. The general data/application
-boundary stays closed and provider deferral is not a backup or readiness waiver.
+2026-10-16 under ADR-0042. Owner-local execution on 2026-10-17 reports
+`POSTGRESQL_QUARANTINE=Passed` on reviewed
+`main@cfa0fbaf21992211ebcffba00eb18dc2ff5c86cf`, following exact-tree native run
+`38959679639` and storage baseline `38959679947`. Public receipt
+`hooshix-pg-quarantine-eb528210c83d4920b70343dbf9eb95c6.json`, SHA256
+`d8bf1e01f04cb95d85b3e2fe4a67da3fc94a60df2f69675a4a1ee6ef91f9c5d3`, matches plan
+`d832b8d058dc204763d552f63685abfdd798603710997b52098ad750cdf42be4`
+and both exact image digests. One empty instance and its bound Retain PVC now
+exist. Empty-state, TLS/SQL denial, guard and ServiceAccount/CNPG Secret-cache
+scope checks are `Passed`; prior root/mesh/OpenBao/ESO/CNPG/Barman are `Preserved`.
+Application ingress is `CLOSED`; application migrations, provider backup and root
+revocation are `Not run`; production readiness is `Not verified`. The general
+data/application boundary stays closed and provider deferral is not a backup or
+readiness waiver. This receipt supersedes earlier target-instance `Not run`
+statements only for the approved empty quarantine; do not repeat installation.
 
 The credential-free PostgreSQL ownership component is implemented at
 `scripts/production/render_postgresql_ownership.py` and documented under
@@ -35,8 +47,9 @@ and transaction-bounded public privilege SQL for five service databases. Native
 PostgreSQL 18.4 tests exercise 40 cross-service CONNECT denials, runtime DDL/role
 denials, forced RLS/context reset and non-destructive replay. Disposable CNPG
 1.30.1/PostgreSQL 18.6 reconciliation and synthetic physical recovery are verified
-below. Signed data-image candidate selection is now pinned below; durable target data storage, real credential
-delivery, destination installation and service migration compatibility remain
+below. Signed data-image candidate selection is now pinned below; guarded target
+storage, credential delivery and empty quarantine are evidenced above. Complete
+service ownership reconciliation and service migration compatibility remain
 `Not run`/`Not verified`. This is a component, not a complete data installer.
 
 PostgreSQL artifact preparation now records four blocked official amd64 inputs:
@@ -957,8 +970,8 @@ Authorization and Web BFF application services are implemented as current reposi
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
 | WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
-| CloudNativePG/PostgreSQL | DESIGNED | CNPG/Barman control planes, guarded PostgreSQL storage/Retain LocalPV and ten credential deliveries Passed on target; database instances Not run | exact owner-local receipts above; application migrations, provider backup/PITR/restore, complete-stack capacity and production readiness Not verified |
-| Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production deployment NOT VERIFIED | local Redis 8.2.8 `noeviction`/AOF policy and application integration PASSED; production TLS/ACL/recovery/capacity evidence NOT VERIFIED |
+| CloudNativePG/PostgreSQL | DESIGNED | CNPG/Barman control planes, guarded storage/bound Retain LocalPV, ten credential deliveries and one empty quarantined instance Passed on target | exact owner-local receipts above; application ingress CLOSED; five-service ownership/migrations, provider backup/PITR/restore, complete-stack capacity and production readiness Not verified |
+| Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production TLS/ACL candidate builder and isolated native gate IMPLEMENTED; target deployment Not run | fixed Redis 8.2.8 binary with Alpine 3.24.2 runtime candidate, complete unsuppressed scan, TLS/ACL/Lua/noeviction/AOF restart/privacy checks; candidate evidence does not establish signed publication, Ambient/admission, target storage, application TLS compatibility, capacity or Production readiness |
 | Kafka | DESIGNED | developer-only local integrated runtime IMPLEMENTED; kind/staging and production deployment NOT PRESENT | pinned local KRaft broker, explicit command/receipt/DLT topics, host/internal listeners and real four-participant erasure replay passed; production durability/ACL/capacity/recovery NOT VERIFIED |
 | OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 initialized/unsealed Shamir 3/2; ESO 2.12.0 installed with six SecretStores Ready under the exact owner-run receipt above | Target installation/TLS/PVC, custody recovery/unseal, operator-local isolated snapshot recovery and reported ESO installation Passed; custody distribution owner-attested; application secret materialization, cloud version/retention/hourly backup, JIT and root revocation Not verified |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |

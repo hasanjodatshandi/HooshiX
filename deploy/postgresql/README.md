@@ -83,15 +83,17 @@ reservation (ext4 usable capacity is less than backing size), with Retain,
 WaitForFirstConsumer and exact node/first-instance claim binding. It does not
 create a PVC, database or Barman component. The Stage10 guide contains its
 exact-tree native evidence builder, owner-local invocation and recovery boundary.
-The current VPS reservation receipt is verified as `Passed` in the Stage10 guide;
-no PVC/database has been created; the separate Barman controller is installed,
-but its database sidecar and provider backup are not. Other servers require their own binding
-and target receipt.
+The current VPS reservation and subsequent owner-local empty quarantine are
+verified as `Passed` in the Stage10 guide. One empty instance and its bound
+Retain PVC now exist; the separate Barman controller is installed, but its
+database sidecar and provider backup are not. Other servers require their own
+binding and target receipt. Do not recreate the existing volume or instance.
 
 Do **not** apply this ownership candidate directly to the VPS. The reviewed complete data
 bundle must first supply the signed CNPG/operator/database/Barman image evidence,
 durable storage guard, finite capacity/pool budgets, TLS and network/mesh isolation,
-and the approved backup/restore path. Actual PostgreSQL commissioning is `Not run`.
+and the approved backup/restore path. Complete data commissioning is `Not run`;
+only the empty quarantine below is installed on the current target.
 ParsPack deferral is not off-host backup or production-readiness evidence.
 
 The separate `render_postgresql_quarantine.py` / `install_postgresql_quarantine.py`
