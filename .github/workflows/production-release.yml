@@ -14,6 +14,7 @@ on:
           - patched-platform-candidate
           - postgresql-candidate
           - cert-manager-candidate
+          - redis-candidate
       release_manifest_path:
         description: Tracked reviewed production release manifest under deploy/releases/production
         required: false
@@ -152,7 +153,7 @@ jobs:
           rm -f -- "$RUNNER_TEMP/docker-config/config.json"
 
   openbao-candidate:
-    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate')
+    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate' || inputs.release_kind == 'redis-candidate')
     runs-on: ubuntu-24.04
     environment: production-release
     timeout-minutes: ${{ (inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate') && 180 || 35 }}
@@ -219,6 +220,10 @@ jobs:
               python3 scripts/production/publish_cert_manager_candidates.py \
                 --directory "$RUNNER_TEMP/cert-manager-release-evidence"
               ;;
+            redis-candidate)
+              python3 scripts/production/publish_redis_candidate.py \
+                --directory "$RUNNER_TEMP/redis-release-evidence"
+              ;;
             *) exit 1 ;;
           esac
       - name: Remove temporary registry authentication
@@ -231,11 +236,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ inputs.release_kind == 'redis-candidate' && 'redis' || inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/${{ inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
+            ${{ runner.temp }}/${{ inputs.release_kind == 'redis-candidate' && 'redis' || inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
             !${{ runner.temp }}/patched-release-evidence/**/source.tar.gz
             !${{ runner.temp }}/postgresql-release-evidence/**/source.tar.gz
             !${{ runner.temp }}/cert-manager-release-evidence/**/source.tar.gz
+            !${{ runner.temp }}/redis-release-evidence/**/source.tar.gz
           retention-days: 30
           if-no-files-found: error
