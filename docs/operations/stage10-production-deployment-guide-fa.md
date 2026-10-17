@@ -1876,6 +1876,53 @@ Production یا تعویق پارس‌پک با این نتیجه عبور نک�
 مراجع رسمی: [Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
 و [Redis ACL](https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/).
 
+### انتشار candidate امضاشدهٔ Redis
+
+انتشار Redis گام بعد از آزمون محلی است. ابزار
+`scripts/production/publish_redis_candidate.py` فقط در dispatch حفاظت‌شدهٔ
+`production-release.yml` روی `main` و با baseline موفق همان SHA اجرا می‌شود.
+مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-private` است؛
+وجود package عمومی یا internal عملیات را رد می‌کند. ابزار visibility را تغییر
+نمی‌دهد. فقط 404 پیش از اولین push می‌تواند نبود package باشد؛ 401/403 خطاست.
+
+از checkout آنلاین با GitHub CLI احرازشده، پس از merge و موفقیت baseline همان main:
+
+```bash
+gh workflow run production-release.yml --ref main -f release_kind=redis-candidate
+gh run list --workflow production-release.yml --event workflow_dispatch --limit 5
+```
+
+run همین dispatch را با SHA و زمان آن تطبیق دهید و تا پایان بررسی کنید؛ اجرای
+CLI ناشر روی لپ‌تاپ جایگزین workflow نیست. هیچ PAT، sudo، custody یا رمز CA در
+ورودی این مرحله لازم نیست: CI فقط token موقت package و OIDC موجود خود را دارد
+و احراز هویت موقت رجیستری در پایان پاک می‌شود. منطق امضا همان helper موجود
+انتشار PostgreSQL است، نه signer یا کلید تازه.
+
+workflow یک بار candidate را می‌سازد و native TLS/ACL/Lua/noeviction/AOF را روی
+همان local image تکرار می‌کند، سپس همان تصویر را push می‌کند. configuration
+digest رجیستری باید با تصویر آزموده‌شده یکسان باشد؛ manifest رجیستری جداگانه
+resolve و با inventory کامل و scan تازه بررسی می‌شود. tag متغیر و local image ID
+جای digest رجیستری نیستند. پس از این کنترل‌ها، همان `@sha256` امضا می‌شود و
+SLSA v1 با نوع صادقانهٔ `patched-upstream-runtime-build` و CycloneDX attestation
+می‌گیرد. signer دقیق workflow روی main، OIDC issuer، payload و subject digest
+بررسی می‌شوند؛ رد signer نادرست و کنترل مثبتِ پس از آن الزامی‌اند.
+
+فقط پایان موفق همهٔ مراحل و تأیید دوبارهٔ private بودن، `publication.json` را
+در artifact عمومی `redis-publication-<run_id>-<attempt>` می‌سازد. رسید شامل SHA
+مخزن، invocation، digest رجیستری و config، scan، native و نتیجهٔ امضاست؛ آرشیو
+سورس و fixtureهای رمزی در artifact نیستند. شکست جزئی ممکن است تصویر/attestation
+در رجیستری باقی بگذارد، اما بدون رسید موفق مجوز استفاده نیست و خودکار تکرار
+نمی‌شود. ابتدا run و artifact همان attempt بررسی شوند؛ چیزی روی VPS پاک یا
+جایگزین نمی‌شود. رسید و شواهد عمومی را بیرون Git نگه دارید.
+
+این مرحله نصب VPS، ساخت Secret، staging یا بازکردن اتصال برنامه‌ها نیست؛
+`deployment`، `runtime_admission` و `staging` در رسید **Not run** باقی می‌مانند.
+نام package یا موفقیت CI به‌تنهایی اثبات انتشار نیست؛ run موفق و رسید نهایی لازم‌اند.
+هیچ تصویری پس از تأیید staging دوباره ساخته نمی‌شود و Production تا شواهد
+مقصد، بازیابی و ظرفیت **Not verified** می‌ماند. تعویق پارس‌پک تغییری نمی‌کند.
+
+مرجع: [Cosign signing and verification](https://github.com/sigstore/cosign).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

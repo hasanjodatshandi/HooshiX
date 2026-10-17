@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/redis-candidate.yml'
+      - '.github/workflows/production-release.yml'
       - 'infrastructure/production/redis/**'
       - 'infrastructure/production/data/data-policy.json'
       - 'scripts/production/*redis*.py'
@@ -16,9 +17,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/redis-candidate.yml'
+      - '.github/workflows/production-release.yml'
       - 'infrastructure/production/redis/**'
       - 'infrastructure/production/data/data-policy.json'
       - 'scripts/production/*redis*.py'
+      - 'scripts/production/tests/test_redis*.py'
       - 'scripts/production/verify_postgresql_artifacts.py'
       - 'scripts/production/test_postgresql_isolation_native.py'
       - 'scripts/production/verify_openbao_artifact.py'
