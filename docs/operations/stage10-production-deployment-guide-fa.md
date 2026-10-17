@@ -1817,6 +1817,65 @@ TLS/رد SQL، guard، مرز ServiceAccount و cache محدود Secretهای CN
 از قرنطینه است و نه موفقیت backup/PITR/restore. هیچ probe یا upload دوباره‌ای
 برای اختلال deferred پارس‌پک در این گام انجام نشده است.
 
+### آماده‌سازی Redis امن، بدون نصب مقصد
+
+این جزء متعلق به Platform است و همان Redis **8.2.8** مصوب را نگه می‌دارد؛
+هیچ Redis، volume، Secret یا پورت جدیدی روی VPS ایجاد نمی‌کند. ورودی رسمی
+Alpine با digest ثابت، runtime پایهٔ Alpine **3.24.2** و بسته‌های ثابت OpenSSL،
+zlib و GCC runtime در `infrastructure/production/redis/candidate.json` و
+`Dockerfile` ثبت شده‌اند. فقط binaryهای همان Redis منتقل می‌شوند؛ سورس Redis
+دوباره کامپایل نمی‌شود. نوع provenance برابر `patched-upstream-runtime-build`
+است، نه unchanged import یا گواهی build رسمی upstream. آرشیو سورس رسمیِ
+checksum-bound و متن مجوز همراه تصویر باقی می‌مانند.
+
+از checkout بررسی‌شده، با Docker محلی Unix، کاربر غیر root، OpenSSL و ابزارهای
+checksum-bound موجود Syft **1.51.0** و Grype **0.117.0**:
+
+```bash
+python3 -m unittest discover -s scripts/production/tests -p 'test_redis*.py'
+PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/build_redis_candidate.py \
+  --directory /path/outside-repo/new-redis-candidate
+```
+
+پوشهٔ خروجی باید تازه و بیرون Git باشد. builder فقط ورودی‌های ثابت را می‌سازد؛
+inventory کامل و بدون exclusion، CycloneDX و scan تازه با دیتابیس معتبر حداکثر
+پنج‌روزه لازم‌اند. هر High/Critical، حتی suppressed، عملیات را رد می‌کند و
+رسید موفق ساخته نمی‌شود. credential رجیستری، sudo، Root یا custody لازم نیست.
+workflow مستقل `Redis security candidate` همین مسیر را بدون مجوز انتشار اجرا
+می‌کند و فقط JSON عمومی و Dockerfile را نگه می‌دارد، نه fixture یا رمزها را.
+
+پیکربندی نهاییِ قابل استفاده در مرحلهٔ نصب از `render_redis_security.py` می‌آید:
+
+- فقط TLS روی ۶۳۷۹؛ `port 0` مسیر plaintext را می‌بندد. رمز مستقل ACL لازم است؛
+  TLS client-certificate در این لایه الزامی نیست و جایگزین Ambient/STRICT آینده نیست.
+- default user غیرفعال است. `authorization` فقط `authorization:admin-quota:v1:*`،
+  `identity` فقط `identity:quota:v1:*` و `webbff` فقط `web-bff:*` را دارند.
+  دستورهای لازم quota/session صریح‌اند؛ admin، enumeration و دسترسی cross-owner
+  مجاز نیست. حساب health فقط PING و monitor فقط INFOهای محدود دارد و هیچ کلیدی
+  را نمی‌خواند. password hash نیز Secret است و نباید در Git، argv یا خروجی باشد.
+- `noeviction`، AOF با `appendfsync everysec` و توقف روی AOF ناقص حفظ می‌شوند.
+  سقف حافظه ورودی اجباری است، نه مقدار تأییدشدهٔ VPS؛ منابع و headroom نصب واقعی
+  باید جداگانه اندازه‌گذاری و آزموده شوند.
+
+native روی همان local image ساخته‌شده، بدون شبکه یا پورت منتشرشده، با filesystem
+فقط‌خواندنی، کاربر غیر root و سقف CPU/RAM اجرا می‌شود. کلیدها، گواهی یک‌روزه و
+داده‌ها فقط fixture مصنوعی در `/dev/shm` هستند و پاک می‌شوند. TLS مثبت، رد
+plaintext/CA نامعتبر، دسترسی خودی و رد GET/SET/Lua بین سرویس‌ها، محدودیت Lua
+روی کلید پویا، رد admin/enumeration، OOM بدون eviction، ماندن داده پس از restart
+AOF و عدم نشت رمز/hash در log باید **Passed** باشند. این آزمون بازیابی پس از
+خرابی دیسک/host یا آزمون کامل Lettuce و برنامه‌ها نیست.
+
+فقط پس از همهٔ کنترل‌ها، `candidate.json` با `scan=Passed` و نتیجهٔ native
+ساخته می‌شود. local image ID، configuration digest، hash دستور ساخت و hash
+شواهد جداگانه ثبت می‌شوند؛ این شناسه‌ها با digest رجیستری یکی فرض نمی‌شوند.
+امضا/انتشار، admission و Ambient، storage پایدار، تحویل OpenBao/ESO، گواهی معتبر
+مقصد، سازگاری TLS برنامه‌ها، ظرفیت و نصب Redis روی VPS هنوز **Not run/Not verified**
+هستند. فایل config یا تصویر candidate را مستقیم روی VPS اجرا نکنید؛ هیچ gate
+Production یا تعویق پارس‌پک با این نتیجه عبور نکرده است.
+
+مراجع رسمی: [Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
+و [Redis ACL](https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

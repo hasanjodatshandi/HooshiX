@@ -1,0 +1,61 @@
+name: Redis security candidate
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/redis-candidate.yml'
+      - 'infrastructure/production/redis/**'
+      - 'infrastructure/production/data/data-policy.json'
+      - 'scripts/production/*redis*.py'
+      - 'scripts/production/tests/test_redis*.py'
+      - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/test_postgresql_isolation_native.py'
+      - 'scripts/production/verify_openbao_artifact.py'
+      - 'scripts/production/install_release_tools.sh'
+      - 'infrastructure/production/release-tools.env'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/redis-candidate.yml'
+      - 'infrastructure/production/redis/**'
+      - 'infrastructure/production/data/data-policy.json'
+      - 'scripts/production/*redis*.py'
+      - 'scripts/production/verify_postgresql_artifacts.py'
+      - 'scripts/production/test_postgresql_isolation_native.py'
+      - 'scripts/production/verify_openbao_artifact.py'
+      - 'scripts/production/install_release_tools.sh'
+      - 'infrastructure/production/release-tools.env'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: redis-security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  candidate:
+    name: Redis exact candidate scan TLS ACL and AOF
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install integrity-pinned scanners
+        run: |
+          set -euo pipefail
+          scripts/production/install_release_tools.sh "$RUNNER_TEMP/redis-tools"
+          echo "$RUNNER_TEMP/redis-tools" >> "$GITHUB_PATH"
+      - name: Verify contracts and exact non-root runtime without target credentials
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/production/tests -p 'test_redis*.py'
+          python3 scripts/production/build_redis_candidate.py --directory "$RUNNER_TEMP/redis-evidence"
+      - name: Retain public evidence only, never synthetic credentials or fixture files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: redis-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/redis-evidence/*json
+            ${{ runner.temp }}/redis-evidence/context/Dockerfile
+          retention-days: 30
+          if-no-files-found: error

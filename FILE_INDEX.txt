@@ -12,6 +12,7 @@
 .github/workflows/postgresql-artifacts.yml
 .github/workflows/production-release.yml
 .github/workflows/production-vulnerability-rescan.yml
+.github/workflows/redis-candidate.yml
 .github/workflows/repository-baseline.yml
 .github/workflows/web-bff.yml
 .github/workflows/web-frontend-e2e.yml
@@ -394,6 +395,9 @@ infrastructure/production/observability/observability-policy.json
 infrastructure/production/platform-contracts.json
 infrastructure/production/profile.json
 infrastructure/production/recovery/recovery-policy.json
+infrastructure/production/redis/.dockerignore
+infrastructure/production/redis/Dockerfile
+infrastructure/production/redis/candidate.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
 infrastructure/production/release/patched-platform-sources.json
@@ -544,6 +548,7 @@ scripts/production/build_postgresql_quarantine_bundle.py
 scripts/production/build_postgresql_secrets_bundle.py
 scripts/production/build_postgresql_storage_bundle.py
 scripts/production/build_provenance.py
+scripts/production/build_redis_candidate.py
 scripts/production/check_human_sshd_candidate.sh
 scripts/production/commission_platform.py
 scripts/production/import_intermediate_ca.py
@@ -616,6 +621,7 @@ scripts/production/render_platform_admission.py
 scripts/production/render_postgresql_ownership.py
 scripts/production/render_postgresql_quarantine.py
 scripts/production/render_postgresql_secrets.py
+scripts/production/render_redis_security.py
 scripts/production/repair_import_referrers.py
 scripts/production/restore_openbao_isolated.py
 scripts/production/rollback_human_sshd_candidate.sh
@@ -636,6 +642,7 @@ scripts/production/run-postgresql-quarantine.ps1
 scripts/production/run-postgresql-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_postgresql_isolation_native.py
+scripts/production/test_redis_security_native.py
 scripts/production/tests/test_barman_control_plane.py
 scripts/production/tests/test_cert_manager_candidates.py
 scripts/production/tests/test_cert_manager_commissioning.py
@@ -688,6 +695,7 @@ scripts/production/tests/test_probe_parspack_audit_bucket.py
 scripts/production/tests/test_published_cert_manager.py
 scripts/production/tests/test_published_postgresql.py
 scripts/production/tests/test_readiness.py
+scripts/production/tests/test_redis_security.py
 scripts/production/tests/test_rehearsal_probes.py
 scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
