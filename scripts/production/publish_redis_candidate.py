@@ -19,8 +19,8 @@ from verify_openbao_artifact import load
 from verify_postgresql_artifacts import scan_inventory
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY
 
-REPOSITORY = 'ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-private'
-PACKAGE_API = 'users/hasanjodatshandi/packages/container/hooshix%2Fplatform-security-redis-private'
+REPOSITORY = 'ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-v2-private'
+PACKAGE_API = 'users/hasanjodatshandi/packages/container/hooshix%2Fplatform-security-redis-v2-private'
 BUILD_TYPE = 'https://github.com/hasanjodatshandi/HooshiX/redis-runtime-build/v1'
 
 
@@ -32,6 +32,8 @@ def package_visibility(*, allow_missing=False):
             return
         raise
     if visibility != 'private':
+        actual = visibility if visibility in ('public', 'internal') else 'invalid'
+        print('REDIS_PACKAGE_VISIBILITY=Rejected; actual=' + actual + '; required=private', flush=True)
         raise ValueError('owned Redis package must remain private')
     return visibility
 
