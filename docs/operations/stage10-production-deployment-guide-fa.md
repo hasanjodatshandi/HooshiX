@@ -2024,6 +2024,12 @@ remount، UUID غلط، readonly، backing loss، unmount و ممنوعیت fall
 
 مرجع رفتار وابستگی: [systemd unit dependencies](https://www.freedesktop.org/software/systemd/man/259/systemd.unit.html).
 
+### رزرو فضای آماده برای Redis
+
+رزرو LocalPV از فایل‌سیستم سالم و guardدار موجود استفاده می‌کند؛ هیچ تخصیص، فرمت،
+حذف داده یا ساخت Redis/PVC/Secret انجام نمی‌شود. فضای OpenBao و PostgreSQL و
+قواعد admission فعلی باید حفظ شوند. این رزرو به‌تنهایی مجوز اجرای Redis نیست.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
