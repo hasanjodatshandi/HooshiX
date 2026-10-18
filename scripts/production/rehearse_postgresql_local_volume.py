@@ -8,13 +8,14 @@ from unittest.mock import patch
 import install_postgresql_local_volume as volume
 
 
-def exercise(k, run, wait, node, pin_image):
-    namespace = 'hooshix-pg-local-volume-ci'
-    path = '/tmp/hooshix-pg-local-volume-ci'
+def exercise(k, run, wait, node, pin_image, *, module=volume, runtime_uid=26, profile='pg'):
+    volume = module
+    namespace = 'hooshix-' + profile + '-local-volume-ci'
+    path = '/tmp/' + namespace
     objects = volume.candidate()
-    objects[0]['metadata']['name'] = 'hooshix-pg-local-ci'
+    objects[0]['metadata']['name'] = 'hooshix-' + profile + '-local-ci'
     pv = objects[1]
-    pv['metadata']['name'] = 'hooshix-pg-local-ci'
+    pv['metadata']['name'] = objects[0]['metadata']['name']
     pv['spec']['storageClassName'] = objects[0]['metadata']['name']
     pv['spec']['capacity']['storage'] = '16Mi'
     pv['spec']['local']['path'] = path
@@ -24,7 +25,7 @@ def exercise(k, run, wait, node, pin_image):
         return k(*args, data=json.dumps(body).encode() if body is not None else None)
     print('POSTGRESQL_LOCAL_VOLUME_TEST=fixture', flush=True)
     run(['docker', 'exec', node, 'mkdir', '-m', '0700', path])
-    run(['docker', 'exec', node, 'chown', '26:26', path])
+    run(['docker', 'exec', node, 'chown', f'{runtime_uid}:{runtime_uid}', path])
     # Let CRI pull the exact digest; Docker archive imports can create incompatible digest aliases.
     call('create', '-f', '-', body={'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {
         'name': namespace, 'labels': {'pod-security.kubernetes.io/enforce': 'restricted'}}})
@@ -60,7 +61,7 @@ def exercise(k, run, wait, node, pin_image):
          .get('status', {}).get('phase') == 'Bound')
     pod = {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': 'volume-writer', 'namespace': namespace},
         'spec': {'restartPolicy': 'Never', 'automountServiceAccountToken': False,
-            'securityContext': {'runAsNonRoot': True, 'runAsUser': 26, 'runAsGroup': 26,
+            'securityContext': {'runAsNonRoot': True, 'runAsUser': runtime_uid, 'runAsGroup': runtime_uid,
                                 'seccompProfile': {'type': 'RuntimeDefault'}},
             'containers': [{'name': 'fixture', 'image': pin_image,
                 'command': ['/bin/sh', '-ec', 'printf synthetic-storage-fixture > /data/proof'],
@@ -94,5 +95,6 @@ def exercise(k, run, wait, node, pin_image):
         raise ValueError('NATIVE_RETAIN_DATA_LOST')
     # All fixture objects/data die with the fresh owned kind cluster, never a target volume.
     return {'source_sha256': hashlib.sha256(Path(volume.__file__).read_bytes()).hexdigest(),
+        'runtime_uid': runtime_uid,
         'reservation_reentry_conflict': 'Passed', 'wrong_claim_denied': 'Passed',
         'node_affinity_and_mount': 'Passed', 'pvc_reuse_persistence': 'Passed', 'retain_after_claim_deletion': 'Passed'}

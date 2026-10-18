@@ -19,7 +19,7 @@ from publish_postgresql_candidates import (EXPECTED_CERTIFICATE_IDENTITY,
 from publish_openbao_candidate import run, verify_payload
 from test_postgresql_isolation_native import exercise_candidate
 from verify_openbao_artifact import load
-from verify_postgresql_artifacts import PIN, pins
+from verify_postgresql_artifacts import PIN, pins, scan_inventory
 from render_platform_admission import SIGSTORE_TUF_MIRROR
 
 
@@ -65,15 +65,19 @@ def verify(directory, output):
             or hashlib.sha256((directory / 'publication.json').read_bytes()).hexdigest()
                != selected['publication_sha256']):
         raise ValueError('exact reviewed public publication receipt required')
-    # Validate every scan before using any registry image or executing native smoke.
-    now = datetime.now(timezone.utc)
+    output.mkdir(mode=0o700)  # Fresh attempt; never overwrite publication or prior acceptance.
+    scan_evidence = {}
     for component, image in publication['images'].items():
-        folder = directory / component / 'registry'
+        print('POSTGRESQL_ACCEPTANCE_STEP=' + component + '-scan', flush=True)
+        folder = output / component / 'registry'
+        folder.mkdir(mode=0o700, parents=True)
         config = publication['image_config_digests'][component]
-        validate_inventory(folder, component, image, now, config)
+        scan_inventory(folder, image, 'registry')
+        validate_inventory(folder, component, image, datetime.now(timezone.utc), config)
         if published_image(repository(component), load(folder / 'syft.json')['source'], config) != image:
             raise ValueError('exact reviewed registry manifest/config required')
-    output.mkdir(mode=0o700)  # Fresh success receipt only after every verification.
+        scan_evidence[component] = {name: hashlib.sha256((folder / name).read_bytes()).hexdigest()
+            for name in ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json', 'scanner-config.json')}
     cache = output.resolve() / 'sigstore-tuf'
     version = cosign(['version'], cache)
     if not re.search(r'(?<![\w.])v3\.0\.6(?![\w.])', version):
@@ -126,7 +130,7 @@ def verify(directory, output):
         'repository_revision': publication['repository_revision'],
         'invocation_id': publication['invocation_id'], 'images': publication['images'],
         'image_config_digests': publication['image_config_digests'], 'local_engine_digests': engines,
-        'scan': 'Passed', 'signature_provenance': 'Passed', 'wrong_signer': 'Passed',
+        'scan': 'Passed', 'scan_evidence_sha256': scan_evidence, 'signature_provenance': 'Passed', 'wrong_signer': 'Passed',
         'native_entrypoints': 'Passed', 'native_database_isolation': 'Passed',
         'staging': 'Not verified', 'runtime_admission': 'Not verified',
         'physical_recovery': 'Not verified', 'deployment': 'Not verified',
