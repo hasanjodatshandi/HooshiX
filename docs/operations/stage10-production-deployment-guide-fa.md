@@ -1936,6 +1936,12 @@ SLSA v1 با نوع صادقانهٔ `patched-upstream-runtime-build` و Cyclone
 تنظیم visibility مستقل package از مخزن:
 [GitHub package visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
 
+### فضای مستقل Redis
+
+فضای AOF باید از OpenBao و PostgreSQL جدا و دارای guard فعال باشد؛ موفقیت انتشار
+تصویر به معنی وجود volume، Secret یا Redis روی مقصد نیست. این مرحله هیچ برنامه‌ای
+را به Redis متصل نمی‌کند و اندازهٔ دیسک جای آزمون ظرفیت حافظه را نمی‌گیرد.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
