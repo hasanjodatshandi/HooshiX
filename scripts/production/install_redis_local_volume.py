@@ -160,7 +160,10 @@ def execute(call=kube, verify=foundation):
     for (namespace, name), before_claim in bindings.items():
         require(json.loads(call('-n', namespace, 'get', 'pvc', name, '-o', 'json')) == before_claim,
             'PRESERVED_DATABASE_BINDING_CHANGED')
-    require(json.loads(call('get', 'validatingpolicy', 'hooshix-platform-data-closed', '-o', 'json')) == closed
+    after = json.loads(call('get', 'validatingpolicy', 'hooshix-platform-data-closed', '-o', 'json'))
+    # Controller status/resourceVersion may advance; policy identity and security spec must not.
+    require(after['metadata']['uid'] == closed['metadata']['uid'] and after['spec'] == spec
+        and after.get('status', {}).get('conditionStatus', {}).get('ready') is True
         and verify() == before, 'PRESERVED_FOUNDATION_CHANGED')
     return {'schema_version': 1, 'redis_local_volume': 'Passed', 'volume': VOLUME,
         'storage_class': CLASS, 'capacity_bytes': CAPACITY, 'node': NODE,

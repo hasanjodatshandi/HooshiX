@@ -110,7 +110,8 @@ class LocalVolumeTest(unittest.TestCase):
             with self.assertRaises(ValueError): bundle.check({}, {}, proof | {'revision': 'invalid'}, 'a' * 40)
 
     def test_reservation_accepts_running_postgresql_but_preserves_admission_and_both_claims(self):
-        policy = {'spec': {'validationActions': ['Deny'], 'failurePolicy': 'Fail',
+        policy = {'metadata': {'uid': 'existing-policy'},
+                  'spec': {'validationActions': ['Deny'], 'failurePolicy': 'Fail',
                           'evaluation': {'admission': {'enabled': True}}},
                   'status': {'conditionStatus': {'ready': True}}}
         calls = []
@@ -154,6 +155,17 @@ class LocalVolumeTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'REDIS_CLAIM_ALREADY_PRESENT'):
                 volume.execute(present_claim, Mock(return_value={}))
             reserve.assert_not_called()
+            def controller_status_only(*args, body=None):
+                value = kube(*args, body=body)
+                if 'validatingpolicy' in args:
+                    changed = json.loads(value)
+                    changed['metadata']['resourceVersion'] = str(len(calls))
+                    changed['status']['observedAt'] = len(calls)
+                    return json.dumps(changed).encode()
+                return value
+            result = volume.execute(controller_status_only, Mock(return_value={}))
+            self.assertEqual('Passed', result['redis_local_volume'])
+            reserve.reset_mock()
             bindings['postgresql-1'] = 'foreign-volume'
             with self.assertRaisesRegex(ValueError, 'EXISTING_DATABASE_BINDING_REQUIRED'):
                 volume.execute(kube, Mock(return_value={}))
