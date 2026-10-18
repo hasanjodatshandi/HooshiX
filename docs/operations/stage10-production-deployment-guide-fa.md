@@ -2093,6 +2093,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 
 مرجع: [Kubernetes PV reservation](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume).
 
+### تحویل ACL و رمزهای Redis از OpenBao
+
+این مرحله از controller موجود و محدود به `platform-data` استفاده می‌کند؛ controller،
+دسترسی شبکه یا workload تازه‌ای نمی‌سازد. پنج رمز مستقل برای authorization، identity،
+webbff، health و monitor در OpenBao نگهداری می‌شوند؛ ACL فقط از hash همان رمزها ساخته
+می‌شود و مانند رمز، محرمانه است. هیچ مقدار یا hash در plan عمومی یا Git قرار نمی‌گیرد.
+اجرای Redis، TLS مقصد و اتصال برنامه‌ها تا commissioning جداگانه بسته می‌مانند.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
