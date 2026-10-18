@@ -199,6 +199,24 @@ all cross-identity/write/admin denials, revoked tokens, source attestation
 negatives, existing authority preservation and log privacy. This prerequisite
 does not create PostgreSQL, approve provider backup, or revoke root.
 
+Redis ACL delivery reuses that already approved `platform-data` ESO controller
+and its namespace-wide Secret cache; no additional controller, webhook, network
+edge or application ingress is granted. Five independent credentials are created
+with the same whole-set preflight/CAS=0/no-rotation contract. Three application
+credentials live under their existing owning service path; health, monitor and
+the hash-only server ACL use separate `production/security-redis` leaves. Six
+new exact-account, exact-leaf read-only roles retain the five-minute explicit
+maximum, explicit audience and self-only token behavior. A separate additive
+Role delegates TokenRequest only for these six accounts, leaving the ten
+PostgreSQL accounts/permissions unchanged. ESO projects five basic-auth Secrets
+and one private ACL Secret into `platform-data` only. Application identities can
+read only their own credential through their existing policy; they cannot read
+the ACL, health/monitor or another owner's credential. Native tests must prove
+delivery, password/hash binding, no-write reentry, all cross-identity/write/admin/
+audience/namespace negatives, unchanged existing identities/data/mesh/admission,
+and log privacy. TLS issuance, Redis/PVC creation, client Secret projections,
+production capacity and opening traffic are separate unverified operations.
+
 ### Existing deployment gates
 
 For this unchanged upstream OpenBao import, `openbao-image.json/import_provenance`

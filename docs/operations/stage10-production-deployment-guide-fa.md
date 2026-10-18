@@ -2091,6 +2091,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 گام بعد TLS/ACL و تحویل از OpenBao/ESO و سپس workload بستهٔ Redis است؛
 نبود Redis/PVC در این مرحله طبیعی است و Stage10 هنوز `Not verified` است.
 
+برای VPS فعلی، رسید محلی ۲۰۲۶-۱۰-۱۸ رزرو `hooshix-redis-local-7gib` را با
+`REDIS_LOCAL_VOLUME=Passed` و حفظ سرویس‌ها تأیید کرده است؛ این نتیجه به معنی
+اجرای Redis یا تأیید فضای سرور دوم نیست.
+
 مرجع: [Kubernetes PV reservation](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume).
 
 ### تحویل ACL و رمزهای Redis از OpenBao
@@ -2100,6 +2104,61 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 webbff، health و monitor در OpenBao نگهداری می‌شوند؛ ACL فقط از hash همان رمزها ساخته
 می‌شود و مانند رمز، محرمانه است. هیچ مقدار یا hash در plan عمومی یا Git قرار نمی‌گیرد.
 اجرای Redis، TLS مقصد و اتصال برنامه‌ها تا commissioning جداگانه بسته می‌مانند.
+
+پیش‌نیازها: OpenBao موجود unsealed، custody قبلی قابل بازیابی، controller امضاشدهٔ
+`hooshix-postgresql-eso` و validation webhook سالم، namespace `platform-data` با
+Ambient/STRICT و restricted PSA، admission بستهٔ فعلی و فضای Redis/LocalPV قبلی.
+PostgreSQL قرنطینه‌شده و هویت‌های موجود نباید تغییر کنند. Root فقط برای همین
+bootstrap نظارت‌شده استفاده می‌شود و لغو یا reset نمی‌شود.
+
+شش حساب `eso-redis-<user>` و `eso-redis-acl` فقط leaf دقیق خود و عملیات self-only
+توکن را می‌خوانند؛ عمر توکن حداکثر پنج دقیقه است. Role جداگانه فقط TokenRequest
+همین شش نام را به controller موجود می‌دهد؛ RBAC قبلی PostgreSQL دست‌نخورده است.
+اسرار `security-redis-authorization`، `security-redis-identity`، `security-redis-webbff`،
+`security-redis-health` و `security-redis-monitor` نوع basic-auth دارند و
+`security-redis-acl` فقط `users.acl` محرمانه را دارد. برنامه‌ها در این مرحله
+Secret یا اتصال Redis دریافت نمی‌کنند. مسیر سه credential برنامه زیر مسیر
+OpenBao همان مالک است؛ health/monitor/ACL از هیچ هویت برنامه‌ای قابل خواندن نیستند.
+
+بستهٔ عمومی از checkout تمیز همان main و staging موفقِ همان tree ساخته شود:
+
+```bash
+python3 scripts/production/build_redis_secrets_bundle.py \
+  --staging-run <successful-platform-staging-run> \
+  --chart /path/outside-repo/eso-2.12.0.tgz --helm /path/to/helm \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-redis-secrets-YYYYMMDD
+```
+
+builder شواهد native تحویل، binding رمز/ACL، هویت، denial، reentry و حفظ حالت را
+از artifact احراز‌شده می‌خواهد؛ receipt دست‌ساز جایگزین نمی‌شود. plan، source hash
+و bundle هیچ رمز یا hash رمز ندارند. ابتدا فقط بررسی محلی بسته:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_redis_secrets_operator.py --bundle /mnt/c/Users/Coder/Downloads/HooshiX-redis-secrets-YYYYMMDD --validate-only
+```
+
+با VNC قابل ورود و نشست دوم SSH باز، فقط مالک فرمان زیر را اجرا کند؛ رمز موجود
+custody مربوط به OpenBao و رمز sudo فقط در دو ورودی مخفی همان پنجره وارد شوند.
+رمز CA/Root، توکن GHCR یا رمز تازه لازم نیست:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_redis_secrets_operator.py --bundle /mnt/c/Users/Coder/Downloads/HooshiX-redis-secrets-YYYYMMDD --custody /home/coder/.local/share/hooshix-openbao-custody/<existing-custody-id> --rescue-and-second-session-ready
+```
+
+نتیجهٔ مورد انتظار `REDIS_SECRET_DELIVERY=Passed`، پنج credential مستقل، شش
+SecretStore/ExternalSecret، ACL متناظر و `public_access=CLOSED` است؛ receipt عمومی
+زیر `~/.local/share/hooshix-redis-secrets/` ذخیره می‌شود. این **انتظار اجرایی** است،
+نه ادعای اجرا روی مقصد. TLS و runtime هنوز `Not run` و Production `Not verified` است.
+
+در تکرار، credential/ACL موجود فقط با مالکیت و محتوای دقیق پذیرفته می‌شوند؛
+هیچ rotation، overwrite، adopt، delete یا patch خودکار وجود ندارد. تضاد یا سابقهٔ
+حذف‌شده عملیات را متوقف و حالت جزئی را حفظ می‌کند. برای رفع خطا Secret یا مسیر
+OpenBao را حذف نکنید؛ receipt بدون اسرار بررسی و فقط پس از اصلاح علت دوباره اجرا شود.
+در استفادهٔ روزمره controller هر دقیقه sync می‌کند؛ مقدارها، ACL، hashها و خروجی
+`kubectl get secret -o yaml/json` را در چت یا گزارش عمومی نفرستید. rotation و TLS
+و انتقال Secret به namespace برنامه‌ها فقط در تغییر بازبینی‌شدهٔ مربوط انجام می‌شود.
+
+مرجع: [ESO Vault Kubernetes auth](https://external-secrets.io/latest/provider/hashicorp-vault/).
 
 پس از آن ادامهٔ مشترک:
 

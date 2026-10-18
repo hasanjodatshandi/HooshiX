@@ -77,6 +77,13 @@ by `render_postgresql_quarantine.py`, not application SQL or business data.
 Complete data commissioning and provider recovery gates still precede production
 data/traffic. Credential delivery alone grants no database or off-host backup readiness.
 
+The same data-namespace ESO also delivers the five independent Redis ACL credentials
+and the private hash-only server ACL under ADR-0011. Its existing namespace-wide
+Secret trust boundary is unchanged; six exact additional TokenRequest identities
+are delegated by a separate Role. No new controller, network permission, Pod
+admission exception or application ingress is created by Redis secret delivery.
+TLS and the closed Redis workload require separate commissioning evidence.
+
 ADR-0002 also permits only the cert-manager API-callback webhook Pod in
 `cnpg-system` outside Ambient. `render_cert_manager_candidate.py` renders the
 three signed certificate components, restricted namespace-local Roles, internal

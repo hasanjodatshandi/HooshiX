@@ -21,15 +21,15 @@ def require(value, reason):
         raise ValueError(reason)
 
 
-def credentials(api, root):
+def credential_values(api, root, *, delivery=contract):
     """Whole-set preflight and create-only CAS; reentry never rotates or adopts a foreign value."""
     values, missing = {}, []
-    for name, item in contract.ENTRIES.items():
+    for name, item in delivery.ENTRIES.items():
         value = api.call('hooshix/data/' + item['key'], token=root, expected=(200, 404))
         if value:
             raw = value['data']['data']
             require(set(raw) == {'username', 'password', 'managed_by', 'installation_id'}
-                and raw['username'] == item['username'] and raw['managed_by'] == contract.MANAGER
+                and raw['username'] == item['username'] and raw['managed_by'] == delivery.MANAGER
                 and raw['installation_id'] == 'hooshix-production'
                 and isinstance(raw['password'], str) and re.fullmatch(r'[A-Za-z0-9_-]{64}', raw['password']),
                 'PG_SECRET_FOREIGN_CREDENTIAL_PRESERVED')
@@ -37,17 +37,26 @@ def credentials(api, root):
             require(not api.call('hooshix/metadata/' + item['key'], token=root, expected=(200, 404)),
                     'PG_SECRET_DELETED_HISTORY_PRESERVED')
             raw = {'username': item['username'], 'password': secrets.token_urlsafe(48),
-                   'managed_by': contract.MANAGER, 'installation_id': 'hooshix-production'}
+                   'managed_by': delivery.MANAGER, 'installation_id': 'hooshix-production'}
             missing.append(name)
         values[name] = raw
-    require(len({v['password'] for v in values.values()}) == len(contract.ENTRIES),
+    require(len({v['password'] for v in values.values()}) == len(delivery.ENTRIES),
             'PG_SECRET_DISTINCT_PASSWORDS_REQUIRED')
+    return values, missing
+
+
+def persist_credentials(api, root, values, missing, *, delivery=contract):
     for name in missing:
-        api.call('hooshix/data/' + contract.entry(name)['key'], 'POST',
+        api.call('hooshix/data/' + delivery.entry(name)['key'], 'POST',
                  {'options': {'cas': 0}, 'data': values[name]}, root)
-    for name, item in contract.ENTRIES.items():
+    for name, item in delivery.ENTRIES.items():
         require(api.call('hooshix/data/' + item['key'], token=root)['data']['data'] == values[name],
                 'PG_SECRET_CREDENTIAL_READBACK_FAILED')
+
+
+def credentials(api, root, *, delivery=contract):
+    values, missing = credential_values(api, root, delivery=delivery)
+    persist_credentials(api, root, values, missing, delivery=delivery)
     return values
 
 
