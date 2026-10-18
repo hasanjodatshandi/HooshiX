@@ -2030,6 +2030,56 @@ remount، UUID غلط، readonly، backing loss، unmount و ممنوعیت fall
 حذف داده یا ساخت Redis/PVC/Secret انجام نمی‌شود. فضای OpenBao و PostgreSQL و
 قواعد admission فعلی باید حفظ شوند. این رزرو به‌تنهایی مجوز اجرای Redis نیست.
 
+فضای ۸ GiB و guard این نصب روی مقصد `Passed` شده‌اند. حجم رزرو Kubernetes
+**۷ GiB** از همان فایل‌سیستم است تا سربار ext4 و فضای رزرو filesystem لحاظ شود،
+نه تخصیص دیسک جدید. ابزار `install_redis_local_volume.py` فقط این دو منبع را
+ایجاد می‌کند و هر دو را پیش از اولین نوشتن از نظر تضاد بررسی می‌کند:
+
+- StorageClass: `hooshix-redis-local`، بدون provisioner پویا، غیر default،
+  `Retain`، `WaitForFirstConsumer` و بدون expansion.
+- PV: `hooshix-redis-local-7gib`، مسیر `/var/lib/hooshixstorage/redis/data`،
+  UID/GID `10001` و nodeAffinity دقیق `hooshix-production-1`، رزروشده فقط برای
+  claim آیندهٔ `platform-data/data-security-redis-0`؛ `Prune=confirm`.
+
+guard نصب‌شده باید با منبع بررسی‌شده منطبق و سالم باشد؛ هر سه guard باید به
+K3s متصل بمانند، audit فعال و بدون lost record باشد و data مخصوص Redis هنوز
+خالی باشد. وجود PostgreSQL/ESO در namespace طبیعی است؛ namespace خالی یا حذف
+دادهٔ PostgreSQL درخواست نمی‌شود. claimهای Bound قبلی OpenBao و PostgreSQL و
+قانون fail-closed فعلی داده قبل/بعد یکسان می‌مانند؛ admission برای Redis باز
+نمی‌شود. منبع خارجی، تغییرکرده، Bound یا Released adopt/overwrite نمی‌شود.
+
+پس از baseline موفق همان درخت کد، از checkout تمیز main بستهٔ عمومی را بسازید:
+
+```bash
+python3 scripts/production/build_redis_local_volume_bundle.py \
+  --native-run <successful-exact-tree-baseline-run> \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-redis-local-volume-YYYYMMDD
+```
+
+builder هم‌زمان `redis-storage` و `openbao-kubernetes` همان attempt را از GitHub
+می‌گیرد و hash منبع، UID `10001`، freshness و native API/mount/Retain را تطبیق
+می‌دهد؛ رسید نوشته‌شده با دست جایگزین آن نیست. fixture، رزرو، رد claim اشتباه،
+پایداری روی همان PVC، nodeAffinity و نگه‌داشتن داده بعد از حذف claim را فقط در
+کلاستر دورریختنی می‌آزماید. هیچ فایل‌سیستم مقصدی برای این آزمون پاک نمی‌شود.
+
+در PowerShell با VNC و نشست دوم SSH آماده، فقط رمز sudo همان‌جا لازم است:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-local-volume-YYYYMMDD\run-redis-local-volume.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-local-volume-YYYYMMDD\run-redis-local-volume.ps1' -RescueAndSecondSessionReady
+```
+
+نتیجهٔ مورد انتظار: `REDIS_LOCAL_VOLUME=Passed` و `PUBLIC_RECEIPT` با
+`capacity_bytes=7516192768`، `existing_storage_host_services=Preserved`،
+`admission=Unchanged` و `redis/pvc/secret_delivery=Not run`.
+خطا یا تضاد، حالت جزئی را نگه می‌دارد و هیچ delete/patch/force/فرمت خودکاری ندارد؛
+ابتدا همان receipt عمومی بررسی شود. حذف PV برای رفع خطا یا تغییر claimRef مجاز
+نیست. مسیر سرور دوم باید از منبع بررسی‌شدهٔ همان نصب ساخته شود.
+گام بعد TLS/ACL و تحویل از OpenBao/ESO و سپس workload بستهٔ Redis است؛
+نبود Redis/PVC در این مرحله طبیعی است و Stage10 هنوز `Not verified` است.
+
+مرجع: [Kubernetes PV reservation](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
