@@ -1878,6 +1878,9 @@ Production یا تعویق پارس‌پک با این نتیجه عبور نک�
 
 ### انتشار candidate امضاشدهٔ Redis
 
+مالک انتشار public یا private را فقط برای همین تصویر زیرساخت Redis تأیید کرده
+است؛ این استثنا شامل کد، اسرار یا تصاویر محصول HooshiX نیست.
+
 انتشار Redis گام بعد از آزمون محلی است. ابزار
 `scripts/production/publish_redis_candidate.py` فقط در dispatch حفاظت‌شدهٔ
 `production-release.yml` روی `main` و با baseline موفق همان SHA اجرا می‌شود.
