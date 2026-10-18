@@ -1,11 +1,13 @@
 """Private Redis publication cannot grant deployment or sign an unverified image."""
 import json
+import io
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from contextlib import redirect_stdout
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import publish_redis_candidate as target
@@ -130,8 +132,11 @@ class RedisPublicationTest(unittest.TestCase):
                     with self.assertRaises(subprocess.CalledProcessError): target.package_visibility(allow_missing=True)
                 with self.assertRaises(subprocess.CalledProcessError): target.package_visibility()
         for visibility in ('public', 'internal', '', 'private\npublic'):
-            with patch.object(target, 'run', return_value=visibility), self.assertRaises(ValueError):
-                target.package_visibility(allow_missing=True)
+            output = io.StringIO()
+            with patch.object(target, 'run', return_value=visibility), redirect_stdout(output):
+                with self.assertRaises(ValueError): target.package_visibility(allow_missing=True)
+            actual = visibility if visibility in ('public', 'internal') else 'invalid'
+            self.assertEqual('REDIS_PACKAGE_VISIBILITY=Rejected; actual=' + actual + '; required=private\n', output.getvalue())
 
     def test_truthful_runtime_repack_provenance_and_fixed_private_destination(self):
         predicate = target.source_predicate(self.revision, 'github:123:1')
@@ -144,7 +149,8 @@ class RedisPublicationTest(unittest.TestCase):
         self.assertEqual(4, len(definition['resolvedDependencies']))
         self.assertEqual(64, len(parameters['recipe_sha256']))
         self.assertEqual(64, len(parameters['dockerfile_sha256']))
-        self.assertEqual('ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-private', target.REPOSITORY)
+        self.assertEqual('ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-v2-private', target.REPOSITORY)
+        self.assertEqual('users/hasanjodatshandi/packages/container/hooshix%2Fplatform-security-redis-v2-private', target.PACKAGE_API)
 
     def test_release_dispatch_keeps_existing_signer_privileges_and_no_production_credentials(self):
         root = Path(__file__).resolve().parents[3]

@@ -1881,9 +1881,15 @@ Production یا تعویق پارس‌پک با این نتیجه عبور نک�
 انتشار Redis گام بعد از آزمون محلی است. ابزار
 `scripts/production/publish_redis_candidate.py` فقط در dispatch حفاظت‌شدهٔ
 `production-release.yml` روی `main` و با baseline موفق همان SHA اجرا می‌شود.
-مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-private` است؛
-وجود package عمومی یا internal عملیات را رد می‌کند. ابزار visibility را تغییر
+مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-v2-private` است؛
+وجود package عمومی یا internal عملیات را رد می‌کند؛ تغییر نام مخزن پروژه یا
+داشتن پسوند `private` این کنترل را جایگزین نمی‌کند. ابزار visibility را تغییر
 نمی‌دهد. فقط 404 پیش از اولین push می‌تواند نبود package باشد؛ 401/403 خطاست.
+مقصدهای دیگر، از جمله نام بدون `v2`، adopt نمی‌شوند. package عمومی در GitHub
+قابل برگشت به private نیست؛ آن را حذف نکنید و اجازهٔ public شدن مقصد تازه را
+ندهید. پیام `REDIS_PACKAGE_VISIBILITY` فقط وضعیت محدود `public`، `internal` یا
+`invalid` را برای تشخیص رد کنترل نشان می‌دهد، نه token یا پاسخ خام. پس از رد،
+همان run را بدون اصلاح علت تکرار نکنید؛ هیچ امضای موفقی از این نتیجه استنباط نمی‌شود.
 
 از checkout آنلاین با GitHub CLI احرازشده، پس از merge و موفقیت baseline همان main:
 
@@ -1922,6 +1928,8 @@ SLSA v1 با نوع صادقانهٔ `patched-upstream-runtime-build` و Cyclone
 مقصد، بازیابی و ظرفیت **Not verified** می‌ماند. تعویق پارس‌پک تغییری نمی‌کند.
 
 مرجع: [Cosign signing and verification](https://github.com/sigstore/cosign).
+تنظیم visibility مستقل package از مخزن:
+[GitHub package visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
 
 پس از آن ادامهٔ مشترک:
 
