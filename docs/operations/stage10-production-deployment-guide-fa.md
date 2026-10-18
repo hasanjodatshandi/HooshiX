@@ -1868,9 +1868,9 @@ AOF و عدم نشت رمز/hash در log باید **Passed** باشند. این
 فقط پس از همهٔ کنترل‌ها، `candidate.json` با `scan=Passed` و نتیجهٔ native
 ساخته می‌شود. local image ID، configuration digest، hash دستور ساخت و hash
 شواهد جداگانه ثبت می‌شوند؛ این شناسه‌ها با digest رجیستری یکی فرض نمی‌شوند.
-امضا/انتشار، admission و Ambient، storage پایدار، تحویل OpenBao/ESO، گواهی معتبر
-مقصد، سازگاری TLS برنامه‌ها، ظرفیت و نصب Redis روی VPS هنوز **Not run/Not verified**
-هستند. فایل config یا تصویر candidate را مستقیم روی VPS اجرا نکنید؛ هیچ gate
+این آزمون محلی به‌تنهایی امضا/انتشار، admission و Ambient، storage پایدار، تحویل
+OpenBao/ESO، گواهی معتبر مقصد، سازگاری TLS برنامه‌ها، ظرفیت یا نصب Redis روی VPS
+را تأیید نمی‌کند. فایل config یا تصویر candidate را مستقیم روی VPS اجرا نکنید؛ هیچ gate
 Production یا تعویق پارس‌پک با این نتیجه عبور نکرده است.
 
 مراجع رسمی: [Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
@@ -1935,6 +1935,94 @@ SLSA v1 با نوع صادقانهٔ `patched-upstream-runtime-build` و Cyclone
 مرجع: [Cosign signing and verification](https://github.com/sigstore/cosign).
 تنظیم visibility مستقل package از مخزن:
 [GitHub package visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
+
+### فضای مستقل Redis
+
+فضای AOF باید از OpenBao و PostgreSQL جدا و دارای guard فعال باشد؛ موفقیت انتشار
+تصویر به معنی وجود volume، Secret یا Redis روی مقصد نیست. این مرحله هیچ برنامه‌ای
+را به Redis متصل نمی‌کند و اندازهٔ دیسک جای آزمون ظرفیت حافظه را نمی‌گیرد.
+
+تصویر منتشرشدهٔ این نصب در run `39109666003`، attempt `1`، از revision
+`13613b929846726699580cf51c58ffa441637489` تولید و با امضا، provenance و SBOM
+تأیید شده است؛ برای ادامه آن را دوباره نسازید:
+
+```text
+ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-v2-private@sha256:b7013f0a95c584029fcfe89810f366060302a5d5bf130d02a5292a0fe6326c14
+```
+
+configuration digest آن
+`sha256:cdc587b3dc307b153d4dc16c9631c88e26e8f363de150392696c8711c6bfd6e5`
+و SHA-256 رسید `publication.json` برابر
+`6da911a1043a42ffd64b9592017a0b614cf3f373baea3c55a675285736db27be` است؛
+این دو شناسه جای manifest digest بالا نیستند. شواهد در
+`redis-publication-39109666003-1` قرار دارند. بستهٔ storage تصویر را اجرا یا تغییر
+نمی‌دهد و هنوز مجوز اجرای workload نیست.
+
+بستهٔ storage از `provision_redis_storage.py` و موتور موجود
+`provision_openbao_storage.py` استفاده می‌کند؛ globals و مسیرها مستقل‌اند.
+پیش‌نیاز این مرحله وجود و سلامت **هر دو** فضای OpenBao و PostgreSQL، فعال‌بودن
+SSH/WireGuard/auditd/K3s و هر دو guard، و باقی‌ماندن حداقل ۳۰٪ فضای root پس از
+تخصیص است. PostgreSQL می‌تواند در حال کار باشد؛ namespace داده نباید خالی شود.
+ابزار Secret یا محتوای دیتابیس موجود را نمی‌خواند.
+
+پس از تأیید مالک برای اندازهٔ ثابت **۸ GiB** و موفقیت baseline دقیق درخت کد،
+از checkout تمیز `main` و GitHub CLI احرازشده، بسته را بیرون پروژه بسازید:
+
+```bash
+python3 scripts/production/build_redis_storage_bundle.py \
+  --native-run <successful-exact-tree-baseline-run> \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-redis-storage-YYYYMMDD
+```
+
+artifact `redis-storage-<run>-<attempt>` باید متعلق به baseline موفق همین مخزن،
+همین درخت، حداکثر پنج روزه و شامل تمام نتایج native guard باشد؛ فایل ادعایی یا
+رسید متعلق به profile دیگر پذیرفته نیست. بسته شامل کد عمومی، hash و رسید CI است،
+نه رمز یا snapshot. در PowerShell ابتدا فقط صحت فایل‌ها را بررسی کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-storage-YYYYMMDD\run-redis-storage.ps1' -ValidateOnly
+```
+
+انتظار: `REDIS_STORAGE_BUNDLE=Validated; no remote execution`.
+با VNC قابل ورود و نشست دوم private SSH باز، فقط پس از تأیید اندازه اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-storage-YYYYMMDD\run-redis-storage.ps1' -RescueAndSecondSessionReady
+```
+
+`READY` را با صفحه‌کلید انگلیسی وارد کنید و رمز sudo را فقط در همان پنجره بدهید؛
+token، رمز custody یا CA لازم نیست. `-ValidateOnly` هرگز sudo/SSH اجرا نمی‌کند.
+بسته برای alias فعلی `hooshix-server` و hostname `mail.hooshix.com` بسته شده؛
+برای سرور دوم، bindingهای میزبان، alias و نسخهٔ ابزارهای OS را در تغییر مستقل
+بررسی کنید، نه با دورزدن کنترل مقصد یا کپی دادهٔ سرور اول.
+
+عملیات فقط فایل **جدید** `/var/lib/hooshixstorage/redis.ext4` را کامل رزرو و ext4
+می‌کند، آن را روی `/var/lib/hooshixstorage/redis` با
+`nosuid,nodev,noexec,noatime,errors=remount-ro` سوار و data را به UID/GID `10001`
+می‌دهد. هیچ دیسک/block device یا فایل موجودی فرمت نمی‌شود. guard مستقل
+`hooshix-redis-storage-guard.service` ابتدا سالم فعال می‌شود و سپس drop-in
+`34-hooshix-redis-storage.conf` به وابستگی K3s اضافه می‌شود؛ فایل‌های دو guard
+قدیمی تغییر نمی‌کنند. سرویس، PID و هویت فایل‌های storage قبلی قبل/بعد مقایسه
+می‌شوند؛ نصب package، restart، reboot، PV/PVC یا Redis انجام نمی‌شود.
+
+انتظار پس از اجرای موفق مقصد: `REDIS_STORAGE=Passed` و مسیر `PUBLIC_RECEIPT`؛
+رسید باید `runtime_uid=10001`، `backing_bytes=8589934592`،
+`storage_guard=Passed`، `existing_storage_host_services=Preserved` و
+`k3s_restart_performed=false` داشته باشد. این نتیجه فقط storage است:
+`redis`، `persistent_volume` و `secret_delivery` هنوز `Not run` و دسترسی `CLOSED` است.
+
+شکست جزئی چیزی را خودکار حذف/فرمت/تکرار نمی‌کند؛ رسید عمومی را نگه دارید و علت
+را اصلاح کنید. اگر دادهٔ Redis از قبل حاضر باشد، ابزار foundation ادامه نمی‌دهد.
+در خرابی storage، guard شروع K3s را رد یا سرویس K3s را متوقف می‌کند؛ **همهٔ
+containerهای موجود الزاماً متوقف نمی‌شوند** و bind موجود می‌تواند فایل‌سیستم
+قدیمی را نگه دارد. recovery/re-arm باید صریح و پس از بررسی هویت mount باشد؛
+guard/drop-in را برای بالا آمدن سرویس حذف نکنید. native CI سناریوهای ENOSPC،
+remount، UUID غلط، readonly، backing loss، unmount و ممنوعیت fallback به root را
+روی fixture دورریختنی ۶۴ MiB اجرا می‌کند، نه روی VPS.
+آزمون reboot/fault مقصد، TLS/ACL/ESO و نصب Redis، سازگاری برنامه، ظرفیت هم‌زمان
+و recovery مستقل باقی‌اند؛ Stage10/Production هنوز `Not verified` است.
+
+مرجع رفتار وابستگی: [systemd unit dependencies](https://www.freedesktop.org/software/systemd/man/259/systemd.unit.html).
 
 پس از آن ادامهٔ مشترک:
 
