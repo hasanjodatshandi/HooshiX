@@ -1,4 +1,4 @@
-"""Private Redis publication cannot grant deployment or sign an unverified image."""
+"""Redis-only visibility approval cannot grant deployment or sign an unverified image."""
 import json
 import io
 import subprocess
@@ -23,7 +23,7 @@ class RedisPublicationTest(unittest.TestCase):
             'GITHUB_SHA': self.revision, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1',
             'RELEASE_KIND': 'redis-candidate'}
 
-    def execute(self, directory, reject=None):
+    def execute(self, directory, reject=None, visibility='private'):
         steps, commands = [], []
 
         def resolution(path):
@@ -37,7 +37,7 @@ class RedisPublicationTest(unittest.TestCase):
             commands.append(argv)
             if argv[0] == 'git': return self.revision
             if argv[0] == 'gh':
-                return 'public' if reject == 'visibility' or reject == 'visibility-after-sign' and 'sign' in steps else 'private'
+                return 'internal' if reject == 'visibility' or reject == 'visibility-after-sign' and 'sign' in steps else visibility
             if argv[0] == 'syft': resolution(Path(argv[-1].removeprefix('syft-json=')))
             if argv[:4] == ['docker', '--host', 'unix:///captured.sock', 'push'] and reject == 'push':
                 raise subprocess.CalledProcessError(1, argv)
@@ -80,7 +80,7 @@ class RedisPublicationTest(unittest.TestCase):
                     self.assertNotIn('sign', steps)
             else:
                 result = target.publish(directory, self.env)
-                self.assertEqual('private', result['registry_visibility'])
+                self.assertEqual(visibility, result['registry_visibility'])
                 self.assertEqual('Passed', result['signature_provenance_sbom'])
                 self.assertEqual(self.config, result['image_configuration_digest'])
                 for key in ('staging', 'runtime_admission', 'deployment'):
@@ -97,6 +97,10 @@ class RedisPublicationTest(unittest.TestCase):
         self.assertEqual(self.engine, tag[4])
         self.assertEqual(target.REPOSITORY + ':candidate-' + self.revision + '-github-123-1', tag[5])
         self.assertEqual(1, sum(argv[:4] == ['docker', '--host', 'unix:///captured.sock', 'push'] for argv in commands))
+
+    def test_owner_approved_public_redis_still_requires_all_scans_and_signatures(self):
+        with tempfile.TemporaryDirectory() as parent:
+            self.execute(Path(parent) / 'attempt', visibility='public')
 
     def test_partial_failures_never_emit_success_or_sign_unclean_image(self):
         for reject in ('visibility', 'build-native', 'push', 'config', 'manifest', 'scan',
@@ -124,21 +128,21 @@ class RedisPublicationTest(unittest.TestCase):
             target.publish(Path(parent), self.env)
         build.assert_not_called()
 
-    def test_only_actual_404_can_be_missing_and_only_private_is_accepted(self):
+    def test_only_actual_404_can_be_missing_and_unapproved_visibility_is_rejected(self):
         for code in (404, 401, 403):
             with patch.object(target, 'run', side_effect=subprocess.CalledProcessError(1, ['gh'], stderr=f'(HTTP {code})')):
                 if code == 404: self.assertIsNone(target.package_visibility(allow_missing=True))
                 else:
                     with self.assertRaises(subprocess.CalledProcessError): target.package_visibility(allow_missing=True)
                 with self.assertRaises(subprocess.CalledProcessError): target.package_visibility()
-        for visibility in ('public', 'internal', '', 'private\npublic'):
+        for visibility in ('internal', '', 'private\npublic'):
             output = io.StringIO()
             with patch.object(target, 'run', return_value=visibility), redirect_stdout(output):
                 with self.assertRaises(ValueError): target.package_visibility(allow_missing=True)
-            actual = visibility if visibility in ('public', 'internal') else 'invalid'
-            self.assertEqual('REDIS_PACKAGE_VISIBILITY=Rejected; actual=' + actual + '; required=private\n', output.getvalue())
+            actual = 'internal' if visibility == 'internal' else 'invalid'
+            self.assertEqual('REDIS_PACKAGE_VISIBILITY=Rejected; actual=' + actual + '; required=private-or-public\n', output.getvalue())
 
-    def test_truthful_runtime_repack_provenance_and_fixed_private_destination(self):
+    def test_truthful_runtime_repack_provenance_and_fixed_redis_only_destination(self):
         predicate = target.source_predicate(self.revision, 'github:123:1')
         definition = predicate['buildDefinition']
         parameters = definition['externalParameters']

@@ -1878,16 +1878,21 @@ Production یا تعویق پارس‌پک با این نتیجه عبور نک�
 
 ### انتشار candidate امضاشدهٔ Redis
 
+مالک انتشار public یا private را فقط برای همین تصویر زیرساخت Redis تأیید کرده
+است؛ این استثنا شامل کد، اسرار یا تصاویر محصول HooshiX نیست.
+
 انتشار Redis گام بعد از آزمون محلی است. ابزار
 `scripts/production/publish_redis_candidate.py` فقط در dispatch حفاظت‌شدهٔ
 `production-release.yml` روی `main` و با baseline موفق همان SHA اجرا می‌شود.
 مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-v2-private` است؛
-وجود package عمومی یا internal عملیات را رد می‌کند؛ تغییر نام مخزن پروژه یا
-داشتن پسوند `private` این کنترل را جایگزین نمی‌کند. ابزار visibility را تغییر
+فقط `private` یا `public` برای همین مقصد مصوب پذیرفته‌اند؛ `internal` یا وضعیت
+نامعتبر عملیات را رد می‌کند. نام یا پسوند package گواه visibility نیست.
+ابزار visibility را تغییر
 نمی‌دهد. فقط 404 پیش از اولین push می‌تواند نبود package باشد؛ 401/403 خطاست.
 مقصدهای دیگر، از جمله نام بدون `v2`، adopt نمی‌شوند. package عمومی در GitHub
-قابل برگشت به private نیست؛ آن را حذف نکنید و اجازهٔ public شدن مقصد تازه را
-ندهید. پیام `REDIS_PACKAGE_VISIBILITY` فقط وضعیت محدود `public`، `internal` یا
+قابل برگشت به private نیست؛ آن را حذف نکنید. این پذیرش محدود، مجوز تغییر
+visibility هیچ package دیگر یا مخزن محصول نیست.
+پیام `REDIS_PACKAGE_VISIBILITY` فقط وضعیت محدود `internal` یا
 `invalid` را برای تشخیص رد کنترل نشان می‌دهد، نه token یا پاسخ خام. پس از رد،
 همان run را بدون اصلاح علت تکرار نکنید؛ هیچ امضای موفقی از این نتیجه استنباط نمی‌شود.
 
@@ -1913,9 +1918,9 @@ SLSA v1 با نوع صادقانهٔ `patched-upstream-runtime-build` و Cyclone
 می‌گیرد. signer دقیق workflow روی main، OIDC issuer، payload و subject digest
 بررسی می‌شوند؛ رد signer نادرست و کنترل مثبتِ پس از آن الزامی‌اند.
 
-فقط پایان موفق همهٔ مراحل و تأیید دوبارهٔ private بودن، `publication.json` را
+فقط پایان موفق همهٔ مراحل و تأیید دوبارهٔ visibility مصوب، `publication.json` را
 در artifact عمومی `redis-publication-<run_id>-<attempt>` می‌سازد. رسید شامل SHA
-مخزن، invocation، digest رجیستری و config، scan، native و نتیجهٔ امضاست؛ آرشیو
+مخزن، invocation، visibility واقعی، digest رجیستری و config، scan، native و نتیجهٔ امضاست؛ آرشیو
 سورس و fixtureهای رمزی در artifact نیستند. شکست جزئی ممکن است تصویر/attestation
 در رجیستری باقی بگذارد، اما بدون رسید موفق مجوز استفاده نیست و خودکار تکرار
 نمی‌شود. ابتدا run و artifact همان attempt بررسی شوند؛ چیزی روی VPS پاک یا
