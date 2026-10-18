@@ -234,7 +234,9 @@ def rehearse():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ci', required=True, action='store_true')
-    parser.add_argument('--postgresql', action='store_true')
+    profile = parser.add_mutually_exclusive_group()
+    profile.add_argument('--postgresql', action='store_true')
+    profile.add_argument('--redis', action='store_true')
     args = parser.parse_args()
     core = Path(storage.__file__).read_bytes()
     if args.postgresql:
@@ -242,8 +244,16 @@ if __name__ == '__main__':
         storage = postgresql.storage(core)
         storage.require(storage.SIZE == 32 * 1024**3 and storage.DATA_UID == storage.DATA_GID == 26,
                         'POSTGRESQL_PROFILE_REQUIRED')
+    elif args.redis:
+        import provision_redis_storage as redis
+        storage = redis.storage(core)
+        storage.require(storage.SIZE == 8 * 1024**3 and storage.DATA_UID == storage.DATA_GID == 10001,
+                        'REDIS_PROFILE_REQUIRED')
     result = rehearse()
     if args.postgresql:
         result.update(profile='postgresql-32gib', source_sha256=hashlib.sha256(
             Path(postgresql.__file__).read_bytes()).hexdigest(), core_sha256=hashlib.sha256(core).hexdigest())
+    elif args.redis:
+        result.update(profile='redis-8gib', source_sha256=hashlib.sha256(
+            Path(redis.__file__).read_bytes()).hexdigest(), core_sha256=hashlib.sha256(core).hexdigest())
     print(json.dumps(result, sort_keys=True))
