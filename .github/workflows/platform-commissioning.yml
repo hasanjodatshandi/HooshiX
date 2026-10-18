@@ -267,6 +267,18 @@ jobs:
           export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
           python3 scripts/production/verify_published_postgresql.py \
             --evidence-dir "$RUNNER_TEMP/postgresql-publication" --output-dir "$RUNNER_TEMP/postgresql-acceptance"
+      - name: Retain fresh public image scans and acceptance receipts only
+        if: ${{ always() && (github.event_name == 'pull_request' || inputs.cert_manager_commissioning || inputs.cnpg_control_plane || inputs.barman_control_plane || inputs.postgresql_quarantine) }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: platform-image-reacceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/cert-manager-acceptance/acceptance.json
+            ${{ runner.temp }}/cert-manager-acceptance/*/registry/*.json
+            ${{ runner.temp }}/postgresql-acceptance/acceptance.json
+            ${{ runner.temp }}/postgresql-acceptance/*/registry/*.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Rehearse exact private images with real Calico Ambient and fail-closed Kyverno
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -982,9 +982,17 @@ PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_pu
   --output-dir /path/outside-repo/postgresql-acceptance-new
 ```
 
-مسیرها نمونه‌اند؛ هر بار پوشهٔ خروجی تازه انتخاب کنید. ابزار ابتدا hash receipt،
-کل مجموعه، manifest/config، inventory کامل و سن کمتر از ۵ روز دیتابیس Grype
-artifact را بررسی می‌کند؛ این بازخوانی scan موجود است، نه اسکن تازهٔ image.
+مسیرها نمونه‌اند؛ هر بار پوشهٔ خروجی تازه انتخاب کنید. ابزار ابتدا hash receipt و
+کل مجموعه را بررسی می‌کند، سپس **همان digestهای منتشرشده** را با Syft/Grype
+مصوب و دیتابیس به‌روز دوباره اسکن می‌کند. manifest/config، inventory کامل،
+نبود exclusion/suppression برای High/Critical و سقف پنج‌روزهٔ دیتابیس حفظ می‌شود.
+scan قدیمیِ artifact جای scan تازه نیست و منقضی‌شدن آن نیاز به rebuild یا امضای
+مجدد تصویر ندارد. گزارش تازه زیر `<output>/<component>/registry` می‌ماند و hash
+پنج فایل آن در `scan_evidence_sha256` رسید پذیرش ثبت می‌شود؛ artifact انتشار
+و SBOM امضاشدهٔ اصلی تغییر نمی‌کنند.
+در CI، فقط JSONهای inventory/scan عمومی این digestها و رسید پذیرش در artifact
+`platform-image-reacceptance-<run>-<attempt>` نگه داشته می‌شوند؛ log یا فایل fixture،
+credential و cache شخصی در آن نیست. artifact محتوای‌زدودهٔ runtime جدا می‌ماند.
 برای trust فقط mirror رسمی مصوب `https://sigstore.github.io/root-signing` را با
 ریشهٔ embedded خود Cosign و cache تازه زیر پوشهٔ خروجی initialize می‌کند. root
 جایگزین، staging trust یا skip verification ندارد؛ تنظیمات trust محیط و cache
@@ -1004,8 +1012,9 @@ forced RLS/context اجرا می‌شود؛ container همان آزمون در �
 `acceptance.json` در پوشهٔ تازه است. فقط native smoke/SQL را ثابت می‌کند، نه
 CNPG reconciliation، admission، staging، physical recovery یا نصب مقصد.
 شکست جزئی receipt موفق تولید نمی‌کند؛ inputها و شواهد موجود پاک نمی‌شوند.
-اگر scan منقضی بود، آن را Passed فرض نکنید؛ بازاسکن و بررسی انتشار مربوط به
-همین digestها لازم است. موفقیت این بخش گیت‌های نصب یا defer پارس‌پک را دور نمی‌زند.
+اگر بازاسکن جاری شکست خورد، آن را Passed فرض نکنید؛ گزارش تازهٔ همان digest
+بررسی شود. هیچ clock backdate، افزایش سن مجاز یا نادیده‌گرفتن High/Critical
+وجود ندارد. موفقیت این بخش گیت‌های نصب یا defer پارس‌پک را دور نمی‌زند.
 
 مرجع trust و cache: [Cosign 3.0.6 initialize](https://github.com/sigstore/cosign/blob/v3.0.6/cmd/cosign/cli/initialize/init.go).
 
@@ -1112,6 +1121,10 @@ python3 scripts/production/verify_published_cert_manager.py \
 در cache تازهٔ همان output استفاده می‌شود؛ cache یا trust میزبان تغییر نمی‌کند.
 بعد از تأیید امضای کل مجموعه، فقط همان سه digest pull و با non-root، شبکهٔ
 خاموش، filesystem فقط‌خواندنی و محدودیت منابع `--help` اجرا می‌شوند.
+اسکن جاری هر بار از همان سه digest با ابزارهای مصوب و دیتابیس به‌روز تولید
+می‌شود؛ scan پنج‌روز گذشتهٔ artifact دوباره به‌عنوان شواهد تازه پذیرفته نمی‌شود.
+گزارش‌ها در `<output>/<component>/registry` و hash آن‌ها در
+`scan_evidence_sha256` باقی می‌مانند؛ publication و attestation اصلی دست‌نخورده‌اند.
 
 اجرای مستقل روی میزبان توسعه در `2026-10-13T14:36:06Z`، امضا/SLSA/SBOM،
 رد signer غلط و smoke محدود هر سه digest را با **Passed** ثبت کرده است.

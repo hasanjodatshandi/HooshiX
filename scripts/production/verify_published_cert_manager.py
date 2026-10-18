@@ -15,6 +15,7 @@ from build_patched_platform import published_image
 from publish_cert_manager_candidates import repository, source_predicate
 from publish_openbao_candidate import run, verify_payload
 from verify_openbao_artifact import load
+from verify_postgresql_artifacts import scan_inventory
 from verify_published_postgresql import cosign
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
 from render_platform_admission import SIGSTORE_TUF_MIRROR
@@ -56,14 +57,19 @@ def verify(directory, output):
     if (publication != selected['publication']
             or hashlib.sha256((directory / 'publication.json').read_bytes()).hexdigest() != selected['publication_sha256']):
         raise ValueError('exact reviewed public receipt required')
-    now = datetime.now(timezone.utc)
+    output.mkdir(mode=0o700)  # Fresh attempt; never overwrite publication or prior acceptance.
+    scan_evidence = {}
     for component, image in publication['images'].items():
-        folder = directory / component / 'registry'
+        print('CERT_MANAGER_ACCEPTANCE_STEP=' + component + '-scan', flush=True)
+        folder = output / component / 'registry'
+        folder.mkdir(mode=0o700, parents=True)
         config = publication['image_config_digests'][component]
-        validate_inventory(folder, component, image, now, config)
+        scan_inventory(folder, image, 'registry')
+        validate_inventory(folder, component, image, datetime.now(timezone.utc), config)
         if published_image(repository(component), load(folder / 'syft.json')['source'], config) != image:
-            raise ValueError('exact registry manifest/config required')
-    output.mkdir(mode=0o700)
+            raise ValueError('exact reviewed registry manifest/config required')
+        scan_evidence[component] = {name: hashlib.sha256((folder / name).read_bytes()).hexdigest()
+            for name in ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json', 'scanner-config.json')}
     cache = output.resolve() / 'sigstore-tuf'
     if not re.search(r'(?<![\w.])v3\.0\.6(?![\w.])', cosign(['version'], cache)):
         raise ValueError('pinned Cosign required')
@@ -103,7 +109,7 @@ def verify(directory, output):
         'publication_sha256': selected['publication_sha256'], 'repository_revision': publication['repository_revision'],
         'invocation_id': publication['invocation_id'], 'images': publication['images'],
         'image_config_digests': publication['image_config_digests'], 'local_engine_digests': engines,
-        'scan': 'Passed', 'signature_provenance': 'Passed', 'wrong_signer': 'Passed', 'native_entrypoints': 'Passed',
+        'scan': 'Passed', 'scan_evidence_sha256': scan_evidence, 'signature_provenance': 'Passed', 'wrong_signer': 'Passed', 'native_entrypoints': 'Passed',
         'certificate_issuance': 'Not verified', 'staging': 'Not verified', 'runtime_admission': 'Not verified',
         'deployment': 'Not verified', 'production_promotion': 'Not verified'}
     (output / 'acceptance.json').write_text(json.dumps(result, indent=2) + '\n')

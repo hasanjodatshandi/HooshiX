@@ -82,7 +82,19 @@ class PublishedPostgreSQLTest(unittest.TestCase):
             if path.name == 'syft.json': return {'source': {'component': path.parent.parent.name}}
             if path.name == 'cyclonedx.json': return {'bomFormat': 'CycloneDX', 'components': [{}]}
             raise AssertionError('unexpected evidence read')
+        refreshed = []
+        def refresh(folder, image, source):
+            component = next(c for c, value in self.publication['images'].items() if value == image)
+            self.assertEqual(output / component / 'registry', folder)
+            self.assertEqual('registry', source)
+            self.assertTrue(folder.is_dir())
+            if reject == 'fresh-scan': raise subprocess.CalledProcessError(2, ['grype'])
+            for name in ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json', 'scanner-config.json'):
+                (folder / name).write_text(json.dumps({'fresh': component, 'file': name}) + '\n')
+            refreshed.append(component)
         def scan(folder, component, image, now, config):
+            self.assertIn(component, refreshed)
+            self.assertEqual(output / component / 'registry', folder)
             self.assertEqual(self.publication['images'][component], image)
             self.assertEqual(self.publication['image_config_digests'][component], config)
             scans.append(component)
@@ -150,6 +162,7 @@ class PublishedPostgreSQLTest(unittest.TestCase):
         with patch.object(target, 'candidate', return_value=self.selected), \
                 patch.object(target, 'load', side_effect=read), \
                 patch.object(target, 'validate_inventory', side_effect=scan), \
+                patch.object(target, 'scan_inventory', side_effect=refresh), \
                 patch.object(target, 'published_image', side_effect=lambda repo, source, config:
                              self.publication['images'][source['component']]), \
                 patch.object(target, 'run', side_effect=native), \
@@ -161,10 +174,15 @@ class PublishedPostgreSQLTest(unittest.TestCase):
                 with self.assertRaises((ValueError, RuntimeError, OSError, subprocess.SubprocessError)):
                     target.verify(evidence, output)
                 self.assertFalse((output / 'acceptance.json').exists())
-                if reject in ('receipt', 'scan', 'existing-output'): self.assertFalse(calls or smokes or sql)
+                if reject in ('receipt', 'scan', 'fresh-scan', 'existing-output'): self.assertFalse(calls or smokes or sql)
             else:
                 result = target.verify(evidence, output)
                 self.assertEqual(result, json.loads((output / 'acceptance.json').read_text()))
+                self.assertEqual(set(self.publication['images']), set(refreshed))
+                for component, hashes in result['scan_evidence_sha256'].items():
+                    self.assertEqual(5, len(hashes))
+                    for name, digest in hashes.items():
+                        self.assertEqual(hashlib.sha256((output / component / 'registry' / name).read_bytes()).hexdigest(), digest)
                 for name in ('signature_provenance', 'wrong_signer', 'native_entrypoints', 'native_database_isolation'):
                     self.assertEqual('Passed', result[name])
                 for name in ('staging', 'runtime_admission', 'physical_recovery', 'deployment', 'production_promotion'):
@@ -180,7 +198,7 @@ class PublishedPostgreSQLTest(unittest.TestCase):
         self.assertEqual(4, sum(argv[:4] == ['docker', '--host', 'unix:///captured.sock', 'pull'] for argv in calls))
 
     def test_every_partial_failure_preserves_no_success_receipt(self):
-        for reject in ('receipt', 'scan', 'existing-output', 'trust', 'signature', 'predicate', 'subject',
+        for reject in ('receipt', 'scan', 'fresh-scan', 'existing-output', 'trust', 'signature', 'predicate', 'subject',
                        'wrong-signer-accepted', 'pull', 'digest', 'platform', 'root', 'smoke', 'sql'):
             with self.subTest(reject=reject), tempfile.TemporaryDirectory() as parent:
                 self.execute(parent, reject)
