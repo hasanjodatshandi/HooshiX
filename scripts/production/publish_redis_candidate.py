@@ -1,4 +1,4 @@
-"""Publish the reviewed private Redis runtime candidate on protected CI; never deploy."""
+"""Publish the owner-approved Redis infrastructure candidate on protected CI; never deploy."""
 from __future__ import annotations
 
 import argparse
@@ -31,10 +31,11 @@ def package_visibility(*, allow_missing=False):
         if allow_missing and '(HTTP 404)' in (error.stderr or ''):
             return
         raise
-    if visibility != 'private':
-        actual = visibility if visibility in ('public', 'internal') else 'invalid'
-        print('REDIS_PACKAGE_VISIBILITY=Rejected; actual=' + actual + '; required=private', flush=True)
-        raise ValueError('owned Redis package must remain private')
+    # Owner approval covers only the fixed Redis infrastructure destination above.
+    if visibility not in ('private', 'public'):
+        actual = 'internal' if visibility == 'internal' else 'invalid'
+        print('REDIS_PACKAGE_VISIBILITY=Rejected; actual=' + actual + '; required=private-or-public', flush=True)
+        raise ValueError('approved Redis infrastructure package visibility required')
     return visibility
 
 
@@ -110,7 +111,7 @@ def main():
         publish(args.directory, dict(os.environ))
     except (ValueError, KeyError, TypeError, OSError, RuntimeError, subprocess.SubprocessError):
         parser.exit(1, 'REDIS_PUBLICATION=Failed; state retained; no deployment or automatic replay\n')
-    print('REDIS_PUBLICATION=Passed; private signed candidate only; production Not verified')
+    print('REDIS_PUBLICATION=Passed; approved signed Redis infrastructure only; production Not verified')
 
 
 if __name__ == '__main__':
