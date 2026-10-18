@@ -1882,7 +1882,8 @@ Production یا تعویق پارس‌پک با این نتیجه عبور نک�
 `scripts/production/publish_redis_candidate.py` فقط در dispatch حفاظت‌شدهٔ
 `production-release.yml` روی `main` و با baseline موفق همان SHA اجرا می‌شود.
 مقصد ثابت `ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-private` است؛
-وجود package عمومی یا internal عملیات را رد می‌کند. ابزار visibility را تغییر
+وجود package عمومی یا internal عملیات را رد می‌کند؛ تغییر نام مخزن پروژه یا
+داشتن پسوند `private` این کنترل را جایگزین نمی‌کند. ابزار visibility را تغییر
 نمی‌دهد. فقط 404 پیش از اولین push می‌تواند نبود package باشد؛ 401/403 خطاست.
 
 از checkout آنلاین با GitHub CLI احرازشده، پس از merge و موفقیت baseline همان main:
