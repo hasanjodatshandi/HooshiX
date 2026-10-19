@@ -45,11 +45,11 @@ def credential_plan(api, root):
     return values, missing, material, not old
 
 
-def verify_auth(api, root, token_request, audiences):
-    names = list(contract.AUTH_ENTRIES)
+def verify_auth(api, root, token_request, audiences, *, entries=contract.AUTH_ENTRIES):
+    names = list(entries)
     login = 'auth/' + auth.MOUNT + '/login'
-    for i, name in enumerate(names):
-        item = contract.AUTH_ENTRIES[name]
+    for name in names:
+        item = entries[name]
         jwt = token_request(contract.NAMESPACE, item['account'], [*audiences, auth.AUDIENCE])
         session = api.call(login, 'POST', {'role': item['account'], 'jwt': jwt})['auth']
         token = session['client_token']
@@ -58,15 +58,16 @@ def verify_auth(api, root, token_request, audiences):
                 and 0 < session['lease_duration'] <= 300, 'REDIS_SECRET_TOKEN_SCOPE_REJECTED')
             path = 'hooshix/data/' + item['key']
             api.call(path, token=token)
-            for other in names:
+            for other in contract.ALL_AUTH_ENTRIES:
                 if other != name:
-                    api.call('hooshix/data/' + contract.AUTH_ENTRIES[other]['key'], token=token, expected=403)
+                    api.call('hooshix/data/' + contract.ALL_AUTH_ENTRIES[other]['key'], token=token, expected=403)
             for foreign in ('production/postgresql/identity/runtime',
                             'production/notification-service/commissioning-probe'):
                 api.call('hooshix/data/' + foreign, token=token, expected=403)
             api.call(path, 'POST', {'data': {'value': 'denied'}}, token, 403)
             api.call('sys/mounts', token=token, expected=403)
-            api.call(login, 'POST', {'role': contract.AUTH_ENTRIES[names[(i + 1) % len(names)]]['account'],
+            other = next(n for n in contract.ALL_AUTH_ENTRIES if n != name)
+            api.call(login, 'POST', {'role': contract.ALL_AUTH_ENTRIES[other]['account'],
                                     'jwt': jwt}, expected=403)
             for ns, account, requested in [(contract.NAMESPACE, item['account'], audiences),
                     ('default', 'default', [*audiences, auth.AUDIENCE])]:

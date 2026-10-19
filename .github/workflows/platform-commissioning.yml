@@ -13,6 +13,8 @@ on:
       - scripts/production/redis_secret_delivery.py
       - scripts/production/render_redis_acl.py
       - scripts/production/tests/test_redis_secrets.py
+      - scripts/production/*redis*tls*.py
+      - scripts/production/tests/test_redis_tls.py
       - scripts/production/*postgresql*quarantine*.py
       - scripts/production/tests/test_postgresql_quarantine.py
       - scripts/production/run-postgresql-quarantine.ps1

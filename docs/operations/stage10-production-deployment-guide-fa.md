@@ -2162,6 +2162,67 @@ OpenBao را حذف نکنید؛ receipt بدون اسرار بررسی و فق�
 
 مرجع: [ESO Vault Kubernetes auth](https://external-secrets.io/latest/provider/hashicorp-vault/).
 
+### تحویل گواهی اولیهٔ Redis
+
+پس از `REDIS_SECRET_DELIVERY=Passed`، بستهٔ TLS فقط گواهی server و کلید همان Redis
+را از intermediate موجود صادر و از OpenBao به ESO تحویل می‌دهد؛ Redis/PVC، شبکه،
+admission و دسترسی برنامه‌ها را تغییر نمی‌دهد. Root جدید ساخته نمی‌شود و رمزهای
+قبلی یا ACL تعویض نمی‌شوند. cert-manager همچنان فقط در scope قبلی خود کار می‌کند.
+
+پیش‌نیاز: همان checkout تمیز main، custody قابل بازیابی، ESO و شش تحویل قبلی سالم،
+PostgreSQL قرنطینه‌شده با volume دقیق موجود، فضای Redis هنوز رزروشده و بدون PVC،
+audit سالم، VNC و نشست دوم SSH. intermediate رمزدار موجود در scope قبلی
+`istio-system` می‌ماند؛ فقط مالک رمز آن را در ورودی مخفی وارد می‌کند. ابزار روی
+مقصد OpenSSL موجودِ baseline را می‌خواهد؛ نصب یا ارتقای package انجام نمی‌دهد.
+پردازش plaintext کلید leaf فقط در tmpfs خصوصی با **swap غیرفعال مقصد** انجام
+می‌شود؛ ابزار در غیر این صورت متوقف می‌شود، نه اینکه خودش swap یا سرویس‌ها را تغییر دهد.
+
+بستهٔ public و فاقد کلید از main و staging موفق همان tree ساخته شود:
+
+```bash
+python3 scripts/production/build_redis_secrets_bundle.py --tls \
+  --staging-run <successful-platform-staging-run> \
+  --chart /path/outside-repo/eso-2.12.0.tgz --helm /path/to/helm \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-redis-tls-YYYYMMDD
+```
+
+پیش از اتصال، فقط یک بار اعتبارسنجی محلی بسته:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_redis_secrets_operator.py --tls --bundle /mnt/c/Users/Coder/Downloads/HooshiX-redis-tls-YYYYMMDD --validate-only
+```
+
+مالک با VNC قابل ورود و نشست دوم SSH باز اجرا کند:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_redis_secrets_operator.py --tls --bundle /mnt/c/Users/Coder/Downloads/HooshiX-redis-tls-YYYYMMDD --custody /home/coder/.local/share/hooshix-openbao-custody/<existing-custody-id> --rescue-and-second-session-ready
+```
+
+ورودی‌ها به‌ترتیب: `READY`، رمز **موجود custody مربوط به OpenBao**، رمز **موجود
+کلید intermediate**، سپس رمز sudo. هیچ رمز تازه، رمز Root یا token GHCR لازم نیست؛
+هیچ‌کدام را در چت یا argv ننویسید. خروجی مورد انتظار `REDIS_TLS_DELIVERY=Passed`
+و receipt فاقد اسرار زیر `~/.local/share/hooshix-redis-secrets/tls-*.json` است؛ این
+خروجی مورد انتظار به‌معنی اجرای تأییدشده روی سرور دوم یا فعلی نیست.
+
+Secret نوع TLS به نام `platform-data/security-redis-tls` فقط `tls.crt`، `tls.key`
+و `ca.crt` دارد. هویت `eso-redis-tls` فقط leaf دقیق `production/security-redis/tls`
+را می‌خواند و عمر توکن حداکثر پنج دقیقه است؛ Role جداگانه فقط TokenRequest همین
+نام را اضافه می‌کند. شش هویت قبلی و برنامه‌ها کلید leaf جدید را نمی‌خوانند.
+گواهی RSA-3072 و server-only با عمر ۳۰ روز فقط برای `127.0.0.1` و این دو نام است:
+`security-redis.platform-data.svc` و `security-redis.platform-data.svc.cluster.local`.
+کلید intermediate و Root در leaf OpenBao یا Secret جدید ذخیره نمی‌شوند.
+
+در استفادهٔ روزمره ESO هر دقیقه همین leaf را sync می‌کند؛ اجرای مجدد ابزار آن را
+تمدید نمی‌کند. ابزار حداقل هفت روز اعتبار باقی‌مانده می‌خواهد؛ تضاد، سابقهٔ حذف،
+گواهی نامعتبر یا نزدیک انقضا باعث توقف و حفظ حالت می‌شود. برای رفع خطا KV/Secret
+یا CA را حذف نکنید و فرمان را کورکورانه تکرار نکنید. بخش renewal/reload و توقف
+ایمن هنگام انقضا باید در commissioning runtime تکمیل شود؛ تا آن زمان برنامه‌ها
+و Production بسته‌اند. تحویل TLS به‌تنهایی اجرای Redis، backup یا ظرفیت نیست.
+
+مراجع: [OpenSSL 3.5 x509](https://docs.openssl.org/3.5/man1/openssl-x509/)،
+[Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
+و [ESO Vault](https://external-secrets.io/latest/provider/hashicorp-vault/).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

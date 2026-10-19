@@ -536,6 +536,7 @@ scripts/production/bootstrap_postgresql_secrets.py
 scripts/production/bootstrap_postgresql_secrets_operator.py
 scripts/production/bootstrap_redis_secrets.py
 scripts/production/bootstrap_redis_secrets_operator.py
+scripts/production/bootstrap_redis_tls.py
 scripts/production/build_barman_control_plane_bundle.py
 scripts/production/build_cert_manager_candidates.py
 scripts/production/build_cert_manager_commissioning_bundle.py
@@ -568,6 +569,7 @@ scripts/production/install_postgresql_quarantine.py
 scripts/production/install_postgresql_secrets.py
 scripts/production/install_redis_local_volume.py
 scripts/production/install_redis_secrets.py
+scripts/production/install_redis_tls.py
 scripts/production/install_release_tools.sh
 scripts/production/jit_broker.py
 scripts/production/jit_runtime.py
@@ -602,6 +604,7 @@ scripts/production/publish_redis_candidate.py
 scripts/production/readiness.py
 scripts/production/recover_openbao_initialization.py
 scripts/production/redis_secret_delivery.py
+scripts/production/redis_tls_material.py
 scripts/production/rehearsal_probes.py
 scripts/production/rehearse_barman_control_plane.py
 scripts/production/rehearse_cert_manager.py
@@ -617,6 +620,7 @@ scripts/production/rehearse_postgresql_local_volume.py
 scripts/production/rehearse_postgresql_quarantine.py
 scripts/production/rehearse_postgresql_secrets.py
 scripts/production/rehearse_redis_secrets.py
+scripts/production/rehearse_redis_tls.py
 scripts/production/release_supply_chain.sh
 scripts/production/render_barman_control_plane.py
 scripts/production/render_cert_manager_candidate.py
@@ -714,6 +718,7 @@ scripts/production/tests/test_redis_publication.py
 scripts/production/tests/test_redis_secrets.py
 scripts/production/tests/test_redis_security.py
 scripts/production/tests/test_redis_storage.py
+scripts/production/tests/test_redis_tls.py
 scripts/production/tests/test_rehearsal_probes.py
 scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py

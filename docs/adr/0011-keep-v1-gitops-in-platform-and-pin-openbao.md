@@ -217,6 +217,27 @@ audience/namespace negatives, unchanged existing identities/data/mesh/admission,
 and log privacy. TLS issuance, Redis/PVC creation, client Secret projections,
 production capacity and opening traffic are separate unverified operations.
 
+The following bounded Redis TLS bootstrap issues only its first server leaf from
+the existing imported cluster intermediate, as with the initial OpenBao server
+leaf. It does not create/import a new Root, move the intermediate key out of its
+existing encrypted host custody, change Istio's 24-hour workload certificate
+rotation, or broaden cert-manager's `cnpg-system` scope. An owner-local hidden
+intermediate passphrase unlocks signing through a pipe descriptor. A new RSA-3072
+server-only leaf has an exact loopback IP and two Redis service DNS names, a
+30-day lifetime, and no wildcard/client-auth/CA capability. Plaintext leaf work is
+private tmpfs with host swap disabled, removed on exit; issuer material is never
+modified or placed in OpenBao. Only the leaf key/chain/public Root enter one
+create-only KV-v2 leaf and one typed ESO TLS Secret in `platform-data`. A seventh
+exact-leaf identity and a separate one-name TokenRequest Role leave the original
+six bindings and all credentials/ACL unchanged. Reentry validates key/chain/name/
+expiry and never reissues, adopts, overwrites or rotates material. Unknown or
+deleted state stops with all data retained. Native evidence includes encrypted
+issuer use, chain/hostname/usage/key/lifetime negatives, ESO delivery, old-identity
+key-read denials, no-write reentry, initialized-volume preservation and log privacy.
+This initial leaf is not continuous renewal, a Redis workload, application
+permission or Production readiness; renewal/reload/expiry-fail-closed evidence
+remains mandatory before opening traffic.
+
 ### Existing deployment gates
 
 For this unchanged upstream OpenBao import, `openbao-image.json/import_provenance`
