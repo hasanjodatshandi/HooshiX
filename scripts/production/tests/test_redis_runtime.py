@@ -111,7 +111,8 @@ class RedisRuntimeTest(unittest.TestCase):
                     pod['status'] = {'containerStatuses': [{'ready': True}]}
                 return b''
             if args[0] == 'auth': return b'no'
-            if args[0] in ('wait', 'rollout', 'exec'): return b''
+            if args[0] == 'rollout': raise AssertionError('OnDelete is not a RollingUpdate rollout')
+            if args[0] in ('wait', 'exec'): return b''
             raise AssertionError(args)
         def replace(value, **_): put(value)
         return plan, state, writes, kube, replace

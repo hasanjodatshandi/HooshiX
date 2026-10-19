@@ -111,6 +111,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=preserved
         and plan.get('profile') == 'production-single-server'
         and plan.get('application_ingress') == plan.get('public_access') == 'CLOSED'
         and plan.get('production_readiness') == 'Not verified', 'CLOSED_REDIS_PLAN_REQUIRED')
+    print('REDIS_RUNTIME_STEP=preflight', file=sys.stderr, flush=True)
     before, credentials = preserve(kube), secrets(kube, plan['public_ca_sha256'])
     labels = get(kube, 'namespace', NS)['metadata']['labels']
     require(labels.get('istio.io/dataplane-mode') == 'ambient'
@@ -131,6 +132,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=preserved
             'PREVIOUS_DATA_ADMISSION_CONFLICT')
     isolation(plan, kube)
     # Whole-set preflight above precedes any admission, claim or workload write.
+    print('REDIS_RUNTIME_STEP=admission', file=sys.stderr, flush=True)
     for obj, old in zip(desired_objects, existing, strict=True):
         if old or obj['kind'] in ('StatefulSet', 'PersistentVolumeClaim'): continue
         obj = copy.deepcopy(obj)
@@ -146,19 +148,26 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=preserved
              obj['kind'].lower() + '/' + obj['metadata']['name'], '--timeout=60s', timeout=75)
     for obj, old in zip(desired_objects, existing, strict=True):
         if old or obj['kind'] not in ('PersistentVolumeClaim', 'StatefulSet'): continue
+        print('REDIS_RUNTIME_STEP=' + ('claim' if obj['kind'] == 'PersistentVolumeClaim' else 'workload'),
+              file=sys.stderr, flush=True)
         defaulted = json.loads(kube('create', '--dry-run=server', '-f', '-', '-o', 'json', body=obj))
         obj = copy.deepcopy(obj)
         obj['metadata'].setdefault('annotations', {})[HASH] = digest(defaulted['spec'])
         kube('create', '-f', '-', body=obj)
-    kube('-n', NS, 'rollout', 'status', 'statefulset/' + NAME, '--timeout=180s', timeout=195)
+    # OnDelete deliberately has no automatic rollout; kubectl rollout status rejects that strategy.
+    print('REDIS_RUNTIME_STEP=readiness', file=sys.stderr, flush=True)
+    kube('-n', NS, 'wait', '--for=jsonpath={.status.readyReplicas}=1',
+         'statefulset/' + NAME, '--timeout=180s', timeout=195)
     pod = get(kube, 'pod', NAME + '-0', NS)
     current = get(kube, 'statefulset', NAME, NS)
     require(current and pod and pod['spec']['serviceAccountName'] == NAME
+        and desired_fields_match(pod, {'kind': 'Pod', **plan['statefulset']['spec']['template']})
         and pod['spec']['containers'][0]['image'] == plan['image']
         and pod['metadata'].get('labels', {}).get('istio.io/dataplane-mode') == 'ambient'
         and pod['status']['containerStatuses'][0]['ready']
         and any(r['uid'] == current['metadata']['uid'] for r in pod['metadata'].get('ownerReferences', [])),
         'READY_OWNED_REDIS_REQUIRED')
+    print('REDIS_RUNTIME_STEP=verification', file=sys.stderr, flush=True)
     for obj in desired_objects:
         m = obj['metadata']
         owned(get(kube, obj['kind'], m['name'], m.get('namespace')), obj)

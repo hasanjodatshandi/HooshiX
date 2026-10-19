@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import re
+import traceback
 from unittest.mock import patch
 
 import install_redis_runtime as installer
@@ -19,7 +20,14 @@ def rehearse(k, wait, run, ca, node, platform):
     if not re.fullmatch('hooshix-bao-ci-[a-f0-9]{12}-control-plane', node):
         raise ValueError('OWNED_REDIS_FIXTURE_NODE_REQUIRED')
     def kube(*args, body=None, **options):
-        return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+        try:
+            return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+        except Exception as error:
+            # Function/line only: never argv, API/Secret bodies, stderr or exception text.
+            frames = [{'function': f.name, 'line': f.lineno} for f in traceback.extract_tb(error.__traceback__)
+                      if f.filename.endswith(('/install_redis_runtime.py', '/rehearse_redis_runtime.py'))]
+            print('REDIS_RUNTIME_FIXED_FAILURE=' + json.dumps({'type': type(error).__name__, 'frames': frames}), flush=True)
+            raise
     previous = json.loads(k('get', 'validatingpolicy', 'hooshix-platform-data-closed', '-o', 'json'))
     previous = {key: previous[key] for key in ('apiVersion', 'kind', 'metadata', 'spec')}
     # No production path is formatted/replaced. This path exists only inside the fresh owned node.
