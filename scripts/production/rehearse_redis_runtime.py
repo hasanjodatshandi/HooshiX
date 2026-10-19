@@ -61,7 +61,10 @@ def rehearse(k, wait, run, ca, node, platform):
             if mode == 'command': c['command'] = ['/bin/sh']
             if mode == 'probe': c['readinessProbe']['exec']['command'] = ['/bin/sh', '-c', 'cat /run/secrets/security-redis/tls.key']
             if mode == 'token': bad['spec']['automountServiceAccountToken'] = True
-            if mode == 'extra-container': bad['spec']['containers'].append(copy.deepcopy(c))
+            if mode == 'extra-container':
+                extra = copy.deepcopy(c)
+                extra['name'] = 'redis-extra'
+                bad['spec']['containers'].append(extra)
             if mode == 'env': c['env'] = [{'name': 'REDISCLI_AUTH', 'value': 'not-secret'}]
             print('REDIS_RUNTIME_POD_ADMISSION_NEGATIVE=' + mode, flush=True)
             admission_result(k, bad, wait, expected=1, public_schema=False)
