@@ -83,6 +83,7 @@ def boundary(previous, spec):
     terms = [admission.scalar_tree('object.spec.' + key, value) for key, value in checked.items()]
     terms += ['object.spec.nodeSelector.size() == 1 && object.spec.nodeSelector["kubernetes.io/hostname"] == '
               + admission.literal(volume.NODE)]
+    terms.append('object.spec.containers.size() == 1')
     terms += ['object.metadata.name == "security-redis-0"',
         'has(object.metadata.labels) && object.metadata.labels["istio.io/dataplane-mode"] == "ambient"'
         ' && object.metadata.labels["app.kubernetes.io/name"] == "security-redis"',

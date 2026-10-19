@@ -55,7 +55,8 @@ class RedisRuntimeTest(unittest.TestCase):
         for term in ('security-redis-0', 'StatefulSet', 'automountServiceAccountToken',
             'ephemeralContainers', 'initContainers', 'imagePullSecrets', 'hostNetwork', 'sysctls',
             'capabilities.add', 'envFrom', 'lifecycle', 'subPathExpr', 'redis.conf', 'tls.key',
-            'health/password', 'readinessProbe', 'terminationMessagePath', 'nodeSelector', 'ephemeral-storage'):
+            'health/password', 'readinessProbe', 'terminationMessagePath', 'nodeSelector', 'ephemeral-storage',
+            'object.spec.containers.size() == 1'):
             self.assertIn(term, checks[-1]['expression'])
         for identity in ('object.spec.serviceAccountName == "security-redis"',
             'object.metadata.name == "security-redis-0"',
