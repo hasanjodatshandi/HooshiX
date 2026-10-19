@@ -31,7 +31,7 @@ STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "sc
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
                    "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
-                   "redis-scoped-secret-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "redis-scoped-secret-delivery", "redis-tls-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -348,7 +348,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             step("tls")
             key, cert = directory / "tls.key", directory / "tls.crt"
             run(["/usr/bin/openssl", "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-nodes",
-                 "-days", "1", "-subj", "/CN=hooshix-ci-only", "-addext",
+                 "-days", "365", "-subj", "/CN=hooshix-ci-only", "-addext",
                  "subjectAltName=IP:127.0.0.1,DNS:openbao.hooshix-secrets.svc,DNS:openbao-0.openbao.hooshix-secrets.svc",
                  "-keyout", str(key), "-out", str(cert)])
             key.chmod(0o600)
@@ -488,6 +488,14 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     from rehearse_redis_secrets import rehearse as redis_secrets
                     redis_secret_result = redis_secrets(k, eso_chart, str(tools / 'helm'),
                         api, token, cert.read_text(), audiences, addresses, name + '-control-plane')
+                    step('redis-tls-delivery')
+                    from rehearse_redis_tls import rehearse as redis_tls
+                    from install_redis_tls import render as tls_plan
+                    import render_postgresql_secrets as pg_plan
+                    plan = tls_plan(pg_plan.render(eso_chart, str(tools / 'helm'), addresses))
+                    plan['public_ca_sha256'] = hashlib.sha256(cert.read_bytes()).hexdigest()
+                    redis_tls_result = redis_tls(k, plan, api, token, cert.read_text(), key,
+                                                audiences, name + '-control-plane')
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
@@ -574,6 +582,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['barman_control_plane'] = barman_result
             result['postgresql_secret_delivery'] = pg_secret_result
             result['redis_secret_delivery'] = redis_secret_result
+            result['redis_tls_delivery'] = redis_tls_result
             if postgresql_quarantine: result['postgresql_quarantine'] = pg_quarantine_result
     else:
         result['postgresql_local_volume'] = local_volume_result

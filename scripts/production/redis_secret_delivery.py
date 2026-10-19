@@ -18,6 +18,10 @@ ACL_NAME = 'security-redis-acl'
 ACL_ENTRY = {'account': 'eso-redis-acl', 'policy': 'hooshix-redis-acl',
              'key': 'production/security-redis/acl'}
 AUTH_ENTRIES = {**ENTRIES, ACL_NAME: ACL_ENTRY}
+TLS_NAME = 'security-redis-tls'
+TLS_ENTRIES = {TLS_NAME: {'account': 'eso-redis-tls', 'policy': 'hooshix-redis-tls',
+                         'key': 'production/security-redis/tls'}}
+ALL_AUTH_ENTRIES = {**AUTH_ENTRIES, **TLS_ENTRIES}
 
 
 def entry(name):
@@ -32,7 +36,7 @@ def resource(kind, name, **body):
 
 
 def policy(name):
-    key = AUTH_ENTRIES[name]['key']
+    key = ALL_AUTH_ENTRIES[name]['key']
     return (f'path "hooshix/data/{key}" {{ capabilities = ["read"] }}\n'
             'path "auth/token/lookup-self" { capabilities = ["read"] }\n'
             'path "auth/token/revoke-self" { capabilities = ["update"] }\n')
@@ -40,15 +44,15 @@ def policy(name):
 
 def role(name):
     value = copy.deepcopy(application.role(application.SERVICES[0]))
-    item = AUTH_ENTRIES[name]
+    item = ALL_AUTH_ENTRIES[name]
     value.update(bound_service_account_names=[item['account']],
         bound_service_account_namespaces=[NAMESPACE], token_policies=[item['policy']])
     return value
 
 
-def check_existing(api, root):
+def check_existing(api, root, *, entries=AUTH_ENTRIES):
     pending = []
-    for name, item in AUTH_ENTRIES.items():
+    for name, item in entries.items():
         for path, body in [('sys/policies/acl/' + item['policy'], {'policy': policy(name)}),
                 ('auth/' + application.MOUNT + '/role/' + item['account'], role(name))]:
             old = api.call(path, token=root, expected=(200, 404))
@@ -59,32 +63,33 @@ def check_existing(api, root):
     return pending
 
 
-def configure(api, root):
-    for path, body in check_existing(api, root):
+def configure(api, root, *, entries=AUTH_ENTRIES):
+    for path, body in check_existing(api, root, entries=entries):
         api.call(path, 'PUT' if path.startswith('sys/') else 'POST', body, root, 204)
-    application.host.require(not check_existing(api, root), 'REDIS_SECRET_AUTH_READBACK_FAILED')
+    application.host.require(not check_existing(api, root, entries=entries), 'REDIS_SECRET_AUTH_READBACK_FAILED')
 
 
-def foundation():
-    accounts = [item['account'] for item in AUTH_ENTRIES.values()]
+def foundation(*, tls=False):
+    accounts = [item['account'] for item in (TLS_ENTRIES if tls else AUTH_ENTRIES).values()]
+    binding = 'hooshix-redis-tls' if tls else MANAGER
     objects = [resource('ServiceAccount', name, automountServiceAccountToken=False) for name in accounts]
-    objects.append(resource('ClusterRoleBinding', MANAGER + '-tokenreview', namespace=None,
+    objects.append(resource('ClusterRoleBinding', binding + '-tokenreview', namespace=None,
         api='rbac.authorization.k8s.io/v1',
         roleRef={'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'ClusterRole',
                  'name': 'hooshix-openbao-tokenreview'},
         subjects=[{'kind': 'ServiceAccount', 'name': name, 'namespace': NAMESPACE} for name in accounts]))
-    objects += [resource('Role', MANAGER + '-tokenrequest', api='rbac.authorization.k8s.io/v1',
+    objects += [resource('Role', binding + '-tokenrequest', api='rbac.authorization.k8s.io/v1',
         rules=[{'apiGroups': [''], 'resources': ['serviceaccounts/token'], 'verbs': ['create'],
                 'resourceNames': accounts}]),
-        resource('RoleBinding', MANAGER + '-tokenrequest', api='rbac.authorization.k8s.io/v1',
+        resource('RoleBinding', binding + '-tokenrequest', api='rbac.authorization.k8s.io/v1',
             roleRef={'apiGroup': 'rbac.authorization.k8s.io', 'kind': 'Role',
-                     'name': MANAGER + '-tokenrequest'},
+                     'name': binding + '-tokenrequest'},
             subjects=[{'kind': 'ServiceAccount', 'name': ACCOUNT, 'namespace': NAMESPACE}])]
     return objects
 
 
 def store(name, audiences):
-    item = AUTH_ENTRIES[name]
+    item = ALL_AUTH_ENTRIES[name]
     value = application.store(application.SERVICES[0], audiences)
     value['metadata'] = resource('SecretStore', name)['metadata']
     auth = value['spec']['provider']['vault']['auth']['kubernetes']
@@ -94,11 +99,13 @@ def store(name, audiences):
 
 
 def external(name):
-    fields = ('users.acl',) if name == ACL_NAME else ('username', 'password')
+    fields = ('tls.crt', 'tls.key', 'ca.crt') if name == TLS_NAME else (
+        ('users.acl',) if name == ACL_NAME else ('username', 'password'))
     return resource('ExternalSecret', name, api='external-secrets.io/v1', spec={
         'refreshInterval': '1m', 'secretStoreRef': {'kind': 'SecretStore', 'name': name},
         'target': {'name': name, 'creationPolicy': 'Owner', 'deletionPolicy': 'Retain',
-            'template': {'type': 'Opaque' if name == ACL_NAME else 'kubernetes.io/basic-auth',
+            'template': {'type': 'kubernetes.io/tls' if name == TLS_NAME else (
+                             'Opaque' if name == ACL_NAME else 'kubernetes.io/basic-auth'),
                          'metadata': {'labels': LABELS.copy()}}},
-        'data': [{'secretKey': key, 'remoteRef': {'key': AUTH_ENTRIES[name]['key'], 'property': key}}
+        'data': [{'secretKey': key, 'remoteRef': {'key': ALL_AUTH_ENTRIES[name]['key'], 'property': key}}
                  for key in fields]})

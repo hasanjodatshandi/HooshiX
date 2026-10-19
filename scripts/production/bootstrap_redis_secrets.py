@@ -10,7 +10,7 @@ import redis_secret_delivery as contract
 
 def token_request(namespace, account, audiences):
     pg.host.require((namespace == contract.NAMESPACE
-        and account in {e['account'] for e in contract.AUTH_ENTRIES.values()}
+        and account in {e['account'] for e in contract.ALL_AUTH_ENTRIES.values()}
         or (namespace, account) == ('default', 'default')), 'REDIS_SECRET_TOKENREQUEST_BOUNDARY')
     pg.host.require(isinstance(audiences, list) and len(audiences) <= 5
         and all(isinstance(a, str) and pg.re.fullmatch(r'[a-zA-Z0-9:/_.-]{1,256}', a) for a in audiences),
@@ -33,7 +33,7 @@ def preserved(kube):
     return retained
 
 
-def execute(plan, **kwargs):
+def execute(plan, *, delivery=installer.execute, **kwargs):
     units = volume.foundation()
     ordinary = kwargs['kube']
 
@@ -51,7 +51,7 @@ def execute(plan, **kwargs):
         reserved.append(value)
     pg.host.require(not kube('-n', contract.NAMESPACE, 'get', 'pvc', volume.CLAIM,
         '--ignore-not-found', '-o', 'json').strip(), 'REDIS_SECRET_EXISTING_RUNTIME_PRESERVED')
-    result = installer.execute(plan, **kwargs)
+    result = delivery(plan, **kwargs)
     pg.host.require(volume.foundation() == units, 'REDIS_SECRET_FOUNDATION_CHANGED')
     for obj, old in zip(volume.candidate(), reserved, strict=True):
         value = json.loads(kube('get', obj['kind'], obj['metadata']['name'], '-o', 'json'))

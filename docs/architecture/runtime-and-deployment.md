@@ -82,7 +82,14 @@ and the private hash-only server ACL under ADR-0011. Its existing namespace-wide
 Secret trust boundary is unchanged; six exact additional TokenRequest identities
 are delegated by a separate Role. No new controller, network permission, Pod
 admission exception or application ingress is created by Redis secret delivery.
-TLS and the closed Redis workload require separate commissioning evidence.
+`redis_tls_material.py` and `install_redis_tls.py` prepare the bounded first
+server-leaf delivery described in ADR-0011: existing encrypted intermediate,
+OpenBao KV-v2 and the same namespace-local ESO, without a new CA/controller or
+network/admission change. Its typed TLS Secret has a separate exact-leaf identity;
+existing passwords/ACL and initialized PostgreSQL remain unchanged. Actual target
+TLS delivery, continuous renewal/reload/expiry handling and the closed Redis
+workload require their own executed evidence. A 30-day bootstrap leaf is not an
+automatic renewal mechanism or a claim of Production readiness.
 
 ADR-0002 also permits only the cert-manager API-callback webhook Pod in
 `cnpg-system` outside Ambient. `render_cert_manager_candidate.py` renders the
