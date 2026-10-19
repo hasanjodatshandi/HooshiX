@@ -9,10 +9,12 @@ from pathlib import Path
 import build_postgresql_secrets_bundle as pg
 import install_redis_secrets as installer
 
-SOURCES = (*pg.SOURCES, 'install_redis_local_volume.py', 'render_redis_acl.py', 'redis_secret_delivery.py',
+SOURCES = (*pg.SOURCES, 'install_postgresql_quarantine.py', 'install_redis_local_volume.py',
+           'render_redis_acl.py', 'redis_secret_delivery.py',
            'install_redis_secrets.py', 'bootstrap_redis_secrets.py')
 CHECKS = ('delivery', 'acl_binding', 'scoped_authentication', 'foreign_secret_and_tokenrequest_denial',
-          'idempotent_reconciliation', 'existing_identities_preserved', 'container_log_privacy')
+          'idempotent_reconciliation', 'existing_identities_preserved', 'container_log_privacy',
+          'bound_database_preservation')
 
 
 def verify_proof(receipt):

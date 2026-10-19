@@ -7,6 +7,7 @@ import openbao_scoped_auth as auth
 import postgresql_secret_delivery as pg
 import redis_secret_delivery as contract
 import render_postgresql_secrets as renderer
+from bootstrap_redis_secrets import preserved, quarantine
 
 
 def rehearse(k, chart, helm, api, root, ca, audiences, addresses):
@@ -28,6 +29,7 @@ def rehearse(k, chart, helm, api, root, ca, audiences, addresses):
         return [api.call(path, token=root)['data'] for path in paths]
 
     before = identities()
+    protected = preserved(kube)
     pg_secrets = {name: k('-n', pg.NAMESPACE, 'get', 'secret', name,
         '-o', 'jsonpath={.metadata.uid}:{.metadata.resourceVersion}') for name in pg.ENTRIES}
     result = installer.execute(plan, kube=kube, api=api, root=root, ca=ca,
@@ -43,6 +45,10 @@ def rehearse(k, chart, helm, api, root, ca, audiences, addresses):
     if before != identities() or any(k('-n', pg.NAMESPACE, 'get', 'secret', n,
         '-o', 'jsonpath={.metadata.uid}:{.metadata.resourceVersion}') != v for n, v in pg_secrets.items()):
         raise ValueError('REDIS_SECRET_EXISTING_AUTHORITY_CHANGED')
+    if preserved(kube) != protected:
+        raise ValueError('REDIS_SECRET_BOUND_DATABASE_CHANGED')
+    current_volume = quarantine.get(kube, 'pv', quarantine.volume.VOLUME)
+    result['bound_database_preservation'] = ('Passed' if current_volume['status']['phase'] == 'Bound' else 'Not run')
     # Existing application identity reads only its own new credential, never server ACL/other owners.
     for user, owner in contract.OWNERS.items():
         jwt = token_request(auth.NAMESPACE, 'eso-' + owner, [*audiences, auth.AUDIENCE])

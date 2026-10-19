@@ -2110,6 +2110,8 @@ webbff، health و monitor در OpenBao نگهداری می‌شوند؛ ACL ف�
 Ambient/STRICT و restricted PSA، admission بستهٔ فعلی و فضای Redis/LocalPV قبلی.
 PostgreSQL قرنطینه‌شده و هویت‌های موجود نباید تغییر کنند. Root فقط برای همین
 bootstrap نظارت‌شده استفاده می‌شود و لغو یا reset نمی‌شود.
+حالت Bound بودن volume PostgreSQL با UID دقیق claim و مالکیت Cluster موجود
+اعتبارسنجی می‌شود؛ این volume به حالت Available برگردانده یا دوباره رزرو نمی‌شود.
 
 شش حساب `eso-redis-<user>` و `eso-redis-acl` فقط leaf دقیق خود و عملیات self-only
 توکن را می‌خوانند؛ عمر توکن حداکثر پنج دقیقه است. Role جداگانه فقط TokenRequest

@@ -119,6 +119,45 @@ class RedisSecretTest(unittest.TestCase):
                 bootstrap.token_request(ns, account, audiences)
             kube.assert_not_called()
 
+    def test_initialized_database_preserver_accepts_only_its_real_bound_claim(self):
+        q = bootstrap.quarantine
+        sc, pv = q.volume.candidate()
+        cluster = {'metadata': {'uid': 'existing-cluster', 'labels': {
+            'app.kubernetes.io/managed-by': q.MANAGER}, 'annotations': {q.SPEC_HASH: q.digest({})}}, 'spec': {}}
+        pv['metadata']['uid'] = 'existing-pg-volume'
+        pv['spec']['claimRef']['uid'] = 'existing-pg-claim'
+        pv['status'] = {'phase': 'Bound'}
+        pvc = {'metadata': {'uid': 'existing-pg-claim', 'ownerReferences': [{'uid': 'existing-cluster'}]},
+               'spec': {'volumeName': q.volume.VOLUME}}
+        state = {('cluster', q.NAME): cluster, ('StorageClass', sc['metadata']['name']): sc,
+                 ('pv', q.volume.VOLUME): pv, ('pvc', q.volume.CLAIM): pvc}
+        def kube(*args):
+            if args[:2] == ('-n', q.NS): args = args[2:]
+            self.assertEqual('get', args[0])
+            return json.dumps(state[(args[1], args[2])]).encode()
+        # A bound initialized volume must still be rejected by the reservation-only helper.
+        self.assertFalse(q.volume.matches(pv, q.volume.candidate()[1]))
+        with patch.object(q, 'protected', return_value=['existing-controls']):
+            result = bootstrap.preserved(kube)
+            self.assertIn({'postgresql_volume_uid': 'existing-pg-volume'}, result)
+            self.assertEqual('Bound', pv['status']['phase'])
+            for kind in ('uid', 'owner', 'spec'):
+                original = copy.deepcopy(state)
+                if kind == 'uid': pvc['metadata']['uid'] = 'foreign-claim'
+                elif kind == 'owner': pvc['metadata']['ownerReferences'] = [{'uid': 'foreign-cluster'}]
+                else: cluster['spec'] = {'foreign': True}
+                with self.subTest(kind=kind), self.assertRaises((ValueError, auth.host.custody.BootstrapFailed)):
+                    bootstrap.preserved(kube)
+                state.clear(); state.update(original)
+                cluster, pvc = state[('cluster', q.NAME)], state[('pvc', q.volume.CLAIM)]
+
+    def test_redis_supervisor_selects_initialized_preserver_without_changing_pg_default(self):
+        with patch.object(bootstrap.pg, 'commission', return_value={}) as shared:
+            bootstrap.commission({}, 'a' * 40)
+        self.assertIs(bootstrap.preserved, shared.call_args.kwargs['preserve'])
+        self.assertIs(bootstrap.pg.platform.protected,
+                      bootstrap.pg.commission.__kwdefaults__['preserve'])
+
     def test_transport_uses_exact_reviewed_supervisor_and_no_secret_arguments(self):
         source = operator.bootstrap('/fixed/public', 'a' * 40, [], supervisor='bootstrap_redis_secrets')
         self.assertIn("sys.modules['bootstrap_redis_secrets']", source)

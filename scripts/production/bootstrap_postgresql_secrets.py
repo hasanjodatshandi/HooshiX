@@ -57,7 +57,8 @@ def token_request(namespace, account, audiences):
                 *['--audience=' + a for a in audiences]).decode().strip()
 
 
-def commission(request, revision, *, execute=installer.execute, token_requester=token_request, audit_label='PostgreSQL'):
+def commission(request, revision, *, execute=installer.execute, token_requester=token_request,
+               audit_label='PostgreSQL', preserve=platform.protected):
     host.require(audit_label in ('PostgreSQL', 'Redis'), 'PG_SECRET_FIXED_AUDIT_LABEL_REQUIRED')
     host.require(set(request) == {'root_token', 'recipients', 'plan', 'plan_sha256'}, 'PG_SECRET_REQUEST_REJECTED')
     plan = decode_plan(request['plan'], request['plan_sha256'])
@@ -65,7 +66,7 @@ def commission(request, revision, *, execute=installer.execute, token_requester=
         'PG_SECRET_REVIEWED_STAGING_REQUIRED')
     digest = host.public_keys(request['recipients'])
     before, claim_uid = host.preflight()
-    retained = platform.protected(kube)
+    retained = preserve(kube)
     guard = host.native(['/usr/bin/systemctl', 'is-active', 'hooshix-postgresql-storage-guard.service'],
                         operation='PG_SECRET_PRESERVE_GUARD')
     host.require(guard.strip() == b'active', 'PG_SECRET_EXISTING_GUARD_REQUIRED')
@@ -93,7 +94,7 @@ def commission(request, revision, *, execute=installer.execute, token_requester=
             result = execute(plan, kube=kube, api=api, root=request['root_token'],
                 ca=certificate.decode('ascii'), audiences=audience, token_request=token_requester)
         host.storage_preflight()
-        host.require(before == host.service_identity() and retained == platform.protected(kube)
+        host.require(before == host.service_identity() and retained == preserve(kube)
             and host.get('pvc', 'data-openbao-0')['metadata']['uid'] == claim_uid,
             'PG_SECRET_PRESERVED_TARGET_CHANGED')
     result.update(source_revision=revision, recipient_sha256=digest, pvc_uid=claim_uid,

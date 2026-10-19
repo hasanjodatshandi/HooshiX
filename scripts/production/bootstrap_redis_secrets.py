@@ -4,6 +4,7 @@ import bootstrap_postgresql_secrets as pg
 import commission_platform as platform
 import install_redis_secrets as installer
 import install_redis_local_volume as volume
+import install_postgresql_quarantine as quarantine
 import redis_secret_delivery as contract
 
 
@@ -16,6 +17,20 @@ def token_request(namespace, account, audiences):
         'REDIS_SECRET_AUDIENCE_BOUNDARY')
     return pg.kube('-n', namespace, 'create', 'token', account, '--duration=10m',
                    *['--audience=' + a for a in audiences]).decode().strip()
+
+
+def preserved(kube):
+    # Reuse the initialized-data boundary, not the earlier unclaimed-PV bootstrap.
+    retained = quarantine.protected(kube)
+    cluster = quarantine.get(kube, 'cluster', quarantine.NAME, quarantine.NS)
+    if cluster:
+        pg.host.require(cluster['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == quarantine.MANAGER
+            and not cluster['metadata'].get('deletionTimestamp')
+            and cluster['metadata'].get('annotations', {}).get(quarantine.SPEC_HASH) == quarantine.digest(cluster['spec']),
+            'REDIS_SECRET_EXISTING_QUARANTINE_REQUIRED')
+        retained.append({'uid': cluster['metadata']['uid'], 'spec': cluster['spec']})
+    retained.append({'postgresql_volume_uid': quarantine.reserved_volume(kube, cluster)})
+    return retained
 
 
 def execute(plan, **kwargs):
@@ -46,7 +61,8 @@ def execute(plan, **kwargs):
 
 
 def commission(request, revision):
-    result = pg.commission(request, revision, execute=execute, token_requester=token_request, audit_label='Redis')
+    result = pg.commission(request, revision, execute=execute, token_requester=token_request,
+                          audit_label='Redis', preserve=preserved)
     result['root_mesh_openbao_application_eso_cnpg_barman_storage'] = 'Preserved'
     return result
 
