@@ -102,16 +102,21 @@ def reserve(objects, call=kube):
         require(matches(actual, desired), 'RESERVATION_VERIFICATION_FAILED')
 
 
-def verify_data():
+def verify_data(*, initialized=False):
     info = DATA.lstat()
     require(stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid) == (10001, 10001)
         and stat.S_IMODE(info.st_mode) in (0o700, 0o770, 0o2770), 'GUARDED_DATA_OWNER_REQUIRED')
-    require(not any(DATA.iterdir()), 'EMPTY_GUARDED_DATA_REQUIRED')
+    if not initialized:
+        require(not any(DATA.iterdir()), 'EMPTY_GUARDED_DATA_REQUIRED')
+    else:
+        require(all(p.name == 'appendonlydir' and p.is_dir() and not p.is_symlink()
+                    for p in DATA.iterdir()), 'UNEXPECTED_REDIS_DATA_PRESERVED')
     fs = os.statvfs(DATA)
-    require(fs.f_bavail * fs.f_frsize >= CAPACITY, 'USABLE_CAPACITY_BELOW_RESERVATION')
+    reserve = fs.f_blocks * fs.f_frsize * 3 // 10 if initialized else CAPACITY
+    require(fs.f_bavail * fs.f_frsize >= reserve, 'USABLE_CAPACITY_BELOW_RESERVATION')
 
 
-def foundation():
+def foundation(*, initialized=False):
     require(os.geteuid() == 0 and os.uname().nodename == 'mail.hooshix.com', 'LOCAL_SUDO_TARGET_REQUIRED')
     for path in (*reversed(GUARD.parents), GUARD):
         info = path.lstat()
@@ -121,7 +126,7 @@ def foundation():
         and GUARD.stat().st_size <= 32768 and hashlib.sha256(GUARD.read_bytes()).hexdigest() == GUARD_SHA256,
         'REVIEWED_INSTALLED_GUARD_REQUIRED')
     native(['/usr/bin/python3', '-I', str(GUARD), '--guard-check'])
-    verify_data()
+    verify_data(initialized=initialized)
     units = {u: native(['/usr/bin/systemctl', 'show', u, '--property=ActiveState,MainPID']) for u in UNITS}
     require(all(b'ActiveState=active' in units[u].splitlines() for u in UNITS[:7]), 'REQUIRED_SERVICE_NOT_ACTIVE')
     bindings = native(['/usr/bin/systemctl', 'show', 'k3s.service', '--property=BindsTo', '--value']).decode().split()

@@ -44,12 +44,14 @@ def exercise(image, endpoint):
         (config / 'ca.crt').write_bytes((config / 'tls.crt').read_bytes())
         (config / 'redis.conf').write_text(server_config(16 * 1024**2))
         (config / 'users.acl').write_text(acl_file(hashes))
+        (config / 'health-password').write_text(passwords['health'])
         for path in config.iterdir():
             path.chmod(0o600)
         started = docker('run', '-d', '--pull', 'never', '--network', 'none', '--read-only',
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user',
             f'{os.getuid()}:{os.getgid()}', '--memory', '128m', '--cpus', '1', '--pids-limit', '64',
             '--mount', f'type=bind,src={config},dst={SECRET_PATH},readonly',
+            '--mount', f'type=bind,src={config / "health-password"},dst=/run/secrets/health/password,readonly',
             '--mount', f'type=bind,src={data},dst=/data', '--entrypoint', '/usr/local/bin/redis-server',
             image, SECRET_PATH + '/redis.conf', timeout=30, docker_host=endpoint)
         container = started.stdout.strip()
@@ -79,6 +81,10 @@ def exercise(image, endpoint):
                     time.sleep(0.5)
 
             ready()
+            from render_redis_security import HEALTH
+            probe = docker('exec', container, '/bin/sh', '-ec', HEALTH, docker_host=endpoint)
+            require(probe.returncode == 0 and not probe.stdout and not probe.stderr,
+                    'CLOSED_RUNTIME_TLS_HEALTH_PROBE_FAILED')
             version = docker('exec', container, 'redis-server', '--version', docker_host=endpoint)
             require(version.returncode == 0 and 'v=8.2.8 ' in version.stdout, 'EXACT_REDIS_VERSION_REQUIRED')
             for section, markers in {'memory': ('maxmemory:16777216', 'maxmemory_policy:noeviction'),

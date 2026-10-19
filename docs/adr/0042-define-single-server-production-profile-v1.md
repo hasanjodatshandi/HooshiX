@@ -164,6 +164,15 @@ Mandatory controls remain:
 
 Redis remains ephemeral security state, not business source of truth. AOF reduces restart loss but does not make the instance HA. Redis loss may invalidate sessions and requires re-authentication; covered security operations remain unavailable/fail closed until a valid Redis decision is possible.
 
+Initial Redis commissioning may run only the closed instance defined by
+`render_redis_runtime.py`, on its already guarded Retain volume with the existing
+OpenBao/ESO ACL/TLS. No application or public client is allowed. Fixed resource
+limits, verified local TLS health, non-root/tokenless hardening, STRICT mesh,
+signature/source/SBOM admission and safe bound-volume reentry are mandatory.
+Native synthetic TLS/ACL/AOF restart, network/admission negatives and preservation
+precede an owner-local target bundle. This does not approve application traffic,
+certificate renewal, capacity, backup or Production readiness.
+
 ## 6. Kafka single-broker KRaft
 
 `production-single-server` uses one Kafka 4.2.1 process with combined KRaft `broker,controller` roles.
