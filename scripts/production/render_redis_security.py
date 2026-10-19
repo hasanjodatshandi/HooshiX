@@ -10,6 +10,10 @@ from verify_openbao_artifact import ROOT, load
 
 PIN = ROOT / 'infrastructure/production/redis/candidate.json'
 SECRET_PATH = '/run/secrets/security-redis'
+HEALTH = ('export REDISCLI_AUTH="$(cat /run/secrets/health/password)"; '
+          'test "$(redis-cli -e --raw -t 2 --tls --cacert '
+          '/run/secrets/security-redis/ca.crt --sni security-redis.platform-data.svc '
+          '-h 127.0.0.1 --user health PING 2>/dev/null)" = PONG')
 
 
 def pins():

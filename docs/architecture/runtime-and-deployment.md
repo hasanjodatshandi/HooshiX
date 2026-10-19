@@ -201,6 +201,19 @@ ADR-0024 additionally requires:
 
 Session loss causes reauthentication. Browser cookie does not reconstruct server authority.
 
+`render_redis_runtime.py` defines a closed initial instance on the existing guarded
+Redis LocalPV, using the already published exact signed digest and delivered ESO
+ACL/TLS material. Its dedicated tokenless non-root StatefulSet admits no network
+clients: default-deny plus an empty ALLOW policy keep applications/public access
+closed. Only the mesh control egress is permitted. Native exec probes use the
+PING-only identity and verified TLS, never password arguments. A 128MiB dataset
+ceiling inside a 512MiB container is a bounded commissioning budget, not measured
+Production capacity. The owner-local installer preserves initialized PostgreSQL,
+OpenBao, credentials and claim identity, and rejects unknown spec/volume drift.
+The existing first leaf is not automatically renewed/reloaded by this runtime;
+renewal, application clients, monitoring, headroom and readiness remain separate
+blocking evidence before traffic. The living Stage10 guide owns operator commands.
+
 ## 8. Kyverno admission
 
 Kyverno 1.19.1 remains blocking/fail-closed. Single-server may run one replica but does not weaken policy semantics.

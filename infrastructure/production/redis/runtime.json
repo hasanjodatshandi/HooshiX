@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "publication_run": "39109666003",
+  "publication_attempt": 1,
+  "repository_revision": "13613b929846726699580cf51c58ffa441637489",
+  "publication_sha256": "6da911a1043a42ffd64b9592017a0b614cf3f373baea3c55a675285736db27be",
+  "recipe_sha256": "682e2af596c904ee2a0dc21d1ca1d1d8b69bd82dd3601ad5495ae26473b0b0d1",
+  "dockerfile_sha256": "95ac6344d31f38218809b76a73af6568eb2f8abadfa9e1980d02b00258f78f48",
+  "image": "ghcr.io/hasanjodatshandi/hooshix/platform-security-redis-v2-private@sha256:b7013f0a95c584029fcfe89810f366060302a5d5bf130d02a5292a0fe6326c14",
+  "image_configuration_digest": "sha256:cdc587b3dc307b153d4dc16c9631c88e26e8f363de150392696c8711c6bfd6e5",
+  "maxmemory_bytes": 134217728,
+  "application_ingress": "CLOSED",
+  "production_readiness": "Not verified"
+}

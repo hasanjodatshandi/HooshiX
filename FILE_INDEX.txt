@@ -398,6 +398,7 @@ infrastructure/production/recovery/recovery-policy.json
 infrastructure/production/redis/.dockerignore
 infrastructure/production/redis/Dockerfile
 infrastructure/production/redis/candidate.json
+infrastructure/production/redis/runtime.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
 infrastructure/production/release/patched-platform-sources.json
@@ -553,6 +554,7 @@ scripts/production/build_postgresql_storage_bundle.py
 scripts/production/build_provenance.py
 scripts/production/build_redis_candidate.py
 scripts/production/build_redis_local_volume_bundle.py
+scripts/production/build_redis_runtime_bundle.py
 scripts/production/build_redis_secrets_bundle.py
 scripts/production/build_redis_storage_bundle.py
 scripts/production/check_human_sshd_candidate.sh
@@ -568,6 +570,7 @@ scripts/production/install_postgresql_local_volume.py
 scripts/production/install_postgresql_quarantine.py
 scripts/production/install_postgresql_secrets.py
 scripts/production/install_redis_local_volume.py
+scripts/production/install_redis_runtime.py
 scripts/production/install_redis_secrets.py
 scripts/production/install_redis_tls.py
 scripts/production/install_release_tools.sh
@@ -619,6 +622,7 @@ scripts/production/rehearse_platform_admission.py
 scripts/production/rehearse_postgresql_local_volume.py
 scripts/production/rehearse_postgresql_quarantine.py
 scripts/production/rehearse_postgresql_secrets.py
+scripts/production/rehearse_redis_runtime.py
 scripts/production/rehearse_redis_secrets.py
 scripts/production/rehearse_redis_tls.py
 scripts/production/release_supply_chain.sh
@@ -637,6 +641,7 @@ scripts/production/render_postgresql_ownership.py
 scripts/production/render_postgresql_quarantine.py
 scripts/production/render_postgresql_secrets.py
 scripts/production/render_redis_acl.py
+scripts/production/render_redis_runtime.py
 scripts/production/render_redis_security.py
 scripts/production/repair_import_referrers.py
 scripts/production/restore_openbao_isolated.py
@@ -657,6 +662,7 @@ scripts/production/run-postgresql-local-volume.ps1
 scripts/production/run-postgresql-quarantine.ps1
 scripts/production/run-postgresql-storage.ps1
 scripts/production/run-redis-local-volume.ps1
+scripts/production/run-redis-runtime.ps1
 scripts/production/run-redis-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_postgresql_isolation_native.py
@@ -715,6 +721,7 @@ scripts/production/tests/test_published_postgresql.py
 scripts/production/tests/test_readiness.py
 scripts/production/tests/test_redis_local_volume.py
 scripts/production/tests/test_redis_publication.py
+scripts/production/tests/test_redis_runtime.py
 scripts/production/tests/test_redis_secrets.py
 scripts/production/tests/test_redis_security.py
 scripts/production/tests/test_redis_storage.py
@@ -735,6 +742,7 @@ scripts/production/verify_platform_publication_run.py
 scripts/production/verify_postgresql_artifacts.py
 scripts/production/verify_published_cert_manager.py
 scripts/production/verify_published_postgresql.py
+scripts/production/verify_published_redis.py
 scripts/production/verify_release.py
 scripts/production/verify_storage_guard.py
 services/authorization-service/.dockerignore

@@ -2223,6 +2223,64 @@ Secret نوع TLS به نام `platform-data/security-redis-tls` فقط `tls.crt
 [Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
 و [ESO Vault](https://external-secrets.io/latest/provider/hashicorp-vault/).
 
+### اجرای داخلی و بستهٔ Redis
+
+پس از تحویل credential و TLS، فقط همان تصویر امضاشده و LocalPV رزروشده مصرف
+می‌شوند. ایجاد workload به معنی بازشدن دسترسی برنامه‌ها یا تأیید Production نیست.
+فضای OpenBao/PostgreSQL و هویت‌های موجود حفظ می‌شوند؛ حذف PVC، فرمت مجدد و
+ساخت CA یا رمز تازه جزو این مرحله نیست. `render_redis_runtime.py` مرجع desired
+state است. builder فقط از main تمیز و evidence معتبر همان Git tree با عمر حداکثر
+پنج روز، پس از بررسی انتشار محافظت‌شدهٔ موجود و اسکن تازه، بسته می‌سازد؛ تصویر
+دوباره build یا publish نمی‌شود. ابزارهای integrity-pinned release، از جمله Grype،
+باید در `PATH` باشند؛ همان chart/Helm معتبر مراحل قبل استفاده می‌شود:
+
+```bash
+python3 scripts/production/build_redis_runtime_bundle.py \
+  --staging-run <successful-platform-staging-run> \
+  --chart <verified-eso-2.12.0-chart.tgz> --helm <verified-helm-4.2.4> \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-redis-runtime-YYYYMMDD
+```
+
+اعتبارسنجی محلی، بدون تماس با VPS یا خواندن custody:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-runtime-YYYYMMDD\run-redis-runtime.ps1' -ValidateOnly
+```
+
+با VNC قابل ورود و نشست دوم SSH باز، اجرای مالک فقط رمز sudo می‌خواهد؛ هیچ token
+یا رمز custody/intermediate لازم نیست:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-runtime-YYYYMMDD\run-redis-runtime.ps1' -RescueAndSecondSessionReady
+```
+
+نتیجهٔ مورد انتظار `REDIS_RUNTIME=Passed` و receipt عمومی کنار بسته است، نه تأیید
+Production. یک StatefulSet تک‌نمونه `platform-data/security-redis` و PVC مستقل
+`data-security-redis-0` فقط PV موجود `hooshix-redis-local-7gib` را مصرف می‌کنند.
+Service از نوع ClusterIP/headless است؛ NetworkPolicy ورودی ندارد و AuthorizationPolicy
+هیچ هویتی را مجاز نمی‌کند. فقط egress کنترل mesh روی 15012 لازم است. برنامه‌ها
+Secret projection یا اجازهٔ اتصال نمی‌گیرند. Pod بدون token خودکار، non-root 10001،
+read-only root، drop ALL، RuntimeDefault و منابع محدود است.
+
+برای commissioning بسته، سقف dataset برابر ۱۲۸ MiB و سقف حافظهٔ container برابر
+۵۱۲ MiB است؛ این انتخاب محافظه‌کارانه جایگزین ظرفیت‌سنجی نهایی و headroom سی‌درصدی
+نیست. TLS فقط روی 6379، plaintext غیرفعال، `noeviction` و AOF/everysec برقرارند.
+probe محلی فقط credential هویت PING-only را از فایل می‌خواند؛ رمز وارد argv یا log
+نمی‌شود. liveness با مهلت طولانی‌تر و startup مستقل تنظیم شده‌اند؛ SIGTERM فرصت
+۶۰ ثانیه‌ای برای shutdown دارد. تست native روی دادهٔ مصنوعی، graceful restart/AOF،
+انکار plaintext/ACL/admin، admission امضا/provenance/SBOM و دسترسی شبکهٔ غیرمجاز
+را بررسی می‌کند. guard فایل‌سیستم مقصد جداگانه بررسی می‌شود؛ path موقت CI شاهد
+mount/fault/reboot مقصد نیست.
+
+اجرای مجدد فقط UID/spec/claim موجود و credential/TLS بدون تغییر را می‌پذیرد؛
+داده یا manifest ناشناخته با حفظ state متوقف می‌شود. در شکست، PVC/PV/AOF را حذف
+نکنید و guard را غیرفعال نکنید. rollback در حالت بسته توقف همان StatefulSet
+در maintenance تأییدشده است؛ volume و Secretها Retain می‌مانند. تغییر پیکربندی
+با `OnDelete` خودکار process را restart نمی‌کند و نیازمند تغییر بازبینی‌شده است.
+renewal/reload گواهی ۳۰روزه، اتصال برنامه‌ها، monitoring کامل، capacity و Production
+هنوز **Not verified** هستند؛ قبل از نزدیک‌شدن انقضا یا بازکردن ترافیک باید جداگانه
+تکمیل شوند. ورود موفق و PING به معنی آماده‌بودن محصول روی دامنه نیست.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
