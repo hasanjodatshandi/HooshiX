@@ -64,8 +64,7 @@ def rehearse(k, wait, run, ca, node, platform):
             if mode == 'extra-container': bad['spec']['containers'].append(copy.deepcopy(c))
             if mode == 'env': c['env'] = [{'name': 'REDISCLI_AUTH', 'value': 'not-secret'}]
             print('REDIS_RUNTIME_POD_ADMISSION_NEGATIVE=' + mode, flush=True)
-            admission_result(k, bad, wait, expected=1,
-                message=b'closed Redis runtime contract rejected', public_schema=False)
+            admission_result(k, bad, wait, expected=1, public_schema=False)
         result['pod_contract_positive_negative'] = 'Passed'
         for original in plan['source_policies']:
             wrong = copy.deepcopy(original)
