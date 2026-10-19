@@ -59,17 +59,20 @@ class RedisTLSTest(unittest.TestCase):
 
     def test_extra_san_client_auth_weak_rsa_and_short_expiry_are_rejected(self):
         ordinary = material.platform.native
-        for mode in ('extra-san', 'client-auth', 'weak-rsa', 'expiry'):
+        for mode in ('extra-san', 'client-auth', 'code-signing', 'weak-rsa', 'weak-signature', 'expiry'):
             def native(argv, **options):
                 argv = list(argv)
                 if mode == 'weak-rsa' and 'req' in argv:
                     argv[argv.index('rsa:3072')] = 'rsa:2048'
                 if mode == 'expiry' and 'x509' in argv and '-days' in argv:
                     argv[argv.index('-days') + 1] = '1'
+                if mode == 'weak-signature' and 'x509' in argv and '-sha256' in argv:
+                    argv[argv.index('-sha256')] = '-sha1'
                 return ordinary(argv, **options)
             extensions = material.EXTENSIONS
             if mode == 'extra-san': extensions = extensions.replace(b'IP:127.0.0.1', b'DNS:*.platform-data.svc,IP:127.0.0.1')
             if mode == 'client-auth': extensions = extensions.replace(b'serverAuth', b'serverAuth,clientAuth')
+            if mode == 'code-signing': extensions = extensions.replace(b'serverAuth', b'serverAuth,codeSigning')
             with self.subTest(mode=mode), patch.object(material, 'EXTENSIONS', extensions), \
                     patch.object(material.platform, 'native', side_effect=native), \
                     self.assertRaises(material.custody.BootstrapFailed):

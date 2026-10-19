@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -53,13 +54,13 @@ def validate(material, root, issuer):
         constraints = native([custody.OPENSSL, 'x509', '-in', leaf, '-noout',
             '-ext', 'basicConstraints,keyUsage,extendedKeyUsage,subjectAltName']).decode()
         description = native([custody.OPENSSL, 'x509', '-in', leaf, '-noout', '-text'])
-        require('Basic Constraints: critical' in constraints and 'Key Usage: critical' in constraints
-            and b'Public Key Algorithm: rsaEncryption' in description and b'Public-Key: (3072 bit)' in description
-            and 'CA:FALSE' in constraints and 'CA:TRUE' not in constraints
-            and 'Digital Signature, Key Encipherment' in constraints
-            and 'TLS Web Server Authentication' in constraints and 'TLS Web Client Authentication' not in constraints
-            and constraints.split('Subject Alternative Name: \n', 1)[-1].strip() ==
-                'IP Address:127.0.0.1, ' + ', '.join('DNS:' + n for n in DNS_NAMES),
+        names = 'IP Address:127.0.0.1, ' + ', '.join('DNS:' + n for n in DNS_NAMES)
+        require(b'Public Key Algorithm: rsaEncryption' in description and b'Public-Key: (3072 bit)' in description
+            and b'Signature Algorithm: sha256WithRSAEncryption' in description
+            and re.fullmatch(r'X509v3 Basic Constraints: critical\s+CA:FALSE\s+'
+                r'X509v3 Key Usage: critical\s+Digital Signature, Key Encipherment\s+'
+                r'X509v3 Extended Key Usage:\s+TLS Web Server Authentication\s+'
+                r'X509v3 Subject Alternative Name:\s+' + re.escape(names) + r'\s*', constraints),
             'REDIS_TLS_SERVER_CONSTRAINTS_REQUIRED')
         native([custody.OPENSSL, 'x509', '-in', leaf, '-checkend', str(7 * 86400), '-noout'])
         dates = native([custody.OPENSSL, 'x509', '-in', leaf, '-noout', '-dates']).decode().splitlines()
