@@ -55,6 +55,12 @@ class RedisRuntimeTest(unittest.TestCase):
             'capabilities.add', 'envFrom', 'lifecycle', 'subPathExpr', 'redis.conf', 'tls.key',
             'health/password', 'readinessProbe', 'terminationMessagePath', 'nodeSelector', 'ephemeral-storage'):
             self.assertIn(term, checks[-1]['expression'])
+        for identity in ('object.spec.serviceAccountName == "security-redis"',
+            'object.metadata.name == "security-redis-0"',
+            'object.metadata.labels["app.kubernetes.io/name"] == "security-redis"',
+            'object.metadata.ownerReferences.exists(r, r.kind == "StatefulSet" && r.name == "security-redis")'):
+            self.assertIn(identity, checks[-1]['expression'])
+        self.assertIn('!(', checks[-1]['expression'])
         self.assertEqual(3, len(p['source_policies']))
         for obj in p['source_policies']:
             self.assertEqual('Fail', obj['spec']['failurePolicy'])

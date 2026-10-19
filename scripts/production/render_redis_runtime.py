@@ -101,8 +101,14 @@ def boundary(previous, spec):
         '!has(' + c + '.securityContext.windowsOptions)',
         c + '.volumeMounts.all(m, !has(m.subPath) && !has(m.subPathExpr) && !has(m.mountPropagation))',
         c + '.ports.all(p, !has(p.hostPort) || p.hostPort == 0)']
+    redis_identity = ['object.spec.serviceAccountName == "security-redis"',
+        'object.metadata.name == "security-redis-0"',
+        'has(object.metadata.labels) && object.metadata.labels["app.kubernetes.io/name"] == "security-redis"',
+        'has(object.metadata.ownerReferences) && object.metadata.ownerReferences.exists(r, '
+        'r.kind == "StatefulSet" && r.name == "security-redis")']
     result['spec']['validations'].append(admission.validation('closed Redis runtime contract rejected',
-        'object.spec.serviceAccountName != "security-redis" || (' + ' && '.join('(' + t + ')' for t in terms) + ')'))
+        '!(' + ' || '.join('(' + identity + ')' for identity in redis_identity) + ') || ('
+        + ' && '.join('(' + t + ')' for t in terms) + ')'))
     return result
 
 
