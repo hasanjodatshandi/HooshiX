@@ -48,6 +48,8 @@ class RedisRuntimeTest(unittest.TestCase):
 
     def test_boundary_retains_old_contract_and_binds_every_executable_secret_probe_and_resource(self):
         p = self.plan()
+        rule = p['boundary']['spec']['matchConstraints']['resourceRules'][0]
+        self.assertEqual(['CREATE', 'UPDATE'], rule['operations'])
         checks = p['boundary']['spec']['validations']
         self.assertEqual('false', checks[0]['expression'].split(' || (', 1)[1][:-1])
         for term in ('security-redis-0', 'StatefulSet', 'automountServiceAccountToken',
@@ -70,6 +72,13 @@ class RedisRuntimeTest(unittest.TestCase):
         for marker in ('redisImages', 'cyclonedx', 'cosign', renderer.pin()['repository_revision'],
                        'github:39109666003:1', 'redis-runtime-build/v1'):
             self.assertIn(marker, source)
+
+    def test_boundary_adds_pod_updates_when_previous_rule_was_create_only(self):
+        old = self.plan()['previous_boundary']
+        old['spec']['matchConstraints']['resourceRules'][0]['operations'] = ['CREATE']
+        updated = renderer.boundary(old, renderer.pod())
+        self.assertEqual(['CREATE', 'UPDATE'],
+            updated['spec']['matchConstraints']['resourceRules'][0]['operations'])
 
     def fixture(self):
         plan, writes = self.plan(), []

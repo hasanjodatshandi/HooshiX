@@ -69,6 +69,12 @@ def pod():
 
 def boundary(previous, spec):
     result = copy.deepcopy(previous)
+    pod_rules = [rule for rule in result['spec']['matchConstraints']['resourceRules']
+        if '' in rule['apiGroups'] and 'v1' in rule['apiVersions'] and 'pods' in rule['resources']]
+    if not pod_rules:
+        raise ValueError('REDIS_POD_ADMISSION_RULE_REQUIRED')
+    for rule in pod_rules:
+        rule['operations'] = sorted(set(rule.get('operations', [])) | {'CREATE', 'UPDATE'})
     for check in result['spec']['validations']:
         check['expression'] = 'object.spec.serviceAccountName == "security-redis" || (' + check['expression'] + ')'
     checked = copy.deepcopy(spec)
