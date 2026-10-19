@@ -2223,6 +2223,14 @@ Secret نوع TLS به نام `platform-data/security-redis-tls` فقط `tls.crt
 [Redis TLS](https://redis.io/docs/latest/operate/oss_and_stack/management/security/encryption/)
 و [ESO Vault](https://external-secrets.io/latest/provider/hashicorp-vault/).
 
+### اجرای داخلی و بستهٔ Redis
+
+پس از تحویل credential و TLS، فقط همان تصویر امضاشده و LocalPV رزروشده مصرف
+می‌شوند. ایجاد workload به معنی بازشدن دسترسی برنامه‌ها یا تأیید Production نیست.
+فضای OpenBao/PostgreSQL و هویت‌های موجود حفظ می‌شوند؛ حذف PVC، فرمت مجدد و
+ساخت CA یا رمز تازه جزو این مرحله نیست. روش اجرایی فقط پس از شواهد native و
+بستهٔ معتبر همان نسخه قابل استفاده است.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
