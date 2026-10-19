@@ -1,6 +1,8 @@
 """Real six-identity Redis delivery using the already signed Ambient data ESO."""
 import hashlib
 import json
+import re
+from unittest.mock import patch
 
 import install_redis_secrets as installer
 import openbao_scoped_auth as auth
@@ -10,7 +12,17 @@ import render_postgresql_secrets as renderer
 from bootstrap_redis_secrets import preserved, quarantine
 
 
-def rehearse(k, chart, helm, api, root, ca, audiences, addresses):
+def preserve_fixture(kube, owned_node):
+    if not re.fullmatch('hooshix-bao-ci-[a-f0-9]{12}-control-plane', owned_node):
+        raise ValueError('CALLER_OWNED_KIND_NODE_REQUIRED')
+    pv = quarantine.get(kube, 'pv', quarantine.volume.VOLUME)
+    # Quarantine binds the real disposable node; the earlier unclaimed fixture uses target metadata.
+    node = owned_node if pv['status']['phase'] == 'Bound' else quarantine.volume.NODE
+    with patch.object(quarantine.volume, 'NODE', node):
+        return preserved(kube)
+
+
+def rehearse(k, chart, helm, api, root, ca, audiences, addresses, owned_node):
     plan = installer.render(renderer.render(chart, helm, addresses))
     plan['public_ca_sha256'] = hashlib.sha256(ca.encode()).hexdigest()
 
@@ -29,7 +41,7 @@ def rehearse(k, chart, helm, api, root, ca, audiences, addresses):
         return [api.call(path, token=root)['data'] for path in paths]
 
     before = identities()
-    protected = preserved(kube)
+    protected = preserve_fixture(kube, owned_node)
     pg_secrets = {name: k('-n', pg.NAMESPACE, 'get', 'secret', name,
         '-o', 'jsonpath={.metadata.uid}:{.metadata.resourceVersion}') for name in pg.ENTRIES}
     result = installer.execute(plan, kube=kube, api=api, root=root, ca=ca,
@@ -45,7 +57,7 @@ def rehearse(k, chart, helm, api, root, ca, audiences, addresses):
     if before != identities() or any(k('-n', pg.NAMESPACE, 'get', 'secret', n,
         '-o', 'jsonpath={.metadata.uid}:{.metadata.resourceVersion}') != v for n, v in pg_secrets.items()):
         raise ValueError('REDIS_SECRET_EXISTING_AUTHORITY_CHANGED')
-    if preserved(kube) != protected:
+    if preserve_fixture(kube, owned_node) != protected:
         raise ValueError('REDIS_SECRET_BOUND_DATABASE_CHANGED')
     current_volume = quarantine.get(kube, 'pv', quarantine.volume.VOLUME)
     result['bound_database_preservation'] = ('Passed' if current_volume['status']['phase'] == 'Bound' else 'Not run')

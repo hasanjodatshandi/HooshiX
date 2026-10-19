@@ -21,6 +21,7 @@ import openbao_scoped_auth as auth
 import redis_secret_delivery as contract
 import render_redis_acl as acl
 import render_redis_security as renderer
+import rehearse_redis_secrets as rehearsal
 from test_postgresql_secrets import CredentialAPI
 
 
@@ -150,6 +151,15 @@ class RedisSecretTest(unittest.TestCase):
                     bootstrap.preserved(kube)
                 state.clear(); state.update(original)
                 cluster, pvc = state[('cluster', q.NAME)], state[('pvc', q.volume.CLAIM)]
+            owned_node = 'hooshix-bao-ci-123456abcdef-control-plane'
+            state[('pv', q.volume.VOLUME)]['spec']['nodeAffinity']['required']['nodeSelectorTerms'][0][
+                'matchExpressions'][0]['values'] = [owned_node]
+            with self.assertRaises(ValueError): bootstrap.preserved(kube)
+            self.assertEqual(result, rehearsal.preserve_fixture(kube, owned_node))
+            self.assertEqual('hooshix-production-1', q.volume.NODE)
+            for node in ('hooshix-production-1', '../arbitrary', 'foreign-control-plane'):
+                with self.subTest(node=node), self.assertRaises(ValueError):
+                    rehearsal.preserve_fixture(kube, node)
 
     def test_redis_supervisor_selects_initialized_preserver_without_changing_pg_default(self):
         with patch.object(bootstrap.pg, 'commission', return_value={}) as shared:

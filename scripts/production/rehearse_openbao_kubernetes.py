@@ -487,7 +487,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     step('redis-scoped-secret-delivery')
                     from rehearse_redis_secrets import rehearse as redis_secrets
                     redis_secret_result = redis_secrets(k, eso_chart, str(tools / 'helm'),
-                        api, token, cert.read_text(), audiences, addresses)
+                        api, token, cert.read_text(), audiences, addresses, name + '-control-plane')
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
