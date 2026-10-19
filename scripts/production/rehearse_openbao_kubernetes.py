@@ -31,7 +31,7 @@ STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "sc
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
                    "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
-                   "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "redis-scoped-secret-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -484,6 +484,10 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     if postgresql_quarantine:
                         from rehearse_postgresql_quarantine import rehearse as quarantine
                         pg_quarantine_result = quarantine(k, wait, run, eso_chart, str(tools / 'helm'), addresses, platform)
+                    step('redis-scoped-secret-delivery')
+                    from rehearse_redis_secrets import rehearse as redis_secrets
+                    redis_secret_result = redis_secrets(k, eso_chart, str(tools / 'helm'),
+                        api, token, cert.read_text(), audiences, addresses, name + '-control-plane')
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
@@ -569,6 +573,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
             result['barman_control_plane'] = barman_result
             result['postgresql_secret_delivery'] = pg_secret_result
+            result['redis_secret_delivery'] = redis_secret_result
             if postgresql_quarantine: result['postgresql_quarantine'] = pg_quarantine_result
     else:
         result['postgresql_local_volume'] = local_volume_result

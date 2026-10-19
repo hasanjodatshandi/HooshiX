@@ -18,13 +18,13 @@ import activate_openbao_operator as operator
 from build_postgresql_secrets_bundle import SOURCES
 
 
-def validate_bundle(directory, revision):
+def validate_bundle(directory, revision, *, sources=SOURCES):
     host.require(not directory.is_symlink() and directory.is_dir(), 'PG_SECRET_PUBLIC_BUNDLE_REQUIRED')
     path = directory / 'bundle.json'
     host.require(not path.is_symlink() and path.stat().st_size <= host.BOUND, 'PG_SECRET_BUNDLE_MANIFEST_BOUND')
     manifest = json.loads(path.read_bytes())
     host.require(manifest.get('schema_version') == 1 and manifest.get('source_revision') == revision
-        and set(manifest['files']) == {'plan.json', *SOURCES}, 'PG_SECRET_EXACT_BUNDLE_REQUIRED')
+        and set(manifest['files']) == {'plan.json', *sources}, 'PG_SECRET_EXACT_BUNDLE_REQUIRED')
     for name, digest in manifest['files'].items():
         path = directory / name
         host.require(not path.is_symlink() and path.is_file() and path.stat().st_size <= 512 * 1024

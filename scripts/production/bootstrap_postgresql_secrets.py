@@ -57,14 +57,16 @@ def token_request(namespace, account, audiences):
                 *['--audience=' + a for a in audiences]).decode().strip()
 
 
-def commission(request, revision):
+def commission(request, revision, *, execute=installer.execute, token_requester=token_request,
+               audit_label='PostgreSQL', preserve=platform.protected):
+    host.require(audit_label in ('PostgreSQL', 'Redis'), 'PG_SECRET_FIXED_AUDIT_LABEL_REQUIRED')
     host.require(set(request) == {'root_token', 'recipients', 'plan', 'plan_sha256'}, 'PG_SECRET_REQUEST_REJECTED')
     plan = decode_plan(request['plan'], request['plan_sha256'])
     host.require(plan['staging']['source_revision'] == revision and plan['staging']['result'] == 'Passed',
         'PG_SECRET_REVIEWED_STAGING_REQUIRED')
     digest = host.public_keys(request['recipients'])
     before, claim_uid = host.preflight()
-    retained = platform.protected(kube)
+    retained = preserve(kube)
     guard = host.native(['/usr/bin/systemctl', 'is-active', 'hooshix-postgresql-storage-guard.service'],
                         operation='PG_SECRET_PRESERVE_GUARD')
     host.require(guard.strip() == b'active', 'PG_SECRET_EXISTING_GUARD_REQUIRED')
@@ -87,12 +89,12 @@ def commission(request, revision):
             api = established.API(client)
             host.require(api.call('auth/token/lookup-self', token=request['root_token'])['data']['policies'] == ['root'],
                          'PG_SECRET_SUPERVISED_ROOT_REQUIRED')
-            host.native(['/usr/sbin/auditctl', '-m', 'HooshiX PostgreSQL secret delivery ' + revision],
+            host.native(['/usr/sbin/auditctl', '-m', 'HooshiX ' + audit_label + ' secret delivery ' + revision],
                         operation='PG_SECRET_OS_AUDIT')
-            result = installer.execute(plan, kube=kube, api=api, root=request['root_token'],
-                ca=certificate.decode('ascii'), audiences=audience, token_request=token_request)
+            result = execute(plan, kube=kube, api=api, root=request['root_token'],
+                ca=certificate.decode('ascii'), audiences=audience, token_request=token_requester)
         host.storage_preflight()
-        host.require(before == host.service_identity() and retained == platform.protected(kube)
+        host.require(before == host.service_identity() and retained == preserve(kube)
             and host.get('pvc', 'data-openbao-0')['metadata']['uid'] == claim_uid,
             'PG_SECRET_PRESERVED_TARGET_CHANGED')
     result.update(source_revision=revision, recipient_sha256=digest, pvc_uid=claim_uid,
@@ -101,7 +103,7 @@ def commission(request, revision):
     return result
 
 
-def main(revision):
+def main(revision, *, commissioner=commission):
     os.umask(0o077)
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     signal.signal(signal.SIGALRM, host.custody.deadline_expired)
@@ -111,7 +113,7 @@ def main(revision):
         print('PG_SECRET_RPC_READY', flush=True)
         content = sys.stdin.buffer.readline(host.BOUND + 1)
         host.require(0 < len(content) <= host.BOUND and content.endswith(b'\n'), 'PG_SECRET_REQUEST_BOUND')
-        print(json.dumps(commission(json.loads(content), revision)), flush=True)
+        print(json.dumps(commissioner(json.loads(content), revision)), flush=True)
         return 0
     except host.custody.BootstrapFailed as error:
         print(json.dumps({'reason': str(error), 'state_preserved': True}), flush=True)
