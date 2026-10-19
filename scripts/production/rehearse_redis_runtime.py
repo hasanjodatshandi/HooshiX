@@ -48,6 +48,7 @@ def rehearse(k, wait, run, ca, node, platform):
         actual = json.loads(k('-n', renderer.NS, 'get', 'pod', renderer.NAME + '-0', '-o', 'json'))
         pod = {key: actual[key] for key in ('apiVersion', 'kind', 'metadata', 'spec')}
         pod['metadata'] = {key: actual['metadata'][key] for key in ('name', 'namespace', 'labels', 'ownerReferences')}
+        print('REDIS_RUNTIME_POD_ADMISSION=positive', flush=True)
         admission_result(k, pod, wait, public_schema=False)
         for mode in ('account', 'image', 'privilege', 'ambient', 'host-path', 'command', 'probe', 'token', 'extra-container', 'env'):
             bad = copy.deepcopy(pod)
@@ -62,7 +63,9 @@ def rehearse(k, wait, run, ca, node, platform):
             if mode == 'token': bad['spec']['automountServiceAccountToken'] = True
             if mode == 'extra-container': bad['spec']['containers'].append(copy.deepcopy(c))
             if mode == 'env': c['env'] = [{'name': 'REDISCLI_AUTH', 'value': 'not-secret'}]
-            admission_result(k, bad, wait, expected=1, public_schema=False)
+            print('REDIS_RUNTIME_POD_ADMISSION_NEGATIVE=' + mode, flush=True)
+            admission_result(k, bad, wait, expected=1,
+                message=b'closed Redis runtime contract rejected', public_schema=False)
         result['pod_contract_positive_negative'] = 'Passed'
         for original in plan['source_policies']:
             wrong = copy.deepcopy(original)
