@@ -390,6 +390,8 @@ infrastructure/production/host/nftables-management-ssh.nft
 infrastructure/production/host/sshd-human-match.tail
 infrastructure/production/host/sshd_config
 infrastructure/production/k3s/config.yaml
+infrastructure/production/kafka/Dockerfile
+infrastructure/production/kafka/candidate.json
 infrastructure/production/network/trust-policy.json
 infrastructure/production/observability/observability-policy.json
 infrastructure/production/platform-contracts.json
@@ -543,6 +545,7 @@ scripts/production/build_cert_manager_candidates.py
 scripts/production/build_cert_manager_commissioning_bundle.py
 scripts/production/build_cnpg_control_plane_bundle.py
 scripts/production/build_eso_commissioning_bundle.py
+scripts/production/build_kafka_candidate.py
 scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
@@ -600,6 +603,7 @@ scripts/production/provision_openbao_storage.py
 scripts/production/provision_postgresql_storage.py
 scripts/production/provision_redis_storage.py
 scripts/production/publish_cert_manager_candidates.py
+scripts/production/publish_kafka_candidate.py
 scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
 scripts/production/publish_postgresql_candidates.py
@@ -665,6 +669,7 @@ scripts/production/run-redis-local-volume.ps1
 scripts/production/run-redis-runtime.ps1
 scripts/production/run-redis-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
+scripts/production/test_kafka_runtime_native.py
 scripts/production/test_postgresql_isolation_native.py
 scripts/production/test_redis_security_native.py
 scripts/production/tests/test_barman_control_plane.py
@@ -684,6 +689,7 @@ scripts/production/tests/test_intermediate_csr.py
 scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
+scripts/production/tests/test_kafka_runtime_candidate.py
 scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_mesh_publication.py
