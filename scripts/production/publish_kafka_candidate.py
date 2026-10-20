@@ -18,20 +18,22 @@ from verify_openbao_artifact import load
 from verify_postgresql_artifacts import scan_inventory
 from verify_release import EXPECTED_CERTIFICATE_IDENTITY
 
-REPOSITORY = "ghcr.io/hasanjodatshandi/hooshix/platform-kafka-private"
-PACKAGE_API = "users/hasanjodatshandi/packages/container/hooshix%2Fplatform-kafka-private"
+REPOSITORY = "ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private"
+PACKAGE_API = "users/hasanjodatshandi/packages/container/hooshix%2Fplatform-kafka-v2-private"
 BUILD_TYPE = "https://github.com/hasanjodatshandi/HooshiX/kafka-runtime-security-build/v1"
 
 
-def package_visibility(*, allow_missing: bool = False) -> str | None:
+def package_visibility() -> str:
     try:
-        visibility = run(["gh", "api", PACKAGE_API, "--jq", ".visibility"], timeout=20).strip()
-    except subprocess.CalledProcessError as error:
-        if allow_missing and "(HTTP 404)" in (error.stderr or ""):
-            return None
-        raise
+        visibility = subprocess.run(
+            ["gh", "api", PACKAGE_API, "--jq", ".visibility"], check=True,
+            capture_output=True, text=True, timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        print("KAFKA_PACKAGE_VISIBILITY=Not verified; release stopped", flush=True)
+        raise ValueError("private Kafka package visibility could not be verified") from None
     if visibility != "private":
-        print("KAFKA_PACKAGE_VISIBILITY=Rejected; required=private", flush=True)
+        actual = visibility if visibility in ("public", "internal") else "invalid"
+        print(f"KAFKA_PACKAGE_VISIBILITY=Rejected; actual={actual}; required=private", flush=True)
         raise ValueError("private Kafka package required")
     return visibility
 
@@ -64,11 +66,11 @@ def publish(directory: Path, env: dict[str, str]) -> dict:
     endpoint = local_endpoint()
     pin = pins()
     directory.mkdir(mode=0o700)
-    package_visibility(allow_missing=True)
+    package_visibility()
     print("KAFKA_PUBLICATION_STEP=build-scan-native", flush=True)
     built = build(directory / "candidate")
     print("KAFKA_PUBLICATION_STEP=push-registry-scan", flush=True)
-    package_visibility(allow_missing=True)
+    package_visibility()
     target = REPOSITORY + ":candidate-" + revision + "-" + invocation.replace(":", "-")
     run(["docker", "--host", endpoint, "tag", built["local_image_id"], target])
     run(["docker", "--host", endpoint, "push", target], timeout=300)

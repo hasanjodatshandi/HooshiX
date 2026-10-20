@@ -2307,11 +2307,79 @@ backup/restore و اجرای VPS را ثابت نمی‌کند.
 
 پس از ادغام تغییر به `main` و موفقیت baseline همان SHA، مالک می‌تواند از GitHub
 Actions، workflow **Production release evidence** را با ورودی
-`kafka-candidate` اجرا کند. این workflow فقط package خصوصی GHCR را build/scan/sign
-می‌کند و هرگز نصب یا deploy نمی‌کند. receipt باید `publication=Passed` و در عین حال
+`kafka-candidate` اجرا کند. مقصد ثابت ابزار برای انتشار خصوصی فقط
+`ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private` است. نام قدیمی
+`platform-kafka-private` بازنشسته و حذف شده و نباید دوباره استفاده شود؛ GitHub اجازهٔ تبدیل
+package عمومی به خصوصی را نمی‌دهد. پسوند `private` به‌تنهایی مدرک خصوصی‌بودن نیست.
+در ایجاد اولیهٔ package از workflow با `GITHUB_TOKEN`، GitHub به‌طور پیش‌فرض مدل
+visibility و permissions مخزن را به package منتقل می‌کند؛ با مخزن Public نباید
+برای ایجاد یک مقصد خصوصی به این مسیر تکیه کرد. visibility یک package موجود را
+می‌توان با دسترسی granular مستقل از مخزن تنظیم کرد.
+
+package باید از پیش به‌صورت خصوصی آماده شده باشد؛ ایجاد مقصد جدید در این workflow
+مجاز نیست. آماده‌سازی مقصد جدید **Passed** است: metadata خصوصی و رد خواندن ناشناس
+باید مستقل بررسی شوند؛ این نتیجه به معنی انتشار candidate یا نصب Kafka نیست.
+اعتبار مدیریت registry باید
+یک PAT **classic** موقت و جدا از کلید خواندنی VPS باشد: ساخت مقصد به
+`read:packages` و `write:packages` و حذف مصوب package قبلی به `delete:packages`
+نیاز دارد. این اعتبار فقط در فایل خصوصی خارج Git روی دستگاه مالک نگه‌داری شود؛
+مجوز کلید خواندنی موجود VPS افزایش پیدا نکند و اعتبار موقت پس از اتمام کار لغو شود.
+برای registry تازه، فقط یک‌بار و خارج Actions، با PAT مالک یک تصویر خالی و بدون
+فایل، executable، کلید یا سورس محصول منتشر کنید تا namespace خصوصی ایجاد شود.
+این تصویر فقط رزرو registry است؛ Kafka نیست، امضا/پذیرش استقرار ندارد و هرگز نباید
+deploy شود. اگر package خصوصی از قبل موجود است، این مرحله را تکرار نکنید.
+فرمان‌های زیر در Bash محلی اجرا می‌شوند؛ tracing/ضبط ترمینال خاموش باشد:
+
+```bash
+(
+set -euo pipefail
+registry_config=$(mktemp -d)
+chmod 700 "$registry_config"
+export DOCKER_CONFIG="$registry_config"
+trap 'unset registry_token; rm -f -- "$registry_config/config.json"; rmdir -- "$registry_config"; unset DOCKER_CONFIG' EXIT
+read -r -s -p 'Temporary GHCR classic token: ' registry_token
+printf '\n'
+printf '%s\n' "$registry_token" | docker --host unix:///var/run/docker.sock login ghcr.io --username hasanjodatshandi --password-stdin
+unset registry_token
+chmod 600 "$registry_config/config.json"
+tar -cf - --files-from /dev/null | docker --host unix:///var/run/docker.sock image import \
+  --change 'LABEL org.opencontainers.image.source=https://github.com/hasanjodatshandi/HooshiX' \
+  --change 'LABEL org.opencontainers.image.description="Empty registry provisioning only; never deploy"' \
+  --change 'USER 65532:65532' - \
+  ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private:registry-bootstrap
+docker --host unix:///var/run/docker.sock push ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private:registry-bootstrap
+docker --host unix:///var/run/docker.sock logout ghcr.io
+)
+```
+
+اگر هر فرمان ناموفق شد، ادامه ندهید. metadata مقصد باید `private` باشد و درخواست
+ناشناس token/manifest نباید خواندن موفق بدهد. تصویر خالی جایگزین build و scan و
+امضای candidate نیست. label اتصال repository به‌تنهایی اثبات دسترسی Actions نیست.
+در تنظیمات همان package،
+visibility باید Private بماند و در **Manage Actions access** فقط دسترسی موردنیاز
+انتشار برای مخزن `hasanjodatshandi/HooshiX` با نقش **Write** تنظیم شود. احراز هویت
+مالک با احراز هویت workflow یکسان نیست؛ خود `GITHUB_TOKEN` نیز باید در preflight
+بتواند metadata مقصد را بخواند. پیش از dispatch، بررسی
+زیر باید دقیقاً `private` برگرداند؛ خطای 404 می‌تواند ناشی از نبود package یا نداشتن
+دسترسی باشد و مجوز ساخت خودکار آن نیست:
+
+```bash
+gh api users/hasanjodatshandi/packages/container/hooshix%2Fplatform-kafka-v2-private --jq .visibility
+```
+
+Publisher پیش از build و دوباره پیش از push، visibility مقصد موجود را می‌سنجد.
+پاسخ‌های 401/403/404، timeout و مقدار `public`، `internal` یا نامعتبر همگی عملیات
+را پیش از push متوقف می‌کنند. پس از push نیز باید visibility برابر `private` باشد
+تا scan/sign و receipt موفق صادر شود. این workflow هرگز نصب یا deploy نمی‌کند. receipt باید
+`registry_visibility=private` و `publication=Passed` و در عین حال
 `staging=Not run`، `deployment=Not run` و `application_ingress=CLOSED` نشان دهد؛
 تا تکمیل TLS/ACL، آزمون staging، backup/recovery و ظرفیت، candidate را روی VPS
 نصب نکنید و نسخهٔ منتشرشده را Production-ready تلقی نکنید.
+
+مرجع محدودیت بازگشت visibility:
+[GitHub Packages visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility).
+مرجع رفتار پیش‌فرض ایجاد از workflow و دسترسی نوشتن:
+[GitHub Actions package permissions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#default-permissions-and-access-settings-for-packages-modified-through-workflows).
 
 پس از آن ادامهٔ مشترک:
 
