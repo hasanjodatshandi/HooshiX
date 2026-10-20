@@ -41,7 +41,7 @@
     "replication_factor": 1,
     "tls_required": true,
     "unclean_leader_election": false,
-    "version": "4.2.1"
+    "version": "4.2.2"
   },
   "observability": {
     "alertmanager": "0.33.1",

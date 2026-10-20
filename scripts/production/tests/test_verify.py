@@ -19,6 +19,34 @@ class ProductionProfileTest(unittest.TestCase):
                 with patch.object(verify, "load_json", changed_load):
                     self.assertIn("production PostgreSQL platform/data version drift: " + key,
                                   verify.validate_static_contracts(self.profile))
+    def test_kafka_target_matches_platform_data_and_blocked_security_candidate(self):
+        original_load = verify.load_json
+        paths = (verify.PRODUCTION / "platform-contracts.json",
+                 verify.PRODUCTION / "data/data-policy.json",
+                 verify.PRODUCTION / "kafka/candidate.json")
+        for path in paths:
+            with self.subTest(path=path.name):
+                def changed_load(selected):
+                    data = original_load(selected)
+                    if selected == path:
+                        if selected.name == "candidate.json":
+                            data["version"] = "4.2.1"
+                        else:
+                            data["kafka"]["version"] = "4.2.1"
+                    return data
+                with patch.object(verify, "load_json", changed_load):
+                    self.assertIn("production Kafka platform/data/candidate version drift",
+                                  verify.validate_static_contracts(self.profile))
+        for key, value in (("production_promotion", "Passed"), ("application_ingress", "OPEN"),
+                           ("platform", "linux/arm64")):
+            def changed_load(selected):
+                data = original_load(selected)
+                if selected == paths[2]:
+                    data[key] = value
+                return data
+            with patch.object(verify, "load_json", changed_load):
+                self.assertIn("Kafka candidate must remain immutable, blocked and closed",
+                              verify.validate_static_contracts(self.profile))
     def test_existing_root_approval_cannot_expand_scope_or_forge_evidence(self):
         original_load = verify.load_json
         authority_path = verify.ROOT / "scripts/production/offline-ca/root-authority.json"

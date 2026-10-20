@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "component": "kafka",
+  "owner": "platform",
+  "version": "4.2.2",
+  "upstream_image": "apache/kafka@sha256:daa39dc85acd37b148fad74d6b22b60fa5f7fa05048a5c8aa3b654140c63dd58",
+  "platform": "linux/amd64",
+  "apk_packages": {
+    "libcrypto3": "3.5.9-r0",
+    "libexpat": "2.9.0-r0",
+    "libssl3": "3.5.9-r0",
+    "openssl": "3.5.9-r0",
+    "zlib": "1.3.2-r1"
+  },
+  "maven_overrides": [
+    {"group": "com.fasterxml.jackson.core", "artifact": "jackson-core", "version": "2.21.7", "path": "com/fasterxml/jackson/core/jackson-core/2.21.7/jackson-core-2.21.7.jar", "sha256": "8c5623b98f32d5f7e1287ff61ed50e08ab7b11381e991fff89327faabba42261", "replaces": "jackson-core-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.core", "artifact": "jackson-databind", "version": "2.21.7", "path": "com/fasterxml/jackson/core/jackson-databind/2.21.7/jackson-databind-2.21.7.jar", "sha256": "1290c2795e93e8a6861a6c4d9ff0d844d32f5ea178362cb2721edf5561e828b1", "replaces": "jackson-databind-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.dataformat", "artifact": "jackson-dataformat-csv", "version": "2.21.7", "path": "com/fasterxml/jackson/dataformat/jackson-dataformat-csv/2.21.7/jackson-dataformat-csv-2.21.7.jar", "sha256": "588050148497158cabdc05c0ae3a7e123194a486b8c62745778fc6239f9b085e", "replaces": "jackson-dataformat-csv-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.dataformat", "artifact": "jackson-dataformat-yaml", "version": "2.21.7", "path": "com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.21.7/jackson-dataformat-yaml-2.21.7.jar", "sha256": "df2b3e6a194181dc067b7211d750926b4ae9e4f3c892a0005b8219a9b59be681", "replaces": "jackson-dataformat-yaml-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.datatype", "artifact": "jackson-datatype-jdk8", "version": "2.21.7", "path": "com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.21.7/jackson-datatype-jdk8-2.21.7.jar", "sha256": "b8f62f98363ed9aa259b3a479a64fcbe7e081158a8bec6733972e900d12f4e47", "replaces": "jackson-datatype-jdk8-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.jakarta.rs", "artifact": "jackson-jakarta-rs-base", "version": "2.21.7", "path": "com/fasterxml/jackson/jakarta/rs/jackson-jakarta-rs-base/2.21.7/jackson-jakarta-rs-base-2.21.7.jar", "sha256": "202b61a95e735d01ae03e411b8f6ae1245bbf19c87d4746c0204579f5c2e456b", "replaces": "jackson-jakarta-rs-base-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.jakarta.rs", "artifact": "jackson-jakarta-rs-json-provider", "version": "2.21.7", "path": "com/fasterxml/jackson/jakarta/rs/jackson-jakarta-rs-json-provider/2.21.7/jackson-jakarta-rs-json-provider-2.21.7.jar", "sha256": "32473ee172e0c181ba63688ee4a94349de77de05bd4279d0846a9515a56bb0fe", "replaces": "jackson-jakarta-rs-json-provider-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.module", "artifact": "jackson-module-blackbird", "version": "2.21.7", "path": "com/fasterxml/jackson/module/jackson-module-blackbird/2.21.7/jackson-module-blackbird-2.21.7.jar", "sha256": "b41fb816cbaa5f2393136cf1c525e0d9a9f9bcea14207a09e8e703df53351596", "replaces": "jackson-module-blackbird-2.21.6.jar"},
+    {"group": "com.fasterxml.jackson.module", "artifact": "jackson-module-jakarta-xmlbind-annotations", "version": "2.21.7", "path": "com/fasterxml/jackson/module/jackson-module-jakarta-xmlbind-annotations/2.21.7/jackson-module-jakarta-xmlbind-annotations-2.21.7.jar", "sha256": "76054ca6e252e7142fec9c0e9a146bd8c43cde13dddf2d1cdaecd9db981c2ddc", "replaces": "jackson-module-jakarta-xmlbind-annotations-2.21.6.jar"},
+    {"group": "at.yawk.lz4", "artifact": "lz4-java", "version": "1.11.4", "path": "at/yawk/lz4/lz4-java/1.11.4/lz4-java-1.11.4.jar", "sha256": "58c8e0b813960d2a248e050c353baea73139b48a2ffc55382d42c69707e17325", "replaces": "lz4-java-1.11.2.jar"}
+  ],
+  "production_promotion": "blocked-until-protected-publication-runtime-staging-and-recovery-evidence",
+  "application_ingress": "CLOSED"
+}

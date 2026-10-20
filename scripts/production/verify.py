@@ -18,7 +18,7 @@ EXPECTED = {
     "platform.kyverno": "1.19.1", "platform.argocd": "3.4.2",
     "postgresql.postgresql": "18.6", "postgresql.cloudnativepg": "1.30.1",
     "postgresql.barman_plugin": "0.15.1", "postgresql.cert_manager": "1.20.3",
-    "redis.version": "8.2.8", "kafka.version": "4.2.1", "secrets.openbao": "2.6.4",
+    "redis.version": "8.2.8", "kafka.version": "4.2.2", "secrets.openbao": "2.6.4",
     "secrets.external_secrets_operator": "2.12.0", "edge.traefik": "3.7.10",
     "edge.traefik_chart": "41.2.0", "edge.gateway_api": "1.5.1",
     "observability.otel_collector": "0.157.0", "observability.prometheus": "3.13.2",
@@ -41,11 +41,15 @@ REQUIRED_FILES = (
     "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "data/postgresql-images.json", "network/trust-policy.json",
     "data/postgresql-source-builds.json", "data/cert-manager-sources.json", "data/cert-manager-images.json", "observability/observability-policy.json", "recovery/recovery-policy.json",
     "release/release-policy.json", "secrets/secrets-policy.json", "gitops/application.yaml",
+    "kafka/candidate.json", "kafka/Dockerfile",
 )
 REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/verify_release.py", ROOT / "scripts/production/readiness.py",
     ROOT / "scripts/production/prepare_human_sshd_candidate.py",
     ROOT / "scripts/production/verify_postgresql_artifacts.py",
+    ROOT / "scripts/production/build_kafka_candidate.py",
+    ROOT / "scripts/production/publish_kafka_candidate.py",
+    ROOT / "scripts/production/test_kafka_runtime_native.py",
     ROOT / "scripts/production/build_postgresql_candidates.py",
     ROOT / "scripts/production/publish_postgresql_candidates.py",
     ROOT / "scripts/production/build_cert_manager_candidates.py",
@@ -175,9 +179,12 @@ def validate_static_contracts(profile: dict) -> list[str]:
     observability = load_json(PRODUCTION/"observability/observability-policy.json")
     secrets = load_json(PRODUCTION/"secrets/secrets-policy.json")
     release = load_json(PRODUCTION/"release/release-policy.json")
+    kafka_candidate = load_json(PRODUCTION/"kafka/candidate.json")
     schema = load_json(PRODUCTION/"release-manifest.schema.json")
     for key, data_key in (("postgresql", "version"), ("cloudnativepg", "cloudnativepg"), ("barman_plugin", "barman_plugin")):
         add(errors, platform.get("postgresql", {}).get(key) == data.get("postgresql", {}).get(data_key), "production PostgreSQL platform/data version drift: " + key)
+    add(errors, platform.get("kafka", {}).get("version") == data.get("kafka", {}).get("version") == kafka_candidate.get("version") == "4.2.2", "production Kafka platform/data/candidate version drift")
+    add(errors, kafka_candidate.get("platform") == "linux/amd64" and re.fullmatch(r"apache/kafka@sha256:[a-f0-9]{64}", kafka_candidate.get("upstream_image", "")) is not None and kafka_candidate.get("production_promotion") == "blocked-until-protected-publication-runtime-staging-and-recovery-evidence" and kafka_candidate.get("application_ingress") == "CLOSED", "Kafka candidate must remain immutable, blocked and closed")
     combined = {"platform":platform.get("platform",{}),"admission":platform.get("admission",{}),"gitops":platform.get("gitops",{}),"postgresql":data.get("postgresql",{}),"redis":data.get("redis",{}),"kafka":data.get("kafka",{}),"secrets":{"openbao":secrets.get("openbao",{}).get("version"),"external_secrets_operator":secrets.get("external_secrets_operator",{}).get("version")},"edge":platform.get("edge",{}),"observability":platform.get("observability",{}),"release":platform.get("release",{})}
     crosswalk = {"platform.kubernetes":"platform.kubernetes","platform.k3s":"platform.k3s","platform.calico":"platform.calico","platform.istio_ambient":"platform.istio_ambient","platform.kyverno":"admission.kyverno","platform.argocd":"gitops.argocd","postgresql.postgresql":"postgresql.version","postgresql.cloudnativepg":"postgresql.cloudnativepg","postgresql.barman_plugin":"postgresql.barman_plugin","redis.version":"redis.version","kafka.version":"kafka.version","secrets.openbao":"secrets.openbao","secrets.external_secrets_operator":"secrets.external_secrets_operator","edge.traefik":"edge.traefik","edge.traefik_chart":"edge.traefik_chart","edge.gateway_api":"edge.gateway_api","observability.otel_collector":"observability.otel_collector","observability.prometheus":"observability.prometheus","observability.alertmanager":"observability.alertmanager","observability.loki":"observability.loki","observability.tempo":"observability.tempo","observability.grafana":"observability.grafana","supply_chain.syft":"release.syft","supply_chain.grype":"release.grype","supply_chain.cosign":"release.cosign"}
     for profile_path, contract_path in crosswalk.items(): add(errors, get(profile,profile_path) == get(combined,contract_path), f"production contract drift: {profile_path} != {contract_path}")
