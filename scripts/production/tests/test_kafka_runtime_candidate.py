@@ -1,9 +1,12 @@
 """Kafka candidate remains pinned, scanned, isolated, private, and non-deploying."""
 import copy
+import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -42,7 +45,10 @@ class KafkaCandidateScanTest(unittest.TestCase):
     def validate(self):
         def load(path):
             return self.pin if path == build.PIN else self.files[path.name]
-        with patch.object(build, "load", side_effect=load), patch.object(Path, "read_bytes", return_value=b"fixture"):
+        with patch.object(build, "load", side_effect=load), \
+                patch.object(Path, "read_bytes", return_value=b"fixture"), \
+                patch.object(build, "datetime", wraps=datetime) as clock:
+            clock.now.return_value = self.now
             return build.validate_scan(Path("evidence"), self.image)
 
     def test_pinned_complete_scan_passes_without_promotion(self):
@@ -89,7 +95,6 @@ class KafkaPublicationTest(unittest.TestCase):
         def run(argv, **kwargs):
             calls.append(argv)
             if argv[0] == "git": return self.revision
-            if argv[0] == "gh": return "private"
             if argv[0] == "syft":
                 path = Path(argv[-1].removeprefix("syft-json="))
                 digest = self.manifest
@@ -118,18 +123,27 @@ class KafkaPublicationTest(unittest.TestCase):
             directory = Path(temporary) / "evidence"
             with patch.object(publish, "context", return_value=(self.revision, "github:123:1")), \
                     patch.object(publish, "run", side_effect=run), \
+                    patch.object(publish.subprocess, "run", return_value=subprocess.CompletedProcess(
+                        ["gh", "api"], 0, stdout="private\n")) as metadata, \
                     patch.object(publish, "local_endpoint", return_value="unix:///captured.sock"), \
                     patch.object(publish, "pins", return_value={"version": "4.2.2", "upstream_image": "apache/kafka@sha256:" + "e" * 64,
                         "maven_overrides": []}), patch.object(publish, "build", side_effect=candidate), \
                     patch.object(publish, "scan_inventory", side_effect=scan), \
                     patch.object(publish, "validate_scan", return_value={"scan": "Passed"}), \
-                    patch.object(publish, "sign_and_verify"):
+                    patch.object(publish, "sign_and_verify") as sign:
                 result = publish.publish(directory, self.env)
         self.assertEqual("Passed", result["publication"])
         self.assertEqual("private", result["registry_visibility"])
         self.assertEqual("Not run", result["deployment"])
         self.assertEqual("CLOSED", result["application_ingress"])
-        self.assertTrue(any(command[:4] == ["docker", "--host", "unix:///captured.sock", "push"] for command in calls))
+        self.assertIn(["docker", "--host", "unix:///captured.sock", "push",
+                       "ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private:"
+                       "candidate-" + self.revision + "-github-123-1"], calls)
+        self.assertEqual(4, metadata.call_count)
+        metadata.assert_called_with(
+            ["gh", "api", "users/hasanjodatshandi/packages/container/hooshix%2Fplatform-kafka-v2-private",
+             "--jq", ".visibility"], check=True, capture_output=True, text=True, timeout=20)
+        sign.assert_called_once()
 
     def test_non_candidate_or_public_package_stops_before_build(self):
         for env, visibility in ((self.env | {"RELEASE_KIND": "applications"}, "private"),
@@ -138,33 +152,82 @@ class KafkaPublicationTest(unittest.TestCase):
                     patch.object(publish, "context", return_value=(self.revision, "github:123:1")), \
                     patch.object(publish, "run", side_effect=lambda argv, **kwargs:
                         self.revision if argv[0] == "git" else visibility), \
+                    patch.object(publish.subprocess, "run", return_value=subprocess.CompletedProcess(
+                        ["gh", "api"], 0, stdout=visibility)), \
                     patch.object(publish, "local_endpoint", return_value="unix:///captured.sock"), \
                     patch.object(publish, "build") as build_candidate, \
-                    self.assertRaises((ValueError, FileExistsError)):
+                    self.assertRaises(ValueError):
                 publish.publish(Path(temporary) / "evidence", env)
             build_candidate.assert_not_called()
 
+    def test_visibility_rejection_reports_only_bounded_category(self):
+        for visibility, actual in (("public", "public"), ("internal", "internal"),
+                                   ("untrusted-secret-like-value", "invalid")):
+            output = io.StringIO()
+            with patch.object(publish.subprocess, "run", return_value=subprocess.CompletedProcess(
+                    ["gh", "api"], 0, stdout=visibility)), redirect_stdout(output), \
+                    self.assertRaises(ValueError):
+                publish.package_visibility()
+            self.assertEqual(f"KAFKA_PACKAGE_VISIBILITY=Rejected; actual={actual}; required=private\n",
+                             output.getvalue())
+
+    def test_unverified_visibility_stops_before_build_or_push_without_raw_errors(self):
+        for failure in (subprocess.CalledProcessError(1, ["gh"], stderr="secret (HTTP 404)"),
+                        subprocess.CalledProcessError(1, ["gh"], stderr="secret (HTTP 403)"),
+                        subprocess.CalledProcessError(1, ["gh"], stderr="secret (HTTP 401)"),
+                        subprocess.TimeoutExpired(["gh"], 20, stderr="secret"), OSError("secret")):
+            output = io.StringIO()
+            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(publish, "context", return_value=(self.revision, "github:123:1")), \
+                    patch.object(publish, "run", return_value=self.revision) as command, \
+                    patch.object(publish.subprocess, "run", side_effect=failure), \
+                    patch.object(publish, "local_endpoint", return_value="unix:///captured.sock"), \
+                    patch.object(publish, "build") as build_candidate, \
+                    patch.object(publish, "sign_and_verify") as sign, redirect_stdout(output), \
+                    self.assertRaisesRegex(ValueError, "visibility could not be verified"):
+                publish.publish(Path(temporary) / "evidence", self.env)
+            build_candidate.assert_not_called()
+            sign.assert_not_called()
+            command.assert_called_once_with(["git", "rev-parse", "HEAD"])
+            self.assertEqual("KAFKA_PACKAGE_VISIBILITY=Not verified; release stopped\n", output.getvalue())
+
     def test_visibility_is_rechecked_after_build_before_registry_push(self):
-        calls = []
+        for response in (subprocess.CompletedProcess(["gh"], 0, stdout="public"),
+                         subprocess.CalledProcessError(1, ["gh"], stderr="secret (HTTP 404)")):
+            with self.subTest(response=type(response).__name__), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(publish, "context", return_value=(self.revision, "github:123:1")), \
+                    patch.object(publish, "run", return_value=self.revision) as command, \
+                    patch.object(publish.subprocess, "run", side_effect=[
+                        subprocess.CompletedProcess(["gh"], 0, stdout="private"), response]), \
+                    patch.object(publish, "local_endpoint", return_value="unix:///captured.sock"), \
+                    patch.object(publish, "pins", return_value={"version": "4.2.2"}), \
+                    patch.object(publish, "build", return_value={"local_image_id": self.config}) as build_candidate, \
+                    patch.object(publish, "sign_and_verify") as sign, \
+                    self.assertRaisesRegex(ValueError, "private Kafka package"):
+                publish.publish(Path(temporary) / "evidence", self.env)
+            build_candidate.assert_called_once()
+            sign.assert_not_called()
+            command.assert_called_once_with(["git", "rev-parse", "HEAD"])
 
-        def run(argv, **kwargs):
-            calls.append(argv)
-            if argv[0] == "git": return self.revision
-            if argv[0] == "gh": return "private" if sum(call[0] == "gh" for call in calls) == 1 else "public"
-            return ""
-
+    def test_visibility_change_after_push_cannot_scan_sign_or_create_success_receipt(self):
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.object(publish, "context", return_value=(self.revision, "github:123:1")), \
-                patch.object(publish, "run", side_effect=run), \
+                patch.object(publish, "run", return_value=self.revision) as command, \
+                patch.object(publish.subprocess, "run", side_effect=[
+                    subprocess.CompletedProcess(["gh"], 0, stdout=value)
+                    for value in ("private", "private", "public")]), \
                 patch.object(publish, "local_endpoint", return_value="unix:///captured.sock"), \
-                patch.object(publish, "pins", return_value={"version": "4.2.2"}), \
-                patch.object(publish, "build", return_value={"local_image_id": self.config}) as build_candidate, \
-                self.assertRaisesRegex(ValueError, "private Kafka package"):
-            publish.publish(Path(temporary) / "evidence", self.env)
-
-        self.assertTrue(build_candidate.called)
-        self.assertFalse(any(command[:4] == ["docker", "--host", "unix:///captured.sock", "push"]
-                             for command in calls))
+                patch.object(publish, "build", return_value={"local_image_id": self.config}), \
+                patch.object(publish, "scan_inventory") as scan, \
+                patch.object(publish, "sign_and_verify") as sign:
+            directory = Path(temporary) / "evidence"
+            with self.assertRaisesRegex(ValueError, "private Kafka package"):
+                publish.publish(directory, self.env)
+            self.assertTrue(any(call.args[0][:4] == ["docker", "--host", "unix:///captured.sock", "push"]
+                                for call in command.call_args_list))
+            self.assertFalse((directory / "publication.json").exists())
+            scan.assert_not_called()
+            sign.assert_not_called()
 
     def test_source_provenance_binds_all_overlays_and_repository(self):
         pin = build.pins()
