@@ -175,7 +175,7 @@ certificate renewal, capacity, backup or Production readiness.
 
 ## 6. Kafka single-broker KRaft
 
-`production-single-server` uses one Kafka 4.2.1 process with combined KRaft `broker,controller` roles.
+`production-single-server` targets Kafka 4.2.2 with one combined KRaft `broker,controller` process. The reviewed security-overlay image is still a candidate: production publication, native TLS/ACL, staging, recovery, and deployment evidence are required before it is installed or promoted.
 
 The profile formally accepts that Apache Kafka recommends separated/redundant controller/broker roles for critical deployments; the single combined process is a cost/operability trade-off and is not HA.
 

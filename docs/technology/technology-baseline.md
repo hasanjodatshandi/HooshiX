@@ -32,7 +32,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Protobuf Java/compiler | 4.34.2 | contract code generation and Spring Boot-managed service runtime aligned |
 | Protobuf validation | Protovalidate Java 1.2.2 | schema annotations plus fail-closed server interceptor; dependency locks and checksums required |
 | External/browser API | REST + OpenAPI through BFF | current architecture |
-| Async/event transport | Apache Kafka 4.2.1 + Spring Kafka 4.1.0 + LZ4 Java 1.11.4 | ADR-0015 profile-aware durability; direct constraint overrides Kafka Clients transitive 1.10.1 and fixes GHSA-343h-94h5-c4wr, GHSA-gm45-99xc-r7wv and GHSA-mcr4-qmvw-px4g ([upstream security release](https://github.com/yawkat/lz4-java/releases/tag/v1.11.4)); service locks/checksums and CI compatibility tests required |
+| Async/event transport | Apache Kafka 4.2.2 candidate + Spring Kafka 4.1.0 + LZ4 Java 1.11.4 | ADR-0015 profile-aware durability; private upstream-runtime-security-overlay candidate pins Alpine security packages and checksum-verifies Jackson 2.21.7/LZ4 1.11.4 overlays; local KRaft smoke and zero-High/Critical image scan required; production TLS/ACL, staging, restore and runtime promotion remain gated |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
 | Database | PostgreSQL 18.6 | profile-aware mutable relational persistence; candidate Alpine 3.24.2 runtime with fixed OpenSSL/zlib; final artifact and CNPG/restore gates required |

@@ -2254,8 +2254,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-redis-runtime-YYYYMMDD\run-redis-runtime.ps1' -RescueAndSecondSessionReady
 ```
 
-نتیجهٔ مورد انتظار `REDIS_RUNTIME=Passed` و receipt عمومی کنار بسته است، نه تأیید
-Production. یک StatefulSet تک‌نمونه `platform-data/security-redis` و PVC مستقل
+اجرای مالک در 2026-10-20 با `REDIS_RUNTIME=Passed` پایان یافت؛ receipt عمومی
+کنار بستهٔ `HooshiX-redis-runtime-20261020` ذخیره شد. این فقط اجرای داخلی را
+تأیید می‌کند، نه آمادگی Production. یک StatefulSet تک‌نمونه
+`platform-data/security-redis` و PVC مستقل
 `data-security-redis-0` فقط PV موجود `hooshix-redis-local-7gib` را مصرف می‌کنند.
 Service از نوع ClusterIP/headless است؛ NetworkPolicy ورودی ندارد و AuthorizationPolicy
 هیچ هویتی را مجاز نمی‌کند. فقط egress کنترل mesh روی 15012 لازم است. برنامه‌ها
@@ -2281,13 +2283,44 @@ renewal/reload گواهی ۳۰روزه، اتصال برنامه‌ها، monito
 هنوز **Not verified** هستند؛ قبل از نزدیک‌شدن انقضا یا بازکردن ترافیک باید جداگانه
 تکمیل شوند. ورود موفق و PING به معنی آماده‌بودن محصول روی دامنه نیست.
 
+### کاندید Kafka، بدون انتشار یا نصب
+
+مرجع کاندید تک‌سرور Kafka `4.2.2` و تصویر upstream ثابت
+`apache/kafka@sha256:daa39dc85acd37b148fad74d6b22b60fa5f7fa05048a5c8aa3b654140c63dd58`
+است. تصویر security-overlay نسخه‌های دقیق بسته‌های Alpine و checksum تمام
+overlayهای Jackson `2.21.7` و LZ4 Java `1.11.4` را در
+`infrastructure/production/kafka/candidate.json` ثبت می‌کند؛ Kafka clientهای
+سرویس‌ها جدا هستند و با این تغییر ارتقا نمی‌یابند.
+
+ساخت محلی فقط از ریشهٔ checkout تمیز و با Docker محلی و ابزارهای integrity-pinned
+Syft/Grype اجرا می‌شود. مسیر evidence باید تازه و خالی باشد:
+
+```bash
+python3 scripts/production/build_kafka_candidate.py \
+  --directory /tmp/hooshix-kafka-candidate-<unique>/evidence
+```
+
+خروجی موفق باید `scan=Passed`، صفر High/Critical و `native_smoke.kraft` و
+`native_smoke.local_produce_consume` برابر `Passed` داشته باشد. تست محلی فقط
+broker دورریختنی با شبکهٔ قطع‌شده و دادهٔ مصنوعی را بررسی می‌کند؛ TLS/ACL، staging،
+backup/restore و اجرای VPS را ثابت نمی‌کند.
+
+پس از ادغام تغییر به `main` و موفقیت baseline همان SHA، مالک می‌تواند از GitHub
+Actions، workflow **Production release evidence** را با ورودی
+`kafka-candidate` اجرا کند. این workflow فقط package خصوصی GHCR را build/scan/sign
+می‌کند و هرگز نصب یا deploy نمی‌کند. receipt باید `publication=Passed` و در عین حال
+`staging=Not run`، `deployment=Not run` و `application_ingress=CLOSED` نشان دهد؛
+تا تکمیل TLS/ACL، آزمون staging، backup/recovery و ظرفیت، candidate را روی VPS
+نصب نکنید و نسخهٔ منتشرشده را Production-ready تلقی نکنید.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
 2. دسترسی عملیاتی محدود، backup ساعتی، recovery و audit امن خارج میزبان؛ root
    اولیه فقط پس از جایگزین معتبر و آزمون recovery لغو شود.
 3. JIT واقعی: expiry/revoke/disconnect، سپس حذف دسترسی دائمی با مسیر نجات کارا.
-4. PostgreSQL/CNPG/Barman، Redis و Kafka با backup/ACL/TLS/restore مصوب.
+4. PostgreSQL/CNPG/Barman و Redis به backup/restore و ظرفیت نیاز دارند؛ Kafka
+   candidate باید پس از انتشار محافظت‌شده TLS/ACL، staging و recovery را بگذراند.
 5. GitOps/Argo CD، انتشار هفت artifact، شش سرویس و frontend، migration و اسرار.
 6. edge/TLS/WAF، مسیر frontend/BFF و دامنهٔ همان نصب؛ origin bypass ممنوع.
 7. observability/alert و monitor مستقل خاموشی host.
