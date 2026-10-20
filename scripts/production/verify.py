@@ -41,7 +41,7 @@ REQUIRED_FILES = (
     "host/sshd_config", "host/sshd-human-match.tail", "host/nftables-management-ssh.nft", "k3s/config.yaml", "data/data-policy.json", "data/postgresql-images.json", "network/trust-policy.json",
     "data/postgresql-source-builds.json", "data/cert-manager-sources.json", "data/cert-manager-images.json", "observability/observability-policy.json", "recovery/recovery-policy.json",
     "release/release-policy.json", "secrets/secrets-policy.json", "gitops/application.yaml",
-    "kafka/candidate.json", "kafka/Dockerfile",
+    "kafka/candidate.json", "kafka/Dockerfile", "kafka/published-candidate.json",
 )
 REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/verify_release.py", ROOT / "scripts/production/readiness.py",
@@ -50,6 +50,7 @@ REQUIRED_SCRIPTS = (
     ROOT / "scripts/production/build_kafka_candidate.py",
     ROOT / "scripts/production/publish_kafka_candidate.py",
     ROOT / "scripts/production/test_kafka_runtime_native.py",
+    ROOT / "scripts/production/test_kafka_tls_acl_native.py",
     ROOT / "scripts/production/build_postgresql_candidates.py",
     ROOT / "scripts/production/publish_postgresql_candidates.py",
     ROOT / "scripts/production/build_cert_manager_candidates.py",

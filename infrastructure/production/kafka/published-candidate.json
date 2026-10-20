@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "version": "4.2.2",
+  "image": "ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private@sha256:9fe8fcb340ffe144e3ffa502df1b0694743a027df56595dd91e62b6f9e716556",
+  "image_configuration_digest": "sha256:e12c940f9d38faa5a7034d622727156e4766a833135de66231e36ec20e854e83",
+  "repository_revision": "7d4d00d781060e723e6f231c5ea63660c9d87d13",
+  "publication_run": "39468920860",
+  "publication_attempt": 1,
+  "publication_sha256": "b1a61c3bf16252ec41b49673b81b67e20114bd3fab43839c2358a888848131a0",
+  "production_promotion": "blocked-until-runtime-staging-and-recovery-evidence"
+}
