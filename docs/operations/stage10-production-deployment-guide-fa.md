@@ -91,6 +91,12 @@ make production-verify
 branch/PR می‌گذرند. اصلاحات امنیتی Java/frontend جزو سورس منتخب‌اند؛ patchهای
 قدیمی دستی تکرار نمی‌شوند. [راهنمای پایه](production-installation-fa.md).
 
+ابزار frontend از Vite ثابت `8.2.4` و lockfile متناظر استفاده می‌کند؛ این patch
+اصلاح امنیتی [GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv)
+برای اجرای editor روی Windows را دارد. وابستگی‌ها را با `npm ci` نصب کنید؛
+اسکن OSV، build، coverage، آزمون مرورگر و دسترس‌پذیری باید موفق باشند.
+در Production فقط خروجی `dist` توسط Caddy سرو می‌شود؛ `vite preview` سرور Production نیست.
+
 ## ۳. inventory و مسیر نجات
 
 در نشست مجاز فقط سرور دوم اجرا کنید:
