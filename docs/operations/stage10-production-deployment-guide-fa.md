@@ -2387,6 +2387,45 @@ Publisher پیش از build و دوباره پیش از push، visibility مقص
 مرجع رفتار پیش‌فرض ایجاد از workflow و دسترسی نوشتن:
 [GitHub Actions package permissions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#default-permissions-and-access-settings-for-packages-modified-through-workflows).
 
+### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
+
+مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`
+است؛ نسخهٔ `4.2.2` از [اجرای محافظت‌شدهٔ انتشار](https://github.com/hasanjodatshandi/HooshiX/actions/runs/39468920860)
+با scan صفر High/Critical و signature/provenance/SBOM معتبر پذیرفته شده است.
+این فایل مجوز promotion نیست؛ شرط‌های staging و recovery همچنان برقرارند.
+
+روی دستگاه Linux محلی با Docker Unix، OpenSSL و `/dev/shm` از نوع tmpfs اجرا کنید؛
+اجراکننده root نباشد. ابتدا با توکن **read-only** و ورودی مخفی، در Docker با
+`--password-stdin` وارد GHCR شوید؛ پیکربندی احراز هویت در پوشهٔ خصوصی موقت و خارج
+Git باشد، سپس پس از pull، logout و حذف همان پیکربندی انجام شود. توکن در فرمان،
+history یا خروجی قرار نگیرد. تصویر دقیق را بکشید؛ tag قابل‌تغییر جایگزین digest نیست:
+
+```bash
+docker --host unix:///var/run/docker.sock pull --platform linux/amd64 \
+  ghcr.io/hasanjodatshandi/hooshix/platform-kafka-v2-private@sha256:9fe8fcb340ffe144e3ffa502df1b0694743a027df56595dd91e62b6f9e716556
+python3 scripts/production/test_kafka_tls_acl_native.py --disposable
+```
+
+اجرای محلی این آزمون روی digest ثبت‌شده **Passed** است؛ اجرای VPS و staging هنوز
+**Not run** است.
+
+ابزار فقط تصویر از قبل موجود با digest ثابت را اجرا می‌کند. شبکهٔ container برابر
+`none` است؛ هیچ پورت host منتشر نمی‌شود. کلیدها و CA آزمایشی یک‌روزه در RAM ساخته
+می‌شوند و هیچ ارتباطی با Root/Intermediate/OpenBao واقعی ندارند. container غیر-root
+با root filesystem فقط‌خواندنی، منابع محدود و دادهٔ دورریختنی اجرا و در پایان همراه
+volumeهای ناشناس خودش حذف می‌شود. کلیدهای آزمایشی و raw log را نگه ندارید.
+
+خروجی موفق باید `native_tls`، `mutual_client_auth`، `hostname_validation`،
+`topic_role_group_acl`، `default_deny`، `acl_admin_denial`، `writer_revocation` و
+`acks_all_idempotent_produce_consume` را `Passed` نشان دهد. خطای transport یا timeout
+جایگزین رد مشخص TLS/ACL نیست. این آزمایش، custody مستقل کلیدهای سرویس‌ها، چرخش و
+انقضا، mesh/NetworkPolicy، quotas، ظرفیت، staging، recovery یا نصب VPS را ثابت
+نمی‌کند؛ `deployment=Not run` و `production_readiness=Not verified` باقی می‌مانند.
+
+مرجع تنظیم‌های نسخهٔ 4.2:
+[Kafka TLS](https://kafka.apache.org/42/security/encryption-and-authentication-using-ssl/)،
+[Kafka ACL](https://kafka.apache.org/42/security/authorization-and-acls/).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
