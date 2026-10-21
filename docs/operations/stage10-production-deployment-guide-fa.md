@@ -2436,6 +2436,13 @@ OpenBao/Root/CA یا توکن GHCR در این گام استفاده نمی‌ش
 بررسی هویت filesystem و با همان مسیر نجات انجام می‌شود. receipt موفقِ مقصد
 پیش‌نیاز رزرو LocalPV و تحویل TLS است، نه مجوز بازکردن ترافیک.
 
+### رزرو volume برای Kafka
+
+پس از موفقیت فضای مستقل، گام بعد رزرو LocalPV با سیاست `Retain` و claim ثابت
+Kafka است؛ رزرو، گواهی یا broker ایجاد نمی‌کند. پیش از نصب، آزمون واقعی binding،
+محدودیت claim، UID، استفادهٔ مجدد و حفظ داده پس از حذف claim باید موفق باشد.
+سه PVC موجود OpenBao، PostgreSQL و Redis و قواعد admission دست‌نخورده می‌مانند.
+
 ### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
 
 مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`
