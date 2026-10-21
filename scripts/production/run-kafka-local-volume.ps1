@@ -1,7 +1,7 @@
 param([switch]$ValidateOnly, [switch]$RescueAndSecondSessionReady)
 $ErrorActionPreference = 'Stop'
 $source = 'install_kafka_local_volume.py'
-$expectedNames = @($source, 'run-kafka-local-volume.ps1', 'kafka-storage-receipt.json', 'openbao-kubernetes-receipt.json')
+$expectedNames = @($source, 'run-kafka-local-volume.ps1', 'kafka-storage-receipt.json', 'kafka-local-volume-receipt.json')
 $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'bundle.json') -Raw | ConvertFrom-Json
 if ($manifest.schema_version -ne 1 -or $manifest.source_revision -cnotmatch '^[a-f0-9]{40}$' -or
     $manifest.native_run -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'REVIEWED_BUNDLE_REQUIRED' }

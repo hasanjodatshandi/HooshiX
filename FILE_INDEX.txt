@@ -624,6 +624,7 @@ scripts/production/rehearse_cnpg_control_plane.py
 scripts/production/rehearse_eso_commissioning.py
 scripts/production/rehearse_eso_delivery.py
 scripts/production/rehearse_import_referrers.py
+scripts/production/rehearse_kafka_local_volume.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py

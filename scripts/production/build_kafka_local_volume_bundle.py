@@ -42,7 +42,7 @@ def build(output, run_id):
     with tempfile.TemporaryDirectory(prefix='hooshix-kafka-local-public-') as temp:
         records = {}
         for prefix, filename in (('kafka-storage', 'kafka-storage-receipt.json'),
-                                 ('openbao-kubernetes', 'openbao-kubernetes-receipt.json')):
+                                 ('kafka-local-volume', 'kafka-local-volume-receipt.json')):
             name = prefix + '-' + run_id + '-' + str(record['run_attempt'])
             matches = [a for a in artifacts if a['name'] == name]
             if len(matches) != 1 or matches[0]['expired'] or not 0 < matches[0]['size_in_bytes'] <= 32768:
@@ -53,7 +53,7 @@ def build(output, run_id):
             if len(files) != 1 or files[0].name != filename or files[0].is_symlink() or files[0].stat().st_size > 16384:
                 raise ValueError('single bounded public proof required')
             records[prefix] = json.loads(files[0].read_bytes())
-        check(record, records['kafka-storage'], records['openbao-kubernetes'], revision)
+        check(record, records['kafka-storage'], records['kafka-local-volume'], revision)
         output.mkdir(mode=0o700)
         for filename in (SOURCE, WRAPPER): shutil.copyfile(ROOT / 'scripts/production' / filename, output / filename)
         for prefix, proof in records.items():

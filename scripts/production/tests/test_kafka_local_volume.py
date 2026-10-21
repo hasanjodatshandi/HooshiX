@@ -3,6 +3,8 @@ import copy
 import hashlib
 import json
 import stat
+import os
+import tempfile
 import sys
 import unittest
 from pathlib import Path
@@ -13,9 +15,51 @@ import install_kafka_local_volume as volume
 import provision_kafka_storage as storage
 import build_kafka_local_volume_bundle as bundle
 import rehearse_postgresql_local_volume as fixture
+import rehearse_kafka_local_volume as runner
 
 
 class LocalVolumeTest(unittest.TestCase):
+    def test_ci_runner_boundary_precedes_cluster_or_receipt_operations(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(runner.fixture, 'run') as command:
+            with self.assertRaises(runner.fixture.RehearsalFailed):
+                runner.rehearse(Path('/tmp/tools'), Path('/tmp/receipt.json'))
+            command.assert_not_called()
+
+    def test_mutable_fixture_image_is_rejected_before_cluster_commands(self):
+        pins = runner.fixture.pins() | {'KIND_NODE_IMAGE': 'kindest/node:latest'}
+        with patch.object(runner.fixture, 'runner_paths'), patch.object(runner.fixture, 'pins', return_value=pins), \
+                patch.object(runner.fixture, 'run') as command:
+            with self.assertRaisesRegex(ValueError, 'PINNED_VOLUME_FIXTURE_NODE_REQUIRED'):
+                runner.rehearse(Path('/tmp/tools'), Path('/tmp/receipt.json'))
+            command.assert_not_called()
+
+    def test_partial_fixture_failure_removes_only_owned_cluster_and_leaves_no_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            tools = directory / 'tools'
+            tools.mkdir()
+            pins = runner.fixture.pins().copy()
+            for name, key in (('kind', 'KIND_LINUX_AMD64_SHA256'), ('kubectl', 'KUBECTL_LINUX_AMD64_SHA256')):
+                (tools / name).write_bytes(name.encode())
+                pins[key] = hashlib.sha256(name.encode()).hexdigest()
+            receipt = directory / 'receipt.json'
+            calls = []
+            def command(args, **options):
+                calls.append(args)
+                if args[1:3] == ['get', 'clusters']: return b''
+                if args[1:3] == ['create', 'cluster']: raise ValueError('synthetic partial startup')
+                return b''
+            with patch.dict(os.environ, {'GITHUB_ACTIONS': 'true', 'RUNNER_TEMP': temporary}), \
+                    patch.object(os, 'getuid', return_value=1000), patch.object(runner.fixture, 'pins', return_value=pins), \
+                    patch.object(runner.fixture, 'run', side_effect=command):
+                with self.assertRaisesRegex(ValueError, 'synthetic partial startup'):
+                    runner.rehearse(tools, receipt)
+            self.assertFalse(receipt.exists())
+            creation = next(c for c in calls if c[1:3] == ['create', 'cluster'])
+            deletion = next(c for c in calls if c[1:3] == ['delete', 'cluster'])
+            self.assertRegex(creation[4], r'^hooshix-kafka-volume-[a-f0-9]{12}$')
+            self.assertEqual(creation[4], deletion[4])
+
     def test_fixture_uses_digest_pulled_by_cri_not_docker_archive_import(self):
         run = Mock()
         kube = Mock(side_effect=ValueError('namespace boundary reached'))

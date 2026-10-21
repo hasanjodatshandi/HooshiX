@@ -2459,8 +2459,11 @@ python3 scripts/production/build_kafka_local_volume_bundle.py \
   --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-local-volume-20261021
 ```
 
-builder به دو شاهد تازه با عمر حداکثر پنج روز نیاز دارد: آزمون mount/ENOSPC/guard
-و آزمون Kubernetes binding/claim/UID/reuse/Retain. مورد دوم از تصویر ثابت
+builder به دو artifact تازه از همان اجرای موفق baseline با عمر حداکثر پنج روز
+نیاز دارد: `kafka-storage` برای mount/ENOSPC/guard و `kafka-local-volume` برای
+Kubernetes binding/claim/UID/reuse/Retain. fixture دوم کلاستر موقت مستقل دارد؛
+برای تغییر صرفاً volume، mesh یا datastoreهای دیگر را دوباره commissioning نمی‌کند.
+آزمون‌های کامل mesh برای تغییرات مربوط به همان بخش همچنان اجباری‌اند. مورد دوم از تصویر ثابت
 PostgreSQL فقط به‌عنوان فرایند نوشتن/خواندن فایل با UID `10001` استفاده می‌کند؛
 این شاهد تست broker، TLS یا ACL خود Kafka نیست. فایل‌های عمومی bundle خارج Git
 می‌مانند. اگر نام پوشه موجود است، نام تازه بدهید و overwrite نکنید.
