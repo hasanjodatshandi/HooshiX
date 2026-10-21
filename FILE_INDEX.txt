@@ -547,6 +547,7 @@ scripts/production/build_cert_manager_commissioning_bundle.py
 scripts/production/build_cnpg_control_plane_bundle.py
 scripts/production/build_eso_commissioning_bundle.py
 scripts/production/build_kafka_candidate.py
+scripts/production/build_kafka_storage_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
@@ -600,6 +601,7 @@ scripts/production/platform_image_egress.py
 scripts/production/postgresql_secret_delivery.py
 scripts/production/prepare_human_sshd_candidate.py
 scripts/production/probe_parspack_audit_bucket.py
+scripts/production/provision_kafka_storage.py
 scripts/production/provision_openbao_storage.py
 scripts/production/provision_postgresql_storage.py
 scripts/production/provision_redis_storage.py
@@ -660,6 +662,7 @@ scripts/production/run-guard-maintenance.ps1
 scripts/production/run-host-inspection.ps1
 scripts/production/run-intermediate-csr.ps1
 scripts/production/run-intermediate-import.ps1
+scripts/production/run-kafka-storage.ps1
 scripts/production/run-mesh-security-upgrade.ps1
 scripts/production/run-openbao-storage.ps1
 scripts/production/run-platform-commissioning.ps1
@@ -692,6 +695,7 @@ scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_kafka_runtime_candidate.py
+scripts/production/tests/test_kafka_storage.py
 scripts/production/tests/test_kafka_tls_acl.py
 scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
