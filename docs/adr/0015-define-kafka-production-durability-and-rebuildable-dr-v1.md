@@ -30,6 +30,21 @@ Internal Kafka topics/features that otherwise require a replication factor great
 
 This is a formal non-HA exception. Apache Kafka recommends separated/redundant broker/controller roles for critical deployments. In this profile, broker/node/disk loss stops asynchronous transport and can lose broker-local data. The exception is acceptable only because Kafka remains rebuildable transport and critical publication/consumer evidence exists outside broker-local storage.
 
+### Bounded initial single-server storage foundation
+
+For the existing owner-approved VPS commissioning, reserve an independent,
+fully preallocated 16GiB ext4 loop filesystem for Kafka logs. Reuse the reviewed
+ADR-0011 storage engine with separate Kafka paths, lock, mount unit, guard and
+K3s dependency; preserve the OpenBao, PostgreSQL and Redis files, guards and
+host-service state. No partition is resized or formatted. UID/GID 10001 owns
+only the mounted data directory; the unmounted path remains root-only. Require
+at least 30% host-filesystem space after reservation. Reject existing data or
+foreign/partial configuration rather than reformatting it. Guard failure stops
+K3s management, not necessarily every existing container; rearming is explicit.
+Native 64MiB ENOSPC/remount/mount-loss tests must precede supervised local-sudo
+execution. This foundation creates no PV or Kafka process, grants no traffic,
+and does not prove target reboot persistence, capacity, TLS/ACL or recovery.
+
 ### `production-ha` topology
 
 When the HA profile is selected:

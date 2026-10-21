@@ -424,12 +424,25 @@ jobs:
           sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
             python3 scripts/production/rehearse_openbao_storage.py --ci --redis \
             | tee "$RUNNER_TEMP/redis-storage-receipt.json"
+      - name: Verify Kafka log profile and fail-closed guard with runtime UID 10001
+        run: |
+          set -euo pipefail
+          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted \
+            python3 scripts/production/rehearse_openbao_storage.py --ci --kafka \
+            | tee "$RUNNER_TEMP/kafka-storage-receipt.json"
+      - name: Retain public Kafka storage evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kafka-storage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kafka-storage-receipt.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Parse storage owner wrappers without target execution
         shell: pwsh
         run: |
           $tokens = $null
           $parseErrors = $null
-          foreach ($name in @('run-postgresql-storage.ps1', 'run-postgresql-local-volume.ps1', 'run-redis-storage.ps1', 'run-redis-local-volume.ps1')) {
+          foreach ($name in @('run-postgresql-storage.ps1', 'run-postgresql-local-volume.ps1', 'run-redis-storage.ps1', 'run-redis-local-volume.ps1', 'run-kafka-storage.ps1')) {
             [void][System.Management.Automation.Language.Parser]::ParseFile(
               (Join-Path $env:GITHUB_WORKSPACE ('scripts/production/' + $name)),
               [ref]$tokens, [ref]$parseErrors)

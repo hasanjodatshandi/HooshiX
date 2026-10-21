@@ -2387,6 +2387,55 @@ Publisher پیش از build و دوباره پیش از push، visibility مقص
 مرجع رفتار پیش‌فرض ایجاد از workflow و دسترسی نوشتن:
 [GitHub Actions package permissions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#default-permissions-and-access-settings-for-packages-modified-through-workflows).
 
+### فضای مستقل Kafka روی VPS
+
+نصب Kafka از فضای مستقل ۱۶GiB با guard هویت mount آغاز می‌شود؛ این فضا از
+OpenBao، PostgreSQL و Redis جداست و محدودیت filesystem واقعی دارد. تخصیص فضا،
+ساخت Kafka یا تأیید ظرفیت Production نیست. تا تحویل TLS از OpenBao/ESO و
+نصب workload داخلیِ بررسی‌شده، وضعیت خود Kafka **Not run** باقی می‌ماند.
+اسرار و داده‌های موجود نباید کپی، فرمت مجدد یا جایگزین شوند.
+
+پیش‌نیاز مقصد، همان نسخه‌های ابزار میزبان در جدول سازگاری و فعال‌بودن guard هر
+سه datastore موجود است. پس از رزرو، حداقل ۳۰٪ دیسک اصلی باید آزاد بماند؛ این
+شرط، تضمین ظرفیت نهایی یا سرعت دیسک نیست. فایل backing برابر
+`/var/lib/hooshixstorage/kafka.ext4` و mount برابر
+`/var/lib/hooshixstorage/kafka` است. قفل، state، mount unit، guard و drop-in
+K3s فقط نام‌های Kafka را دارند. مسیر unmounted برای کاربر غیر-root قابل‌نوشتن نیست.
+
+از checkout تمیز main با CI موفق، bundle عمومی را خارج Git بسازید؛
+`MAIN_BASELINE_RUN_ID` شناسهٔ اجرای موفق `Repository baseline` با tree دقیق همان
+main است، نه هر اجرای قدیمی:
+
+```bash
+python3 scripts/production/build_kafka_storage_bundle.py \
+  --native-run MAIN_BASELINE_RUN_ID \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-storage-20261021
+```
+
+اگر پوشه از قبل وجود دارد، نام تازه انتخاب کنید؛ روی آن overwrite نکنید.
+bundle به receipt عمومیِ native با عمر حداکثر پنج روز و hash دقیق دو منبع وابسته
+است. با کنسول نجات VNC قابل ورود و نشست دوم SSH خصوصی باز، در PowerShell اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-storage-20261021\run-kafka-storage.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-storage-20261021\run-kafka-storage.ps1' -RescueAndSecondSessionReady
+```
+
+فقط `READY` دقیق با صفحه‌کلید انگلیسی و رمز sudo در همان پنجره لازم است؛ رمز
+OpenBao/Root/CA یا توکن GHCR در این گام استفاده نمی‌شود. خروجی مورد انتظار
+`KAFKA_STORAGE=Passed` و مسیر receipt است؛ فایل JSON باید
+`kafka_storage=Passed`، `storage_guard=Passed`، `backing_bytes=17179869184`،
+`runtime_uid=10001`، `existing_storage_host_services=Preserved` و
+`k3s_restart_performed=false` داشته باشد. این عملیات reboot، restart یا نصب پکیج ندارد.
+هنوز `kafka`، `persistent_volume` و `secret_delivery` برابر `Not run` و
+`production_readiness` و `reboot_persistence` برابر `Not verified` هستند.
+
+در خرابی یا state ناشناخته تکرار کور، فرمت، حذف backing/state/قفل و restart
+خودکار ممنوع است. guard هویت mount/backing را بررسی می‌کند؛ خرابی آن K3s را
+متوقف می‌کند، نه الزاماً تمام containerهای موجود را. بازیابی و re-arm فقط پس از
+بررسی هویت filesystem و با همان مسیر نجات انجام می‌شود. receipt موفقِ مقصد
+پیش‌نیاز رزرو LocalPV و تحویل TLS است، نه مجوز بازکردن ترافیک.
+
 ### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
 
 مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`
