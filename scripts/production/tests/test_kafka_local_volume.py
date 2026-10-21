@@ -32,8 +32,9 @@ class LocalVolumeTest(unittest.TestCase):
         self.assertEqual('WaitForFirstConsumer', sc['volumeBindingMode'])
         self.assertEqual('Retain', sc['reclaimPolicy'])
         self.assertFalse(sc['allowVolumeExpansion'])
-        self.assertEqual({'storage': '15Gi'}, pv['spec']['capacity'])
-        self.assertLess(volume.CAPACITY, 16500000000)
+        self.assertEqual({'storage': '14Gi'}, pv['spec']['capacity'])
+        # Available bytes from the successful 16GiB target filesystem receipt, not backing size.
+        self.assertLess(volume.CAPACITY, 15851999232)
         self.assertEqual({'name': 'data-kafka-0', 'namespace': 'platform-data'}, pv['spec']['claimRef'])
         self.assertEqual(str(volume.DATA), pv['spec']['local']['path'])
         root = Path(storage.__file__).parent

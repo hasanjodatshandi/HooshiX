@@ -16,9 +16,9 @@ MANAGER = 'hooshix-kafka-local-volume'
 NODE = 'hooshix-production-1'
 NAMESPACE = 'platform-data'
 CLASS = 'hooshix-kafka-local'
-VOLUME = 'hooshix-kafka-local-15gib'
+VOLUME = 'hooshix-kafka-local-14gib'
 CLAIM = 'data-kafka-0'
-CAPACITY = 15 * 1024**3
+CAPACITY = 14 * 1024**3
 DATA = Path('/var/lib/hooshixstorage/kafka/data')
 GUARD = Path('/var/lib/hooshixstorage/kafka-storage-guard.py')
 GUARD_SHA256 = '738a6ede6eeb6ccda7368e1efd9e67ec3e11eb40bdf99efc4b3bbca59df34761'
@@ -54,7 +54,7 @@ def candidate():
          'provisioner': 'kubernetes.io/no-provisioner', 'reclaimPolicy': 'Retain',
          'volumeBindingMode': 'WaitForFirstConsumer', 'allowVolumeExpansion': False},
         {'apiVersion': 'v1', 'kind': 'PersistentVolume', 'metadata': metadata(VOLUME), 'spec': {
-            'capacity': {'storage': '15Gi'}, 'volumeMode': 'Filesystem', 'accessModes': ['ReadWriteOnce'],
+            'capacity': {'storage': '14Gi'}, 'volumeMode': 'Filesystem', 'accessModes': ['ReadWriteOnce'],
             'persistentVolumeReclaimPolicy': 'Retain', 'storageClassName': CLASS,
             'local': {'path': str(DATA)}, 'claimRef': {'namespace': NAMESPACE, 'name': CLAIM},
             'nodeAffinity': {'required': {'nodeSelectorTerms': [{'matchExpressions': [
@@ -199,7 +199,7 @@ def main():
             require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_nlink == 1
                 and stat.S_IMODE(info.st_mode) == 0o600, 'SAFE_EXISTING_LOCK_REQUIRED')
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            native(['/usr/sbin/auditctl', '-m', 'HooshiX Kafka guarded LocalPV reservation 15GiB'])
+            native(['/usr/sbin/auditctl', '-m', 'HooshiX Kafka guarded LocalPV reservation 14GiB'])
             result = execute()
             result['source_sha256'] = hashlib.sha256(source).hexdigest()
             print(json.dumps(result, sort_keys=True))

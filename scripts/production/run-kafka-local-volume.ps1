@@ -35,7 +35,7 @@ sys.argv=['$source','--reserve-approved-volume']
 exec(compile(content,'$source','exec'),{'__name__':'__main__','__file__':'$source','__hooshix_source_bytes__':content})
 "@
 $numeric = [string]::Join(',', [Text.Encoding]::UTF8.GetBytes($bootstrap))
-Write-Output 'Reserve existing guarded Kafka storage as a private 15GiB Retain LocalPV. No allocation, format, PVC/Kafka, credentials, restart, admission or existing database changes. Enter sudo only here.'
+Write-Output 'Reserve existing guarded Kafka storage as a private 14GiB Retain LocalPV. No allocation, format, PVC/Kafka, credentials, restart, admission or existing database changes. Enter sudo only here.'
 & ssh.exe -t -o ConnectTimeout=8 hooshix-server ('umask 077; sudo /usr/bin/python3 -I -c ''exec(bytes([' + $numeric + ']))'' > ' + $report + '; status=$?; exit $status')
 $operationExit = $LASTEXITCODE
 & scp.exe -q -o BatchMode=yes -o ConnectTimeout=8 ('hooshix-server:' + $report) $localReport
@@ -43,8 +43,8 @@ if ($LASTEXITCODE -ne 0) { throw 'PUBLIC_RECEIPT_COPY_FAILED_STATE_PRESERVED' }
 if ($operationExit -ne 0) { throw 'LOCAL_VOLUME_FAILED_STATE_PRESERVED_NO_BLIND_RETRY' }
 $receipt = Get-Content -LiteralPath $localReport -Raw | ConvertFrom-Json
 if ($receipt.source_sha256 -cne $manifest.files.$source -or
-    $receipt.kafka_local_volume -cne 'Passed' -or $receipt.capacity_bytes -ne 16106127360 -or
-    $receipt.volume -cne 'hooshix-kafka-local-15gib' -or $receipt.storage_guard -cne 'Passed' -or
+    $receipt.kafka_local_volume -cne 'Passed' -or $receipt.capacity_bytes -ne 15032385536 -or
+    $receipt.volume -cne 'hooshix-kafka-local-14gib' -or $receipt.storage_guard -cne 'Passed' -or
     $receipt.node -cne 'hooshix-production-1' -or $receipt.reserved_claim -cne 'platform-data/data-kafka-0' -or
     $receipt.existing_storage_host_services -cne 'Preserved' -or $receipt.kafka -cne 'Not run' -or $receipt.pvc -cne 'Not run' -or
     $receipt.secret_delivery -cne 'Not run' -or $receipt.public_access -cne 'Unchanged' -or

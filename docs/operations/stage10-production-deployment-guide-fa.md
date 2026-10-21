@@ -2443,8 +2443,8 @@ Kafka است؛ رزرو، گواهی یا broker ایجاد نمی‌کند. پ�
 محدودیت claim، UID، استفادهٔ مجدد و حفظ داده پس از حذف claim باید موفق باشد.
 سه PVC موجود OpenBao، PostgreSQL و Redis و قواعد admission دست‌نخورده می‌مانند.
 
-برای filesystem مستقل ۱۶GiB، فقط **۱۵GiB** به volume
-`hooshix-kafka-local-15gib` از کلاس `hooshix-kafka-local` اختصاص می‌یابد؛ باقی
+برای filesystem مستقل ۱۶GiB، فقط **۱۴GiB** به volume
+`hooshix-kafka-local-14gib` از کلاس `hooshix-kafka-local` اختصاص می‌یابد؛ باقی
 برای سربار filesystem می‌ماند. مسیر دقیق `/var/lib/hooshixstorage/kafka/data`
 با UID/GID `10001` و claim رزروشدهٔ `platform-data/data-kafka-0` است.
 فقط node مصوب `hooshix-production-1` می‌تواند این PV محلی را mount کند؛ این
@@ -2474,7 +2474,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Download
 
 فقط `READY` انگلیسی و رمز sudo همان‌جا لازم است؛ رمز custody/CA یا توکن لازم
 نیست. خروجی `KAFKA_LOCAL_VOLUME=Passed` و JSON عمومی باید ظرفیت
-`16106127360`، guard موفق، claim/node فوق و `existing_storage_host_services=Preserved`
+`15032385536`، guard موفق، claim/node فوق و `existing_storage_host_services=Preserved`
 داشته باشد. `pvc`، `kafka` و `secret_delivery` هنوز `Not run` هستند.
 این گام نه فرمت/تخصیص مجدد دارد، نه restart و نه تغییر admission.
 
