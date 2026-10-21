@@ -214,6 +214,11 @@ The frontend lock resolves `source-map-js` to `1.2.2` within the existing consum
 `^1.2.1` ranges for the [upstream indexed-source-map DoS fix](https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2).
 No new root dependency or override is added; OSV and the existing frontend build,
 coverage, browser, accessibility, and image smoke gates remain blocking.
+Vite is pinned to `8.2.4`, the fixed 8.2 patch for
+[GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv).
+Its bundled `launch-editor` rejects Windows editor arguments containing `%` or
+line breaks before invoking the shell. This is development/build tooling, not
+the production Caddy runtime; lock integrity and the same frontend gates remain required.
 
 - exact deployed images/artifacts/packages and build/security tools are digest/integrity pinned by owning deployment/provisioning/CI mechanism;
 - Gitleaks 8.30.0 immutable official image digest, OSV-Scanner 2.4.0, ShellCheck 0.11.0, actionlint 1.7.12, Ruff 0.16.5, Syft 1.51.0, Grype 0.117.0, Cosign 3.0.6, and other downloaded security tools verify exact checksums/digests/signatures as applicable before use;
