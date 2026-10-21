@@ -2387,6 +2387,14 @@ Publisher پیش از build و دوباره پیش از push، visibility مقص
 مرجع رفتار پیش‌فرض ایجاد از workflow و دسترسی نوشتن:
 [GitHub Actions package permissions](https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#default-permissions-and-access-settings-for-packages-modified-through-workflows).
 
+### فضای مستقل Kafka روی VPS
+
+نصب Kafka از فضای مستقل ۱۶GiB با guard هویت mount آغاز می‌شود؛ این فضا از
+OpenBao، PostgreSQL و Redis جداست و محدودیت filesystem واقعی دارد. تخصیص فضا،
+ساخت Kafka یا تأیید ظرفیت Production نیست. تا تحویل TLS از OpenBao/ESO و
+نصب workload داخلیِ بررسی‌شده، وضعیت خود Kafka **Not run** باقی می‌ماند.
+اسرار و داده‌های موجود نباید کپی، فرمت مجدد یا جایگزین شوند.
+
 ### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
 
 مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`
