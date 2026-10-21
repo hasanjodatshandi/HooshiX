@@ -2443,6 +2443,48 @@ Kafka است؛ رزرو، گواهی یا broker ایجاد نمی‌کند. پ�
 محدودیت claim، UID، استفادهٔ مجدد و حفظ داده پس از حذف claim باید موفق باشد.
 سه PVC موجود OpenBao، PostgreSQL و Redis و قواعد admission دست‌نخورده می‌مانند.
 
+برای filesystem مستقل ۱۶GiB، فقط **۱۵GiB** به volume
+`hooshix-kafka-local-15gib` از کلاس `hooshix-kafka-local` اختصاص می‌یابد؛ باقی
+برای سربار filesystem می‌ماند. مسیر دقیق `/var/lib/hooshixstorage/kafka/data`
+با UID/GID `10001` و claim رزروشدهٔ `platform-data/data-kafka-0` است.
+فقط node مصوب `hooshix-production-1` می‌تواند این PV محلی را mount کند؛ این
+تنظیم failover نیست. برای سرور دوم نام node و اتصال هدف باید در تغییر بررسی‌شده
+تطبیق داده و native proof دوباره اجرا شود؛ این bundle را روی مقصد دیگری اجرا نکنید.
+
+از main تمیز با `Repository baseline` موفق و tree یکسان:
+
+```bash
+python3 scripts/production/build_kafka_local_volume_bundle.py \
+  --native-run MAIN_BASELINE_RUN_ID \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-local-volume-20261021
+```
+
+builder به دو شاهد تازه با عمر حداکثر پنج روز نیاز دارد: آزمون mount/ENOSPC/guard
+و آزمون Kubernetes binding/claim/UID/reuse/Retain. مورد دوم از تصویر ثابت
+PostgreSQL فقط به‌عنوان فرایند نوشتن/خواندن فایل با UID `10001` استفاده می‌کند؛
+این شاهد تست broker، TLS یا ACL خود Kafka نیست. فایل‌های عمومی bundle خارج Git
+می‌مانند. اگر نام پوشه موجود است، نام تازه بدهید و overwrite نکنید.
+
+با VNC قابل ورود و نشست دوم SSH خصوصی باز، در PowerShell:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-local-volume-20261021\run-kafka-local-volume.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-local-volume-20261021\run-kafka-local-volume.ps1' -RescueAndSecondSessionReady
+```
+
+فقط `READY` انگلیسی و رمز sudo همان‌جا لازم است؛ رمز custody/CA یا توکن لازم
+نیست. خروجی `KAFKA_LOCAL_VOLUME=Passed` و JSON عمومی باید ظرفیت
+`16106127360`، guard موفق، claim/node فوق و `existing_storage_host_services=Preserved`
+داشته باشد. `pvc`، `kafka` و `secret_delivery` هنوز `Not run` هستند.
+این گام نه فرمت/تخصیص مجدد دارد، نه restart و نه تغییر admission.
+
+reentry پیش از ساخت claim فقط همان دو شیء سالم و تحت مالکیت نصب را می‌پذیرد؛
+هیچ apply اجباری، حذف، adoption یا تغییر داده‌ای انجام نمی‌شود. وجود claim یا
+دادهٔ ناشناخته موجب توقف با حفظ state است؛ پس از راه‌اندازی broker این ابزار
+رزرو را دوباره اجرا نکنید. volume از نوع `Retain` است؛ حذف claim راه پاک‌کردن
+داده یا مجوز استفادهٔ claim دیگری نیست. گام بعد تحویل TLS موجود از OpenBao/ESO
+و workload بسته با native/admission proof مستقل است، نه بازکردن ترافیک.
+
 ### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
 
 مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`
