@@ -989,8 +989,8 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 
 ### پذیرش مجموعهٔ منتشرشدهٔ PostgreSQL
 
-اجرای محافظت‌شدهٔ `38382418665`، attempt `1` روی
-`main@5b0c547e27c5f89d5ec76186defa112739b64f3c` انتشار هر چهار تصویر را با
+اجرای محافظت‌شدهٔ `39830467736`، attempt `1` روی
+`main@e1be2ac6132b1c9faec3dcae96ee523f4bebaf71` انتشار هر چهار تصویر را با
 `publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
 واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
 این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
@@ -1004,7 +1004,7 @@ artifact همان اجرا را بیرون Git دانلود کنید و روی �
 Unix و ابزارهای integrity-pinned اجرا کنید؛ این فرمان VPS را متصل نمی‌کند:
 
 ```bash
-gh run download 38382418665 --name postgresql-publication-38382418665-1 --dir /path/outside-repo/postgresql-publication
+gh run download 39830467736 --name postgresql-publication-39830467736-1 --dir /path/outside-repo/postgresql-publication
 bash scripts/production/install_release_tools.sh /path/outside-repo/release-tools
 PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_published_postgresql.py \
   --evidence-dir /path/outside-repo/postgresql-publication \
@@ -2541,6 +2541,12 @@ PostgreSQL و Redis بسته باید سالم باشند؛ namespace داده `
 هویت `eso-kafka-tls` فقط همین leaf را می‌خواند؛ عمر توکن حداکثر پنج دقیقه است.
 یک Role مستقل فقط TokenRequest همین نام را به ESO موجود می‌دهد؛ controller،
 پورت، مجوز Secret عمومی یا تغییر CA جدیدی ایجاد نمی‌شود.
+
+تحویل leaf، دیتابیس یا کنترلرهای موجود را ارتقا نمی‌دهد. مقایسهٔ فقط‌خواندنیِ
+مرز بسته، علاوه بر مجموعهٔ فعلی، فقط دو digest دقیق PostgreSQL/operator نصب‌شده
+در قرنطینهٔ موجود را می‌شناسد؛ این سازگاری مجوز نصب/rollback آن تصاویر نیست.
+هر مرز ناشناخته رد می‌شود و spec/UID دیتابیس، Redis و کنترلرها قبل و بعد یکسان
+می‌مانند. انتشار جدید مجموعهٔ داده به‌تنهایی وضعیت نصب VPS را تغییر نمی‌دهد.
 
 روی checkout تمیز همان `main` بررسی‌شده، ابتدا bundle عمومی را خارج Git بسازید.
 `STAGING_RUN` اجرای موفق `Platform commissioning staging` برای همین tree است؛

@@ -17,6 +17,9 @@ import kafka_tls_material as material
 import redis_tls_material as shared
 import bootstrap_kafka_tls as bootstrap
 import build_kafka_tls_bundle as bundle
+import render_platform_admission as admission
+import render_postgresql_quarantine as quarantine
+import render_redis_runtime as runtime
 import activate_openbao_operator as operator
 import rehearse_openbao_kubernetes as rehearsal
 from rehearse_redis_tls import fixture_issuer
@@ -88,6 +91,22 @@ class KafkaTLSTest(unittest.TestCase):
         self.assertEqual(['eso-kafka-tls'], next(o for o in objects if o['kind'] == 'Role')['rules'][0]['resourceNames'])
         self.assertFalse(any(o['kind'] in ('Secret', 'Deployment', 'NetworkPolicy', 'ClusterRole') for o in objects))
         self.assertEqual(set(material.FIELDS), {d['secretKey'] for d in contract.external()['spec']['data']})
+
+    def test_new_publication_does_not_upgrade_or_adopt_the_existing_database_boundary(self):
+        base = admission.policy('ValidatingPolicy', 'hooshix-platform-data-closed', 'platform-data',
+            [admission.validation('closed existing controller', 'false')])
+        existing = dict(boundary=base, objects=[], public_ca_sha256='a' * 64,
+            webhook_names=[], webhook_contracts=[], webhook_selector={})
+        plan = installer.render(existing)
+        retained = runtime.boundary(quarantine.boundary(base, installer.RETAINED_DATABASE_IMAGES), runtime.pod())
+        self.assertIn(retained['spec'], plan['allowed_boundary_specs'])
+        self.assertEqual(4, len(plan['allowed_boundary_specs']))
+        changed = copy.deepcopy(installer.RETAINED_DATABASE_IMAGES)
+        changed['postgresql'] = changed['postgresql'].split('@')[0] + '@sha256:' + 'f' * 64
+        self.assertNotIn(runtime.boundary(quarantine.boundary(base, changed), runtime.pod())['spec'],
+            plan['allowed_boundary_specs'])
+        self.assertNotIn('objects', plan)  # No retained image is ever applied by leaf delivery.
+        self.assertEqual('Not run', plan['database'])
 
     def test_supervisor_fixed_identity_audience_and_source_loader(self):
         for ns, account, audience in [('platform-apps', 'eso-kafka-tls', ['api']),

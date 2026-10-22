@@ -12,13 +12,24 @@ from install_eso import desired_fields_match
 
 require = certificates.require
 
+# Read-only compatibility with the installed quarantine, never deployment/rollback inputs.
+RETAINED_DATABASE_IMAGES = {
+    'operator': 'ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-operator-v2-private@sha256:'
+                '04bac3c474f9e144c38afdfc8bc79a1a395d5ff53f92d6cbb7678ae95a7bb345',
+    'postgresql': 'ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-postgresql-private@sha256:'
+                  '4f0dca725887fab09f652314b774bfb0b9430eaa818a61cf6e56c360e923edde'}
+
 
 def render(existing):
+    from render_postgresql_quarantine import boundary
+    from render_redis_runtime import boundary as redis_boundary, pod
     from render_redis_runtime import render as runtime
     result = previous.render(existing)
     last = copy.deepcopy(existing['boundary'])
     last['spec'] = copy.deepcopy(result['allowed_boundary_specs'][-1])
     result['allowed_boundary_specs'].append(runtime(last)['boundary']['spec'])
+    retained = boundary(existing['boundary'], RETAINED_DATABASE_IMAGES)
+    result['allowed_boundary_specs'].append(redis_boundary(retained, pod())['spec'])
     result['kafka_tls_delivery'] = True
     return result
 
