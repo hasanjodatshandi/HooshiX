@@ -442,7 +442,7 @@ jobs:
         run: |
           $tokens = $null
           $parseErrors = $null
-          foreach ($name in @('run-postgresql-storage.ps1', 'run-postgresql-local-volume.ps1', 'run-redis-storage.ps1', 'run-redis-local-volume.ps1', 'run-kafka-storage.ps1')) {
+          foreach ($name in @('run-postgresql-storage.ps1', 'run-postgresql-local-volume.ps1', 'run-redis-storage.ps1', 'run-redis-local-volume.ps1', 'run-kafka-storage.ps1', 'run-kafka-local-volume.ps1')) {
             [void][System.Management.Automation.Language.Parser]::ParseFile(
               (Join-Path $env:GITHUB_WORKSPACE ('scripts/production/' + $name)),
               [ref]$tokens, [ref]$parseErrors)
@@ -508,6 +508,19 @@ jobs:
         with:
           name: openbao-kubernetes-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/openbao-kubernetes-receipt.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Rehearse isolated Kafka LocalPV binding and retention without unrelated mesh commissioning
+        run: |
+          python3 scripts/production/rehearse_kafka_local_volume.py --ci \
+            --tools-dir "$RUNNER_TEMP/openbao-kubernetes-tools" \
+            --receipt "$RUNNER_TEMP/kafka-local-volume-receipt.json"
+      - name: Retain only successful public Kafka LocalPV evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kafka-local-volume-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kafka-local-volume-receipt.json
           retention-days: 30
           if-no-files-found: error
 
