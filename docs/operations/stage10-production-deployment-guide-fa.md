@@ -797,9 +797,18 @@ candidateهای نهایی operand و sidecar از پایهٔ Alpine 3.24.2 با
 OpenSSL 3.5.9-r0 و zlib 1.3.2-r1 ساخته می‌شوند. operand همان PostgreSQL 18.6
 است؛ sidecar از Python 3.14.8 و Barman 3.20.1 استفاده می‌کند. نسخه و hash تمام
 dependencyهای Barman از lock رسمی همان source بررسی می‌شود.
-برای اصلاح امنیتی trust store، override محدود certifi باید نسخه و SHA-256
-ثابت داشته باشد و گیت تصویر نهایی نبود نسخهٔ آسیب‌پذیر را تأیید کند؛ استفاده
-از تصویر قبلی یا کنارگذاشتن بررسی TLS جایگزین این اصلاح نیست.
+override محدود `certifi==2026.10.19` با SHA-256 ثابت wheel و sdist فقط همان
+بخش lock رسمی را جایگزین می‌کند؛ باقی نسخه‌ها و `--require-hashes` حفظ می‌شوند.
+ریشهٔ آسیب‌دیدهٔ `emSign ECC Root CA - G3` از Requests، دو bundle همراه pip و
+منبع گواهی سیستم حذف می‌شود؛ `update-ca-certificates` bundle و لینک‌های hash
+سیستم را بازسازی می‌کند. bundleهای pip دقیقاً از بستهٔ رسمی اصلاح‌شده کپی
+می‌شوند، نه با دستکاری شمارهٔ نسخه. ریشه‌های سالم G1/C1/C3 باید باقی بمانند.
+گیت inventory نبود نسخهٔ آسیب‌پذیر و آزمون native نبود fingerprint خطرناک در
+تمام مسیرهای فوق، botocore و مسیر پیش‌فرض Python/OpenSSL را کنترل می‌کند.
+نسخهٔ Python، `pip check` و چهار فرمان backup/WAL/restore Barman نیز آزموده
+می‌شوند؛ خاموش‌کردن TLS یا استفاده از تصویر قبلی جایگزین این اصلاح نیست.
+اصلاح build به‌تنهایی نصب VPS نیست: انتشار محافظت‌شدهٔ مجموعهٔ ثابت، اسکن
+تازه، signature/provenance/SBOM، انتخاب digest جدید و staging همچنان الزامی‌اند.
 نصب بدون hash، کاهش سطح گیت یا استفاده از tag متغیر مجاز نیست. اسکن مجموعهٔ candidate و آزمون
 مستقل CNPG/WAL/PITR با دادهٔ مصنوعی `Passed` است؛ تأیید انتشار، staging و نصب
 روی VPS هنوز `Not verified` است. هیچ digestی صرفاً با تغییر پایه مجوز نصب نمی‌گیرد.

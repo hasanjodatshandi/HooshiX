@@ -2,9 +2,11 @@
 import copy
 import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
+import warnings
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -40,6 +42,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                          [{'name': name, 'version': version, 'type': 'apk'} for name, version in
                           (self.selected['runtime_packages'] | self.selected['sidecar_packages']).items()] +
                          [{'name': 'barman', 'version': '3.20.1', 'type': 'python'},
+                          {'name': 'certifi', 'version': target.CERTIFI_VERSION, 'type': 'python'},
                           {'name': 'postgresql', 'version': '18.6', 'type': 'binary'}]},
             'grype.json': {'source': {'target': {'imageID': self.image, 'userInput': self.image}}, 'matches': []},
             'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
@@ -63,7 +66,7 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             with patch.object(target, 'run', return_value='3.14.8') as run:
                 target.native_entrypoint(component, self.image, 'unix:///captured.sock')
             calls = [call.args[0] for call in run.call_args_list]
-            self.assertEqual(7 if component == 'barman-sidecar' else 1, len(calls))
+            self.assertEqual(8 if component == 'barman-sidecar' else 1, len(calls))
             for argv in calls:
                 self.assertEqual(['docker', '--host', 'unix:///captured.sock', 'run', '--rm'], argv[:5])
                 self.assertIn(self.image, argv)
@@ -100,6 +103,10 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         self.assertIn('FROM ' + self.selected['sidecar_runtime'], sidecar)
         self.assertIn('--require-hashes', sidecar)
         self.assertIn('pip check', sidecar)
+        self.assertIn(target.CERTIFI_VERSION, sidecar)
+        for digest in target.CERTIFI_HASHES: self.assertIn(digest, sidecar)
+        self.assertIn('update-ca-certificates --fresh', sidecar)
+        self.assertIn('emSign_ECC_Root_CA_-_G3.crt', sidecar)
         self.assertNotIn(target.pins()['components']['barman-sidecar']['image'], sidecar)
         postgresql = target.dockerfile('postgresql', self.selected)
         self.assertIn('FROM ' + self.selected['postgresql_runtime'], postgresql)
@@ -112,6 +119,45 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             self.assertIn('GOTOOLCHAIN=local', generated)
             self.assertIn('sha256sum -c -', generated)
             self.assertIn('patched-upstream-source-build', generated)
+
+    def test_certifi_patch_preserves_other_pins_and_rejects_changed_or_duplicate_input(self):
+        old = ('certifi==2026.7.22 \\\n'
+            '    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \\\n'
+            '    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55\n')
+        prefix, suffix = '# synthetic lock\nbarman==3.20.1\n', 'requests==2.34.2\n'
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'requirements.txt'
+            for body in (prefix + old + suffix, prefix + suffix, prefix + old + old + suffix,
+                         prefix + old.replace('62f227', '000000') + suffix):
+                path.write_text(body)
+                result = subprocess.run([sys.executable, '-I', '-c', target.certifi_lock_patch(), str(path)],
+                    capture_output=True, timeout=10)
+                if body == prefix + old + suffix:
+                    self.assertEqual(0, result.returncode)
+                    fixed = path.read_text()
+                    self.assertTrue(fixed.startswith(prefix) and fixed.endswith(suffix))
+                    self.assertIn('certifi==' + target.CERTIFI_VERSION, fixed)
+                    for digest in target.CERTIFI_HASHES: self.assertIn('--hash=sha256:' + digest, fixed)
+                    self.assertNotIn('2026.7.22', fixed)
+                else:
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertEqual(body, path.read_text())
+
+    def test_missing_old_or_additional_vulnerable_certifi_copy_rejected(self):
+        for mode in ('missing', 'old', 'duplicate-old'):
+            evidence = self.evidence('barman-sidecar')
+            artifacts = evidence['syft.json']['artifacts']
+            certifi = next(item for item in artifacts if item['name'] == 'certifi')
+            if mode == 'missing': artifacts.remove(certifi)
+            if mode == 'old': certifi['version'] = '2026.7.22'
+            if mode == 'duplicate-old': artifacts.append(certifi | {'version': '2026.7.22'})
+            with self.subTest(mode=mode), self.assertRaises(ValueError): self.validate('barman-sidecar', evidence)
+
+    def test_generated_trust_programs_compile_without_python_escape_warnings(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', SyntaxWarning)
+            for program in (target.certifi_lock_patch(), target.trust_material_patch(), target.trust_material_check()):
+                compile(program, 'reviewed-trust-program', 'exec')
 
     def test_old_or_missing_embedded_binary_never_passes(self):
         for alternate in ('old-arm64', 'missing-arm64', 'old-extra-binary', 'old-net'):

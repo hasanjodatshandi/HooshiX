@@ -37,7 +37,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Runtime Schema Registry | none in v1 | ADR-0003 |
 | Database | PostgreSQL 18.6 | profile-aware mutable relational persistence; candidate Alpine 3.24.2 runtime with fixed OpenSSL/zlib; final artifact and CNPG/restore gates required |
 | PostgreSQL operator | CloudNativePG 1.30.1 | ADR-0019/0034; fixed-source artifact gate required |
-| PostgreSQL backup | Barman Cloud CNPG-I plugin 0.15.1 / Barman 3.20.1 | WAL/PITR model; sidecar candidate Python 3.14.8 on Alpine 3.24.2; plugin and sidecar gated together |
+| PostgreSQL backup | Barman Cloud CNPG-I plugin 0.15.1 / Barman 3.20.1 | WAL/PITR model; sidecar candidate Python 3.14.8 on Alpine 3.24.2; certifi 2026.10.19 hash-locked override; compromised emSign G3 removed from Python/pip/system trust; plugin and sidecar gated together |
 | Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 |
 | PostgreSQL JDBC | 42.7.13 | must not regress below security-fixed line 42.7.12 |
 | Migration | Flyway 12.4.0 | sole mutable relational schema-change mechanism |

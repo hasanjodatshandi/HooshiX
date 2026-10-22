@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,82 @@ SIDECAR_PACKAGES = {'libpq': '18.6-r0', 'lz4-libs': '1.10.0-r1', 'snappy': '1.2.
 BUILD_PACKAGES = {'build-base': '0.5-r4', 'cargo': '1.96.1-r0', 'postgresql18-dev': '18.6-r0',
                   'lz4-dev': '1.10.0-r1', 'snappy-dev': '1.2.2-r0',
                   'libffi-dev': '3.5.2-r1', 'openssl-dev': '3.5.9-r0'}
+CERTIFI_VERSION = '2026.10.19'
+CERTIFI_HASHES = ('035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae',
+                  '42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b')
+COMPROMISED_ROOT = '86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b'
+RETAINED_ROOTS = ('40f6af0346a99aa1cd1d555a4e9cce62c7f9634603ee406615833dc8c8d00367',
+                  '125609aa301da0a249b97a8239cb6a34216f44dcac9f3954b14292f2e8c8608f',
+                  'bc4d809b15189d78db3e1d8cf4f9726a795da1643ca5f1358e1ddb0edc0d7eb3')
+
+
+def certifi_lock_patch():
+    old = ('certifi==2026.7.22 \\\n'
+           '    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \\\n'
+           '    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55\n')
+    new = ('certifi==' + CERTIFI_VERSION + ' \\\n    --hash=sha256:'
+           + ' \\\n    --hash=sha256:'.join(CERTIFI_HASHES) + '\n')
+    return ('from pathlib import Path; import sys; p=Path(sys.argv[1]); s=p.read_text(); '
+            f'old={old!r}; new={new!r}; '
+            'p.write_text(s.replace(old,new)) if s.count(old)==1 else '
+            'sys.exit("exact upstream certifi lock required")')
+
+
+def trust_material_check():
+    return f'''import certifi, hashlib, re, ssl, sys
+from pathlib import Path
+bad = {COMPROMISED_ROOT!r}
+retained = set({RETAINED_ROOTS!r})
+def roots(path):
+    ctx = ssl.create_default_context(cafile=str(path))
+    if not ctx.check_hostname or ctx.verify_mode != ssl.CERT_REQUIRED:
+        raise SystemExit("verified TLS required")
+    return {{hashlib.sha256(c).hexdigest() for c in ctx.get_ca_certs(binary_form=True)}}
+if certifi.__version__ != {CERTIFI_VERSION!r}:
+    raise SystemExit("fixed certifi required")
+paths = [Path(certifi.where()), Path(sys.prefix + '/lib/python3.14/site-packages/pip/_vendor/certifi/cacert.pem'),
+         Path(sys.base_prefix + '/lib/python3.14/site-packages/pip/_vendor/certifi/cacert.pem'),
+         Path('/etc/ssl/cert.pem')]
+for path in paths:
+    values = roots(path)
+    if bad in values or not retained <= values:
+        raise SystemExit("compromised or incomplete trust store")
+ctx = ssl.create_default_context()
+if bad in {{hashlib.sha256(c).hexdigest() for c in ctx.get_ca_certs(binary_form=True)}}:
+    raise SystemExit("compromised default trust")
+for directory in ('/etc/ssl/certs', '/usr/share/ca-certificates', '/usr/local/share/ca-certificates'):
+    for path in Path(directory).rglob('*'):
+        if path.is_file():
+            for block in re.findall(br'-----BEGIN CERTIFICATE-----[\\s\\S]+?-----END CERTIFICATE-----', path.read_bytes()):
+                pem = block.decode('ascii')
+                if hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest() == bad:
+                    raise SystemExit("compromised certificate-directory route")
+import botocore, requests.certs
+if bad in roots(Path(botocore.__file__).with_name('cacert.pem')):
+    raise SystemExit("compromised provider trust store")
+if requests.certs.where() != certifi.where():
+    raise SystemExit("unexpected Requests trust store")
+'''
+
+
+def trust_material_patch():
+    # Pip has two vendored stores; system regeneration must also remove the hashed G3 route.
+    return f'''import certifi, hashlib, shutil, ssl, sys
+from pathlib import Path
+source = Path(certifi.where())
+if certifi.__version__ != {CERTIFI_VERSION!r}:
+    raise SystemExit("fixed certifi required")
+anchor = Path('/usr/share/ca-certificates/mozilla/emSign_ECC_Root_CA_-_G3.crt')
+if anchor.is_symlink() or not anchor.is_file() or hashlib.sha256(
+        ssl.PEM_cert_to_DER_cert(anchor.read_text())).hexdigest() != {COMPROMISED_ROOT!r}:
+    raise SystemExit("reviewed compromised system anchor required")
+for prefix in (sys.prefix, sys.base_prefix):
+    target = Path(prefix + '/lib/python3.14/site-packages/pip/_vendor/certifi/cacert.pem')
+    if target.is_symlink() or not target.is_file():
+        raise SystemExit("reviewed pip trust store required")
+    shutil.copyfile(source, target)
+anchor.unlink()
+'''
 
 
 def source_key(component):
@@ -110,6 +187,7 @@ def dockerfile(component, selected):
         lines += [f"FROM {selected['sidecar_runtime']} AS pythonbuild", 'WORKDIR /build',
                   f'RUN apk add --no-cache {runtime_packages} {build_packages}',
                   'COPY --from=build /src/containers/sidecar-requirements.txt /build/requirements.txt',
+                  'RUN python3 -c ' + shlex.quote(certifi_lock_patch()) + ' /build/requirements.txt',
                   'RUN python3 -m venv /venv && /venv/bin/pip install --disable-pip-version-check '
                   '--no-cache-dir --require-hashes -r /build/requirements.txt && /venv/bin/pip check && '
                   'sha256sum /build/requirements.txt > /venv/requirements.sha256',
@@ -118,6 +196,9 @@ def dockerfile(component, selected):
                   'adduser -D -H -u 26 -G tape -s /sbin/nologin cnpg',
                   'COPY --from=pythonbuild /venv /venv', 'ENV PATH="/venv/bin:$PATH"',
                   'ENV PYTHONDONTWRITEBYTECODE=1',
+                  'RUN /venv/bin/python -c ' + shlex.quote('exec(' + repr(trust_material_patch()) + ')')
+                  + ' && update-ca-certificates --fresh && /venv/bin/python -c '
+                  + shlex.quote('exec(' + repr(trust_material_check()) + ')'),
                   'USER 26:26', 'ENTRYPOINT ["/manager"]', 'CMD []']
     base = selected['plugin_runtime'] if component == 'barman-plugin' else pins()['components']['operator']['image']
     if component != 'barman-sidecar':
@@ -185,6 +266,10 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
         application = [item for item in syft['artifacts'] if item['name'] == name]
         if not application or any(item['version'] != version for item in application):
             raise ValueError('exact complete operand/Barman inventory required')
+        if component == 'barman-sidecar':
+            certifi = [item for item in syft['artifacts'] if item['name'].lower() == 'certifi']
+            if not certifi or any(item['version'] != CERTIFI_VERSION for item in certifi):
+                raise ValueError('every catalogued certifi package must be fixed')
     standard = [item for item in syft['artifacts'] if item['name'] == 'stdlib']
     locations = {place['path'] for item in standard for place in item['locations']}
     net = [item for item in syft['artifacts'] if item['name'] == 'golang.org/x/net']
@@ -227,6 +312,7 @@ def native_entrypoint(component, image_id, endpoint):
         if version != recipe()['python_version']:
             raise ValueError('exact fixed Python interpreter required')
         run(runtime + ['--entrypoint', '/venv/bin/pip', image_id, 'check'], timeout=30)
+        run(runtime + ['--entrypoint', '/venv/bin/python', image_id, '-c', trust_material_check()], timeout=30)
         for command in ('barman-cloud-backup', 'barman-cloud-wal-archive',
                         'barman-cloud-restore', 'barman-cloud-wal-restore'):
             run(runtime + ['--entrypoint', '/venv/bin/' + command, image_id, '--help'], timeout=30)
