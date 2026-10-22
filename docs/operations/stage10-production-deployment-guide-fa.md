@@ -796,8 +796,11 @@ backup در sidecar جداست و نباید در تصویر برنامه یا �
 candidateهای نهایی operand و sidecar از پایهٔ Alpine 3.24.2 با نسخه‌های ثابت
 OpenSSL 3.5.9-r0 و zlib 1.3.2-r1 ساخته می‌شوند. operand همان PostgreSQL 18.6
 است؛ sidecar از Python 3.14.8 و Barman 3.20.1 استفاده می‌کند. نسخه و hash تمام
-dependencyهای Barman از lock رسمی همان source بررسی می‌شود؛ نصب بدون hash،
-کاهش سطح گیت یا استفاده از tag متغیر مجاز نیست. اسکن مجموعهٔ candidate و آزمون
+dependencyهای Barman از lock رسمی همان source بررسی می‌شود.
+برای اصلاح امنیتی trust store، override محدود certifi باید نسخه و SHA-256
+ثابت داشته باشد و گیت تصویر نهایی نبود نسخهٔ آسیب‌پذیر را تأیید کند؛ استفاده
+از تصویر قبلی یا کنارگذاشتن بررسی TLS جایگزین این اصلاح نیست.
+نصب بدون hash، کاهش سطح گیت یا استفاده از tag متغیر مجاز نیست. اسکن مجموعهٔ candidate و آزمون
 مستقل CNPG/WAL/PITR با دادهٔ مصنوعی `Passed` است؛ تأیید انتشار، staging و نصب
 روی VPS هنوز `Not verified` است. هیچ digestی صرفاً با تغییر پایه مجوز نصب نمی‌گیرد.
 
