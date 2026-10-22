@@ -80,7 +80,7 @@ jobs:
       - run: npm run check:api
       - name: Verify component tests and risk-based coverage thresholds
         run: npm run test:coverage
-      - run: npx playwright install --with-deps
+      - run: npx playwright install --with-deps chromium
       - run: npm run build
       - name: Verify production frontend Helm chart
         run: |
