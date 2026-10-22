@@ -2508,6 +2508,61 @@ OpenBao/ESO استفاده می‌کند؛ Root تازه، رمز در Git، ف�
 شبکه/admission و شواهد همان نسخه لازم‌اند. ابزار آماده یا CI موفق، اجرای VPS
 یا آمادگی Production نیست؛ دستور مقصد تا تکمیل بستهٔ معتبر ارائه نمی‌شود.
 
+### تحویل نخستین گواهی node به Kafka
+
+این گام پس از `KAFKA_LOCAL_VOLUME=Passed` و پیش از ایجاد claim/broker است.
+PostgreSQL و Redis بسته باید سالم باشند؛ namespace داده `restricted` و
+`ambient`، mesh روی `STRICT` و ESO موجود آماده بمانند. فقط یک گواهی
+`CN=kafka-node-1` با RSA-3072 و عمر ۳۰ روز از intermediate رمزدار موجود صادر
+می‌شود. کاربردهای `serverAuth,clientAuth` برای ارتباط داخلی node لازم‌اند؛
+این گواهی مجوز برنامه یا کاربر نیست. نام‌ها دقیقاً این چهار مورد و loopback
+`127.0.0.1` هستند؛ wildcard و قابلیت CA مجاز نیست:
+
+- `kafka.platform-data.svc`
+- `kafka.platform-data.svc.cluster.local`
+- `kafka-0.kafka.platform-data.svc`
+- `kafka-0.kafka.platform-data.svc.cluster.local`
+
+کلید در tmpfs خصوصی و بدون swap ساخته می‌شود. فقط leaf key/chain و Root عمومی
+در مسیر `hooshix/production/kafka/node-tls` از KV-v2 و Secret نوع
+`kubernetes.io/tls` به نام `platform-data/kafka-node-tls` نگهداری می‌شوند.
+هویت `eso-kafka-tls` فقط همین leaf را می‌خواند؛ عمر توکن حداکثر پنج دقیقه است.
+یک Role مستقل فقط TokenRequest همین نام را به ESO موجود می‌دهد؛ controller،
+پورت، مجوز Secret عمومی یا تغییر CA جدیدی ایجاد نمی‌شود.
+
+روی checkout تمیز همان `main` بررسی‌شده، ابتدا bundle عمومی را خارج Git بسازید.
+`STAGING_RUN` اجرای موفق `Platform commissioning staging` برای همین tree است؛
+باید شاهد `kafka_tls_delivery` همراه با حفظ PostgreSQL و Redis فعال داشته باشد.
+مقادیر `ESO_CHART` و `HELM` همان ابزارها/بستهٔ ثابت بخش ESO هستند:
+
+```bash
+python3 scripts/production/build_kafka_tls_bundle.py \
+  --staging-run "$STAGING_RUN" --chart "$ESO_CHART" --helm "$HELM" \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-tls
+python3 scripts/production/bootstrap_kafka_tls_operator.py \
+  --bundle /mnt/c/Users/Coder/Downloads/HooshiX-kafka-tls --validate-only
+```
+
+VNC قابل ورود و نشست دوم SSH خصوصی را باز نگه دارید. فرمان زیر در PowerShell
+از WSL استفاده می‌کند؛ `CUSTODY_DIRECTORY` را با مسیر اصلی custody موجود در WSL
+جایگزین کنید، نه فایل/رمز Root آفلاین:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_kafka_tls_operator.py --bundle /mnt/c/Users/Coder/Downloads/HooshiX-kafka-tls --custody CUSTODY_DIRECTORY --rescue-and-second-session-ready
+```
+
+به‌ترتیب رمز **موجود** custody مربوط به OpenBao، رمز **موجود** intermediate و
+sudo فقط در ورودی مخفی محلی وارد می‌شوند؛ توکن GHCR یا رمز Root لازم نیست.
+خروجی مورد انتظار `KAFKA_TLS_DELIVERY=Passed` و receipt عمومی در
+`~/.local/share/hooshix-kafka-tls/` است. این خروجی هنوز `kafka=Not run` دارد:
+این ابزار broker/PVC/ACL برنامه نمی‌سازد و Root را revoke نمی‌کند.
+
+ورود مجدد پیش از نصب broker گواهی را اعتبارسنجی می‌کند و کلید را تعویض یا
+دوباره صادر نمی‌کند. conflict مالکیت، سابقهٔ حذف leaf، کلید نامعتبر یا اعتبار
+کمتر از هفت روز موجب توقف با حفظ state است؛ Secret/KV/volume را برای رفع آن
+حذف نکنید. بعد از ساخت claim این ابزار bootstrap را دوباره اجرا نکنید.
+تمدید/بارگذاری مجدد، بازیابی، ظرفیت و بازکردن ترافیک هنوز `Not verified` هستند.
+
 ### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
 
 مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`

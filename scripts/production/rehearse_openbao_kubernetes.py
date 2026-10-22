@@ -31,7 +31,7 @@ STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "sc
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
                    "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
-                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -501,6 +501,15 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                         from rehearse_redis_runtime import rehearse as redis_runtime
                         redis_runtime_result = redis_runtime(k, wait, run, cert.read_text(),
                             name + '-control-plane', platform)
+                        step('kafka-tls-delivery')
+                        from rehearse_kafka_tls import rehearse as kafka_tls
+                        from install_kafka_tls import render as kafka_plan
+                        import install_redis_local_volume as redis_volume
+                        with patch.object(redis_volume, 'NODE', name + '-control-plane'):
+                            plan = kafka_plan(pg_plan.render(eso_chart, str(tools / 'helm'), addresses))
+                        plan['public_ca_sha256'] = hashlib.sha256(cert.read_bytes()).hexdigest()
+                        kafka_tls_result = kafka_tls(k, plan, api, token, cert.read_text(), key,
+                            audiences, name + '-control-plane')
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
@@ -591,6 +600,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             if postgresql_quarantine:
                 result['postgresql_quarantine'] = pg_quarantine_result
                 result['redis_runtime'] = redis_runtime_result
+                result['kafka_tls_delivery'] = kafka_tls_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['redis_local_volume'] = redis_volume_result

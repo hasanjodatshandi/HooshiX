@@ -19,6 +19,9 @@ on:
       - scripts/production/verify_published_redis.py
       - scripts/production/run-redis-runtime.ps1
       - scripts/production/tests/test_redis_runtime.py
+      - scripts/production/*kafka*tls*.py
+      - scripts/production/kafka_secret_delivery.py
+      - scripts/production/tests/test_kafka_tls.py
       - scripts/production/test_redis_security_native.py
       - scripts/production/render_redis_security.py
       - infrastructure/production/redis/runtime.json

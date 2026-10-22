@@ -91,6 +91,13 @@ TLS delivery, continuous renewal/reload/expiry handling and the closed Redis
 workload require their own executed evidence. A 30-day bootstrap leaf is not an
 automatic renewal mechanism or a claim of Production readiness.
 
+`kafka_tls_material.py` and `install_kafka_tls.py` use this same existing issuer
+and data-namespace ESO for one separate, create-only Kafka node TLS leaf under
+ADR-0011. The dual server/client EKU is infrastructure-node authentication, not an
+application credential. Existing PostgreSQL/Redis workloads, credentials, mesh,
+admission and reserved unclaimed Kafka storage are preserved. No broker, client
+ACL, network permission or renewal mechanism is created by leaf delivery.
+
 ADR-0002 also permits only the cert-manager API-callback webhook Pod in
 `cnpg-system` outside Ambient. `render_cert_manager_candidate.py` renders the
 three signed certificate components, restricted namespace-local Roles, internal
