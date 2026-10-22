@@ -61,7 +61,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Repository source lint | ShellCheck 0.11.0 + actionlint 1.7.12 + Ruff 0.16.5 | checksum-pinned official Linux/x64 artifacts; selected high-signal shell, GitHub Actions, and Python source checks in repository baseline CI |
 | CI orchestration | GitHub Actions | required checks; third-party actions pinned by SHA |
 | BDD | Cucumber-JVM + Gherkin | critical behavior only |
-| Frontend unit/component | Vitest 4.1.11 + `@vitest/coverage-v8` 4.1.11 + React Testing Library | exact frontend lockfile; global baseline plus higher risk-module thresholds |
+| Frontend unit/component | Vitest 4.1.12 + `@vitest/coverage-v8` 4.1.12 + React Testing Library | exact frontend lockfile; global baseline plus higher risk-module thresholds; mock registration injection and Windows redirect traversal fixes |
 | Browser E2E | Playwright Test + TypeScript | frontend lockfile |
 
 ## 2. Platform baseline

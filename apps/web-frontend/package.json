@@ -29,12 +29,12 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.1.0",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "4.1.12",
     "jsdom": "30.0.1",
     "openapi-typescript": "7.9.1",
     "typescript": "5.9.3",
     "vite": "8.2.4",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   },
   "overrides": {
     "brace-expansion": "2.1.7",
