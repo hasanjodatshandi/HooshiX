@@ -2499,6 +2499,15 @@ reentry پیش از ساخت claim فقط همان دو شیء سالم و تح�
 داده یا مجوز استفادهٔ claim دیگری نیست. گام بعد تحویل TLS موجود از OpenBao/ESO
 و workload بسته با native/admission proof مستقل است، نه بازکردن ترافیک.
 
+### مرز نصب اولیهٔ بستهٔ Kafka
+
+نصب اولیه فقط یک broker/controller خالی و بسته روی LocalPV رزروشدهٔ `14Gi`
+است؛ برنامه یا کاربر شبکه‌ای مجاز نیست. TLS از intermediate موجود و تحویل
+OpenBao/ESO استفاده می‌کند؛ Root تازه، رمز در Git، فرمت مجدد، reset یا پذیرش
+دادهٔ ناشناخته مجاز نیست. پیش از دستور مقصد، آزمون بومی TLS، restart و رد
+شبکه/admission و شواهد همان نسخه لازم‌اند. ابزار آماده یا CI موفق، اجرای VPS
+یا آمادگی Production نیست؛ دستور مقصد تا تکمیل بستهٔ معتبر ارائه نمی‌شود.
+
 ### آزمون بومی TLS و ACL روی candidate منتشرشدهٔ Kafka
 
 مرجع digest انتخاب‌شده `infrastructure/production/kafka/published-candidate.json`
