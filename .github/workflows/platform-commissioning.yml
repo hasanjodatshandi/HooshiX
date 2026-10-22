@@ -19,6 +19,9 @@ on:
       - scripts/production/verify_published_redis.py
       - scripts/production/run-redis-runtime.ps1
       - scripts/production/tests/test_redis_runtime.py
+      - scripts/production/*kafka*tls*.py
+      - scripts/production/kafka_secret_delivery.py
+      - scripts/production/tests/test_kafka_tls.py
       - scripts/production/test_redis_security_native.py
       - scripts/production/render_redis_security.py
       - infrastructure/production/redis/runtime.json
@@ -280,8 +283,8 @@ jobs:
             -o "$RUNNER_TEMP/platform-tools/barman.yaml"
           printf '%s  %s\n' 8f377ff4a7d0d3f74fc64b0f7ac4f449fc38ca9e83a40107cca2f9315a9bd920 \
             "$RUNNER_TEMP/platform-tools/barman.yaml" | sha256sum --check --strict
-          gh run download 38382418665 --repo hasanjodatshandi/HooshiX \
-            --name postgresql-publication-38382418665-1 --dir "$RUNNER_TEMP/postgresql-publication"
+          gh run download 39830467736 --repo hasanjodatshandi/HooshiX \
+            --name postgresql-publication-39830467736-1 --dir "$RUNNER_TEMP/postgresql-publication"
           export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
           python3 scripts/production/verify_published_postgresql.py \
             --evidence-dir "$RUNNER_TEMP/postgresql-publication" --output-dir "$RUNNER_TEMP/postgresql-acceptance"

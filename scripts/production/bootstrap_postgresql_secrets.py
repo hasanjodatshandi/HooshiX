@@ -59,7 +59,7 @@ def token_request(namespace, account, audiences):
 
 def commission(request, revision, *, execute=installer.execute, token_requester=token_request,
                audit_label='PostgreSQL', preserve=platform.protected):
-    host.require(audit_label in ('PostgreSQL', 'Redis'), 'PG_SECRET_FIXED_AUDIT_LABEL_REQUIRED')
+    host.require(audit_label in ('PostgreSQL', 'Redis', 'Kafka'), 'PG_SECRET_FIXED_AUDIT_LABEL_REQUIRED')
     host.require(set(request) == {'root_token', 'recipients', 'plan', 'plan_sha256'}, 'PG_SECRET_REQUEST_REJECTED')
     plan = decode_plan(request['plan'], request['plan_sha256'])
     host.require(plan['staging']['source_revision'] == revision and plan['staging']['result'] == 'Passed',

@@ -4,22 +4,22 @@
   "production_promotion": "blocked-until-supply-chain-staging-and-recovery-evidence",
   "published_security_candidate": {
     "recipe_sha256": "84494b7f034e89f47a5f0a88aaf0d053cd7c587e98010923b389781b8f61c612",
-    "publication_sha256": "638f49f7b5370cac6df1a7d51dc1e72295e66015638fabb6f668ae3f2917c93f",
+    "publication_sha256": "0440441054add3fde3288731f19fc649c483c460c026b9c6a19829a8adf95b00",
     "publication": {
       "schema_version": 1,
-      "repository_revision": "5b0c547e27c5f89d5ec76186defa112739b64f3c",
-      "invocation_id": "github:38382418665:1",
+      "repository_revision": "e1be2ac6132b1c9faec3dcae96ee523f4bebaf71",
+      "invocation_id": "github:39830467736:1",
       "images": {
-        "operator": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-operator-v2-private@sha256:04bac3c474f9e144c38afdfc8bc79a1a395d5ff53f92d6cbb7678ae95a7bb345",
-        "postgresql": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-postgresql-private@sha256:4f0dca725887fab09f652314b774bfb0b9430eaa818a61cf6e56c360e923edde",
-        "barman-plugin": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-barman-plugin-private@sha256:cf73898591800e6a8be90e95220e465a3525372a830f6490261f668ae9f8d661",
-        "barman-sidecar": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-barman-sidecar-private@sha256:afbf7dfc4a8665f5d90601a7b6c32b308ff20b33c22927c9ebfe68378e6d5398"
+        "operator": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-operator-v2-private@sha256:a7ec0367a113c37bfc904588d248b933e0dbe5902bad477523cd84fab1ef5a61",
+        "postgresql": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-postgresql-private@sha256:354e2671a701fd9b56ef7380139fed7689371712eaf9c4c275db231f948bb92b",
+        "barman-plugin": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-barman-plugin-private@sha256:f97f202ca7cda2ee57f9c03fd0d05eeb0abdb60ac9d11497c73df9b0eb971f79",
+        "barman-sidecar": "ghcr.io/hasanjodatshandi/hooshix/platform-postgresql-barman-sidecar-private@sha256:878e1e38f46c344e4d606aa7a56cd200991c7124a58c5634887e571425a3b811"
       },
       "image_config_digests": {
-        "operator": "sha256:235ae879eb36d9e61a26e4676dc5d1b9102353d649e625ca0eea82861dc3ae89",
-        "postgresql": "sha256:5550a3f9982dd62d45c1efa9cb8dcb60da52d4ad3964c5d58a2eaa91d1a45909",
-        "barman-plugin": "sha256:436336ab94838556e58364e044836b6a341c5b650b0ddd94dbfd4b6c1ad8890c",
-        "barman-sidecar": "sha256:eefc9778fa96f89b8d0615f017136c19dbb51689072dfa3b286bee1ab9420ce5"
+        "operator": "sha256:beab30b1f88f8cbf249b746c853af7ac1e4f83cac5949176847c896538fe7ce9",
+        "postgresql": "sha256:060e57ac7103a75f3b4e55aa764c1cc1bb037f316d608705eb9147538cb6323e",
+        "barman-plugin": "sha256:a78e97109600def5385b894412118168b96db375f315570efc357cd6c1cc245c",
+        "barman-sidecar": "sha256:7bbb0ce57c8651d34da3420d34e6927ac04aa035734acefcc93420a5375e9432"
       },
       "provenance_kinds": {
         "operator": "patched-upstream-source-build",

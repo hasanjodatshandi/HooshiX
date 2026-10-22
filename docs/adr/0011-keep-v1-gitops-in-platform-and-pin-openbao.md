@@ -238,6 +238,21 @@ This initial leaf is not continuous renewal, a Redis workload, application
 permission or Production readiness; renewal/reload/expiry-fail-closed evidence
 remains mandatory before opening traffic.
 
+The bounded Kafka node bootstrap uses the same existing encrypted intermediate
+and create-only OpenBao/ESO delivery, not a new CA or cert-manager authority.
+One RSA-3072, 30-day leaf has exactly `CN=kafka-node-1`, loopback IP and the four
+reviewed Kafka service/ordinal DNS names. Both serverAuth and clientAuth are
+required because the combined node authenticates internal broker/controller
+connections. This is one infrastructure-node identity, not an application client
+credential or application ACL grant. One five-minute, exact-leaf identity and
+one-name TokenRequest Role isolate its key from all existing application,
+PostgreSQL and Redis identities. Initial delivery preserves the unclaimed
+reserved Kafka volume, running Redis/PostgreSQL, existing CA, admission, mesh,
+ESO and root custody. It never reissues on reentry or overwrites foreign/deleted
+state. Native evidence must prove real ESO delivery, identity denials, unchanged
+bound datastores, no-write reentry and log privacy. Kafka runtime installation,
+renewal/reload, capacity, recovery and opening traffic remain separate gates.
+
 ### Existing deployment gates
 
 For this unchanged upstream OpenBao import, `openbao-image.json/import_provenance`
