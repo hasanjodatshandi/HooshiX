@@ -41,6 +41,14 @@ Stageهای قبلی ساخت/آزمون محصول‌اند و برای نصب 
 JIT کامل، داده‌ها و برنامه‌های Production هنوز کامل نشده‌اند.
 Stage10 و Production readiness همچنان `Not verified` هستند.
 
+تحویل TLS کافکا در ۲۰۲۶-۱۰-۲۳ با `KAFKA_TLS_DELIVERY=Passed` پایان یافت؛ اجرا
+از `main@e6ed7d859dea75eccdb1856290dc85dcd2376b6c` و plan SHA-256
+`cdc84930059dc68a553ad8f3d29c3bc4f30e8cfd85c4ccb9139d321f40465843` بود.
+رسید عمومی: `~/.local/share/hooshix-kafka-tls/delivery-00170c7e127744a38fcbf73f6cfc96a6.json`.
+این عملیات از issuer/OpenBao/ESO موجود استفاده کرد و Root را حفظ کرد؛ broker،
+claim یا PVC نساخت. آزمون Kubernetes staging، broker مقصد، recovery، ظرفیت و
+Production readiness همچنان `Not verified` هستند.
+
 | مرحله | وضعیت سرور اول | تکرار برای نصب دوم |
 | --- | --- | --- |
 | مدیریت SSH/WireGuard | آزمون‌های محدود ورود و محدودسازی Passed | هویت و آزمون مستقل |
@@ -53,6 +61,7 @@ Stage10 و Production readiness همچنان `Not verified` هستند.
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
+| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | broker هنوز نصب نشده؛ runtime staging و اجرای مقصد لازم است |
 | JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -2312,7 +2321,7 @@ renewal/reload گواهی ۳۰روزه، اتصال برنامه‌ها، monito
 هنوز **Not verified** هستند؛ قبل از نزدیک‌شدن انقضا یا بازکردن ترافیک باید جداگانه
 تکمیل شوند. ورود موفق و PING به معنی آماده‌بودن محصول روی دامنه نیست.
 
-### کاندید Kafka، بدون انتشار یا نصب
+### کاندید منتشرشدهٔ Kafka؛ runtime هنوز نصب نشده
 
 مرجع کاندید تک‌سرور Kafka `4.2.2` و تصویر upstream ثابت
 `apache/kafka@sha256:daa39dc85acd37b148fad74d6b22b60fa5f7fa05048a5c8aa3b654140c63dd58`
