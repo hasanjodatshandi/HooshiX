@@ -71,6 +71,20 @@ def safe_failure_type(error):
     return 'Other'
 
 
+def safe_failure_location(error):
+    frame = error.__traceback__
+    while frame and frame.tb_next:
+        frame = frame.tb_next
+    if not frame:
+        return 'Other'
+    module = frame.tb_frame.f_globals.get('__name__', '')
+    function = frame.tb_frame.f_code.co_name
+    if (re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,7}', module)
+            and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,63}', function)):
+        return f'{module}.{function}:{frame.tb_lineno}'
+    return 'Other'
+
+
 def rehearse(k, wait, run, ca, node, platform):
     if not re.fullmatch('hooshix-bao-ci-[a-f0-9]{12}-control-plane', node):
         raise ValueError('OWNED_KAFKA_RUNTIME_FIXTURE_REQUIRED')
@@ -105,6 +119,7 @@ def rehearse(k, wait, run, ca, node, platform):
                 print('KAFKA_RUNTIME_PREFLIGHT_FAILURE=' + code, flush=True)
             else:
                 print('KAFKA_RUNTIME_PREFLIGHT_FAILURE_TYPE=' + safe_failure_type(error), flush=True)
+                print('KAFKA_RUNTIME_PREFLIGHT_FAILURE_AT=' + safe_failure_location(error), flush=True)
             raise
         first_identity = installer.storage_identity(kube)
         first_claim = installer.get(kube, 'pvc', volume.CLAIM, renderer.NS)['metadata']['uid']

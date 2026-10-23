@@ -146,6 +146,18 @@ class KafkaRuntimeTest(unittest.TestCase):
         unsafe_type = type('invalid exception name', (Exception,), {})
         self.assertEqual('Other', rehearsal.safe_failure_type(unsafe_type()))
 
+    def test_staging_failure_location_excludes_exception_details(self):
+        def fail():
+            raise UnicodeDecodeError('utf-8', b'PRIVATE_SECRET_BYTES', 0, 1, 'PRIVATE_ERROR_DETAIL')
+
+        try:
+            fail()
+        except UnicodeDecodeError as error:
+            location = rehearsal.safe_failure_location(error)
+        self.assertRegex(location, r'\.fail:[0-9]+$')
+        self.assertNotIn('PRIVATE_SECRET_BYTES', location)
+        self.assertNotIn('PRIVATE_ERROR_DETAIL', location)
+
     def test_native_rehearsal_uses_disposable_node_for_all_preserved_local_volumes(self):
         node = 'hooshix-bao-ci-0123456789ab-control-plane'
         previous = json.dumps(prior_boundary()).encode()
