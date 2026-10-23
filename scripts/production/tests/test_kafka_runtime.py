@@ -63,6 +63,35 @@ class KafkaRuntimeTest(unittest.TestCase):
         startup_budget = probe['failureThreshold'] * probe['periodSeconds']
         self.assertGreaterEqual(installer.READINESS_TIMEOUT_SECONDS, startup_budget + 60)
 
+    def test_readiness_snapshot_exposes_only_bounded_status_classes(self):
+        objects = {
+            'statefulset': {'status': {'replicas': 1, 'readyReplicas': 0}},
+            'pod': {'status': {'phase': 'Pending', 'conditions': [{
+                'type': 'PodScheduled', 'status': 'False', 'reason': 'FailedScheduling',
+                'message': 'PRIVATE_EVENT_MESSAGE'}], 'initContainerStatuses': [{
+                'name': 'tls-material', 'ready': False, 'restartCount': 0,
+                'state': {'waiting': {'reason': 'ErrImagePull', 'message': 'PRIVATE_IMAGE_ERROR'}}}],
+                'containerStatuses': []}},
+            'events': {'items': [{'type': 'Warning', 'reason': 'FailedScheduling',
+                'message': 'PRIVATE_EVENT_MESSAGE'}, {'type': 'Warning', 'reason': 'OtherSecretValue',
+                'message': 'PRIVATE_SECOND_EVENT'}, {'type': 'Warning',
+                'message': 'PRIVATE_THIRD_EVENT'}]},
+        }
+
+        def kube(*args, **_kwargs):
+            kind = next((value for value in ('statefulset', 'pod', 'events') if value in args), None)
+            return json.dumps(objects[kind]).encode()
+
+        result = rehearsal.readiness_snapshot(kube)
+        serialized = json.dumps(result)
+        self.assertEqual(0, result['statefulset']['ready_replicas'])
+        self.assertEqual('ErrImagePull', result['pod']['containers'][0]['reason'])
+        self.assertEqual([{'reason': 'FailedScheduling', 'count': 1}, {'reason': 'Other', 'count': 2}],
+                         result['warning_events']['reasons'])
+        for private_value in ('PRIVATE_EVENT_MESSAGE', 'PRIVATE_IMAGE_ERROR', 'PRIVATE_SECOND_EVENT',
+                              'PRIVATE_THIRD_EVENT'):
+            self.assertNotIn(private_value, serialized)
+
     def test_service_and_two_network_boundaries_are_closed(self):
         service = next(x for x in self.plan['objects'] if x['kind'] == 'Service')
         network = next(x for x in self.plan['objects'] if x['kind'] == 'NetworkPolicy')

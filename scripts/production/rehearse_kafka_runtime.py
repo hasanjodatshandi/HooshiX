@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -52,6 +53,79 @@ SAFE_RUNTIME_FAILURE_CODES = frozenset({
     'UNEXPECTED_KAFKA_POD_COUNT', 'UNOWNED_KAFKA_POD_PRESERVED',
     'BOUND_RETAIN_KAFKA_VOLUME_REQUIRED',
 })
+SAFE_PHASES = frozenset({'Pending', 'Running', 'Succeeded', 'Failed', 'Unknown'})
+SAFE_STATES = frozenset({'waiting', 'running', 'terminated', 'unknown'})
+SAFE_CONTAINER_REASONS = frozenset({
+    'ContainerCannotRun', 'ContainerCreating', 'Completed', 'CreateContainerConfigError',
+    'CreateContainerError', 'CrashLoopBackOff', 'DeadlineExceeded', 'ErrImagePull',
+    'Error', 'ImagePullBackOff', 'OOMKilled', 'PodInitializing', 'RunContainerError',
+    'StartError',
+})
+SAFE_EVENT_REASONS = frozenset({
+    'BackOff', 'ErrImagePull', 'Failed', 'FailedAttachVolume', 'FailedCreate',
+    'FailedCreatePodSandBox', 'FailedMount', 'FailedScheduling', 'ImagePullBackOff',
+    'Killing', 'PodCompleted', 'Pulled', 'Scheduled', 'SandboxChanged', 'Started',
+    'SuccessfulAttachVolume', 'SuccessfulCreate', 'SuccessfulMountVolume', 'Unhealthy',
+})
+
+
+def readiness_snapshot(kube):
+    """Return bounded Pod/StatefulSet failure classes; never retain API messages or logs."""
+    def marker(value, allowed):
+        return value if isinstance(value, str) and value in allowed else ('Other' if value else None)
+
+    stateful = installer.get(kube, 'statefulset', renderer.NAME, renderer.NS)
+    pod = installer.get(kube, 'pod', renderer.NAME + '-0', renderer.NS)
+    pod_status = (pod or {}).get('status') or {}
+    stateful_status = (stateful or {}).get('status') or {}
+    states = []
+    for status in pod_status.get('initContainerStatuses', []) + pod_status.get('containerStatuses', []):
+        name = status.get('name')
+        if name not in ('kafka', 'tls-material'):
+            continue
+        current = status.get('state', {})
+        kind = next((value for value in ('waiting', 'running', 'terminated') if value in current), 'unknown')
+        state = current.get(kind, {}) if kind != 'unknown' else {}
+        item = {'name': name, 'ready': status.get('ready') is True,
+                'restarts': status.get('restartCount') if type(status.get('restartCount')) is int else None,
+                'state': marker(kind, SAFE_STATES),
+                'reason': marker(state.get('reason'), SAFE_CONTAINER_REASONS)}
+        if kind == 'terminated':
+            item['exit_code'] = state.get('exitCode') if type(state.get('exitCode')) is int else None
+        last_exit = ((status.get('lastState') or {}).get('terminated') or {}).get('exitCode')
+        if type(last_exit) is int:
+            item['last_exit_code'] = last_exit
+        states.append(item)
+
+    conditions = []
+    for condition in pod_status.get('conditions', []):
+        kind = condition.get('type')
+        status = condition.get('status')
+        if kind not in ('PodScheduled', 'Initialized', 'ContainersReady', 'Ready') or status not in ('True', 'False', 'Unknown'):
+            continue
+        conditions.append({'type': kind, 'status': status,
+                           'reason': marker(condition.get('reason'), SAFE_EVENT_REASONS)})
+
+    try:
+        raw = kube('-n', renderer.NS, 'get', 'events', '--field-selector',
+                   'involvedObject.kind=Pod,involvedObject.name=kafka-0,type=Warning', '-o', 'json',
+                   output_bound=32768)
+        events = json.loads(raw).get('items', [])
+        reasons = Counter(marker(event.get('reason'), SAFE_EVENT_REASONS) or 'Other'
+                          for event in events if event.get('type') == 'Warning')
+        warning_events = {'count': sum(reasons.values()), 'reasons': [
+            {'reason': reason, 'count': count} for reason, count in sorted(reasons.items())[:12]]}
+    except Exception:
+        warning_events = {'available': False}
+
+    return {'statefulset': {'present': stateful is not None,
+            'replicas': stateful_status.get('replicas') if type(stateful_status.get('replicas')) is int else None,
+            'ready_replicas': stateful_status.get('readyReplicas')
+                if type(stateful_status.get('readyReplicas')) is int else 0},
+        'pod': {'present': pod is not None, 'phase': marker(pod_status.get('phase'), SAFE_PHASES),
+            'conditions': conditions, 'containers': states}, 'warning_events': warning_events}
+
+
 def safe_failure_code(error):
     code = error.args[0] if len(error.args) == 1 else None
     if isinstance(code, str) and code in SAFE_RUNTIME_FAILURE_CODES:
@@ -89,7 +163,17 @@ def rehearse(k, wait, run, ca, node, platform):
     if not re.fullmatch('hooshix-bao-ci-[a-f0-9]{12}-control-plane', node):
         raise ValueError('OWNED_KAFKA_RUNTIME_FIXTURE_REQUIRED')
     def kube(*args, body=None, **options):
-        return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+        try:
+            return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
+        except Exception:
+            if 'wait' in args and 'statefulset/' + renderer.NAME in args:
+                try:
+                    diagnosis = readiness_snapshot(k)
+                except Exception:
+                    diagnosis = {'available': False}
+                print('KAFKA_RUNTIME_READINESS_DIAGNOSIS=' + json.dumps(
+                    diagnosis, separators=(',', ':'), sort_keys=True), flush=True)
+            raise
 
     previous = json.loads(k('get', 'validatingpolicy', 'hooshix-platform-data-closed', '-o', 'json'))
     previous = {key: previous[key] for key in ('apiVersion', 'kind', 'metadata', 'spec')}

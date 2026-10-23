@@ -2653,6 +2653,11 @@ gh workflow run platform-commissioning.yml --ref main \
 gh run list --workflow platform-commissioning.yml --event workflow_dispatch --limit 5
 ```
 
+در staging، مهلت readiness باید از بودجهٔ startup probe بیشتر باشد. اگر broker در
+مهلت به Ready نرسد، خروجی تشخیصی فقط phase، readiness، restart/exit code، دلیل‌های
+محدودشدهٔ وضعیت و شمار رخدادهای Warning را گزارش می‌کند؛ متن رخداد، log و محتوای
+Secret نگهداری یا چاپ نمی‌شود. این گزارش جایگزین موفقیت staging نیست.
+
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را
 تغییر نمی‌دهد.
