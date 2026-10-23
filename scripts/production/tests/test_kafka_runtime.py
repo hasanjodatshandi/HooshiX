@@ -131,8 +131,15 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_staging_failure_diagnostic_only_emits_allowlisted_invariant_codes(self):
         self.assertEqual('RESERVED_VOLUME_DRIFT_PRESERVED',
             rehearsal.safe_failure_code(ValueError('RESERVED_VOLUME_DRIFT_PRESERVED')))
+        self.assertEqual('EMPTY_QUARANTINED_KAFKA_REQUIRED',
+            rehearsal.safe_failure_code(ValueError('EMPTY_QUARANTINED_KAFKA_REQUIRED')))
+        self.assertEqual('EXISTING_TYPED_REDIS_SECRETS_REQUIRED',
+            rehearsal.safe_failure_code(ValueError('EXISTING_TYPED_REDIS_SECRETS_REQUIRED')))
         self.assertIsNone(rehearsal.safe_failure_code(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
         self.assertIsNone(rehearsal.safe_failure_code(ValueError('RESERVED_VOLUME_DRIFT_PRESERVED', 'extra')))
+        self.assertEqual('ValueError', rehearsal.safe_failure_type(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
+        unsafe_type = type('GHCR_TOKEN_MUST_STAY_PRIVATE', (Exception,), {})
+        self.assertEqual('Other', rehearsal.safe_failure_type(unsafe_type()))
 
     def test_native_rehearsal_uses_disposable_node_for_all_preserved_local_volumes(self):
         node = 'hooshix-bao-ci-0123456789ab-control-plane'
