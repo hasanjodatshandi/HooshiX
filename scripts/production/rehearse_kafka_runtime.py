@@ -53,14 +53,19 @@ SAFE_RUNTIME_FAILURE_CODES = frozenset({
     'BOUND_RETAIN_KAFKA_VOLUME_REQUIRED',
 })
 SAFE_RUNTIME_EXCEPTION_TYPES = frozenset({
-    'AttributeError', 'CalledProcessError', 'IndexError', 'JSONDecodeError', 'KeyError',
+    'AttributeError', 'BootstrapFailed', 'CalledProcessError', 'IndexError', 'JSONDecodeError', 'KeyError',
     'OSError', 'PermissionError', 'RuntimeError', 'TimeoutExpired', 'TypeError', 'ValueError',
 })
 
 
 def safe_failure_code(error):
     code = error.args[0] if len(error.args) == 1 else None
-    return code if isinstance(code, str) and code in SAFE_RUNTIME_FAILURE_CODES else None
+    if isinstance(code, str) and code in SAFE_RUNTIME_FAILURE_CODES:
+        return code
+    if isinstance(error, installer.host.custody.BootstrapFailed) and isinstance(code, str) \
+            and re.fullmatch('[A-Z][A-Z0-9_]{2,127}', code):
+        return code
+    return None
 
 
 def safe_failure_type(error):

@@ -137,6 +137,10 @@ class KafkaRuntimeTest(unittest.TestCase):
             rehearsal.safe_failure_code(ValueError('EXISTING_TYPED_REDIS_SECRETS_REQUIRED')))
         self.assertIsNone(rehearsal.safe_failure_code(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
         self.assertIsNone(rehearsal.safe_failure_code(ValueError('RESERVED_VOLUME_DRIFT_PRESERVED', 'extra')))
+        bootstrap_failure = rehearsal.installer.host.custody.BootstrapFailed
+        self.assertEqual('UNLISTED_STATIC_BOOTSTRAP_CODE',
+            rehearsal.safe_failure_code(bootstrap_failure('UNLISTED_STATIC_BOOTSTRAP_CODE')))
+        self.assertIsNone(rehearsal.safe_failure_code(bootstrap_failure('private details')))
         self.assertEqual('ValueError', rehearsal.safe_failure_type(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
         unsafe_type = type('GHCR_TOKEN_MUST_STAY_PRIVATE', (Exception,), {})
         self.assertEqual('Other', rehearsal.safe_failure_type(unsafe_type()))
