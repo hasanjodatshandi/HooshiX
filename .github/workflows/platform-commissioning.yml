@@ -22,6 +22,10 @@ on:
       - scripts/production/*kafka*tls*.py
       - scripts/production/kafka_secret_delivery.py
       - scripts/production/tests/test_kafka_tls.py
+      - scripts/production/*kafka*runtime*.py
+      - scripts/production/build_kafka_runtime_bundle.py
+      - scripts/production/run-kafka-runtime.ps1
+      - scripts/production/tests/test_kafka_runtime.py
       - scripts/production/test_redis_security_native.py
       - scripts/production/render_redis_security.py
       - infrastructure/production/redis/runtime.json
@@ -86,7 +90,7 @@ on:
         type: boolean
         default: false
       postgresql_quarantine:
-        description: Rehearse only the owner-approved empty closed PostgreSQL quarantine
+        description: Rehearse the owner-approved closed PostgreSQL quarantine and empty closed Kafka runtime
         type: boolean
         default: false
       mesh_run:
@@ -155,6 +159,10 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-redis-runtime.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'REDIS_RUNTIME_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-kafka-runtime.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'KAFKA_RUNTIME_WRAPPER_SYNTAX_FAILED' }
           [void][System.Management.Automation.Language.Parser]::ParseFile(
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-barman-control-plane.ps1'),
             [ref]$tokens, [ref]$parseErrors)

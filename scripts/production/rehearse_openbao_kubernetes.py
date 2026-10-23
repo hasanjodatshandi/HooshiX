@@ -31,7 +31,7 @@ STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "sc
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
                    "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
-                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "kafka-closed-runtime", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -510,6 +510,10 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                         plan['public_ca_sha256'] = hashlib.sha256(cert.read_bytes()).hexdigest()
                         kafka_tls_result = kafka_tls(k, plan, api, token, cert.read_text(), key,
                             audiences, name + '-control-plane')
+                        step('kafka-closed-runtime')
+                        from rehearse_kafka_runtime import rehearse as kafka_runtime
+                        kafka_runtime_result = kafka_runtime(k, wait, run, cert.read_text(),
+                            name + '-control-plane', platform)
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
@@ -598,9 +602,11 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['redis_secret_delivery'] = redis_secret_result
             result['redis_tls_delivery'] = redis_tls_result
             if postgresql_quarantine:
+                result['scope'] = 'Disposable Calico/Ambient initialized-store closed Kafka runtime'
                 result['postgresql_quarantine'] = pg_quarantine_result
                 result['redis_runtime'] = redis_runtime_result
                 result['kafka_tls_delivery'] = kafka_tls_result
+                result['kafka_closed_runtime'] = kafka_runtime_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['redis_local_volume'] = redis_volume_result

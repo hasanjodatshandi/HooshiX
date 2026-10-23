@@ -8,6 +8,7 @@ import tempfile
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -160,6 +161,36 @@ class LocalVolumeTest(unittest.TestCase):
             data.lstat.return_value.st_mode = stat.S_IFLNK | 0o700
             with self.assertRaisesRegex(ValueError, 'GUARDED_DATA_OWNER_REQUIRED'):
                 volume.verify_data()
+
+    def test_initialized_data_reentry_rejects_nested_links_and_unsafe_types(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'data'
+            nested = root / '__cluster_metadata-0'
+            nested.mkdir(parents=True)
+            marker = nested / '00000000000000000000.log'
+            marker.touch()
+            marker.chmod(0o600)
+            root.chmod(0o700)
+            nested.chmod(0o700)
+            real_lstat = Path.lstat
+
+            def owned_lstat(path):
+                item = real_lstat(path)
+                return type('Stat', (), {'st_mode': item.st_mode, 'st_uid': 10001, 'st_gid': 10001,
+                    'st_nlink': item.st_nlink})()
+
+            filesystem = SimpleNamespace(f_bavail=100, f_frsize=10, f_blocks=100)
+            with patch.object(volume, 'DATA', root), patch.object(Path, 'lstat', owned_lstat), \
+                    patch.object(volume.os, 'statvfs', return_value=filesystem):
+                volume.verify_data(initialized=True)
+                extra = root / 'nested-link'
+                extra.symlink_to(marker)
+                with self.assertRaisesRegex(ValueError, 'UNSAFE_INITIALIZED_KAFKA_DATA_PRESERVED'):
+                    volume.verify_data(initialized=True)
+                extra.unlink()
+                os.link(marker, root / 'hard-link')
+                with self.assertRaisesRegex(ValueError, 'UNSAFE_INITIALIZED_KAFKA_DATA_PRESERVED'):
+                    volume.verify_data(initialized=True)
 
     def test_binding_identity_ignores_controller_metadata_but_not_replacement_or_deletion(self):
         original = {'metadata': {'uid': 'existing', 'resourceVersion': '1'},

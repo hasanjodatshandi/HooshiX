@@ -61,7 +61,7 @@ Production readiness همچنان `Not verified` هستند.
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
-| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | broker هنوز نصب نشده؛ runtime staging و اجرای مقصد لازم است |
+| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | پیاده‌سازی runtime بسته در PR جاری؛ پس از ادغام، staging دقیق `main` و اجرای مقصد لازم است؛ broker نصب نشده |
 | JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -2522,12 +2522,15 @@ reentry پیش از ساخت claim فقط همان دو شیء سالم و تح�
 
 ### مرز نصب اولیهٔ بستهٔ Kafka
 
-نصب اولیه فقط یک broker/controller خالی و بسته روی LocalPV رزروشدهٔ `14Gi`
-است؛ برنامه یا کاربر شبکه‌ای مجاز نیست. TLS از intermediate موجود و تحویل
-OpenBao/ESO استفاده می‌کند؛ Root تازه، رمز در Git، فرمت مجدد، reset یا پذیرش
-دادهٔ ناشناخته مجاز نیست. پیش از دستور مقصد، آزمون بومی TLS، restart و رد
-شبکه/admission و شواهد همان نسخه لازم‌اند. ابزار آماده یا CI موفق، اجرای VPS
-یا آمادگی Production نیست؛ دستور مقصد تا تکمیل بستهٔ معتبر ارائه نمی‌شود.
+محدوده فقط یک broker/controller خالی روی LocalPV رزروشدهٔ `14Gi` است؛ بدون
+topic تجاری، client برنامه/کاربر یا مسیر عمومی. تصویر باید digest ثابت و
+signature/provenance/SBOM معتبر داشته باشد؛ TLS از leaf موجود Kafka استفاده
+می‌کند، و STRICT Ambient، NetworkPolicy بدون ingress و admission fail-closed
+حفظ می‌شوند. فرمت فقط وقتی مجاز است که پوشهٔ داده خالی و guard سالم باشد؛ دادهٔ
+ناشناخته یا نیمه‌کاره حفظ و باعث توقف می‌شود. راهنمای اجرای مقصد پس از آزمون
+بومی، staging روی `main` دقیق و بستهٔ مالکِ همان revision در بخش
+«اجرای broker بسته» آمده است. این استقرار به‌تنهایی recovery، ظرفیت یا آمادگی
+Production را ثابت نمی‌کند.
 
 ### تحویل نخستین گواهی node به Kafka
 
@@ -2629,14 +2632,63 @@ volumeهای ناشناس خودش حذف می‌شود. کلیدهای آزما
 [Kafka TLS](https://kafka.apache.org/42/security/encryption-and-authentication-using-ssl/)،
 [Kafka ACL](https://kafka.apache.org/42/security/authorization-and-acls/).
 
+### اجرای broker بسته پس از ادغام و staging دقیق `main`
+
+ابتدا PR این تغییر باید review و merge شده باشد. سپس روی `main` تازه و clean،
+یک native staging کامل با همهٔ dependencyها اجرا کنید تا receipt نهایی برای
+همان SHA شامل `kafka_closed_runtime` باشد. اجرای دستی workflow باید شش ورودی
+زیر را فعال کند؛ workflow را تا نتیجهٔ نهایی موفق دنبال کنید:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main \
+  -f mesh_security_upgrade=true -f eso_commissioning=true \
+  -f cert_manager_commissioning=true -f cnpg_control_plane=true \
+  -f barman_control_plane=true -f postgresql_quarantine=true
+gh run list --workflow platform-commissioning.yml --event workflow_dispatch --limit 5
+```
+
+`STAGING_RUN` را از اجرای موفقی انتخاب کنید که `head_sha` آن دقیقاً با خروجی
+`git rev-parse HEAD` روی `main` برابر است. با همان chart تأییدشدهٔ ESO 2.12.0 و
+Helm 4.2.4، bundle عمومی را بیرون Git بسازید؛ پوشه باید تازه و خالی از قبل
+باشد:
+
+```bash
+python3 scripts/production/build_kafka_runtime_bundle.py \
+  --staging-run "$STAGING_RUN" --chart "$ESO_CHART" --helm "$HELM" \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-runtime
+```
+
+در PowerShell، ابتدا فقط صحت فایل‌های public bundle را بررسی کنید، سپس VNC
+قابل ورود و یک نشست دوم SSH خصوصی را باز نگه دارید و runner را با همان پوشه
+اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-runtime\run-kafka-runtime.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-runtime\run-kafka-runtime.ps1' -RescueAndSecondSessionReady
+```
+
+در prompt فقط `READY` انگلیسی و رمز sudo را وارد کنید؛ توکن GHCR یا رمز
+OpenBao/Root/CA لازم نیست. موفقیت باید `KAFKA_RUNTIME=Passed`، یک broker
+داخلی روی همان Retain volume، `business_topics=None`، `application_ingress=CLOSED`
+و `public_access=CLOSED` نشان دهد؛ receipt عمومی کنار پوشهٔ bundle ذخیره می‌شود.
+فرمت اولیه فقط یک‌بار و فقط روی پوشهٔ خالیِ تأییدشده انجام می‌شود؛ دادهٔ موجود
+هرگز reset/reformat نمی‌شود. TLS/Root تغییر نمی‌کند، host service restart یا
+سرور reboot نمی‌شود. خطای اجرا state را حفظ می‌کند؛ ابزار رزرو volume یا تحویل
+TLS را پس از ایجاد claim تکرار نکنید.
+
+پس از نصب نیز recovery/rebuild واقعی از GitOps، replay/dedup evidence، capacity،
+certificate renewal، topic/client credentials/ACL، observability و complete-stack
+readiness همچنان `Not verified` هستند. ترافیک برنامه تا عبور این gateها بسته
+می‌ماند.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
 2. دسترسی عملیاتی محدود، backup ساعتی، recovery و audit امن خارج میزبان؛ root
    اولیه فقط پس از جایگزین معتبر و آزمون recovery لغو شود.
 3. JIT واقعی: expiry/revoke/disconnect، سپس حذف دسترسی دائمی با مسیر نجات کارا.
-4. PostgreSQL/CNPG/Barman و Redis به backup/restore و ظرفیت نیاز دارند؛ Kafka
-   candidate باید پس از انتشار محافظت‌شده TLS/ACL، staging و recovery را بگذراند.
+4. PostgreSQL/CNPG/Barman، Redis و Kafka به backup/restore و ظرفیت نیاز دارند؛
+   broker بستهٔ Kafka ترافیک برنامه را مجاز نمی‌کند.
 5. GitOps/Argo CD، انتشار هفت artifact، شش سرویس و frontend، migration و اسرار.
 6. edge/TLS/WAF، مسیر frontend/BFF و دامنهٔ همان نصب؛ origin bypass ممنوع.
 7. observability/alert و monitor مستقل خاموشی host.
