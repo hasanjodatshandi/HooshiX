@@ -65,32 +65,75 @@ class KafkaRuntimeTest(unittest.TestCase):
 
     def test_readiness_snapshot_exposes_only_bounded_status_classes(self):
         objects = {
-            'statefulset': {'status': {'replicas': 1, 'readyReplicas': 0}},
+            'statefulset': {'metadata': {'generation': 2}, 'spec': {'replicas': 1},
+                'status': {'observedGeneration': 2, 'replicas': 1, 'readyReplicas': 0}},
             'pod': {'status': {'phase': 'Pending', 'conditions': [{
                 'type': 'PodScheduled', 'status': 'False', 'reason': 'FailedScheduling',
                 'message': 'PRIVATE_EVENT_MESSAGE'}], 'initContainerStatuses': [{
                 'name': 'tls-material', 'ready': False, 'restartCount': 0,
                 'state': {'waiting': {'reason': 'ErrImagePull', 'message': 'PRIVATE_IMAGE_ERROR'}}}],
                 'containerStatuses': []}},
-            'events': {'items': [{'type': 'Warning', 'reason': 'FailedScheduling',
+            'pod-events': {'items': [{'type': 'Warning', 'reason': 'FailedScheduling',
                 'message': 'PRIVATE_EVENT_MESSAGE'}, {'type': 'Warning', 'reason': 'OtherSecretValue',
                 'message': 'PRIVATE_SECOND_EVENT'}, {'type': 'Warning',
                 'message': 'PRIVATE_THIRD_EVENT'}]},
+            'statefulset-events': {'items': []},
         }
 
         def kube(*args, **_kwargs):
-            kind = next((value for value in ('statefulset', 'pod', 'events') if value in args), None)
+            if 'events' in args:
+                selector = args[args.index('--field-selector') + 1]
+                kind = 'pod-events' if 'involvedObject.kind=Pod' in selector else 'statefulset-events'
+            else:
+                kind = next(value for value in ('statefulset', 'pod') if value in args)
+                if kind == 'pod' and objects[kind] is None:
+                    return b''
             return json.dumps(objects[kind]).encode()
 
         result = rehearsal.readiness_snapshot(kube)
         serialized = json.dumps(result)
+        self.assertEqual(1, result['statefulset']['desired_replicas'])
+        self.assertEqual(2, result['statefulset']['observed_generation'])
         self.assertEqual(0, result['statefulset']['ready_replicas'])
         self.assertEqual('ErrImagePull', result['pod']['containers'][0]['reason'])
         self.assertEqual([{'reason': 'FailedScheduling', 'count': 1}, {'reason': 'Other', 'count': 2}],
-                         result['warning_events']['reasons'])
+                         result['warning_events']['pod']['reasons'])
         for private_value in ('PRIVATE_EVENT_MESSAGE', 'PRIVATE_IMAGE_ERROR', 'PRIVATE_SECOND_EVENT',
                               'PRIVATE_THIRD_EVENT'):
             self.assertNotIn(private_value, serialized)
+
+    def test_readiness_snapshot_captures_statefulset_pod_creation_failure(self):
+        objects = {
+            'statefulset': {'metadata': {'generation': 3}, 'spec': {'replicas': 1},
+                'status': {'observedGeneration': 3, 'replicas': 0, 'readyReplicas': 0,
+                    'conditions': [{'type': 'ReplicaFailure', 'status': 'True', 'reason': 'FailedCreate',
+                                    'message': 'PRIVATE_ADMISSION_DETAIL'}]}},
+            'pod': None,
+            'pod-events': {'items': []},
+            'statefulset-events': {'items': [{'type': 'Warning', 'reason': 'FailedCreate',
+                'message': 'PRIVATE_ADMISSION_DETAIL'}]},
+        }
+
+        def kube(*args, **_kwargs):
+            if 'events' in args:
+                selector = args[args.index('--field-selector') + 1]
+                kind = 'pod-events' if 'involvedObject.kind=Pod' in selector else 'statefulset-events'
+            else:
+                kind = next(value for value in ('statefulset', 'pod') if value in args)
+                if kind == 'pod' and objects[kind] is None:
+                    return b''
+            return json.dumps(objects[kind]).encode()
+
+        result = rehearsal.readiness_snapshot(kube)
+        serialized = json.dumps(result)
+        self.assertEqual(1, result['statefulset']['desired_replicas'])
+        self.assertEqual(0, result['statefulset']['replicas'])
+        self.assertEqual([{'type': 'ReplicaFailure', 'status': 'True', 'reason': 'FailedCreate'}],
+                         result['statefulset']['conditions'])
+        self.assertEqual([{'reason': 'FailedCreate', 'count': 1}],
+                         result['warning_events']['statefulset']['reasons'])
+        self.assertFalse(result['pod']['present'])
+        self.assertNotIn('PRIVATE_ADMISSION_DETAIL', serialized)
 
     def test_service_and_two_network_boundaries_are_closed(self):
         service = next(x for x in self.plan['objects'] if x['kind'] == 'Service')

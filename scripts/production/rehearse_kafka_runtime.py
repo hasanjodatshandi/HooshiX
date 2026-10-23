@@ -77,6 +77,8 @@ def readiness_snapshot(kube):
     stateful = installer.get(kube, 'statefulset', renderer.NAME, renderer.NS)
     pod = installer.get(kube, 'pod', renderer.NAME + '-0', renderer.NS)
     pod_status = (pod or {}).get('status') or {}
+    stateful_spec = (stateful or {}).get('spec') or {}
+    stateful_metadata = (stateful or {}).get('metadata') or {}
     stateful_status = (stateful or {}).get('status') or {}
     states = []
     for status in pod_status.get('initContainerStatuses', []) + pod_status.get('containerStatuses', []):
@@ -106,22 +108,39 @@ def readiness_snapshot(kube):
         conditions.append({'type': kind, 'status': status,
                            'reason': marker(condition.get('reason'), SAFE_EVENT_REASONS)})
 
-    try:
-        raw = kube('-n', renderer.NS, 'get', 'events', '--field-selector',
-                   'involvedObject.kind=Pod,involvedObject.name=kafka-0,type=Warning', '-o', 'json',
-                   output_bound=32768)
-        events = json.loads(raw).get('items', [])
-        reasons = Counter(marker(event.get('reason'), SAFE_EVENT_REASONS) or 'Other'
-                          for event in events if event.get('type') == 'Warning')
-        warning_events = {'count': sum(reasons.values()), 'reasons': [
-            {'reason': reason, 'count': count} for reason, count in sorted(reasons.items())[:12]]}
-    except Exception:
-        warning_events = {'available': False}
+    stateful_conditions = []
+    for condition in stateful_status.get('conditions', []):
+        status = condition.get('status')
+        if condition.get('type') != 'ReplicaFailure' or status not in ('True', 'False', 'Unknown'):
+            continue
+        stateful_conditions.append({'type': 'ReplicaFailure', 'status': status,
+                                    'reason': marker(condition.get('reason'), SAFE_EVENT_REASONS)})
+
+    warning_events = {}
+    for object_kind, object_name in (('Pod', renderer.NAME + '-0'), ('StatefulSet', renderer.NAME)):
+        try:
+            raw = kube('-n', renderer.NS, 'get', 'events', '--field-selector',
+                       f'involvedObject.kind={object_kind},involvedObject.name={object_name},type=Warning',
+                       '-o', 'json', output_bound=32768)
+            events = json.loads(raw).get('items', [])
+            reasons = Counter(marker(event.get('reason'), SAFE_EVENT_REASONS) or 'Other'
+                              for event in events if event.get('type') == 'Warning')
+            warning_events[object_kind.lower()] = {'count': sum(reasons.values()), 'reasons': [
+                {'reason': reason, 'count': count} for reason, count in sorted(reasons.items())[:12]]}
+        except Exception:
+            warning_events[object_kind.lower()] = {'available': False}
 
     return {'statefulset': {'present': stateful is not None,
+            'desired_replicas': stateful_spec.get('replicas')
+                if type(stateful_spec.get('replicas')) is int else None,
+            'generation': stateful_metadata.get('generation')
+                if type(stateful_metadata.get('generation')) is int else None,
+            'observed_generation': stateful_status.get('observedGeneration')
+                if type(stateful_status.get('observedGeneration')) is int else None,
             'replicas': stateful_status.get('replicas') if type(stateful_status.get('replicas')) is int else None,
             'ready_replicas': stateful_status.get('readyReplicas')
-                if type(stateful_status.get('readyReplicas')) is int else 0},
+                if type(stateful_status.get('readyReplicas')) is int else 0,
+            'conditions': stateful_conditions},
         'pod': {'present': pod is not None, 'phase': marker(pod_status.get('phase'), SAFE_PHASES),
             'conditions': conditions, 'containers': states}, 'warning_events': warning_events}
 
