@@ -26,6 +26,7 @@ from upgrade_mesh_security import replace_policy
 
 NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
 HASH = 'hooshix.io/kafka-spec-sha256'
+READINESS_TIMEOUT_SECONDS = 420
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 require, get, digest = pg.require, pg.get, pg.digest
 
@@ -270,7 +271,8 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
 
     print('KAFKA_RUNTIME_STEP=readiness', file=sys.stderr, flush=True)
     kube('-n', NS, 'wait', '--for=jsonpath={.status.readyReplicas}=1',
-         'statefulset/' + NAME, '--timeout=300s', timeout=315)
+         'statefulset/' + NAME, f'--timeout={READINESS_TIMEOUT_SECONDS}s',
+         timeout=READINESS_TIMEOUT_SECONDS + 15)
     pod = get(kube, 'pod', NAME + '-0', NS)
     current = get(kube, 'statefulset', NAME, NS)
     expected = {'kind': 'Pod', 'spec': plan['statefulset']['spec']['template']['spec']}

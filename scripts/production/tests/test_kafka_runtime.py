@@ -58,6 +58,11 @@ class KafkaRuntimeTest(unittest.TestCase):
         self.assertEqual(['ALL'], pod['containers'][0]['securityContext']['capabilities']['drop'])
         self.assertTrue(pod['containers'][0]['securityContext']['runAsNonRoot'])
 
+    def test_readiness_deadline_covers_the_startup_probe_budget(self):
+        probe = self.plan['statefulset']['spec']['template']['spec']['containers'][0]['startupProbe']
+        startup_budget = probe['failureThreshold'] * probe['periodSeconds']
+        self.assertGreaterEqual(installer.READINESS_TIMEOUT_SECONDS, startup_budget + 60)
+
     def test_service_and_two_network_boundaries_are_closed(self):
         service = next(x for x in self.plan['objects'] if x['kind'] == 'Service')
         network = next(x for x in self.plan['objects'] if x['kind'] == 'NetworkPolicy')
