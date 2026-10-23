@@ -16,6 +16,37 @@ from rehearse_platform_admission import admission_result, apply, policy_ready
 from rehearse_cert_manager import network_negative
 from upgrade_mesh_security import replace_policy
 
+SAFE_RUNTIME_FAILURE_CODES = frozenset({
+    'ACTIVE_CLOSED_DATA_ADMISSION_REQUIRED', 'ADDITIONAL_KAFKA_MESH_ACCESS_REJECTED',
+    'ADDITIONAL_KAFKA_NETWORK_ACCESS_REJECTED', 'CLOSED_KAFKA_RUNTIME_PLAN_REQUIRED',
+    'CNPG_EXISTING_CERT_MANAGER_REQUIRED', 'EXACT_KAFKA_BINDING_REQUIRED',
+    'EXACT_KAFKA_NODE_CHAIN_REQUIRED', 'EXISTING_CONTROLLERS_REQUIRED',
+    'EXISTING_KAFKA_CLAIM_BINDING_REQUIRED', 'EXISTING_KAFKA_TLS_DELIVERY_REQUIRED',
+    'EXISTING_REDIS_ACL_BINDING_REQUIRED', 'EXISTING_REDIS_CHAIN_REQUIRED',
+    'EXISTING_REDIS_CREDENTIAL_REQUIRED', 'EXISTING_REDIS_ESO_DELIVERY_REQUIRED',
+    'EXISTING_RESERVED_VOLUME_REQUIRED', 'EXISTING_STATIC_CLASS_REQUIRED',
+    'FOREIGN_CLAIM_PRESERVED', 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED',
+    'FOREIGN_OR_CHANGED_KAFKA_VOLUME_PRESERVED', 'FOREIGN_OR_CHANGED_REDIS_VOLUME_PRESERVED',
+    'KAFKA_CLOSED_POLICY_REQUIRED', 'KAFKA_DEFAULTED_SPEC_DRIFT_PRESERVED',
+    'KAFKA_EXISTING_REDIS_REQUIRED', 'KAFKA_ISOLATION_DRIFT', 'KAFKA_STRICT_AMBIENT_MTLS_REQUIRED',
+    'KAFKA_TLS_BOUNDED_LIFETIME_REQUIRED', 'KAFKA_TLS_EXACT_MATERIAL_REQUIRED',
+    'KAFKA_TLS_ISSUER_CHAIN_CONFLICT', 'KAFKA_TLS_KEY_CONFLICT',
+    'KAFKA_TLS_NODE_CONSTRAINTS_REQUIRED', 'KAFKA_TLS_NODE_SUBJECT_REQUIRED',
+    'KAFKA_TLS_PKCS8_REQUIRED', 'NATIVE_OPERATION_FAILED_STATE_PRESERVED',
+    'PINNED_KAFKA_ROOT_REQUIRED', 'PINNED_REDIS_ROOT_REQUIRED',
+    'REDIS_SECRET_EXISTING_QUARANTINE_REQUIRED', 'REDIS_SECRET_REVIEWED_VOLUME_REQUIRED',
+    'REDIS_TLS_RAM_FILESYSTEM_REQUIRED', 'RESERVED_KAFKA_VOLUME_REQUIRED',
+    'RESERVED_REDIS_VOLUME_REQUIRED', 'RESERVED_VOLUME_DRIFT_PRESERVED',
+    'RETAIN_KAFKA_CLASS_REQUIRED', 'RETAIN_REDIS_CLASS_REQUIRED',
+    'RESTRICTED_AMBIENT_KAFKA_NAMESPACE_REQUIRED', 'TEN_EXISTING_TYPED_SECRETS_REQUIRED',
+    'UNEXPECTED_KAFKA_POD_COUNT', 'UNOWNED_KAFKA_POD_PRESERVED',
+})
+
+
+def safe_failure_code(error):
+    code = error.args[0] if len(error.args) == 1 else None
+    return code if isinstance(code, str) and code in SAFE_RUNTIME_FAILURE_CODES else None
+
 
 def rehearse(k, wait, run, ca, node, platform):
     if not re.fullmatch('hooshix-bao-ci-[a-f0-9]{12}-control-plane', node):
@@ -43,7 +74,13 @@ def rehearse(k, wait, run, ca, node, platform):
         options = {'kube': kube, 'guard': lambda **_: {},
             'preserve': lambda call, _digest: tls.preserved(call, plan['public_ca_sha256'])}
         print('KAFKA_RUNTIME_NATIVE_STEP=closed-start', flush=True)
-        result = installer.execute(plan, **options)
+        try:
+            result = installer.execute(plan, **options)
+        except Exception as error:
+            code = safe_failure_code(error)
+            if code:
+                print('KAFKA_RUNTIME_PREFLIGHT_FAILURE=' + code, flush=True)
+            raise
         first_identity = installer.storage_identity(kube)
         first_claim = installer.get(kube, 'pvc', volume.CLAIM, renderer.NS)['metadata']['uid']
         again = installer.execute(plan, **options)

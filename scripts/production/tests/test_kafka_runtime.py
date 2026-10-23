@@ -128,6 +128,12 @@ class KafkaRuntimeTest(unittest.TestCase):
             installer.execute({}, kube=kube)
         kube.assert_not_called()
 
+    def test_staging_failure_diagnostic_only_emits_allowlisted_invariant_codes(self):
+        self.assertEqual('RESERVED_VOLUME_DRIFT_PRESERVED',
+            rehearsal.safe_failure_code(ValueError('RESERVED_VOLUME_DRIFT_PRESERVED')))
+        self.assertIsNone(rehearsal.safe_failure_code(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
+        self.assertIsNone(rehearsal.safe_failure_code(ValueError('RESERVED_VOLUME_DRIFT_PRESERVED', 'extra')))
+
     def test_native_rehearsal_uses_disposable_node_for_all_preserved_local_volumes(self):
         node = 'hooshix-bao-ci-0123456789ab-control-plane'
         previous = json.dumps(prior_boundary()).encode()
