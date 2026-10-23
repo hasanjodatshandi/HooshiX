@@ -2658,6 +2658,8 @@ gh run list --workflow platform-commissioning.yml --event workflow_dispatch --li
 ReplicaFailure، وضعیت Pod و شمار/دلیل‌های allowlist‌شدهٔ رخدادهای Warning متصل به
 Pod و StatefulSet را گزارش می‌کند؛ متن رخداد، log و محتوای Secret نگهداری یا چاپ
 نمی‌شود. این گزارش جایگزین موفقیت staging نیست.
+بودجهٔ job برابر ۵۵ دقیقه است تا rehearsal کامل، مهلت ۷ دقیقه‌ای broker و پاک‌سازی
+fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا گیت امنیتی از این زمان‌بندی حذف نمی‌شود.
 
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را
