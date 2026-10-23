@@ -44,9 +44,9 @@ def node_secret(kube, ca_sha256):
               for key, value in secret['data'].items()}
     require(hashlib.sha256(values['ca.crt'].encode()).hexdigest() == ca_sha256,
             'PINNED_KAFKA_ROOT_REQUIRED')
-    chain = certificates.platform.ca_import.pem_certificates(values['tls.crt'].encode())
-    require(len(chain) == 2, 'EXACT_KAFKA_NODE_CHAIN_REQUIRED')
-    certificates.validate(values, values['ca.crt'], chain[1].decode())
+    pem_chain = certificates.platform.ca_import.pem_certificate_blocks(values['tls.crt'].encode())
+    require(len(pem_chain) == 2, 'EXACT_KAFKA_NODE_CHAIN_REQUIRED')
+    certificates.validate(values, values['ca.crt'], pem_chain[1].decode())
     return (secret['metadata']['uid'], secret['type'], secret['data'],
             external['metadata']['uid'], external['spec'])
 
