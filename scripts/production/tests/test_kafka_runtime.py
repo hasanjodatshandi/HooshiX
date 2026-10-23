@@ -141,8 +141,9 @@ class KafkaRuntimeTest(unittest.TestCase):
         self.assertEqual('UNLISTED_STATIC_BOOTSTRAP_CODE',
             rehearsal.safe_failure_code(bootstrap_failure('UNLISTED_STATIC_BOOTSTRAP_CODE')))
         self.assertIsNone(rehearsal.safe_failure_code(bootstrap_failure('private details')))
-        self.assertEqual('ValueError', rehearsal.safe_failure_type(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
-        unsafe_type = type('GHCR_TOKEN_MUST_STAY_PRIVATE', (Exception,), {})
+        self.assertEqual('builtins.ValueError',
+            rehearsal.safe_failure_type(ValueError('GHCR_TOKEN_MUST_STAY_PRIVATE')))
+        unsafe_type = type('invalid exception name', (Exception,), {})
         self.assertEqual('Other', rehearsal.safe_failure_type(unsafe_type()))
 
     def test_native_rehearsal_uses_disposable_node_for_all_preserved_local_volumes(self):

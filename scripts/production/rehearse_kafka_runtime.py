@@ -52,12 +52,6 @@ SAFE_RUNTIME_FAILURE_CODES = frozenset({
     'UNEXPECTED_KAFKA_POD_COUNT', 'UNOWNED_KAFKA_POD_PRESERVED',
     'BOUND_RETAIN_KAFKA_VOLUME_REQUIRED',
 })
-SAFE_RUNTIME_EXCEPTION_TYPES = frozenset({
-    'AttributeError', 'BootstrapFailed', 'CalledProcessError', 'IndexError', 'JSONDecodeError', 'KeyError',
-    'OSError', 'PermissionError', 'RuntimeError', 'TimeoutExpired', 'TypeError', 'ValueError',
-})
-
-
 def safe_failure_code(error):
     code = error.args[0] if len(error.args) == 1 else None
     if isinstance(code, str) and code in SAFE_RUNTIME_FAILURE_CODES:
@@ -69,8 +63,12 @@ def safe_failure_code(error):
 
 
 def safe_failure_type(error):
-    name = type(error).__name__
-    return name if name in SAFE_RUNTIME_EXCEPTION_TYPES else 'Other'
+    error_type = type(error)
+    module, name = error_type.__module__, error_type.__name__
+    if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,63}', name) and re.fullmatch(
+            r'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,7}', module):
+        return module + '.' + name
+    return 'Other'
 
 
 def rehearse(k, wait, run, ca, node, platform):
