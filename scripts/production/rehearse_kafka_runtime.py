@@ -32,7 +32,7 @@ def rehearse(k, wait, run, ca, node, platform):
         'chown 10001:10001 /var/lib/hooshixstorage/kafka/data && '
         'chmod 0700 /var/lib/hooshixstorage/kafka/data'])
     with patch.object(volume, 'NODE', node), patch.object(installer.volume, 'NODE', node), \
-            patch.object(tls.redis.volume, 'NODE', node):
+            patch.object(tls.redis.volume, 'NODE', node), patch.object(tls.redis.pg.volume, 'NODE', node):
         volume.reserve(volume.candidate(), kube)
         plan = renderer.render(previous)
         plan['repository_source_revision'] = os.environ['GITHUB_SHA']

@@ -13,6 +13,7 @@ import build_kafka_runtime_bundle as bundle
 import install_kafka_runtime as installer
 import render_platform_admission as admission
 import render_kafka_runtime as renderer
+import rehearse_kafka_runtime as rehearsal
 
 
 def prior_boundary():
@@ -126,6 +127,26 @@ class KafkaRuntimeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'CLOSED_KAFKA_RUNTIME_PLAN_REQUIRED'):
             installer.execute({}, kube=kube)
         kube.assert_not_called()
+
+    def test_native_rehearsal_uses_disposable_node_for_all_preserved_local_volumes(self):
+        node = 'hooshix-bao-ci-0123456789ab-control-plane'
+        previous = json.dumps(prior_boundary()).encode()
+        captured = {}
+
+        def stop_after_node_binding(*args, **kwargs):
+            captured['nodes'] = (rehearsal.volume.NODE, installer.volume.NODE,
+                renderer.volume.NODE, rehearsal.tls.redis.volume.NODE,
+                rehearsal.tls.redis.pg.volume.NODE)
+            raise RuntimeError('FIXTURE_NODE_BOUND')
+
+        with patch.object(rehearsal.volume, 'reserve'), \
+                patch.object(rehearsal.renderer, 'render', return_value={}), \
+                patch.object(rehearsal.installer, 'execute', side_effect=stop_after_node_binding), \
+                patch.dict('os.environ', {'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '12345'}):
+            with self.assertRaisesRegex(RuntimeError, 'FIXTURE_NODE_BOUND'):
+                rehearsal.rehearse(lambda *args, **kwargs: previous, lambda *_args, **_kwargs: None,
+                    lambda *_args, **_kwargs: None, 'fixture-ca', node, {})
+        self.assertEqual((node, node, node, node, node), captured['nodes'])
 
     def test_staging_source_revision_is_bound_to_exact_owner_bundle(self):
         wrapper = (Path(__file__).resolve().parents[1] / 'run-kafka-runtime.ps1').read_text()
