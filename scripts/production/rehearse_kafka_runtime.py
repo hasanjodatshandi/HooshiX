@@ -67,6 +67,44 @@ SAFE_EVENT_REASONS = frozenset({
     'Killing', 'PodCompleted', 'Pulled', 'Scheduled', 'SandboxChanged', 'Started',
     'SuccessfulAttachVolume', 'SuccessfulCreate', 'SuccessfulMountVolume', 'Unhealthy',
 })
+SAFE_CREATE_FAILURE_CLASSES = frozenset({
+    'ADMISSION_REJECTED', 'ADMISSION_WEBHOOK_UNAVAILABLE', 'POD_SECURITY_REJECTED',
+    'REFERENCED_OBJECT_MISSING', 'RESOURCE_QUOTA_EXCEEDED', 'OTHER',
+})
+SAFE_KAFKA_ADMISSION_POLICIES = frozenset({
+    'hooshix-platform-data-bootstrap-boundary', 'hooshix-kafka-source-signature',
+    'hooshix-kafka-source-provenance', 'hooshix-kafka-source-sbom',
+})
+SAFE_KAFKA_ADMISSION_FAILURES = {
+    'closed kafka runtime contract rejected': 'KAFKA_RUNTIME_BOUNDARY',
+    'platform bootstrap identity/security exception rejected': 'PLATFORM_DATA_BOUNDARY',
+    'platform image signature verification failed': 'KAFKA_IMAGE_SIGNATURE',
+    'platform import source revision rejected': 'KAFKA_SOURCE_REVISION',
+    'platform provenance signature verification failed': 'KAFKA_PROVENANCE_SIGNATURE',
+    'platform signed sbom is not cyclonedx': 'KAFKA_SBOM_FORMAT',
+    'platform signed sbom verification failed': 'KAFKA_SBOM_SIGNATURE',
+    'kafka source build identity rejected': 'KAFKA_SOURCE_IDENTITY',
+}
+
+
+def failed_create_class(message):
+    """Classify a controller event without retaining or emitting its private message."""
+    text = message[:4096].casefold() if isinstance(message, str) else ''
+    if 'exceeded quota' in text or 'exceeded its quota' in text:
+        result = 'RESOURCE_QUOTA_EXCEEDED'
+    elif any(value in text for value in ('failed calling webhook', 'no endpoints available',
+                                         'context deadline exceeded', 'connection refused')):
+        result = 'ADMISSION_WEBHOOK_UNAVAILABLE'
+    elif 'violates podsecurity' in text or 'pod security standard' in text:
+        result = 'POD_SECURITY_REJECTED'
+    elif 'not found' in text:
+        result = 'REFERENCED_OBJECT_MISSING'
+    elif any(value in text for value in ('forbidden', 'denied the request', 'admission rejected',
+                                         'failed to evaluate policy')):
+        result = 'ADMISSION_REJECTED'
+    else:
+        result = 'OTHER'
+    return result if result in SAFE_CREATE_FAILURE_CLASSES else 'OTHER'
 
 
 def readiness_snapshot(kube):
@@ -123,10 +161,25 @@ def readiness_snapshot(kube):
                        f'involvedObject.kind={object_kind},involvedObject.name={object_name},type=Warning',
                        '-o', 'json', output_bound=32768)
             events = json.loads(raw).get('items', [])
+            warnings = [event for event in events if event.get('type') == 'Warning']
             reasons = Counter(marker(event.get('reason'), SAFE_EVENT_REASONS) or 'Other'
-                              for event in events if event.get('type') == 'Warning')
-            warning_events[object_kind.lower()] = {'count': sum(reasons.values()), 'reasons': [
-                {'reason': reason, 'count': count} for reason, count in sorted(reasons.items())[:12]]}
+                              for event in warnings)
+            failed_creates = [event for event in warnings if event.get('reason') == 'FailedCreate']
+            failure_classes = Counter(failed_create_class(event.get('message')) for event in failed_creates)
+            known_policies = {name for event in failed_creates if isinstance(event.get('message'), str)
+                              for name in SAFE_KAFKA_ADMISSION_POLICIES
+                              if name in event['message'][:4096].casefold()}
+            known_failures = {marker for event in failed_creates if isinstance(event.get('message'), str)
+                              for phrase, marker in SAFE_KAFKA_ADMISSION_FAILURES.items()
+                              if phrase in event['message'][:4096].casefold()}
+            warning_events[object_kind.lower()] = {
+                'count': sum(reasons.values()),
+                'reasons': [{'reason': reason, 'count': count}
+                            for reason, count in sorted(reasons.items())[:12]],
+                'failed_create_classes': [{'class': name, 'count': count}
+                    for name, count in sorted(failure_classes.items())],
+                'known_admission_policies': sorted(known_policies),
+                'known_admission_failures': sorted(known_failures)}
         except Exception:
             warning_events[object_kind.lower()] = {'available': False}
 

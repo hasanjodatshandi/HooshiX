@@ -2655,9 +2655,10 @@ gh run list --workflow platform-commissioning.yml --event workflow_dispatch --li
 
 در staging، مهلت readiness باید از بودجهٔ startup probe بیشتر باشد. اگر broker در
 مهلت به Ready نرسد، خروجی تشخیصی فقط replicaهای مطلوب/مشاهده‌شده، شرط محدودشدهٔ
-ReplicaFailure، وضعیت Pod و شمار/دلیل‌های allowlist‌شدهٔ رخدادهای Warning متصل به
-Pod و StatefulSet را گزارش می‌کند؛ متن رخداد، log و محتوای Secret نگهداری یا چاپ
-نمی‌شود. این گزارش جایگزین موفقیت staging نیست.
+ReplicaFailure، وضعیت Pod، شمار/دلیل‌های allowlist‌شدهٔ Warning و دسته‌بندی ثابت
+رخداد `FailedCreate` را گزارش می‌کند؛ نام policy فقط از فهرست ثابت policyهای Kafka
+و مرز داده و شناسهٔ رد فقط از پیام‌های ثابت شناخته‌شده نمایش داده می‌شوند. متن
+رخداد، log و محتوای Secret نگهداری یا چاپ نمی‌شود. این گزارش جایگزین موفقیت staging نیست.
 بودجهٔ job برابر ۵۵ دقیقه است تا rehearsal کامل، مهلت ۷ دقیقه‌ای broker و پاک‌سازی
 fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا گیت امنیتی از این زمان‌بندی حذف نمی‌شود.
 

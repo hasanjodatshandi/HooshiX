@@ -111,7 +111,8 @@ class KafkaRuntimeTest(unittest.TestCase):
             'pod': None,
             'pod-events': {'items': []},
             'statefulset-events': {'items': [{'type': 'Warning', 'reason': 'FailedCreate',
-                'message': 'PRIVATE_ADMISSION_DETAIL'}]},
+                'message': 'Error creating pod: forbidden; policy hooshix-platform-data-bootstrap-boundary '
+                           'rejected closed Kafka runtime contract rejected PRIVATE_ADMISSION_DETAIL'}]},
         }
 
         def kube(*args, **_kwargs):
@@ -132,8 +133,28 @@ class KafkaRuntimeTest(unittest.TestCase):
                          result['statefulset']['conditions'])
         self.assertEqual([{'reason': 'FailedCreate', 'count': 1}],
                          result['warning_events']['statefulset']['reasons'])
+        self.assertEqual([{'class': 'ADMISSION_REJECTED', 'count': 1}],
+                         result['warning_events']['statefulset']['failed_create_classes'])
+        self.assertEqual(['hooshix-platform-data-bootstrap-boundary'],
+                         result['warning_events']['statefulset']['known_admission_policies'])
+        self.assertEqual(['KAFKA_RUNTIME_BOUNDARY'],
+                         result['warning_events']['statefulset']['known_admission_failures'])
         self.assertFalse(result['pod']['present'])
         self.assertNotIn('PRIVATE_ADMISSION_DETAIL', serialized)
+
+    def test_failed_create_diagnostic_classes_are_fixed_and_bounded(self):
+        cases = (
+            ('pods exceeded quota PRIVATE_QUOTA', 'RESOURCE_QUOTA_EXCEEDED'),
+            ('failed calling webhook PRIVATE_WEBHOOK', 'ADMISSION_WEBHOOK_UNAVAILABLE'),
+            ('violates PodSecurity restricted PRIVATE_POLICY', 'POD_SECURITY_REJECTED'),
+            ('serviceaccount was not found PRIVATE_REFERENCE', 'REFERENCED_OBJECT_MISSING'),
+            ('unknown private detail PRIVATE_OTHER', 'OTHER'),
+        )
+        for message, expected in cases:
+            with self.subTest(expected=expected):
+                result = rehearsal.failed_create_class(message)
+                self.assertEqual(expected, result)
+                self.assertIn(result, rehearsal.SAFE_CREATE_FAILURE_CLASSES)
 
     def test_service_and_two_network_boundaries_are_closed(self):
         service = next(x for x in self.plan['objects'] if x['kind'] == 'Service')
