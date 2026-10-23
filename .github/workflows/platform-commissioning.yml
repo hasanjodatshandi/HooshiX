@@ -318,6 +318,12 @@ jobs:
             ${{ runner.temp }}/redis-acceptance/registry/*.json
           retention-days: 30
           if-no-files-found: error
+      - name: Disable swap for ephemeral TLS-key validation
+        run: |
+          set -euo pipefail
+          sudo swapoff --all
+          awk 'END { exit NR != 1 }' /proc/swaps
+          printf 'CI_PRIVATE_KEY_SWAP=Disabled\n'
       - name: Rehearse exact private images with real Calico Ambient and fail-closed Kyverno
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -2647,6 +2647,10 @@ gh workflow run platform-commissioning.yml --ref main \
 gh run list --workflow platform-commissioning.yml --event workflow_dispatch --limit 5
 ```
 
+runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
+شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را
+تغییر نمی‌دهد.
+
 `STAGING_RUN` را از اجرای موفقی انتخاب کنید که `head_sha` آن دقیقاً با خروجی
 `git rev-parse HEAD` روی `main` برابر است. با همان chart تأییدشدهٔ ESO 2.12.0 و
 Helm 4.2.4، bundle عمومی را بیرون Git بسازید؛ پوشه باید تازه و خالی از قبل
