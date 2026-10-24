@@ -116,7 +116,8 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
         scope = 'Disposable Calico/Ambient initialized-store closed Kafka runtime'
         proof = receipt.get('kafka_closed_runtime', {})
         required = ('kafka_runtime', 'mutual_tls_health', 'single_node_quorum', 'service_account_scope',
-            'idempotent_reconciliation', 'pod_contract_positive_negative', 'source_identity_positive_negative',
+            'data_admission_boundary', 'idempotent_reconciliation', 'pod_contract_positive_negative',
+            'source_identity_positive_negative',
             'retained_volume_process_restart', 'network_and_mesh_policy')
         if (not (mesh_security_upgrade and eso_commissioning and cert_manager_commissioning
                 and cnpg_control_plane and barman_control_plane)

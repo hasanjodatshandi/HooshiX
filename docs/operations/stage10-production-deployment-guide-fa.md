@@ -2662,16 +2662,14 @@ ReplicaFailure، وضعیت Pod، شمار/دلیل‌های allowlist‌شده�
 بودجهٔ job برابر ۵۵ دقیقه است تا rehearsal کامل، مهلت ۷ دقیقه‌ای broker و پاک‌سازی
 fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا گیت امنیتی از این زمان‌بندی حذف نمی‌شود.
 
-installer هر دو ValidatingPolicy فعال `hooshix-platform-data-closed` و
-`hooshix-platform-data-bootstrap-boundary` را با `failurePolicy=Fail` و
-`validationActions=Deny` حفظ می‌کند. پس از ایجاد StatefulSet، استثنای Pod فقط با
-ServiceAccount، نام/برچسب، ownerReference و UID همان StatefulSet ساخته می‌شود؛
-قرارداد کامل Pod در هر دو policy باقی می‌ماند. پیش‌بررسی policy bootstrap، scope
-محدود به `platform-data`، fail-closed بودن، deny بودن و یک validation با پیام ثابت
-را الزام می‌کند؛ قاعدهٔ قبلی برای سایر Podها حفظ و hash spec پایه هنگام تغییر ثبت
-می‌شود تا در اجرای مجدد تطبیق شود. bundle فقط پس از ثبت `bootstrap_boundary=Passed`
-در receipt staging ساخته می‌شود. scope یا policy drift پس از ثبت hash و UID قدیمی
-موجب توقف fail-closed می‌شود.
+installer فقط ValidatingPolicy موجود `hooshix-platform-data-closed` را با
+`failurePolicy=Fail` و `validationActions=Deny` نگه می‌دارد. پس از ایجاد StatefulSet،
+استثنا در همین policy فقط برای Pod دارای ServiceAccount، نام/برچسب، ownerReference
+و UID همان StatefulSet ساخته می‌شود؛ قاعدهٔ پایه برای سایر Podها حفظ می‌شود و
+قرارداد کامل Pod نیز جداگانه در همان policy اعمال می‌ماند. پیش‌بررسی و تطبیق مجدد
+policy با spec پایهٔ ثبت‌شده در bundle انجام می‌شود؛ policy یا scope مفقود/متغیر
+موجب توقف fail-closed می‌شود. bundle فقط پس از ثبت
+`data_admission_boundary=Passed` در receipt staging ساخته می‌شود.
 
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را

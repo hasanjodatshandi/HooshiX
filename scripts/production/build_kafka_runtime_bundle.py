@@ -15,7 +15,7 @@ import render_redis_runtime as redis
 
 SOURCES = (*previous.SOURCES, 'install_kafka_runtime.py')
 WRAPPER = 'run-kafka-runtime.ps1'
-CHECKS = ('kafka_runtime', 'bootstrap_boundary', 'mutual_tls_health', 'single_node_quorum', 'service_account_scope',
+CHECKS = ('kafka_runtime', 'data_admission_boundary', 'mutual_tls_health', 'single_node_quorum', 'service_account_scope',
           'idempotent_reconciliation', 'pod_contract_positive_negative', 'source_identity_positive_negative',
           'retained_volume_process_restart', 'network_and_mesh_policy')
 
