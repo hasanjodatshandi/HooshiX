@@ -113,32 +113,40 @@ def admission_candidate(stateful):
 
 def preflight_admission(kube, stateful):
     candidate = admission_candidate(stateful)
+
+    def admission_command(*args, **options):
+        try:
+            return kube(*args, **options)
+        except Exception:
+            # The CI kubectl shim uses a separate exception type and can carry command details.
+            raise subprocess.SubprocessError from None
+
     deadline = time.monotonic() + ADMISSION_RETRY_SECONDS
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED')
         try:
-            raw = kube('-n', NS, 'get', 'pod', NAME + '-0', '--ignore-not-found', '-o', 'json',
+            raw = admission_command('-n', NS, 'get', 'pod', NAME + '-0', '--ignore-not-found', '-o', 'json',
                 timeout=min(10, remaining))
             existing = json.loads(raw) if raw.strip() else None
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED')
             if existing is None:
-                kube('create', '--dry-run=server', '-f', '-', body=candidate,
+                admission_command('create', '--dry-run=server', '-f', '-', body=candidate,
                     timeout=min(10, remaining))
                 operation = 'create'
             else:
                 require(desired_fields_match(existing, candidate), 'KAFKA_EXISTING_POD_CONTRACT_REQUIRED')
                 probe = {'metadata': {'annotations': {
                     'hooshix.io/admission-preflight': str(time.monotonic_ns())}}}
-                kube('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
+                admission_command('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
                     json.dumps(probe), '--dry-run=server',
                     timeout=min(10, remaining))
                 operation = 'patch'
             break
-        except (host.custody.BootstrapFailed, subprocess.TimeoutExpired) as error:
+        except subprocess.SubprocessError as error:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED') from error
@@ -151,17 +159,17 @@ def preflight_admission(kube, stateful):
         if operation == 'create':
             wrong_owner = copy.deepcopy(candidate)
             wrong_owner['metadata']['ownerReferences'][0]['uid'] = wrong_uid
-            kube('create', '--dry-run=server', '-f', '-', body=wrong_owner, expected=1,
+            admission_command('create', '--dry-run=server', '-f', '-', body=wrong_owner, expected=1,
                 required_error=b'closed Kafka runtime contract rejected', timeout=20)
         else:
             wrong_owner = {'metadata': {'ownerReferences': copy.deepcopy(
                 candidate['metadata']['ownerReferences']), 'annotations': {
                     'hooshix.io/admission-preflight': str(time.monotonic_ns())}}}
             wrong_owner['metadata']['ownerReferences'][0]['uid'] = wrong_uid
-            kube('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
+            admission_command('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
                 json.dumps(wrong_owner), '--dry-run=server', expected=1,
                 required_error=b'closed Kafka runtime contract rejected', timeout=20)
-    except (host.custody.BootstrapFailed, subprocess.TimeoutExpired) as error:
+    except subprocess.SubprocessError as error:
         raise ValueError('KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED') from error
 
 

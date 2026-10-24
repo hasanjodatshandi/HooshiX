@@ -226,7 +226,7 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_admission_preflight_waits_for_positive_policy_then_checks_exact_negative(self):
         stateful = copy.deepcopy(self.plan['statefulset'])
         stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
-        denied = installer.host.custody.BootstrapFailed('NATIVE_OPERATION_FAILED_STATE_PRESERVED')
+        denied = RuntimeError('PRIVATE_REHEARSAL_FAILURE')
         kube = Mock(side_effect=[b'', denied, b'', b'', b''])
 
         with patch.object(installer.time, 'sleep') as sleep:
@@ -245,8 +245,7 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_admission_preflight_fails_closed_when_the_exact_pod_remains_denied(self):
         stateful = copy.deepcopy(self.plan['statefulset'])
         stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
-        kube = Mock(side_effect=[b'', installer.host.custody.BootstrapFailed(
-            'NATIVE_OPERATION_FAILED_STATE_PRESERVED')])
+        kube = Mock(side_effect=[b'', RuntimeError('PRIVATE_REHEARSAL_FAILURE')])
 
         with patch.object(installer.time, 'monotonic', side_effect=[0, 0, 0, installer.ADMISSION_RETRY_SECONDS]), \
                 patch.object(installer.time, 'sleep') as sleep, \
@@ -259,14 +258,14 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_admission_preflight_rejects_a_broken_kafka_owner_contract(self):
         stateful = copy.deepcopy(self.plan['statefulset'])
         stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
-        kube = Mock(side_effect=[b'', b'', installer.host.custody.BootstrapFailed(
-            'NATIVE_OPERATION_FAILED_STATE_PRESERVED')])
+        kube = Mock(side_effect=[b'', b'', RuntimeError('PRIVATE_REHEARSAL_FAILURE')])
 
-        with self.assertRaisesRegex(ValueError, 'KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED'):
+        with self.assertRaisesRegex(ValueError, '^KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED$') as failure:
             installer.preflight_admission(kube, stateful)
 
         self.assertEqual(3, kube.call_count)
         self.assertEqual(1, kube.call_args.kwargs['expected'])
+        self.assertNotIn('PRIVATE_REHEARSAL_FAILURE', str(failure.exception.__cause__))
 
     def test_admission_preflight_uses_dry_run_updates_for_an_existing_pod(self):
         stateful = copy.deepcopy(self.plan['statefulset'])
