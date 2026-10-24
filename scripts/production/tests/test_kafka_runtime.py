@@ -123,6 +123,14 @@ class KafkaRuntimeTest(unittest.TestCase):
         startup_budget = probe['failureThreshold'] * probe['periodSeconds']
         self.assertGreaterEqual(installer.READINESS_TIMEOUT_SECONDS, startup_budget + 60)
 
+    def test_short_lived_cli_and_probe_cancel_the_actual_jvm(self):
+        self.assertTrue(renderer.PROBE.startswith('exec /usr/bin/env '))
+        self.assertEqual(installer.TOOL_JVM_OPTIONS, renderer.TOOL_JVM_OPTIONS)
+        self.assertIn('KAFKA_JVM_PERFORMANCE_OPTS="' + installer.TOOL_JVM_OPTIONS + '"', renderer.PROBE)
+        self.assertEqual('-XX:+UseSerialGC -XX:TieredStopAtLevel=1', installer.TOOL_JVM_OPTIONS)
+        container = self.plan['statefulset']['spec']['template']['spec']['containers'][0]
+        self.assertEqual([{'name': 'KAFKA_HEAP_OPTS', 'value': '-Xms512m -Xmx512m'}], container['env'])
+
     def test_readiness_snapshot_exposes_only_bounded_status_classes(self):
         objects = {
             'statefulset': {'metadata': {'generation': 2}, 'spec': {'replicas': 1},
@@ -202,6 +210,14 @@ class KafkaRuntimeTest(unittest.TestCase):
         self.assertFalse(result['pod']['present'])
         self.assertNotIn('PRIVATE_ADMISSION_DETAIL', serialized)
         self.assertIn('hooshix-platform-data-closed', rehearsal.SAFE_KAFKA_ADMISSION_POLICIES)
+
+    def test_memory_snapshot_emits_only_known_cgroup_counters_and_byte_counts(self):
+        result = rehearsal.memory_snapshot(Mock(return_value=(
+            b'low 0\nhigh 0\nmax 10\noom 2\noom_kill 1\n'
+            b'PRIVATE_KEY 999\noom_group_kill PRIVATE_VALUE\n123\n2147483648\n')))
+        self.assertEqual({'low': 0, 'high': 0, 'max': 10, 'oom': 2, 'oom_kill': 1,
+                          'current_bytes': 123, 'limit_bytes': 2147483648}, result)
+        self.assertNotIn('PRIVATE', json.dumps(result))
 
     def test_failed_create_diagnostic_classes_are_fixed_and_bounded(self):
         cases = (

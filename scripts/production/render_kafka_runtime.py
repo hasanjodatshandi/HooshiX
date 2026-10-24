@@ -19,7 +19,10 @@ MATERIAL = '/run/kafka'
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 RESOURCES = {'requests': {'cpu': '250m', 'memory': '768Mi', 'ephemeral-storage': '64Mi'},
              'limits': {'cpu': '1', 'memory': '2Gi', 'ephemeral-storage': '128Mi'}}
-PROBE = ('KAFKA_HEAP_OPTS="-Xms32m -Xmx128m" /opt/kafka/bin/kafka-topics.sh '
+TOOL_JVM_OPTIONS = '-XX:+UseSerialGC -XX:TieredStopAtLevel=1'
+# Replace the exec-probe shell so its timeout kills the JVM, not just its parent.
+PROBE = ('exec /usr/bin/env KAFKA_HEAP_OPTS="-Xms32m -Xmx128m" '
+         f'KAFKA_JVM_PERFORMANCE_OPTS="{TOOL_JVM_OPTIONS}" /opt/kafka/bin/kafka-topics.sh '
          '--bootstrap-server 127.0.0.1:9092 --command-config /etc/kafka/commissioned/client.properties '
          '--list >/dev/null 2>&1')
 

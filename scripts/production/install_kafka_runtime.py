@@ -30,6 +30,7 @@ NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
 HASH = 'hooshix.io/kafka-spec-sha256'
 READINESS_TIMEOUT_SECONDS = 420
 ADMISSION_RETRY_SECONDS = 45
+TOOL_JVM_OPTIONS = '-XX:+UseSerialGC -XX:TieredStopAtLevel=1'
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 require, get, digest = pg.require, pg.get, pg.digest
 
@@ -312,6 +313,7 @@ def pod_inventory(kube, stateful, *, required=False):
 
 def storage_identity(kube):
     script = ('set -eu; export KAFKA_HEAP_OPTS="-Xms32m -Xmx128m"; '
+        f'export KAFKA_JVM_PERFORMANCE_OPTS="{TOOL_JVM_OPTIONS}"; '
         'data=/var/lib/kafka/data; marker=$(cat "$data/.hooshix-runtime-marker"); '
         'case "$marker" in hooshix-kafka-runtime-v1:*) id=${marker#hooshix-kafka-runtime-v1:};; *) exit 1;; esac; '
         'case "$id" in ""|*[!A-Za-z0-9_-]*) exit 1;; esac; '
@@ -327,6 +329,7 @@ def storage_identity(kube):
 def quorum_and_topics(kube, cluster_id):
     status = kube('-n', NS, 'exec', NAME + '-0', '-c', 'kafka', '--',
         '/usr/bin/env', 'KAFKA_HEAP_OPTS=-Xms32m -Xmx128m',
+        'KAFKA_JVM_PERFORMANCE_OPTS=' + TOOL_JVM_OPTIONS,
         '/opt/kafka/bin/kafka-metadata-quorum.sh', '--command-config',
         '/etc/kafka/commissioned/client.properties', '--bootstrap-server', '127.0.0.1:9092',
         'describe', '--status').decode()
@@ -338,6 +341,7 @@ def quorum_and_topics(kube, cluster_id):
         and voters[0].get('id') == 1, 'SINGLE_NODE_KAFKA_QUORUM_REQUIRED')
     topics = kube('-n', NS, 'exec', NAME + '-0', '-c', 'kafka', '--',
         '/usr/bin/env', 'KAFKA_HEAP_OPTS=-Xms32m -Xmx128m',
+        'KAFKA_JVM_PERFORMANCE_OPTS=' + TOOL_JVM_OPTIONS,
         '/opt/kafka/bin/kafka-topics.sh', '--bootstrap-server', '127.0.0.1:9092',
         '--command-config', '/etc/kafka/commissioned/client.properties', '--list')
     require(not topics.strip(), 'EMPTY_QUARANTINED_KAFKA_REQUIRED')

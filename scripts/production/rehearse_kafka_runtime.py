@@ -202,6 +202,22 @@ def readiness_snapshot(kube):
             'conditions': conditions, 'containers': states}, 'warning_events': warning_events}
 
 
+def memory_snapshot(kube):
+    raw = kube('-n', renderer.NS, 'exec', renderer.NAME + '-0', '-c', 'kafka', '--',
+        '/bin/sh', '-ec', 'cat /sys/fs/cgroup/memory.events; '
+        'cat /sys/fs/cgroup/memory.current /sys/fs/cgroup/memory.max', output_bound=1024)
+    result = {}
+    for line in raw.decode().splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[0] in ('low', 'high', 'max', 'oom', 'oom_kill', 'oom_group_kill'):
+            if re.fullmatch('[0-9]{1,20}', fields[1]):
+                result[fields[0]] = int(fields[1])
+    numbers = raw.decode().splitlines()[-2:]
+    if len(numbers) == 2 and all(re.fullmatch('[0-9]{1,20}', value) for value in numbers):
+        result.update(current_bytes=int(numbers[0]), limit_bytes=int(numbers[1]))
+    return result
+
+
 def admission_policy_snapshot(kube):
     policy = installer.get(kube, 'validatingpolicy', 'hooshix-platform-data-closed')
     if policy is None:
@@ -270,7 +286,13 @@ def rehearse(k, wait, run, ca, node, platform):
                     ('kafka-metadata-quorum.sh', 'quorum'), ('kafka-topics.sh', 'topics'))
                     if any(token in part for part in args)), 'other')
                 print('KAFKA_RUNTIME_EXEC_FAILURE=' + operation, flush=True)
-            if 'wait' in args and 'statefulset/' + renderer.NAME in args:
+                try:
+                    memory = memory_snapshot(k)
+                except Exception:
+                    memory = {'available': False}
+                print('KAFKA_RUNTIME_MEMORY_DIAGNOSIS=' + json.dumps(memory, sort_keys=True), flush=True)
+            if ('wait' in args and 'statefulset/' + renderer.NAME in args
+                    or 'exec' in args and renderer.NAME + '-0' in args):
                 try:
                     diagnosis = readiness_snapshot(k)
                 except Exception:

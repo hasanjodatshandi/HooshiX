@@ -161,18 +161,30 @@ def exercise(docker_host: str) -> dict:
             health = docker('exec', container, *probe['exec']['command'],
                             timeout=probe['timeoutSeconds'], docker_host=docker_host)
             require(health.returncode == 0, 'RENDERED_KAFKA_HEALTH_PROBE_FAILED')
+            cancelled = docker('exec', container, '/usr/bin/timeout', '-s', 'KILL', '2',
+                '/bin/sh', '-ec', runtime.PROBE.replace('127.0.0.1:9092', '127.0.0.1:1'),
+                timeout=10, docker_host=docker_host)
+            require(cancelled.returncode == 137, 'RENDERED_KAFKA_PROBE_CANCELLATION_REQUIRED')
+            processes = docker('exec', container, '/bin/sh', '-ec',
+                "ps -o stat,comm | awk '$2 == \"java\" && $1 !~ /Z/ {n++} END {print n+0}'",
+                timeout=5, docker_host=docker_host)
+            require(processes.returncode == 0 and processes.stdout.strip() == '1',
+                    'CANCELLED_KAFKA_PROBE_LEFT_LIVE_JVM')
             def closed_command(*args):
                 require(args[:7] == ('-n', runtime.NS, 'exec', runtime.NAME + '-0', '-c', 'kafka', '--'),
                         'LOCAL_KAFKA_VERIFICATION_EXEC_REQUIRED')
-                concurrent = (runtime.PROBE + ' & first=$!; ' + runtime.PROBE + ' & second=$!; '
+                timed_probe = ('/usr/bin/timeout -s KILL ' + str(probe['timeoutSeconds'])
+                    + ' /bin/sh -ec ' + shlex.quote(runtime.PROBE))
+                concurrent = (timed_probe + ' & first=$!; ' + timed_probe + ' & second=$!; '
                     + shlex.join(args[7:]) + '; wait "$first"; wait "$second"')
                 result = docker('exec', container, '/bin/sh', '-ec', concurrent,
                                 timeout=30, docker_host=docker_host)
                 require(result.returncode == 0, 'RENDERED_KAFKA_VERIFICATION_FAILED')
                 return result.stdout.encode()
 
-            cluster_id, _ = installer.storage_identity(closed_command)
-            installer.quorum_and_topics(closed_command, cluster_id)
+            for _ in range(3):
+                cluster_id, _ = installer.storage_identity(closed_command)
+                installer.quorum_and_topics(closed_command, cluster_id)
             for topic in (TOPIC, "other-events"):
                 command("topics", "admin", "--create", "--topic", topic, "--partitions", "1",
                         "--replication-factor", "1", "--config", "min.insync.replicas=1")
@@ -210,6 +222,7 @@ def exercise(docker_host: str) -> dict:
                     "topic_role_group_acl": "Passed", "default_deny": "Passed", "acl_admin_denial": "Passed",
                     "writer_revocation": "Passed", "acks_all_idempotent_produce_consume": "Passed",
                     "rendered_runtime_probe": "Passed", "single_node_quorum": "Passed",
+                    "probe_cancellation": "Passed",
                     "network": "none", "credentials": "synthetic-disposable-only",
                     "staging": "Not run", "deployment": "Not run", "production_readiness": "Not verified"}
         finally:
