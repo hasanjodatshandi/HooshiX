@@ -189,19 +189,25 @@ class KafkaRuntimeTest(unittest.TestCase):
                 '!has(c.lifecycle)', '!has(c.envFrom)', '!has(c.volumeDevices)'):
             self.assertIn(expected, expressions)
         self.assertEqual(['Deny'], changed['spec']['validationActions'])
+        self.assertIn('object.spec.serviceAccountName == "kafka" ||',
+                      changed['spec']['validations'][0]['expression'])
+        self.assertIn('object.spec.serviceAccountName != "kafka" ||',
+                      changed['spec']['validations'][1]['expression'])
+        self.assertIn('ownerReferences[0].uid == "stateful-uid"',
+                      changed['spec']['validations'][1]['expression'])
 
     def test_boundary_binds_only_to_the_existing_owned_statefulset_uid(self):
         identity = {'metadata': {'uid': 'stateful-uid'}}
         actual = installer.boundary_for_statefulset(self.plan, identity['metadata']['uid'])
         self.assertEqual('hooshix-platform-data-closed', actual['metadata']['name'])
         expressions = ' '.join(item['expression'] for item in actual['spec']['validations'])
-        self.assertEqual(2, sum(item['expression'].count('object.metadata.ownerReferences[0].uid == "stateful-uid"')
+        self.assertEqual(1, sum(item['expression'].count('object.metadata.ownerReferences[0].uid == "stateful-uid"')
                                 for item in actual['spec']['validations']))
         self.assertNotIn(renderer.BOUNDARY_UID_PLACEHOLDER, expressions)
         with self.assertRaisesRegex(ValueError, 'KAFKA_STATEFULSET_UID_REQUIRED'):
             installer.boundary_for_statefulset(self.plan, 'bad uid')
         broken = copy.deepcopy(self.plan)
-        broken['boundary']['spec']['validations'][0]['expression'] = 'false'
+        broken['boundary']['spec']['validations'][-1]['expression'] = 'false'
         with self.assertRaisesRegex(ValueError, 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED'):
             installer.boundary_for_statefulset(broken, 'stateful-uid')
 

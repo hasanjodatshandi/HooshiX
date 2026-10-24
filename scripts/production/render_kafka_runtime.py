@@ -168,9 +168,8 @@ def boundary(previous, spec, statefulset_uid):
         ' && object.metadata.ownerReferences.all(r, r.apiVersion == "apps/v1"'
         ' && r.kind == "StatefulSet" && r.name == "kafka" && r.controller)']
     candidate = ' && '.join('(' + value + ')' for value in identity)
-    exception = candidate + ' && object.metadata.ownerReferences[0].uid == ' + admission.literal(statefulset_uid)
     for check in result['spec']['validations']:
-        check['expression'] = '!(' + exception + ') || (' + check['expression'] + ')'
+        check['expression'] = 'object.spec.serviceAccountName == "kafka" || (' + check['expression'] + ')'
     checked = copy.deepcopy(spec)
     checked.pop('nodeSelector')
     checked['containers'][0].pop('resources')
@@ -224,8 +223,8 @@ def boundary(previous, spec, statefulset_uid):
         'object.spec.containers[0].ports.all(p, !has(p.hostPort) || p.hostPort == 0)',
         '!has(object.spec.initContainers[0].ports) || object.spec.initContainers[0].ports.size() == 0']
     result['spec']['validations'].append(admission.validation('closed Kafka runtime contract rejected',
-        '!(' + candidate + ') || ('
-        + ' && '.join('(' + x + ')' for x in terms) + ')'))
+        'object.spec.serviceAccountName != "kafka" || ((' + candidate + ') && ('
+        + ' && '.join('(' + x + ')' for x in terms) + '))'))
     return result
 
 

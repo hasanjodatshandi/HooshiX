@@ -2665,8 +2665,9 @@ fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا 
 installer ابتدا StatefulSet را با `replicas=0` می‌سازد تا controller پیش از آماده‌شدن
 مرز admission نتواند Pod بسازد. سپس فقط ValidatingPolicy موجود
 `hooshix-platform-data-closed` را با `failurePolicy=Fail` و `validationActions=Deny`
-نگه می‌دارد و استثنای همین policy را به ServiceAccount، نام/برچسب، ownerReference
-و UID همان StatefulSet می‌بندد. پس از Ready شدن policy، تعداد replica را به ۱ افزایش
+نگه می‌دارد. فقط Pod دارای ServiceAccount `kafka` از قواعد bootstrap قبلی عبور
+می‌کند؛ validation مستقل همان policy هر Pod با این حساب را به نام/برچسب، ownerReference
+و UID دقیق همان StatefulSet و قرارداد کامل Pod می‌بندد. پس از Ready شدن policy، تعداد replica را به ۱ افزایش
 می‌دهد؛ این ترتیب از رد اولیهٔ Pod توسط قاعدهٔ قبلی جلوگیری می‌کند. قاعدهٔ پایه برای
 سایر Podها حفظ می‌شود و قرارداد کامل Pod نیز جداگانه در همان policy اعمال می‌ماند.
 حالت موقت صفر replica با hash دقیق spec قابل‌بازیابی است؛ هر drift موجب توقف

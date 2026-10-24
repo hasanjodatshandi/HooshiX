@@ -95,11 +95,16 @@ def boundary_for_statefulset(plan, uid):
     result = copy.deepcopy(plan['boundary'])
     needle = json.dumps(BOUNDARY_UID_PLACEHOLDER)
     replacement = json.dumps(uid)
+    uid_checks = 0
     for validation in result.get('spec', {}).get('validations', []):
         expression = validation.get('expression')
-        require(isinstance(expression, str) and expression.count(needle) == 1,
-                'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED')
-        validation['expression'] = expression.replace(needle, replacement)
+        require(isinstance(expression, str), 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED')
+        count = expression.count(needle)
+        require(count in (0, 1), 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED')
+        if count:
+            validation['expression'] = expression.replace(needle, replacement)
+            uid_checks += count
+    require(uid_checks == 1, 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED')
     return result
 
 
