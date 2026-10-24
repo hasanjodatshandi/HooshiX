@@ -2681,6 +2681,11 @@ fail-closed می‌شود. پیش‌بررسی و تطبیق مجدد policy ب�
 انجام می‌شود؛ policy یا scope مفقود/متغیر موجب توقف fail-closed می‌شود. bundle فقط پس از ثبت
 `data_admission_boundary=Passed` در receipt staging ساخته می‌شود.
 
+سه `ImageValidatingPolicy` مربوط به امضای تصویر، provenance و SBOM ارجاع صریح
+`spec.credentials.secrets: [hooshix-ghcr-read]` دارند؛ Secret از قبل در namespace
+`kyverno` ایجاد می‌شود. bundle فقط نام Secret را نگه می‌دارد و مقدار credential
+وارد bundle یا Git نمی‌شود؛ احراز هویت برای بررسی تصویر private در GHCR لازم است.
+
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را
 تغییر نمی‌دهد.

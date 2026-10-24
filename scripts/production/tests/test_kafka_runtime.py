@@ -35,6 +35,10 @@ class KafkaRuntimeTest(unittest.TestCase):
             for container in self.plan['statefulset']['spec']['template']['spec']['containers']
             + self.plan['statefulset']['spec']['template']['spec']['initContainers']})
 
+    def test_private_source_policies_keep_the_kyverno_registry_secret_reference(self):
+        self.assertTrue(all(policy['spec']['credentials'] == {'secrets': [admission.PULL_SECRET]}
+                            for policy in self.plan['source_policies']))
+
     def test_configuration_has_no_plaintext_listener_and_denies_default_acl(self):
         config = renderer.server_config()
         for expected in ('process.roles=broker,controller', 'controller.quorum.bootstrap.servers=',

@@ -255,7 +255,6 @@ def render(previous):
     policy = admission.image_policy(NS, [selected['image']], selected['repository_revision'])
     policy['metadata'].update(name='hooshix-kafka-source', labels=LABELS.copy())
     policy['metadata'].pop('namespace', None)
-    policy['spec'].pop('credentials', None)
     policy['spec']['validations'][2] = admission.validation('Kafka source build identity rejected',
         provenance_expression(source_predicate(candidate_pin(), selected['repository_revision'],
             'github:' + selected['publication_run'] + ':' + str(selected['publication_attempt']))))
