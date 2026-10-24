@@ -207,9 +207,12 @@ services to `4.2.17.Final`. The frontend root override pins transitive `js-yaml`
 owning OpenAPI toolchain resolves at least that fixed version directly.
 Jackson databind is constrained to security-fixed `3.1.7` across all six Java services; Gradle locks and
 verification metadata must reflect the aligned Jackson core/BOM set before promotion.
-The frontend development lock resolves transitive `undici` to `8.11.2` within jsdom's
-declared `^8.9.0` range to clear the current OSV advisories; this is not a new
-production runtime dependency.
+The frontend development lock resolves transitive `undici` to `8.12.3` within jsdom's
+declared `^8.9.0` range. Undici `8.12.2` fixes the reported TLS certificate-validation
+advisory ([GHSA-2m5v-pch6-74hx](https://github.com/nodejs/undici/security/advisories/GHSA-2m5v-pch6-74hx));
+`8.12.3` is the subsequent patch release. Undici 8.x requires Node.js `>=22.19.0`,
+which is satisfied by the frontend's pinned `22.22.0` runtime. This remains a
+development-only transitive dependency, not a production runtime dependency.
 The frontend lock resolves `source-map-js` to `1.2.2` within the existing consumers'
 `^1.2.1` ranges for the [upstream indexed-source-map DoS fix](https://github.com/7rulnik/source-map-js/releases/tag/v1.2.2).
 No new root dependency or override is added; OSV and the existing frontend build,
