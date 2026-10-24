@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import kafka_tls_material as node_tls
+import install_kafka_runtime as installer
 import render_kafka_runtime as runtime
 from test_kafka_runtime_native import require
 from test_postgresql_isolation_native import docker
@@ -159,9 +160,15 @@ def exercise(docker_host: str) -> dict:
             health = docker('exec', container, *probe['exec']['command'],
                             timeout=probe['timeoutSeconds'], docker_host=docker_host)
             require(health.returncode == 0, 'RENDERED_KAFKA_HEALTH_PROBE_FAILED')
-            quorum = command('metadata-quorum', 'admin', 'describe', '--status')
-            require(re.search(r'^LeaderId:\s+1\s*$', quorum, re.MULTILINE) is not None,
-                    'RENDERED_KAFKA_SINGLE_NODE_QUORUM_REQUIRED')
+            def closed_command(*args):
+                require(args[:7] == ('-n', runtime.NS, 'exec', runtime.NAME + '-0', '-c', 'kafka', '--'),
+                        'LOCAL_KAFKA_VERIFICATION_EXEC_REQUIRED')
+                result = docker('exec', container, *args[7:], timeout=25, docker_host=docker_host)
+                require(result.returncode == 0, 'RENDERED_KAFKA_VERIFICATION_FAILED')
+                return result.stdout.encode()
+
+            cluster_id, _ = installer.storage_identity(closed_command)
+            installer.quorum_and_topics(closed_command, cluster_id)
             for topic in (TOPIC, "other-events"):
                 command("topics", "admin", "--create", "--topic", topic, "--partitions", "1",
                         "--replication-factor", "1", "--config", "min.insync.replicas=1")

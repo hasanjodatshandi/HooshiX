@@ -66,7 +66,9 @@ class KafkaTlsAclTest(unittest.TestCase):
                 elif "kafka-console-consumer.sh" in text:
                     out = "synthetic-event\n"
                 elif 'kafka-metadata-quorum.sh' in text:
-                    out = 'LeaderId: 1\n'
+                    out = 'ClusterId: synthetic-cluster-1234\nLeaderId: 1\nCurrentVoters: [{"id":1}]\n'
+                elif '.hooshix-runtime-marker' in text:
+                    out = 'synthetic-cluster-1234\n'
             return subprocess.CompletedProcess(args, code, stdout=out, stderr=error)
 
         with patch.object(target, "docker", side_effect=docker), \
@@ -95,7 +97,7 @@ class KafkaTlsAclTest(unittest.TestCase):
         for args in calls:
             if args[0] == "exec":
                 if '/bin/sh' in args:
-                    self.assertEqual(target.runtime.PROBE, args[-1])
+                    self.assertTrue(args[-1] == target.runtime.PROBE or '.hooshix-runtime-marker' in args[-1])
                 else:
                     self.assertIn("--command-config", args)
                 self.assertNotIn("--producer.config", args)

@@ -22,7 +22,7 @@ import install_kafka_tls as tls
 import install_postgresql_quarantine as pg
 import kafka_secret_delivery as delivery
 import kafka_tls_material as certificates
-from install_eso import desired_fields_match
+from install_eso import desired_fields_match, mismatched_path
 import render_platform_admission as admission
 from upgrade_mesh_security import replace_policy
 
@@ -106,10 +106,19 @@ def owned(old, desired):
         require(meta.get('annotations', {}).get(HASH) == digest(old['spec']),
                 'KAFKA_DEFAULTED_SPEC_DRIFT_PRESERVED')
     actual = old
+    if desired.get('kind') == 'Service' and desired['spec'].get('publishNotReadyAddresses') is False:
+        actual = copy.deepcopy(old)
+        # The typed Kubernetes API omits this boolean when it is false.
+        actual['spec'].setdefault('publishNotReadyAddresses', False)
     if desired.get('kind') == 'StatefulSet' and old.get('spec', {}).get('replicas') == 0:
         actual = copy.deepcopy(old)
         actual['spec']['replicas'] = desired['spec']['replicas']
-    require(desired_fields_match(actual, desired), 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED')
+    matches = desired_fields_match(actual, desired)
+    if not matches:
+        print('KAFKA_PUBLIC_DRIFT=' + json.dumps({'kind': desired['kind'],
+            'name': desired['metadata']['name'], 'field': mismatched_path(actual, desired)}),
+            file=sys.stderr, flush=True)
+    require(matches, 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED')
 
 
 def activate_statefulset(kube, stateful):

@@ -382,6 +382,28 @@ class KafkaRuntimeTest(unittest.TestCase):
         for secret in ('PRIVATE_MESSAGE', 'PRIVATE_CONDITION', 'PRIVATE_REASON', 'InternalError'):
             self.assertNotIn(secret, serialized)
 
+    def test_owned_service_accepts_api_omitted_false_without_mutating_the_snapshot(self):
+        desired = next(item for item in self.plan['objects'] if item['kind'] == 'Service')
+        actual = copy.deepcopy(desired)
+        actual['spec'].pop('publishNotReadyAddresses')
+        actual['metadata']['annotations'] = {installer.HASH: installer.digest(actual['spec'])}
+        before = copy.deepcopy(actual)
+        installer.owned(actual, desired)
+        self.assertEqual(before, actual)
+
+    def test_owned_service_rejects_true_and_exposes_only_the_public_field_path(self):
+        desired = next(item for item in self.plan['objects'] if item['kind'] == 'Service')
+        actual = copy.deepcopy(desired)
+        actual['spec']['publishNotReadyAddresses'] = True
+        actual['metadata']['annotations'] = {installer.HASH: installer.digest(actual['spec']),
+                                             'private': 'PRIVATE_VALUE'}
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output), self.assertRaisesRegex(
+                ValueError, 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED'):
+            installer.owned(actual, desired)
+        self.assertIn('spec.publishNotReadyAddresses', output.getvalue())
+        self.assertNotIn('PRIVATE_VALUE', output.getvalue())
+
     def test_owned_quiescent_statefulset_is_resumable_only_without_other_drift(self):
         desired = copy.deepcopy(self.plan['statefulset'])
         staged = copy.deepcopy(desired)
