@@ -211,6 +211,116 @@ class KafkaRuntimeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED'):
             installer.boundary_for_statefulset(broken, 'stateful-uid')
 
+    def test_admission_candidate_matches_the_quiescent_statefulset_pod(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        candidate = installer.admission_candidate(stateful)
+        self.assertEqual(('Pod', renderer.NS, 'kafka-0'),
+            (candidate['kind'], candidate['metadata']['namespace'], candidate['metadata']['name']))
+        self.assertEqual(stateful['spec']['template']['spec'], candidate['spec'])
+        self.assertEqual(stateful['spec']['template']['metadata']['labels'], candidate['metadata']['labels'])
+        self.assertEqual([{'apiVersion': 'apps/v1', 'kind': 'StatefulSet', 'name': 'kafka',
+            'uid': 'stateful-uid', 'controller': True, 'blockOwnerDeletion': True}],
+            candidate['metadata']['ownerReferences'])
+
+    def test_admission_preflight_waits_for_positive_policy_then_checks_exact_negative(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        denied = installer.host.custody.BootstrapFailed('NATIVE_OPERATION_FAILED_STATE_PRESERVED')
+        kube = Mock(side_effect=[b'', denied, b'', b'', b''])
+
+        with patch.object(installer.time, 'sleep') as sleep:
+            installer.preflight_admission(kube, stateful)
+
+        self.assertEqual(5, kube.call_count)
+        self.assertEqual(2, sleep.call_args.args[0])
+        positive = kube.call_args_list[3]
+        self.assertIn('--dry-run=server', positive.args)
+        negative = kube.call_args_list[4]
+        self.assertEqual(1, negative.kwargs['expected'])
+        self.assertEqual(b'closed Kafka runtime contract rejected', negative.kwargs['required_error'])
+        self.assertEqual('00000000-0000-4000-8000-000000000001',
+            negative.kwargs['body']['metadata']['ownerReferences'][0]['uid'])
+
+    def test_admission_preflight_fails_closed_when_the_exact_pod_remains_denied(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        kube = Mock(side_effect=[b'', installer.host.custody.BootstrapFailed(
+            'NATIVE_OPERATION_FAILED_STATE_PRESERVED')])
+
+        with patch.object(installer.time, 'monotonic', side_effect=[0, 0, 0, installer.ADMISSION_RETRY_SECONDS]), \
+                patch.object(installer.time, 'sleep') as sleep, \
+                self.assertRaisesRegex(ValueError, 'KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED'):
+            installer.preflight_admission(kube, stateful)
+
+        self.assertEqual(2, kube.call_count)
+        sleep.assert_not_called()
+
+    def test_admission_preflight_rejects_a_broken_kafka_owner_contract(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        kube = Mock(side_effect=[b'', b'', installer.host.custody.BootstrapFailed(
+            'NATIVE_OPERATION_FAILED_STATE_PRESERVED')])
+
+        with self.assertRaisesRegex(ValueError, 'KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED'):
+            installer.preflight_admission(kube, stateful)
+
+        self.assertEqual(3, kube.call_count)
+        self.assertEqual(1, kube.call_args.kwargs['expected'])
+
+    def test_admission_preflight_uses_dry_run_updates_for_an_existing_pod(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        existing = installer.admission_candidate(stateful)
+        existing['metadata']['uid'] = 'pod-uid'
+        kube = Mock(side_effect=[json.dumps(existing).encode(), b'', b''])
+
+        installer.preflight_admission(kube, stateful)
+
+        self.assertEqual(3, kube.call_count)
+        positive = kube.call_args_list[1]
+        self.assertIn('patch', positive.args)
+        self.assertIn('--dry-run=server', positive.args)
+        self.assertIn('hooshix.io/admission-preflight', json.loads(
+            positive.args[positive.args.index('-p') + 1])['metadata']['annotations'])
+        negative = kube.call_args_list[2]
+        self.assertEqual(1, negative.kwargs['expected'])
+        self.assertEqual(b'closed Kafka runtime contract rejected', negative.kwargs['required_error'])
+        self.assertEqual('00000000-0000-4000-8000-000000000001', json.loads(
+            negative.args[negative.args.index('-p') + 1])['metadata']['ownerReferences'][0]['uid'])
+
+    def test_admission_preflight_rejects_an_existing_pod_with_contract_drift(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        existing = installer.admission_candidate(stateful)
+        existing['metadata']['labels']['app.kubernetes.io/name'] = 'foreign'
+        kube = Mock(return_value=json.dumps(existing).encode())
+
+        with self.assertRaisesRegex(ValueError, 'KAFKA_EXISTING_POD_CONTRACT_REQUIRED'):
+            installer.preflight_admission(kube, stateful)
+
+        kube.assert_called_once()
+
+    def test_admission_policy_snapshot_is_bounded_and_excludes_private_messages(self):
+        policy = {'metadata': {'generation': 8}, 'status': {'conditionStatus': {
+            'ready': True, 'message': 'PRIVATE_MESSAGE', 'conditions': [
+                {'type': 'WebhookConfigured', 'status': 'True', 'reason': 'Succeeded',
+                    'observedGeneration': 8, 'message': 'PRIVATE_CONDITION'},
+                {'type': 'RBACPermissionsGranted', 'status': 'Unknown', 'reason': 'InternalError'},
+                {'type': 'Unrecognized', 'status': 'True', 'reason': 'PRIVATE_REASON'}]}}}
+
+        with patch.object(rehearsal.installer, 'get', return_value=policy):
+            snapshot = rehearsal.admission_policy_snapshot(Mock())
+
+        self.assertEqual({'present': True, 'generation': 8, 'ready': True, 'conditions': [
+            {'type': 'WebhookConfigured', 'status': 'True', 'reason': 'Succeeded',
+                'observed_generation': 8},
+            {'type': 'RBACPermissionsGranted', 'status': 'Unknown', 'reason': 'Other',
+                'observed_generation': None}]}, snapshot)
+        serialized = json.dumps(snapshot)
+        for secret in ('PRIVATE_MESSAGE', 'PRIVATE_CONDITION', 'PRIVATE_REASON', 'InternalError'):
+            self.assertNotIn(secret, serialized)
+
     def test_owned_quiescent_statefulset_is_resumable_only_without_other_drift(self):
         desired = copy.deepcopy(self.plan['statefulset'])
         staged = copy.deepcopy(desired)

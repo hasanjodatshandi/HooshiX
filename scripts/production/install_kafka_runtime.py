@@ -12,6 +12,7 @@ import signal
 import stat
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from upgrade_mesh_security import replace_policy
 NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
 HASH = 'hooshix.io/kafka-spec-sha256'
 READINESS_TIMEOUT_SECONDS = 420
+ADMISSION_RETRY_SECONDS = 45
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 require, get, digest = pg.require, pg.get, pg.digest
 
@@ -87,6 +89,80 @@ def activate_statefulset(kube, stateful):
         {'op': 'replace', 'path': '/metadata/annotations/' + HASH.replace('/', '~1'), 'value': digest(active)},
     ]
     kube('patch', 'statefulset', NAME, '-n', NS, '--type=json', '-p', json.dumps(patch))
+
+
+def admission_candidate(stateful):
+    metadata = stateful.get('metadata', {})
+    uid = metadata.get('uid')
+    template = stateful.get('spec', {}).get('template', {})
+    template_metadata = template.get('metadata', {})
+    labels = template_metadata.get('labels')
+    require(metadata.get('name') == NAME and metadata.get('namespace') == NS
+        and isinstance(uid, str) and re.fullmatch('[A-Za-z0-9-]{1,128}', uid)
+        and isinstance(labels, dict) and labels.get('app.kubernetes.io/name') == NAME
+        and labels.get('istio.io/dataplane-mode') == 'ambient'
+        and isinstance(template.get('spec'), dict), 'KAFKA_STATEFULSET_REQUIRED')
+    pod_metadata = {'name': NAME + '-0', 'namespace': NS, 'labels': copy.deepcopy(labels),
+        'ownerReferences': [{'apiVersion': 'apps/v1', 'kind': 'StatefulSet', 'name': NAME,
+            'uid': uid, 'controller': True, 'blockOwnerDeletion': True}]}
+    if template_metadata.get('annotations'):
+        pod_metadata['annotations'] = copy.deepcopy(template_metadata['annotations'])
+    return {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': pod_metadata,
+        'spec': copy.deepcopy(template['spec'])}
+
+
+def preflight_admission(kube, stateful):
+    candidate = admission_candidate(stateful)
+    deadline = time.monotonic() + ADMISSION_RETRY_SECONDS
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED')
+        try:
+            raw = kube('-n', NS, 'get', 'pod', NAME + '-0', '--ignore-not-found', '-o', 'json',
+                timeout=min(10, remaining))
+            existing = json.loads(raw) if raw.strip() else None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED')
+            if existing is None:
+                kube('create', '--dry-run=server', '-f', '-', body=candidate,
+                    timeout=min(10, remaining))
+                operation = 'create'
+            else:
+                require(desired_fields_match(existing, candidate), 'KAFKA_EXISTING_POD_CONTRACT_REQUIRED')
+                probe = {'metadata': {'annotations': {
+                    'hooshix.io/admission-preflight': str(time.monotonic_ns())}}}
+                kube('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
+                    json.dumps(probe), '--dry-run=server',
+                    timeout=min(10, remaining))
+                operation = 'patch'
+            break
+        except (host.custody.BootstrapFailed, subprocess.TimeoutExpired) as error:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED') from error
+            time.sleep(min(2, remaining))
+
+    wrong_uid = '00000000-0000-4000-8000-000000000001'
+    if wrong_uid == candidate['metadata']['ownerReferences'][0]['uid']:
+        wrong_uid = '00000000-0000-4000-8000-000000000002'
+    try:
+        if operation == 'create':
+            wrong_owner = copy.deepcopy(candidate)
+            wrong_owner['metadata']['ownerReferences'][0]['uid'] = wrong_uid
+            kube('create', '--dry-run=server', '-f', '-', body=wrong_owner, expected=1,
+                required_error=b'closed Kafka runtime contract rejected', timeout=20)
+        else:
+            wrong_owner = {'metadata': {'ownerReferences': copy.deepcopy(
+                candidate['metadata']['ownerReferences']), 'annotations': {
+                    'hooshix.io/admission-preflight': str(time.monotonic_ns())}}}
+            wrong_owner['metadata']['ownerReferences'][0]['uid'] = wrong_uid
+            kube('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
+                json.dumps(wrong_owner), '--dry-run=server', expected=1,
+                required_error=b'closed Kafka runtime contract rejected', timeout=20)
+    except (host.custody.BootstrapFailed, subprocess.TimeoutExpired) as error:
+        raise ValueError('KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED') from error
 
 
 def boundary_for_statefulset(plan, uid):
@@ -298,8 +374,13 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
     if current_boundary['spec'] != stateful_boundary['spec']:
         replace_policy(stateful_boundary, get=lambda kind, name: get(kube, kind, name),
             kube=kube, previous=plan['previous_boundary'])
-    kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
-         'validatingpolicy/' + stateful_boundary['metadata']['name'], '--timeout=60s', timeout=75)
+    active_boundary = get(kube, 'validatingpolicy', stateful_boundary['metadata']['name'])
+    require(active_boundary and active_boundary.get('spec') == stateful_boundary['spec']
+        and active_boundary.get('spec', {}).get('validationActions') == ['Deny']
+        and active_boundary.get('spec', {}).get('failurePolicy') == 'Fail',
+        'KAFKA_BOUNDARY_APPLY_REQUIRED')
+    print('KAFKA_RUNTIME_STEP=admission-preflight', file=sys.stderr, flush=True)
+    preflight_admission(kube, stateful)
     print('KAFKA_RUNTIME_STEP=data-admission', file=sys.stderr, flush=True)
 
     print('KAFKA_RUNTIME_STEP=activate', file=sys.stderr, flush=True)

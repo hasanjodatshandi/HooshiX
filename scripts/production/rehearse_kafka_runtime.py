@@ -20,6 +20,8 @@ from upgrade_mesh_security import replace_policy
 SAFE_RUNTIME_FAILURE_CODES = frozenset({
     'ACTIVE_CLOSED_DATA_ADMISSION_REQUIRED', 'ADDITIONAL_KAFKA_MESH_ACCESS_REJECTED',
     'ADDITIONAL_KAFKA_NETWORK_ACCESS_REJECTED', 'CLOSED_KAFKA_RUNTIME_PLAN_REQUIRED',
+    'KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED', 'KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED',
+    'KAFKA_EXISTING_POD_CONTRACT_REQUIRED',
     'CNPG_EXISTING_CERT_MANAGER_REQUIRED', 'EXACT_KAFKA_BINDING_REQUIRED',
     'EXACT_KAFKA_NODE_CHAIN_REQUIRED', 'EXISTING_CONTROLLERS_REQUIRED',
     'EXISTING_KAFKA_CLAIM_BINDING_REQUIRED', 'EXISTING_KAFKA_TLS_DELIVERY_REQUIRED',
@@ -200,6 +202,28 @@ def readiness_snapshot(kube):
             'conditions': conditions, 'containers': states}, 'warning_events': warning_events}
 
 
+def admission_policy_snapshot(kube):
+    policy = installer.get(kube, 'validatingpolicy', 'hooshix-platform-data-closed')
+    if policy is None:
+        return {'present': False}
+    metadata = policy.get('metadata', {})
+    status = policy.get('status', {}).get('conditionStatus', {})
+    conditions = []
+    for condition in status.get('conditions', []):
+        kind, value = condition.get('type'), condition.get('status')
+        if kind not in ('WebhookConfigured', 'RBACPermissionsGranted') or value not in ('True', 'False', 'Unknown'):
+            continue
+        observed = condition.get('observedGeneration')
+        reason = condition.get('reason')
+        conditions.append({'type': kind, 'status': value,
+            'reason': reason if reason in ('Succeeded', 'Failed') else 'Other',
+            'observed_generation': observed if type(observed) is int else None})
+    generation = metadata.get('generation')
+    ready = status.get('ready')
+    return {'present': True, 'generation': generation if type(generation) is int else None,
+        'ready': ready if type(ready) is bool else None, 'conditions': conditions}
+
+
 def safe_failure_code(error):
     code = error.args[0] if len(error.args) == 1 else None
     if isinstance(code, str) and code in SAFE_RUNTIME_FAILURE_CODES:
@@ -275,6 +299,14 @@ def rehearse(k, wait, run, ca, node, platform):
             code = safe_failure_code(error)
             if code:
                 print('KAFKA_RUNTIME_PREFLIGHT_FAILURE=' + code, flush=True)
+                if code in ('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED',
+                            'KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED'):
+                    try:
+                        diagnosis = admission_policy_snapshot(kube)
+                    except Exception:
+                        diagnosis = {'available': False}
+                    print('KAFKA_RUNTIME_ADMISSION_DIAGNOSIS=' + json.dumps(
+                        diagnosis, separators=(',', ':'), sort_keys=True), flush=True)
             else:
                 print('KAFKA_RUNTIME_PREFLIGHT_FAILURE_TYPE=' + safe_failure_type(error), flush=True)
                 print('KAFKA_RUNTIME_PREFLIGHT_FAILURE_AT=' + safe_failure_location(error), flush=True)

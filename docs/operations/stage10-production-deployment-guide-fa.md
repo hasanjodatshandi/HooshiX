@@ -2667,8 +2667,14 @@ installer ابتدا StatefulSet را با `replicas=0` می‌سازد تا con
 `hooshix-platform-data-closed` را با `failurePolicy=Fail` و `validationActions=Deny`
 نگه می‌دارد. فقط Pod دارای ServiceAccount `kafka` از قواعد bootstrap قبلی عبور
 می‌کند؛ validation مستقل همان policy هر Pod با این حساب را به نام/برچسب، ownerReference
-و UID دقیق همان StatefulSet و قرارداد کامل Pod می‌بندد. پس از Ready شدن policy، تعداد replica را به ۱ افزایش
-می‌دهد؛ این ترتیب از رد اولیهٔ Pod توسط قاعدهٔ قبلی جلوگیری می‌کند. قاعدهٔ پایه برای
+و UID دقیق همان StatefulSet و قرارداد کامل Pod می‌بندد. پیش از افزایش replica، همان
+Pod با `kubectl create --dry-run=server` در حالت تازه یا درخواست PATCH دارای
+`--dry-run=server` روی Pod موجود از admission واقعی API سرور عبور داده می‌شود؛
+برای حالت موجود ابتدا مشخصات و مالکیت
+Pod باید با قرارداد تطبیق کند. درخواست منفی با UID مالک دست‌کاری‌شده باید دقیقاً توسط
+قرارداد Kafka رد شود. همگرایی مثبت حداکثر ۴۵ ثانیه انتظار دارد؛ هر خطای مثبت/منفی
+توقف fail-closed می‌دهد و replica افزایش نمی‌یابد. dry-run هیچ Pod یا تغییر پایدار
+ایجاد نمی‌کند. فقط پس از موفقیت هر دو آزمون، تعداد replica به ۱ می‌رسد. قاعدهٔ پایه برای
 سایر Podها حفظ می‌شود و قرارداد کامل Pod نیز جداگانه در همان policy اعمال می‌ماند.
 حالت موقت صفر replica با hash دقیق spec قابل‌بازیابی است؛ هر drift موجب توقف
 fail-closed می‌شود. پیش‌بررسی و تطبیق مجدد policy با spec پایهٔ ثبت‌شده در bundle
