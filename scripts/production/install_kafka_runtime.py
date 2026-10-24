@@ -23,6 +23,7 @@ import install_postgresql_quarantine as pg
 import kafka_secret_delivery as delivery
 import kafka_tls_material as certificates
 from install_eso import desired_fields_match
+import render_platform_admission as admission
 from upgrade_mesh_security import replace_policy
 
 NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
@@ -52,6 +53,46 @@ def node_secret(kube, ca_sha256):
     certificates.validate(values, values['ca.crt'], pem_chain[1].decode())
     return (secret['metadata']['uid'], secret['type'], secret['data'],
             external['metadata']['uid'], external['spec'])
+
+
+def ensure_registry_pull_secret(kube):
+    source = get(kube, 'secret', admission.PULL_SECRET, 'hooshix-secrets')
+    require(isinstance(source, dict), 'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
+    metadata = source.get('metadata')
+    data = source.get('data')
+    require(isinstance(metadata, dict) and isinstance(data, dict)
+        and isinstance(metadata.get('labels'), dict), 'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
+    encoded = data.get('.dockerconfigjson')
+    require(metadata.get('namespace') == 'hooshix-secrets'
+        and metadata.get('name') == admission.PULL_SECRET
+        and all(metadata['labels'].get(key) == value for key, value in host.LABELS.items())
+        and not metadata.get('deletionTimestamp') and not metadata.get('ownerReferences')
+        and source.get('type') == 'kubernetes.io/dockerconfigjson'
+        and set(data) == {'.dockerconfigjson'} and isinstance(encoded, str) and 1 <= len(encoded) <= 65536,
+        'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
+    try:
+        config = json.loads(base64.b64decode(encoded, validate=True))
+    except (TypeError, ValueError):
+        raise ValueError('EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED') from None
+    auths = config.get('auths') if isinstance(config, dict) else None
+    ghcr = auths.get('ghcr.io') if isinstance(auths, dict) else None
+    auth = ghcr.get('auth') if isinstance(ghcr, dict) else None
+    require(isinstance(config, dict) and set(config) == {'auths'}
+        and isinstance(auths, dict) and set(auths) == {'ghcr.io'}
+        and isinstance(ghcr, dict) and set(ghcr) == {'auth'}
+        and isinstance(auth, str) and 1 <= len(auth) <= 8192,
+        'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
+    try:
+        credential = base64.b64decode(auth, validate=True)
+    except (TypeError, ValueError):
+        raise ValueError('EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED') from None
+    prefix = b'hasanjodatshandi:'
+    token = credential[len(prefix):] if credential.startswith(prefix) else b''
+    require(credential.startswith(prefix) and 1 <= len(token) <= 4096
+        and all(32 < char < 127 for char in token),
+            'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
+    del config, auths, ghcr, auth, credential, token
+    host.write_registry_secret(NS, encoded, kube_call=kube)
 
 
 def owned(old, desired):
@@ -348,6 +389,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
     units = guard(initialized=initialized)
     isolation(plan, kube)
     pod_inventory(kube, stateful)
+    ensure_registry_pull_secret(kube)
 
     print('KAFKA_RUNTIME_STEP=admission', file=sys.stderr, flush=True)
     for obj, old in zip(desired_objects, existing, strict=True):

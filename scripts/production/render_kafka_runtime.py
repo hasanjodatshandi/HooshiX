@@ -141,6 +141,7 @@ def pod():
             {'name': 'source', 'mountPath': '/source', 'readOnly': True},
             {'name': 'material', 'mountPath': MATERIAL}]}
     return {'serviceAccountName': NAME, 'automountServiceAccountToken': False,
+        'imagePullSecrets': [{'name': admission.PULL_SECRET}],
         'nodeSelector': {'kubernetes.io/hostname': volume.NODE}, 'terminationGracePeriodSeconds': 60,
         'securityContext': {'runAsNonRoot': True, 'runAsUser': 10001, 'runAsGroup': 10001,
             'fsGroup': 10001, 'fsGroupChangePolicy': 'OnRootMismatch',
@@ -204,7 +205,7 @@ def boundary(previous, spec, statefulset_uid):
         'object.spec.initContainers.all(c, !has(c.lifecycle) && !has(c.envFrom) && !has(c.volumeDevices))',
         'object.spec.containers.all(c, (!has(c.stdin) || !c.stdin) && (!has(c.stdinOnce) || !c.stdinOnce) && (!has(c.tty) || !c.tty))',
         'object.spec.initContainers.all(c, (!has(c.stdin) || !c.stdin) && (!has(c.stdinOnce) || !c.stdinOnce) && (!has(c.tty) || !c.tty))',
-        '!has(object.spec.ephemeralContainers) && !has(object.spec.imagePullSecrets)',
+        '!has(object.spec.ephemeralContainers)',
         '!has(object.spec.hostNetwork) || !object.spec.hostNetwork',
         '!has(object.spec.hostPID) || !object.spec.hostPID',
         '!has(object.spec.hostIPC) || !object.spec.hostIPC',

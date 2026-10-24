@@ -1,6 +1,9 @@
 """The commissioned Kafka runtime stays signed, TLS-only, private and recoverable."""
+import base64
 import copy
+import contextlib
 import hashlib
+import io
 import json
 import re
 import sys
@@ -38,6 +41,49 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_private_source_policies_keep_the_kyverno_registry_secret_reference(self):
         self.assertTrue(all(policy['spec']['credentials'] == {'secrets': [admission.PULL_SECRET]}
                             for policy in self.plan['source_policies']))
+
+    def test_private_image_pull_uses_only_the_approved_namespaced_secret(self):
+        pod = self.plan['statefulset']['spec']['template']['spec']
+        self.assertEqual([{'name': admission.PULL_SECRET}], pod['imagePullSecrets'])
+
+    def test_registry_pull_secret_is_copied_from_owned_source_without_output(self):
+        auth = base64.b64encode(b'hasanjodatshandi:synthetic-read-only-token').decode()
+        payload = json.dumps({'auths': {'ghcr.io': {'auth': auth}}}).encode()
+        source = {'metadata': {'name': admission.PULL_SECRET, 'namespace': 'hooshix-secrets',
+            'labels': dict(installer.host.LABELS)}, 'type': 'kubernetes.io/dockerconfigjson',
+            'data': {'.dockerconfigjson': base64.b64encode(payload).decode()}}
+        client = Mock()
+        with patch.object(installer, 'get', return_value=source), \
+                patch.object(installer.host, 'write_registry_secret') as write, \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            installer.ensure_registry_pull_secret(client)
+        write.assert_called_once_with(renderer.NS, source['data']['.dockerconfigjson'], kube_call=client)
+        self.assertEqual('', output.getvalue())
+
+    def test_registry_pull_secret_rejects_unowned_or_malformed_source(self):
+        auth = base64.b64encode(b'hasanjodatshandi:synthetic-token').decode()
+        payload = json.dumps({'auths': {'ghcr.io': {'auth': auth}}}).encode()
+        valid = {'metadata': {'name': admission.PULL_SECRET, 'namespace': 'hooshix-secrets',
+            'labels': dict(installer.host.LABELS)}, 'type': 'kubernetes.io/dockerconfigjson',
+            'data': {'.dockerconfigjson': base64.b64encode(payload).decode()}}
+        extra_registry = base64.b64encode(json.dumps({'auths': {
+            'ghcr.io': {'auth': auth}, 'other.example': {'auth': auth}}}).encode()).decode()
+        malformed_auth = base64.b64encode(json.dumps({'auths': {'ghcr.io': {'auth': 'not-base64'}}}).encode()).decode()
+        invalid = [None, valid | {'type': 'Opaque'}, valid | {'data': {'other': 'private'}},
+                   'malformed-source', valid | {'metadata': {'labels': None}},
+                   {'metadata': valid['metadata'] | {'labels': {}}, 'type': valid['type'], 'data': valid['data']},
+                   valid | {'metadata': valid['metadata'] | {'ownerReferences': [{'uid': 'foreign'}]}},
+                   valid | {'metadata': valid['metadata'] | {'deletionTimestamp': '2026-10-24T00:00:00Z'}},
+                   valid | {'data': {'.dockerconfigjson': 'not-base64'}},
+                   valid | {'data': {'.dockerconfigjson': base64.b64encode(b'{}').decode()}},
+                   valid | {'data': {'.dockerconfigjson': extra_registry}},
+                   valid | {'data': {'.dockerconfigjson': malformed_auth}}]
+        for source in invalid:
+            with patch.object(installer, 'get', return_value=source), \
+                    patch.object(installer.host, 'write_registry_secret') as write, \
+                    self.assertRaises(ValueError):
+                installer.ensure_registry_pull_secret(Mock())
+            write.assert_not_called()
 
     def test_configuration_has_no_plaintext_listener_and_denies_default_acl(self):
         config = renderer.server_config()
@@ -190,6 +236,8 @@ class KafkaRuntimeTest(unittest.TestCase):
                 'r.name == "kafka" && r.controller',
                 'object.metadata.ownerReferences[0].uid == "stateful-uid"',
                 'object.spec.volumes.all(v, !has(v.hostPath))',
+                'object.spec.imagePullSecrets.size() == 1',
+                'object.spec.imagePullSecrets[0].name == "hooshix-ghcr-read"',
                 '!has(c.lifecycle)', '!has(c.envFrom)', '!has(c.volumeDevices)'):
             self.assertIn(expected, expressions)
         self.assertEqual(['Deny'], changed['spec']['validationActions'])

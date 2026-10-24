@@ -2683,8 +2683,13 @@ fail-closed می‌شود. پیش‌بررسی و تطبیق مجدد policy ب�
 
 سه `ImageValidatingPolicy` مربوط به امضای تصویر، provenance و SBOM ارجاع صریح
 `spec.credentials.secrets: [hooshix-ghcr-read]` دارند؛ Secret از قبل در namespace
-`kyverno` ایجاد می‌شود. bundle فقط نام Secret را نگه می‌دارد و مقدار credential
-وارد bundle یا Git نمی‌شود؛ احراز هویت برای بررسی تصویر private در GHCR لازم است.
+`kyverno` ایجاد می‌شود. Kafka Pod نیز فقط همین نام را در `imagePullSecrets` دارد؛
+نصب Kafka پس از تأیید مالکیت، آن را از Secret موجود در `hooshix-secrets` به
+namespace-local `platform-data` کپی می‌کند تا kubelet تصویر private را pull کند.
+اجرای مجدد همین مرحله پس از به‌روزرسانی Secret مبدأ، مقدار namespace-local را نیز
+به‌صورت مشروط و با `resourceVersion` تازه می‌کند؛ Secret بیگانه جایگزین نمی‌شود و
+تغییر Secret مقصد immutable موجب توقف fail-closed می‌شود.
+bundle فقط نام Secret را نگه می‌دارد و مقدار credential وارد bundle یا Git نمی‌شود.
 
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را
