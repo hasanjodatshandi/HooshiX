@@ -10,6 +10,8 @@ import tempfile
 import time
 from pathlib import Path
 
+import kafka_tls_material as node_tls
+import render_kafka_runtime as runtime
 from test_kafka_runtime_native import require
 from test_postgresql_isolation_native import docker
 
@@ -45,37 +47,7 @@ def client_config(identity: str | None, *, trust: str = "ca.crt") -> str:
     return properties
 
 
-def server_config() -> str:
-    return (f"""process.roles=broker,controller
-node.id=1
-controller.quorum.voters=1@{HOST}:9093
-listeners=SSL://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093
-advertised.listeners=SSL://{HOST}:9092
-controller.listener.names=CONTROLLER
-inter.broker.listener.name=SSL
-listener.security.protocol.map=SSL:SSL,CONTROLLER:SSL
-authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
-allow.everyone.if.no.acl.found=false
-super.users=User:CN=broker;User:CN=admin
-ssl.client.auth=required
-ssl.keystore.type=PEM
-ssl.keystore.location={MOUNT}/broker.pem
-ssl.truststore.type=PEM
-ssl.truststore.location={MOUNT}/ca.crt
-ssl.endpoint.identification.algorithm=https
-ssl.enabled.protocols=TLSv1.3,TLSv1.2
-log.dirs=/var/lib/kafka/data
-metadata.log.dir=/var/lib/kafka/data
-num.partitions=1
-default.replication.factor=1
-min.insync.replicas=1
-offsets.topic.replication.factor=1
-transaction.state.log.replication.factor=1
-transaction.state.log.min.isr=1
-unclean.leader.election.enable=false
-auto.create.topics.enable=false
-group.initial.rebalance.delay.ms=0
-""")
+server_config = runtime.server_config
 
 
 def certificates(work: Path) -> None:
@@ -89,10 +61,11 @@ def certificates(work: Path) -> None:
                 "-out", str(work / (ca + ".crt")), "-addext", "basicConstraints=critical,CA:TRUE",
                 "-addext", "keyUsage=critical,keyCertSign,cRLSign")
     for identity in ("broker", "admin", "writer", "reader", "outsider", "rogue"):
-        openssl("req", "-new", "-newkey", "rsa:2048", "-noenc", "-sha256", "-subj", "/CN=" + identity,
+        subject = node_tls.COMMON_NAME if identity in ("broker", "admin") else identity
+        openssl("req", "-new", "-newkey", "rsa:2048", "-noenc", "-sha256", "-subj", "/CN=" + subject,
                 "-keyout", str(work / (identity + ".key")), "-out", str(work / (identity + ".csr")))
         extension = ("basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n"
-                     "extendedKeyUsage=clientAuth" + (",serverAuth\nsubjectAltName=DNS:" + HOST
+                     "extendedKeyUsage=clientAuth" + (",serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:" + HOST
                                                        if identity == "broker" else "") + "\n")
         (work / "leaf.cnf").write_text(extension)
         ca = "rogue-ca" if identity == "rogue" else "ca"
@@ -107,6 +80,7 @@ def certificates(work: Path) -> None:
     (work / "untrusted-server.properties").write_text(client_config("admin", trust="rogue-ca.crt"))
     (work / "missing-client.properties").write_text(client_config(None))
     (work / "server.properties").write_text(server_config())
+    (work / "client.properties").write_text(runtime.client_config())
 
 
 def exercise(docker_host: str) -> dict:
@@ -130,9 +104,7 @@ def exercise(docker_host: str) -> dict:
         work.chmod(0o700)
         certificates(work)
         uid, gid = os.getuid(), os.getgid()
-        start = "cluster_id=$(/opt/kafka/bin/kafka-storage.sh random-uuid); " \
-                f"/opt/kafka/bin/kafka-storage.sh format -t \"$cluster_id\" -c {MOUNT}/server.properties; " \
-                f"exec /opt/kafka/bin/kafka-server-start.sh {MOUNT}/server.properties"
+        start = runtime.start_script()
         started = docker("run", "-d", "--pull=never", "--network", "none", "--user", f"{uid}:{gid}", "--read-only",
                          "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--memory", "2g",
                          "--cpus", "1", "--pids-limit", "256", "--hostname", HOST,
@@ -141,7 +113,9 @@ def exercise(docker_host: str) -> dict:
                          "--tmpfs", f"/opt/kafka/logs:rw,nosuid,nodev,noexec,size=16m,uid={uid},gid={gid}",
                          "--tmpfs", f"/tmp:rw,nosuid,nodev,noexec,size=32m,uid={uid},gid={gid}",
                          "--mount", f"type=bind,src={work},dst={MOUNT},readonly",
-                         "-e", "KAFKA_HEAP_OPTS=-Xms128m -Xmx256m", "--entrypoint", "/bin/sh",
+                         "--mount", f"type=bind,src={work},dst=/run/kafka,readonly",
+                         "--mount", f"type=bind,src={work},dst=/etc/kafka/commissioned,readonly",
+                         "-e", "KAFKA_HEAP_OPTS=-Xms512m -Xmx512m", "--entrypoint", "/bin/sh",
                          image["Id"], "-ec", start, timeout=30, docker_host=docker_host)
         container = started.stdout.strip()
         require(started.returncode == 0 and re.fullmatch(r"[a-f0-9]{64}", container) is not None,
@@ -181,6 +155,13 @@ def exercise(docker_host: str) -> dict:
                     require(state.returncode == 0 and state.stdout.strip() == "true", "TLS_KAFKA_EXITED")
                     require(time.monotonic() < deadline, "TLS_KAFKA_STARTUP_DEADLINE_EXCEEDED")
                     time.sleep(1)
+            probe = runtime.pod()['containers'][0]['readinessProbe']
+            health = docker('exec', container, *probe['exec']['command'],
+                            timeout=probe['timeoutSeconds'], docker_host=docker_host)
+            require(health.returncode == 0, 'RENDERED_KAFKA_HEALTH_PROBE_FAILED')
+            quorum = command('metadata-quorum', 'admin', 'describe', '--status')
+            require(re.search(r'^LeaderId:\s+1\s*$', quorum, re.MULTILINE) is not None,
+                    'RENDERED_KAFKA_SINGLE_NODE_QUORUM_REQUIRED')
             for topic in (TOPIC, "other-events"):
                 command("topics", "admin", "--create", "--topic", topic, "--partitions", "1",
                         "--replication-factor", "1", "--config", "min.insync.replicas=1")
@@ -210,13 +191,14 @@ def exercise(docker_host: str) -> dict:
                     input_text="revoked\n", expected="TopicAuthorizationException")
             for identity in ("missing-client", "rogue", "untrusted-server"):
                 command("topics", identity, "--list", expected="SSLHandshakeException")
-            command("topics", "admin", "--list", address="127.0.0.1", expected="SSLHandshakeException")
+            command("topics", "admin", "--list", address="127.0.0.2", expected="SSLHandshakeException")
             # A healthy positive control prevents outages from masquerading as authorization denial.
             command("topics", "admin", "--describe", "--topic", TOPIC)
             return {"schema_version": 1, "image": pin["image"], "version": pin["version"],
                     "native_tls": "Passed", "mutual_client_auth": "Passed", "hostname_validation": "Passed",
                     "topic_role_group_acl": "Passed", "default_deny": "Passed", "acl_admin_denial": "Passed",
                     "writer_revocation": "Passed", "acks_all_idempotent_produce_consume": "Passed",
+                    "rendered_runtime_probe": "Passed", "single_node_quorum": "Passed",
                     "network": "none", "credentials": "synthetic-disposable-only",
                     "staging": "Not run", "deployment": "Not run", "production_readiness": "Not verified"}
         finally:

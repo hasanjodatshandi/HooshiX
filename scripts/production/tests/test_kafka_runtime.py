@@ -97,6 +97,7 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_configuration_has_no_plaintext_listener_and_denies_default_acl(self):
         config = renderer.server_config()
         for expected in ('process.roles=broker,controller', 'controller.quorum.bootstrap.servers=',
+                'advertised.listeners=SSL://127.0.0.1:9092',
                 'ssl.client.auth=required', 'ssl.endpoint.identification.algorithm=https',
                 'authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer',
                 'allow.everyone.if.no.acl.found=false', 'auto.create.topics.enable=false',

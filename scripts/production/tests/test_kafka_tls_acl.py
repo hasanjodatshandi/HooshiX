@@ -17,6 +17,7 @@ class KafkaTlsAclTest(unittest.TestCase):
                          "allow.everyone.if.no.acl.found=false", "unclean.leader.election.enable=false",
                          "default.replication.factor=1", "min.insync.replicas=1"):
             self.assertIn(required, server)
+        self.assertIn('advertised.listeners=SSL://127.0.0.1:9092', server)
         self.assertNotIn("PLAINTEXT", server)
         self.assertNotIn("User:CN=writer", server)
         config = target.client_config("writer")
@@ -47,7 +48,7 @@ class KafkaTlsAclTest(unittest.TestCase):
                 if "--remove" in args:
                     revoked = True
                 if any(identity + ".properties" in text for identity in
-                       ("missing-client", "rogue", "untrusted-server")) or "127.0.0.1:9092" in text:
+                       ("missing-client", "rogue", "untrusted-server")) or "127.0.0.2:9092" in text:
                     code, error = 1, "TimeoutException" if outage else "SSLHandshakeException"
                 elif "foreign-group" in args:
                     code = 1 if consumer_records is None else 0
@@ -64,6 +65,8 @@ class KafkaTlsAclTest(unittest.TestCase):
                     code, error = 1, "TopicAuthorizationException"
                 elif "kafka-console-consumer.sh" in text:
                     out = "synthetic-event\n"
+                elif 'kafka-metadata-quorum.sh' in text:
+                    out = 'LeaderId: 1\n'
             return subprocess.CompletedProcess(args, code, stdout=out, stderr=error)
 
         with patch.object(target, "docker", side_effect=docker), \
@@ -91,7 +94,10 @@ class KafkaTlsAclTest(unittest.TestCase):
         self.assertEqual("256", started[started.index("--pids-limit") + 1])
         for args in calls:
             if args[0] == "exec":
-                self.assertIn("--command-config", args)
+                if '/bin/sh' in args:
+                    self.assertEqual(target.runtime.PROBE, args[-1])
+                else:
+                    self.assertIn("--command-config", args)
                 self.assertNotIn("--producer.config", args)
                 self.assertNotIn("--consumer.config", args)
         self.assertEqual(("rm", "--volumes", "-f", "a" * 64), calls[-1])

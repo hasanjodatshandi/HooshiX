@@ -19,8 +19,9 @@ MATERIAL = '/run/kafka'
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 RESOURCES = {'requests': {'cpu': '250m', 'memory': '768Mi', 'ephemeral-storage': '64Mi'},
              'limits': {'cpu': '1', 'memory': '2Gi', 'ephemeral-storage': '128Mi'}}
-PROBE = ('/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 '
-         '--command-config /etc/kafka/commissioned/client.properties >/dev/null 2>&1')
+PROBE = ('KAFKA_HEAP_OPTS="-Xms32m -Xmx128m" /opt/kafka/bin/kafka-topics.sh '
+         '--bootstrap-server 127.0.0.1:9092 --command-config /etc/kafka/commissioned/client.properties '
+         '--list >/dev/null 2>&1')
 
 
 def pin():
@@ -48,7 +49,7 @@ def server_config():
 node.id=1
 controller.quorum.bootstrap.servers=127.0.0.1:9093
 listeners=SSL://0.0.0.0:9092,CONTROLLER://127.0.0.1:9093
-advertised.listeners=SSL://kafka-0.kafka.platform-data.svc.cluster.local:9092
+advertised.listeners=SSL://127.0.0.1:9092
 controller.listener.names=CONTROLLER
 inter.broker.listener.name=SSL
 listener.security.protocol.map=SSL:SSL,CONTROLLER:SSL
@@ -83,6 +84,8 @@ ssl.truststore.type=PEM
 ssl.truststore.location=/run/kafka/ca.crt
 ssl.endpoint.identification.algorithm=https
 ssl.enabled.protocols=TLSv1.3,TLSv1.2
+request.timeout.ms=3000
+default.api.timeout.ms=4000
 '''
 
 
@@ -118,7 +121,7 @@ exec /opt/kafka/bin/kafka-server-start.sh "$config"
 
 
 def pod():
-    probe = {'exec': {'command': ['/bin/sh', '-ec', PROBE]}, 'timeoutSeconds': 5,
+    probe = {'exec': {'command': ['/bin/sh', '-ec', PROBE]}, 'timeoutSeconds': 10,
         'periodSeconds': 10, 'successThreshold': 1, 'failureThreshold': 3}
     mounts = [{'name': 'data', 'mountPath': '/var/lib/kafka/data'},
         {'name': 'logs', 'mountPath': '/opt/kafka/logs'}, {'name': 'tmp', 'mountPath': '/tmp'},
