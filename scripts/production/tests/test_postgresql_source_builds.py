@@ -40,7 +40,8 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                           for destination in target.BINARIES.get(component, {}).values()] +
                          [{'name': 'golang.org/x/net', 'version': 'v0.60.0'}] if component != 'postgresql' else []) +
                          [{'name': name, 'version': version, 'type': 'apk'} for name, version in
-                          (self.selected['runtime_packages'] | self.selected['sidecar_packages']).items()] +
+                          (self.selected['runtime_packages'] | self.selected['sidecar_packages'] |
+                           {'brotli-libs': target.BROTLI_VERSION}).items()] +
                          [{'name': 'barman', 'version': '3.20.1', 'type': 'python'},
                           {'name': 'certifi', 'version': target.CERTIFI_VERSION, 'type': 'python'},
                           {'name': 'postgresql', 'version': '18.6', 'type': 'binary'}]},
@@ -113,6 +114,8 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         self.assertIn('USER 26:26', postgresql)
         self.assertIn('adduser -D -H -u 26', postgresql)
         self.assertIn('libssl3=3.5.9-r0', postgresql)
+        for generated in (postgresql, sidecar):
+            self.assertIn('brotli-libs=1.2.1-r0', generated)
         self.assertIn('patched-upstream-runtime-build', postgresql)
         for generated in (operator, plugin, sidecar):
             self.assertIn('go mod verify', generated)
@@ -260,6 +263,18 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                 if change == 'old-application':
                     name = 'postgresql' if component == 'postgresql' else 'barman'
                     artifacts.append({'name': name, 'version': 'old'})
+                with self.subTest(component=component, change=change), self.assertRaises(ValueError):
+                    self.validate(component, evidence)
+
+    def test_brotli_fixed_package_is_required_even_without_a_scanner_finding(self):
+        for component in ('postgresql', 'barman-sidecar'):
+            for change in ('missing', 'old', 'duplicate'):
+                evidence = self.evidence(component)
+                artifacts = evidence['syft.json']['artifacts']
+                package = next(item for item in artifacts if item['name'] == 'brotli-libs')
+                if change == 'missing': artifacts.remove(package)
+                if change == 'old': package['version'] = '1.2.0-r1'
+                if change == 'duplicate': artifacts.append(package | {'version': '1.2.0-r1'})
                 with self.subTest(component=component, change=change), self.assertRaises(ValueError):
                     self.validate(component, evidence)
 
