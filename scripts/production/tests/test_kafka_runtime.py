@@ -21,6 +21,15 @@ def prior_boundary():
         [admission.validation('existing closed data contract', 'false')])
 
 
+def prior_bootstrap_boundary():
+    result = admission.policy('ValidatingPolicy', installer.BOOTSTRAP_BOUNDARY, 'platform-data',
+        [admission.validation(installer.BOOTSTRAP_VALIDATION_MESSAGE, 'object.spec.serviceAccountName == "postgresql"')])
+    result['spec']['matchConstraints']['resourceRules'][0]['resources'].append('pods/ephemeralcontainers')
+    result['metadata'].update(uid='bootstrap-uid', resourceVersion='1')
+    result['status'] = {'conditionStatus': {'ready': True}}
+    return result
+
+
 class KafkaRuntimeTest(unittest.TestCase):
     def setUp(self):
         self.plan = renderer.render(prior_boundary())
@@ -141,6 +150,7 @@ class KafkaRuntimeTest(unittest.TestCase):
                          result['warning_events']['statefulset']['known_admission_failures'])
         self.assertFalse(result['pod']['present'])
         self.assertNotIn('PRIVATE_ADMISSION_DETAIL', serialized)
+        self.assertIn('hooshix-platform-data-closed', rehearsal.SAFE_KAFKA_ADMISSION_POLICIES)
 
     def test_failed_create_diagnostic_classes_are_fixed_and_bounded(self):
         cases = (
@@ -203,6 +213,68 @@ class KafkaRuntimeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED'):
             installer.boundary_for_statefulset(broken, 'stateful-uid')
 
+    def test_bootstrap_boundary_adds_only_the_exact_uid_bound_kafka_contract_and_resumes(self):
+        previous = prior_bootstrap_boundary()
+        base = installer.bootstrap_base_policy(previous, self.plan)
+        self.assertEqual(previous['spec'], base['spec'])
+        desired = installer.bootstrap_boundary_for_statefulset(previous, 'stateful-uid', self.plan)
+        expression = desired['spec']['validations'][0]['expression']
+        self.assertTrue(expression.startswith('!(('))
+        self.assertIn('object.metadata.ownerReferences[0].uid == "stateful-uid"', expression)
+        self.assertIn('object.spec.serviceAccountName == "postgresql"', expression)
+        self.assertEqual(previous['spec']['validations'][0]['message'],
+                         desired['spec']['validations'][0]['message'])
+        self.assertEqual('closed Kafka runtime contract rejected', desired['spec']['validations'][1]['message'])
+        self.assertEqual(installer.boundary_for_statefulset(self.plan, 'stateful-uid')
+                         ['spec']['validations'][-1]['expression'],
+                         desired['spec']['validations'][1]['expression'])
+        resumed = copy.deepcopy(desired)
+        resumed['metadata'].update(uid='bootstrap-uid', resourceVersion='2')
+        resumed['status'] = {'conditionStatus': {'ready': True}}
+        recovered = installer.bootstrap_base_policy(resumed, self.plan, 'stateful-uid')
+        self.assertEqual(previous['spec'], recovered['spec'])
+        with self.assertRaisesRegex(ValueError, 'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED'):
+            installer.bootstrap_base_policy(resumed, self.plan, 'foreign-stateful-uid')
+
+    def test_bootstrap_boundary_rejects_scope_drift_and_base_policy_tampering(self):
+        broadened = prior_bootstrap_boundary()
+        broadened['spec']['matchConstraints']['namespaceSelector'] = {}
+        with self.assertRaisesRegex(ValueError, 'KAFKA_BOOTSTRAP_BOUNDARY_SCOPE_DRIFT_PRESERVED'):
+            installer.bootstrap_base_policy(broadened, self.plan)
+        previous = prior_bootstrap_boundary()
+        active = installer.bootstrap_boundary_for_statefulset(previous, 'stateful-uid', self.plan)
+        active['metadata'].update(uid='bootstrap-uid', resourceVersion='2')
+        active['status'] = {'conditionStatus': {'ready': True}}
+        active['spec']['validations'][0]['expression'] += ' || true'
+        with self.assertRaisesRegex(ValueError, 'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED'):
+            installer.bootstrap_base_policy(active, self.plan, 'stateful-uid')
+
+    def test_bootstrap_boundary_update_uses_resource_version_and_spec_compare_and_swap(self):
+        previous = prior_bootstrap_boundary()
+        desired = installer.bootstrap_boundary_for_statefulset(previous, 'stateful-uid', self.plan)
+        calls = []
+        installer.replace_bootstrap_boundary(previous, desired, kube=lambda *args: calls.append(args))
+        self.assertEqual(1, len(calls))
+        args = calls[0]
+        patch = json.loads(args[args.index('-p') + 1])
+        self.assertEqual({'op': 'test', 'path': '/metadata/resourceVersion', 'value': '1'}, patch[0])
+        self.assertEqual({'op': 'test', 'path': '/spec', 'value': previous['spec']}, patch[1])
+        self.assertEqual('replace', patch[2]['op'])
+        self.assertEqual('/spec', patch[2]['path'])
+        self.assertEqual(desired['spec'], patch[2]['value'])
+        self.assertEqual('add', patch[3]['op'])
+        self.assertEqual('/metadata/annotations', patch[3]['path'])
+        self.assertEqual({installer.BOOTSTRAP_BASE_HASH:
+                          desired['metadata']['annotations'][installer.BOOTSTRAP_BASE_HASH]}, patch[3]['value'])
+        previous['metadata']['annotations'] = {'existing': 'preserved'}
+        desired = installer.bootstrap_boundary_for_statefulset(previous, 'stateful-uid', self.plan)
+        calls.clear()
+        installer.replace_bootstrap_boundary(previous, desired, kube=lambda *args: calls.append(args))
+        patch = json.loads(calls[0][calls[0].index('-p') + 1])
+        self.assertEqual('/metadata/annotations/' + installer.BOOTSTRAP_BASE_HASH.replace('/', '~1'),
+                         patch[3]['path'])
+        self.assertEqual('preserved', previous['metadata']['annotations']['existing'])
+
     def test_unowned_extra_or_foreign_pod_is_rejected(self):
         stateful = {'metadata': {'uid': 'expected'}}
         listed = {'items': [{'metadata': {'name': 'kafka-0', 'labels': {
@@ -229,6 +301,8 @@ class KafkaRuntimeTest(unittest.TestCase):
     def test_staging_failure_diagnostic_only_emits_allowlisted_invariant_codes(self):
         self.assertEqual('RESERVED_VOLUME_DRIFT_PRESERVED',
             rehearsal.safe_failure_code(ValueError('RESERVED_VOLUME_DRIFT_PRESERVED')))
+        self.assertEqual('KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED',
+            rehearsal.safe_failure_code(ValueError('KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')))
         self.assertEqual('EMPTY_QUARANTINED_KAFKA_REQUIRED',
             rehearsal.safe_failure_code(ValueError('EMPTY_QUARANTINED_KAFKA_REQUIRED')))
         self.assertEqual('EXISTING_TYPED_REDIS_SECRETS_REQUIRED',
@@ -309,6 +383,7 @@ class KafkaRuntimeTest(unittest.TestCase):
             bundle.verify_proof(receipt)
             for change in ({'application_ingress': 'OPEN'}, {'business_topics': 'present'},
                            {'production_readiness': 'Passed'}, {'mutual_tls_health': 'Not run'},
+                           {'bootstrap_boundary': 'Not run'},
                            {'host_storage_guard': 'Passed'}):
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     bundle.verify_proof({'kafka_closed_runtime': good | change})

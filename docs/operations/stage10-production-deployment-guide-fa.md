@@ -61,7 +61,7 @@ Production readiness همچنان `Not verified` هستند.
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
-| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | پیاده‌سازی runtime بسته در PR جاری؛ پس از ادغام، staging دقیق `main` و اجرای مقصد لازم است؛ broker نصب نشده |
+| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | runtime بسته در PR جاری؛ staging دقیق `main` و اجرای مقصد هنوز لازم است؛ broker نصب نشده |
 | JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -2661,6 +2661,17 @@ ReplicaFailure، وضعیت Pod، شمار/دلیل‌های allowlist‌شده�
 رخداد، log و محتوای Secret نگهداری یا چاپ نمی‌شود. این گزارش جایگزین موفقیت staging نیست.
 بودجهٔ job برابر ۵۵ دقیقه است تا rehearsal کامل، مهلت ۷ دقیقه‌ای broker و پاک‌سازی
 fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا گیت امنیتی از این زمان‌بندی حذف نمی‌شود.
+
+installer هر دو ValidatingPolicy فعال `hooshix-platform-data-closed` و
+`hooshix-platform-data-bootstrap-boundary` را با `failurePolicy=Fail` و
+`validationActions=Deny` حفظ می‌کند. پس از ایجاد StatefulSet، استثنای Pod فقط با
+ServiceAccount، نام/برچسب، ownerReference و UID همان StatefulSet ساخته می‌شود؛
+قرارداد کامل Pod در هر دو policy باقی می‌ماند. پیش‌بررسی policy bootstrap، scope
+محدود به `platform-data`، fail-closed بودن، deny بودن و یک validation با پیام ثابت
+را الزام می‌کند؛ قاعدهٔ قبلی برای سایر Podها حفظ و hash spec پایه هنگام تغییر ثبت
+می‌شود تا در اجرای مجدد تطبیق شود. bundle فقط پس از ثبت `bootstrap_boundary=Passed`
+در receipt staging ساخته می‌شود. scope یا policy drift پس از ثبت hash و UID قدیمی
+موجب توقف fail-closed می‌شود.
 
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را

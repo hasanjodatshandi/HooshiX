@@ -26,6 +26,9 @@ from upgrade_mesh_security import replace_policy
 
 NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
 HASH = 'hooshix.io/kafka-spec-sha256'
+BOOTSTRAP_BOUNDARY = 'hooshix-platform-data-bootstrap-boundary'
+BOOTSTRAP_BASE_HASH = 'hooshix.io/kafka-bootstrap-base-sha256'
+BOOTSTRAP_VALIDATION_MESSAGE = 'platform bootstrap identity/security exception rejected'
 READINESS_TIMEOUT_SECONDS = 420
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 require, get, digest = pg.require, pg.get, pg.digest
@@ -76,6 +79,112 @@ def boundary_for_statefulset(plan, uid):
                 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED')
         validation['expression'] = expression.replace(needle, replacement)
     return result
+
+
+def bootstrap_exception_prefix(plan, statefulset_uid):
+    policy = boundary_for_statefulset(plan, statefulset_uid)
+    expression = policy['spec']['validations'][0].get('expression', '')
+    guard, separator, _ = expression.partition(') || (')
+    require(separator and guard.startswith('!('), 'KAFKA_BOOTSTRAP_BOUNDARY_TEMPLATE_REQUIRED')
+    return guard + separator
+
+
+def bootstrap_boundary_from_base(base, statefulset_uid, plan):
+    result = copy.deepcopy(base)
+    prefix = bootstrap_exception_prefix(plan, statefulset_uid)
+    for validation in result['spec']['validations']:
+        validation['expression'] = prefix + validation['expression'] + ')'
+    result['spec']['validations'].append(copy.deepcopy(
+        boundary_for_statefulset(plan, statefulset_uid)['spec']['validations'][-1]))
+    return result
+
+
+def bootstrap_base_policy(actual, plan, statefulset_uid=None):
+    require(actual and actual.get('apiVersion') == 'policies.kyverno.io/v1'
+        and actual.get('kind') == 'ValidatingPolicy', 'KAFKA_BOOTSTRAP_BOUNDARY_REQUIRED')
+    metadata = actual.get('metadata', {})
+    annotations = metadata.get('annotations') or {}
+    marker = annotations.get(BOOTSTRAP_BASE_HASH)
+    require(metadata.get('name') == BOOTSTRAP_BOUNDARY and 'namespace' not in metadata
+        and isinstance(metadata.get('uid'), str) and metadata['uid']
+        and isinstance(metadata.get('resourceVersion'), str) and metadata['resourceVersion']
+        and not metadata.get('deletionTimestamp')
+        and actual.get('status', {}).get('conditionStatus', {}).get('ready') is True,
+        'KAFKA_BOOTSTRAP_BOUNDARY_REQUIRED')
+    base = {key: actual[key] for key in ('apiVersion', 'kind')}
+    base['metadata'] = {key: metadata[key] for key in ('name', 'labels', 'annotations') if key in metadata}
+    base['spec'] = copy.deepcopy(actual.get('spec'))
+    spec = base['spec']
+    expected = {'failurePolicy': 'Fail', 'validationActions': ['Deny'],
+        'autogen': {'podControllers': {'controllers': []}},
+        'evaluation': {'admission': {'enabled': True}, 'background': {'enabled': True}},
+        'matchConstraints': {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': NS}},
+            'resourceRules': [{'apiGroups': [''], 'apiVersions': ['v1'], 'operations': ['CREATE', 'UPDATE'],
+                'resources': ['pods', 'pods/ephemeralcontainers']} ]}}
+    require(isinstance(spec, dict)
+        and {key: value for key, value in spec.items() if key != 'validations'}
+            == {key: value for key, value in expected.items() if key != 'validations'}
+        and isinstance(spec.get('validations'), list), 'KAFKA_BOOTSTRAP_BOUNDARY_SCOPE_DRIFT_PRESERVED')
+    if marker is None:
+        require((statefulset_uid is None or isinstance(statefulset_uid, str)
+                and re.fullmatch('[A-Za-z0-9-]{1,128}', statefulset_uid))
+            and len(spec['validations']) == 1
+            and spec['validations'][0].get('message') == BOOTSTRAP_VALIDATION_MESSAGE
+            and set(spec['validations'][0]) == {'message', 'expression'}
+            and isinstance(spec['validations'][0].get('expression'), str)
+            and 0 < len(spec['validations'][0]['expression']) <= 65536,
+            'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+        return base
+    require(isinstance(marker, str) and re.fullmatch('[a-f0-9]{64}', marker)
+        and isinstance(statefulset_uid, str) and re.fullmatch('[A-Za-z0-9-]{1,128}', statefulset_uid)
+        and len(spec['validations']) == 2, 'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+    old, runtime = spec['validations']
+    require(old.get('message') == BOOTSTRAP_VALIDATION_MESSAGE
+        and set(old) == {'message', 'expression'}
+        and runtime == boundary_for_statefulset(plan, statefulset_uid)['spec']['validations'][-1],
+        'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+    prefix = bootstrap_exception_prefix(plan, statefulset_uid)
+    expression = old.get('expression')
+    require(isinstance(expression, str) and expression.startswith(prefix) and expression.endswith(')'),
+        'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+    old['expression'] = expression[len(prefix):-1]
+    base['spec']['validations'] = [old]
+    require(digest(base['spec']) == marker
+        and bootstrap_boundary_from_base(base, statefulset_uid, plan)['spec'] == actual['spec'],
+        'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+    return base
+
+
+def bootstrap_boundary_for_statefulset(actual, uid, plan):
+    base = bootstrap_base_policy(actual, plan, uid)
+    result = bootstrap_boundary_from_base(base, uid, plan)
+    result.setdefault('metadata', {}).setdefault('annotations', {})[BOOTSTRAP_BASE_HASH] = digest(base['spec'])
+    return result
+
+
+def replace_bootstrap_boundary(actual, desired, *, kube):
+    annotations = actual['metadata'].get('annotations') or {}
+    desired_hash = desired['metadata']['annotations'][BOOTSTRAP_BASE_HASH]
+    if actual['spec'] == desired['spec']:
+        require(annotations.get(BOOTSTRAP_BASE_HASH) == desired_hash,
+            'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+        return
+    require(annotations.get(BOOTSTRAP_BASE_HASH) in (None, desired_hash),
+        'KAFKA_BOOTSTRAP_BOUNDARY_DRIFT_PRESERVED')
+    patch = [
+        {'op': 'test', 'path': '/metadata/resourceVersion', 'value': actual['metadata']['resourceVersion']},
+        {'op': 'test', 'path': '/spec', 'value': actual['spec']},
+        {'op': 'replace', 'path': '/spec', 'value': desired['spec']},
+    ]
+    if BOOTSTRAP_BASE_HASH not in annotations:
+        if actual['metadata'].get('annotations') is None:
+            patch.append({'op': 'add', 'path': '/metadata/annotations',
+                'value': {BOOTSTRAP_BASE_HASH: desired_hash}})
+        else:
+            patch.append({'op': 'add', 'path': '/metadata/annotations/' + BOOTSTRAP_BASE_HASH.replace('/', '~1'),
+                'value': desired_hash})
+    kube('patch', 'validatingpolicy', BOOTSTRAP_BOUNDARY, '--type=json',
+         '-p', json.dumps(patch, separators=(',', ':')))
 
 
 def binding(kube, claim):
@@ -203,6 +312,8 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
     boundary = get(kube, 'validatingpolicy', plan['boundary']['metadata']['name'])
     stateful = get(kube, 'statefulset', NAME, NS)
     claim = get(kube, 'pvc', volume.CLAIM, NS)
+    bootstrap = get(kube, 'validatingpolicy', BOOTSTRAP_BOUNDARY)
+    bootstrap_base_policy(bootstrap, plan, stateful.get('metadata', {}).get('uid') if stateful else None)
     if not stateful:
         require(claim is None, 'ORPHANED_KAFKA_CLAIM_PRESERVED')
     desired_objects = [*plan['objects'], plan['statefulset'], *plan['source_policies']]
@@ -268,6 +379,13 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
             kube=kube, previous=plan['previous_boundary'])
     kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
          'validatingpolicy/' + stateful_boundary['metadata']['name'], '--timeout=60s', timeout=75)
+    print('KAFKA_RUNTIME_STEP=bootstrap-admission', file=sys.stderr, flush=True)
+    current_bootstrap = get(kube, 'validatingpolicy', BOOTSTRAP_BOUNDARY)
+    bootstrap_boundary = bootstrap_boundary_for_statefulset(current_bootstrap,
+        stateful['metadata']['uid'], plan)
+    replace_bootstrap_boundary(current_bootstrap, bootstrap_boundary, kube=kube)
+    kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
+         'validatingpolicy/' + BOOTSTRAP_BOUNDARY, '--timeout=60s', timeout=75)
 
     print('KAFKA_RUNTIME_STEP=readiness', file=sys.stderr, flush=True)
     kube('-n', NS, 'wait', '--for=jsonpath={.status.readyReplicas}=1',
@@ -301,6 +419,13 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
             'KAFKA_MUTUAL_TLS_HEALTH_REQUIRED')
     cluster_id, identity = storage_identity(kube)
     quorum_and_topics(kube, cluster_id)
+    final_bootstrap = get(kube, 'validatingpolicy', BOOTSTRAP_BOUNDARY)
+    expected_bootstrap = bootstrap_boundary_for_statefulset(final_bootstrap, current['metadata']['uid'], plan)
+    require(final_bootstrap['spec'] == expected_bootstrap['spec']
+        and final_bootstrap.get('metadata', {}).get('annotations', {}).get(BOOTSTRAP_BASE_HASH)
+            == expected_bootstrap['metadata']['annotations'][BOOTSTRAP_BASE_HASH]
+        and final_bootstrap.get('status', {}).get('conditionStatus', {}).get('ready') is True,
+        'KAFKA_BOOTSTRAP_BOUNDARY_NOT_READY')
     actor = '--as=system:serviceaccount:' + NS + ':' + NAME
     for verb, target in (('get', 'secret/' + delivery.NAME), ('list', 'secrets'),
                          ('create', 'pods'), ('create', 'serviceaccounts/' + delivery.ENTRY['account'])):
@@ -320,6 +445,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
     return {'schema_version': 1, 'kafka_runtime': 'Passed', 'image': plan['image'],
         'statefulset_uid': current['metadata']['uid'], 'pvc_uid': claim['metadata']['uid'],
         'volume_uid': volume_uid, 'cluster_identity_sha256': identity,
+        'bootstrap_boundary': 'Passed',
         'mutual_tls_health': 'Passed', 'single_node_quorum': 'Passed', 'business_topics': 'None',
         'service_account_scope': 'Passed', 'storage_guard': 'Passed' if units else 'Not run',
         'existing_database_redis_openbao_eso_tls': 'Preserved', 'application_ingress': 'CLOSED',
