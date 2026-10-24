@@ -91,7 +91,7 @@ jobs:
           printf '%s  %s\n' "${HELM_SHA256}" /tmp/helm.tar.gz | sha256sum --check --strict -
           tar -xzf /tmp/helm.tar.gz -C /tmp
           /tmp/linux-amd64/helm version --short | grep -F "v${HELM_VERSION}"
-          chart=deploy/helm/web-frontend
+          chart=apps/web-frontend/deploy/helm/web-frontend
           /tmp/linux-amd64/helm lint "$chart" -f "$chart/ci/test-values.yaml"
           /tmp/linux-amd64/helm template web-frontend "$chart" \
             --namespace platform-apps -f "$chart/ci/test-values.yaml" > /tmp/web-frontend-rendered.yaml
