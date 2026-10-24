@@ -2690,6 +2690,9 @@ namespace-local `platform-data` کپی می‌کند تا kubelet تصویر pri
 به‌صورت مشروط و با `resourceVersion` تازه می‌کند؛ Secret بیگانه جایگزین نمی‌شود و
 تغییر Secret مقصد immutable موجب توقف fail-closed می‌شود.
 bundle فقط نام Secret را نگه می‌دارد و مقدار credential وارد bundle یا Git نمی‌شود.
+با root filesystem فقط‌خواندنی، مسیرهای موقت Kafka در `/opt/kafka/logs` با سقف
+`16Mi` و `/tmp` با سقف `32Mi` روی `emptyDir` حافظه‌ای قرار دارند؛ دادهٔ پایدار فقط
+روی LocalPV مستقل باقی می‌ماند.
 
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
 شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را

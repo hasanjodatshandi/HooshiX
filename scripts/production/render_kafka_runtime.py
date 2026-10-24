@@ -121,6 +121,7 @@ def pod():
     probe = {'exec': {'command': ['/bin/sh', '-ec', PROBE]}, 'timeoutSeconds': 5,
         'periodSeconds': 10, 'successThreshold': 1, 'failureThreshold': 3}
     mounts = [{'name': 'data', 'mountPath': '/var/lib/kafka/data'},
+        {'name': 'logs', 'mountPath': '/opt/kafka/logs'}, {'name': 'tmp', 'mountPath': '/tmp'},
         {'name': 'material', 'mountPath': MATERIAL, 'readOnly': True},
         {'name': 'config', 'mountPath': '/etc/kafka/commissioned', 'readOnly': True}]
     container = {'name': 'kafka', 'image': pin()['image'], 'imagePullPolicy': 'IfNotPresent',
@@ -152,6 +153,8 @@ def pod():
                 {'secret': {'name': SECRET, 'items': [{'key': k, 'path': k}
                     for k in ('tls.crt', 'tls.key', 'ca.crt')]}}]}},
             {'name': 'material', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '16Mi'}},
+            {'name': 'logs', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '16Mi'}},
+            {'name': 'tmp', 'emptyDir': {'medium': 'Memory', 'sizeLimit': '32Mi'}},
             {'name': 'config', 'configMap': {'name': NAME, 'defaultMode': 0o440,
                 'items': [{'key': k, 'path': k} for k in ('server.properties', 'client.properties', 'start.sh')]}}]}
 

@@ -46,6 +46,15 @@ class KafkaRuntimeTest(unittest.TestCase):
         pod = self.plan['statefulset']['spec']['template']['spec']
         self.assertEqual([{'name': admission.PULL_SECRET}], pod['imagePullSecrets'])
 
+    def test_read_only_kafka_root_has_bounded_memory_backed_runtime_scratch(self):
+        pod = self.plan['statefulset']['spec']['template']['spec']
+        volumes = {volume['name']: volume for volume in pod['volumes']}
+        mounts = {mount['name']: mount['mountPath'] for mount in pod['containers'][0]['volumeMounts']}
+        self.assertEqual({'logs': '/opt/kafka/logs', 'tmp': '/tmp'},
+                         {name: mounts[name] for name in ('logs', 'tmp')})
+        self.assertEqual({'medium': 'Memory', 'sizeLimit': '16Mi'}, volumes['logs']['emptyDir'])
+        self.assertEqual({'medium': 'Memory', 'sizeLimit': '32Mi'}, volumes['tmp']['emptyDir'])
+
     def test_registry_pull_secret_is_copied_from_owned_source_without_output(self):
         auth = base64.b64encode(b'hasanjodatshandi:synthetic-read-only-token').decode()
         payload = json.dumps({'auths': {'ghcr.io': {'auth': auth}}}).encode()
