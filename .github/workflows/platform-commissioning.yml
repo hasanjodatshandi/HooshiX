@@ -22,6 +22,10 @@ on:
       - scripts/production/*kafka*tls*.py
       - scripts/production/kafka_secret_delivery.py
       - scripts/production/tests/test_kafka_tls.py
+      - scripts/production/*kafka*runtime*.py
+      - scripts/production/build_kafka_runtime_bundle.py
+      - scripts/production/run-kafka-runtime.ps1
+      - scripts/production/tests/test_kafka_runtime.py
       - scripts/production/test_redis_security_native.py
       - scripts/production/render_redis_security.py
       - infrastructure/production/redis/runtime.json
@@ -86,7 +90,7 @@ on:
         type: boolean
         default: false
       postgresql_quarantine:
-        description: Rehearse only the owner-approved empty closed PostgreSQL quarantine
+        description: Rehearse the owner-approved closed PostgreSQL quarantine and empty closed Kafka runtime
         type: boolean
         default: false
       mesh_run:
@@ -110,7 +114,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     name: Signed Calico Ambient Kyverno OpenBao staging
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 55
     permissions:
       contents: read
       actions: read
@@ -155,6 +159,10 @@ jobs:
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-redis-runtime.ps1'),
             [ref]$tokens, [ref]$parseErrors)
           if ($parseErrors.Count -ne 0) { throw 'REDIS_RUNTIME_WRAPPER_SYNTAX_FAILED' }
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-kafka-runtime.ps1'),
+            [ref]$tokens, [ref]$parseErrors)
+          if ($parseErrors.Count -ne 0) { throw 'KAFKA_RUNTIME_WRAPPER_SYNTAX_FAILED' }
           [void][System.Management.Automation.Language.Parser]::ParseFile(
             (Join-Path $env:GITHUB_WORKSPACE 'scripts/production/run-barman-control-plane.ps1'),
             [ref]$tokens, [ref]$parseErrors)
@@ -310,6 +318,12 @@ jobs:
             ${{ runner.temp }}/redis-acceptance/registry/*.json
           retention-days: 30
           if-no-files-found: error
+      - name: Disable swap for ephemeral TLS-key validation
+        run: |
+          set -euo pipefail
+          sudo swapoff --all
+          awk 'END { exit NR != 1 }' /proc/swaps
+          printf 'CI_PRIVATE_KEY_SWAP=Disabled\n'
       - name: Rehearse exact private images with real Calico Ambient and fail-closed Kyverno
         env:
           GITHUB_TOKEN: ${{ github.token }}

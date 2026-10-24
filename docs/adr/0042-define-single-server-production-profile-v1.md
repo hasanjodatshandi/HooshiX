@@ -175,7 +175,21 @@ certificate renewal, capacity, backup or Production readiness.
 
 ## 6. Kafka single-broker KRaft
 
-`production-single-server` targets Kafka 4.2.2 with one combined KRaft `broker,controller` process. The reviewed security-overlay image is still a candidate: production publication, native TLS/ACL, staging, recovery, and deployment evidence are required before it is installed or promoted.
+`production-single-server` targets Kafka 4.2.2 with one combined KRaft `broker,controller` process. Production promotion requires protected publication, exact-image native TLS/ACL and Kubernetes staging, recovery/rebuild evidence, and deployment evidence.
+
+The security owner approved one narrowly scoped commissioning exception: after
+the exact published image passes native TLS/ACL and disposable Kubernetes
+staging, one empty broker/controller may be initialized on the already-reserved
+14Gi Retain LocalPV. It remains isolated with no application or user clients,
+no business topics/data, no client ACLs, no public route, no promotion, and no
+claim of recovery or Production readiness. NetworkPolicy denies all ingress;
+STRICT Ambient mTLS and fail-closed signed-image admission remain required.
+The controller listener remains loopback-only. Initial formatting is permitted
+only on a verified empty data directory; unknown or partial data is preserved
+and blocks startup rather than being reset. This exception permits commissioning
+the closed empty process only; it does not satisfy Kafka cold-DR/rebuild evidence,
+critical event replay/dedup retention, capacity, or any Production gate. Application
+traffic remains closed until those separate requirements pass.
 
 The profile formally accepts that Apache Kafka recommends separated/redundant controller/broker roles for critical deployments; the single combined process is a cost/operability trade-off and is not HA.
 
