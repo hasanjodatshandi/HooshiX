@@ -2662,13 +2662,16 @@ ReplicaFailure، وضعیت Pod، شمار/دلیل‌های allowlist‌شده�
 بودجهٔ job برابر ۵۵ دقیقه است تا rehearsal کامل، مهلت ۷ دقیقه‌ای broker و پاک‌سازی
 fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا گیت امنیتی از این زمان‌بندی حذف نمی‌شود.
 
-installer فقط ValidatingPolicy موجود `hooshix-platform-data-closed` را با
-`failurePolicy=Fail` و `validationActions=Deny` نگه می‌دارد. پس از ایجاد StatefulSet،
-استثنا در همین policy فقط برای Pod دارای ServiceAccount، نام/برچسب، ownerReference
-و UID همان StatefulSet ساخته می‌شود؛ قاعدهٔ پایه برای سایر Podها حفظ می‌شود و
-قرارداد کامل Pod نیز جداگانه در همان policy اعمال می‌ماند. پیش‌بررسی و تطبیق مجدد
-policy با spec پایهٔ ثبت‌شده در bundle انجام می‌شود؛ policy یا scope مفقود/متغیر
-موجب توقف fail-closed می‌شود. bundle فقط پس از ثبت
+installer ابتدا StatefulSet را با `replicas=0` می‌سازد تا controller پیش از آماده‌شدن
+مرز admission نتواند Pod بسازد. سپس فقط ValidatingPolicy موجود
+`hooshix-platform-data-closed` را با `failurePolicy=Fail` و `validationActions=Deny`
+نگه می‌دارد و استثنای همین policy را به ServiceAccount، نام/برچسب، ownerReference
+و UID همان StatefulSet می‌بندد. پس از Ready شدن policy، تعداد replica را به ۱ افزایش
+می‌دهد؛ این ترتیب از رد اولیهٔ Pod توسط قاعدهٔ قبلی جلوگیری می‌کند. قاعدهٔ پایه برای
+سایر Podها حفظ می‌شود و قرارداد کامل Pod نیز جداگانه در همان policy اعمال می‌ماند.
+حالت موقت صفر replica با hash دقیق spec قابل‌بازیابی است؛ هر drift موجب توقف
+fail-closed می‌شود. پیش‌بررسی و تطبیق مجدد policy با spec پایهٔ ثبت‌شده در bundle
+انجام می‌شود؛ policy یا scope مفقود/متغیر موجب توقف fail-closed می‌شود. bundle فقط پس از ثبت
 `data_admission_boundary=Passed` در receipt staging ساخته می‌شود.
 
 runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این

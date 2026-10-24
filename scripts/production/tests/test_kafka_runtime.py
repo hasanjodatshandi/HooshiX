@@ -205,6 +205,39 @@ class KafkaRuntimeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'KAFKA_BOUNDARY_UID_TEMPLATE_REQUIRED'):
             installer.boundary_for_statefulset(broken, 'stateful-uid')
 
+    def test_owned_quiescent_statefulset_is_resumable_only_without_other_drift(self):
+        desired = copy.deepcopy(self.plan['statefulset'])
+        staged = copy.deepcopy(desired)
+        staged['spec']['replicas'] = 0
+        staged['metadata']['annotations'] = {installer.HASH: installer.digest(staged['spec'])}
+        installer.owned(staged, desired)
+
+        staged['spec']['template']['spec']['containers'][0]['image'] = 'unreviewed:latest'
+        staged['metadata']['annotations'][installer.HASH] = installer.digest(staged['spec'])
+        with self.assertRaisesRegex(ValueError, 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED'):
+            installer.owned(staged, desired)
+
+    def test_activate_statefulset_is_atomic_and_hashes_the_final_defaulted_spec(self):
+        spec = copy.deepcopy(self.plan['statefulset']['spec'])
+        spec['replicas'] = 0
+        stateful = {'metadata': {'annotations': {installer.HASH: installer.digest(spec)}}, 'spec': spec}
+        kube = Mock()
+
+        installer.activate_statefulset(kube, stateful)
+
+        args = kube.call_args.args
+        self.assertEqual(('patch', 'statefulset', 'kafka', '-n', 'platform-data', '--type=json'), args[:6])
+        patch = json.loads(args[7])
+        self.assertEqual([spec, 0, installer.digest(spec)],
+                         [patch[0]['value'], patch[1]['value'], patch[2]['value']])
+        self.assertEqual([1, installer.digest(spec | {'replicas': 1})],
+                         [patch[3]['value'], patch[4]['value']])
+
+    def test_activate_statefulset_does_not_patch_an_already_active_statefulset(self):
+        kube = Mock()
+        installer.activate_statefulset(kube, {'spec': {'replicas': 1}})
+        kube.assert_not_called()
+
     def test_unowned_extra_or_foreign_pod_is_rejected(self):
         stateful = {'metadata': {'uid': 'expected'}}
         listed = {'items': [{'metadata': {'name': 'kafka-0', 'labels': {

@@ -57,11 +57,36 @@ def owned(old, desired):
         return
     meta = old.get('metadata', {})
     require(meta.get('labels', {}).get('app.kubernetes.io/managed-by') == MANAGER
-        and not meta.get('deletionTimestamp') and not meta.get('ownerReferences')
-        and desired_fields_match(old, desired), 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED')
+        and not meta.get('deletionTimestamp') and not meta.get('ownerReferences'),
+        'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED')
     if 'spec' in desired:
         require(meta.get('annotations', {}).get(HASH) == digest(old['spec']),
                 'KAFKA_DEFAULTED_SPEC_DRIFT_PRESERVED')
+    actual = old
+    if desired.get('kind') == 'StatefulSet' and old.get('spec', {}).get('replicas') == 0:
+        actual = copy.deepcopy(old)
+        actual['spec']['replicas'] = desired['spec']['replicas']
+    require(desired_fields_match(actual, desired), 'FOREIGN_OR_CHANGED_KAFKA_RESOURCE_PRESERVED')
+
+
+def activate_statefulset(kube, stateful):
+    require(isinstance(stateful, dict), 'KAFKA_STATEFULSET_REQUIRED')
+    spec = copy.deepcopy(stateful['spec'])
+    if spec.get('replicas') == 1:
+        return
+    annotations = stateful.get('metadata', {}).get('annotations', {})
+    require(spec.get('replicas') == 0 and annotations.get(HASH) == digest(spec),
+            'QUIESCENT_KAFKA_STATEFULSET_REQUIRED')
+    active = copy.deepcopy(spec)
+    active['replicas'] = 1
+    patch = [
+        {'op': 'test', 'path': '/spec', 'value': spec},
+        {'op': 'test', 'path': '/spec/replicas', 'value': 0},
+        {'op': 'test', 'path': '/metadata/annotations/' + HASH.replace('/', '~1'), 'value': annotations[HASH]},
+        {'op': 'replace', 'path': '/spec/replicas', 'value': 1},
+        {'op': 'replace', 'path': '/metadata/annotations/' + HASH.replace('/', '~1'), 'value': digest(active)},
+    ]
+    kube('patch', 'statefulset', NAME, '-n', NS, '--type=json', '-p', json.dumps(patch))
 
 
 def boundary_for_statefulset(plan, uid):
@@ -253,6 +278,8 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
         print('KAFKA_RUNTIME_STEP=' + ('claim' if obj['kind'] == 'PersistentVolumeClaim' else 'workload'),
               file=sys.stderr, flush=True)
         desired = copy.deepcopy(obj)
+        if obj['kind'] == 'StatefulSet':
+            desired['spec']['replicas'] = 0
         defaulted = json.loads(kube('create', '--dry-run=server', '-f', '-', '-o', 'json', body=desired))
         desired['metadata'].setdefault('annotations', {})[HASH] = digest(defaulted['spec'])
         kube('create', '-f', '-', body=desired)
@@ -269,6 +296,9 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
     kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
          'validatingpolicy/' + stateful_boundary['metadata']['name'], '--timeout=60s', timeout=75)
     print('KAFKA_RUNTIME_STEP=data-admission', file=sys.stderr, flush=True)
+
+    print('KAFKA_RUNTIME_STEP=activate', file=sys.stderr, flush=True)
+    activate_statefulset(kube, get(kube, 'statefulset', NAME, NS))
 
     print('KAFKA_RUNTIME_STEP=readiness', file=sys.stderr, flush=True)
     kube('-n', NS, 'wait', '--for=jsonpath={.status.readyReplicas}=1',
