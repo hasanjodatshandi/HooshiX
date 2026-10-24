@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 import time
@@ -163,7 +164,10 @@ def exercise(docker_host: str) -> dict:
             def closed_command(*args):
                 require(args[:7] == ('-n', runtime.NS, 'exec', runtime.NAME + '-0', '-c', 'kafka', '--'),
                         'LOCAL_KAFKA_VERIFICATION_EXEC_REQUIRED')
-                result = docker('exec', container, *args[7:], timeout=25, docker_host=docker_host)
+                concurrent = (runtime.PROBE + ' & first=$!; ' + runtime.PROBE + ' & second=$!; '
+                    + shlex.join(args[7:]) + '; wait "$first"; wait "$second"')
+                result = docker('exec', container, '/bin/sh', '-ec', concurrent,
+                                timeout=30, docker_host=docker_host)
                 require(result.returncode == 0, 'RENDERED_KAFKA_VERIFICATION_FAILED')
                 return result.stdout.encode()
 

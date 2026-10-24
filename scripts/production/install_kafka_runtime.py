@@ -311,7 +311,8 @@ def pod_inventory(kube, stateful, *, required=False):
 
 
 def storage_identity(kube):
-    script = ('set -eu; data=/var/lib/kafka/data; marker=$(cat "$data/.hooshix-runtime-marker"); '
+    script = ('set -eu; export KAFKA_HEAP_OPTS="-Xms32m -Xmx128m"; '
+        'data=/var/lib/kafka/data; marker=$(cat "$data/.hooshix-runtime-marker"); '
         'case "$marker" in hooshix-kafka-runtime-v1:*) id=${marker#hooshix-kafka-runtime-v1:};; *) exit 1;; esac; '
         'case "$id" in ""|*[!A-Za-z0-9_-]*) exit 1;; esac; '
         'grep -Fqx "cluster.id=$id" "$data/meta.properties"; '
@@ -325,6 +326,7 @@ def storage_identity(kube):
 
 def quorum_and_topics(kube, cluster_id):
     status = kube('-n', NS, 'exec', NAME + '-0', '-c', 'kafka', '--',
+        '/usr/bin/env', 'KAFKA_HEAP_OPTS=-Xms32m -Xmx128m',
         '/opt/kafka/bin/kafka-metadata-quorum.sh', '--command-config',
         '/etc/kafka/commissioned/client.properties', '--bootstrap-server', '127.0.0.1:9092',
         'describe', '--status').decode()
@@ -335,6 +337,7 @@ def quorum_and_topics(kube, cluster_id):
         and isinstance(voters, list) and len(voters) == 1
         and voters[0].get('id') == 1, 'SINGLE_NODE_KAFKA_QUORUM_REQUIRED')
     topics = kube('-n', NS, 'exec', NAME + '-0', '-c', 'kafka', '--',
+        '/usr/bin/env', 'KAFKA_HEAP_OPTS=-Xms32m -Xmx128m',
         '/opt/kafka/bin/kafka-topics.sh', '--bootstrap-server', '127.0.0.1:9092',
         '--command-config', '/etc/kafka/commissioned/client.properties', '--list')
     require(not topics.strip(), 'EMPTY_QUARANTINED_KAFKA_REQUIRED')

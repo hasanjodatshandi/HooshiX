@@ -264,6 +264,12 @@ def rehearse(k, wait, run, ca, node, platform):
         try:
             return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
         except Exception:
+            if 'exec' in args and renderer.NAME + '-0' in args:
+                operation = next((name for token, name in (
+                    (renderer.PROBE, 'health'), ('.hooshix-runtime-marker', 'storage'),
+                    ('kafka-metadata-quorum.sh', 'quorum'), ('kafka-topics.sh', 'topics'))
+                    if any(token in part for part in args)), 'other')
+                print('KAFKA_RUNTIME_EXEC_FAILURE=' + operation, flush=True)
             if 'wait' in args and 'statefulset/' + renderer.NAME in args:
                 try:
                     diagnosis = readiness_snapshot(k)

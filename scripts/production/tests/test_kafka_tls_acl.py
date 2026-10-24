@@ -97,7 +97,7 @@ class KafkaTlsAclTest(unittest.TestCase):
         for args in calls:
             if args[0] == "exec":
                 if '/bin/sh' in args:
-                    self.assertTrue(args[-1] == target.runtime.PROBE or '.hooshix-runtime-marker' in args[-1])
+                    self.assertIn(target.runtime.PROBE, args[-1])
                 else:
                     self.assertIn("--command-config", args)
                 self.assertNotIn("--producer.config", args)

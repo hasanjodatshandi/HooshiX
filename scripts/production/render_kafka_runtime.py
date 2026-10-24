@@ -84,8 +84,8 @@ ssl.truststore.type=PEM
 ssl.truststore.location=/run/kafka/ca.crt
 ssl.endpoint.identification.algorithm=https
 ssl.enabled.protocols=TLSv1.3,TLSv1.2
-request.timeout.ms=3000
-default.api.timeout.ms=4000
+request.timeout.ms=5000
+default.api.timeout.ms=10000
 '''
 
 

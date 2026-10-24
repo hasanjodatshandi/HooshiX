@@ -216,6 +216,19 @@ class OpenBaoKubernetesTest(unittest.TestCase):
         self.assertLessEqual(len(json.loads(line).encode()), 4096)
         self.assertNotIn("\n::error::", output.getvalue())
 
+    def test_private_native_failures_classify_stdout_without_revealing_its_contents(self):
+        result = Mock(returncode=1,
+            stdout=b'PRIVATE_STDOUT Timed out waiting for a node assignment. Call: listTopics\n',
+            stderr=b'PRIVATE_STDERR')
+        output = io.StringIO()
+        with patch.object(subprocess, 'run', return_value=result), contextlib.redirect_stdout(output), \
+                self.assertRaises(rehearsal.RehearsalFailed):
+            rehearsal.run(['kubectl'])
+        self.assertIn('Timed out waiting for a node assignment', output.getvalue())
+        self.assertIn('Call: listTopics', output.getvalue())
+        self.assertNotIn('PRIVATE_STDOUT', output.getvalue())
+        self.assertNotIn('PRIVATE_STDERR', output.getvalue())
+
     def test_fixed_step_labels_and_failure_receipt_do_not_reveal_errors(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):

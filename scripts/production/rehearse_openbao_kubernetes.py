@@ -67,13 +67,15 @@ def run(args: list[str], *, data: bytes | None = None, timeout: int = 30,
                 'no such overload', 'no such key', 'context deadline exceeded',
                 'service "cert-manager-webhook" not found',
                 'strict decoding error', 'unknown field', 'spec.storage.pvcTemplate',
+                'Timed out waiting for a node assignment', 'Call: listTopics', 'Call: describeMetadataQuorum',
+                'Could not reserve enough space', 'unable to create native thread', 'OutOfMemoryError',
                 "Can't use just the image sha", 'invalid version tag',
                 'secrets "cert-manager-webhook-ca" not found',
                 'the server could not find the requested resource',
                 'resource issuers not found in group cert-manager.io/v1',
                 'no endpoints available for service', 'certificate signed by unknown authority',
                 'PodInitializing', 'ContainerCreating', 'waiting to start')
-                if marker.encode() in (result.stderr or b'')]
+                if marker.encode() in (result.stderr or b'') + (result.stdout or b'')]
             print('OPENBAO_NATIVE_ERROR_CLASSES=' + json.dumps(markers), flush=True)
             print('OPENBAO_NATIVE_ERROR_RESULT=' + json.dumps({
                 'expected_exit': expected, 'exit': result.returncode,

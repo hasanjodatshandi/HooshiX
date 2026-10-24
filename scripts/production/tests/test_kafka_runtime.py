@@ -512,6 +512,28 @@ class KafkaRuntimeTest(unittest.TestCase):
                     lambda *_args, **_kwargs: None, 'fixture-ca', node, {})
         self.assertEqual((node, node, node, node, node), captured['nodes'])
 
+    def test_staging_exec_failure_reports_only_the_fixed_operation(self):
+        def k(*args, **kwargs):
+            if 'exec' in args:
+                raise RuntimeError('PRIVATE_ERROR')
+            return json.dumps(prior_boundary()).encode()
+
+        def execute(*args, **kwargs):
+            kwargs['kube']('-n', renderer.NS, 'exec', 'kafka-0', '-c', 'kafka', '--',
+                '/opt/kafka/bin/kafka-metadata-quorum.sh', 'PRIVATE_ARGUMENT')
+
+        output = io.StringIO()
+        with patch.object(rehearsal.volume, 'reserve'), \
+                patch.object(rehearsal.renderer, 'render', return_value={}), \
+                patch.object(rehearsal.installer, 'execute', side_effect=execute), \
+                patch.dict('os.environ', {'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '12345'}), \
+                contextlib.redirect_stdout(output), self.assertRaises(RuntimeError):
+            rehearsal.rehearse(k, lambda *_a, **_k: None, lambda *_a, **_k: None,
+                'fixture-ca', 'hooshix-bao-ci-0123456789ab-control-plane', {})
+        self.assertIn('KAFKA_RUNTIME_EXEC_FAILURE=quorum', output.getvalue())
+        self.assertNotIn('PRIVATE_ERROR', output.getvalue())
+        self.assertNotIn('PRIVATE_ARGUMENT', output.getvalue())
+
     def test_staging_source_revision_is_bound_to_exact_owner_bundle(self):
         wrapper = (Path(__file__).resolve().parents[1] / 'run-kafka-runtime.ps1').read_text()
         source_block = wrapper.split('$sources = @(', 1)[1].split(')', 1)[0]
