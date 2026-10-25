@@ -2692,6 +2692,9 @@ Pod باید با قرارداد تطبیق کند. درخواست منفی با
 fail-closed می‌شود. پیش‌بررسی و تطبیق مجدد policy با spec پایهٔ ثبت‌شده در bundle
 انجام می‌شود؛ policy یا scope مفقود/متغیر موجب توقف fail-closed می‌شود. bundle فقط پس از ثبت
 `data_admission_boundary=Passed` در receipt staging ساخته می‌شود.
+آزمون منفی مالکیت در staging، علاوه بر UID نادرست، یک ownerReference دوم با UID متمایز
+و بدون نقش controller می‌فرستد؛ هر دو باید با پیام دقیق قرارداد Kafka رد شوند، نه صرفاً
+با خطای اعتبارسنجی عمومی Kubernetes. این dry-run مالکیت Pod موجود را تغییر نمی‌دهد.
 
 سه `ImageValidatingPolicy` مربوط به امضای تصویر، provenance و SBOM ارجاع صریح
 `spec.credentials.secrets: [hooshix-ghcr-read]` دارند؛ Secret از قبل در namespace

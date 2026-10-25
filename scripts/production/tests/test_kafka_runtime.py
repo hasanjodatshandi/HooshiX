@@ -28,6 +28,29 @@ class KafkaRuntimeTest(unittest.TestCase):
     def setUp(self):
         self.plan = renderer.render(prior_boundary())
 
+    def test_extra_owner_negative_survives_uid_merge_without_multiple_controllers(self):
+        owner = {'apiVersion': 'apps/v1', 'kind': 'StatefulSet', 'name': 'kafka',
+                 'uid': 'synthetic-statefulset-uid', 'controller': True, 'blockOwnerDeletion': True}
+        original = dict(owner)
+        additional = rehearsal.additional_owner_reference(owner)
+        self.assertEqual(original, owner)
+        self.assertNotEqual(owner['uid'], additional['uid'])
+        self.assertNotEqual(owner['name'], additional['name'])
+        self.assertFalse(additional['controller'])
+        self.assertFalse(additional['blockOwnerDeletion'])
+        self.assertEqual(owner['apiVersion'], additional['apiVersion'])
+        self.assertEqual(owner['kind'], additional['kind'])
+
+    def test_restart_readiness_waits_for_absent_pending_and_unready_pods(self):
+        for pod in (None, {}, {'status': {}}, {'status': {'containerStatuses': []}},
+                    {'status': {'containerStatuses': [{'ready': False}]}},
+                    {'status': {'containerStatuses': [{'ready': True}, {'ready': True}]}}):
+            with patch.object(rehearsal.installer, 'get', return_value=pod):
+                self.assertFalse(rehearsal.kafka_pod_ready(Mock()))
+        with patch.object(rehearsal.installer, 'get', return_value={
+                'status': {'containerStatuses': [{'ready': True}]}}):
+            self.assertTrue(rehearsal.kafka_pod_ready(Mock()))
+
     def test_runtime_is_the_exact_private_published_digest(self):
         pin = renderer.pin()
         self.assertEqual(pin['image'], self.plan['image'])

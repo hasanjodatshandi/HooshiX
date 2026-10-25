@@ -91,6 +91,18 @@ SAFE_KAFKA_ADMISSION_FAILURES = {
 }
 
 
+def additional_owner_reference(owner):
+    # ownerReferences merges by UID; an identical duplicate never reaches admission.
+    return owner | {'name': owner['name'] + '-additional', 'uid': owner['uid'] + '-additional',
+                    'controller': False, 'blockOwnerDeletion': False}
+
+
+def kafka_pod_ready(kube):
+    pod = installer.get(kube, 'pod', renderer.NAME + '-0', renderer.NS)
+    statuses = (pod or {}).get('status', {}).get('containerStatuses', [])
+    return len(statuses) == 1 and statuses[0].get('ready') is True
+
+
 def failed_create_class(message):
     """Classify a controller event without retaining or emitting its private message."""
     text = message[:4096].casefold() if isinstance(message, str) else ''
@@ -370,11 +382,18 @@ def rehearse(k, wait, run, ca, node, platform):
                 extra['name'] = 'unreviewed'
                 bad['spec']['containers'].append(extra)
             if mode == 'owner-reference':
-                bad['metadata']['ownerReferences'].append(copy.deepcopy(bad['metadata']['ownerReferences'][0]))
+                bad['metadata']['ownerReferences'].append(
+                    additional_owner_reference(bad['metadata']['ownerReferences'][0]))
             if mode == 'owner-uid':
                 bad['metadata']['ownerReferences'][0]['uid'] = 'foreign-statefulset-uid'
             print('KAFKA_RUNTIME_POD_ADMISSION_NEGATIVE=' + mode, flush=True)
-            admission_result(k, bad, wait, expected=1, public_schema=False)
+            if mode in ('owner-reference', 'owner-uid'):
+                k('-n', renderer.NS, 'patch', 'pod', pod['metadata']['name'], '--type=merge',
+                  '-p', json.dumps({'metadata': {'ownerReferences': bad['metadata']['ownerReferences']}}),
+                  '--dry-run=server', expected=1, public_schema=False,
+                  required_error=b'closed Kafka runtime contract rejected')
+            else:
+                admission_result(k, bad, wait, expected=1, public_schema=False)
         result['pod_contract_positive_negative'] = 'Passed'
 
         for original in plan['source_policies']:
@@ -402,8 +421,7 @@ def rehearse(k, wait, run, ca, node, platform):
 
         # A real controller restart proves the local volume is reused, never formatted again.
         k('-n', renderer.NS, 'delete', 'pod', renderer.NAME + '-0', '--wait=true', '--timeout=60s', timeout=70)
-        wait(lambda: json.loads(k('-n', renderer.NS, 'get', 'pod', renderer.NAME + '-0', '-o', 'json'))
-            .get('status', {}).get('containerStatuses', [{}])[0].get('ready') is True, seconds=180)
+        wait(lambda: kafka_pod_ready(kube), seconds=installer.READINESS_TIMEOUT_SECONDS)
         recovered = installer.execute(plan, **options)
         if (recovered['pvc_uid'] != first_claim or recovered['statefulset_uid'] != result['statefulset_uid']
                 or installer.storage_identity(kube) != first_identity):
