@@ -29,7 +29,8 @@ NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
 HASH = 'hooshix.io/kafka-spec-sha256'
 PULL_SECRET = 'hooshix-ghcr-read'
 READINESS_TIMEOUT_SECONDS = 420
-ADMISSION_RETRY_SECONDS = 45
+ADMISSION_RETRY_SECONDS = 120
+ADMISSION_REQUEST_TIMEOUT_SECONDS = 60
 TOOL_JVM_OPTIONS = '-XX:+UseSerialGC -XX:TieredStopAtLevel=1'
 BOUNDARY_UID_PLACEHOLDER = 'KAFKA_STATEFULSET_UID_BOUNDARY_PLACEHOLDER'
 require, get, digest = pg.require, pg.get, pg.digest
@@ -186,7 +187,7 @@ def preflight_admission(kube, stateful):
                 raise ValueError('KAFKA_ADMISSION_POSITIVE_PREFLIGHT_FAILED')
             if existing is None:
                 admission_command('create', '--dry-run=server', '-f', '-', body=candidate,
-                    timeout=min(10, remaining))
+                    timeout=min(ADMISSION_REQUEST_TIMEOUT_SECONDS, remaining))
                 operation = 'create'
             else:
                 require(desired_fields_match(existing, candidate), 'KAFKA_EXISTING_POD_CONTRACT_REQUIRED')
@@ -194,7 +195,7 @@ def preflight_admission(kube, stateful):
                     'hooshix.io/admission-preflight': str(time.monotonic_ns())}}}
                 admission_command('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
                     json.dumps(probe), '--dry-run=server',
-                    timeout=min(10, remaining))
+                    timeout=min(ADMISSION_REQUEST_TIMEOUT_SECONDS, remaining))
                 operation = 'patch'
             break
         except subprocess.SubprocessError as error:
@@ -211,7 +212,8 @@ def preflight_admission(kube, stateful):
             wrong_owner = copy.deepcopy(candidate)
             wrong_owner['metadata']['ownerReferences'][0]['uid'] = wrong_uid
             admission_command('create', '--dry-run=server', '-f', '-', body=wrong_owner, expected=1,
-                required_error=b'closed Kafka runtime contract rejected', timeout=20)
+                required_error=b'closed Kafka runtime contract rejected',
+                timeout=ADMISSION_REQUEST_TIMEOUT_SECONDS)
         else:
             wrong_owner = {'metadata': {'ownerReferences': copy.deepcopy(
                 candidate['metadata']['ownerReferences']), 'annotations': {
@@ -219,7 +221,8 @@ def preflight_admission(kube, stateful):
             wrong_owner['metadata']['ownerReferences'][0]['uid'] = wrong_uid
             admission_command('-n', NS, 'patch', 'pod', NAME + '-0', '--type=merge', '-p',
                 json.dumps(wrong_owner), '--dry-run=server', expected=1,
-                required_error=b'closed Kafka runtime contract rejected', timeout=20)
+                required_error=b'closed Kafka runtime contract rejected',
+                timeout=ADMISSION_REQUEST_TIMEOUT_SECONDS)
     except subprocess.SubprocessError as error:
         raise ValueError('KAFKA_ADMISSION_NEGATIVE_PREFLIGHT_FAILED') from error
 
