@@ -24,7 +24,7 @@ class PublishedPostgreSQLTest(unittest.TestCase):
         self.engine = 'sha256:' + 'e' * 64
 
     def test_reviewed_set_preserves_upstream_and_promotion_boundaries(self):
-        self.assertEqual('github:39830467736:1', self.publication['invocation_id'])
+        self.assertEqual('github:40132294662:1', self.publication['invocation_id'])
         self.assertEqual(set(target.COMPONENTS), set(self.publication['images']))
         self.assertEqual('Passed', self.publication['publication'])
         self.assertEqual('blocked-until-supply-chain-staging-and-recovery-evidence',

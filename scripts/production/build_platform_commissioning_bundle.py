@@ -42,7 +42,8 @@ def git(*args):
 
 
 def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso_commissioning=False,
-                  cert_manager_commissioning=False, cnpg_control_plane=False, barman_control_plane=False):
+                  cert_manager_commissioning=False, cnpg_control_plane=False, barman_control_plane=False,
+                  kafka_closed_runtime=False):
     checks = CHECKS
     scope = 'Disposable Calico/Ambient/Kyverno signed platform staging'
     if mesh_security_upgrade:
@@ -110,6 +111,27 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
                     'source_identity_positive_negative', 'rbac_actual_positive_negative',
                     'tls_client_hostname_and_strict_mtls', 'container_key_log_markers'))):
             raise ValueError('exact signed Barman TLS/cache/authority boundaries required')
+    if kafka_closed_runtime:
+        import render_kafka_runtime as kafka
+        scope = 'Disposable Calico/Ambient initialized-store closed Kafka runtime'
+        proof = receipt.get('kafka_closed_runtime', {})
+        required = ('kafka_runtime', 'mutual_tls_health', 'single_node_quorum', 'service_account_scope',
+            'data_admission_boundary', 'idempotent_reconciliation', 'pod_contract_positive_negative',
+            'source_identity_positive_negative',
+            'retained_volume_process_restart', 'network_and_mesh_policy')
+        if (not (mesh_security_upgrade and eso_commissioning and cert_manager_commissioning
+                and cnpg_control_plane and barman_control_plane)
+                or proof.get('schema_version') != 1 or proof.get('image') != kafka.pin()['image']
+                or proof.get('business_topics') != 'None'
+                or proof.get('storage_guard') != 'Not run'
+                or proof.get('host_storage_guard') != 'Not run; disposable local path'
+                or proof.get('application_ingress') != 'CLOSED' or proof.get('public_access') != 'CLOSED'
+                or any(proof.get(key) != 'Passed' for key in required)
+                or any(proof.get(key) != 'Not run' for key in ('automatic_renewal', 'provider_backup'))
+                or proof.get('capacity') != 'Not verified' or proof.get('production_readiness') != 'Not verified'
+                or not all(proof.get(key) for key in ('statefulset_uid', 'pvc_uid', 'volume_uid',
+                                                       'cluster_identity_sha256'))):
+            raise ValueError('exact closed Kafka runtime native proof required')
     if (record.get('path') != WORKFLOW or record.get('status') != 'completed'
             or record.get('conclusion') != 'success'
             or record.get('repository', {}).get('full_name') != publication.REPOSITORY
@@ -131,7 +153,8 @@ def check_staging(record, receipt, revision, *, mesh_security_upgrade=False, eso
 
 
 def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, eso_commissioning=False,
-                   cert_manager_commissioning=False, cnpg_control_plane=False, barman_control_plane=False):
+                   cert_manager_commissioning=False, cnpg_control_plane=False, barman_control_plane=False,
+                   kafka_closed_runtime=False):
     if not re.fullmatch(r'[1-9][0-9]{0,19}', run_id):
         raise ValueError('numeric staging run required')
     record = json.loads(publication.run(['api', 'repos/' + publication.REPOSITORY + '/actions/runs/' + run_id]))
@@ -150,7 +173,8 @@ def staged_receipt(run_id, directory, revision, *, mesh_security_upgrade=False, 
     receipt = json.loads(files[0].read_bytes())
     check_staging(record, receipt, revision, mesh_security_upgrade=mesh_security_upgrade,
                   eso_commissioning=eso_commissioning, cert_manager_commissioning=cert_manager_commissioning,
-                  cnpg_control_plane=cnpg_control_plane, barman_control_plane=barman_control_plane)
+                  cnpg_control_plane=cnpg_control_plane, barman_control_plane=barman_control_plane,
+                  kafka_closed_runtime=kafka_closed_runtime)
     return receipt
 
 

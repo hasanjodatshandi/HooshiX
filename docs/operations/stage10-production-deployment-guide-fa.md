@@ -41,6 +41,14 @@ Stageهای قبلی ساخت/آزمون محصول‌اند و برای نصب 
 JIT کامل، داده‌ها و برنامه‌های Production هنوز کامل نشده‌اند.
 Stage10 و Production readiness همچنان `Not verified` هستند.
 
+تحویل TLS کافکا در ۲۰۲۶-۱۰-۲۳ با `KAFKA_TLS_DELIVERY=Passed` پایان یافت؛ اجرا
+از `main@e6ed7d859dea75eccdb1856290dc85dcd2376b6c` و plan SHA-256
+`cdc84930059dc68a553ad8f3d29c3bc4f30e8cfd85c4ccb9139d321f40465843` بود.
+رسید عمومی: `~/.local/share/hooshix-kafka-tls/delivery-00170c7e127744a38fcbf73f6cfc96a6.json`.
+این عملیات از issuer/OpenBao/ESO موجود استفاده کرد و Root را حفظ کرد؛ broker،
+claim یا PVC نساخت. آزمون Kubernetes staging، broker مقصد، recovery، ظرفیت و
+Production readiness همچنان `Not verified` هستند.
+
 | مرحله | وضعیت سرور اول | تکرار برای نصب دوم |
 | --- | --- | --- |
 | مدیریت SSH/WireGuard | آزمون‌های محدود ورود و محدودسازی Passed | هویت و آزمون مستقل |
@@ -53,6 +61,7 @@ Stage10 و Production readiness همچنان `Not verified` هستند.
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
+| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | runtime بسته در PR جاری؛ staging دقیق `main` و اجرای مقصد هنوز لازم است؛ broker نصب نشده |
 | JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -992,17 +1001,17 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 ساخت جدید operand و Barman sidecar باید بستهٔ امضاشدهٔ Alpine
 `brotli-libs=1.2.1-r0` را داشته باشد؛ inventory فاقد بسته، قدیمی یا دارای نسخهٔ
 آسیب‌پذیر تکراری، حتی بدون finding اسکنر، رد می‌شود. این pin اصلاح
-`CVE-2026-111497` است؛ اسکن تازهٔ مجموعهٔ قبلی این مورد را `Critical` گزارش کرده
-و پذیرش فعلی آن بسته است. ابتدا ساخت/انتشار محافظت‌شده، امضا، provenance و SBOM
-مجموعهٔ جدید، سپس پذیرش digestهای جدید در تغییر جداگانه و staging لازم است.
-این اصلاح سورس به‌تنهایی تصویر منتشرشده یا PostgreSQL روی VPS را به‌روزرسانی
-نمی‌کند و مجوز تعویض، reset یا reinit دیتابیس نیست.
+`CVE-2026-111497` است؛ مجموعهٔ انتخاب‌شدهٔ زیر با این اصلاح ساخته و منتشر شده است.
+پذیرش digestها و staging همچنان مستقل از انتشار الزامی هستند. انتخاب تصویر تازه
+در Git به‌تنهایی PostgreSQL روی VPS را به‌روزرسانی نمی‌کند و مجوز تعویض، reset
+یا reinit دیتابیس نیست. نسخهٔ قرنطینه‌شدهٔ قدیمی تا ارتقای بررسی‌شده و آزموده‌شده،
+برای داده و ترافیک واقعی Production تأییدشده محسوب نمی‌شود.
 
 مرجع: [انتشار امنیتی Brotli 1.2.1](https://github.com/google/brotli/releases/tag/v1.2.1)،
 [بسته و secfix رسمی Alpine 3.24](https://github.com/alpinelinux/aports/blob/3.24-stable/main/brotli/APKBUILD).
 
-اجرای محافظت‌شدهٔ `39830467736`، attempt `1` روی
-`main@e1be2ac6132b1c9faec3dcae96ee523f4bebaf71` انتشار هر چهار تصویر را با
+اجرای محافظت‌شدهٔ `40132294662`، attempt `1` روی
+`main@e6af3123a96c48cb802c3253cca3c1c999e8ccd4` انتشار هر چهار تصویر را با
 `publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
 واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
 این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
@@ -1016,7 +1025,7 @@ artifact همان اجرا را بیرون Git دانلود کنید و روی �
 Unix و ابزارهای integrity-pinned اجرا کنید؛ این فرمان VPS را متصل نمی‌کند:
 
 ```bash
-gh run download 39830467736 --name postgresql-publication-39830467736-1 --dir /path/outside-repo/postgresql-publication
+gh run download 40132294662 --name postgresql-publication-40132294662-1 --dir /path/outside-repo/postgresql-publication
 bash scripts/production/install_release_tools.sh /path/outside-repo/release-tools
 PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_published_postgresql.py \
   --evidence-dir /path/outside-repo/postgresql-publication \
@@ -2324,7 +2333,7 @@ renewal/reload گواهی ۳۰روزه، اتصال برنامه‌ها، monito
 هنوز **Not verified** هستند؛ قبل از نزدیک‌شدن انقضا یا بازکردن ترافیک باید جداگانه
 تکمیل شوند. ورود موفق و PING به معنی آماده‌بودن محصول روی دامنه نیست.
 
-### کاندید Kafka، بدون انتشار یا نصب
+### کاندید منتشرشدهٔ Kafka؛ runtime هنوز نصب نشده
 
 مرجع کاندید تک‌سرور Kafka `4.2.2` و تصویر upstream ثابت
 `apache/kafka@sha256:daa39dc85acd37b148fad74d6b22b60fa5f7fa05048a5c8aa3b654140c63dd58`
@@ -2525,12 +2534,21 @@ reentry پیش از ساخت claim فقط همان دو شیء سالم و تح�
 
 ### مرز نصب اولیهٔ بستهٔ Kafka
 
-نصب اولیه فقط یک broker/controller خالی و بسته روی LocalPV رزروشدهٔ `14Gi`
-است؛ برنامه یا کاربر شبکه‌ای مجاز نیست. TLS از intermediate موجود و تحویل
-OpenBao/ESO استفاده می‌کند؛ Root تازه، رمز در Git، فرمت مجدد، reset یا پذیرش
-دادهٔ ناشناخته مجاز نیست. پیش از دستور مقصد، آزمون بومی TLS، restart و رد
-شبکه/admission و شواهد همان نسخه لازم‌اند. ابزار آماده یا CI موفق، اجرای VPS
-یا آمادگی Production نیست؛ دستور مقصد تا تکمیل بستهٔ معتبر ارائه نمی‌شود.
+محدوده فقط یک broker/controller خالی روی LocalPV رزروشدهٔ `14Gi` است؛ بدون
+topic تجاری، client برنامه/کاربر یا مسیر عمومی. تصویر باید digest ثابت و
+signature/provenance/SBOM معتبر داشته باشد؛ TLS از leaf موجود Kafka استفاده
+می‌کند، و STRICT Ambient، NetworkPolicy بدون ingress و admission fail-closed
+حفظ می‌شوند. فرمت فقط وقتی مجاز است که پوشهٔ داده خالی و guard سالم باشد؛ دادهٔ
+ناشناخته یا نیمه‌کاره حفظ و باعث توقف می‌شود. راهنمای اجرای مقصد پس از آزمون
+بومی، staging روی `main` دقیق و بستهٔ مالکِ همان revision در بخش
+«اجرای broker بسته» آمده است. این استقرار به‌تنهایی recovery، ظرفیت یا آمادگی
+Production را ثابت نمی‌کند.
+
+پیش‌پرواز runtime، Root pin‌شده، زنجیرهٔ دقیق دوگواهی PEM، تطابق کلید و
+issuer و محدودیت‌های گواهی leaf را دوباره اعتبارسنجی می‌کند؛ هر ناسازگاری
+پیش از تغییر منابع کلاستر موجب توقف با حفظ state می‌شود.
+مهلت readiness نیز دست‌کم یک دقیقه از حداکثر پنجرهٔ startupProbe بیشتر است تا
+شروع سرد broker پیش از پایان مهلت rollout قطع نشود.
 
 ### تحویل نخستین گواهی node به Kafka
 
@@ -2632,14 +2650,139 @@ volumeهای ناشناس خودش حذف می‌شود. کلیدهای آزما
 [Kafka TLS](https://kafka.apache.org/42/security/encryption-and-authentication-using-ssl/)،
 [Kafka ACL](https://kafka.apache.org/42/security/authorization-and-acls/).
 
+### اجرای broker بسته پس از ادغام و staging دقیق `main`
+
+ابتدا PR این تغییر باید review و merge شده باشد. سپس روی `main` تازه و clean،
+یک native staging کامل با همهٔ dependencyها اجرا کنید تا receipt نهایی برای
+همان SHA شامل `kafka_closed_runtime` باشد. اجرای دستی workflow باید شش ورودی
+زیر را فعال کند؛ workflow را تا نتیجهٔ نهایی موفق دنبال کنید:
+
+```bash
+gh workflow run platform-commissioning.yml --ref main \
+  -f mesh_security_upgrade=true -f eso_commissioning=true \
+  -f cert_manager_commissioning=true -f cnpg_control_plane=true \
+  -f barman_control_plane=true -f postgresql_quarantine=true
+gh run list --workflow platform-commissioning.yml --event workflow_dispatch --limit 5
+```
+
+در staging، مهلت readiness باید از بودجهٔ startup probe بیشتر باشد. اگر broker در
+مهلت به Ready نرسد، خروجی تشخیصی فقط replicaهای مطلوب/مشاهده‌شده، شرط محدودشدهٔ
+ReplicaFailure، وضعیت Pod، شمار/دلیل‌های allowlist‌شدهٔ Warning و دسته‌بندی ثابت
+رخداد `FailedCreate` را گزارش می‌کند؛ نام policy فقط از فهرست ثابت policyهای Kafka
+و مرز داده و شناسهٔ رد فقط از پیام‌های ثابت شناخته‌شده نمایش داده می‌شوند. متن
+رخداد، log و محتوای Secret نگهداری یا چاپ نمی‌شود. این گزارش جایگزین موفقیت staging نیست.
+بودجهٔ job برابر ۵۵ دقیقه است تا rehearsal کامل، مهلت ۷ دقیقه‌ای broker و پاک‌سازی
+fixture بدون لغو زودهنگام جا شوند؛ هیچ آزمون یا گیت امنیتی از این زمان‌بندی حذف نمی‌شود.
+
+installer ابتدا StatefulSet را با `replicas=0` می‌سازد تا controller پیش از آماده‌شدن
+مرز admission نتواند Pod بسازد. سپس فقط ValidatingPolicy موجود
+`hooshix-platform-data-closed` را با `failurePolicy=Fail` و `validationActions=Deny`
+نگه می‌دارد. فقط Pod دارای ServiceAccount `kafka` از قواعد bootstrap قبلی عبور
+می‌کند؛ validation مستقل همان policy هر Pod با این حساب را به نام/برچسب، ownerReference
+و UID دقیق همان StatefulSet و قرارداد کامل Pod می‌بندد. پیش از افزایش replica، همان
+Pod با `kubectl create --dry-run=server` در حالت تازه یا درخواست PATCH دارای
+`--dry-run=server` روی Pod موجود از admission واقعی API سرور عبور داده می‌شود؛
+برای حالت موجود ابتدا مشخصات و مالکیت
+Pod باید با قرارداد تطبیق کند. درخواست منفی با UID مالک دست‌کاری‌شده باید دقیقاً توسط
+قرارداد Kafka رد شود. همگرایی مثبت حداکثر ۴۵ ثانیه انتظار دارد؛ هر خطای مثبت/منفی
+توقف fail-closed می‌دهد و replica افزایش نمی‌یابد. dry-run هیچ Pod یا تغییر پایدار
+ایجاد نمی‌کند. فقط پس از موفقیت هر دو آزمون، تعداد replica به ۱ می‌رسد. قاعدهٔ پایه برای
+سایر Podها حفظ می‌شود و قرارداد کامل Pod نیز جداگانه در همان policy اعمال می‌ماند.
+حالت موقت صفر replica با hash دقیق spec قابل‌بازیابی است؛ هر drift موجب توقف
+fail-closed می‌شود. پیش‌بررسی و تطبیق مجدد policy با spec پایهٔ ثبت‌شده در bundle
+انجام می‌شود؛ policy یا scope مفقود/متغیر موجب توقف fail-closed می‌شود. bundle فقط پس از ثبت
+`data_admission_boundary=Passed` در receipt staging ساخته می‌شود.
+آزمون منفی مالکیت در staging، علاوه بر UID نادرست، یک ownerReference دوم با UID متمایز
+و بدون نقش controller می‌فرستد؛ هر دو باید با پیام دقیق قرارداد Kafka رد شوند، نه صرفاً
+با خطای اعتبارسنجی عمومی Kubernetes. این dry-run مالکیت Pod موجود را تغییر نمی‌دهد.
+
+سه `ImageValidatingPolicy` مربوط به امضای تصویر، provenance و SBOM ارجاع صریح
+`spec.credentials.secrets: [hooshix-ghcr-read]` دارند؛ Secret از قبل در namespace
+`kyverno` ایجاد می‌شود. Kafka Pod نیز فقط همین نام را در `imagePullSecrets` دارد؛
+نصب Kafka پس از تأیید مالکیت، آن را از Secret موجود در `hooshix-secrets` به
+namespace-local `platform-data` کپی می‌کند تا kubelet تصویر private را pull کند.
+اجرای مجدد همین مرحله پس از به‌روزرسانی Secret مبدأ، مقدار namespace-local را نیز
+به‌صورت مشروط و با `resourceVersion` تازه می‌کند؛ Secret بیگانه جایگزین نمی‌شود و
+تغییر Secret مقصد immutable موجب توقف fail-closed می‌شود.
+bundle فقط نام Secret را نگه می‌دارد و مقدار credential وارد bundle یا Git نمی‌شود.
+با root filesystem فقط‌خواندنی، مسیرهای موقت Kafka در `/opt/kafka/logs` با سقف
+`16Mi` و `/tmp` با سقف `32Mi` روی `emptyDir` حافظه‌ای قرار دارند؛ دادهٔ پایدار فقط
+روی LocalPV مستقل باقی می‌ماند.
+در این broker قرنطینه‌شده، `advertised.listeners` نیز روی `127.0.0.1:9092` است؛
+ابزارهای محلی سلامت و quorum به DNS سرویس یا مسیر شبکهٔ برنامه وابسته نیستند.
+probe با TLS و هویت موجود، فهرست topic را با heap محدود و deadline ده‌ثانیه‌ای
+می‌خواند. پیش از اتصال برنامه‌ها، endpoint قابل‌دسترسی، ACL و قواعد شبکه باید در
+تغییر جداگانهٔ بازکردن دسترسی برنامه‌ها تنظیم و آزموده شوند.
+آزمون native همان `server.properties`، `client.properties`، اسکریپت شروع و probe
+تولیدشده برای این نصب را با داده و گواهی موقت اجرا می‌کند.
+فرمان‌های تأیید storage/quorum/topic نیز heap مستقل حداکثر `128Mi` دارند؛
+برای JVMهای کوتاه‌عمر probe و این ابزارها، `UseSerialGC` و `TieredStopAtLevel=1`
+اعمال می‌شود؛ تنظیمات JVM خود broker تغییر نمی‌کند. probe با `exec` جای shell را
+می‌گیرد تا پایان مهلت، همان JVM بررسی را متوقف کند و فرزند فعال باقی نماند.
+مهلت درخواست کلاینت پنج ثانیه و مهلت کل API ده ثانیه است. آزمون native قطع واقعی
+probe روی پورت بسته و نبودن JVM فعال باقی‌مانده را بررسی می‌کند؛ سپس این فرمان‌ها
+را سه بار هم‌زمان با دو probe، زیر همان سقف یک CPU و `2Gi` اجرا می‌کند.
+در شکست exec، گزارش staging فقط شمارنده‌های ثابت OOM و تعداد بایت مصرف/سقف
+cgroup را نمایش می‌دهد؛ خروجی خام پردازش یا دادهٔ خصوصی چاپ نمی‌شود.
+تطبیق Service، مقدار حذف‌شدهٔ `publishNotReadyAddresses` در پاسخ API را همان
+`false` می‌داند؛ مقدار `true` یا تغییر سایر فیلدها همچنان رد می‌شود. در صورت drift،
+فقط نوع و نام منبع عمومی و مسیر فیلد گزارش می‌شود؛ مقدار فیلد چاپ نمی‌شود.
+
+runner موقت GitHub پیش از fixture swap را خاموش و نبودن آن را تأیید می‌کند؛ این
+شرط برای اعتبارسنجی کلیدهای موقت TLS در `tmpfs` است و تنظیم swap سرور مقصد را
+تغییر نمی‌دهد.
+
+`STAGING_RUN` را از اجرای موفقی انتخاب کنید که `head_sha` آن دقیقاً با خروجی
+`git rev-parse HEAD` روی `main` برابر است. با همان chart تأییدشدهٔ ESO 2.12.0 و
+Helm 4.2.4، bundle عمومی را بیرون Git بسازید؛ پوشه باید تازه و خالی از قبل
+باشد:
+
+```bash
+python3 scripts/production/build_kafka_runtime_bundle.py \
+  --staging-run "$STAGING_RUN" --chart "$ESO_CHART" --helm "$HELM" \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-runtime
+```
+
+برای **VPS فعلی** که همان PostgreSQL خالی و قرنطینه‌شدهٔ اولیه را نگه داشته است،
+گزینهٔ `--retained-database-quarantine` را به فرمان ساخت bundle اضافه کنید.
+این گزینه فقط دو digest ثابتِ ثبت‌شده در `install_kafka_tls.RETAINED_DATABASE_IMAGES`
+را برای تطبیق دقیق مرز قبلی حفظ می‌کند؛ image دلخواه نمی‌پذیرد و PostgreSQL را
+ایجاد، ارتقا، rollback یا reset نمی‌کند. روی سرور تازه با مجموعهٔ جاری PostgreSQL
+این گزینه را ندهید. در هر دو حالت installer باید کل spec مرز قبلی را دقیقاً تطبیق
+دهد؛ drift مجاز نمی‌شود و فقط استثنای دقیق Pod جدید Kafka به همان مرز اضافه می‌شود.
+این سازگاریِ قرنطینه، اصلاح امنیتی/بازیابی/ظرفیت دیتابیس یا مجوز Production نیست.
+
+در PowerShell، ابتدا فقط صحت فایل‌های public bundle را بررسی کنید، سپس VNC
+قابل ورود و یک نشست دوم SSH خصوصی را باز نگه دارید و runner را با همان پوشه
+اجرا کنید:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-runtime\run-kafka-runtime.ps1' -ValidateOnly
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-runtime\run-kafka-runtime.ps1' -RescueAndSecondSessionReady
+```
+
+در prompt فقط `READY` انگلیسی و رمز sudo را وارد کنید؛ توکن GHCR یا رمز
+OpenBao/Root/CA لازم نیست. موفقیت باید `KAFKA_RUNTIME=Passed`، یک broker
+داخلی روی همان Retain volume، `business_topics=None`، `application_ingress=CLOSED`
+و `public_access=CLOSED` نشان دهد؛ receipt عمومی کنار پوشهٔ bundle ذخیره می‌شود.
+فرمت اولیه فقط یک‌بار و فقط روی پوشهٔ خالیِ تأییدشده انجام می‌شود؛ دادهٔ موجود
+هرگز reset/reformat نمی‌شود. TLS/Root تغییر نمی‌کند، host service restart یا
+سرور reboot نمی‌شود. خطای اجرا state را حفظ می‌کند؛ ابزار رزرو volume یا تحویل
+TLS را پس از ایجاد claim تکرار نکنید.
+
+پس از نصب نیز recovery/rebuild واقعی از GitOps، replay/dedup evidence، capacity،
+certificate renewal، topic/client credentials/ACL، observability و complete-stack
+readiness همچنان `Not verified` هستند. ترافیک برنامه تا عبور این gateها بسته
+می‌ماند.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
 2. دسترسی عملیاتی محدود، backup ساعتی، recovery و audit امن خارج میزبان؛ root
    اولیه فقط پس از جایگزین معتبر و آزمون recovery لغو شود.
 3. JIT واقعی: expiry/revoke/disconnect، سپس حذف دسترسی دائمی با مسیر نجات کارا.
-4. PostgreSQL/CNPG/Barman و Redis به backup/restore و ظرفیت نیاز دارند؛ Kafka
-   candidate باید پس از انتشار محافظت‌شده TLS/ACL، staging و recovery را بگذراند.
+4. PostgreSQL/CNPG/Barman، Redis و Kafka به backup/restore و ظرفیت نیاز دارند؛
+   broker بستهٔ Kafka ترافیک برنامه را مجاز نمی‌کند.
 5. GitOps/Argo CD، انتشار هفت artifact، شش سرویس و frontend، migration و اسرار.
 6. edge/TLS/WAF، مسیر frontend/BFF و دامنهٔ همان نصب؛ origin bypass ممنوع.
 7. observability/alert و monitor مستقل خاموشی host.

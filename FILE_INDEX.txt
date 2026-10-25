@@ -550,6 +550,7 @@ scripts/production/build_cnpg_control_plane_bundle.py
 scripts/production/build_eso_commissioning_bundle.py
 scripts/production/build_kafka_candidate.py
 scripts/production/build_kafka_local_volume_bundle.py
+scripts/production/build_kafka_runtime_bundle.py
 scripts/production/build_kafka_storage_bundle.py
 scripts/production/build_kafka_tls_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
@@ -576,6 +577,7 @@ scripts/production/install_cert_manager.py
 scripts/production/install_cnpg_control_plane.py
 scripts/production/install_eso.py
 scripts/production/install_kafka_local_volume.py
+scripts/production/install_kafka_runtime.py
 scripts/production/install_kafka_tls.py
 scripts/production/install_postgresql_local_volume.py
 scripts/production/install_postgresql_quarantine.py
@@ -631,6 +633,7 @@ scripts/production/rehearse_eso_commissioning.py
 scripts/production/rehearse_eso_delivery.py
 scripts/production/rehearse_import_referrers.py
 scripts/production/rehearse_kafka_local_volume.py
+scripts/production/rehearse_kafka_runtime.py
 scripts/production/rehearse_kafka_tls.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
@@ -649,6 +652,7 @@ scripts/production/render_cnpg_control_plane.py
 scripts/production/render_eso_candidate.py
 scripts/production/render_eso_commissioning.py
 scripts/production/render_gitops.py
+scripts/production/render_kafka_runtime.py
 scripts/production/render_mesh_candidate.py
 scripts/production/render_mesh_security_upgrade.py
 scripts/production/render_openbao_candidate.py
@@ -673,6 +677,7 @@ scripts/production/run-host-inspection.ps1
 scripts/production/run-intermediate-csr.ps1
 scripts/production/run-intermediate-import.ps1
 scripts/production/run-kafka-local-volume.ps1
+scripts/production/run-kafka-runtime.ps1
 scripts/production/run-kafka-storage.ps1
 scripts/production/run-mesh-security-upgrade.ps1
 scripts/production/run-openbao-storage.ps1
@@ -706,6 +711,7 @@ scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_kafka_local_volume.py
+scripts/production/tests/test_kafka_runtime.py
 scripts/production/tests/test_kafka_runtime_candidate.py
 scripts/production/tests/test_kafka_storage.py
 scripts/production/tests/test_kafka_tls.py

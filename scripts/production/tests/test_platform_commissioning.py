@@ -378,6 +378,11 @@ class PlatformCommissioningTest(unittest.TestCase):
         kube.assert_not_called()
         create.assert_not_called()
 
+    def test_registry_pull_secret_can_be_scoped_to_data_namespace(self):
+        with patch.object(host, 'get', return_value=None), patch.object(host, 'create') as create:
+            host.write_registry_secret('platform-data', 'synthetic-docker-config')
+        self.assertEqual('platform-data', create.call_args.args[0]['metadata']['namespace'])
+
     def test_registry_rotation_rejects_foreign_shape_missing_version_and_immutable(self):
         for field, value in (('name', 'foreign'), ('namespace', 'other'), ('labels', {}),
                              ('resourceVersion', None), ('resourceVersion', ''), ('resourceVersion', 123)):

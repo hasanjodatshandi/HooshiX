@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import install_kafka_tls as installer
+import install_kafka_runtime as runtime_installer
 import kafka_secret_delivery as contract
 import kafka_tls_material as material
 import redis_tls_material as shared
@@ -53,6 +54,19 @@ class KafkaTLSTest(unittest.TestCase):
             material.issue(self.root, self.issuer, self.key, b'wrong-passphrase')
         self.assertEqual(before, hashlib.sha256(self.key.read_bytes()).hexdigest())
         self.assertNotIn('PRIVATE KEY', self.root + self.issuer)
+
+    def test_runtime_preserves_pem_issuer_instead_of_decoding_der_as_utf8(self):
+        external = {'metadata': {'uid': 'external'}, 'spec': contract.external()['spec'],
+            'status': {'conditions': [{'type': 'Ready', 'status': 'True'}]}}
+        secret = {'metadata': {'uid': 'secret', 'labels': {'app.kubernetes.io/managed-by': contract.MANAGER},
+                'ownerReferences': runtime_installer.tls.owner(external)},
+            'type': 'kubernetes.io/tls',
+            'data': {key: base64.b64encode(value.encode()).decode() for key, value in self.value.items()}}
+        with patch.object(runtime_installer, 'get', side_effect=[secret, external]), \
+                patch.object(runtime_installer, 'desired_fields_match', return_value=True):
+            result = runtime_installer.node_secret(lambda *_args: b'', hashlib.sha256(self.root.encode()).hexdigest())
+        self.assertEqual('secret', result[0])
+        self.assertEqual('external', result[3])
 
     def test_usage_subject_wildcard_key_and_expiry_mutations_fail(self):
         ordinary = material.platform.native

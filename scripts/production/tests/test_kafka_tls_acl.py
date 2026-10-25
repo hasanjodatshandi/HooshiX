@@ -17,6 +17,7 @@ class KafkaTlsAclTest(unittest.TestCase):
                          "allow.everyone.if.no.acl.found=false", "unclean.leader.election.enable=false",
                          "default.replication.factor=1", "min.insync.replicas=1"):
             self.assertIn(required, server)
+        self.assertIn('advertised.listeners=SSL://127.0.0.1:9092', server)
         self.assertNotIn("PLAINTEXT", server)
         self.assertNotIn("User:CN=writer", server)
         config = target.client_config("writer")
@@ -26,7 +27,8 @@ class KafkaTlsAclTest(unittest.TestCase):
         self.assertNotIn("ssl.keystore", target.client_config(None))
 
     def run_fixture(self, *, wrong_digest=False, manifest_store=False, outage=False,
-                    hidden_topic=False, reader_cluster_denial=False, consumer_records=None, cleanup_failure=False):
+                    hidden_topic=False, reader_cluster_denial=False, consumer_records=None, cleanup_failure=False,
+                    cancellation_exit=137, live_jvms='1'):
         calls, revoked = [], False
         pin = target.selected()
 
@@ -44,10 +46,14 @@ class KafkaTlsAclTest(unittest.TestCase):
                 code = int(cleanup_failure)
             elif args[0] == "exec":
                 text = " ".join(args)
-                if "--remove" in args:
+                if '/usr/bin/timeout' in args:
+                    code = cancellation_exit
+                elif "ps -o stat,comm" in text:
+                    out = live_jvms + '\n'
+                elif "--remove" in args:
                     revoked = True
                 if any(identity + ".properties" in text for identity in
-                       ("missing-client", "rogue", "untrusted-server")) or "127.0.0.1:9092" in text:
+                       ("missing-client", "rogue", "untrusted-server")) or "127.0.0.2:9092" in text:
                     code, error = 1, "TimeoutException" if outage else "SSLHandshakeException"
                 elif "foreign-group" in args:
                     code = 1 if consumer_records is None else 0
@@ -64,6 +70,10 @@ class KafkaTlsAclTest(unittest.TestCase):
                     code, error = 1, "TopicAuthorizationException"
                 elif "kafka-console-consumer.sh" in text:
                     out = "synthetic-event\n"
+                elif 'kafka-metadata-quorum.sh' in text:
+                    out = 'ClusterId: synthetic-cluster-1234\nLeaderId: 1\nCurrentVoters: [{"id":1}]\n'
+                elif '.hooshix-runtime-marker' in text:
+                    out = 'synthetic-cluster-1234\n'
             return subprocess.CompletedProcess(args, code, stdout=out, stderr=error)
 
         with patch.object(target, "docker", side_effect=docker), \
@@ -80,6 +90,7 @@ class KafkaTlsAclTest(unittest.TestCase):
         result, error, calls = self.run_fixture()
         self.assertIsNone(error)
         self.assertEqual("Passed", result["topic_role_group_acl"])
+        self.assertEqual("Passed", result["probe_cancellation"])
         self.assertEqual("Not run", result["deployment"])
         started = next(args for args in calls if args[0] == "run")
         self.assertIn(target.selected()["image_configuration_digest"], started)
@@ -91,7 +102,14 @@ class KafkaTlsAclTest(unittest.TestCase):
         self.assertEqual("256", started[started.index("--pids-limit") + 1])
         for args in calls:
             if args[0] == "exec":
-                self.assertIn("--command-config", args)
+                if 'ps -o stat,comm' in args[-1]:
+                    continue
+                if '/usr/bin/timeout' in args:
+                    self.assertIn('127.0.0.1:1', args[-1])
+                elif '/bin/sh' in args:
+                    self.assertIn(target.runtime.PROBE, args[-1])
+                else:
+                    self.assertIn("--command-config", args)
                 self.assertNotIn("--producer.config", args)
                 self.assertNotIn("--consumer.config", args)
         self.assertEqual(("rm", "--volumes", "-f", "a" * 64), calls[-1])
@@ -102,6 +120,14 @@ class KafkaTlsAclTest(unittest.TestCase):
         self.assertEqual("Passed", result["native_tls"])
         started = next(args for args in calls if args[0] == "run")
         self.assertIn(target.selected()["image"].split("@")[1], started)
+
+    def test_cancellation_requires_actual_timeout_and_no_remaining_live_probe_jvm(self):
+        for options, expected in (({'cancellation_exit': 0}, 'RENDERED_KAFKA_PROBE_CANCELLATION_REQUIRED'),
+                ({'live_jvms': '2'}, 'CANCELLED_KAFKA_PROBE_LEFT_LIVE_JVM')):
+            result, error, calls = self.run_fixture(**options)
+            self.assertIsNone(result)
+            self.assertEqual(expected, error)
+            self.assertEqual('rm', calls[-1][0])
 
     def test_outage_is_not_a_security_denial(self):
         result, error, calls = self.run_fixture(outage=True)

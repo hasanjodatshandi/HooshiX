@@ -49,13 +49,17 @@ def read_public(folder):
         os.close(descriptor)
 
 
-def pem_certificates(content):
+def pem_certificate_blocks(content):
     pattern = rb'-----BEGIN CERTIFICATE-----\s+[A-Za-z0-9+/=\s]+?-----END CERTIFICATE-----'
     blocks = re.findall(pattern, content)
     custody.require(blocks and not re.sub(rb'\s', b'', re.sub(pattern, b'', content)),
                     'CERTIFICATE_PEM_REJECTED')
+    return blocks
+
+
+def pem_certificates(content):
     return [custody.native([custody.OPENSSL, 'x509', '-outform', 'DER'], input_bytes=block)
-            for block in blocks]
+            for block in pem_certificate_blocks(content)]
 
 
 def validate_public(files, marker, work):

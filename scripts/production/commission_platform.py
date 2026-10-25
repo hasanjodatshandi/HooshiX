@@ -273,7 +273,8 @@ def registry_credentials():
 
 
 def write_registry_secret(namespace, data, *, kube_call=None):
-    require(namespace in ('kyverno', 'istio-system', 'hooshix-secrets', 'platform-apps'), 'REGISTRY_NAMESPACE_REJECTED')
+    require(namespace in ('kyverno', 'istio-system', 'hooshix-secrets', 'platform-apps', 'platform-data'),
+            'REGISTRY_NAMESPACE_REJECTED')
     call = kube if kube_call is None else kube_call
     value = {'apiVersion': 'v1', 'kind': 'Secret', 'metadata': {
         'name': 'hooshix-ghcr-read', 'namespace': namespace, 'labels': LABELS},
