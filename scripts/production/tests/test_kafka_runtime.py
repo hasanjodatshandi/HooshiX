@@ -347,6 +347,48 @@ class KafkaRuntimeTest(unittest.TestCase):
         self.assertEqual('00000000-0000-4000-8000-000000000001',
             negative.kwargs['body']['metadata']['ownerReferences'][0]['uid'])
 
+    def test_admission_preflight_allows_slow_verified_positive_and_exact_negative(self):
+        for existing_pod in (False, True):
+            with self.subTest(existing_pod=existing_pod):
+                stateful = copy.deepcopy(self.plan['statefulset'])
+                stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+                candidate = installer.admission_candidate(stateful)
+                clock = [0.0]
+
+                def slow_admission(*args, **options):
+                    if 'get' in args:
+                        return json.dumps(candidate).encode() if existing_pod else b''
+                    self.assertIn('--dry-run=server', args)
+                    negative = options.get('expected') == 1
+                    elapsed = 23.2 if negative else 25.3
+                    timeout = options['timeout']
+                    clock[0] += min(elapsed, timeout)
+                    if timeout < elapsed:
+                        raise subprocess.TimeoutExpired('synthetic-admission', timeout)
+                    self.assertLessEqual(timeout, 60)
+                    if negative:
+                        self.assertEqual(b'closed Kafka runtime contract rejected',
+                                         options['required_error'])
+                    return b''
+
+                kube = Mock(side_effect=slow_admission)
+                with patch.object(installer.time, 'monotonic', side_effect=lambda: clock[0]), \
+                        patch.object(installer.time, 'sleep') as sleep:
+                    installer.preflight_admission(kube, stateful)
+
+                self.assertEqual(3, kube.call_count)
+                self.assertEqual(1, kube.call_args.kwargs['expected'])
+                sleep.assert_not_called()
+
+    def test_admission_preflight_caps_positive_attempt_at_remaining_deadline(self):
+        stateful = copy.deepcopy(self.plan['statefulset'])
+        stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
+        kube = Mock(side_effect=[b'', b'', b''])
+        with patch.object(installer.time, 'monotonic', side_effect=[0, 100, 100]):
+            installer.preflight_admission(kube, stateful)
+        self.assertEqual(20, kube.call_args_list[1].kwargs['timeout'])
+        self.assertEqual(60, kube.call_args_list[2].kwargs['timeout'])
+
     def test_admission_preflight_fails_closed_when_the_exact_pod_remains_denied(self):
         stateful = copy.deepcopy(self.plan['statefulset'])
         stateful['metadata'].update(namespace=renderer.NS, uid='stateful-uid')
