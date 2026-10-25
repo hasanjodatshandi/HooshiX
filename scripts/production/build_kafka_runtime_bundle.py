@@ -36,7 +36,16 @@ def verify_proof(receipt):
         raise ValueError('EXACT_CLOSED_KAFKA_NATIVE_RUNTIME_EVIDENCE_REQUIRED')
 
 
-def build(output, run_id, chart, helm):
+def data_boundary(chart, helm, retained_database_quarantine=False):
+    base = postgresql.render(chart, helm, ['10.43.0.1'])['boundary']
+    if retained_database_quarantine:
+        base = quarantine.boundary(base, previous.installer.RETAINED_DATABASE_IMAGES)
+    else:
+        base = quarantine.render(base, ['10.43.0.1'])['boundary']
+    return redis.boundary(base, redis.pod())
+
+
+def build(output, run_id, chart, helm, retained_database_quarantine=False):
     root, revision = staging.mesh.ROOT, staging.git('rev-parse', 'HEAD')
     if (staging.git('status', '--porcelain') or output.exists() or output.is_symlink()
         or output.resolve().is_relative_to(root)
@@ -47,10 +56,7 @@ def build(output, run_id, chart, helm):
             mesh_security_upgrade=True, eso_commissioning=True, cert_manager_commissioning=True,
             cnpg_control_plane=True, barman_control_plane=True, kafka_closed_runtime=True)
         verify_proof(receipt)
-        base = postgresql.render(chart, helm, ['10.43.0.1'])['boundary']
-        base = quarantine.render(base, ['10.43.0.1'])['boundary']
-        base = redis.boundary(base, redis.pod())
-        plan = renderer.render(base)
+        plan = renderer.render(data_boundary(chart, helm, retained_database_quarantine))
         plan['repository_source_revision'] = revision
         plan['staging'] = {'source_revision': revision, 'run_id': run_id,
             'observed_at': receipt['observed_at'], 'result': 'Passed'}
@@ -70,9 +76,11 @@ def main():
     parser.add_argument('--staging-run', required=True)
     parser.add_argument('--chart', type=Path, required=True)
     parser.add_argument('--helm', required=True)
+    parser.add_argument('--retained-database-quarantine', action='store_true',
+        help='Preserve only the exact already-installed empty quarantine; never upgrade/redeploy its images')
     args = parser.parse_args()
     try:
-        build(args.output, args.staging_run, args.chart, args.helm)
+        build(args.output, args.staging_run, args.chart, args.helm, args.retained_database_quarantine)
     except (OSError, ValueError, KeyError, TypeError):
         parser.exit(1, 'KAFKA_RUNTIME_BUNDLE=Failed; no target changes\n')
     print('KAFKA_RUNTIME_BUNDLE=Passed; public owner bundle only; target Not run')

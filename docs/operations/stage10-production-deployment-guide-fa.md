@@ -1001,17 +1001,17 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 ساخت جدید operand و Barman sidecar باید بستهٔ امضاشدهٔ Alpine
 `brotli-libs=1.2.1-r0` را داشته باشد؛ inventory فاقد بسته، قدیمی یا دارای نسخهٔ
 آسیب‌پذیر تکراری، حتی بدون finding اسکنر، رد می‌شود. این pin اصلاح
-`CVE-2026-111497` است؛ اسکن تازهٔ مجموعهٔ قبلی این مورد را `Critical` گزارش کرده
-و پذیرش فعلی آن بسته است. ابتدا ساخت/انتشار محافظت‌شده، امضا، provenance و SBOM
-مجموعهٔ جدید، سپس پذیرش digestهای جدید در تغییر جداگانه و staging لازم است.
-این اصلاح سورس به‌تنهایی تصویر منتشرشده یا PostgreSQL روی VPS را به‌روزرسانی
-نمی‌کند و مجوز تعویض، reset یا reinit دیتابیس نیست.
+`CVE-2026-111497` است؛ مجموعهٔ انتخاب‌شدهٔ زیر با این اصلاح ساخته و منتشر شده است.
+پذیرش digestها و staging همچنان مستقل از انتشار الزامی هستند. انتخاب تصویر تازه
+در Git به‌تنهایی PostgreSQL روی VPS را به‌روزرسانی نمی‌کند و مجوز تعویض، reset
+یا reinit دیتابیس نیست. نسخهٔ قرنطینه‌شدهٔ قدیمی تا ارتقای بررسی‌شده و آزموده‌شده،
+برای داده و ترافیک واقعی Production تأییدشده محسوب نمی‌شود.
 
 مرجع: [انتشار امنیتی Brotli 1.2.1](https://github.com/google/brotli/releases/tag/v1.2.1)،
 [بسته و secfix رسمی Alpine 3.24](https://github.com/alpinelinux/aports/blob/3.24-stable/main/brotli/APKBUILD).
 
-اجرای محافظت‌شدهٔ `39830467736`، attempt `1` روی
-`main@e1be2ac6132b1c9faec3dcae96ee523f4bebaf71` انتشار هر چهار تصویر را با
+اجرای محافظت‌شدهٔ `40132294662`، attempt `1` روی
+`main@e6af3123a96c48cb802c3253cca3c1c999e8ccd4` انتشار هر چهار تصویر را با
 `publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
 واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
 این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
@@ -1025,7 +1025,7 @@ artifact همان اجرا را بیرون Git دانلود کنید و روی �
 Unix و ابزارهای integrity-pinned اجرا کنید؛ این فرمان VPS را متصل نمی‌کند:
 
 ```bash
-gh run download 39830467736 --name postgresql-publication-39830467736-1 --dir /path/outside-repo/postgresql-publication
+gh run download 40132294662 --name postgresql-publication-40132294662-1 --dir /path/outside-repo/postgresql-publication
 bash scripts/production/install_release_tools.sh /path/outside-repo/release-tools
 PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_published_postgresql.py \
   --evidence-dir /path/outside-repo/postgresql-publication \
@@ -2739,6 +2739,15 @@ python3 scripts/production/build_kafka_runtime_bundle.py \
   --staging-run "$STAGING_RUN" --chart "$ESO_CHART" --helm "$HELM" \
   --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-runtime
 ```
+
+برای **VPS فعلی** که همان PostgreSQL خالی و قرنطینه‌شدهٔ اولیه را نگه داشته است،
+گزینهٔ `--retained-database-quarantine` را به فرمان ساخت bundle اضافه کنید.
+این گزینه فقط دو digest ثابتِ ثبت‌شده در `install_kafka_tls.RETAINED_DATABASE_IMAGES`
+را برای تطبیق دقیق مرز قبلی حفظ می‌کند؛ image دلخواه نمی‌پذیرد و PostgreSQL را
+ایجاد، ارتقا، rollback یا reset نمی‌کند. روی سرور تازه با مجموعهٔ جاری PostgreSQL
+این گزینه را ندهید. در هر دو حالت installer باید کل spec مرز قبلی را دقیقاً تطبیق
+دهد؛ drift مجاز نمی‌شود و فقط استثنای دقیق Pod جدید Kafka به همان مرز اضافه می‌شود.
+این سازگاریِ قرنطینه، اصلاح امنیتی/بازیابی/ظرفیت دیتابیس یا مجوز Production نیست.
 
 در PowerShell، ابتدا فقط صحت فایل‌های public bundle را بررسی کنید، سپس VNC
 قابل ورود و یک نشست دوم SSH خصوصی را باز نگه دارید و runner را با همان پوشه

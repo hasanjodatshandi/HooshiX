@@ -588,6 +588,22 @@ class KafkaRuntimeTest(unittest.TestCase):
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     bundle.verify_proof({'kafka_closed_runtime': good | change})
 
+    def test_bundle_preserves_only_the_explicit_known_retained_quarantine(self):
+        base = prior_boundary()
+        with patch.object(bundle.postgresql, 'render', return_value={'boundary': base}):
+            retained = bundle.data_boundary(Path('chart'), 'helm', True)
+            current = bundle.data_boundary(Path('chart'), 'helm')
+        expected = bundle.redis.boundary(bundle.quarantine.boundary(
+            base, bundle.previous.installer.RETAINED_DATABASE_IMAGES), bundle.redis.pod())
+        self.assertEqual(expected, retained)
+        self.assertNotEqual(current['spec'], retained['spec'])
+        expression = json.dumps(retained['spec'])
+        for image in bundle.previous.installer.RETAINED_DATABASE_IMAGES.values():
+            self.assertIn(image, expression)
+        plan = renderer.render(retained)
+        self.assertEqual(retained, plan['previous_boundary'])
+        self.assertNotIn('StatefulSet', json.dumps(plan['objects']))
+
 
 if __name__ == '__main__':
     unittest.main()
