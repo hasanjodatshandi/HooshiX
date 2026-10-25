@@ -998,6 +998,18 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 
 ### پذیرش مجموعهٔ منتشرشدهٔ PostgreSQL
 
+ساخت جدید operand و Barman sidecar باید بستهٔ امضاشدهٔ Alpine
+`brotli-libs=1.2.1-r0` را داشته باشد؛ inventory فاقد بسته، قدیمی یا دارای نسخهٔ
+آسیب‌پذیر تکراری، حتی بدون finding اسکنر، رد می‌شود. این pin اصلاح
+`CVE-2026-111497` است؛ اسکن تازهٔ مجموعهٔ قبلی این مورد را `Critical` گزارش کرده
+و پذیرش فعلی آن بسته است. ابتدا ساخت/انتشار محافظت‌شده، امضا، provenance و SBOM
+مجموعهٔ جدید، سپس پذیرش digestهای جدید در تغییر جداگانه و staging لازم است.
+این اصلاح سورس به‌تنهایی تصویر منتشرشده یا PostgreSQL روی VPS را به‌روزرسانی
+نمی‌کند و مجوز تعویض، reset یا reinit دیتابیس نیست.
+
+مرجع: [انتشار امنیتی Brotli 1.2.1](https://github.com/google/brotli/releases/tag/v1.2.1)،
+[بسته و secfix رسمی Alpine 3.24](https://github.com/alpinelinux/aports/blob/3.24-stable/main/brotli/APKBUILD).
+
 اجرای محافظت‌شدهٔ `39830467736`، attempt `1` روی
 `main@e1be2ac6132b1c9faec3dcae96ee523f4bebaf71` انتشار هر چهار تصویر را با
 `publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
