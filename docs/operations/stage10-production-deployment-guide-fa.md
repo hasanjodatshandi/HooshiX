@@ -2756,6 +2756,10 @@ python3 scripts/production/build_kafka_runtime_bundle.py \
 قابل ورود و یک نشست دوم SSH خصوصی را باز نگه دارید و runner را با همان پوشه
 اجرا کنید:
 
+آزمون بسته، همهٔ ماژول‌های تحویلی را به ترتیب runner در یک Python تازه با `-I`
+و بیرون checkout بارگذاری می‌کند؛ سپس `--help` نصاب را بدون اتصال VPS اجرا می‌کند.
+نصاب روی VPS به rendererهای checkout یا `PYTHONPATH` میزبان وابسته نیست.
+
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-runtime\run-kafka-runtime.ps1' -ValidateOnly
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\Users\Coder\Downloads\HooshiX-kafka-runtime\run-kafka-runtime.ps1' -RescueAndSecondSessionReady

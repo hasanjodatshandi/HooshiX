@@ -6,7 +6,10 @@ import hashlib
 import io
 import json
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -67,6 +70,7 @@ class KafkaRuntimeTest(unittest.TestCase):
 
     def test_private_image_pull_uses_only_the_approved_namespaced_secret(self):
         pod = self.plan['statefulset']['spec']['template']['spec']
+        self.assertEqual(admission.PULL_SECRET, installer.PULL_SECRET)
         self.assertEqual([{'name': admission.PULL_SECRET}], pod['imagePullSecrets'])
 
     def test_read_only_kafka_root_has_bounded_memory_backed_runtime_scratch(self):
@@ -589,6 +593,25 @@ class KafkaRuntimeTest(unittest.TestCase):
             'observed_at': '2026-10-23T00:00:00+00:00', 'result': 'Passed'}
         with self.assertRaisesRegex(ValueError, 'CLOSED_KAFKA_RUNTIME_PLAN_REQUIRED'):
             installer.execute(self.plan, kube=Mock())
+
+    def test_owner_bootstrap_loads_only_bundled_sources_under_isolated_python(self):
+        bootstrap = '''import json,pathlib,sys,types
+root=pathlib.Path(sys.argv[1])
+for name in json.loads(sys.argv[2]):
+ module=types.ModuleType(name[:-3]); module.__file__=str(root/name)
+ sys.modules[name[:-3]]=module
+ exec(compile((root/name).read_bytes(),name,'exec'),module.__dict__)
+sys.argv=['install_kafka_runtime.py','--help']
+raise SystemExit(sys.modules['install_kafka_runtime'].main())
+'''
+        with tempfile.TemporaryDirectory(prefix='hooshix-kafka-import-test-') as directory:
+            for name in bundle.SOURCES:
+                shutil.copyfile(Path(__file__).resolve().parents[1] / name, Path(directory) / name)
+            result = subprocess.run([sys.executable, '-I', '-c', bootstrap,
+                directory, json.dumps(bundle.SOURCES)], cwd=directory,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20, check=False)
+        self.assertEqual(0, result.returncode, result.stderr.decode())
+        self.assertIn(b'--plan', result.stdout)
 
     def test_owner_bundle_requires_closed_runtime_and_accurate_nonproduction_scope(self):
         good = {'schema_version': 1, 'image': renderer.pin()['image'],

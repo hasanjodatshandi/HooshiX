@@ -23,11 +23,11 @@ import install_postgresql_quarantine as pg
 import kafka_secret_delivery as delivery
 import kafka_tls_material as certificates
 from install_eso import desired_fields_match, mismatched_path
-import render_platform_admission as admission
 from upgrade_mesh_security import replace_policy
 
 NS, NAME, MANAGER = 'platform-data', 'kafka', 'hooshix-kafka-runtime'
 HASH = 'hooshix.io/kafka-spec-sha256'
+PULL_SECRET = 'hooshix-ghcr-read'
 READINESS_TIMEOUT_SECONDS = 420
 ADMISSION_RETRY_SECONDS = 45
 TOOL_JVM_OPTIONS = '-XX:+UseSerialGC -XX:TieredStopAtLevel=1'
@@ -57,7 +57,7 @@ def node_secret(kube, ca_sha256):
 
 
 def ensure_registry_pull_secret(kube):
-    source = get(kube, 'secret', admission.PULL_SECRET, 'hooshix-secrets')
+    source = get(kube, 'secret', PULL_SECRET, 'hooshix-secrets')
     require(isinstance(source, dict), 'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
     metadata = source.get('metadata')
     data = source.get('data')
@@ -65,7 +65,7 @@ def ensure_registry_pull_secret(kube):
         and isinstance(metadata.get('labels'), dict), 'EXISTING_KAFKA_REGISTRY_SECRET_REQUIRED')
     encoded = data.get('.dockerconfigjson')
     require(metadata.get('namespace') == 'hooshix-secrets'
-        and metadata.get('name') == admission.PULL_SECRET
+        and metadata.get('name') == PULL_SECRET
         and all(metadata['labels'].get(key) == value for key, value in host.LABELS.items())
         and not metadata.get('deletionTimestamp') and not metadata.get('ownerReferences')
         and source.get('type') == 'kubernetes.io/dockerconfigjson'
