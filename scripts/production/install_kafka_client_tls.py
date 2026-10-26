@@ -5,7 +5,7 @@ import json
 
 import install_kafka_runtime as runtime
 import kafka_client_tls as contract
-from install_eso import desired_fields_match
+from install_eso import desired_fields_match, MANAGER as ESO_MANAGER
 
 require = contract.require
 MARKERS = {'managed_by': contract.MANAGER, 'installation_id': 'hooshix-production'}
@@ -63,8 +63,10 @@ def snapshot(kube, plan):
         require(isinstance(configured, list) and contract.auth.AUDIENCE in configured,
                 'KAFKA_CLIENT_EXISTING_AUDIENCES_REQUIRED')
         audiences = plan.get('audiences', [a for a in configured if a != contract.auth.AUDIENCE])
+        expected_store = contract.auth.store(service, audiences)
+        expected_store['metadata']['labels']['app.kubernetes.io/managed-by'] = ESO_MANAGER
         require(store and ready(store)
-            and desired_fields_match(store, contract.auth.store(service, audiences)),
+            and desired_fields_match(store, expected_store),
             'KAFKA_CLIENT_EXISTING_STORE_REQUIRED')
         retained.append((store['metadata']['uid'], store['spec']))
     return retained

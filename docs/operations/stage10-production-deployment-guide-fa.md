@@ -2812,7 +2812,9 @@ Secret از نوع Opaque و با کلیدهای configtree استاندارد S
 `spring.kafka.security.protocol=SSL`، دو store از نوع `PEM`، کلید PKCS#8،
 زنجیرهٔ leaf+intermediate، Root عمومی و اعتبارسنجی hostname برابر `HTTPS`.
 اسرار مستقل هر سرویس توسط SecretStore موجود `hooshix-<service>` خوانده می‌شوند؛
-ServiceAccount، Role، policy و دسترسی شبکهٔ تازه ایجاد نمی‌شود. فایل configtree
+ServiceAccount، Role، policy و دسترسی شبکهٔ تازه ایجاد نمی‌شود. مالک SecretStore
+موجود باید دقیقاً `hooshix-eso-commissioning`، مطابق نصاب ESO، باقی بماند؛
+برچسب مالکیت آن تغییر داده نمی‌شود. فایل configtree
 این مقادیر را در mount موجود هر سرویس مصرف خواهد کرد؛ آزمون واقعی configtree با
 Spring Boot 4.1.0 نگاشت PEM و hostname validation را برای producer، consumer و
 admin بررسی می‌کند. اجرای واقعی برنامه هنوز

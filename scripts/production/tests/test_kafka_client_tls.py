@@ -235,6 +235,7 @@ class KafkaClientTLSTest(unittest.TestCase):
             objects[item['kind'].lower(), item['metadata']['name']] = item
         for service in contract.SERVICES:
             item = contract.auth.store(service, ['api'])
+            item['metadata']['labels']['app.kubernetes.io/managed-by'] = 'hooshix-eso-commissioning'
             item['metadata']['uid'] = 'store-' + service
             item['status'] = {'conditions': [{'type': 'Ready', 'status': 'True'}]}
             objects['secretstore', item['metadata']['name']] = item
@@ -250,6 +251,11 @@ class KafkaClientTLSTest(unittest.TestCase):
             self.assertEqual(first, installer.snapshot(Mock(), plan))
             isolation.assert_called()
             inventory.assert_called()
+            store = objects['secretstore', 'hooshix-' + contract.SERVICES[0]]
+            store['metadata']['labels']['app.kubernetes.io/managed-by'] = contract.auth.LABELS['app.kubernetes.io/managed-by']
+            with self.assertRaisesRegex(shared.custody.BootstrapFailed, 'KAFKA_CLIENT_EXISTING_STORE_REQUIRED'):
+                installer.snapshot(Mock(), plan)
+            store['metadata']['labels']['app.kubernetes.io/managed-by'] = 'hooshix-eso-commissioning'
             # Preserve the preceding fixture's verified API-defaulted contract.
             predecessor = copy.deepcopy(runtime['previous_boundary'])
             predecessor['spec']['matchConstraints']['matchPolicy'] = 'Equivalent'
