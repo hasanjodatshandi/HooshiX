@@ -2128,6 +2128,37 @@ sudo systemctl is-active k3s.service
 انجام می‌شود، بدون init یا recovery initialization. نتیجهٔ VPS هنوز تا اجرای
 موفق و readback **Not verified** است.
 
+### بازیابی enrollment کنترلرهای ESO پس از توقف K3s
+
+پیش‌شرط: K3s و هر چهار guard فعال، OpenBao موجود unsealed و مسیر نجات باز
+باشد. اگر SecretStoreها خطای اتصال دارند، فقط annotation
+`ambient.istio.io/redirection=enabled` را نشانهٔ سلامت ندانید؛ listenerهای
+`15001`، `15006` و `15008` باید در network namespace همان Pod وجود داشته باشند.
+بررسی فقط‌خواندنی باید هویت Pod/ServiceAccount و sandbox جاری را تطبیق دهد؛
+نبود listener در هر دو کنترلر با وجود listener سالم OpenBao، مجوز تغییر CA،
+auth role، credential یا خاموش‌کردن STRICT نیست.
+
+فقط در همین وضعیتِ تأییدشده، Podهای دو کنترلر stateless زیر را بازسازی کنید؛
+Deployment، image، ServiceAccount، template و سیاست شبکه تغییر نمی‌کنند.
+webhook، cert-controller، OpenBao و workloadهای داده حذف یا restart نمی‌شوند:
+
+```bash
+set -e
+sudo /usr/local/bin/k3s kubectl -n platform-apps delete pod -l app.kubernetes.io/instance=hooshix-eso,app.kubernetes.io/name=external-secrets --wait=true --timeout=90s
+sudo /usr/local/bin/k3s kubectl -n platform-data delete pod -l app.kubernetes.io/instance=hooshix-postgresql-eso,app.kubernetes.io/name=external-secrets --wait=true --timeout=90s
+sudo /usr/local/bin/k3s kubectl -n platform-apps rollout status deployment/hooshix-eso --timeout=180s
+sudo /usr/local/bin/k3s kubectl -n platform-data rollout status deployment/hooshix-postgresql-eso --timeout=180s
+sudo /usr/local/bin/k3s kubectl -n platform-data wait --for=condition=Ready externalsecrets --all --timeout=180s
+sudo /usr/local/bin/k3s kubectl -n platform-apps wait --for=condition=Ready secretstores --all --timeout=180s
+```
+
+انتظار، rollout موفق هر دو کنترلر و Ready شدن منابع موجود است؛ Secret یا
+ExternalSecret را حذف، اسرار را بازتولید یا نصب پایه را تکرار نکنید. اگر recovery
+شکست خورد، همان خروجی را نگه دارید و علت جدید را بررسی کنید؛ تکرار خودکار یا
+انتظار طولانیِ بی‌تغییر مجاز نیست. موفقیت این گام فقط بازیابی همگام‌سازی ESO است،
+نه تمدید خودکار گواهی، رفع علت تاریخی توقف guard یا تأیید Production. پس از آن
+تحویل گواهی client Kafka با همان bundle و custody تأییدشده عملیات جداگانه است.
+
 ### رزرو فضای آماده برای Redis
 
 رزرو LocalPV از فایل‌سیستم سالم و guardدار موجود استفاده می‌کند؛ هیچ تخصیص، فرمت،
