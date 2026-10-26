@@ -2159,6 +2159,31 @@ ExternalSecret را حذف، اسرار را بازتولید یا نصب پای
 نه تمدید خودکار گواهی، رفع علت تاریخی توقف guard یا تأیید Production. پس از آن
 تحویل گواهی client Kafka با همان bundle و custody تأییدشده عملیات جداگانه است.
 
+### بازیابی Pod موجود Kafka در وضعیت Unknown
+
+پس از بازیابی K3s، اگر StatefulSet موجود `kafka` همچنان یک replica می‌خواهد اما
+Pod قدیمی `kafka-0` در وضعیت `Unknown` مانده است، ساخت broker را از ابتدا اجرا
+نکنید. پیش‌شرط، سلامت چهار guard و filesystemهای قبلی، همان StatefulSet/PVC و
+node همین نصب است؛ منبع یا claim بیگانه نباید adopt شود. فقط پس از Ready بودن
+node، حذف عادی همان Pod و انتظار روی StatefulSet موجود مجاز است:
+
+```bash
+set -e
+sudo /usr/local/bin/k3s kubectl wait --for=condition=Ready node/hooshix-production-1 --timeout=30s
+sudo /usr/local/bin/k3s kubectl -n platform-data delete pod/kafka-0 --wait=true --timeout=90s
+sudo /usr/local/bin/k3s kubectl -n platform-data rollout status statefulset/kafka --timeout=420s
+```
+
+نام node مختص نصب جاری است؛ در نصب دوم باید نام node همان نصب باشد. این فرمان
+هیچ StatefulSet، PVC/PV، cluster ID، فایل KRaft، backing یا گواهی را حذف یا
+تغییر نمی‌دهد و از `--force` یا `--grace-period=0` استفاده نمی‌کند. اگر node
+Ready نیست، حذف عادی تمام نشد یا rollout شکست خورد، متوقف شوید؛ برای دورزدن
+مشکل، Pod را force-delete، replica را زیاد یا data را format/reset نکنید.
+انتظار روی StatefulSet از خطای زودهنگام NotFound هنگام ساخته‌نشدن Pod جایگزین
+جلوگیری می‌کند. Ready شدن broker فقط بازیابی runtime موجود است؛ هویت storage،
+node TLS و مرز بستهٔ قبلی پیش از تحویل client دوباره توسط ابزار بررسی می‌شوند.
+هیچ topic تجاری، ACL برنامه یا دسترسی عمومی از این recovery ایجاد نمی‌شود.
+
 ### رزرو فضای آماده برای Redis
 
 رزرو LocalPV از فایل‌سیستم سالم و guardدار موجود استفاده می‌کند؛ هیچ تخصیص، فرمت،
