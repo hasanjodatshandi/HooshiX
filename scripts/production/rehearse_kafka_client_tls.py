@@ -2,12 +2,36 @@
 import hashlib
 import json
 import re
+import traceback
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import build_kafka_client_tls_bundle as bundle
 import install_kafka_client_tls as installer
 import kafka_client_tls as contract
 from rehearse_redis_tls import fixture_issuer, synthetic_memory
+
+SAFE_FAILURES = frozenset({
+    'KAFKA_CLIENT_READY_CLOSED_BROKER_REQUIRED', 'KAFKA_CLIENT_CLOSED_BOUNDARY_REQUIRED',
+    'KAFKA_CLIENT_EXISTING_BROKER_RESOURCE_REQUIRED', 'KAFKA_CLIENT_ACTIVE_SOURCE_VERIFICATION_REQUIRED',
+    'KAFKA_CLIENT_RESTRICTED_NAMESPACE_REQUIRED', 'KAFKA_CLIENT_EXISTING_APPLICATION_ESO_REQUIRED',
+    'KAFKA_CLIENT_EXISTING_AUDIENCES_REQUIRED', 'KAFKA_CLIENT_EXISTING_STORE_REQUIRED',
+    'KAFKA_CLIENT_FOREIGN_EXTERNAL_PRESERVED', 'KAFKA_CLIENT_FOREIGN_TARGET_PRESERVED',
+    'KAFKA_CLIENT_EXISTING_AUTH_ROLE_REQUIRED', 'KAFKA_CLIENT_EXISTING_AUTH_POLICY_REQUIRED',
+    'KAFKA_CLIENT_ORPHANED_DELIVERY_PRESERVED', 'KAFKA_CLIENT_ESO_READBACK_REQUIRED',
+    'KAFKA_CLIENT_EXISTING_STATE_CHANGED', 'KAFKA_CLIENT_NATIVE_ADMIN_DENIAL_REQUIRED'})
+
+
+def failure_details(error):
+    from rehearse_kafka_runtime import safe_failure_code
+    code = error.args[0] if error.args and isinstance(error.args[0], str) else ''
+    result = {'code': code if code in SAFE_FAILURES else safe_failure_code(error) or 'OTHER'}
+    allowed = {'kafka_client_tls.py', 'install_kafka_client_tls.py', 'rehearse_kafka_client_tls.py',
+               'install_kafka_runtime.py', 'install_eso.py'}
+    frames = traceback.extract_tb(error.__traceback__)
+    if frames and Path(frames[-1].filename).name in allowed:
+        result.update(source=Path(frames[-1].filename).name, line=frames[-1].lineno)
+    return result
 
 
 def broker_denial(k, values):
@@ -53,8 +77,12 @@ def rehearse(k, runtime_plan, api, root, ca, root_key, audiences, node):
             fixture_issuer(ca, root_key) as (issuer, key, password):
         options = dict(kube=kube, api=api, root=root, ca=ca, issuer=issuer,
                        audiences=audiences, token_request=token_request)
-        result = installer.execute(plan, **options,
-            issue=lambda service: contract.issue(service, ca, issuer, key, password))
+        try:
+            result = installer.execute(plan, **options,
+                issue=lambda service: contract.issue(service, ca, issuer, key, password))
+        except Exception as error:
+            print('KAFKA_CLIENT_REHEARSAL_FAILURE=' + json.dumps(failure_details(error)), flush=True)
+            raise
         before = {}
         for service in contract.SERVICES:
             path = 'hooshix/data/' + contract.entry(service)['key']

@@ -250,9 +250,26 @@ class KafkaClientTLSTest(unittest.TestCase):
             self.assertEqual(first, installer.snapshot(Mock(), plan))
             isolation.assert_called()
             inventory.assert_called()
+            # Preserve the preceding fixture's verified API-defaulted contract.
+            predecessor = copy.deepcopy(runtime['previous_boundary'])
+            predecessor['spec']['matchConstraints']['matchPolicy'] = 'Equivalent'
+            verified_runtime = bundle.previous.renderer.render(predecessor)
+            live_boundary = installer.runtime.boundary_for_statefulset(verified_runtime, 'stateful-uid')
+            boundary['spec'] = live_boundary['spec']
+            with self.assertRaisesRegex(shared.custody.BootstrapFailed, 'KAFKA_CLIENT_CLOSED_BOUNDARY_REQUIRED'):
+                installer.snapshot(Mock(), plan)
+            self.assertTrue(installer.snapshot(Mock(), bundle.plan(verified_runtime)))
             live['spec']['replicas'] = 0
             with self.assertRaises(ValueError):
                 installer.snapshot(Mock(), plan)
+
+    def test_fixture_failure_classification_never_prints_private_exception_text(self):
+        from rehearse_kafka_client_tls import failure_details
+        private = 'PRIVATE-KEY-OR-TOKEN-MUST-NOT-APPEAR'
+        self.assertEqual({'code': 'OTHER'}, failure_details(ValueError(private)))
+        code = 'KAFKA_CLIENT_CLOSED_BOUNDARY_REQUIRED'
+        self.assertEqual({'code': code}, failure_details(shared.custody.BootstrapFailed(code)))
+        self.assertNotIn(private, json.dumps(failure_details(KeyError(private))))
 
     def test_foreign_external_or_target_stops_before_auth_issuance_and_cas(self):
         plan = {'schema_version': 1, 'installation_id': 'hooshix-production', 'kafka_client_tls': True,

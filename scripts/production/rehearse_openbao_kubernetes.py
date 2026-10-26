@@ -515,19 +515,14 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                             audiences, name + '-control-plane')
                         step('kafka-closed-runtime')
                         from rehearse_kafka_runtime import rehearse as kafka_runtime
-                        kafka_runtime_result = kafka_runtime(k, wait, run, cert.read_text(),
-                            name + '-control-plane', platform)
-                        step('kafka-application-client-tls-delivery')
                         from rehearse_kafka_client_tls import rehearse as kafka_clients
-                        import build_kafka_runtime_bundle as kafka_bundle
-                        import install_kafka_runtime as kafka_installer
-                        with patch.object(kafka_installer.volume, 'NODE', name + '-control-plane'), \
-                                patch.object(kafka_installer.tls.redis.volume, 'NODE', name + '-control-plane'), \
-                                patch.object(kafka_installer.tls.redis.pg.volume, 'NODE', name + '-control-plane'):
-                            client_runtime_plan = kafka_bundle.renderer.render(
-                                kafka_bundle.data_boundary(eso_chart, str(tools / 'helm')))
-                        kafka_client_result = kafka_clients(k, client_runtime_plan, api, token, cert.read_text(),
-                            key, audiences, name + '-control-plane')
+                        kafka_client_result = {}
+                        def deliver_kafka_clients(verified_plan):
+                            step('kafka-application-client-tls-delivery')
+                            kafka_client_result.update(kafka_clients(k, verified_plan, api, token, cert.read_text(),
+                                key, audiences, name + '-control-plane'))
+                        kafka_runtime_result = kafka_runtime(k, wait, run, cert.read_text(),
+                            name + '-control-plane', platform, on_verified_runtime=deliver_kafka_clients)
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the

@@ -2830,7 +2830,9 @@ client باید TLS معتبر داشته باشند، درخواست مدیری
 `ClusterAuthorizationException` رد شود و فایل خصوصی موقتی باقی نماند.
 rehearsal کامل Calico/Ambient/OpenBao/ESO نیز تحویل پنج Secret، رد خواندن متقابل،
 رد نوشتن، انقضای محدود token، revoke، تکرار بدون صدور/تغییر نسخه و عدم نشت در
-لاگ‌ها را اثبات می‌کند. این شواهد جایگزین نتیجهٔ VPS نیستند.
+لاگ‌ها را اثبات می‌کند. مرحلهٔ client همان plan تأییدشدهٔ مرحلهٔ broker را، با
+defaultهای API همان محیط، دریافت می‌کند؛ مقایسهٔ دقیق قرارداد حذف یا سست نمی‌شود.
+این شواهد جایگزین نتیجهٔ VPS نیستند.
 
 فقط روی checkout تمیز `main` و با `STAGING_RUN` موفقِ همان SHA شامل
 `kafka_client_tls_delivery`، bundle عمومی را بیرون Git بسازید؛ Helm و chart همان
