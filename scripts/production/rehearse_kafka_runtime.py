@@ -285,7 +285,7 @@ def safe_failure_location(error):
     return 'Other'
 
 
-def rehearse(k, wait, run, ca, node, platform):
+def rehearse(k, wait, run, ca, node, platform, *, on_verified_runtime=None):
     if not re.fullmatch('hooshix-bao-ci-[a-f0-9]{12}-control-plane', node):
         raise ValueError('OWNED_KAFKA_RUNTIME_FIXTURE_REQUIRED')
     def kube(*args, body=None, **options):
@@ -432,4 +432,6 @@ def rehearse(k, wait, run, ca, node, platform):
         result['network_and_mesh_policy'] = 'Passed'
         result['host_storage_guard'] = 'Not run; disposable local path'
         result['application_ingress'] = 'CLOSED'
+        if on_verified_runtime is not None:
+            on_verified_runtime(copy.deepcopy(plan))
         return result

@@ -534,6 +534,8 @@ scripts/production/apply_human_sshd_candidate.sh
 scripts/production/backup_openbao_host.py
 scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_intermediate_csr.py
+scripts/production/bootstrap_kafka_client_tls.py
+scripts/production/bootstrap_kafka_client_tls_operator.py
 scripts/production/bootstrap_kafka_tls.py
 scripts/production/bootstrap_kafka_tls_operator.py
 scripts/production/bootstrap_openbao_auth.py
@@ -549,6 +551,7 @@ scripts/production/build_cert_manager_commissioning_bundle.py
 scripts/production/build_cnpg_control_plane_bundle.py
 scripts/production/build_eso_commissioning_bundle.py
 scripts/production/build_kafka_candidate.py
+scripts/production/build_kafka_client_tls_bundle.py
 scripts/production/build_kafka_local_volume_bundle.py
 scripts/production/build_kafka_runtime_bundle.py
 scripts/production/build_kafka_storage_bundle.py
@@ -576,6 +579,7 @@ scripts/production/install_barman_control_plane.py
 scripts/production/install_cert_manager.py
 scripts/production/install_cnpg_control_plane.py
 scripts/production/install_eso.py
+scripts/production/install_kafka_client_tls.py
 scripts/production/install_kafka_local_volume.py
 scripts/production/install_kafka_runtime.py
 scripts/production/install_kafka_tls.py
@@ -589,6 +593,7 @@ scripts/production/install_redis_tls.py
 scripts/production/install_release_tools.sh
 scripts/production/jit_broker.py
 scripts/production/jit_runtime.py
+scripts/production/kafka_client_tls.py
 scripts/production/kafka_secret_delivery.py
 scripts/production/kafka_tls_material.py
 scripts/production/offline-ca/README-fa.txt
@@ -632,6 +637,7 @@ scripts/production/rehearse_cnpg_control_plane.py
 scripts/production/rehearse_eso_commissioning.py
 scripts/production/rehearse_eso_delivery.py
 scripts/production/rehearse_import_referrers.py
+scripts/production/rehearse_kafka_client_tls.py
 scripts/production/rehearse_kafka_local_volume.py
 scripts/production/rehearse_kafka_runtime.py
 scripts/production/rehearse_kafka_tls.py
@@ -689,6 +695,7 @@ scripts/production/run-redis-local-volume.ps1
 scripts/production/run-redis-runtime.ps1
 scripts/production/run-redis-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
+scripts/production/test_kafka_client_tls_native.py
 scripts/production/test_kafka_runtime_native.py
 scripts/production/test_kafka_tls_acl_native.py
 scripts/production/test_postgresql_isolation_native.py
@@ -710,6 +717,7 @@ scripts/production/tests/test_intermediate_csr.py
 scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
+scripts/production/tests/test_kafka_client_tls.py
 scripts/production/tests/test_kafka_local_volume.py
 scripts/production/tests/test_kafka_runtime.py
 scripts/production/tests/test_kafka_runtime_candidate.py
@@ -865,6 +873,7 @@ services/authorization-service/src/test/java/com/sajtech/authorization/applicati
 services/authorization-service/src/test/java/com/sajtech/authorization/architecture/ArchitectureRulesTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/configuration/AuthorizationApplicationPropertiesTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/configuration/AuthorizationMigrationProfileIntegrationTest.java
+services/authorization-service/src/test/java/com/sajtech/authorization/configuration/KafkaClientConfigTreeTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/observability/AuthorizationReservationMonitorTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/persistence/AuthorizationPersistenceIntegrationTest.java
 services/authorization-service/src/test/java/com/sajtech/authorization/infrastructure/persistence/AuthorizationRlsIntegrationTest.java

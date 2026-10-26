@@ -31,7 +31,8 @@ STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "sc
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
                    "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
-                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "kafka-closed-runtime", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "kafka-closed-runtime",
+                   "kafka-application-client-tls-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -514,8 +515,14 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                             audiences, name + '-control-plane')
                         step('kafka-closed-runtime')
                         from rehearse_kafka_runtime import rehearse as kafka_runtime
+                        from rehearse_kafka_client_tls import rehearse as kafka_clients
+                        kafka_client_result = {}
+                        def deliver_kafka_clients(verified_plan):
+                            step('kafka-application-client-tls-delivery')
+                            kafka_client_result.update(kafka_clients(k, verified_plan, api, token, cert.read_text(),
+                                key, audiences, name + '-control-plane'))
                         kafka_runtime_result = kafka_runtime(k, wait, run, cert.read_text(),
-                            name + '-control-plane', platform)
+                            name + '-control-plane', platform, on_verified_runtime=deliver_kafka_clients)
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
@@ -609,6 +616,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 result['redis_runtime'] = redis_runtime_result
                 result['kafka_tls_delivery'] = kafka_tls_result
                 result['kafka_closed_runtime'] = kafka_runtime_result
+                result['kafka_client_tls_delivery'] = kafka_client_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['redis_local_volume'] = redis_volume_result
