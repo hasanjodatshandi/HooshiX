@@ -24,13 +24,16 @@ class PublishedPostgreSQLTest(unittest.TestCase):
         self.engine = 'sha256:' + 'e' * 64
 
     def test_reviewed_set_preserves_upstream_and_promotion_boundaries(self):
-        self.assertEqual('github:40132294662:1', self.publication['invocation_id'])
+        self.assertEqual('github:40333333697:1', self.publication['invocation_id'])
         self.assertEqual(set(target.COMPONENTS), set(self.publication['images']))
         self.assertEqual('Passed', self.publication['publication'])
         self.assertEqual('blocked-until-supply-chain-staging-and-recovery-evidence',
                          target.pins()['production_promotion'])
         text = json.dumps(self.publication, indent=2) + '\n'
         self.assertEqual(self.selected['publication_sha256'], hashlib.sha256(text.encode()).hexdigest())
+        workflow = (target.PIN.parents[3] / '.github/workflows/platform-commissioning.yml').read_text()
+        self.assertIn('gh run download 40333333697 --repo hasanjodatshandi/HooshiX', workflow)
+        self.assertIn('--name postgresql-publication-40333333697-1', workflow)
 
     def test_partial_untrusted_or_promoted_catalog_rejected(self):
         def image(p):
