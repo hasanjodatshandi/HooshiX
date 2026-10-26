@@ -2096,6 +2096,38 @@ remount، UUID غلط، readonly، backing loss، unmount و ممنوعیت fall
 
 مرجع رفتار وابستگی: [systemd unit dependencies](https://www.freedesktop.org/software/systemd/man/259/systemd.unit.html).
 
+### بازیابی صریح guard Redis و K3s
+
+اگر guard Redis در حالت `failed` و K3s متوقف است، ابزار foundation یا تحویل
+گواهی را برای recovery دوباره اجرا نکنید. با VNC قابل ورود و نشست دوم SSH باز،
+ابتدا وضعیت mount و علت شکست guard را بررسی کنید. در نصب فعلی که هر چهار
+storage موجودند، فقط اگر بررسی مستقل هویت هر چهار storage موفق باشد، re-arm
+صریح زیر مجاز است. این عملیات داده، UUID، backing، permission یا unit را تغییر
+نمی‌دهد؛ تنها guard Redis و K3s متوقف‌شده را راه‌اندازی می‌کند.
+
+در shell لینوکسِ همان VPS، رمز sudo را فقط در ورودی محلی وارد کنید:
+
+```bash
+set -e
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/openbao-storage-guard.py --guard-check
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/postgresql-storage-guard.py --guard-check
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/redis-storage-guard.py --guard-check
+sudo /usr/bin/python3 -I /var/lib/hooshixstorage/kafka-storage-guard.py --guard-check
+sudo systemctl reset-failed hooshix-redis-storage-guard.service
+sudo systemctl start hooshix-redis-storage-guard.service
+sudo systemctl is-active hooshix-openbao-storage-guard.service hooshix-postgresql-storage-guard.service hooshix-redis-storage-guard.service hooshix-kafka-storage-guard.service
+sudo systemctl start k3s.service
+sudo systemctl is-active k3s.service
+```
+
+هر بررسی هویت باید exit صفر و هر سرویس در پایان `active` داشته باشد. در خطا
+متوقف شوید؛ هیچ guard یا وابستگی را حذف، غیرفعال یا ضعیف نکنید. موفقیت یک بررسی
+لحظه‌ای علت تاریخی شکست را ثابت نمی‌کند؛ شکست دوباره نیاز به بررسی علت دارد،
+نه تکرار خودکار re-arm. پس از فعال‌شدن K3s، وضعیت OpenBao و ESO را بررسی کنید؛
+اگر OpenBao sealed بود، unseal فقط با همان custody و عملیات جداگانهٔ تحت نظارت
+انجام می‌شود، بدون init یا recovery initialization. نتیجهٔ VPS هنوز تا اجرای
+موفق و readback **Not verified** است.
+
 ### رزرو فضای آماده برای Redis
 
 رزرو LocalPV از فایل‌سیستم سالم و guardدار موجود استفاده می‌کند؛ هیچ تخصیص، فرمت،
