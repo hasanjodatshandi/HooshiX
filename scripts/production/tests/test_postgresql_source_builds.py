@@ -41,7 +41,8 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                          [{'name': 'golang.org/x/net', 'version': 'v0.60.0'}] if component != 'postgresql' else []) +
                          [{'name': name, 'version': version, 'type': 'apk'} for name, version in
                           (self.selected['runtime_packages'] | self.selected['sidecar_packages'] |
-                           {'brotli-libs': target.BROTLI_VERSION}).items()] +
+                           {'brotli-libs': target.BROTLI_VERSION} |
+                           ({'libcurl': target.LIBCURL_VERSION} if component == 'postgresql' else {})).items()] +
                          [{'name': 'barman', 'version': '3.20.1', 'type': 'python'},
                           {'name': 'certifi', 'version': target.CERTIFI_VERSION, 'type': 'python'},
                           {'name': 'postgresql', 'version': '18.6', 'type': 'binary'}]},
@@ -116,6 +117,8 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
         self.assertIn('libssl3=3.5.9-r0', postgresql)
         for generated in (postgresql, sidecar):
             self.assertIn('brotli-libs=1.2.1-r0', generated)
+        self.assertIn('libcurl=8.23.0-r0', postgresql)
+        self.assertNotIn('libcurl=', sidecar)
         self.assertIn('patched-upstream-runtime-build', postgresql)
         for generated in (operator, plugin, sidecar):
             self.assertIn('go mod verify', generated)
@@ -277,6 +280,18 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                 if change == 'duplicate': artifacts.append(package | {'version': '1.2.0-r1'})
                 with self.subTest(component=component, change=change), self.assertRaises(ValueError):
                     self.validate(component, evidence)
+
+    def test_libcurl_fixed_package_is_required_even_without_a_scanner_finding(self):
+        for change in ('missing', 'old', 'duplicate'):
+            evidence = self.evidence('postgresql')
+            artifacts = evidence['syft.json']['artifacts']
+            artifacts[:] = [item for item in artifacts if item['name'] != 'libcurl']
+            if change != 'missing':
+                artifacts.append({'name': 'libcurl', 'version': '8.22.0-r0', 'type': 'apk'})
+            if change == 'duplicate':
+                artifacts.append({'name': 'libcurl', 'version': '8.23.0-r0', 'type': 'apk'})
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.validate('postgresql', evidence)
 
     def test_export_pins_endpoint_and_build_identity_and_never_precedes_scan(self):
         payload = b'public-source-fixture'
