@@ -2976,6 +2976,12 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 [Spring Boot Kafka properties](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)،
 [Kafka 4.2 PEM client configuration](https://kafka.apache.org/42/configuration/admin-configs/).
 
+### قرارداد topic و ACL Kafka
+
+گام بعد فقط topicهای versioned موجود در قرارداد برنامه و ACLهای literal پنج
+هویت تحویل‌شده است. این گام مجوز wildcard، مدیریت broker، تغییر credential یا
+بازکردن مسیر برنامه/اینترنت نیست. اجرای مقصد و آزمون دسترسی هنوز **Not run** است.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
