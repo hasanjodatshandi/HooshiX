@@ -998,10 +998,12 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 
 ### پذیرش مجموعهٔ منتشرشدهٔ PostgreSQL
 
-operand و Barman sidecar فقط با `libcurl=8.23.0-r0` روی Alpine 3.24.2
+operand PostgreSQL فقط با `libcurl=8.23.0-r0` روی Alpine 3.24.2
 ساخته می‌شوند؛ این pin اصلاح `CVE-2026-92392` است.
 انتشار دوبارهٔ مجموعه، SBOM و اسکن تازه و پذیرش digestها پیش از استفاده الزامی است؛
 این تغییر مجوز ارتقا یا restart دیتابیس VPS نیست.
+تا ثبت receipt انتشار تازه و موفقیت پذیرش آن، مجموعهٔ منتشرشدهٔ فعلی برای
+پذیرش مجدد یا promotion مجاز نیست؛ صرف تغییر pin به معنی رفع تصویر قبلی نیست.
 مرجع: [اطلاعیهٔ امنیتی رسمی curl](https://curl.se/docs/CVE-2026-92392.html).
 
 ساخت جدید operand و Barman sidecar باید بستهٔ امضاشدهٔ Alpine

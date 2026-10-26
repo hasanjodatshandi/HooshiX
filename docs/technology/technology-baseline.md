@@ -35,7 +35,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Async/event transport | Apache Kafka 4.2.2 candidate + Spring Kafka 4.1.0 + LZ4 Java 1.11.4 | ADR-0015 profile-aware durability; private upstream-runtime-security-overlay candidate pins Alpine security packages and checksum-verifies Jackson 2.21.7/LZ4 1.11.4 overlays; local KRaft smoke and zero-High/Critical image scan required; production TLS/ACL, staging, restore and runtime promotion remain gated |
 | Event/API schema | Protobuf | Git + Buf governance |
 | Runtime Schema Registry | none in v1 | ADR-0003 |
-| Database | PostgreSQL 18.6 | profile-aware mutable relational persistence; candidate Alpine 3.24.2 runtime with fixed OpenSSL/zlib and brotli-libs 1.2.1-r0 for CVE-2026-111497; fresh publication/adoption, final artifact and CNPG/restore gates required |
+| Database | PostgreSQL 18.6 | profile-aware mutable relational persistence; candidate Alpine 3.24.2 runtime with fixed OpenSSL/zlib, brotli-libs 1.2.1-r0 and libcurl 8.23.0-r0 for CVE-2026-92392; fresh publication/adoption, final artifact and CNPG/restore gates required |
 | PostgreSQL operator | CloudNativePG 1.30.1 | ADR-0019/0034; fixed-source artifact gate required |
 | PostgreSQL backup | Barman Cloud CNPG-I plugin 0.15.1 / Barman 3.20.1 | WAL/PITR model; sidecar candidate Python 3.14.8 on Alpine 3.24.2 with brotli-libs 1.2.1-r0; certifi 2026.10.19 hash-locked override; compromised emSign G3 removed from Python/pip/system trust; plugin and sidecar gated together |
 | Barman plugin TLS dependency | cert-manager 1.20.3 | approved with Kubernetes 1.35 |

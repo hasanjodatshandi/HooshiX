@@ -27,7 +27,7 @@ This matrix records production technology combinations that must remain compatib
 | Istio | 1.30.5 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |
 | Calico | 3.32.1 | Kubernetes 1.35; K3s custom CNI; HBONE/health policy tests |
 | CloudNativePG | 1.30.1 | Kubernetes 1.35/PostgreSQL 18; one shared instance in single-server, dedicated clusters in HA; rebuilt artifact tests required |
-| PostgreSQL | 18.6 | candidate Alpine 3.24.2 runtime with brotli-libs 1.2.1-r0; fresh publication/adoption and CNPG/locale/restore gates; distinct service DB/roles/Flyway/RLS; shared physical only in single-server; 18.4 fixture is not 18.6 evidence |
+| PostgreSQL | 18.6 | candidate Alpine 3.24.2 runtime with brotli-libs 1.2.1-r0 and libcurl 8.23.0-r0; fresh publication/adoption and CNPG/locale/restore gates; distinct service DB/roles/Flyway/RLS; shared physical only in single-server; 18.4 fixture is not 18.6 evidence |
 | PostgreSQL JDBC | 42.7.13 | fixed security line; locks must not regress below 42.7.12 |
 | Barman Cloud plugin | 0.15.1 / Barman 3.20.1 | sidecar candidate Python 3.14.8/Alpine 3.24.2; hash-locked certifi 2026.10.19; compromised emSign G3 rejected by Requests, pip-vendored and system trust without removing unaffected roots; selected CNPG WAL/PITR integration; complete artifact and recovery gates required |
 | cert-manager | 1.20.3 | compatible with Kubernetes 1.35 |
