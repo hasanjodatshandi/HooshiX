@@ -26,6 +26,7 @@ MODULES = {'golang.org/x/net': 'v0.60.0', 'golang.org/x/crypto': 'v0.57.0',
            'golang.org/x/text': 'v0.42.0'}
 RUNTIME_PACKAGES = {'libcrypto3': '3.5.9-r0', 'libssl3': '3.5.9-r0', 'zlib': '1.3.2-r1'}
 BROTLI_VERSION = '1.2.1-r0'
+LIBCURL_VERSION = '8.23.0-r0'
 SIDECAR_PACKAGES = {'libpq': '18.6-r0', 'lz4-libs': '1.10.0-r1', 'snappy': '1.2.2-r0',
                     'libstdc++': '15.2.0-r5', 'tar': '1.35-r5'}
 BUILD_PACKAGES = {'build-base': '0.5-r4', 'cargo': '1.96.1-r0', 'postgresql18-dev': '18.6-r0',
@@ -154,7 +155,8 @@ def dockerfile(component, selected):
         raise ValueError('known fixed-source component required')
     source = selected['sources'][source_key(component)]
     runtime_packages = ' '.join(name + '=' + version for name, version in
-        (selected['runtime_packages'] | {'brotli-libs': BROTLI_VERSION}).items())
+        (selected['runtime_packages'] | {'brotli-libs': BROTLI_VERSION} |
+         ({'libcurl': LIBCURL_VERSION} if component == 'postgresql' else {})).items())
     if component == 'postgresql':
         lines = [f"FROM {selected['postgresql_runtime']}", 'WORKDIR /', 'USER 0:0',
                  f'RUN apk add --no-cache {runtime_packages} && '
@@ -257,7 +259,7 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
     require_unsuppressed_scan(report)
     if component in ('postgresql', 'barman-sidecar'):
         expected_packages = selected['runtime_packages'] | {'brotli-libs': BROTLI_VERSION} | (
-            selected['sidecar_packages'] if component == 'barman-sidecar' else {})
+            {'libcurl': LIBCURL_VERSION} if component == 'postgresql' else selected['sidecar_packages'])
         packages = [item for item in syft['artifacts'] if item.get('type') == 'apk'
                     and item['name'] in expected_packages]
         if (syft['distro'].get('id') != 'alpine' or syft['distro'].get('versionID') != selected['alpine_version']

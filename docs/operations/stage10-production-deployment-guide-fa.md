@@ -998,6 +998,15 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 
 ### پذیرش مجموعهٔ منتشرشدهٔ PostgreSQL
 
+operand PostgreSQL فقط با `libcurl=8.23.0-r0` روی Alpine 3.24.2
+ساخته می‌شود؛ این pin اصلاح `CVE-2026-92392` است.
+مجموعهٔ انتخاب‌شدهٔ زیر با این pin منتشر شده است؛ SBOM و اسکن تازه و پذیرش
+digestها پیش از استفاده الزامی است؛
+این تغییر مجوز ارتقا یا restart دیتابیس VPS نیست.
+بدون موفقیت پذیرش و staging، انتشار به‌تنهایی مجوز promotion نیست؛
+صرف تغییر pin به معنی رفع تصویر قبلی نیست.
+مرجع: [اطلاعیهٔ امنیتی رسمی curl](https://curl.se/docs/CVE-2026-92392.html).
+
 ساخت جدید operand و Barman sidecar باید بستهٔ امضاشدهٔ Alpine
 `brotli-libs=1.2.1-r0` را داشته باشد؛ inventory فاقد بسته، قدیمی یا دارای نسخهٔ
 آسیب‌پذیر تکراری، حتی بدون finding اسکنر، رد می‌شود. این pin اصلاح
@@ -1010,8 +1019,8 @@ receipt همچنان `Not verified` می‌مانند. موفقیت انتشار
 مرجع: [انتشار امنیتی Brotli 1.2.1](https://github.com/google/brotli/releases/tag/v1.2.1)،
 [بسته و secfix رسمی Alpine 3.24](https://github.com/alpinelinux/aports/blob/3.24-stable/main/brotli/APKBUILD).
 
-اجرای محافظت‌شدهٔ `40132294662`، attempt `1` روی
-`main@e6af3123a96c48cb802c3253cca3c1c999e8ccd4` انتشار هر چهار تصویر را با
+اجرای محافظت‌شدهٔ `40333333697`، attempt `1` روی
+`main@c16176096b526897a5734ec1e3378cf8ccc3d9d5` انتشار هر چهار تصویر را با
 `publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
 واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
 این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
@@ -1025,7 +1034,7 @@ artifact همان اجرا را بیرون Git دانلود کنید و روی �
 Unix و ابزارهای integrity-pinned اجرا کنید؛ این فرمان VPS را متصل نمی‌کند:
 
 ```bash
-gh run download 40132294662 --name postgresql-publication-40132294662-1 --dir /path/outside-repo/postgresql-publication
+gh run download 40333333697 --name postgresql-publication-40333333697-1 --dir /path/outside-repo/postgresql-publication
 bash scripts/production/install_release_tools.sh /path/outside-repo/release-tools
 PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_published_postgresql.py \
   --evidence-dir /path/outside-repo/postgresql-publication \
