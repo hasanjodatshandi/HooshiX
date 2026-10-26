@@ -2171,14 +2171,16 @@ node، حذف عادی همان Pod و انتظار روی StatefulSet موجو�
 set -e
 sudo /usr/local/bin/k3s kubectl wait --for=condition=Ready node/hooshix-production-1 --timeout=30s
 sudo /usr/local/bin/k3s kubectl -n platform-data delete pod/kafka-0 --wait=true --timeout=90s
-sudo /usr/local/bin/k3s kubectl -n platform-data rollout status statefulset/kafka --timeout=420s
+sudo /usr/local/bin/k3s kubectl -n platform-data wait --for=jsonpath={.status.readyReplicas}=1 statefulset/kafka --timeout=420s
 ```
 
 نام node مختص نصب جاری است؛ در نصب دوم باید نام node همان نصب باشد. این فرمان
 هیچ StatefulSet، PVC/PV، cluster ID، فایل KRaft، backing یا گواهی را حذف یا
 تغییر نمی‌دهد و از `--force` یا `--grace-period=0` استفاده نمی‌کند. اگر node
-Ready نیست، حذف عادی تمام نشد یا rollout شکست خورد، متوقف شوید؛ برای دورزدن
+Ready نیست، حذف عادی تمام نشد یا انتظار Ready شکست خورد، متوقف شوید؛ برای دورزدن
 مشکل، Pod را force-delete، replica را زیاد یا data را format/reset نکنید.
+راهبرد StatefulSet موجود `OnDelete` است؛ آن را تغییر ندهید. اگر حذف عادی قبلاً
+موفق شده است، فقط فرمان انتظار را اجرا کنید و حذف Pod را تکرار نکنید.
 انتظار روی StatefulSet از خطای زودهنگام NotFound هنگام ساخته‌نشدن Pod جایگزین
 جلوگیری می‌کند. Ready شدن broker فقط بازیابی runtime موجود است؛ هویت storage،
 node TLS و مرز بستهٔ قبلی پیش از تحویل client دوباره توسط ابزار بررسی می‌شوند.
