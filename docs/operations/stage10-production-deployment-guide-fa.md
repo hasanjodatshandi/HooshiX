@@ -2783,6 +2783,19 @@ certificate renewal، topic/client credentials/ACL، observability و complete-s
 readiness همچنان `Not verified` هستند. ترافیک برنامه تا عبور این gateها بسته
 می‌ماند.
 
+### تحویل گواهی مستقل کلاینت‌های Kafka
+
+پنج مصرف‌کنندهٔ فعلی Kafka عبارت‌اند از `authorization-service`،
+`conversation-service`، `identity-service`، `notification-service` و `web-bff`.
+هر سرویس فقط گواهی clientAuth و کلید مستقل خودش را از مسیر اختصاصی OpenBao
+و SecretStore موجود همان سرویس در `platform-apps` دریافت می‌کند. گواهی node،
+Root و intermediate موجود جایگزین نمی‌شوند. تحویل credential به معنی ایجاد
+topic، اعطای ACL، بازکردن شبکه یا استقرار برنامه نیست؛ broker همچنان بسته است.
+کلیدهای خصوصی فقط در حافظه/tmpfs بدون swap، OpenBao و Secret مدیریت‌شدهٔ ESO
+قرار می‌گیرند؛ Git، bundle عمومی، خروجی ترمینال و فایل محلی محل نگهداری آن‌ها نیستند.
+اجرای دوباره نباید کلید موجود را بچرخاند یا تاریخچهٔ حذف‌شده و منابع بیگانه را تصاحب کند.
+ابزار و شاهد اجرای مقصد این بخش تا تکمیل پیاده‌سازی و آزمون مستقل **Not verified** است.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
