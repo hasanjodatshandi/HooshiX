@@ -22,6 +22,8 @@ on:
       - scripts/production/*kafka*tls*.py
       - scripts/production/kafka_secret_delivery.py
       - scripts/production/tests/test_kafka_tls.py
+      - scripts/production/*kafka*client*tls*.py
+      - scripts/production/tests/test_kafka_client_tls.py
       - scripts/production/*kafka*runtime*.py
       - scripts/production/build_kafka_runtime_bundle.py
       - scripts/production/run-kafka-runtime.ps1

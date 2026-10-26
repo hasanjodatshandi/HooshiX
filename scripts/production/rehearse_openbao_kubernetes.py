@@ -31,7 +31,8 @@ STEPS = frozenset({"tools", "cluster", "ca-import", "schema", "schema-crds", "sc
                    "schema-pod", "schema-psa-negative", "tls", "workload", "sealed",
                    "public-ca-projection", "unseal", "acl", "scoped-auth", "eso-delivery",
                    "signed-ambient-eso-commissioning", "signed-ambient-cert-manager-commissioning", "signed-ambient-cnpg-control-plane", "signed-ambient-barman-control-plane",
-                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "kafka-closed-runtime", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
+                   "redis-scoped-secret-delivery", "redis-tls-delivery", "redis-closed-runtime", "kafka-tls-delivery", "kafka-closed-runtime",
+                   "kafka-application-client-tls-delivery", "restart", "pvc-retain", "revoke", "privacy", "cleanup"})
 
 
 def step(name: str) -> None:
@@ -516,6 +517,17 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                         from rehearse_kafka_runtime import rehearse as kafka_runtime
                         kafka_runtime_result = kafka_runtime(k, wait, run, cert.read_text(),
                             name + '-control-plane', platform)
+                        step('kafka-application-client-tls-delivery')
+                        from rehearse_kafka_client_tls import rehearse as kafka_clients
+                        import build_kafka_runtime_bundle as kafka_bundle
+                        import install_kafka_runtime as kafka_installer
+                        with patch.object(kafka_installer.volume, 'NODE', name + '-control-plane'), \
+                                patch.object(kafka_installer.tls.redis.volume, 'NODE', name + '-control-plane'), \
+                                patch.object(kafka_installer.tls.redis.pg.volume, 'NODE', name + '-control-plane'):
+                            client_runtime_plan = kafka_bundle.renderer.render(
+                                kafka_bundle.data_boundary(eso_chart, str(tools / 'helm')))
+                        kafka_client_result = kafka_clients(k, client_runtime_plan, api, token, cert.read_text(),
+                            key, audiences, name + '-control-plane')
                 # The earlier reader may already be past its explicit 20-minute maximum
                 # after the lengthy commissioned components. Mint a fresh independent
                 # read-only credential while this API forward is still alive and prove the
@@ -609,6 +621,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                 result['redis_runtime'] = redis_runtime_result
                 result['kafka_tls_delivery'] = kafka_tls_result
                 result['kafka_closed_runtime'] = kafka_runtime_result
+                result['kafka_client_tls_delivery'] = kafka_client_result
     else:
         result['postgresql_local_volume'] = local_volume_result
         result['redis_local_volume'] = redis_volume_result

@@ -2794,7 +2794,84 @@ topic، اعطای ACL، بازکردن شبکه یا استقرار برنام�
 کلیدهای خصوصی فقط در حافظه/tmpfs بدون swap، OpenBao و Secret مدیریت‌شدهٔ ESO
 قرار می‌گیرند؛ Git، bundle عمومی، خروجی ترمینال و فایل محلی محل نگهداری آن‌ها نیستند.
 اجرای دوباره نباید کلید موجود را بچرخاند یا تاریخچهٔ حذف‌شده و منابع بیگانه را تصاحب کند.
-ابزار و شاهد اجرای مقصد این بخش تا تکمیل پیاده‌سازی و آزمون مستقل **Not verified** است.
+| سرویس | Secret در `platform-apps` |
+| --- | --- |
+| `authorization-service` | `authorization-kafka` |
+| `conversation-service` | `conversation-kafka` |
+| `identity-service` | `identity-kafka` |
+| `notification-service` | `notification-kafka` |
+| `web-bff` | `web-bff-kafka` |
+
+مسیر هر سرویس `hooshix/data/production/<service>/kafka-tls` و subject آن
+`CN=hooshix-<service>-kafka` است؛ principal ادمین/node به برنامه داده نمی‌شود.
+هر leaf از نوع RSA 3072/SHA-256، غیر CA، فقط clientAuth و دارای اعتبار حداکثر
+۳۰ روز است. ابزار حداقل هفت روز اعتبار باقی‌مانده می‌خواهد؛ تمدید خودکار هنوز
+**Not run** است و اجرای مجدد جایگزین عملیات تمدید نیست.
+
+Secret از نوع Opaque و با کلیدهای configtree استاندارد Spring Boot ساخته می‌شود:
+`spring.kafka.security.protocol=SSL`، دو store از نوع `PEM`، کلید PKCS#8،
+زنجیرهٔ leaf+intermediate، Root عمومی و اعتبارسنجی hostname برابر `HTTPS`.
+اسرار مستقل هر سرویس توسط SecretStore موجود `hooshix-<service>` خوانده می‌شوند؛
+ServiceAccount، Role، policy و دسترسی شبکهٔ تازه ایجاد نمی‌شود. فایل configtree
+این مقادیر را در mount موجود هر سرویس مصرف خواهد کرد؛ آزمون واقعی configtree با
+Spring Boot 4.1.0 نگاشت PEM و hostname validation را برای producer، consumer و
+admin بررسی می‌کند. اجرای واقعی برنامه هنوز
+جزو این مرحله نیست. منابع بیگانه، drift، Secret بدون مالک ESO معتبر و تاریخچهٔ
+حذف‌شدهٔ OpenBao موجب توقف می‌شوند؛ دادهٔ موجود هرگز reset یا خودکار rotate نمی‌شود.
+
+قبل از ساخت bundle، آزمون یک‌بارمصرف با تصویر دقیق منتشرشده اجرا می‌شود:
+
+```bash
+python3 scripts/production/test_kafka_client_tls_native.py --disposable
+```
+
+این آزمون فقط Docker محلی، Root/issuer مصنوعی و tmpfs را مصرف می‌کند؛ هر پنج
+client باید TLS معتبر داشته باشند، درخواست مدیریت ACL آن‌ها با
+`ClusterAuthorizationException` رد شود و فایل خصوصی موقتی باقی نماند.
+rehearsal کامل Calico/Ambient/OpenBao/ESO نیز تحویل پنج Secret، رد خواندن متقابل،
+رد نوشتن، انقضای محدود token، revoke، تکرار بدون صدور/تغییر نسخه و عدم نشت در
+لاگ‌ها را اثبات می‌کند. این شواهد جایگزین نتیجهٔ VPS نیستند.
+
+فقط روی checkout تمیز `main` و با `STAGING_RUN` موفقِ همان SHA شامل
+`kafka_client_tls_delivery`، bundle عمومی را بیرون Git بسازید؛ Helm و chart همان
+نسخه‌ها و مسیرهای تأییدشدهٔ بخش قبل هستند:
+
+```bash
+python3 scripts/production/build_kafka_client_tls_bundle.py \
+  --staging-run "$STAGING_RUN" --chart "$ESO_CHART" --helm "$HELM" \
+  --retained-database-quarantine \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-client-tls
+python3 scripts/production/bootstrap_kafka_client_tls_operator.py \
+  --bundle /mnt/c/Users/Coder/Downloads/HooshiX-kafka-client-tls --validate-only
+```
+
+گزینهٔ `--retained-database-quarantine` فقط برای VPS فعلی با همان PostgreSQL
+خالی اولیه است؛ برای نصب جدید با baseline جاری حذفش کنید. این گزینه image یا
+workload موجود را تغییر نمی‌دهد. صدور فقط پس از تأیید کل مجموعهٔ منابع و کلیدهای
+موجود شروع می‌شود؛ CAS صفر مانع overwrite است و state جزئی برای ادامه حفظ می‌شود.
+
+با VNC قابل ورود و نشست دوم private SSH باز، روی Windows اجرا کنید. مقدار
+`CUSTODY_DIRECTORY` را مسیر **همان custody موجود همان نصب** قرار دهید؛ Root یا
+custody جدید نسازید:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_kafka_client_tls_operator.py --bundle /mnt/c/Users/Coder/Downloads/HooshiX-kafka-client-tls --custody CUSTODY_DIRECTORY --rescue-and-second-session-ready
+```
+
+به‌ترتیب `READY` انگلیسی، رمز موجود custody، رمز موجود intermediate و sudo را
+فقط در ورودی‌های مخفی وارد کنید؛ توکن GHCR لازم نیست. نتیجه باید
+`KAFKA_CLIENT_TLS_DELIVERY=Passed` و پنج credential مستقل با دسترسی برنامه و
+عمومی `CLOSED` باشد. رسید عمومی در `~/.local/share/hooshix-kafka-client-tls/`
+ثبت می‌شود و کلید خصوصی در رسید نیست. نصب فقط پس از این خروجی روی مقصد
+تأیید می‌شود؛ تا آن زمان **Not verified** است. برای بررسی وضعیت عمومی بدون
+چاپ Secret می‌توانید از `kubectl -n platform-apps get externalsecrets` استفاده کنید.
+در خطا، state را حفظ کنید؛ broker، PVC، Root، node certificate و مقادیر موجود
+را حذف یا بازتولید نکنید. topic/ACL، دسترسی برنامه، تمدید، recovery و ظرفیت
+همچنان دروازه‌های مستقل بعدی هستند.
+
+منابع قرارداد configtree/PEM:
+[Spring Boot Kafka properties](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)،
+[Kafka 4.2 PEM client configuration](https://kafka.apache.org/42/configuration/admin-configs/).
 
 پس از آن ادامهٔ مشترک:
 

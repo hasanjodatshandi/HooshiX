@@ -85,7 +85,7 @@ def certificates(work: Path) -> None:
     (work / "client.properties").write_text(runtime.client_config())
 
 
-def exercise(docker_host: str) -> dict:
+def exercise(docker_host: str, *, client_tls_check=None) -> dict:
     require(isinstance(docker_host, str) and docker_host.startswith("unix://")
             and os.environ.get("DOCKER_HOST", "unix://").startswith("unix://")
             and os.getuid() != 0, "LOCAL_NONROOT_UNIX_DOCKER_REQUIRED")
@@ -185,6 +185,8 @@ def exercise(docker_host: str) -> dict:
             for _ in range(3):
                 cluster_id, _ = installer.storage_identity(closed_command)
                 installer.quorum_and_topics(closed_command, cluster_id)
+            if client_tls_check is not None:
+                client_tls_check(container, work)
             for topic in (TOPIC, "other-events"):
                 command("topics", "admin", "--create", "--topic", topic, "--partitions", "1",
                         "--replication-factor", "1", "--config", "min.insync.replicas=1")
