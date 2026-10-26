@@ -2128,6 +2128,64 @@ sudo systemctl is-active k3s.service
 انجام می‌شود، بدون init یا recovery initialization. نتیجهٔ VPS هنوز تا اجرای
 موفق و readback **Not verified** است.
 
+### بازیابی enrollment کنترلرهای ESO پس از توقف K3s
+
+پیش‌شرط: K3s و هر چهار guard فعال، OpenBao موجود unsealed و مسیر نجات باز
+باشد. اگر SecretStoreها خطای اتصال دارند، فقط annotation
+`ambient.istio.io/redirection=enabled` را نشانهٔ سلامت ندانید؛ listenerهای
+`15001`، `15006` و `15008` باید در network namespace همان Pod وجود داشته باشند.
+بررسی فقط‌خواندنی باید هویت Pod/ServiceAccount و sandbox جاری را تطبیق دهد؛
+نبود listener در هر دو کنترلر با وجود listener سالم OpenBao، مجوز تغییر CA،
+auth role، credential یا خاموش‌کردن STRICT نیست.
+
+فقط در همین وضعیتِ تأییدشده، Podهای دو کنترلر stateless زیر را بازسازی کنید؛
+Deployment، image، ServiceAccount، template و سیاست شبکه تغییر نمی‌کنند.
+webhook، cert-controller، OpenBao و workloadهای داده حذف یا restart نمی‌شوند:
+
+```bash
+set -e
+sudo /usr/local/bin/k3s kubectl -n platform-apps delete pod -l app.kubernetes.io/instance=hooshix-eso,app.kubernetes.io/name=external-secrets --wait=true --timeout=90s
+sudo /usr/local/bin/k3s kubectl -n platform-data delete pod -l app.kubernetes.io/instance=hooshix-postgresql-eso,app.kubernetes.io/name=external-secrets --wait=true --timeout=90s
+sudo /usr/local/bin/k3s kubectl -n platform-apps rollout status deployment/hooshix-eso --timeout=180s
+sudo /usr/local/bin/k3s kubectl -n platform-data rollout status deployment/hooshix-postgresql-eso --timeout=180s
+sudo /usr/local/bin/k3s kubectl -n platform-data wait --for=condition=Ready externalsecrets --all --timeout=180s
+sudo /usr/local/bin/k3s kubectl -n platform-apps wait --for=condition=Ready secretstores --all --timeout=180s
+```
+
+انتظار، rollout موفق هر دو کنترلر و Ready شدن منابع موجود است؛ Secret یا
+ExternalSecret را حذف، اسرار را بازتولید یا نصب پایه را تکرار نکنید. اگر recovery
+شکست خورد، همان خروجی را نگه دارید و علت جدید را بررسی کنید؛ تکرار خودکار یا
+انتظار طولانیِ بی‌تغییر مجاز نیست. موفقیت این گام فقط بازیابی همگام‌سازی ESO است،
+نه تمدید خودکار گواهی، رفع علت تاریخی توقف guard یا تأیید Production. پس از آن
+تحویل گواهی client Kafka با همان bundle و custody تأییدشده عملیات جداگانه است.
+
+### بازیابی Pod موجود Kafka در وضعیت Unknown
+
+پس از بازیابی K3s، اگر StatefulSet موجود `kafka` همچنان یک replica می‌خواهد اما
+Pod قدیمی `kafka-0` در وضعیت `Unknown` مانده است، ساخت broker را از ابتدا اجرا
+نکنید. پیش‌شرط، سلامت چهار guard و filesystemهای قبلی، همان StatefulSet/PVC و
+node همین نصب است؛ منبع یا claim بیگانه نباید adopt شود. فقط پس از Ready بودن
+node، حذف عادی همان Pod و انتظار روی StatefulSet موجود مجاز است:
+
+```bash
+set -e
+sudo /usr/local/bin/k3s kubectl wait --for=condition=Ready node/hooshix-production-1 --timeout=30s
+sudo /usr/local/bin/k3s kubectl -n platform-data delete pod/kafka-0 --wait=true --timeout=90s
+sudo /usr/local/bin/k3s kubectl -n platform-data wait --for=jsonpath={.status.readyReplicas}=1 statefulset/kafka --timeout=420s
+```
+
+نام node مختص نصب جاری است؛ در نصب دوم باید نام node همان نصب باشد. این فرمان
+هیچ StatefulSet، PVC/PV، cluster ID، فایل KRaft، backing یا گواهی را حذف یا
+تغییر نمی‌دهد و از `--force` یا `--grace-period=0` استفاده نمی‌کند. اگر node
+Ready نیست، حذف عادی تمام نشد یا انتظار Ready شکست خورد، متوقف شوید؛ برای دورزدن
+مشکل، Pod را force-delete، replica را زیاد یا data را format/reset نکنید.
+راهبرد StatefulSet موجود `OnDelete` است؛ آن را تغییر ندهید. اگر حذف عادی قبلاً
+موفق شده است، فقط فرمان انتظار را اجرا کنید و حذف Pod را تکرار نکنید.
+انتظار روی StatefulSet از خطای زودهنگام NotFound هنگام ساخته‌نشدن Pod جایگزین
+جلوگیری می‌کند. Ready شدن broker فقط بازیابی runtime موجود است؛ هویت storage،
+node TLS و مرز بستهٔ قبلی پیش از تحویل client دوباره توسط ابزار بررسی می‌شوند.
+هیچ topic تجاری، ACL برنامه یا دسترسی عمومی از این recovery ایجاد نمی‌شود.
+
 ### رزرو فضای آماده برای Redis
 
 رزرو LocalPV از فایل‌سیستم سالم و guardدار موجود استفاده می‌کند؛ هیچ تخصیص، فرمت،
