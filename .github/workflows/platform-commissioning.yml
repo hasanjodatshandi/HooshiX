@@ -24,6 +24,8 @@ on:
       - scripts/production/tests/test_kafka_tls.py
       - scripts/production/*kafka*client*tls*.py
       - scripts/production/tests/test_kafka_client_tls.py
+      - scripts/production/*kafka*topic*acl*.py
+      - scripts/production/tests/test_kafka_topic_acl.py
       - scripts/production/*kafka*runtime*.py
       - scripts/production/build_kafka_runtime_bundle.py
       - scripts/production/run-kafka-runtime.ps1

@@ -521,7 +521,7 @@ def execute(plan, *, kube=host.kube, guard=volume.foundation, preserve=tls.prese
         'capacity': 'Not verified', 'production_readiness': 'Not verified'}
 
 
-def main():
+def main(*, executor=execute, operation='KAFKA_RUNTIME'):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan', required=True, type=Path)
     parser.add_argument('--sha256', required=True)
@@ -552,8 +552,8 @@ def main():
             require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_nlink == 1
                 and stat.S_IMODE(info.st_mode) == 0o600, 'EXISTING_SAFE_KAFKA_LOCK_REQUIRED')
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            host.native(['/usr/sbin/auditctl', '-m', 'HooshiX closed Kafka runtime plan=' + args.sha256])
-            result = execute(plan)
+            host.native(['/usr/sbin/auditctl', '-m', 'HooshiX ' + operation + ' plan=' + args.sha256])
+            result = executor(plan)
         require(host.snapshot_services() == services, 'HOST_SERVICE_CHANGED')
         host.kernel_audit()
         result['plan_sha256'] = args.sha256
@@ -561,7 +561,7 @@ def main():
         return 0
     except (ValueError, KeyError, IndexError, TypeError, OSError, subprocess.SubprocessError,
             host.custody.BootstrapFailed):
-        print('KAFKA_RUNTIME=Failed; state preserved; no reset or automatic retry', file=sys.stderr)
+        print(operation + '=Failed; state preserved; no reset or automatic retry', file=sys.stderr)
         return 1
     finally:
         signal.alarm(0)

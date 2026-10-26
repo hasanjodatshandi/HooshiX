@@ -183,6 +183,12 @@ HA retains RF3/minISR2 current topology.
 
 TLS/auth/principals/ACLs/quotas, Outbox/Inbox/idempotency/replay remain mandatory. Kafka is transport, not business authority.
 
+ADR-0042's closed topic/ACL commissioning follows the verified empty broker and
+five client TLS identities. It creates only the existing versioned topic/group
+contract with a cluster/PVC-bound ownership journal; broker/application/public
+network paths stay closed. It is not quota, capacity, replay/recovery or traffic
+approval. The Stage10 living guide owns the supervised execution procedure.
+
 ## 7. Security Redis / quota runtime
 
 Single-server:
