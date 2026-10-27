@@ -13,7 +13,11 @@ require = runtime.require
 
 
 def fingerprint(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+    def encode_bytes(item):
+        if not isinstance(item, bytes):
+            raise TypeError('KAFKA_HEALTH_SNAPSHOT_TYPE_REJECTED')
+        return {'bytes_sha256': hashlib.sha256(item).hexdigest()}
+    return hashlib.sha256(json.dumps(value, sort_keys=True, default=encode_bytes).encode()).hexdigest()
 
 
 def preserved(kube, plan):

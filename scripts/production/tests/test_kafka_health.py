@@ -63,7 +63,8 @@ class KafkaHealthTest(unittest.TestCase):
              patch.object(health.runtime, 'preflight_admission'), \
              patch.object(health.runtime, 'storage_identity', return_value=('fixed-id','a' * 64)), \
              patch.object(health.delivery, 'snapshot', return_value=[]), \
-             patch.object(health, 'preserved', return_value=['existing-data-and-credentials']), \
+             patch.object(health, 'preserved', return_value=[[b'ca-uid:resource-version',
+                 {'spec': {'replicas': 1}}, (b'public-uid', {'tls.crt': 'synthetic-only'})], 'retained-volume']), \
              patch.object(health, 'replace_policy', side_effect=self.policy):
             return health.execute(self.plan, kube=self.kube)
 
@@ -92,6 +93,15 @@ class KafkaHealthTest(unittest.TestCase):
         self.current['spec']['template']['spec']['containers'][0]['livenessProbe']['exec']['command'][2] = 'foreign'
         with self.assertRaises(ValueError): self.run_upgrade()
         self.assertFalse(self.writes)
+
+    def test_snapshot_fingerprint_preserves_nested_byte_identity_without_serializing_values(self):
+        value = [[b'ca-uid:version', {'pod': ('uid', 1)}], {'key': 'synthetic-only'}]
+        self.assertEqual(health.fingerprint(value), health.fingerprint(copy.deepcopy(value)))
+        self.assertNotEqual(health.fingerprint(value), health.fingerprint(
+            [['ca-uid:version', {'pod': ('uid', 1)}], {'key': 'synthetic-only'}]))
+        self.assertNotEqual(health.fingerprint(value), health.fingerprint(
+            [[b'changed-ca-uid:version', {'pod': ('uid', 1)}], {'key': 'synthetic-only'}]))
+        with self.assertRaises(TypeError): health.fingerprint(object())
 
     def test_foreign_journal_and_non_health_spec_drift_fail_before_mutation(self):
         self.run_upgrade()
