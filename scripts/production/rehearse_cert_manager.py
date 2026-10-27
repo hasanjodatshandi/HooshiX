@@ -19,6 +19,8 @@ from upgrade_mesh_security import replace_policy
 
 def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webhook', port=10250,
                      namespace=renderer.NAMESPACE):
+    def adapter(*args, body=None, **options):
+        return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
     name = 'cert-manager-wrong-source'
     boundary_name = 'hooshix-hooshix-secrets-bootstrap-boundary'
     previous = json.loads(k('get', 'validatingpolicy', boundary_name, '-o', 'json'))
@@ -45,7 +47,7 @@ def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webh
         'to': [{'ipBlock': {'cidr': target + '/32'}}], 'ports': [{'protocol': 'TCP', 'port': port}]}]}}
     try:
         replace_policy(bounded, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
-                       kube=k, previous=original)
+                       kube=adapter, previous=original)
         apply(k, egress)
         apply(k, {'apiVersion': 'v1', 'kind': 'Pod', 'metadata': {'name': name, 'namespace': 'hooshix-secrets',
             'labels': {'hooshix-cert-manager-probe': name, 'istio.io/dataplane-mode': 'none'}}, 'spec': pod})
@@ -61,7 +63,7 @@ def network_negative(k, wait, platform, *, selector='app.kubernetes.io/name=webh
         k('-n', 'hooshix-secrets', 'delete', 'pod', name, '--ignore-not-found', '--timeout=30s', timeout=40)
         k('-n', 'hooshix-secrets', 'delete', 'networkpolicy', name, '--ignore-not-found')
         replace_policy(original, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
-                       kube=k, previous=bounded)
+                       kube=adapter, previous=bounded)
         policy_ready(k, original)
 
 
@@ -120,12 +122,12 @@ def rehearse(k, wait, run, manifest, platform):
                 renderer.candidate()['publication']['repository_revision'], '0' * 40)
         try:
             replace_policy(p, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
-                           kube=k, previous=original)
+                           kube=adapter, previous=original)
             policy_ready(k, p)
             admission_result(k, test, wait, expected=1, public_schema=False)
         finally:
             replace_policy(original, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
-                           kube=k, previous=p)
+                           kube=adapter, previous=p)
             policy_ready(k, original)
         admission_result(k, test, wait, public_schema=False)
     result['source_identity_positive_negative'] = 'Passed'

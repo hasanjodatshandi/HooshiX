@@ -24,6 +24,7 @@ class KafkaHealthTest(unittest.TestCase):
         self.current['metadata'].update(uid='fixed-uid', resourceVersion='1',
                                        annotations={health.runtime.HASH: health.runtime.digest(self.current['spec'])})
         self.boundary = health.runtime.boundary_for_statefulset(self.plan['kafka_health_upgrade'], 'fixed-uid')
+        self.boundary['metadata']['resourceVersion'] = '1'
         self.boundary['status'] = {'conditionStatus': {'ready': True}}
         self.journal, self.pod, self.writes, self.fail_after_stop = None, True, [], False
 
@@ -39,6 +40,12 @@ class KafkaHealthTest(unittest.TestCase):
         self.writes.append(args)
         if args == ('create', '-f', '-'):
             self.journal = copy.deepcopy(body)
+        elif args[0] == 'patch' and body is not None:
+            self.assertIn('--patch-file=/dev/stdin', args)
+            self.assertEqual(self.boundary['metadata']['resourceVersion'], body[0]['value'])
+            self.assertEqual(self.boundary['spec'], body[1]['value'])
+            self.boundary['spec'] = copy.deepcopy(body[-1]['value'])
+            self.boundary['metadata']['resourceVersion'] = '2'
         elif 'patch' in args:
             operations = json.loads(args[args.index('-p') + 1])
             for op in operations:
@@ -53,10 +60,6 @@ class KafkaHealthTest(unittest.TestCase):
             if self.fail_after_stop: raise ValueError('SIMULATED_INTERRUPTION')
         return b''
 
-    def policy(self, value, **kwargs):
-        self.boundary = copy.deepcopy(value)
-        self.boundary['status'] = {'conditionStatus': {'ready': True}}
-
     def run_upgrade(self):
         with patch.object(health.runtime, 'get', side_effect=self.get), \
              patch.object(health.runtime, 'pod_inventory'), \
@@ -64,8 +67,7 @@ class KafkaHealthTest(unittest.TestCase):
              patch.object(health.runtime, 'storage_identity', return_value=('fixed-id','a' * 64)), \
              patch.object(health.delivery, 'snapshot', return_value=[]), \
              patch.object(health, 'preserved', return_value=[[b'ca-uid:resource-version',
-                 {'spec': {'replicas': 1}}, (b'public-uid', {'tls.crt': 'synthetic-only'})], 'retained-volume']), \
-             patch.object(health, 'replace_policy', side_effect=self.policy):
+                 {'spec': {'replicas': 1}}, (b'public-uid', {'tls.crt': 'synthetic-only'})], 'retained-volume']):
             return health.execute(self.plan, kube=self.kube)
 
     def test_upgrade_preserves_owner_volume_image_and_reenters_without_patches(self):

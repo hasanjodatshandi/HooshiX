@@ -98,7 +98,7 @@ class BarmanControlPlaneTest(unittest.TestCase):
                 return json.dumps(obj).encode() if obj else b''
             if args[0] == 'patch':
                 o = states[(args[1].lower(), None, args[2])]
-                changes = json.loads(args[-1])
+                changes = body if body is not None else json.loads(args[-1])
                 self.assertEqual(o['spec'], changes[1]['value'])
                 o['spec'] = changes[2]['value']
             if args[0] in ('create', 'apply') and body:
@@ -119,7 +119,11 @@ class BarmanControlPlaneTest(unittest.TestCase):
         for args, body, _ in calls:
             self.assertNotEqual('delete', args[0])
             self.assertNotIn('--force-conflicts', args)
-            if body: self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'ObjectStore', 'PersistentVolume', 'PersistentVolumeClaim'))
+            if isinstance(body, list):
+                self.assertEqual(('patch', 'ValidatingPolicy'), args[:2])
+                self.assertEqual(['test', 'test', 'replace'], [op['op'] for op in body])
+            elif body:
+                self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'ObjectStore', 'PersistentVolume', 'PersistentVolumeClaim'))
 
     def test_foreign_drift_or_secret_key_rejected_before_first_write(self):
         for case in ('foreign', 'extra-role', 'public-service', 'boundary', 'unlabeled-secret', 'data'):

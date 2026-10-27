@@ -24,6 +24,8 @@ def failure_classes(output):
 
 def strict_negative(k, wait, platform):
     """Only synthetic probes get temporary metrics reachability; STRICT is never relaxed."""
+    def adapter(*args, body=None, **options):
+        return k(*args, data=json.dumps(body).encode() if body is not None else None, **options)
     ns, label, boundary = 'hooshix-secrets', 'cnpg-mtls-probe', 'hooshix-hooshix-secrets-bootstrap-boundary'
     current = json.loads(k('get', 'validatingpolicy', boundary, '-o', 'json'))
     previous = {key: current[key] for key in ('apiVersion', 'kind', 'spec')}
@@ -58,7 +60,7 @@ def strict_negative(k, wait, platform):
                  'to': [{'operation': {'ports': ['8080']}}]}]}}]
     try:
         replace_policy(bounded, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
-                       kube=k, previous=previous)
+                       kube=adapter, previous=previous)
         for obj in policies: apply(k, obj)
         def probe(mode):
             name = label + '-' + mode
@@ -80,7 +82,7 @@ def strict_negative(k, wait, platform):
         for obj in policies:
             k('-n', obj['metadata']['namespace'], 'delete', obj['kind'], label, '--ignore-not-found')
         replace_policy(previous, get=lambda kind, name: json.loads(k('get', kind, name, '-o', 'json')),
-                       kube=k, previous=bounded)
+                       kube=adapter, previous=bounded)
         policy_ready(k, previous)
 
 
