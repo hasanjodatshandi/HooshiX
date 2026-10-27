@@ -79,7 +79,7 @@ exec(compile(b,'owner-loader.py','exec'))
         report = remote + '/receipt.json'
         command = ('umask 077; sudo /usr/bin/python3 -I -c ' + shlex.quote(checked)
                    + ' > ' + shlex.quote(report))
-        print('Create only six versioned topics and exact service ACLs. Existing data/TLS and application/public CLOSED boundaries preserved.')
+        print('Migrate ONLY the exact legacy Kafka liveness if present, with one controlled broker stop/start on the SAME retained volume; then complete six topics and exact ACLs. Data/TLS and application/public CLOSED boundaries preserved.')
         print('Enter sudo password ONLY here; no custody/CA/GHCR prompt. No recording.', flush=True)
         result = subprocess.run([operator.SSH, '-t', '-o', 'ConnectTimeout=8', 'hooshix-server', command],
                                 timeout=1000, env=operator.ENV, check=False)
@@ -98,6 +98,8 @@ exec(compile(b,'owner-loader.py','exec'))
             and receipt.get('production_readiness') == receipt.get('capacity') == 'Not verified'
             and receipt.get('application_ingress') == receipt.get('public_access') == 'CLOSED'
             and receipt.get('existing_state') == 'Preserved', 'KAFKA_TOPIC_RECEIPT_REJECTED')
+        require(receipt.get('health_upgrade') in ('Passed', 'Not applicable; current health contract'),
+                'KAFKA_TOPIC_HEALTH_RECEIPT_REQUIRED')
         print('KAFKA_TOPIC_ACL=Passed; six topics; five service identities; applications/public CLOSED')
         print('PUBLIC_RECEIPT=' + str(path))
         return 0

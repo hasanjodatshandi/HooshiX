@@ -161,6 +161,17 @@ def exercise(docker_host: str, *, client_tls_check=None) -> dict:
             health = docker('exec', container, *probe['exec']['command'],
                             timeout=probe['timeoutSeconds'], docker_host=docker_host)
             require(health.returncode == 0, 'RENDERED_KAFKA_HEALTH_PROBE_FAILED')
+            liveness = runtime.pod()['containers'][0]['livenessProbe']
+            for script, success in ((runtime.LIVENESS, True),
+                    (runtime.LIVENESS.replace('-verify_ip 127.0.0.1', '-verify_ip 127.0.0.2'), False),
+                    (runtime.LIVENESS.replace('/run/kafka/ca.crt', MOUNT + '/rogue-ca.crt'), False),
+                    (runtime.LIVENESS.replace('-cert /run/kafka/broker.pem', '-cert ' + MOUNT + '/rogue.pem')
+                        .replace('-key /run/kafka/broker.pem', '-key ' + MOUNT + '/rogue.pem'), False),
+                    (runtime.LIVENESS.replace('127.0.0.1:9092', '127.0.0.1:1'), False)):
+                checked = docker('exec', container, '/bin/sh', '-ec', script,
+                                 timeout=liveness['timeoutSeconds'], docker_host=docker_host)
+                require((checked.returncode == 0) == success and not checked.stdout and not checked.stderr,
+                        'KAFKA_AUTHENTICATED_LIVENESS_POSITIVE_NEGATIVE_REQUIRED')
             cancelled = docker('exec', container, '/usr/bin/timeout', '-s', 'KILL', '2',
                 '/bin/sh', '-ec', runtime.PROBE.replace('127.0.0.1:9092', '127.0.0.1:1'),
                 timeout=10, docker_host=docker_host)

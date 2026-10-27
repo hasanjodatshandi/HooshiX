@@ -118,7 +118,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
                 return json.dumps(value).encode() if value else b''
             if args[0] == 'patch':
                 old = states[(args[1].lower(), None, args[2])]
-                operations = json.loads(args[-1])
+                operations = body if body is not None else json.loads(args[-1])
                 self.assertEqual(old['metadata']['resourceVersion'], operations[0]['value'])
                 self.assertEqual(old['spec'], operations[1]['value'])
                 old['spec'] = operations[2]['value']
@@ -153,7 +153,11 @@ class CnpgControlPlaneTest(unittest.TestCase):
             self.assertNotIn('delete', args)
             self.assertNotIn('--force-conflicts', args)
             if body is not None and '--dry-run=server' not in args:
-                self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'PersistentVolume', 'PersistentVolumeClaim'))
+                if isinstance(body, list):
+                    self.assertEqual(('patch', 'ValidatingPolicy'), args[:2])
+                    self.assertEqual(['test', 'test', 'replace'], [op['op'] for op in body])
+                else:
+                    self.assertNotIn(body['kind'], ('Secret', 'Cluster', 'PersistentVolume', 'PersistentVolumeClaim'))
 
     def test_existing_data_stops_before_writes(self):
         for kind in ('pods', 'pvc', 'clusters.postgresql.cnpg.io'):
@@ -215,7 +219,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
     def test_partial_failure_preserves_created_state_and_log_diagnostics_are_fixed(self):
         p, states, calls, k = self.stateful()
         def fail(*args, body=None, **kwargs):
-            if body and body['kind'] == 'Deployment' and args[0] == 'create':
+            if args[0] == 'create' and body and body['kind'] == 'Deployment':
                 raise ValueError('native-create-failed')
             return k(*args, body=body, **kwargs)
         with patch.object(installer, 'protected', return_value=[]), \

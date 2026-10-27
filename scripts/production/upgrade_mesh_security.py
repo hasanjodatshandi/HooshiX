@@ -58,10 +58,11 @@ def replace_policy(value, *, get, kube, previous=None):
         require(before['spec'] == value['spec'] or (
             previous is not None and before['spec'] == previous['spec']), 'policy drift preserved')
         if before['spec'] != value['spec']:
-            kube('patch', kind, name, '--type=json', '-p', json.dumps([
+            # A complete data policy CAS exceeds Linux's single-argument bound; keep it on stdin.
+            kube('patch', kind, name, '--type=json', '--patch-file=/dev/stdin', body=[
                 {'op': 'test', 'path': '/metadata/resourceVersion', 'value': before['metadata']['resourceVersion']},
                 {'op': 'test', 'path': '/spec', 'value': before['spec']},
-                {'op': 'replace', 'path': '/spec', 'value': value['spec']}]))
+                {'op': 'replace', 'path': '/spec', 'value': value['spec']}])
     kube('wait', '--for=jsonpath={.status.conditionStatus.ready}=true',
          kind + '/' + name, '--timeout=60s', timeout=75)
 

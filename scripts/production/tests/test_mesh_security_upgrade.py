@@ -2,6 +2,8 @@
 import copy
 import io
 import json
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -87,7 +89,7 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
                 else:
                     kind, name, namespace = args[1], args[2], None
                 resource = resources[(kind, name, namespace)]
-                ops = json.loads(args[-1])
+                ops = body if body is not None else json.loads(args[-1])
                 self.assertEqual(resource['metadata']['resourceVersion'], ops[0]['value'])
                 if ops[-1]['path'] == '/spec':
                     resource['spec'] = ops[-1]['value']
@@ -116,6 +118,34 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
         self.assertFalse(any('patch' in c[0] for c in calls))
         mutations = [c for c in calls if 'patch' in c[0] or c[0][0] in ('create', 'apply', 'delete')]
         self.assertTrue(all('--dry-run=server' in c[0] for c in mutations))
+
+    @unittest.skipUnless(shutil.which('kubectl'), 'native local kubectl unavailable; full staging remains required')
+    def test_large_compare_and_swap_uses_stdin_with_real_local_kubectl(self):
+        before = {'apiVersion': 'v1', 'kind': 'Pod',
+            'metadata': {'name': 'synthetic-large-policy-transport', 'resourceVersion': '1'},
+            'spec': {'containers': [{'name': 'fixture', 'image': 'synthetic.invalid/never-run',
+                'env': [{'name': 'PUBLIC_FIXTURE', 'value': 'old' * 30000}]}]}}
+        desired = copy.deepcopy(before)
+        desired['spec']['containers'][0]['env'][0]['value'] = 'new' * 30000
+        calls = []
+        with tempfile.TemporaryDirectory(prefix='hooshix-public-patch-') as directory:
+            path = Path(directory) / 'public-pod.json'
+            path.write_text(json.dumps(before))
+            def kube(*args, body=None, **options):
+                calls.append((args, body))
+                if args[0] != 'patch': return b''
+                self.assertIn('--patch-file=/dev/stdin', args)
+                self.assertNotIn('-p', args)
+                self.assertGreater(len(json.dumps(body)), 131072)
+                command = [shutil.which('kubectl'), 'patch', '--local', '-f', str(path), '-o', 'json', *args[3:]]
+                self.assertLess(max(len(value) for value in command), 1024)
+                result = subprocess.run(command, input=json.dumps(body).encode(),
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=False)
+                self.assertEqual(0, result.returncode, 'native local patch failed; raw output suppressed')
+                self.assertEqual(desired['spec'], json.loads(result.stdout)['spec'])
+                return result.stdout
+            target.replace_policy(desired, get=lambda *_: copy.deepcopy(before), kube=kube, previous=before)
+        self.assertEqual(2, len(calls))
 
     def test_main_stdout_is_only_json_and_diagnostics_use_stderr(self):
         plan = copy.deepcopy(self.plan)

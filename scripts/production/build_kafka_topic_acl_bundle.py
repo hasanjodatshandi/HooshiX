@@ -9,7 +9,7 @@ from pathlib import Path
 import build_kafka_client_tls_bundle as previous
 import kafka_topic_acl as contract
 
-SOURCES = (*previous.SOURCES[:-1], 'kafka_topic_acl.py', 'install_kafka_topic_acl.py')
+SOURCES = (*previous.SOURCES[:-1], 'kafka_topic_acl.py', 'upgrade_kafka_health.py', 'install_kafka_topic_acl.py')
 
 
 def verify_proof(receipt):
@@ -19,7 +19,7 @@ def verify_proof(receipt):
         or proof.get('topic_count') != 6 or proof.get('credential_count') != 5 or proof.get('group_count') != 7
         or proof.get('acl_entries') != len(contract.permissions())
         or any(proof.get(k) != 'Passed' for k in ('positive_produce_consume',
-            'foreign_topic_group_admin_denials', 'idempotent_reconciliation'))
+            'foreign_topic_group_admin_denials', 'idempotent_reconciliation', 'health_upgrade', 'partial_recovery'))
         or proof.get('existing_state') != 'Preserved'
         or proof.get('application_ingress') != proof.get('public_access') or proof.get('public_access') != 'CLOSED'
         or proof.get('quotas') != 'Not run' or proof.get('production_readiness') != 'Not verified'):
@@ -40,6 +40,7 @@ def build(output, run_id, chart, helm, retained_database_quarantine=False):
         verify_proof(receipt)
         runtime = previous.previous.renderer.render(previous.previous.data_boundary(chart, helm, retained_database_quarantine))
         plan = {**previous.plan(runtime), 'kafka_topic_acl': True, 'repository_source_revision': revision,
+            'kafka_health_upgrade': previous.previous.renderer.legacy_health(previous.plan(runtime)['kafka_runtime']),
             'staging': {'source_revision': revision, 'run_id': run_id,
                         'observed_at': receipt['observed_at'], 'result': 'Passed'}}
         output.mkdir(mode=0o700)

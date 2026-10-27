@@ -46,6 +46,10 @@ class KafkaTlsAclTest(unittest.TestCase):
                 code = int(cleanup_failure)
             elif args[0] == "exec":
                 text = " ".join(args)
+                if 'exec /usr/bin/openssl s_client' in text:
+                    rejected = any(option in text for option in
+                        ('-verify_ip 127.0.0.2', '/rogue-ca.crt', '/rogue.pem', '127.0.0.1:1 '))
+                    return subprocess.CompletedProcess(args, int(rejected), '', '')
                 if '/usr/bin/timeout' in args:
                     code = cancellation_exit
                 elif "ps -o stat,comm" in text:
@@ -106,6 +110,9 @@ class KafkaTlsAclTest(unittest.TestCase):
                     continue
                 if '/usr/bin/timeout' in args:
                     self.assertIn('127.0.0.1:1', args[-1])
+                elif 'exec /usr/bin/openssl s_client' in args[-1]:
+                    self.assertIn('-verify_return_error', args[-1])
+                    self.assertIn('-cert_chain /run/kafka/broker.pem', args[-1])
                 elif '/bin/sh' in args:
                     self.assertIn(target.runtime.PROBE, args[-1])
                 else:
