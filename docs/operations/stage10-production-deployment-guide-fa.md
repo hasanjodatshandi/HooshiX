@@ -2976,6 +2976,79 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 [Spring Boot Kafka properties](https://docs.spring.io/spring-boot/appendix/application-properties/index.html)،
 [Kafka 4.2 PEM client configuration](https://kafka.apache.org/42/configuration/admin-configs/).
 
+### قرارداد topic و ACL Kafka
+
+گام بعد فقط topicهای versioned موجود در قرارداد برنامه و ACLهای literal پنج
+هویت تحویل‌شده است. این گام مجوز wildcard، مدیریت broker، تغییر credential یا
+بازکردن مسیر برنامه/اینترنت نیست. اجرای مقصد و آزمون دسترسی هنوز **Not run** است.
+
+منبع اجرایی `scripts/production/kafka_topic_acl.py` است؛ نام topic و consumer
+group با تنظیمات فعلی هر پنج سرویس آزمون تطبیق دارد. سه topic اصلی
+`hooshix.identity.erasure.command.v1`، `hooshix.identity.erasure.receipt.v1` و
+`hooshix.identity.tenant.lifecycle.v1` با پسوند `.DLT` برای هرکدام ساخته می‌شوند.
+هر شش topic یک partition، RF1/minISR1، cleanup از نوع delete و unclean election
+خاموش دارند. retention اصلی ۳۵ روز و DLT چهارده روز است؛ این retention جایگزین
+شاهد replay/dedup پایدار در دیتابیس، ظرفیت دیسک یا backup نیست.
+
+| هویت | خواندن | نوشتن |
+| --- | --- | --- |
+| identity | command و receipt؛ groupهای مستقل خودش | command، receipt، lifecycle؛ DLTهای command و receipt |
+| conversation | command و lifecycle؛ groupهای مستقل خودش | receipt؛ DLTهای command و lifecycle |
+| authorization، notification، web-bff | command؛ group مستقل هر سرویس | receipt و DLT مربوط به command |
+
+فقط `Read`/`Write`/`Describe` لازم روی topic literal و `Read` روی هفت group literal
+اعطا می‌شود. هیچ `Create`، `Delete`، `Alter`، `All`، ACL مدیریتی یا resource
+wildcard/prefix به برنامه‌ها داده نمی‌شود. به Compromised Password نیز مجوزی داده
+نمی‌شود. هویت `kafka-node-1` مسیر محلیِ مدیریتی فعلی است و به برنامه‌ها تحویل نمی‌شود.
+
+نصاب کل inventory topic و ACL را قبل از اولین تغییر بررسی می‌کند. در اجرای اول،
+broker باید بدون topic/ACL قبلی باشد؛ منبع هم‌نام حتی با تنظیم ظاهراً درست adopt
+نمی‌شود. سپس ConfigMap تغییرناپذیر `platform-data/hooshix-kafka-topic-acl-v1`
+با hash قرارداد، cluster identity، UIDِ StatefulSet و PVC ثبت می‌شود. ادامهٔ اجرای
+جزئی فقط با همین journal و subset دقیق قرارداد ممکن است. اختلاف تنظیم، مجوز اضافی،
+journal بیگانه یا cluster جدید متوقف می‌شود؛ حذف topic، کاهش retention، overwrite
+یا rollback خودکار انجام نمی‌شود. journal را برای عبور از خطا حذف نکنید.
+
+ابتدا آزمون پنج هویت واقعیِ مصنوعی روی همان digest و staging امضاشده باید موفق
+باشد. ارسال/دریافت مثبت، رد topic/group بیگانه، رد مدیریت ACL و اجرای مجدد بدون
+تغییر، شرط ساخت bundle هستند؛ پیام مصنوعی وارد topicهای VPS نمی‌شود.
+
+از checkout تمیزِ دقیق `main` و رسید staging همان revision، با chart/Helm تأییدشده:
+
+```bash
+python3 scripts/production/build_kafka_topic_acl_bundle.py \
+  --staging-run "$STAGING_RUN" --chart "$ESO_CHART" --helm "$HELM" \
+  --retained-database-quarantine \
+  --output /mnt/c/Users/Coder/Downloads/HooshiX-kafka-topic-acl
+python3 scripts/production/bootstrap_kafka_topic_acl_operator.py \
+  --bundle /mnt/c/Users/Coder/Downloads/HooshiX-kafka-topic-acl --validate-only
+```
+
+گزینهٔ retained فقط برای PostgreSQL قرنطینهٔ قبلی همین VPS است؛ در نصب جدید با
+baseline فعلی حذفش کنید. هر چهار guard، K3s، OpenBao unsealed، ESO و broker باید
+سالم باشند و هر پنج ExternalSecretِ client، Ready و متعلق به نصب باشند. کلیدها
+فقط در حافظه برای تطبیق بررسی می‌شوند؛ صادر، تعویض یا چاپ نمی‌شوند.
+
+با VNC قابل ورود و نشست دوم SSH باز، در PowerShell اجرا کنید:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_kafka_topic_acl_operator.py --bundle /mnt/c/Users/Coder/Downloads/HooshiX-kafka-topic-acl --rescue-and-second-session-ready
+```
+
+فقط `READY` انگلیسی و sudo در پنجرهٔ محلی لازم است؛ رمز custody/intermediate/Root
+یا GHCR نمی‌خواهد. نتیجهٔ مورد انتظار `KAFKA_TOPIC_ACL=Passed` است. رسید عمومی
+در `~/.local/share/hooshix-kafka-topics/` ذخیره می‌شود. تا دریافت رسید مقصد، نصب
+**Not verified** است. این عملیات broker را restart نمی‌کند؛ image، PVC، cluster
+ID، گواهی‌ها، advertise loopback، admission و قواعد شبکه تغییر نمی‌کنند.
+
+پس از این گام هنوز quota، ظرفیت/بازیابی، endpoint داخلی قابل‌دسترسی و مجوز شبکهٔ
+هر برنامه دروازه‌های مستقل هستند؛ برنامه/اینترنت همچنان `CLOSED` می‌ماند و هیچ
+ترافیک واقعی یا ادعای Production مجاز نیست.
+
+منابع نسخهٔ 4.2:
+[Kafka authorization/ACL](https://kafka.apache.org/42/security/authorization-and-acls/)،
+[topic configuration](https://kafka.apache.org/42/configuration/topic-configs/).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

@@ -191,6 +191,22 @@ the closed empty process only; it does not satisfy Kafka cold-DR/rebuild evidenc
 critical event replay/dedup retention, capacity, or any Production gate. Application
 traffic remains closed until those separate requirements pass.
 
+After that empty-runtime commissioning and delivery of the five independent
+application TLS identities, the owner-approved next closed step may create only
+the six existing versioned erasure/lifecycle topics and their literal per-service
+topic/group ACLs. `kafka_topic_acl.py` owns this fixed contract; it grants no
+application broker administration, wildcard resource, topic creation or deletion.
+All topic/ACL inventory is preflighted before a create-only immutable ownership
+journal binds the contract to the existing cluster, StatefulSet and Retain PVC.
+Foreign or drifted resources are preserved, not adopted/reset. Partial exact
+state may resume only with that journal. This step neither sends test/business
+messages on the VPS nor changes credentials, broker listeners, NetworkPolicy,
+mesh authorization or application/public access. Real positive/negative messaging
+is tested only in disposable signed-image fixtures. Quotas, disk/throughput
+capacity, retained replay/dedup evidence, recovery and client network activation
+remain separate mandatory gates before application traffic; none is waived by
+creating empty topics or ACLs.
+
 The profile formally accepts that Apache Kafka recommends separated/redundant controller/broker roles for critical deployments; the single combined process is a cost/operability trade-off and is not HA.
 
 Required settings/semantics include:

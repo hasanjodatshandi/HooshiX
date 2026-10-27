@@ -538,6 +538,7 @@ scripts/production/bootstrap_kafka_client_tls.py
 scripts/production/bootstrap_kafka_client_tls_operator.py
 scripts/production/bootstrap_kafka_tls.py
 scripts/production/bootstrap_kafka_tls_operator.py
+scripts/production/bootstrap_kafka_topic_acl_operator.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
 scripts/production/bootstrap_postgresql_secrets.py
@@ -556,6 +557,7 @@ scripts/production/build_kafka_local_volume_bundle.py
 scripts/production/build_kafka_runtime_bundle.py
 scripts/production/build_kafka_storage_bundle.py
 scripts/production/build_kafka_tls_bundle.py
+scripts/production/build_kafka_topic_acl_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
@@ -583,6 +585,7 @@ scripts/production/install_kafka_client_tls.py
 scripts/production/install_kafka_local_volume.py
 scripts/production/install_kafka_runtime.py
 scripts/production/install_kafka_tls.py
+scripts/production/install_kafka_topic_acl.py
 scripts/production/install_postgresql_local_volume.py
 scripts/production/install_postgresql_quarantine.py
 scripts/production/install_postgresql_secrets.py
@@ -596,6 +599,7 @@ scripts/production/jit_runtime.py
 scripts/production/kafka_client_tls.py
 scripts/production/kafka_secret_delivery.py
 scripts/production/kafka_tls_material.py
+scripts/production/kafka_topic_acl.py
 scripts/production/offline-ca/README-fa.txt
 scripts/production/offline-ca/build-package.ps1
 scripts/production/offline-ca/intermediate.cnf
@@ -641,6 +645,7 @@ scripts/production/rehearse_kafka_client_tls.py
 scripts/production/rehearse_kafka_local_volume.py
 scripts/production/rehearse_kafka_runtime.py
 scripts/production/rehearse_kafka_tls.py
+scripts/production/rehearse_kafka_topic_acl.py
 scripts/production/rehearse_openbao_kubernetes.py
 scripts/production/rehearse_openbao_recovery.py
 scripts/production/rehearse_openbao_storage.py
@@ -698,6 +703,7 @@ scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_kafka_client_tls_native.py
 scripts/production/test_kafka_runtime_native.py
 scripts/production/test_kafka_tls_acl_native.py
+scripts/production/test_kafka_topic_acl_native.py
 scripts/production/test_postgresql_isolation_native.py
 scripts/production/test_redis_security_native.py
 scripts/production/tests/test_barman_control_plane.py
@@ -724,6 +730,7 @@ scripts/production/tests/test_kafka_runtime_candidate.py
 scripts/production/tests/test_kafka_storage.py
 scripts/production/tests/test_kafka_tls.py
 scripts/production/tests/test_kafka_tls_acl.py
+scripts/production/tests/test_kafka_topic_acl.py
 scripts/production/tests/test_kyverno_upgrade.py
 scripts/production/tests/test_mesh_candidate.py
 scripts/production/tests/test_mesh_publication.py

@@ -124,4 +124,15 @@ def rehearse(k, runtime_plan, api, root, ca, root_key, audiences, node):
                 raise ValueError('KAFKA_CLIENT_CONTAINER_LOG_LEAK')
         result['container_log_privacy'] = 'Passed'
         result['broker_and_datastore_preservation'] = 'Passed'
+        from install_kafka_topic_acl import execute as topics
+        topic_plan = {**plan, 'kafka_topic_acl': True,
+                      'repository_source_revision': runtime_plan['repository_source_revision']}
+        result['kafka_topic_acl'] = topics(topic_plan, kube=kube, guard=lambda **_: None)
+        if topics(topic_plan, kube=kube, guard=lambda **_: None) != result['kafka_topic_acl']:
+            raise ValueError('KAFKA_TOPIC_ACL_REENTRY_CHANGED_STATE')
+        from rehearse_kafka_topic_acl import verify as verify_topics
+        result['kafka_topic_acl'].update(verify_topics(k, {service: {
+            key: value for key, value in api.call('hooshix/data/' + contract.entry(service)['key'], token=root)
+                ['data']['data'].items() if key not in installer.MARKERS} for service in contract.SERVICES}))
+        result['kafka_topic_acl']['idempotent_reconciliation'] = 'Passed'
     return result
