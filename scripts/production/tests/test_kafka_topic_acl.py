@@ -143,7 +143,10 @@ class KafkaTopicACLTest(unittest.TestCase):
         broker, objects, writes = Broker(), {}, []
         def get(kube, kind, name, namespace):
             return objects.get(name) if kind == 'configmap' else {'metadata': {'uid': kind + '-uid'}}
-        def kube(*args, body=None):
+        def kube(*args, body=None, **options):
+            if 'wait' in args:
+                self.assertEqual('statefulset/kafka', args[-2])
+                return b''
             self.assertEqual(('create', '-f', '-'), args)
             writes.append(copy.deepcopy(body))
             objects[body['metadata']['name']] = copy.deepcopy(body)
@@ -184,7 +187,8 @@ class KafkaTopicACLTest(unittest.TestCase):
             'group_count': 7, 'acl_entries': len(contract.permissions()), 'positive_produce_consume': 'Passed',
             'foreign_topic_group_admin_denials': 'Passed', 'idempotent_reconciliation': 'Passed',
             'existing_state': 'Preserved', 'application_ingress': 'CLOSED', 'public_access': 'CLOSED',
-            'quotas': 'Not run', 'production_readiness': 'Not verified'}
+            'quotas': 'Not run', 'production_readiness': 'Not verified', 'health_upgrade': 'Passed',
+            'partial_recovery': 'Passed'}
         with patch.object(bundle.previous, 'verify_proof'):
             bundle.verify_proof({'kafka_client_tls_delivery': {'kafka_topic_acl': proof}})
             for key in proof:

@@ -324,7 +324,8 @@ def rehearse(k, wait, run, ca, node, platform, *, on_verified_runtime=None):
     with patch.object(volume, 'NODE', node), patch.object(installer.volume, 'NODE', node), \
             patch.object(tls.redis.volume, 'NODE', node), patch.object(tls.redis.pg.volume, 'NODE', node):
         volume.reserve(volume.candidate(), kube)
-        plan = renderer.render(previous)
+        # Exercise the exact retained target profile, then its bounded health migration.
+        plan = renderer.render(previous, legacy=True)
         plan['repository_source_revision'] = os.environ['GITHUB_SHA']
         plan['public_ca_sha256'] = hashlib.sha256(ca.encode()).hexdigest()
         plan['staging'] = {'source_revision': os.environ['GITHUB_SHA'],

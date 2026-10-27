@@ -25,6 +25,12 @@ PROBE = ('exec /usr/bin/env KAFKA_HEAP_OPTS="-Xms32m -Xmx128m" '
          f'KAFKA_JVM_PERFORMANCE_OPTS="{TOOL_JVM_OPTIONS}" /opt/kafka/bin/kafka-topics.sh '
          '--bootstrap-server 127.0.0.1:9092 --command-config /etc/kafka/commissioned/client.properties '
          '--list >/dev/null 2>&1')
+# Liveness checks the authenticated local TLS listener, not a second short-lived JVM.
+LIVENESS = ('exec /usr/bin/openssl s_client -brief -tls1_2 -no_ign_eof '
+            '-connect 127.0.0.1:9092 -verify_ip 127.0.0.1 -verify_return_error '
+            '-CAfile /run/kafka/ca.crt -cert /run/kafka/broker.pem '
+            '-key /run/kafka/broker.pem -cert_chain /run/kafka/broker.pem '
+            '</dev/null >/dev/null 2>&1')
 
 
 def pin():
@@ -140,7 +146,8 @@ def pod():
         'ports': [{'name': 'tls', 'containerPort': 9092, 'protocol': 'TCP'}],
         'terminationMessagePath': '/dev/termination-log', 'terminationMessagePolicy': 'File',
         'startupProbe': probe | {'failureThreshold': 36}, 'readinessProbe': copy.deepcopy(probe),
-        'livenessProbe': probe | {'periodSeconds': 20, 'failureThreshold': 6}}
+        'livenessProbe': probe | {'exec': {'command': ['/bin/sh', '-ec', LIVENESS]},
+                                'periodSeconds': 20, 'failureThreshold': 6}}
     init = {'name': 'tls-material', 'image': pin()['image'], 'imagePullPolicy': 'IfNotPresent',
         'command': ['/bin/sh', '-ec', init_command()],
         'securityContext': copy.deepcopy(container['securityContext']),
@@ -238,7 +245,21 @@ def boundary(previous, spec, statefulset_uid):
     return result
 
 
-def render(previous):
+def legacy_health(plan):
+    """Exact prior health contract, solely for existing-broker migration and its rehearsal."""
+    result = copy.deepcopy(plan)
+    result['statefulset']['spec']['template']['spec']['containers'][0]['livenessProbe']['exec']['command'][2] = PROBE
+    count = 0
+    for validation in result['boundary']['spec']['validations']:
+        expression = validation['expression']
+        count += expression.count(admission.literal(LIVENESS))
+        validation['expression'] = expression.replace(admission.literal(LIVENESS), admission.literal(PROBE))
+    if count != 2:
+        raise ValueError('EXACT_KAFKA_HEALTH_TRANSITION_REQUIRED')
+    return result
+
+
+def render(previous, *, legacy=False):
     selected, spec = pin(), pod()
     labels = {'app.kubernetes.io/name': NAME}
     def resource(kind, name=NAME, api='v1', **body):
@@ -282,7 +303,7 @@ def render(previous):
     ca_sha256 = authority['existing_root_exception']['certificate_file_sha256']
     if len(ca_sha256) != 64 or any(c not in '0123456789abcdef' for c in ca_sha256):
         raise ValueError('PINNED_PRODUCTION_ROOT_REQUIRED')
-    return {'schema_version': 1, 'installation_id': 'hooshix-production', 'profile': 'production-single-server',
+    result = {'schema_version': 1, 'installation_id': 'hooshix-production', 'profile': 'production-single-server',
         'image': selected['image'], 'repository_revision': selected['repository_revision'],
         'publication_run': selected['publication_run'], 'publication_attempt': selected['publication_attempt'],
         'publication_sha256': selected['publication_sha256'], 'image_configuration_digest': selected['image_configuration_digest'],
@@ -291,3 +312,4 @@ def render(previous):
         'previous_boundary': previous,
         'boundary': boundary(previous, spec, BOUNDARY_UID_PLACEHOLDER),
         'public_access': 'CLOSED', 'application_ingress': 'CLOSED', 'production_readiness': 'Not verified'}
+    return legacy_health(result) if legacy else result

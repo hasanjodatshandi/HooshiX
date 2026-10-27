@@ -6,6 +6,7 @@ import sys
 
 import install_kafka_client_tls as delivery
 import kafka_topic_acl as contract
+import upgrade_kafka_health as health
 
 runtime = delivery.runtime
 require = runtime.require
@@ -47,12 +48,21 @@ def credential_snapshot(kube, ca):
     return result
 
 
+def broker_epoch(kube):
+    pod = runtime.get(kube, 'pod', 'kafka-0', runtime.NS)
+    require(pod and pod['metadata'].get('uid'), 'KAFKA_TOPIC_EXISTING_BROKER_REQUIRED')
+    return pod['metadata']['uid'], [item.get('restartCount')
+        for item in pod.get('status', {}).get('containerStatuses', [])]
+
+
 def _execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
     require(plan.get('kafka_topic_acl') is True and plan.get('schema_version') == 1
         and plan.get('installation_id') == 'hooshix-production'
         and plan.get('public_access') == plan.get('application_ingress') == 'CLOSED',
         'KAFKA_TOPIC_CLOSED_PLAN_REQUIRED')
     units = guard(initialized=True)
+    health_upgrade = health.execute(plan, kube=kube)
+    epoch = broker_epoch(kube)
     before = delivery.snapshot(kube, plan)
     credentials = credential_snapshot(kube, plan['public_ca_sha256'])
     _, cluster = runtime.storage_identity(kube)
@@ -76,11 +86,15 @@ def _execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
     current = runtime.get(kube, 'configmap', JOURNAL, runtime.NS)
     require(current and delivery.desired_fields_match(current, journal), 'KAFKA_TOPIC_JOURNAL_READBACK_REQUIRED')
     result = next(reconciliation)
+    kube('-n', runtime.NS, 'wait', '--for=jsonpath={.status.readyReplicas}=1',
+         'statefulset/kafka', '--timeout=120s', timeout=135)
     require(before == delivery.snapshot(kube, plan)
         and credentials == credential_snapshot(kube, plan['public_ca_sha256'])
         and cluster == runtime.storage_identity(kube)[1]
+        and epoch == broker_epoch(kube)
         and guard(initialized=True) == units, 'KAFKA_TOPIC_EXISTING_STATE_CHANGED')
     return {**result, 'existing_state': 'Preserved', 'contract_sha256': fingerprint,
+            'health_upgrade': health_upgrade,
             'cluster_identity_sha256': cluster, 'pvc_uid': pvc['metadata']['uid'],
             'source_revision': plan['repository_source_revision']}
 
@@ -97,6 +111,12 @@ def execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
             'KAFKA_TOPIC_READBACK_REQUIRED', 'KAFKA_ACL_READBACK_REQUIRED', 'KAFKA_ACL_INVENTORY_REJECTED',
             'ESO_UNSEALED_BAO_REQUIRED', 'KAFKA_CLIENT_READY_CLOSED_BROKER_REQUIRED',
             'KAFKA_CLIENT_CLOSED_BOUNDARY_REQUIRED', 'KAFKA_CLIENT_EXISTING_STORE_REQUIRED'}
+        allowed |= {'KAFKA_HEALTH_EXISTING_BROKER_REQUIRED', 'KAFKA_HEALTH_FOREIGN_PROBE_PRESERVED',
+            'KAFKA_HEALTH_EXACT_TRANSITION_REQUIRED',
+            'KAFKA_HEALTH_FOREIGN_BOUNDARY_PRESERVED', 'KAFKA_HEALTH_UNJOURNALED_TRANSITION_PRESERVED',
+            'KAFKA_HEALTH_FOREIGN_JOURNAL_PRESERVED', 'KAFKA_HEALTH_SPEC_HASH_REQUIRED',
+            'KAFKA_HEALTH_QUIESCENT_BROKER_REQUIRED', 'KAFKA_HEALTH_RETAINED_IDENTITY_CHANGED',
+            'KAFKA_TOPIC_EXISTING_BROKER_REQUIRED'}
         code = str(error) if str(error) in allowed else 'OTHER_PREFLIGHT_OR_NATIVE_FAILURE'
         print('KAFKA_TOPIC_ACL_FAILURE=' + code, file=sys.stderr, flush=True)
         raise

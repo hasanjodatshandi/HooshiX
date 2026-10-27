@@ -124,8 +124,33 @@ def rehearse(k, runtime_plan, api, root, ca, root_key, audiences, node):
                 raise ValueError('KAFKA_CLIENT_CONTAINER_LOG_LEAK')
         result['container_log_privacy'] = 'Passed'
         result['broker_and_datastore_preservation'] = 'Passed'
-        from install_kafka_topic_acl import execute as topics
+        import install_kafka_topic_acl as topic_installer
+        topics = topic_installer.execute
+        legacy_topic_plan = {**plan, 'kafka_topic_acl': True,
+            'repository_source_revision': runtime_plan['repository_source_revision']}
+        original_command, added = topic_installer.command, 0
+        def interrupt_partial(kube, tool, *args):
+            nonlocal added
+            if tool == 'acls' and '--add' in args:
+                if added == 4:
+                    raise ValueError('KAFKA_FIXTURE_PARTIAL_ACL_STOP')
+                added += 1
+            return original_command(kube, tool, *args)
+        with patch.object(topic_installer, 'command', side_effect=interrupt_partial):
+            try:
+                topic_installer._execute(legacy_topic_plan, kube=kube, guard=lambda **_: None)
+            except ValueError as error:
+                if str(error) != 'KAFKA_FIXTURE_PARTIAL_ACL_STOP':
+                    raise
+            else:
+                raise ValueError('KAFKA_PARTIAL_FIXTURE_INTERRUPTION_REQUIRED')
+        if added != 4:
+            raise ValueError('KAFKA_PARTIAL_FIXTURE_ACL_COUNT_REQUIRED')
+        import render_kafka_runtime as health_renderer
+        upgraded = health_renderer.render(runtime_plan['previous_boundary'])
         topic_plan = {**plan, 'kafka_topic_acl': True,
+                      'kafka_runtime': {key: upgraded[key] for key in ('statefulset','objects','boundary','source_policies')},
+                      'kafka_health_upgrade': plan['kafka_runtime'],
                       'repository_source_revision': runtime_plan['repository_source_revision']}
         result['kafka_topic_acl'] = topics(topic_plan, kube=kube, guard=lambda **_: None)
         if topics(topic_plan, kube=kube, guard=lambda **_: None) != result['kafka_topic_acl']:
@@ -135,4 +160,5 @@ def rehearse(k, runtime_plan, api, root, ca, root_key, audiences, node):
             key: value for key, value in api.call('hooshix/data/' + contract.entry(service)['key'], token=root)
                 ['data']['data'].items() if key not in installer.MARKERS} for service in contract.SERVICES}))
         result['kafka_topic_acl']['idempotent_reconciliation'] = 'Passed'
+        result['kafka_topic_acl']['partial_recovery'] = 'Passed'
     return result

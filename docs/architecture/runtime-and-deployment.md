@@ -189,6 +189,16 @@ contract with a cluster/PVC-bound ownership journal; broker/application/public
 network paths stay closed. It is not quota, capacity, replay/recovery or traffic
 approval. The Stage10 living guide owns the supervised execution procedure.
 
+Kafka liveness uses a bounded local mutual-TLS handshake with the existing node
+certificate and explicit CA/IP verification, without starting a Java CLI. Startup
+and readiness retain the authenticated Kafka API check. Their finite deadlines,
+resource limits and fail-closed traffic boundaries remain in force. The exact
+legacy liveness contract can be migrated by `upgrade_kafka_health.py` only under
+the existing commissioning lock, with an immutable cluster/PVC/StatefulSet-bound
+journal, graceful broker quiescence, exact admission replacement, positive/negative
+admission dry-runs and retained-identity readback. The same signed image, credentials,
+topics, ACLs and volume are retained; no reset, format or force adoption is allowed.
+
 ## 7. Security Redis / quota runtime
 
 Single-server:

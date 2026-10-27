@@ -158,6 +158,22 @@ class KafkaRuntimeTest(unittest.TestCase):
         container = self.plan['statefulset']['spec']['template']['spec']['containers'][0]
         self.assertEqual([{'name': 'KAFKA_HEAP_OPTS', 'value': '-Xms512m -Xmx512m'}], container['env'])
 
+    def test_liveness_uses_verified_mutual_tls_without_another_jvm(self):
+        container = renderer.pod()['containers'][0]
+        live = container['livenessProbe']
+        self.assertEqual(['/bin/sh', '-ec', renderer.LIVENESS], live['exec']['command'])
+        for option in ('exec /usr/bin/openssl', '-verify_return_error', '-verify_ip 127.0.0.1',
+                       '-CAfile /run/kafka/ca.crt', '-cert /run/kafka/broker.pem', '-key /run/kafka/broker.pem'):
+            self.assertIn(option, renderer.LIVENESS)
+        self.assertNotIn('java', renderer.LIVENESS)
+        self.assertEqual((10, 20, 6), (live['timeoutSeconds'], live['periodSeconds'], live['failureThreshold']))
+        self.assertEqual(renderer.PROBE, container['readinessProbe']['exec']['command'][2])
+        self.assertEqual(renderer.PROBE, container['startupProbe']['exec']['command'][2])
+        legacy = renderer.legacy_health(self.plan)
+        self.assertEqual(renderer.PROBE, legacy['statefulset']['spec']['template']['spec']['containers'][0]
+                         ['livenessProbe']['exec']['command'][2])
+        self.assertNotEqual(self.plan['boundary']['spec'], legacy['boundary']['spec'])
+
     def test_readiness_snapshot_exposes_only_bounded_status_classes(self):
         objects = {
             'statefulset': {'metadata': {'generation': 2}, 'spec': {'replicas': 1},

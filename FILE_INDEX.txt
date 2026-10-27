@@ -724,6 +724,7 @@ scripts/production/tests/test_intermediate_import.py
 scripts/production/tests/test_jit_broker.py
 scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_kafka_client_tls.py
+scripts/production/tests/test_kafka_health.py
 scripts/production/tests/test_kafka_local_volume.py
 scripts/production/tests/test_kafka_runtime.py
 scripts/production/tests/test_kafka_runtime_candidate.py
@@ -778,6 +779,7 @@ scripts/production/tests/test_release.py
 scripts/production/tests/test_render_gitops.py
 scripts/production/tests/test_target_storage_guard.py
 scripts/production/tests/test_verify.py
+scripts/production/upgrade_kafka_health.py
 scripts/production/upgrade_kyverno.py
 scripts/production/upgrade_mesh_security.py
 scripts/production/verify.py
