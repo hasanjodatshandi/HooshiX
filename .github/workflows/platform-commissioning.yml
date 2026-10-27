@@ -120,7 +120,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     name: Signed Calico Ambient Kyverno OpenBao staging
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    # Full signed-stack commissioning includes retained-broker health migration and five-client ACL proofs.
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read
