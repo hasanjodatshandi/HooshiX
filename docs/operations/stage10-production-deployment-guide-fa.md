@@ -2978,6 +2978,10 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 
 ### قرارداد topic و ACL Kafka
 
+سلامت Kafka باید هنگام اجرای ابزارهای مدیریتی محدود نیز پایدار بماند. خروجی
+موفق ابزار بدون کنترل restart کانتینر و حفظ هویت broker/PVC، شاهد تکمیل عملیات
+نیست. کمبود ظرفیت با حذف probe، غیرفعال‌کردن TLS یا بازکردن دسترسی برنامه حل نمی‌شود.
+
 گام بعد فقط topicهای versioned موجود در قرارداد برنامه و ACLهای literal پنج
 هویت تحویل‌شده است. این گام مجوز wildcard، مدیریت broker، تغییر credential یا
 بازکردن مسیر برنامه/اینترنت نیست. اجرای مقصد و آزمون دسترسی هنوز **Not run** است.
