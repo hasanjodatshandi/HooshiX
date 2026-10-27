@@ -42,6 +42,12 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     constraints {
+        implementation("com.google.guava:guava:33.7.2-android") {
+            because("Fix GHSA-xxph-c9ww-hj94 while preserving the existing transitive coordinate")
+        }
+        implementation("org.xerial.snappy:snappy-java:1.1.10.9") {
+            because("Fix Snappy native buffer overflow, allocation and range-validation advisories")
+        }
         implementation("org.apache.tomcat.embed:tomcat-embed-core:11.0.25") {
             because("Tomcat 11.0.25 fixes the August 2026 authentication and access-control advisories")
         }

@@ -4,6 +4,7 @@ import stat
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -11,8 +12,46 @@ import verify_repository as verifier  # noqa: E402
 
 
 class RepositoryBaselineVerifierTest(unittest.TestCase):
+    def test_six_services_lock_and_verify_security_fixed_guava(self) -> None:
+        version = "33.7.2-android"
+        for name in ("identity-service", "authorization-service", "notification-service",
+                     "compromised-password-service", "web-bff", "conversation-service"):
+            with self.subTest(service=name):
+                service = verifier.ROOT / "services" / name
+                self.assertIn(f'implementation("com.google.guava:guava:{version}")',
+                              (service / "build.gradle.kts").read_text())
+                resolved = [line.split("=", 1)[0]
+                            for line in (service / "gradle.lockfile").read_text().splitlines()
+                            if line.startswith("com.google.guava:guava:")]
+                self.assertEqual([f"com.google.guava:guava:{version}"], resolved)
+                self.assertIn(f'<component group="com.google.guava" name="guava" version="{version}">',
+                              (service / "gradle/verification-metadata.xml").read_text())
+                self.assertIn(f'<component group="com.google.guava" name="guava-parent" version="{version}">',
+                              (service / "gradle/verification-metadata.xml").read_text())
+                self.assertIn('<artifact name="junit-bom-5.10.1.module">',
+                              (service / "gradle/verification-metadata.xml").read_text())
+                components = ET.parse(service / "gradle/verification-metadata.xml").findall('.//{*}component')
+                artifacts = [(c.get('group'), c.get('name'), c.get('version'), a.get('name'))
+                             for c in components for a in c.findall('{*}artifact')]
+                self.assertTrue(artifacts)
+                self.assertEqual(len(artifacts), len(set(artifacts)))
+
     def test_current_six_service_framework_locks_follow_security_baseline(self) -> None:
         self.assertEqual([], verifier.validate_spring_framework_alignment(verifier.ROOT))
+
+    def test_kafka_services_lock_and_verify_security_fixed_snappy(self) -> None:
+        for name in ("identity-service", "authorization-service", "notification-service",
+                     "web-bff", "conversation-service"):
+            with self.subTest(service=name):
+                service = verifier.ROOT / "services" / name
+                self.assertIn('implementation("org.xerial.snappy:snappy-java:1.1.10.9")',
+                              (service / "build.gradle.kts").read_text())
+                resolved = [line.split("=", 1)[0]
+                            for line in (service / "gradle.lockfile").read_text().splitlines()
+                            if line.startswith("org.xerial.snappy:snappy-java:")]
+                self.assertEqual(["org.xerial.snappy:snappy-java:1.1.10.9"], resolved)
+                self.assertIn('<component group="org.xerial.snappy" name="snappy-java" version="1.1.10.9">',
+                              (service / "gradle/verification-metadata.xml").read_text())
 
     def test_framework_alignment_rejects_old_mixed_missing_lock_and_bom(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

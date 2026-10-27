@@ -29,6 +29,8 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Access-token signing | RS256 / RSA-3072 / 90-day rotation | ADR-0023 |
 | Internal synchronous API | gRPC + Protobuf | current architecture |
 | gRPC Java | 1.83.1 | runtime/Netty/stubs/codegen/testing aligned in locks; includes upstream Netty server stream-limit bypass fix |
+| Guava | 33.7.2-android | existing gRPC transitive coordinate constrained in all six Java services; fixes GHSA-xxph-c9ww-hj94; Gradle keeps selecting its standard-JVM variant; locks and artifact checksums required |
+| Snappy Java | 1.1.10.9 | existing Kafka-client transitive dependency constrained in the five Kafka-using services; native bounds/allocation fixes; not introduced into Compromised Password |
 | Protobuf Java/compiler | 4.34.2 | contract code generation and Spring Boot-managed service runtime aligned |
 | Protobuf validation | Protovalidate Java 1.2.2 | schema annotations plus fail-closed server interceptor; dependency locks and checksums required |
 | External/browser API | REST + OpenAPI through BFF | current architecture |
@@ -189,6 +191,22 @@ Both profiles preserve:
 - zero-standing-privilege human access.
 
 ## 6. Version governance
+
+Guava uses native Gradle constraints at `33.7.2-android` across all six services,
+preserving the existing gRPC-selected coordinate and standard-JVM variant resolution.
+Its upstream metadata also advances the annotation dependency `org.jspecify:jspecify` to `1.0.1`.
+The [official Guava advisory](https://github.com/google/guava/security/advisories/GHSA-xxph-c9ww-hj94)
+identifies `33.7.2` as the fix for excessive allocation during native Java deserialization.
+No attacker-controlled Java object deserialization entrypoint was identified in application
+source; this does not waive the locked-dependency gate. Locks, independently checked
+artifact hashes, strict service tests and advisory scans remain required before promotion.
+
+The five Kafka-using services constrain `org.xerial.snappy:snappy-java:1.1.10.9`,
+the [upstream security-fixed release](https://github.com/xerial/snappy-java/releases/tag/v1.1.10.9)
+for GHSA-gwq9-9ffj-mvrv, GHSA-q233-g92q-qxp6 and GHSA-xqrx-qh46-34m7.
+This replaces the existing transitive artifact without changing Kafka compression configuration,
+broker data, protocol contracts or application permissions. Native runtime compatibility,
+service tests and final-image security gates remain required before promotion.
 
 Spring Framework modules use the official `spring-framework-bom:7.0.9` in each service's
 native Gradle platform configuration, overriding Boot 4.1.0's affected 7.0.8 family without
