@@ -3073,6 +3073,8 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 فقط `READY` انگلیسی و sudo در پنجرهٔ محلی لازم است؛ رمز custody/intermediate/Root
 یا GHCR نمی‌خواهد. نتیجهٔ مورد انتظار `KAFKA_TOPIC_ACL=Passed` است. رسید عمومی
 در `~/.local/share/hooshix-kafka-topics/` ذخیره می‌شود. تا دریافت رسید مقصد، نصب
+فایل رسید باید متعلق به کاربر محلی و با مجوز `0600` در پوشهٔ `0700` باشد؛
+اعتبارسنجی hash برنامه، revision و نتیجه مستقل از انتقال فایل الزامی است.
 **Not verified** است. این عملیات broker را restart نمی‌کند؛ image، PVC، cluster
 ID، گواهی‌ها، advertise loopback، admission و قواعد شبکه تغییر نمی‌کنند.
 
