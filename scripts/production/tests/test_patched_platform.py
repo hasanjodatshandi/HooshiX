@@ -14,6 +14,7 @@ import build_patched_platform as target
 class PatchedPlatformTest(unittest.TestCase):
     def setUp(self):
         self.selected = target.recipe()
+        self.candidate = target.recipe(target.CANDIDATE_RECIPE)
         self.now = datetime(2026, 10, 10, tzinfo=timezone.utc)
         self.digest = 'sha256:' + 'a' * 64
         self.files = {'syft.json': {'source': {'type': 'image', 'metadata': {
@@ -110,6 +111,68 @@ class PatchedPlatformTest(unittest.TestCase):
         self.assertIn('-tags \'all_providers\'', target.dockerfile('eso', self.selected))
         self.assertIn('version.fullVersion=2.6.4', target.dockerfile('openbao', self.selected))
 
+    def test_jose_candidate_does_not_rewrite_adopted_recipe(self):
+        self.assertNotIn('github.com/go-jose/go-jose/v4', self.selected['modules'])
+        self.assertEqual('v4.1.6', self.candidate['modules']['github.com/go-jose/go-jose/v4'])
+        self.assertEqual(self.selected['sources'], self.candidate['sources'])
+        self.assertEqual(self.selected['builder'], self.candidate['builder'])
+        self.assertEqual('a1980938b7e303ff72fba1d0f9f452ea7bce6c4a0642faa3ca2283bb606c8db1',
+                         hashlib.sha256(target.RECIPE.read_bytes()).hexdigest())
+        for component in target.COMPONENTS:
+            text = target.dockerfile(component, self.candidate, target.CANDIDATE_RECIPE)
+            self.assertIn('github.com/go-jose/go-jose/v4@v4.1.6', text)
+            self.assertIn('go test -mod=mod -p 2 -timeout 5m github.com/go-jose', text)
+            self.assertIn(hashlib.sha256(target.CANDIDATE_RECIPE.read_bytes()).hexdigest(), text)
+            self.assertEqual(component == 'openbao', 'git apply --check' in text)
+        text = target.dockerfile('openbao', self.candidate, target.CANDIDATE_RECIPE)
+        self.assertIn('go mod verify', text)
+        self.assertIn('./builtin/credential/jwt ./builtin/credential/kubernetes', text)
+        self.assertIn('./jwt ./oidc ./oidc/clientassertion', text)
+        self.assertIn('go mod edit -replace=github.com/hashicorp/cap=/cap', text)
+        self.assertIn('-replace=github.com/okta/okta-sdk-golang/v2=/okta', text)
+        self.assertIn('./okta ./tests/unit', text)
+        self.assertIn("! grep -E '^github.com/go-jose/go-jose/v[123](/|$)'", text)
+
+    def test_candidate_rejects_missing_fixed_jose_and_every_v3_binary(self):
+        self.files['syft.json']['source']['metadata']['labels']['io.hooshix.recipe.sha256'] = \
+            hashlib.sha256(target.CANDIDATE_RECIPE.read_bytes()).hexdigest()
+        def validate():
+            with patch.object(target, 'recipe', return_value=self.candidate), \
+                    patch.object(target, 'load', side_effect=lambda path: self.files[path.name]):
+                return target.validate_local(Path('public'), 'eso', self.digest, self.now,
+                                             target.CANDIDATE_RECIPE)
+        with self.assertRaises(ValueError):
+            validate()
+        jose = {'name': 'github.com/go-jose/go-jose/v4', 'version': 'v4.1.6'}
+        self.files['syft.json']['artifacts'].append(jose)
+        self.assertEqual('Passed', validate()['scan'])
+        jose['version'] = 'v4.1.5'
+        with self.assertRaises(ValueError):
+            validate()
+        jose['version'] = 'v4.1.6'
+        self.files['syft.json']['artifacts'].append(
+            {'name': 'github.com/go-jose/go-jose/v3', 'version': 'v3.0.5'})
+        with self.assertRaises(ValueError):
+            validate()
+
+    def test_candidate_rejects_changed_overlay_or_module_pin(self):
+        with patch.object(Path, 'read_bytes', return_value=b'changed'), self.assertRaises(ValueError):
+            target.recipe(target.CANDIDATE_RECIPE)
+        with self.assertRaises(ValueError):
+            target.recipe(Path('/tmp/unreviewed.json'))
+        for key in ('cap_patch', 'okta_patch'):
+            for field, value in (('sha256', 'a' * 64), ('version', 'v0.13.0'),
+                                 ('path', '/tmp/untrusted.patch')):
+                changed = copy.deepcopy(self.candidate)
+                changed[key][field] = value
+                with self.subTest(key=key, field=field), \
+                        patch.object(target, 'load', return_value=changed), self.assertRaises(ValueError):
+                    target.recipe(target.CANDIDATE_RECIPE)
+        changed = copy.deepcopy(self.candidate)
+        changed['modules']['github.com/go-jose/go-jose/v4'] = 'v4.1.5'
+        with patch.object(target, 'load', return_value=changed), self.assertRaises(ValueError):
+            target.recipe(target.CANDIDATE_RECIPE)
+
     def test_unprotected_publication_stops_before_any_build(self):
         with patch.object(target, 'build') as builder, self.assertRaises(ValueError):
             target.publish(Path('unused'), {})
@@ -143,7 +206,7 @@ class PatchedPlatformTest(unittest.TestCase):
         receipt = {'image_config_digest': self.digest, 'recipe_sha256': 'd' * 64,
                    'module_files_sha256': {'go.mod': 'e' * 64, 'go.sum': 'f' * 64}}
         with patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
-                patch.object(target, 'recipe', return_value=self.selected), \
+                patch.object(target, 'recipe', return_value=self.candidate), \
                 patch.object(target, 'base_image', return_value='base@sha256:' + 'a' * 64), \
                 patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
                 patch.object(Path, 'write_text'), patch.object(target, 'build', return_value=('tag', receipt)), \

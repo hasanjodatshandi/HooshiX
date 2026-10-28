@@ -70,6 +70,24 @@ effective image pins or claim compatibility: rebuilt-image scans, native tests,
 distinct source-build provenance and signed digest/admission adoption remain
 required. Both CNI binaries are rebuilt; ztunnel and waypoint are unchanged.
 
+New source candidates use `jose-platform-sources.json` with go-jose v4.1.6 for
+[GHSA-mgcc-cww5-fp2q](https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q).
+The original recipe stays byte-identical for existing signed-image provenance;
+its hash is not relabeled as a corrected build. OpenBao's CAP v0.14.0 consumer
+and Okta SDK v2.20.0 consumers are migrated from v3 to v4 with checksum-bound
+source patches, retaining the
+existing asymmetric algorithm inventory and downstream role/claim validation.
+HMAC/none are not added. CAP JWT/OIDC/client-assertion tests, upstream JOSE tests,
+Okta SDK unit/client-assertion positive/negative tests, and OpenBao
+JWT/Kubernetes auth tests execute before candidate binary builds. A runtime
+package-graph assertion rejects remaining JOSE v1/v2/v3 imports before build.
+The upstream default RSA JWK limit is 4096 bits and is not raised; configured
+external JWT/JWKS providers using larger keys require explicit compatibility
+review before adoption. Existing CA keys are not rotated by this source change.
+Every candidate scan rejects embedded v3 or a v4 version other than 4.1.6.
+Fresh registry scans, signatures, native recovery and reviewed exact-digest
+adoption remain separate gates; these candidates do not replace VPS workloads.
+
 Cert-manager 1.20.3 has a separate three-component source candidate recipe with
 Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.2. Product version, source commit,
 archive checksum, nested binary modules and official runtime bases remain explicit.
