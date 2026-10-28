@@ -48,7 +48,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Notification persistence | jOOQ/JDBC, no JPA | fixed service decision |
 | Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2.RELEASE | single-server TLS/ACL/noeviction/AOF; HA Sentinel |
 | Resilience | Resilience4j | breaker/bulkhead; no layered retry |
-| Observability API | Spring Boot 4.1 Micrometer Observation/Tracing + OpenTelemetry | ADR-0044; Day-1 service requirement |
+| Observability API | Spring Boot 4.1 Micrometer Observation/Tracing + OpenTelemetry Java BOM 1.67.0 | ADR-0044; aligned API/SDK/exporters; GHSA-ccrj-gw8r-854m fixed |
 | Trace export protocol | OTLP | services -> approved internal Collector |
 | Logging | structured JSON stdout + ADR-0031 controls | allow-list/redaction/canary/runtime detection |
 | Backend test | JUnit 5 + Testcontainers | service locks |
