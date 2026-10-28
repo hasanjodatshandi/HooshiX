@@ -21,6 +21,7 @@ from verify_release import EXPECTED_CERTIFICATE_IDENTITY, EXPECTED_OIDC_ISSUER
 COMPONENTS = ('eso', 'openbao', 'istiod', 'cni')
 BUILD_TYPE = 'https://github.com/hasanjodatshandi/HooshiX/platform-security-source-build/v1'
 RECIPE = ROOT / 'infrastructure/production/release/patched-platform-sources.json'
+CANDIDATE_RECIPE = ROOT / 'infrastructure/production/release/jose-platform-sources.json'
 SOURCE = {'eso': 'eso', 'openbao': 'openbao', 'istiod': 'istio', 'cni': 'istio'}
 BINARIES = {'eso': {'main.go': '/usr/bin/external-secrets'}, 'openbao': {'.': '/usr/bin/bao'},
     'istiod': {'./pilot/cmd/pilot-discovery': '/usr/local/bin/pilot-discovery'},
@@ -28,14 +29,27 @@ BINARIES = {'eso': {'main.go': '/usr/bin/external-secrets'}, 'openbao': {'.': '/
             './cni/cmd/istio-cni': '/opt/cni/bin/istio-cni'}}
 
 
-def recipe():
-    selected = load(RECIPE)
+def recipe(path=RECIPE):
+    if path not in (RECIPE, CANDIDATE_RECIPE):
+        raise ValueError('reviewed recipe path required')
+    selected = load(path)
+    modules = {'golang.org/x/net': 'v0.60.0', 'golang.org/x/crypto': 'v0.57.0',
+        'golang.org/x/sys': 'v0.48.0', 'golang.org/x/term': 'v0.46.0',
+        'golang.org/x/text': 'v0.42.0'}
+    if path == CANDIDATE_RECIPE:
+        modules['github.com/go-jose/go-jose/v4'] = 'v4.1.6'
+        overlay = selected.get('cap_patch', {})
+        if (overlay != {'module': 'github.com/hashicorp/cap', 'version': 'v0.14.0',
+                'module_sum': 'h1:IPWX/ewgw8tQPl0qpnCuNf6BFXOCz7ijSM5ikX27cNg=',
+                'path': 'infrastructure/production/release/cap-jose-v4.patch',
+                'sha256': 'd6bd48a9c8cae8a9f3bb7a627cc539e81a95e04da8675ddc13d41ba306bcac08'}
+                or hashlib.sha256((ROOT / overlay['path']).read_bytes()).hexdigest()
+                != overlay['sha256']):
+            raise ValueError('exact reviewed CAP migration required')
     if (selected['schema_version'] != 1 or selected['go_version'] != '1.26.9'
             or selected['builder'] != 'docker.io/library/golang@sha256:'
                'bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff'
-            or selected['modules'] != {'golang.org/x/net': 'v0.60.0',
-                'golang.org/x/crypto': 'v0.57.0', 'golang.org/x/sys': 'v0.48.0',
-                'golang.org/x/term': 'v0.46.0', 'golang.org/x/text': 'v0.42.0'}
+            or selected['modules'] != modules
             or selected['production_promotion'] !=
                'blocked-until-signed-digest-admission-native-and-recovery-evidence'):
         raise ValueError('reviewed blocked security build required')
@@ -64,7 +78,7 @@ def base_image(component):
     raise ValueError('unapproved component')
 
 
-def dockerfile(component, selected):
+def dockerfile(component, selected, recipe_path=RECIPE):
     source = selected['sources'][SOURCE[component]]
     flags = '-trimpath -buildvcs=false -mod=readonly'
     ldflags = '-buildid='
@@ -83,9 +97,22 @@ def dockerfile(component, selected):
         'ENV GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org',
         'COPY source.tar.gz /tmp/source.tar.gz',
         f"RUN echo '{source['archive_sha256']}  /tmp/source.tar.gz' | sha256sum -c - && "
-        'tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src',
-        f"RUN test \"$(go env GOVERSION)\" = go{selected['go_version']} && go get {modules} && go mod download && go mod verify",
-        'RUN mkdir /out && sha256sum go.mod go.sum > /out/module-files.sha256 && go list -m -json all > /out/modules.json']
+        'tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src']
+    if component == 'openbao' and recipe_path == CANDIDATE_RECIPE:
+        overlay = selected['cap_patch']
+        lines += ['COPY cap-jose-v4.patch /tmp/cap-jose-v4.patch',
+            f"RUN echo '{overlay['sha256']}  /tmp/cap-jose-v4.patch' | sha256sum -c - && "
+            'go mod download github.com/hashicorp/cap@v0.14.0 && go mod verify && '
+            'cp -R /go/pkg/mod/github.com/hashicorp/cap@v0.14.0 /cap && chmod -R u+w /cap && '
+            'cd /cap && git apply --check /tmp/cap-jose-v4.patch && git apply /tmp/cap-jose-v4.patch',
+            'RUN go mod edit -replace=github.com/hashicorp/cap=/cap && '
+            'cd /cap && go test -mod=mod -p 2 -timeout 5m ./jwt ./oidc ./oidc/clientassertion']
+    lines += [f"RUN test \"$(go env GOVERSION)\" = go{selected['go_version']} && go get {modules} && go mod download && go mod verify"]
+    if recipe_path == CANDIDATE_RECIPE:
+        lines += ['RUN go test -mod=mod -p 2 -timeout 5m github.com/go-jose/go-jose/v4 github.com/go-jose/go-jose/v4/jwt']
+        if component == 'openbao':
+            lines += ['RUN go test -mod=mod -p 2 -timeout 10m ./builtin/credential/jwt ./builtin/credential/kubernetes']
+    lines += ['RUN mkdir /out && sha256sum go.mod go.sum > /out/module-files.sha256 && go list -m -json all > /out/modules.json']
     for package, destination in BINARIES[component].items():
         name = Path(destination).name
         lines.append(f"RUN go build {flags} -tags '{tags}' -ldflags '{ldflags}' -o /out/{name} {package} && go version -m /out/{name} > /out/{name}.buildinfo")
@@ -95,12 +122,12 @@ def dockerfile(component, selected):
     lines += ['COPY --from=build /out/*.sha256 /out/*.json /out/*.buildinfo /usr/share/hooshix-source-build/',
         'LABEL io.hooshix.provenance.kind="patched-upstream-source-build"',
         f'LABEL io.hooshix.source.revision="{source["revision"]}"',
-        f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(RECIPE.read_bytes()).hexdigest()}"']
+        f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(recipe_path.read_bytes()).hexdigest()}"']
     return '\n'.join(lines) + '\n'
 
 
-def validate_local(directory, component, image_id, now):
-    selected = recipe()
+def validate_local(directory, component, image_id, now, recipe_path=RECIPE):
+    selected = recipe() if recipe_path == RECIPE else recipe(recipe_path)
     syft, cdx, report, db = (load(directory / name) for name in
         ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json'))
     metadata = syft['source']['metadata']
@@ -108,7 +135,7 @@ def validate_local(directory, component, image_id, now):
             or metadata['os'] != 'linux' or metadata['architecture'] != 'amd64'
             or metadata['labels'].get('io.hooshix.provenance.kind') != 'patched-upstream-source-build'
             or metadata['labels'].get('io.hooshix.source.revision') != selected['sources'][SOURCE[component]]['revision']
-            or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
+            or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(recipe_path.read_bytes()).hexdigest()
             or not cdx.get('components') or cdx.get('bomFormat') != 'CycloneDX'):
         raise ValueError('exact built configuration and SBOM required')
     built = datetime.fromisoformat(db['built'].replace('Z', '+00:00'))
@@ -130,13 +157,19 @@ def validate_local(directory, component, image_id, now):
     net = [artifact for artifact in artifacts if artifact['name'] == 'golang.org/x/net']
     if not net or any(item['version'] != selected['modules']['golang.org/x/net'] for item in net):
         raise ValueError('fixed network dependency required')
+    if recipe_path == CANDIDATE_RECIPE:
+        jose = [item for item in artifacts if item['name'] == 'github.com/go-jose/go-jose/v4']
+        if (any(item['name'] == 'github.com/go-jose/go-jose/v3' for item in artifacts)
+                or (component != 'cni' and not jose)
+                or any(item['version'] != 'v4.1.6' for item in jose)):
+            raise ValueError('fixed JOSE v4 and no embedded v3 required')
     return {'schema_version': 1, 'component': component, 'image_config_digest': image_id,
-        'scan': 'Passed', 'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
+        'scan': 'Passed', 'recipe_sha256': hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
         'provenance_kind': 'patched-upstream-source-build', 'production_promotion': 'Not verified'}
 
 
 def build(component, directory):
-    selected = recipe()
+    selected = recipe(CANDIDATE_RECIPE)
     source = selected['sources'][SOURCE[component]]
     directory.mkdir(mode=0o700)
     url = f"https://codeload.github.com/{source['repository']}/tar.gz/{source['revision']}"
@@ -145,8 +178,10 @@ def build(component, directory):
     if len(data) > 128 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != source['archive_sha256']:
         raise ValueError('bounded official source integrity required')
     (directory / 'source.tar.gz').write_bytes(data)
-    (directory / 'Dockerfile').write_text(dockerfile(component, selected))
-    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n')
+    (directory / 'Dockerfile').write_text(dockerfile(component, selected, CANDIDATE_RECIPE))
+    if component == 'openbao':
+        (directory / 'cap-jose-v4.patch').write_bytes((ROOT / selected['cap_patch']['path']).read_bytes())
+    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n!cap-jose-v4.patch\n')
     tag = 'hooshix-patched-' + component + ':candidate'
     run(['docker', 'build', '--platform', 'linux/amd64', '--tag', tag, str(directory)], timeout=2700)
     image_id = run(['docker', 'image', 'inspect', '--format', '{{.Id}}', tag]).strip()
@@ -165,7 +200,7 @@ def build(component, directory):
         '-o', 'syft-json=' + str(directory / 'syft.json'),
         '-o', 'cyclonedx-json=' + str(directory / 'cyclonedx.json')], timeout=300)
     scan(directory)
-    receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc))
+    receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc), CANDIDATE_RECIPE)
     module_files = directory / 'module-evidence/module-files.sha256'
     locks = module_files.read_text().splitlines()
     if len(locks) != 2 or not all(re.fullmatch(r'[a-f0-9]{64}  go\.(mod|sum)', line) for line in locks):
@@ -201,7 +236,7 @@ def publish(directory, env):
         'schema_version': 1, 'image_config_digest': built['openbao'][1]['image_config_digest'],
         'disposable_tls_shamir_raft_restore_acl_audit_root_revoke': 'Passed',
         'production_readiness': 'Not verified'}) + '\n')
-    selected, targets, visibilities = recipe(), {}, {}
+    selected, targets, visibilities = recipe(CANDIDATE_RECIPE), {}, {}
     for component, (tag, receipt) in built.items():
         print('PATCHED_PUBLICATION_STEP=' + component + '-push', flush=True)
         package_component = 'eso-v2' if component == 'eso' else component
@@ -246,6 +281,7 @@ def publish(directory, env):
             'externalParameters': {'component': component, 'source': source,
                 'recipe_sha256': built[component][1]['recipe_sha256'], 'modules': selected['modules'],
                 'module_files_sha256': built[component][1]['module_files_sha256'],
+                'source_patches': [selected['cap_patch']] if component == 'openbao' else [],
                 'builder': selected['builder'], 'runtime_base': base_image(component),
                 'go_version': selected['go_version'], 'repository_revision': revision},
             'internalParameters': {},
