@@ -28,5 +28,9 @@
     "cainjector": "quay.io/jetstack/cert-manager-cainjector@sha256:a2b12d27950d1603d2c8168c3ccd95d07b93ce6ec4b530316196a31db592a9c0",
     "webhook": "quay.io/jetstack/cert-manager-webhook@sha256:953a97df613f7da7eda8ce4b1c8d8e6b50963db0800fab595d040db6eb5cb060"
   },
-  "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence"
+  "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence",
+  "test_patch": {
+    "path": "infrastructure/production/data/cert-manager-acme-ipv6-test.patch",
+    "sha256": "a8843b7f96af5b08113e10c0812307312646f1bab656e1ab184ee49a359c68d2"
+  }
 }

@@ -30,6 +30,12 @@ def recipe(path=RECIPE):
     selected = load(path)
     modules = MODULES | ({'github.com/go-jose/go-jose/v4': 'v4.1.6'}
                          if path == CANDIDATE_RECIPE else {})
+    if path == CANDIDATE_RECIPE:
+        fixture = selected.get('test_patch', {})
+        if (fixture != {'path': 'infrastructure/production/data/cert-manager-acme-ipv6-test.patch',
+                'sha256': 'a8843b7f96af5b08113e10c0812307312646f1bab656e1ab184ee49a359c68d2'}
+                or hashlib.sha256((ROOT / fixture['path']).read_bytes()).hexdigest() != fixture['sha256']):
+            raise ValueError('exact upstream IPv6 test-only fixture patch required')
     baseline = load(ROOT / 'infrastructure/production/profile.json')['postgresql']['cert_manager']
     if (selected['schema_version'] != 1 or selected['version'] != baseline or baseline != '1.20.3'
             or selected['platform'] != 'linux/amd64' or selected['go_version'] != '1.26.9'
@@ -65,6 +71,10 @@ def dockerfile(component, selected, recipe_path=RECIPE):
         'COPY source.tar.gz /tmp/source.tar.gz',
         f"RUN echo '{source['archive_sha256']}  /tmp/source.tar.gz' | sha256sum -c - && "
         'tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src',
+        *(['COPY test.patch /tmp/test.patch',
+           f"RUN echo '{selected['test_patch']['sha256']}  /tmp/test.patch' | sha256sum -c - && "
+           'git apply --check /tmp/test.patch && git apply /tmp/test.patch']
+          if recipe_path == CANDIDATE_RECIPE and component == 'controller' else []),
         f'RUN test "$(go env GOVERSION)" = go1.26.9 && go get {modules} && go mod verify',
         *(['RUN go mod tidy && go test -mod=readonly ./pkg/issuer/acme/... && go mod verify']
           if recipe_path == CANDIDATE_RECIPE and component == 'controller' else []),
@@ -172,7 +182,9 @@ def build(component, directory, *, docker_host=None):
         raise ValueError('bounded official source integrity required')
     (directory / 'source.tar.gz').write_bytes(data)
     (directory / 'Dockerfile').write_text(dockerfile(component, selected, CANDIDATE_RECIPE))
-    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n')
+    if component == 'controller':
+        (directory / 'test.patch').write_bytes((ROOT / selected['test_patch']['path']).read_bytes())
+    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n!test.patch\n')
     identity = directory / 'image-id.txt'
     try:
         run(['docker', '--host', endpoint, 'build', '--platform', 'linux/amd64',

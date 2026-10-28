@@ -50,9 +50,16 @@ class CertManagerBuildTest(unittest.TestCase):
             self.assertIn('go test ./...', generated)
             self.assertNotIn('DefaultMaxRSAKeySize', generated)
             self.assertIn(hashlib.sha256(build.CANDIDATE_RECIPE.read_bytes()).hexdigest(), generated)
+            self.assertEqual(component == 'controller', 'git apply --check' in generated)
         with self.assertRaises(ValueError): build.recipe(Path('/unreviewed.json'))
-        self.selected['modules']['github.com/go-jose/go-jose/v4'] = 'v4.1.5'
         original = build.load
+        for field, value in (('sha256', '0' * 64), ('path', '/unreviewed.patch')):
+            bad = copy.deepcopy(self.selected)
+            bad['test_patch'][field] = value
+            with patch.object(build, 'load', side_effect=lambda p:
+                    bad if p == build.CANDIDATE_RECIPE else original(p)), self.assertRaises(ValueError):
+                build.recipe(build.CANDIDATE_RECIPE)
+        self.selected['modules']['github.com/go-jose/go-jose/v4'] = 'v4.1.5'
         with patch.object(build, 'load', side_effect=lambda p:
                 self.selected if p == build.CANDIDATE_RECIPE else original(p)), self.assertRaises(ValueError):
             build.recipe(build.CANDIDATE_RECIPE)
@@ -166,7 +173,7 @@ class CertManagerBuildTest(unittest.TestCase):
         for rejected in ('hash', 'build', 'native', 'scan'):
             with tempfile.TemporaryDirectory() as parent:
                 directory = Path(parent) / 'candidate'
-                selected = copy.deepcopy(self.selected)
+                selected = build.recipe(build.CANDIDATE_RECIPE)
                 selected['source']['archive_sha256'] = hashlib.sha256(b'fixture').hexdigest()
                 def native(argv, **kwargs):
                     if rejected == 'build': raise subprocess.CalledProcessError(1, argv)
@@ -188,7 +195,7 @@ class CertManagerBuildTest(unittest.TestCase):
     def test_build_failure_evidence_retains_public_test_locations_without_raw_output(self):
         with tempfile.TemporaryDirectory() as parent:
             directory = Path(parent) / 'failed'
-            selected = copy.deepcopy(self.selected)
+            selected = build.recipe(build.CANDIDATE_RECIPE)
             selected['source']['archive_sha256'] = hashlib.sha256(b'fixture').hexdigest()
             failure = subprocess.CalledProcessError(1, ['docker'], stderr=(
                 '--- FAIL: TestSynthetic/invalid_key (0.01s)\nissuer_test.go:42: '

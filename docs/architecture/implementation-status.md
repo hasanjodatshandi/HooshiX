@@ -165,6 +165,8 @@ The prospective cert-manager source build now selects the separate
 modules. The archived recipe bytes and all current published-digest readers
 remain unchanged. Candidate controller builds execute upstream ACME tests;
 all three builds execute JOSE tests and reject old linked JOSE modules.
+A checksummed test-only patch uses bracketed IPv6 URL syntax in the upstream
+HTTP solver fixture, preserving its test cases/assertions and all runtime code.
 New protected publication, signed-digest adoption, certificate issuance and
 target upgrade remain `Not verified`; existing receipts do not cover new bytes.
 Independent execution at `2026-10-13T14:36:06.181297+00:00` passed the complete
