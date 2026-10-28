@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from build_cert_manager_candidates import (BLOCKED, COMPONENTS, RECIPE, ROOT,
+from build_cert_manager_candidates import (BLOCKED, CANDIDATE_RECIPE, COMPONENTS, ROOT,
     local_endpoint, native_entrypoint, recipe, validate_inventory)
 from build_patched_platform import published_image
 from publish_cert_manager_candidates import repository, source_predicate
@@ -24,13 +24,13 @@ PIN = ROOT / 'infrastructure/production/data/cert-manager-images.json'
 
 
 def candidate():
-    source = recipe()
+    source = recipe(CANDIDATE_RECIPE)
     catalog = load(PIN)
     selected = catalog['published_security_candidate']
     publication = selected['publication']
     if (catalog['schema_version'] != 1 or catalog['version'] != source['version']
             or catalog['platform'] != 'linux/amd64' or catalog['production_promotion'] != BLOCKED
-            or selected['recipe_sha256'] != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
+            or selected['recipe_sha256'] != hashlib.sha256(CANDIDATE_RECIPE.read_bytes()).hexdigest()
             or not re.fullmatch(r'[a-f0-9]{64}', selected['publication_sha256'])
             or publication['schema_version'] != 1
             or not re.fullmatch(r'[a-f0-9]{40}', publication['repository_revision'])
@@ -65,7 +65,7 @@ def verify(directory, output):
         folder.mkdir(mode=0o700, parents=True)
         config = publication['image_config_digests'][component]
         scan_inventory(folder, image, 'registry')
-        validate_inventory(folder, component, image, datetime.now(timezone.utc), config)
+        validate_inventory(folder, component, image, datetime.now(timezone.utc), config, CANDIDATE_RECIPE)
         if published_image(repository(component), load(folder / 'syft.json')['source'], config) != image:
             raise ValueError('exact reviewed registry manifest/config required')
         scan_evidence[component] = {name: hashlib.sha256((folder / name).read_bytes()).hexdigest()
@@ -76,13 +76,14 @@ def verify(directory, output):
     cosign(['initialize', '--mirror', SIGSTORE_TUF_MIRROR], cache)
     flags = ['--certificate-identity', EXPECTED_CERTIFICATE_IDENTITY,
              '--certificate-oidc-issuer', EXPECTED_OIDC_ISSUER]
-    source = recipe()
+    source = recipe(CANDIDATE_RECIPE)
     for component, image in publication['images'].items():
         print('CERT_MANAGER_ACCEPTANCE_STEP=' + component + '-signature', flush=True)
         cosign(['verify', *flags, image], cache)
         for kind, uri, predicate in (
                 ('slsaprovenance1', 'https://slsa.dev/provenance/v1',
-                 source_predicate(component, source, publication['repository_revision'], publication['invocation_id'])),
+                 source_predicate(component, source, publication['repository_revision'],
+                                  publication['invocation_id'], CANDIDATE_RECIPE)),
                 ('cyclonedx', 'https://cyclonedx.org/bom', load(directory / component / 'registry/cyclonedx.json'))):
             verify_payload(cosign(['verify-attestation', '--type', kind, *flags, image], cache),
                            uri, predicate, image.split('@sha256:')[1])

@@ -147,12 +147,12 @@ The protected `cert-manager-candidate` dispatcher publishes only controller,
 cainjector and webhook destinations under the owner's explicit three-package
 public/private exception. It requires whole-set registry scans before signing,
 then exact signature/SLSA/CycloneDX verification via the existing release helper.
-Protected publication `38409447796:1` on
-`main@c5dd3c0012139e7969606bc074f207adebd65d26` completed with `Passed` for all
+Protected publication `40782339939:1` on
+`main@624ad6a634c7d0c93627f3d5869a7eb883824e46` completed with `Passed` for all
 three signatures/exact SLSA/CycloneDX payloads and actual public visibility
 within that limited exception. `cert-manager-images.json` separately binds the
 published set and public receipt SHA256
-`b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8`, preserving
+`1bccaa06d82490017e34c967d7090062375e66c954ae9041901487ec93409766`, preserving
 the source recipe and its provenance hash. `verify_published_cert_manager.py`
 independently verifies every exact registry scan/signature/attestation and signer
 negative before pulling those same three digests for restricted help-only smoke.
@@ -162,17 +162,19 @@ their own executed receipts exist. Application private-only policy, the offline
 Root, Istio CA and VPS remain unchanged.
 The prospective cert-manager source build now selects the separate
 `cert-manager-jose-sources.json` recipe and pins JOSE v4.1.6 in root/nested
-modules. The archived recipe bytes and all current published-digest readers
-remain unchanged. Candidate controller builds execute upstream ACME tests;
+modules. Archived recipe bytes remain unchanged; prospective catalog/admission
+readers select corrected publication `40782339939:1` from
+`main@624ad6a634c7d0c93627f3d5869a7eb883824e46`. Candidate controller builds execute upstream ACME tests;
 all three builds execute JOSE tests and reject old linked JOSE modules.
 A checksummed test-only patch uses bracketed IPv6 URL syntax in the upstream
 HTTP solver fixture, preserving its test cases/assertions and all runtime code.
-New protected publication, signed-digest adoption, certificate issuance and
-target upgrade remain `Not verified`; existing receipts do not cover new bytes.
-Independent execution at `2026-10-13T14:36:06.181297+00:00` passed the complete
+Corrected protected publication is `Passed`; signed native staging, certificate
+issuance with the corrected images and target upgrade remain `Not verified`;
+existing target receipts do not cover the new bytes.
+Independent acceptance of the selected corrected publication passed the complete
 published signature/SLSA/CycloneDX set, wrong-signer controls and restricted native
 entrypoints. Public acceptance receipt SHA256 is
-`7855cf84fe2a8bbde40474ab872d91f0d83ed657b2b320f66768599b02dc8c8b`.
+`65bec34e504fa27bdefd08b41f0d6f917497f27bb0c6e7823c7d4ab53c9210e6`.
 Certificate issuance/API behavior and target readiness are not established by help.
 
 Internal cert-manager commissioning tooling now renders only three signed

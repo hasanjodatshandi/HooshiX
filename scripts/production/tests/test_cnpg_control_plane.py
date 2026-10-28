@@ -25,7 +25,7 @@ class CnpgControlPlaneTest(unittest.TestCase):
         self.manifest = Path(self.tmp.name) / 'cnpg.yaml'
         self.cert_manifest = Path(self.tmp.name) / 'certificates.yaml'
         self.cert_manifest.write_text(yaml.safe_dump_all(certificate_upstream()))
-        self.cert_recipe = copy.deepcopy(renderer.certificates.recipe())
+        self.cert_recipe = copy.deepcopy(renderer.certificates.recipe(renderer.certificates.CANDIDATE_RECIPE))
         self.cert_recipe['manifest']['sha256'] = hashlib.sha256(self.cert_manifest.read_bytes()).hexdigest()
         resources = ['backups', 'clusterimagecatalogs', 'clusters', 'databaseroles', 'databases',
             'failoverquorums', 'imagecatalogs', 'poolers', 'publications', 'scheduledbackups', 'subscriptions']

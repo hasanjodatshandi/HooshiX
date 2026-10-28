@@ -704,7 +704,7 @@ pin جدید فقط candidate آزمون staging است؛ receipt قبلی VPS �
 source predicate دقیق شامل JOSE `v4.1.6` و `source_patches: []` است؛ recipe
 یا JOSE قدیمی، hash ماژول متفاوت، signer اشتباه یا SBOM نامعتبر رد می‌شود.
 recipe آرشیوی برای provenance قبلی تغییر نمی‌کند. روی VPS موجود، بسته‌های
-bootstrap/mesh/ESO این بخش را با pin جدید دوباره اجرا نکنید: مهاجرت از تصاویر
+bootstrap/mesh/ESO/cert-manager این بخش را با pin جدید دوباره اجرا نکنید: مهاجرت از تصاویر
 source-patched نصب‌شدهٔ قبلی به این مجموعه، بررسی و بستهٔ مستقل لازم دارد و
 هنوز **Not verified** است. این گام فقط staging disposable را پیش می‌برد؛
 تغییری روی CA، کلید، data، PVC، شبکه یا دسترسی برنامه/عمومی مقصد نمی‌دهد.
@@ -1159,11 +1159,11 @@ job، package دیگر، تصاویر محصول، اسرار یا بازکرد�
 این بخش فقط candidate انتشار می‌سازد، نه نصب TLS یا readiness تولید؛ نتیجهٔ
 نصب اجراشدهٔ VPS در بخش commissioning پایین ثبت شده است.
 
-انتشار محافظت‌شدهٔ کل سه تصویر در run `38409447796`، attempt `1`، از
-`main@c5dd3c0012139e7969606bc074f207adebd65d26` با **Passed** ثبت شده است.
+انتشار منتخبِ سه تصویر اصلاح‌شده در run `40782339939`، attempt `1`، از
+`main@624ad6a634c7d0c93627f3d5869a7eb883824e46` با **Passed** ثبت شده است.
 visibility واقعی فقط همین سه مقصد `public` است و در استثنای محدود بالا قرار دارد.
 SHA-256 فایل عمومی `publication.json`:
-`b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8`.
+`1bccaa06d82490017e34c967d7090062375e66c954ae9041901487ec93409766`.
 این رسید انتشار، به‌تنهایی مجوز نصب یا شاهد TLS/admission/staging نیست.
 
 سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
@@ -1179,8 +1179,8 @@ buildinfo و hash چهار فایل go.mod/go.sum در تصویر نهایی ن�
 JOSE را در ماژول ریشه و هر سه `cmd` روی `v4.1.6` ثابت می‌کند. recipe اصلی
 `cert-manager-sources.json` با SHA-256
 `350941c06ad2bc5536ebc47b972643db4a56e8f831cef2617841e701cfdee4e9`
-فقط برای بازسازی provenance انتشار قبلی حفظ می‌شود؛ خوانندهٔ انتشار فعلی
-به آن متصل می‌ماند تا مجموعهٔ تازه مستقلاً منتشر و پذیرفته شود. Go، نسخهٔ
+فقط برای بازسازی provenance انتشار قبلی حفظ می‌شود؛ خوانندهٔ candidate فعلی
+و policy دقیق staging به recipe اصلاح‌شدهٔ JOSE و همین انتشار جدید متصل‌اند. Go، نسخهٔ
 cert-manager، manifest و runtime base تغییر نمی‌کنند. تست‌های upstream
 JOSE و آزمون‌های ACME در مسیر ساخت controller اجرا می‌شوند؛ محدودیت پیش‌فرض
 RSA دست‌کاری نمی‌شود. اسکن نهایی controller باید JOSE اصلاح‌شده را نشان دهد؛
@@ -1238,7 +1238,7 @@ provenance معتبر بماند. از داخل checkout پروژه، artifact �
 پوشهٔ تازهٔ خارج از Git دریافت و پذیرش مستقل را اجرا کنید:
 
 ```bash
-gh run download 38409447796 --name cert-manager-publication-38409447796-1 \
+gh run download 40782339939 --name cert-manager-publication-40782339939-1 \
   --dir /tmp/hooshix-cert-manager-published-evidence
 scripts/production/install_release_tools.sh /tmp/hooshix-cert-manager-verification-tools
 export PATH=/tmp/hooshix-cert-manager-verification-tools:$PATH
@@ -1260,10 +1260,10 @@ python3 scripts/production/verify_published_cert_manager.py \
 گزارش‌ها در `<output>/<component>/registry` و hash آن‌ها در
 `scan_evidence_sha256` باقی می‌مانند؛ publication و attestation اصلی دست‌نخورده‌اند.
 
-اجرای مستقل روی میزبان توسعه در `2026-10-13T14:36:06Z`، امضا/SLSA/SBOM،
+پذیرش مستقل انتشار اصلاح‌شدهٔ منتخب روی میزبان توسعه، امضا/SLSA/SBOM،
 رد signer غلط و smoke محدود هر سه digest را با **Passed** ثبت کرده است.
 SHA-256 رسید عمومی `acceptance.json`:
-`7855cf84fe2a8bbde40474ab872d91f0d83ed657b2b320f66768599b02dc8c8b`.
+`65bec34e504fa27bdefd08b41f0d6f917497f27bb0c6e7823c7d4ab53c9210e6`.
 این شاهد همان bytes منتشرشده است، نه صدور TLS یا نصب مقصد.
 
 خروجی موفق `CERT_MANAGER_PUBLISHED_ACCEPTANCE=Passed` و `acceptance.json` است؛
