@@ -576,11 +576,14 @@ Ambient mTLS روی VPS همچنان مستقل و الزامی‌اند. اجر
 
 ### ساخت candidate امنیتی از سورس رسمی
 
-recipe ثابت `infrastructure/production/release/patched-platform-sources.json`
+recipe ساخت جدید `infrastructure/production/release/jose-platform-sources.json`
 برای ESO `2.12.0`، OpenBao `2.6.4` و Istio `1.30.5` است. نسخهٔ محصول و chart
 حفظ می‌شود؛ compiler برابر Go `1.26.9` با تصویر builder دارای digest ثابت است.
 `x/net=v0.60.0` و وابستگی‌های لازم آن (`x/crypto=v0.57.0`، `x/sys=v0.48.0`،
-`x/term=v0.46.0` و `x/text=v0.42.0`) ثابت‌اند. archive سورس رسمی هر پروژه به
+`x/term=v0.46.0` و `x/text=v0.42.0`) و JOSE `v4.1.6` ثابت‌اند.
+patchهای دارای checksum برای CAP و Okta در OpenBao اعمال می‌شوند؛ recipe قدیمی
+`patched-platform-sources.json` فقط برای provenance تصاویر قبلی حفظ می‌شود.
+archive سورس رسمی هر پروژه به
 commit و SHA-256 bind است؛ checksum، sumdb، `go mod verify` و build readonly
 خاموش نمی‌شوند. این مسیر ساخت جدید، تصویر رسمی upstream نیست.
 
