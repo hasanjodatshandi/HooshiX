@@ -188,6 +188,15 @@ def build(component, directory, *, docker_host=None):
             if phrase in (error.stderr or ''):
                 reason = category
                 break
+        output = error.stderr or ''
+        failure = {'schema_version': 1, 'component': component, 'reason': reason,
+            'tests': sorted(set(re.findall(r'--- FAIL: ([A-Za-z0-9_./=-]{1,200})', output)))[:32],
+            'locations': sorted(set(re.findall(r'([A-Za-z0-9_./-]+\.go:[0-9]{1,6})', output)))[:32],
+            'phrases': [p for p in ('signal: killed', 'panic:', 'operation not permitted',
+                'permission denied', 'address already in use', 'connection refused',
+                'FAIL', 'no required module provides package', 'could not import',
+                'Resource temporarily unavailable') if p in output]}
+        (directory / 'build-failure.json').write_text(json.dumps(failure, indent=2) + '\n')
         print('CERT_MANAGER_BUILD_FAILURE=' + reason, file=sys.stderr, flush=True)
         raise
     engine = identity.read_text().strip()

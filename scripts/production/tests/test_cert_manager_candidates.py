@@ -185,6 +185,27 @@ class CertManagerBuildTest(unittest.TestCase):
             build.build('controller', Path('unused'), docker_host='tcp://remote:2375')
         fetch.assert_not_called()
 
+    def test_build_failure_evidence_retains_public_test_locations_without_raw_output(self):
+        with tempfile.TemporaryDirectory() as parent:
+            directory = Path(parent) / 'failed'
+            selected = copy.deepcopy(self.selected)
+            selected['source']['archive_sha256'] = hashlib.sha256(b'fixture').hexdigest()
+            failure = subprocess.CalledProcessError(1, ['docker'], stderr=(
+                '--- FAIL: TestSynthetic/invalid_key (0.01s)\nissuer_test.go:42: '
+                'private-value-must-not-escape\npanic: private-value-must-not-escape'))
+            with patch.object(build, 'recipe', return_value=selected), \
+                    patch.object(build.urllib.request, 'urlopen') as fetch, \
+                    patch.object(build, 'run', side_effect=failure), self.assertRaises(subprocess.CalledProcessError):
+                fetch.return_value.__enter__.return_value.read.return_value = b'fixture'
+                build.build('controller', directory, docker_host='unix:///captured.sock')
+            text = (directory / 'build-failure.json').read_text()
+            self.assertNotIn('private-value-must-not-escape', text)
+            result = json.loads(text)
+            self.assertEqual(['TestSynthetic/invalid_key'], result['tests'])
+            self.assertEqual(['issuer_test.go:42'], result['locations'])
+            self.assertIn('panic:', result['phrases'])
+            self.assertFalse((directory / 'receipt.json').exists())
+
 
 class CertManagerPublicationTest(unittest.TestCase):
     def setUp(self):
