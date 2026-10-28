@@ -3016,7 +3016,8 @@ topicها و ACLهای موجود حفظ می‌شوند. journal تغییرنا
 
 گام بعد فقط topicهای versioned موجود در قرارداد برنامه و ACLهای literal پنج
 هویت تحویل‌شده است. این گام مجوز wildcard، مدیریت broker، تغییر credential یا
-بازکردن مسیر برنامه/اینترنت نیست. اجرای مقصد و آزمون دسترسی هنوز **Not run** است.
+بازکردن مسیر برنامه/اینترنت نیست. وضعیت اجرای سرور اول در رسید مقصدِ پایین ثبت
+شده است؛ سرور دیگر به اجرای مستقل همین روش و رسید خودش نیاز دارد.
 
 منبع اجرایی `scripts/production/kafka_topic_acl.py` است؛ نام topic و consumer
 group با تنظیمات فعلی هر پنج سرویس آزمون تطبیق دارد. سه topic اصلی
@@ -3097,6 +3098,46 @@ Windows SCP، فایل مقصد خالی را با ایجاد انحصاری، �
 `client.id` قابل‌تغییر. آماده‌سازی و آزمون ایزوله مجوز اعمال روی VPS یا بازکردن
 دسترسی برنامه نیست. این اعداد ظرفیت نهایی Production، سقف دیسک یا شاهد recovery
 نیستند؛ آزمون بار کامل و اعمال تأییدشدهٔ مقصد همچنان لازم‌اند.
+quotaهای bandwidth میانگین پنجره‌ای Kafka هستند؛ burst کوتاه ممکن است و این
+اعداد سقف سختِ هر بسته یا تضمین فضای دیسک محسوب نمی‌شوند.
+
+مرجع دقیق اعداد و وضعیت، `infrastructure/production/kafka/quota-profile.json` است؛
+`kafka_quota_profile.py` واحد بایت/ثانیه، پنج principal موجود، scope و بسته‌ماندن
+دسترسی را کنترل می‌کند. پروفایل ناشناخته، float، فیلد اضافه یا ادعای نصب/ظرفیت
+موفق پذیرفته نمی‌شود. این بخش فقط bandwidth است؛ سقف زمان پردازش درخواست،
+اتصال و مصرف دیسک را تأیید نمی‌کند.
+
+آزمون فقط روی دستگاه توسعه و Docker محلی با Unix socket اجرا می‌شود. باید
+`javac` نسخهٔ ۲۵ baseline و تصویر ثابت `published-candidate.json` از قبل موجود
+باشند. حساب Docker و توکن registry را فقط از مسیر خصوصی موجود دستگاه آماده
+کنید؛ هیچ رمز VPS، custody یا intermediate درخواست نمی‌شود:
+
+```bash
+python3 scripts/production/test_kafka_quota_native.py --disposable
+```
+
+آزمون همان digest را با شبکهٔ `none`، root filesystem فقط‌خواندنی و منابع محدود
+اجرا می‌کند. گواهی‌های مصنوعی و فایل‌های موقت فقط در tmpfs هستند. روی broker
+دورریختنی پنج quota از نوع user ساخته و تمام inventory بازخوانی می‌شود؛ دو
+`client.id` متفاوت برای هر principal ارسال انجام می‌دهند و هر پنج consumer
+دادهٔ مصنوعی خود را دریافت می‌کنند. موفقیت نیازمند مشاهدهٔ واقعی throttle در
+متریک producer و consumer هر هویت، دریافت دقیق پیام‌ها و رد تغییر quota توسط
+تمام برنامه‌ها است. زمان، تعداد پیام‌ها و حافظه محدودند؛ container و دادهٔ
+دورریختنی در پایان حذف می‌شوند. هیچ پیام یا quota روی VPS ایجاد نمی‌شود.
+
+رسید CI در artifactِ `kafka-quota-profile-<run>-<attempt>` قرار می‌گیرد و
+`isolated_quota_profile` را از رسید topic/ACL جدا نگه می‌دارد. تنها پس از موفقیت
+آزمون، فیلدهای `principal_quota_readback`، `produce_fetch_throttling`،
+`two_client_ids_per_principal` و `quota_mutation_denial` باید `Passed` باشند؛
+`target_installation=Not run` و `production_capacity=Not verified` باقی می‌مانند.
+تا ابزار مستقل، آزمون staging و اجرای نظارت‌شدهٔ مقصد آماده نشده، فرمان نصب
+quota روی سرور موجود نیست؛ دستور آزمایشی را جایگزین فرمان عملیاتی نکنید.
+آزمون محلیِ ایزوله در ۲۰۲۶-۱۰-۲۸ روی digest موجود `9fe8fcb3…` موفق شد: پنج
+هویت، throttle واقعی ارسال/دریافت، دو client ID برای هر principal و رد تغییر
+quota، همگی `Passed`. این شاهد محلی، نصب quota روی VPS نیست.
+
+مرجع رفتار quota و precedence هویت:
+[Kafka 4.2 quota operations](https://kafka.apache.org/42/operations/basic-kafka-operations/#setting-quotas).
 
 پس از این گام هنوز quota، ظرفیت/بازیابی، endpoint داخلی قابل‌دسترسی و مجوز شبکهٔ
 هر برنامه دروازه‌های مستقل هستند؛ برنامه/اینترنت همچنان `CLOSED` می‌ماند و هیچ

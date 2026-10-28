@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "profile": "isolated-low-load-v1",
+  "scope": "authenticated-user",
+  "producer_byte_rate": 65536,
+  "consumer_byte_rate": 262144,
+  "target_installation": "Not run",
+  "production_capacity": "Not verified",
+  "application_ingress": "CLOSED",
+  "public_access": "CLOSED"
+}

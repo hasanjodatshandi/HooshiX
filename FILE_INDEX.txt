@@ -393,6 +393,7 @@ infrastructure/production/k3s/config.yaml
 infrastructure/production/kafka/Dockerfile
 infrastructure/production/kafka/candidate.json
 infrastructure/production/kafka/published-candidate.json
+infrastructure/production/kafka/quota-profile.json
 infrastructure/production/network/trust-policy.json
 infrastructure/production/observability/observability-policy.json
 infrastructure/production/platform-contracts.json
@@ -574,6 +575,7 @@ scripts/production/build_redis_secrets_bundle.py
 scripts/production/build_redis_storage_bundle.py
 scripts/production/check_human_sshd_candidate.sh
 scripts/production/commission_platform.py
+scripts/production/fixtures/KafkaQuotaProbe.java
 scripts/production/import_intermediate_ca.py
 scripts/production/inspect_host.py
 scripts/production/install_audit_prerequisite.py
@@ -597,6 +599,7 @@ scripts/production/install_release_tools.sh
 scripts/production/jit_broker.py
 scripts/production/jit_runtime.py
 scripts/production/kafka_client_tls.py
+scripts/production/kafka_quota_profile.py
 scripts/production/kafka_secret_delivery.py
 scripts/production/kafka_tls_material.py
 scripts/production/kafka_topic_acl.py
@@ -701,6 +704,7 @@ scripts/production/run-redis-runtime.ps1
 scripts/production/run-redis-storage.ps1
 scripts/production/test_jit_systemd_expiry.py
 scripts/production/test_kafka_client_tls_native.py
+scripts/production/test_kafka_quota_native.py
 scripts/production/test_kafka_runtime_native.py
 scripts/production/test_kafka_tls_acl_native.py
 scripts/production/test_kafka_topic_acl_native.py
@@ -726,6 +730,7 @@ scripts/production/tests/test_jit_runtime.py
 scripts/production/tests/test_kafka_client_tls.py
 scripts/production/tests/test_kafka_health.py
 scripts/production/tests/test_kafka_local_volume.py
+scripts/production/tests/test_kafka_quota_profile.py
 scripts/production/tests/test_kafka_runtime.py
 scripts/production/tests/test_kafka_runtime_candidate.py
 scripts/production/tests/test_kafka_storage.py
