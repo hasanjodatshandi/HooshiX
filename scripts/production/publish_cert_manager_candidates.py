@@ -9,7 +9,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from build_cert_manager_candidates import COMPONENTS, RECIPE, build, dockerfile, recipe, validate_inventory
+from build_cert_manager_candidates import (CANDIDATE_RECIPE, COMPONENTS, RECIPE, build,
+                                           dockerfile, recipe, validate_inventory)
 from build_patched_platform import published_image
 from build_postgresql_candidates import local_endpoint
 from publish_openbao_candidate import context, run
@@ -42,7 +43,7 @@ def package_visibility(component, *, allow_missing=False):
     return visibility
 
 
-def source_predicate(component, selected, revision, invocation):
+def source_predicate(component, selected, revision, invocation, recipe_path=RECIPE):
     if component not in COMPONENTS:
         raise ValueError('unapproved cert-manager component')
     source, runtime = selected['source'], selected['components'][component]
@@ -56,8 +57,8 @@ def source_predicate(component, selected, revision, invocation):
     return {'buildDefinition': {'buildType': BUILD_TYPE,
         'externalParameters': {'component': component, 'operation': 'patched-upstream-source-build',
             'source': source, 'recipe': selected,
-            'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
-            'dockerfile_sha256': hashlib.sha256(dockerfile(component, selected).encode()).hexdigest(),
+            'recipe_sha256': hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
+            'dockerfile_sha256': hashlib.sha256(dockerfile(component, selected, recipe_path).encode()).hexdigest(),
             'runtime_base': runtime, 'platform': 'linux/amd64', 'repository_revision': revision},
         'internalParameters': {}, 'resolvedDependencies': dependencies},
         'runDetails': {'builder': {'id': EXPECTED_CERTIFICATE_IDENTITY},
@@ -71,7 +72,7 @@ def publish(directory, env):
         raise ValueError('exact protected cert-manager dispatch required')
     endpoint = local_endpoint()
     directory.mkdir(mode=0o700)
-    selected = recipe()
+    selected = recipe(CANDIDATE_RECIPE)
     for component in COMPONENTS:
         package_visibility(component, allow_missing=True)
     built = {}
@@ -99,14 +100,14 @@ def publish(directory, env):
                            receipt['image_config_digest']) != image:
             raise ValueError('immutable registry manifest changed')
         checked = validate_inventory(folder, component, image, datetime.now(timezone.utc),
-                                     receipt['image_config_digest'])
+                                     receipt['image_config_digest'], CANDIDATE_RECIPE)
         targets[component] = image
         (folder / 'receipt.json').write_text(json.dumps(checked, indent=2) + '\n')
     # No signature until every final registry image has passed the complete scan.
     for component, image in targets.items():
         print('CERT_MANAGER_PUBLICATION_STEP=' + component + '-sign-verify', flush=True)
         sign_and_verify(directory / component / 'registry', image,
-                        source_predicate(component, selected, revision, invocation))
+                        source_predicate(component, selected, revision, invocation, CANDIDATE_RECIPE))
     for component in COMPONENTS:
         visibilities[component] = package_visibility(component)
     result = {'schema_version': 1, 'repository_revision': revision, 'invocation_id': invocation,
