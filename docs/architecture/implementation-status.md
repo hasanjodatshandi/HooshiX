@@ -160,6 +160,13 @@ It never builds, pushes, signs, installs or connects to the VPS. Target installa
 certificate issuance, admission and staging remain `Not run`/`Not verified` until
 their own executed receipts exist. Application private-only policy, the offline
 Root, Istio CA and VPS remain unchanged.
+The prospective cert-manager source build now selects the separate
+`cert-manager-jose-sources.json` recipe and pins JOSE v4.1.6 in root/nested
+modules. The archived recipe bytes and all current published-digest readers
+remain unchanged. Candidate controller builds execute upstream ACME tests;
+all three builds execute JOSE tests and reject old linked JOSE modules.
+New protected publication, signed-digest adoption, certificate issuance and
+target upgrade remain `Not verified`; existing receipts do not cover new bytes.
 Independent execution at `2026-10-13T14:36:06.181297+00:00` passed the complete
 published signature/SLSA/CycloneDX set, wrong-signer controls and restricted native
 entrypoints. Public acceptance receipt SHA256 is

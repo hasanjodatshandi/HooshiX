@@ -1155,6 +1155,19 @@ runtime هر جزء در `infrastructure/production/data/cert-manager-sources.js
 `go mod tidy` در همان ماژول جزء، فایل‌های قفل را پیش از build readonly همگام می‌کند؛
 buildinfo و hash چهار فایل go.mod/go.sum در تصویر نهایی نگه داشته می‌شود.
 
+ساخت candidate جدید از `cert-manager-jose-sources.json` استفاده می‌کند و
+JOSE را در ماژول ریشه و هر سه `cmd` روی `v4.1.6` ثابت می‌کند. recipe اصلی
+`cert-manager-sources.json` با SHA-256
+`350941c06ad2bc5536ebc47b972643db4a56e8f831cef2617841e701cfdee4e9`
+فقط برای بازسازی provenance انتشار قبلی حفظ می‌شود؛ خوانندهٔ انتشار فعلی
+به آن متصل می‌ماند تا مجموعهٔ تازه مستقلاً منتشر و پذیرفته شود. Go، نسخهٔ
+cert-manager، manifest و runtime base تغییر نمی‌کنند. تست‌های upstream
+JOSE و آزمون‌های ACME در مسیر ساخت controller اجرا می‌شوند؛ محدودیت پیش‌فرض
+RSA دست‌کاری نمی‌شود. اسکن نهایی controller باید JOSE اصلاح‌شده را نشان دهد؛
+JOSE قدیمی در هر جزء رد می‌شود. خروجی help صرفاً smoke است و صدور گواهی یا
+ارتقای VPS را اثبات نمی‌کند. انتشار محافظت‌شده و پذیرش امضا/SBOM/admission
+برای digestهای جدید همچنان پیش‌نیاز مستقل staging و هر نصب بعدی هستند.
+
 برای ساخت و اسکن بدون credential روی میزبان توسعه، از checkout مربوط به
 تغییر و ابزارهای checksum-pinned پروژه استفاده کنید. پوشهٔ خروجی باید تازه و
 خارج از Git باشد؛ این فرمان هیچ تصویر یا فایل production را منتشر نمی‌کند:

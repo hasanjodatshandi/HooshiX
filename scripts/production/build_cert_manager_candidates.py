@@ -18,19 +18,24 @@ from verify_postgresql_artifacts import (scan_inventory, require_complete_invent
                                          require_unsuppressed_scan)
 
 RECIPE = ROOT / 'infrastructure/production/data/cert-manager-sources.json'
+CANDIDATE_RECIPE = ROOT / 'infrastructure/production/data/cert-manager-jose-sources.json'
 COMPONENTS = ('controller', 'cainjector', 'webhook')
 MODULES = NETWORK_MODULES | {'google.golang.org/grpc': 'v1.83.2'}
 BLOCKED = 'blocked-until-signed-digest-admission-native-and-recovery-evidence'
 
 
-def recipe():
-    selected = load(RECIPE)
+def recipe(path=RECIPE):
+    if path not in (RECIPE, CANDIDATE_RECIPE):
+        raise ValueError('reviewed cert-manager recipe required')
+    selected = load(path)
+    modules = MODULES | ({'github.com/go-jose/go-jose/v4': 'v4.1.6'}
+                         if path == CANDIDATE_RECIPE else {})
     baseline = load(ROOT / 'infrastructure/production/profile.json')['postgresql']['cert_manager']
     if (selected['schema_version'] != 1 or selected['version'] != baseline or baseline != '1.20.3'
             or selected['platform'] != 'linux/amd64' or selected['go_version'] != '1.26.9'
             or selected['builder'] != 'docker.io/library/golang@sha256:'
                'bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff'
-            or selected['modules'] != MODULES or selected['production_promotion'] != BLOCKED
+            or selected['modules'] != modules or selected['production_promotion'] != BLOCKED
             or selected['source'] != {'repository': 'cert-manager/cert-manager',
                 'revision': '1e1d16d1744e6d9c80e464e58e8d9ab1caed222b',
                 'tag_object': '904f9feddaf7739a78d1a0c56bdb4ff61a4ff65b',
@@ -46,7 +51,7 @@ def recipe():
     return selected
 
 
-def dockerfile(component, selected):
+def dockerfile(component, selected, recipe_path=RECIPE):
     if component not in COMPONENTS:
         raise ValueError('unapproved cert-manager component')
     source = selected['source']
@@ -61,8 +66,12 @@ def dockerfile(component, selected):
         f"RUN echo '{source['archive_sha256']}  /tmp/source.tar.gz' | sha256sum -c - && "
         'tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src',
         f'RUN test "$(go env GOVERSION)" = go1.26.9 && go get {modules} && go mod verify',
+        *(['RUN go mod tidy && go test -mod=readonly ./pkg/issuer/acme/... && go mod verify']
+          if recipe_path == CANDIDATE_RECIPE and component == 'controller' else []),
         f'WORKDIR /src/cmd/{component}',
         f'RUN go get {modules} && go mod tidy && go mod verify',
+        *(['RUN cd "$(go list -m -f \'{{.Dir}}\' github.com/go-jose/go-jose/v4)" && '
+           'go test ./...'] if recipe_path == CANDIDATE_RECIPE else []),
         f"RUN mkdir /out && go build -trimpath -buildvcs=false -mod=readonly -ldflags '{flags}' "
         f'-o /out/{component} . && go mod verify && go version -m /out/{component} > /out/{component}.buildinfo',
         'WORKDIR /src',
@@ -75,11 +84,11 @@ def dockerfile(component, selected):
         'LABEL org.opencontainers.image.source="https://github.com/hasanjodatshandi/HooshiX"',
         'LABEL io.hooshix.provenance.kind="patched-upstream-source-build"',
         f'LABEL io.hooshix.source.revision="{source["revision"]}"',
-        f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(RECIPE.read_bytes()).hexdigest()}"'
+        f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(recipe_path.read_bytes()).hexdigest()}"'
     ]) + '\n'
 
 
-def validate_inventory(directory, component, image, now, config_digest=None):
+def validate_inventory(directory, component, image, now, config_digest=None, recipe_path=RECIPE):
     if component not in COMPONENTS:
         raise ValueError('known component required')
     if config_digest is None:
@@ -87,7 +96,7 @@ def validate_inventory(directory, component, image, now, config_digest=None):
     elif (not re.fullmatch(r'[a-z0-9./_-]+@sha256:[a-f0-9]{64}', image)
           or not re.fullmatch(r'sha256:[a-f0-9]{64}', config_digest)):
         raise ValueError('immutable registry/config identities required')
-    selected = recipe()
+    selected = recipe() if recipe_path == RECIPE else recipe(recipe_path)
     syft, cdx, report, db = (load(directory / name) for name in
                             ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json'))
     require_complete_inventory(syft)
@@ -102,7 +111,7 @@ def validate_inventory(directory, component, image, now, config_digest=None):
             or report['source']['target']['userInput'] != image
             or metadata['labels'].get('io.hooshix.provenance.kind') != 'patched-upstream-source-build'
             or metadata['labels'].get('io.hooshix.source.revision') != selected['source']['revision']
-            or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
+            or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(recipe_path.read_bytes()).hexdigest()
             or metadata['labels'].get('org.opencontainers.image.source') != 'https://github.com/hasanjodatshandi/HooshiX'
             or cdx.get('bomFormat') != 'CycloneDX' or not cdx.get('components')
             or db.get('valid') is not True or db.get('error') or not db.get('schemaVersion')
@@ -117,14 +126,20 @@ def validate_inventory(directory, component, image, now, config_digest=None):
             or f'/app/cmd/{component}/{component}' not in
                {place['path'] for item in standard for place in item['locations']}):
         raise ValueError('every Go executable must use fixed compiler')
-    for module, version in MODULES.items():
+    for module, version in selected['modules'].items():
         items = [item for item in syft['artifacts'] if item['name'] == module]
         if (module == 'golang.org/x/net' and not items
                 or any(item['version'] != version for item in items)):
             raise ValueError('fixed linked dependencies required')
+    if recipe_path == CANDIDATE_RECIPE:
+        jose = [item for item in syft['artifacts'] if item['name'].startswith(
+            ('github.com/go-jose/go-jose', 'gopkg.in/square/go-jose'))]
+        if (any(item['name'] != 'github.com/go-jose/go-jose/v4' or item['version'] != 'v4.1.6'
+                for item in jose) or component == 'controller' and not jose):
+            raise ValueError('fixed JOSE v4 only; controller must link the corrected module')
     return {'schema_version': 1, 'component': component, 'version': '1.20.3', 'scan': 'Passed',
         'image_config_digest': metadata['imageID'], 'provenance_kind': 'patched-upstream-source-build',
-        'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
+        'recipe_sha256': hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
         ('local_engine_digest' if config_digest is None else 'registry_image'): image,
         'signature_provenance': 'Not verified', 'staging': 'Not verified',
         'deployment': 'Not verified', 'production_promotion': 'Not verified'}
@@ -145,7 +160,7 @@ def native_entrypoint(component, engine, endpoint):
 
 def build(component, directory, *, docker_host=None):
     if component not in COMPONENTS: raise ValueError('unapproved cert-manager component')
-    selected = recipe()
+    selected = recipe(CANDIDATE_RECIPE)
     endpoint = local_endpoint() if docker_host is None else docker_host
     if not endpoint.startswith('unix://'): raise ValueError('local Unix Docker required')
     directory.mkdir(mode=0o700)
@@ -156,7 +171,7 @@ def build(component, directory, *, docker_host=None):
     if len(data) > 128 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != source['archive_sha256']:
         raise ValueError('bounded official source integrity required')
     (directory / 'source.tar.gz').write_bytes(data)
-    (directory / 'Dockerfile').write_text(dockerfile(component, selected))
+    (directory / 'Dockerfile').write_text(dockerfile(component, selected, CANDIDATE_RECIPE))
     (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n')
     identity = directory / 'image-id.txt'
     try:
@@ -179,7 +194,8 @@ def build(component, directory, *, docker_host=None):
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', engine): raise ValueError('immutable engine identity required')
     native_entrypoint(component, engine, endpoint)
     scan_inventory(directory, engine, 'docker', docker_host=endpoint)
-    result = validate_inventory(directory, component, engine, datetime.now(timezone.utc))
+    result = validate_inventory(directory, component, engine, datetime.now(timezone.utc),
+                                recipe_path=CANDIDATE_RECIPE)
     result['native_entrypoint'] = 'Passed'
     (directory / 'receipt.json').write_text(json.dumps(result, indent=2) + '\n')
     return result

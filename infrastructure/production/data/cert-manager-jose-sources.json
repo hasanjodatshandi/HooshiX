@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "version": "1.20.3",
+  "platform": "linux/amd64",
+  "go_version": "1.26.9",
+  "builder": "docker.io/library/golang@sha256:bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff",
+  "modules": {
+    "golang.org/x/net": "v0.60.0",
+    "golang.org/x/crypto": "v0.57.0",
+    "golang.org/x/sys": "v0.48.0",
+    "golang.org/x/term": "v0.46.0",
+    "golang.org/x/text": "v0.42.0",
+    "google.golang.org/grpc": "v1.83.2",
+    "github.com/go-jose/go-jose/v4": "v4.1.6"
+  },
+  "source": {
+    "repository": "cert-manager/cert-manager",
+    "revision": "1e1d16d1744e6d9c80e464e58e8d9ab1caed222b",
+    "tag_object": "904f9feddaf7739a78d1a0c56bdb4ff61a4ff65b",
+    "archive_sha256": "ec89ef9c50ddf5a86015b84545f53138f35d32b79bf0b778dee5e135842bb5f9"
+  },
+  "manifest": {
+    "url": "https://github.com/cert-manager/cert-manager/releases/download/v1.20.3/cert-manager.yaml",
+    "sha256": "7ee74ba06845213e96d8ceaff3d20dd51e682765c1418eddda4e8780ba082261"
+  },
+  "components": {
+    "controller": "quay.io/jetstack/cert-manager-controller@sha256:1e4af57beb469cc3bb0fb48b9201caea2723819b9ffd3c3ea98568f55b4dd38b",
+    "cainjector": "quay.io/jetstack/cert-manager-cainjector@sha256:a2b12d27950d1603d2c8168c3ccd95d07b93ce6ec4b530316196a31db592a9c0",
+    "webhook": "quay.io/jetstack/cert-manager-webhook@sha256:953a97df613f7da7eda8ce4b1c8d8e6b50963db0800fab595d040db6eb5cb060"
+  },
+  "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence"
+}

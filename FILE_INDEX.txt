@@ -378,6 +378,7 @@ infrastructure/observability/pins.env
 infrastructure/observability/prometheus.yaml
 infrastructure/production/README.md
 infrastructure/production/data/cert-manager-images.json
+infrastructure/production/data/cert-manager-jose-sources.json
 infrastructure/production/data/cert-manager-sources.json
 infrastructure/production/data/data-policy.json
 infrastructure/production/data/postgresql-images.json

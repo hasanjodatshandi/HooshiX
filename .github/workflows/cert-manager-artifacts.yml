@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/cert-manager-artifacts.yml'
       - 'infrastructure/production/data/cert-manager-sources.json'
+      - 'infrastructure/production/data/cert-manager-jose-sources.json'
       - 'scripts/production/build_cert_manager_candidates.py'
       - 'scripts/production/publish_cert_manager_candidates.py'
       - 'scripts/production/build_postgresql_candidates.py'
@@ -17,6 +18,7 @@ on:
     paths:
       - '.github/workflows/cert-manager-artifacts.yml'
       - 'infrastructure/production/data/cert-manager-sources.json'
+      - 'infrastructure/production/data/cert-manager-jose-sources.json'
       - 'scripts/production/build_cert_manager_candidates.py'
       - 'scripts/production/publish_cert_manager_candidates.py'
       - 'scripts/production/build_postgresql_candidates.py'
