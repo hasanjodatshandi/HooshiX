@@ -20,11 +20,12 @@ SELECTOR = {'matchExpressions': [{'key': 'kubernetes.io/metadata.name',
 
 def predicate():
     selected = pin()['published_security_candidate']
-    recipe = build.recipe()
+    recipe = build.recipe(build.CANDIDATE_RECIPE)
     source = recipe['sources']['eso']
     return {'buildDefinition': {'buildType': build.BUILD_TYPE, 'externalParameters': {
         'component': 'eso', 'source': source, 'recipe_sha256': selected['recipe_sha256'],
         'modules': recipe['modules'], 'module_files_sha256': selected['module_files_sha256'],
+        'source_patches': [],
         'builder': recipe['builder'], 'runtime_base': build.base_image('eso'),
         'go_version': recipe['go_version'], 'repository_revision': selected['repository_revision']},
         'internalParameters': {}, 'resolvedDependencies': [{
@@ -49,12 +50,16 @@ def validate_publication(directory):
     publication = build.load(directory / 'publication.json')
     folder = directory / 'eso'
     receipt = build.load(folder / 'receipt.json')
-    if (publication.get('publication') != 'Passed'
+    if (publication.get('schema_version') != 1 or publication.get('publication') != 'Passed'
+            or publication.get('provenance_kind') != 'patched-upstream-source-build'
             or publication.get('repository_revision') != selected['repository_revision']
             or publication.get('images', {}).get('eso') != selected['image']
+            or receipt.get('component') != 'eso'
+            or receipt.get('module_files_sha256') != selected['module_files_sha256']
             or build.load(folder / 'source-provenance.json') != predicate()):
         raise ValueError('exact ESO publication and recipe required')
-    evidence = build.validate_local(folder, 'eso', receipt['image_config_digest'], datetime.now(timezone.utc))
+    evidence = build.validate_local(folder, 'eso', receipt['image_config_digest'],
+                                    datetime.now(timezone.utc), build.CANDIDATE_RECIPE)
     if any(receipt.get(key) != value for key, value in evidence.items()):
         raise ValueError('ESO scan receipt mismatch')
     if build.published_image(selected['image'].split('@')[0], build.load(folder / 'syft.json')['source'],

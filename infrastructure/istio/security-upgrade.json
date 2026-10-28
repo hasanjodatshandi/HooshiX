@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "publication_run": "38137708512",
+  "publication_run": "40677251011",
   "publication_attempt": 1,
   "predecessor_import_revision": "ffc299093b965450e4ef433a2d8392a01c404e0c",
-  "repository_revision": "fa7fbbe3a20be6ba99459209cfb6087d2fecba24",
-  "recipe_sha256": "a1980938b7e303ff72fba1d0f9f452ea7bce6c4a0642faa3ca2283bb606c8db1",
+  "repository_revision": "46596901ccb9afeab021c7ed3f86ec31d5d82c6e",
+  "recipe_sha256": "b0a7a314f95c64c5be9db3d9446867ff8af1f2ae0cacfcfcfeec35c33a64b63b",
   "module_files_sha256": {
-    "go.mod": "ffbe18d6089721ced80c7f3f6c72774f6590e861dcaa3665475555c51f7f34a6",
-    "go.sum": "9cfa3021984d1fbac30d9697a3e443facfb838db74e36aed85ff8359600a26fe"
+    "go.mod": "e1b86b872d2c44df4d41b47de40c856c65164ea4be55234787468ccfbdd9e447",
+    "go.sum": "e6fee5b2abc8a01d5d442369c2e7a6b0d97b5e698783685fa787be9afa6e13bf"
   },
   "images": {
-    "istiod": "ghcr.io/hasanjodatshandi/hooshix/platform-istiod-patched-private@sha256:3114d37f86969e4b70fd608bb13864046d80309cb4728175edc2bc33c9eca242",
-    "cni": "ghcr.io/hasanjodatshandi/hooshix/platform-cni-patched-private@sha256:703a72d3853bc9cdbc2c0bf0a835319b8c466546e768caa1b9bba70431f18ab5"
+    "istiod": "ghcr.io/hasanjodatshandi/hooshix/platform-istiod-patched-private@sha256:ebc39a486fe921508884af723dfebf2c61888dd13c5f75cdfe6e6d2164595af3",
+    "cni": "ghcr.io/hasanjodatshandi/hooshix/platform-cni-patched-private@sha256:96012ab4ad137c1c40599f274a2a8ab14df8399410b210ef9613137c3d1fec4e"
   },
   "production_promotion": "Not verified"
 }

@@ -519,7 +519,7 @@ class Staging:
                     'name': 'source-upgrade-probe', 'namespace': 'istio-system'}, 'spec': pod}
                 admission_result(k, test, wait, public_schema=False)
                 for field in ('wrong_signer', 'missing_sbom', 'component', 'go_version',
-                              'recipe_sha256', 'repository_revision'):
+                              'recipe_sha256', 'source_patches', 'repository_revision'):
                     bad = copy.deepcopy(original)
                     message = b'platform source build identity rejected'
                     if field == 'wrong_signer':
@@ -530,7 +530,8 @@ class Staging:
                         message = b'platform signed SBOM verification failed'
                     else:
                         expected = renderer.predicate(component)
-                        expected['buildDefinition']['externalParameters'][field] = 'wrong'
+                        expected['buildDefinition']['externalParameters'][field] = (
+                            ['unapproved-source-patch'] if field == 'source_patches' else 'wrong')
                         bad['spec']['validations'][2]['expression'] = renderer.provenance_expression(expected)
                     try:
                         apply(k, bad)

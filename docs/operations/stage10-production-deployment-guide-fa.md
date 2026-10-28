@@ -540,10 +540,10 @@ python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz
 
 این گزینه تصویر دلخواه نمی‌گیرد؛ فقط `published_security_candidate` در
 `eso-image.json` را انتخاب می‌کند. digest انتخاب‌شده به انتشار موفق
-[38137708512](https://github.com/hasanjodatshandi/HooshiX/actions/runs/38137708512)
-روی revision `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` و recipe ثابت bind است.
+[40677251011](https://github.com/hasanjodatshandi/HooshiX/actions/runs/40677251011)
+روی revision `46596901ccb9afeab021c7ed3f86ec31d5d82c6e` و recipe اصلاح‌شدهٔ JOSE bind است.
 تصویر ESO و هر سه workload برابر
-`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:961e047189afbfcc2a5ce58468f7205fc94a14eab45bf5eacbfa8fa4b839e397`
+`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:e5d64b56dde56296057032a9ccab227f0d65df5498779cfca886e34cf8c51f8d`
 خواهد بود. بدون این گزینه، render تصویر upstream را برای بررسی پایه حفظ
 می‌کند؛ آن خروجی را با candidate اصلاح‌شده اشتباه نگیرید.
 
@@ -677,19 +677,33 @@ CI مربوط به SHA دقیق جدید لازم است؛ پس از merge نی�
 انتخاب می‌شوند. این مسیر نصب اولیه نیست: ztunnel، CA، OpenBao و داده‌های آن،
 SSH، ایمیل و storage نباید تغییر کنند. اجرای دوبارهٔ `commission_platform.py`
 برای این ارتقا مجاز نیست. روی VPS اول، receipt مقصد با plan بررسی‌شدهٔ main
-`351802f1ba55aa11ca5c11740c038e575dc996bf` و digestهای همین pin، نتیجهٔ
+`351802f1ba55aa11ca5c11740c038e575dc996bf` و digestهای ثبت‌شده در همان plan، نتیجهٔ
 `mesh_security_upgrade=Passed` و `openbao_ca_ztunnel_storage=Preserved` دارد.
 این شاهد ارتقای همان مقصد است، نه آمادگی Production یا نصب ESO؛ روی سرور
 دیگر اجرای مستقل و receipt همان سرور لازم است. سبزشدن baseline به‌تنهایی
 شاهد تعویض تصویر VPS نیست.
 
 مرجع انتخاب candidate، `infrastructure/istio/security-upgrade.json` است؛
-این فایل pins upstream/chart را عوض نمی‌کند. publication شمارهٔ `38137708512`
-به revision دقیق `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` متصل است. سازنده
+این فایل pins upstream/chart را عوض نمی‌کند. publication شمارهٔ `40677251011`
+به revision دقیق `46596901ccb9afeab021c7ed3f86ec31d5d82c6e` متصل است. سازنده
 پیش از تحویل بسته، اجرای موفق workflow انتشار روی main و scan تازهٔ همان
 digestها را کنترل می‌کند. هر تصویر، policy مستقل source-build با signer/issuer
 دقیق، provenance شامل recipe، سورس، Go، module locks و invocation، و SBOM
 امضاشده دارد. policy قدیمی ztunnel و OpenBao حفظ می‌شود.
+
+pin جدید فقط candidate آزمون staging است؛ receipt قبلی VPS به این digestها
+تعمیم داده نمی‌شود. تصویرهای prospective عبارت‌اند از:
+
+- istiod: `sha256:ebc39a486fe921508884af723dfebf2c61888dd13c5f75cdfe6e6d2164595af3`
+- CNI: `sha256:96012ab4ad137c1c40599f274a2a8ab14df8399410b210ef9613137c3d1fec4e`
+
+source predicate دقیق شامل JOSE `v4.1.6` و `source_patches: []` است؛ recipe
+یا JOSE قدیمی، hash ماژول متفاوت، signer اشتباه یا SBOM نامعتبر رد می‌شود.
+recipe آرشیوی برای provenance قبلی تغییر نمی‌کند. روی VPS موجود، بسته‌های
+bootstrap/mesh/ESO این بخش را با pin جدید دوباره اجرا نکنید: مهاجرت از تصاویر
+source-patched نصب‌شدهٔ قبلی به این مجموعه، بررسی و بستهٔ مستقل لازم دارد و
+هنوز **Not verified** است. این گام فقط staging disposable را پیش می‌برد؛
+تغییری روی CA، کلید، data، PVC، شبکه یا دسترسی برنامه/عمومی مقصد نمی‌دهد.
 
 ```bash
 python3 -m unittest discover -s scripts/production/tests -p test_mesh_security_upgrade.py

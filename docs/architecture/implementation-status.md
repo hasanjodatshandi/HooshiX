@@ -290,9 +290,17 @@ artifacts were independently revalidated against recipe SHA256
 `b0a7a314f95c64c5be9db3d9446867ff8af1f2ae0cacfcfcfeec35c33a64b63b`.
 OpenBao has JOSE v4.1.6 only and zero High/Critical findings; its native
 TLS/Shamir/Raft recovery passed. These results are source-candidate evidence,
-not a fix on the VPS. Corrected protected registry publication, fresh signed
-digest/admission adoption and target compatibility remain `Not verified`;
-installed images, keys and data were not replaced by this change.
+not a fix on the VPS. Corrected protected registry publication `40677251011`
+on `46596901ccb9afeab021c7ed3f86ec31d5d82c6e` is `Passed`; its four immutable
+registry receipts, source provenance, signed SBOMs, wrong-signer rejection and
+OpenBao recovery were independently checked. Prospective mesh/ESO catalog and
+exact-payload readers select that publication and JOSE recipe for disposable
+staging; archived recipe bytes and upstream build bases remain unchanged.
+Signed native staging for the updated catalog and target compatibility remain
+`Not verified`. The prior target receipt does not apply to the new digests;
+an existing patched-source VPS requires a separately reviewed transition before
+reuse of installation/upgrade bundles. Installed images, keys and data were not
+replaced by this change; application/public access stays closed.
 PR/push/manual baseline gates now build and scan the selected final source
 candidates, while scheduled upstream scans remain blocking and preserve the old
 image findings. The OpenBao candidate gate also requires disposable native
