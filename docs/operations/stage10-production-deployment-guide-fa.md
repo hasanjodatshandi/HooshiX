@@ -59,7 +59,8 @@ Stage10 و Production readiness همچنان `Not verified` هستند.
 `cdc84930059dc68a553ad8f3d29c3bc4f30e8cfd85c4ccb9139d321f40465843` بود.
 رسید عمومی: `~/.local/share/hooshix-kafka-tls/delivery-00170c7e127744a38fcbf73f6cfc96a6.json`.
 این عملیات از issuer/OpenBao/ESO موجود استفاده کرد و Root را حفظ کرد؛ broker،
-claim یا PVC نساخت. آزمون Kubernetes staging، broker مقصد، recovery، ظرفیت و
+claim یا PVC نساخت. این رسید فقط تحویل TLS را اثبات می‌کند؛ وضعیت broker و
+topic/ACL در بخش مربوط و رسید مستقل همان گام مشخص می‌شود. recovery، ظرفیت و
 Production readiness همچنان `Not verified` هستند.
 
 | مرحله | وضعیت سرور اول | تکرار برای نصب دوم |
@@ -74,7 +75,7 @@ Production readiness همچنان `Not verified` هستند.
 | recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
-| Kafka بسته | storage guard، LocalPV و تحویل TLS موجود Passed | runtime بسته در PR جاری؛ staging دقیق `main` و اجرای مقصد هنوز لازم است؛ broker نصب نشده |
+| Kafka بسته | broker داخلی، TLS پنج هویت و رسید ۶ topic/۴۷ ACL با مهاجرت health موجود Passed؛ دسترسی برنامه/عمومی CLOSED | بستهٔ اختصاصی، staging همان revision و رسید مستقل مقصد؛ ظرفیت/بازیابی همچنان لازم است |
 | JIT/داده/GitOps/برنامه/edge | کامل نشده | مراحل بعد این راهنما |
 
 ## ۱. برگهٔ عمومی نصب
@@ -3072,11 +3073,22 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 
 فقط `READY` انگلیسی و sudo در پنجرهٔ محلی لازم است؛ رمز custody/intermediate/Root
 یا GHCR نمی‌خواهد. نتیجهٔ مورد انتظار `KAFKA_TOPIC_ACL=Passed` است. رسید عمومی
-در `~/.local/share/hooshix-kafka-topics/` ذخیره می‌شود. تا دریافت رسید مقصد، نصب
-فایل رسید باید متعلق به کاربر محلی و با مجوز `0600` در پوشهٔ `0700` باشد؛
-اعتبارسنجی hash برنامه، revision و نتیجه مستقل از انتقال فایل الزامی است.
-**Not verified** است. این عملیات broker را restart نمی‌کند؛ image، PVC، cluster
-ID، گواهی‌ها، advertise loopback، admission و قواعد شبکه تغییر نمی‌کنند.
+در `~/.local/share/hooshix-kafka-topics/` ذخیره می‌شود. نصاب پیش از دریافت با
+Windows SCP، فایل مقصد خالی را با ایجاد انحصاری، مالکیت همان کاربر و مجوز `0600`
+داخل پوشهٔ `0700` می‌سازد؛ SCP در این مسیر فقط محتوای همان فایل را می‌نویسد.
+پس از دریافت، کنترل فایل معمولی، مالک، مجوز، تعداد لینک و اندازه همچنان الزامی
+است؛ hash برنامه، revision و تمام نتیجه نیز بررسی می‌شوند. انتقال موفق فایل
+به‌تنهایی شاهد نصب نیست؛ تا رسید معتبر مقصد، عملیات **Not verified** است.
+در قرارداد قدیمی فقط مهاجرت liveness بالا یک restart محدود دارد؛ ایجاد topic/ACL
+به‌تنهایی restart نمی‌کند. image، PVC، cluster ID، گواهی‌ها، advertise loopback
+و مرزهای admission/شبکه حفظ می‌شوند.
+
+رسید مقصد سرور اول در ۲۰۲۶-۱۰-۲۸ از `main@ac00a244d3290ac534a86c3f3afb9efa7ee0cf81`
+اعتبارسنجی شد: مهاجرت health، شش topic، ۴۷ ACL، پنج هویت و هفت group، همگی
+`Passed`؛ state موجود `Preserved` و دسترسی برنامه/عمومی `CLOSED` است. رسید عمومی:
+`~/.local/share/hooshix-kafka-topics/receipt-7a7e383f418e44d9a26c5740b7a4b46e.json`.
+این رسید شاهد ظرفیت، quota، recovery یا آمادگی Production نیست و برای سرور دوم
+اعتبار اجرایی ایجاد نمی‌کند.
 
 پس از این گام هنوز quota، ظرفیت/بازیابی، endpoint داخلی قابل‌دسترسی و مجوز شبکهٔ
 هر برنامه دروازه‌های مستقل هستند؛ برنامه/اینترنت همچنان `CLOSED` می‌ماند و هیچ

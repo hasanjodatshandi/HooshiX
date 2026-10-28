@@ -3,10 +3,14 @@ import copy
 import contextlib
 import hashlib
 import io
+import json
+import stat
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -52,6 +56,50 @@ class Broker:
 
 
 class KafkaTopicACLTest(unittest.TestCase):
+    def test_owner_download_precreates_private_receipt_before_native_scp(self):
+        revision = 'a' * 40
+        payload = json.dumps({'kafka_topic_acl': True, 'public_access': 'CLOSED',
+                              'application_ingress': 'CLOSED'}).encode()
+        receipt = {'kafka_topic_acl': 'Passed', 'plan_sha256': hashlib.sha256(payload).hexdigest(),
+            'source_revision': revision, 'topic_count': 6, 'credential_count': 5, 'group_count': 7,
+            'acl_entries': len(contract.permissions()), 'quotas': 'Not run', 'capacity': 'Not verified',
+            'production_readiness': 'Not verified', 'application_ingress': 'CLOSED',
+            'public_access': 'CLOSED', 'existing_state': 'Preserved', 'health_upgrade': 'Passed'}
+        downloaded = []
+        def command(argv, **kwargs):
+            if argv[0] == 'git':
+                return revision.encode() if 'rev-parse' in argv else b''
+            if argv[0] == 'wslpath':
+                return argv[-1].encode()
+            if argv[0] == operator.operator.SCP and argv[-2].startswith('hooshix-server:'):
+                path = Path(argv[-1])
+                self.assertTrue(path.is_file())
+                self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
+                path.write_bytes(json.dumps(receipt).encode())
+                downloaded.append(path)
+            return b''
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'bundle.json').write_text(json.dumps({'files': {}}))
+            local_os = SimpleNamespace(umask=lambda _: None, getuid=lambda: 1000,
+                                      uname=lambda: SimpleNamespace(release='microsoft'))
+            with patch.object(sys, 'argv', ['operator', '--bundle', str(root), '--rescue-and-second-session-ready']), \
+                    patch.multiple(operator.operator, command=command, BASE=root / 'custody',
+                        custody_directory=lambda _: None, sys_tty=lambda: True,
+                        stage_sources=lambda _: ('/var/tmp/synthetic-operator', [])), \
+                    patch.object(operator.bundle, 'validate_bundle', return_value=payload), \
+                    patch.object(operator, 'os', local_os), patch.object(operator.resource, 'setrlimit'), \
+                    patch('builtins.input', return_value='READY'), \
+                    patch.object(operator.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(0, operator.main())
+            self.assertEqual(1, len(downloaded))
+            self.assertEqual(json.dumps(receipt).encode(), operator.operator.read_private(downloaded[0]))
+            self.assertIn('KAFKA_TOPIC_ACL=Passed', output.getvalue())
+            downloaded[0].chmod(0o644)
+            with self.assertRaises(operator.operator.host.custody.BootstrapFailed):
+                operator.operator.read_private(downloaded[0])
+
     def test_all_groups_and_topic_defaults_match_current_service_contracts(self):
         root = Path(__file__).resolve().parents[3]
         groups = []
