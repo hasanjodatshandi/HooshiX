@@ -37,5 +37,12 @@
     "path": "infrastructure/production/release/cap-jose-v4.patch",
     "sha256": "d6bd48a9c8cae8a9f3bb7a627cc539e81a95e04da8675ddc13d41ba306bcac08"
   },
+  "okta_patch": {
+    "module": "github.com/okta/okta-sdk-golang/v2",
+    "version": "v2.20.0",
+    "module_sum": "h1:EDKM+uOPfihOMNwgHMdno+NAsIfyXkVnoFAYVPay0YU=",
+    "path": "infrastructure/production/release/okta-jose-v4.patch",
+    "sha256": "a28f1acde1918d4cae14a22b2e4aec54ad014b78769f5a5f40d71573d71d0b37"
+  },
   "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence"
 }

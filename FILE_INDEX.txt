@@ -406,6 +406,7 @@ infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
 infrastructure/production/release/cap-jose-v4.patch
 infrastructure/production/release/jose-platform-sources.json
+infrastructure/production/release/okta-jose-v4.patch
 infrastructure/production/release/patched-platform-sources.json
 infrastructure/production/release/release-policy.json
 infrastructure/production/secrets/eso-image.json

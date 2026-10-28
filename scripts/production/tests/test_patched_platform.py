@@ -129,6 +129,9 @@ class PatchedPlatformTest(unittest.TestCase):
         self.assertIn('./builtin/credential/jwt ./builtin/credential/kubernetes', text)
         self.assertIn('./jwt ./oidc ./oidc/clientassertion', text)
         self.assertIn('go mod edit -replace=github.com/hashicorp/cap=/cap', text)
+        self.assertIn('-replace=github.com/okta/okta-sdk-golang/v2=/okta', text)
+        self.assertIn('./okta ./tests/unit', text)
+        self.assertIn("! grep -E '^github.com/go-jose/go-jose/v[123](/|$)'", text)
 
     def test_candidate_rejects_missing_fixed_jose_and_every_v3_binary(self):
         self.files['syft.json']['source']['metadata']['labels']['io.hooshix.recipe.sha256'] = \
@@ -157,13 +160,14 @@ class PatchedPlatformTest(unittest.TestCase):
             target.recipe(target.CANDIDATE_RECIPE)
         with self.assertRaises(ValueError):
             target.recipe(Path('/tmp/unreviewed.json'))
-        for field, value in (('sha256', 'a' * 64), ('version', 'v0.13.0'),
-                             ('path', '/tmp/untrusted.patch')):
-            changed = copy.deepcopy(self.candidate)
-            changed['cap_patch'][field] = value
-            with self.subTest(field=field), patch.object(target, 'load', return_value=changed), \
-                    self.assertRaises(ValueError):
-                target.recipe(target.CANDIDATE_RECIPE)
+        for key in ('cap_patch', 'okta_patch'):
+            for field, value in (('sha256', 'a' * 64), ('version', 'v0.13.0'),
+                                 ('path', '/tmp/untrusted.patch')):
+                changed = copy.deepcopy(self.candidate)
+                changed[key][field] = value
+                with self.subTest(key=key, field=field), \
+                        patch.object(target, 'load', return_value=changed), self.assertRaises(ValueError):
+                    target.recipe(target.CANDIDATE_RECIPE)
         changed = copy.deepcopy(self.candidate)
         changed['modules']['github.com/go-jose/go-jose/v4'] = 'v4.1.5'
         with patch.object(target, 'load', return_value=changed), self.assertRaises(ValueError):

@@ -38,14 +38,20 @@ def recipe(path=RECIPE):
         'golang.org/x/text': 'v0.42.0'}
     if path == CANDIDATE_RECIPE:
         modules['github.com/go-jose/go-jose/v4'] = 'v4.1.6'
-        overlay = selected.get('cap_patch', {})
-        if (overlay != {'module': 'github.com/hashicorp/cap', 'version': 'v0.14.0',
+        overlays = {'cap_patch': {'module': 'github.com/hashicorp/cap', 'version': 'v0.14.0',
                 'module_sum': 'h1:IPWX/ewgw8tQPl0qpnCuNf6BFXOCz7ijSM5ikX27cNg=',
                 'path': 'infrastructure/production/release/cap-jose-v4.patch',
-                'sha256': 'd6bd48a9c8cae8a9f3bb7a627cc539e81a95e04da8675ddc13d41ba306bcac08'}
-                or hashlib.sha256((ROOT / overlay['path']).read_bytes()).hexdigest()
-                != overlay['sha256']):
-            raise ValueError('exact reviewed CAP migration required')
+                'sha256': 'd6bd48a9c8cae8a9f3bb7a627cc539e81a95e04da8675ddc13d41ba306bcac08'},
+            'okta_patch': {'module': 'github.com/okta/okta-sdk-golang/v2', 'version': 'v2.20.0',
+                'module_sum': 'h1:EDKM+uOPfihOMNwgHMdno+NAsIfyXkVnoFAYVPay0YU=',
+                'path': 'infrastructure/production/release/okta-jose-v4.patch',
+                'sha256': 'a28f1acde1918d4cae14a22b2e4aec54ad014b78769f5a5f40d71573d71d0b37'}}
+        for key, expected in overlays.items():
+            overlay = selected.get(key, {})
+            if (overlay != expected
+                    or hashlib.sha256((ROOT / overlay['path']).read_bytes()).hexdigest()
+                    != overlay['sha256']):
+                raise ValueError('exact reviewed JOSE consumer migration required')
     if (selected['schema_version'] != 1 or selected['go_version'] != '1.26.9'
             or selected['builder'] != 'docker.io/library/golang@sha256:'
                'bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff'
@@ -99,19 +105,27 @@ def dockerfile(component, selected, recipe_path=RECIPE):
         f"RUN echo '{source['archive_sha256']}  /tmp/source.tar.gz' | sha256sum -c - && "
         'tar -xzf /tmp/source.tar.gz --strip-components=1 -C /src']
     if component == 'openbao' and recipe_path == CANDIDATE_RECIPE:
-        overlay = selected['cap_patch']
-        lines += ['COPY cap-jose-v4.patch /tmp/cap-jose-v4.patch',
-            f"RUN echo '{overlay['sha256']}  /tmp/cap-jose-v4.patch' | sha256sum -c - && "
-            'go mod download github.com/hashicorp/cap@v0.14.0 && go mod verify && '
-            'cp -R /go/pkg/mod/github.com/hashicorp/cap@v0.14.0 /cap && chmod -R u+w /cap && '
-            'cd /cap && git apply --check /tmp/cap-jose-v4.patch && git apply /tmp/cap-jose-v4.patch',
-            'RUN go mod edit -replace=github.com/hashicorp/cap=/cap && '
-            'cd /cap && go test -mod=mod -p 2 -timeout 5m ./jwt ./oidc ./oidc/clientassertion']
+        for key, directory in (('cap_patch', 'cap'), ('okta_patch', 'okta')):
+            overlay = selected[key]
+            filename = Path(overlay['path']).name
+            lines += [f'COPY {filename} /tmp/{filename}',
+                f"RUN echo '{overlay['sha256']}  /tmp/{filename}' | sha256sum -c - && "
+                f"go mod download {overlay['module']}@{overlay['version']} && go mod verify && "
+                f"cp -R /go/pkg/mod/{overlay['module']}@{overlay['version']} /{directory} && "
+                f'chmod -R u+w /{directory} && cd /{directory} && '
+                f'git apply --check /tmp/{filename} && git apply /tmp/{filename}']
+        lines += ['RUN go mod edit -replace=github.com/hashicorp/cap=/cap '
+            '-replace=github.com/okta/okta-sdk-golang/v2=/okta && '
+            'cd /cap && go test -mod=mod -p 2 -timeout 5m ./jwt ./oidc ./oidc/clientassertion && '
+            'cd /okta && OKTA_CLIENT_ORGURL=https://testing.oktapreview.com '
+            'OKTA_CLIENT_TOKEN=fixture go test -mod=mod -p 2 -timeout 5m ./okta ./tests/unit']
     lines += [f"RUN test \"$(go env GOVERSION)\" = go{selected['go_version']} && go get {modules} && go mod download && go mod verify"]
     if recipe_path == CANDIDATE_RECIPE:
         lines += ['RUN go test -mod=mod -p 2 -timeout 5m github.com/go-jose/go-jose/v4 github.com/go-jose/go-jose/v4/jwt']
         if component == 'openbao':
-            lines += ['RUN go test -mod=mod -p 2 -timeout 10m ./builtin/credential/jwt ./builtin/credential/kubernetes']
+            lines += ['RUN go list -deps . > /tmp/runtime-packages && '
+                "! grep -E '^github.com/go-jose/go-jose/v[123](/|$)' /tmp/runtime-packages",
+                'RUN go test -mod=mod -p 2 -timeout 10m ./builtin/credential/jwt ./builtin/credential/kubernetes']
     lines += ['RUN mkdir /out && sha256sum go.mod go.sum > /out/module-files.sha256 && go list -m -json all > /out/modules.json']
     for package, destination in BINARIES[component].items():
         name = Path(destination).name
@@ -180,8 +194,10 @@ def build(component, directory):
     (directory / 'source.tar.gz').write_bytes(data)
     (directory / 'Dockerfile').write_text(dockerfile(component, selected, CANDIDATE_RECIPE))
     if component == 'openbao':
-        (directory / 'cap-jose-v4.patch').write_bytes((ROOT / selected['cap_patch']['path']).read_bytes())
-    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n!cap-jose-v4.patch\n')
+        for key in ('cap_patch', 'okta_patch'):
+            source_patch = ROOT / selected[key]['path']
+            (directory / source_patch.name).write_bytes(source_patch.read_bytes())
+    (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n!cap-jose-v4.patch\n!okta-jose-v4.patch\n')
     tag = 'hooshix-patched-' + component + ':candidate'
     run(['docker', 'build', '--platform', 'linux/amd64', '--tag', tag, str(directory)], timeout=2700)
     image_id = run(['docker', 'image', 'inspect', '--format', '{{.Id}}', tag]).strip()
@@ -281,7 +297,7 @@ def publish(directory, env):
             'externalParameters': {'component': component, 'source': source,
                 'recipe_sha256': built[component][1]['recipe_sha256'], 'modules': selected['modules'],
                 'module_files_sha256': built[component][1]['module_files_sha256'],
-                'source_patches': [selected['cap_patch']] if component == 'openbao' else [],
+                'source_patches': [selected['cap_patch'], selected['okta_patch']] if component == 'openbao' else [],
                 'builder': selected['builder'], 'runtime_base': base_image(component),
                 'go_version': selected['go_version'], 'repository_revision': revision},
             'internalParameters': {},
