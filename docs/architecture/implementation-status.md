@@ -272,17 +272,27 @@ combined staging/target receipts; application secret materialization remains
 
 Owner-approved source-security candidates retain ESO 2.12.0, OpenBao 2.6.4
 and Istio 1.30.5 product versions while rebuilding their Go executables with
-Go 1.26.9 and x/net 0.60.0 plus its fixed transitive requirements. The pinned
+Go 1.26.9, x/net 0.60.0 and JOSE v4.1.6. Checksum-bound CAP v0.14.0 and
+Okta SDK v2.20.0 source migrations remove the two direct JOSE v3 consumers
+from OpenBao; its runtime package graph and final SBOM reject old JOSE.
+The `jose-platform-sources.json` recipe drives new builds; the original
+`patched-platform-sources.json` remains immutable identity evidence for
+previous publications, not a corrected-build claim. The pinned
 recipe, credential-free four-component build/scan CI and protected-main private
 publication path are implemented. Both CNI executables are covered; runtime
 base files/users/entrypoints remain unchanged. Rebuilt bytes use distinct
 `patched-upstream-source-build` provenance, never unchanged-import claims.
-At candidate `1ce7d8ac91f9688996da94ca4ec38ad0f26690b0`, source-security run
-`38050468775` passed all four build/scan jobs. Repository baseline run
-`38050468774`, commissioning staging run `38050468781` and web E2E run
-`38050468658` also passed on that exact candidate. Publication, ESO native
-delivery compatibility and adoption into digest/admission contracts remain
-`Not verified`.
+At candidate `71ab5f787024a92a42217f5dfcab5affa5ee1557`, source-security run
+`40671407695` passed all four build/scan jobs, baseline `40671407708` and
+web E2E `40671407696` passed; all 23 PR checks passed before PR #256 merged
+as `46596901ccb9afeab021c7ed3f86ec31d5d82c6e`. All four downloaded source
+artifacts were independently revalidated against recipe SHA256
+`b0a7a314f95c64c5be9db3d9446867ff8af1f2ae0cacfcfcfeec35c33a64b63b`.
+OpenBao has JOSE v4.1.6 only and zero High/Critical findings; its native
+TLS/Shamir/Raft recovery passed. These results are source-candidate evidence,
+not a fix on the VPS. Corrected protected registry publication, fresh signed
+digest/admission adoption and target compatibility remain `Not verified`;
+installed images, keys and data were not replaced by this change.
 PR/push/manual baseline gates now build and scan the selected final source
 candidates, while scheduled upstream scans remain blocking and preserve the old
 image findings. The OpenBao candidate gate also requires disposable native
