@@ -3217,6 +3217,9 @@ quota، همگی `Passed`. این شاهد محلی، نصب quota روی VPS ن
 
 ### اعمال quota روی Kafka بستهٔ موجود
 
+بستهٔ quota باید به قرارداد admission همان نصب متصل باشد؛ انتخاب digest جدید
+در catalog، مرز نصب قبلی را خودکار تغییر نمی‌دهد و مجوز ارتقای ESO نیست.
+
 `install_kafka_quotas.py` فقط پنج quota از نوع user با همین اعداد را اضافه می‌کند.
 پیش‌نیازها: broker آماده، OpenBao unsealed، ESO و پنج گواهی معتبر و Ready، هر چهار
 guard سالم، volume موجود با هویت ثابت، شش topic و ۴۷ ACL دقیق و journal قبلی آن‌ها.
