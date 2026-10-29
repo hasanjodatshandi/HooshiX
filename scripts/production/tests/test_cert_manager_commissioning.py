@@ -51,7 +51,7 @@ class CertManagerCommissioningTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / 'manifest.yaml'
         self.path.write_text(yaml.safe_dump_all(upstream()))
-        self.source = copy.deepcopy(target.recipe())
+        self.source = copy.deepcopy(target.recipe(target.CANDIDATE_RECIPE))
         self.source['manifest']['sha256'] = hashlib.sha256(self.path.read_bytes()).hexdigest()
 
     def plan(self):
@@ -132,6 +132,10 @@ class CertManagerCommissioningTest(unittest.TestCase):
             if p['kind'] == 'ImageValidatingPolicy':
                 self.assertNotIn('credentials', p['spec'])
                 self.assertEqual(1, len(p['spec']['matchImageReferences']))
+                if p['metadata']['name'].endswith('-provenance'):
+                    expression = p['spec']['validations'][1]['expression']
+                    self.assertIn('v4.1.6', expression)
+                    self.assertIn('test_patch', expression)
         issuers = next(p for p in plan['policies'] if p['metadata']['name'].endswith('-internal-issuers'))
         self.assertIn('!has(object.spec.acme)', issuers['spec']['validations'][0]['expression'])
 

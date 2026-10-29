@@ -54,6 +54,7 @@ class ESOArtifactTest(unittest.TestCase):
                 ('image', 'ghcr.io/hasanjodatshandi/hooshix/platform-eso-patched-private@sha256:' + 'a' * 64),
                 ('repository_revision', 'main'), ('publication_run_id', '1;command'),
                 ('publication_run_id', '0'), ('recipe_sha256', '0' * 64),
+                ('recipe_sha256', 'a1980938b7e303ff72fba1d0f9f452ea7bce6c4a0642faa3ca2283bb606c8db1'),
                 ('provenance_kind', 'unchanged-upstream-import'),
                 ('production_promotion', 'Passed')]:
             selected = copy.deepcopy(self.pin)

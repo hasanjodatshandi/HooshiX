@@ -23,12 +23,14 @@ class PublishedCertManagerTest(unittest.TestCase):
         self.engine = 'sha256:' + 'e' * 64
 
     def test_exact_publication_does_not_change_source_recipe_or_promotion(self):
-        self.assertEqual('github:38409447796:1', self.publication['invocation_id'])
+        self.assertEqual('github:40782339939:1', self.publication['invocation_id'])
         self.assertEqual(set(target.COMPONENTS), set(self.publication['images']))
         text = json.dumps(self.publication, indent=2) + '\n'
         self.assertEqual(self.selected['publication_sha256'], hashlib.sha256(text.encode()).hexdigest())
-        self.assertEqual(self.selected['recipe_sha256'], hashlib.sha256(target.RECIPE.read_bytes()).hexdigest())
-        self.assertNotIn('published_security_candidate', target.recipe())
+        self.assertEqual(self.selected['recipe_sha256'], hashlib.sha256(target.CANDIDATE_RECIPE.read_bytes()).hexdigest())
+        selected = target.recipe(target.CANDIDATE_RECIPE)
+        self.assertEqual('v4.1.6', selected['modules']['github.com/go-jose/go-jose/v4'])
+        self.assertNotIn('published_security_candidate', selected)
 
     def test_unreviewed_partial_or_promoted_catalog_cannot_authorize_use(self):
         original = target.load(target.PIN)
@@ -37,6 +39,8 @@ class PublishedCertManagerTest(unittest.TestCase):
                 lambda c: c.update(version='1.20.2'),
                 lambda c: c.update(platform='linux/arm64'),
                 lambda c: c['published_security_candidate'].update(recipe_sha256='0' * 64),
+                lambda c: c['published_security_candidate'].update(
+                    recipe_sha256='350941c06ad2bc5536ebc47b972643db4a56e8f831cef2617841e701cfdee4e9'),
                 lambda c: c['published_security_candidate'].update(publication_sha256='invalid'),
                 lambda c: c['published_security_candidate']['publication'].update(repository_revision='main'),
                 lambda c: c['published_security_candidate']['publication'].update(invocation_id='github:0:1'),
@@ -76,7 +80,8 @@ class PublishedCertManagerTest(unittest.TestCase):
             for name in ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json', 'scanner-config.json'):
                 (folder / name).write_text(json.dumps({'fresh': component, 'file': name}) + '\n')
             refreshed.append(component)
-        def scan(folder, component, image, now, config):
+        def scan(folder, component, image, now, config, recipe_path):
+            self.assertEqual(target.CANDIDATE_RECIPE, recipe_path)
             self.assertIn(component, refreshed)
             self.assertEqual(output / component / 'registry', folder)
             self.assertEqual(self.publication['images'][component], image)
@@ -101,8 +106,9 @@ class PublishedCertManagerTest(unittest.TestCase):
             if args[0] == 'verify': return ''
             component = next(c for c, image in self.publication['images'].items() if image == args[-1])
             kind = args[args.index('--type') + 1]
-            predicate = (target.source_predicate(component, target.recipe(), self.publication['repository_revision'],
-                         self.publication['invocation_id']) if kind == 'slsaprovenance1' else read(Path('cyclonedx.json')))
+            predicate = (target.source_predicate(component, target.recipe(target.CANDIDATE_RECIPE),
+                         self.publication['repository_revision'], self.publication['invocation_id'],
+                         target.CANDIDATE_RECIPE) if kind == 'slsaprovenance1' else read(Path('cyclonedx.json')))
             if reject == 'predicate': predicate = {'wrong': True}
             statement = {'_type': 'https://in-toto.io/Statement/v0.1',
                 'predicateType': 'https://slsa.dev/provenance/v1' if kind == 'slsaprovenance1' else 'https://cyclonedx.org/bom',

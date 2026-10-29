@@ -39,7 +39,7 @@ def published_pin():
     """Select a reviewed published candidate for rendering, never authorize deployment."""
     selected = pin()
     candidate = selected['published_security_candidate']
-    recipe = ROOT / 'infrastructure/production/release/patched-platform-sources.json'
+    recipe = ROOT / 'infrastructure/production/release/jose-platform-sources.json'
     if (not re.fullmatch(r'ghcr\.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private'
                         r'@sha256:[a-f0-9]{64}', candidate['image'])
             or not re.fullmatch(r'[a-f0-9]{40}', candidate['repository_revision'])
