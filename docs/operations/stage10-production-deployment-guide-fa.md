@@ -2,6 +2,17 @@
 
 ## مرز اصلاح امنیتی تصاویر زیرساخت
 
+وابستگی Java مربوط به پردازش `tracestate` نیز پیش از ساخت تصاویر برنامه باید
+نسخهٔ رفع‌شدهٔ OpenTelemetry را داشته باشد؛ این اصلاحِ build و lockfile مجوز
+نصب برنامه‌ها یا بازکردن دسترسی Production نیست.
+شش سرویس Java از BOM ثابت `io.opentelemetry:opentelemetry-bom:1.67.0`
+استفاده می‌کنند تا API، SDK و exporterها هماهنگ بمانند. lockfile و checksumهای
+Gradle هر سرویس باید همراه هم بررسی شوند و ساخت بعدی با verification سخت‌گیرانه
+اجرا شود. OkHttp `5.5.0` و Okio `3.18.1` وابستگی‌های حل‌شدهٔ همین exporter هستند.
+آزمون parser باید whitespace طولانی بدون کاما را در زمان محدود پردازش کند و
+هم‌زمان round-trip معتبر و رد parent نامعتبر را حفظ کند. شواهد جدید build/scan و
+امضای همان digest همچنان پیش‌نیاز staging و نصب هر تصویر برنامه هستند.
+
 اصلاح مستقل cert-manager نیز فقط در مسیر ساخت candidate انجام می‌شود؛
 recipe و provenance انتشار قبلی تا پذیرش digestهای جدید حفظ می‌شوند.
 این اصلاح مجوز نصب روی VPS یا تغییر Root/CA و کلیدها نیست.
