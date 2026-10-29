@@ -1,5 +1,24 @@
 """Create-only exact user quotas; preserve every foreign/default/client quota and stop on drift."""
+import copy
+import json
 import re
+
+CURRENT_ESO = ('ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:'
+               'e5d64b56dde56296057032a9ccab227f0d65df5498779cfca886e34cf8c51f8d')
+RETAINED_ESO = ('ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:'
+                '961e047189afbfcc2a5ce58468f7205fc94a14eab45bf5eacbfa8fa4b839e397')
+
+
+def retained_boundary(value):
+    """Expected-state binding only; never apply this value as a cluster policy."""
+    result = copy.deepcopy(value)
+    count = sum(v['expression'].count(json.dumps(CURRENT_ESO)) for v in result['spec']['validations'])
+    if (result['metadata']['name'] != 'hooshix-platform-data-closed' or count != 1
+            or RETAINED_ESO in json.dumps(value)):
+        raise ValueError('KAFKA_QUOTA_RETAINED_BOUNDARY_CONTRACT_REQUIRED')
+    for validation in result['spec']['validations']:
+        validation['expression'] = validation['expression'].replace(json.dumps(CURRENT_ESO), json.dumps(RETAINED_ESO))
+    return result
 
 
 def inventory(command, desired):

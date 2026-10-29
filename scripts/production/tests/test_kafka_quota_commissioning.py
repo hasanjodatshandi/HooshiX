@@ -41,6 +41,70 @@ class Broker:
 
 
 class KafkaQuotaCommissioningTest(unittest.TestCase):
+    def test_bundle_retained_mode_is_explicit_and_modifies_only_expected_boundary(self):
+        revision = 'a' * 40
+        boundary = {'metadata': {'name': 'hooshix-platform-data-closed'}, 'spec': {
+            'validations': [{'expression': 'image == ' + json.dumps(contract.CURRENT_ESO)}]}}
+        runtime = {'public_ca_sha256': 'b' * 64, 'statefulset': {'unchanged': True},
+                   'objects': [], 'source_policies': [], 'boundary': boundary}
+        staging = bundle.previous.previous.staging
+        def git(*args):
+            if args[0] == 'status': return ''
+            if args[0] == 'ls-remote': return revision + '\trefs/heads/main'
+            return revision
+        with tempfile.TemporaryDirectory() as temp, patch.object(staging, 'git', side_effect=git), \
+                patch.object(staging, 'staged_receipt', return_value={'observed_at': '2026-10-29T00:00:00+00:00'}), \
+                patch.object(bundle, 'verify_proof'), \
+                patch.object(bundle.previous.previous, 'data_boundary', return_value={}), \
+                patch.object(bundle.previous.previous.renderer, 'render', return_value=runtime):
+            for mode in (False, True):
+                out = Path(temp) / str(mode)
+                bundle.build(out, '1', Path('/unused-chart'), 'unused-helm', True, mode)
+                plan = json.loads((out / 'plan.json').read_bytes())
+                self.assertIs(plan['retained_eso_admission'], mode)
+                self.assertEqual(contract.retained_boundary(boundary) if mode else boundary,
+                                 plan['kafka_runtime']['boundary'])
+                self.assertEqual(runtime['statefulset'], plan['kafka_runtime']['statefulset'])
+                self.assertEqual([], plan['kafka_runtime']['source_policies'])
+                self.assertEqual(boundary, runtime['boundary'])
+
+    def test_retained_binding_changes_only_one_fixed_image_and_keeps_original_immutable(self):
+        boundary = {'metadata': {'name': 'hooshix-platform-data-closed'}, 'spec': {
+            'failurePolicy': 'Fail', 'validationActions': ['Deny'],
+            'validations': [{'expression': 'object.image == ' + json.dumps(contract.CURRENT_ESO)},
+                            {'expression': 'protected.kafka && protected.redis'}]}}
+        saved = copy.deepcopy(boundary)
+        changed = contract.retained_boundary(boundary)
+        self.assertEqual(saved, boundary)
+        expected = copy.deepcopy(boundary)
+        expected['spec']['validations'][0]['expression'] = 'object.image == ' + json.dumps(contract.RETAINED_ESO)
+        self.assertEqual(expected, changed)
+        for bad in (changed, {**boundary, 'metadata': {'name': 'foreign'}},
+                    {**boundary, 'spec': {'validations': [{'expression': 'unknown'}]}},
+                    {**boundary, 'spec': {'validations': boundary['spec']['validations'] * 2}}):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                contract.retained_boundary(bad)
+
+    def test_retained_mode_requires_exact_live_predecessor_image_identity_and_ready_state(self):
+        deployment = {'metadata': {'uid': 'retained-uid'}, 'status': {'availableReplicas': 1},
+            'spec': {'template': {'spec': {'serviceAccountName': 'hooshix-postgresql-eso',
+                'containers': [{'name': 'external-secrets', 'image': contract.RETAINED_ESO}]}}}}
+        plan = {'retained_eso_admission': True}
+        with patch.object(installer.runtime, 'get', return_value=deployment) as get:
+            self.assertEqual(('retained-uid', deployment['spec']), installer.retained_eso(None, plan))
+            self.assertIsNone(installer.retained_eso(None, {}))
+            self.assertEqual(1, get.call_count)
+            for case in ('current-image', 'foreign-account', 'not-ready', 'multiple-containers', 'non-bool'):
+                bad = copy.deepcopy(deployment)
+                pod = bad['spec']['template']['spec']
+                if case == 'current-image': pod['containers'][0]['image'] = contract.CURRENT_ESO
+                if case == 'foreign-account': pod['serviceAccountName'] = 'default'
+                if case == 'not-ready': bad['status']['availableReplicas'] = 0
+                if case == 'multiple-containers': pod['containers'] *= 2
+                with self.subTest(case=case), patch.object(installer.runtime, 'get', return_value=bad), \
+                        self.assertRaises(ValueError):
+                    installer.retained_eso(None, {'retained_eso_admission': 'true'} if case == 'non-bool' else plan)
+
     def test_owner_download_is_private_and_wrong_profile_receipt_is_rejected(self):
         revision = 'a' * 40
         plan = {'kafka_quotas': True, 'application_ingress': 'CLOSED', 'public_access': 'CLOSED',
@@ -204,6 +268,7 @@ class KafkaQuotaCommissioningTest(unittest.TestCase):
         proof = {'schema_version': 1, 'kafka_quotas': 'Passed', 'credential_count': 5,
             'producer_byte_rate': 65536, 'consumer_byte_rate': 262144,
             'idempotent_reconciliation': 'Passed', 'partial_recovery': 'Passed',
+            'retained_current_digest_denied': 'Passed',
             'existing_state': 'Preserved', 'application_ingress': 'CLOSED', 'public_access': 'CLOSED',
             'capacity': 'Not verified', 'production_readiness': 'Not verified'}
         with patch.object(bundle.topics, 'verify_proof'):
