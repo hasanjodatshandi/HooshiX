@@ -15,7 +15,9 @@ from build_kafka_topic_acl_bundle import SOURCES
 import kafka_topic_acl as contract
 
 
-def loader(remote, sources, plan_hash):
+def loader(remote, sources, plan_hash, *, installer='install_kafka_topic_acl'):
+    if installer not in ('install_kafka_topic_acl', 'install_kafka_quotas'):
+        raise ValueError('KAFKA_FIXED_INSTALLER_REQUIRED')
     return f'''import os,stat,hashlib,sys,types
 p={remote!r}
 for name,digest in {sources!r}:
@@ -24,8 +26,8 @@ for name,digest in {sources!r}:
  if not stat.S_ISREG(s.st_mode) or s.st_nlink!=1 or len(content)>32768 or hashlib.sha256(content).hexdigest()!=digest: raise SystemExit(1)
  m=types.ModuleType(name[:-3]); m.__file__=p+'/'+name; sys.modules[name[:-3]]=m
  exec(compile(content,name,'exec'),m.__dict__)
-sys.argv=['install_kafka_topic_acl','--plan',p+'/plan.json','--sha256',{plan_hash!r}]
-raise SystemExit(sys.modules['install_kafka_topic_acl'].main())
+sys.argv=[{installer!r},'--plan',p+'/plan.json','--sha256',{plan_hash!r}]
+raise SystemExit(sys.modules[{installer!r}].main())
 '''
 
 

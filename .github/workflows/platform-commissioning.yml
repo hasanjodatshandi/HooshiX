@@ -29,6 +29,13 @@ on:
       - scripts/production/test_kafka_quota_native.py
       - scripts/production/fixtures/KafkaQuotaProbe.java
       - scripts/production/tests/test_kafka_quota_profile.py
+      - scripts/production/kafka_quota_commissioning.py
+      - scripts/production/install_kafka_quotas.py
+      - scripts/production/bootstrap_kafka_quota_operator.py
+      - scripts/production/build_kafka_quota_bundle.py
+      - scripts/production/rehearse_kafka_quotas.py
+      - scripts/production/test_kafka_quota_commissioning_native.py
+      - scripts/production/tests/test_kafka_quota_commissioning.py
       - scripts/production/*kafka*topic*acl*.py
       - scripts/production/tests/test_kafka_topic_acl.py
       - scripts/production/upgrade_kafka_health.py
@@ -152,10 +159,14 @@ jobs:
           docker pull "$image"
           python3 scripts/production/test_kafka_quota_native.py --disposable \
             | tee "$RUNNER_TEMP/kafka-quota-profile-receipt.json"
+          python3 scripts/production/test_kafka_quota_commissioning_native.py --disposable \
+            | tee "$RUNNER_TEMP/kafka-quota-commissioning-native.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: kafka-quota-profile-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/kafka-quota-profile-receipt.json
+          path: |
+            ${{ runner.temp }}/kafka-quota-profile-receipt.json
+            ${{ runner.temp }}/kafka-quota-commissioning-native.json
           if-no-files-found: error
           retention-days: 14
 
