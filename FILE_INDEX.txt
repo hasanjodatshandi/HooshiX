@@ -377,7 +377,9 @@ infrastructure/observability/networkpolicy.yaml
 infrastructure/observability/pins.env
 infrastructure/observability/prometheus.yaml
 infrastructure/production/README.md
+infrastructure/production/data/cert-manager-acme-ipv6-test.patch
 infrastructure/production/data/cert-manager-images.json
+infrastructure/production/data/cert-manager-jose-sources.json
 infrastructure/production/data/cert-manager-sources.json
 infrastructure/production/data/data-policy.json
 infrastructure/production/data/postgresql-images.json
@@ -405,6 +407,9 @@ infrastructure/production/redis/candidate.json
 infrastructure/production/redis/runtime.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
+infrastructure/production/release/cap-jose-v4.patch
+infrastructure/production/release/jose-platform-sources.json
+infrastructure/production/release/okta-jose-v4.patch
 infrastructure/production/release/patched-platform-sources.json
 infrastructure/production/release/release-policy.json
 infrastructure/production/secrets/eso-image.json
@@ -1746,6 +1751,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/Identity
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGatewaySurfaceCharacterizationTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGrpcClientSupportTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptorTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/W3CTraceContextSecurityTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/OidcClockSafetyGuardTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/OidcHostTimeHealthTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/RedisOidcQuotaIntegrationTest.java

@@ -4,21 +4,21 @@
   "platform": "linux/amd64",
   "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence",
   "published_security_candidate": {
-    "recipe_sha256": "350941c06ad2bc5536ebc47b972643db4a56e8f831cef2617841e701cfdee4e9",
-    "publication_sha256": "b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8",
+    "recipe_sha256": "7d62fafb1a39ab11b9ca06161e5138672e9faea25f5a5d4d5625f4b78df245cb",
+    "publication_sha256": "1bccaa06d82490017e34c967d7090062375e66c954ae9041901487ec93409766",
     "publication": {
       "schema_version": 1,
-      "repository_revision": "c5dd3c0012139e7969606bc074f207adebd65d26",
-      "invocation_id": "github:38409447796:1",
+      "repository_revision": "624ad6a634c7d0c93627f3d5869a7eb883824e46",
+      "invocation_id": "github:40782339939:1",
       "images": {
-        "controller": "ghcr.io/hasanjodatshandi/hooshix/platform-cert-manager-controller@sha256:8571ce8e4a36d46223359184be8201933d9277d516369cb49c7e4a6f70fdccd4",
-        "cainjector": "ghcr.io/hasanjodatshandi/hooshix/platform-cert-manager-cainjector@sha256:154b064c342b3d62dae53832ae851f4af96711c71b1ef9d6c04f73070514dc29",
-        "webhook": "ghcr.io/hasanjodatshandi/hooshix/platform-cert-manager-webhook@sha256:fed57b37bf0cd8cc11fd3c5cb2dd6dcdc81a7fadcba99d0314d8eefafd4a4e55"
+        "controller": "ghcr.io/hasanjodatshandi/hooshix/platform-cert-manager-controller@sha256:264eaf536a6f1fa27daae3eeba4bc19ab7b67e4bcf851224e024a5f5f33eecfb",
+        "cainjector": "ghcr.io/hasanjodatshandi/hooshix/platform-cert-manager-cainjector@sha256:f5ab25961d0c1f613b6466d1a1dfeaee774a14b3c4494565af337bac48555e2d",
+        "webhook": "ghcr.io/hasanjodatshandi/hooshix/platform-cert-manager-webhook@sha256:a3e0ca9d97eea375c2c44ff4709ad06af08821e6334667756a9acfd292ee3d9f"
       },
       "image_config_digests": {
-        "controller": "sha256:63e4dfa1565c01a2beed8a1a850d616730bcb1ab58a7e92e83651e3d03cf4a61",
-        "cainjector": "sha256:8e3ca2c8997ba7203aba0b7c9dc52f236eb1c9309cfbbb3149572cd81b300539",
-        "webhook": "sha256:1c031531ea09a5626ac6f08553c199b2e7f514e1dc469de9bde2ea3e49dcec76"
+        "controller": "sha256:5c459ef6960f6d22f6560dc24ff92c0882cbb98a087d360b8c2f95eea0ea835d",
+        "cainjector": "sha256:e7e036f5b0deaa74fc97efbf88eb34b5786777a6745d6cc8fd39e0a5c315ce55",
+        "webhook": "sha256:33b1b1bbb2f93a8f50828ca944b5e36a9cb0043107e81c495af94a7a71467f08"
       },
       "provenance_kinds": {
         "controller": "patched-upstream-source-build",

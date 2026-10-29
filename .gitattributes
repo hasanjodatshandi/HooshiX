@@ -19,6 +19,10 @@ infrastructure/gateway-api/vendor/1.5.1/standard-install.yaml -whitespace
 infrastructure/kyverno/vendor/1.18.2/install.yaml -whitespace
 infrastructure/kyverno/vendor/1.19.1/install.yaml -whitespace
 
+# Unified-diff context requires space-prefixed tabs and empty lines.
+infrastructure/production/release/cap-jose-v4.patch -whitespace
+infrastructure/production/release/okta-jose-v4.patch -whitespace
+
 infrastructure/traefik/chart/41.2.0/traefik-41.2.0.tgz binary
 
 infrastructure/istio/chart/1.30.3/*.tgz binary

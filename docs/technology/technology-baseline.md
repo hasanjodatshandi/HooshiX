@@ -48,7 +48,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | Notification persistence | jOOQ/JDBC, no JPA | fixed service decision |
 | Security/session/quota Redis | Redis 8.2.8 + Lettuce 7.5.2.RELEASE | single-server TLS/ACL/noeviction/AOF; HA Sentinel |
 | Resilience | Resilience4j | breaker/bulkhead; no layered retry |
-| Observability API | Spring Boot 4.1 Micrometer Observation/Tracing + OpenTelemetry | ADR-0044; Day-1 service requirement |
+| Observability API | Spring Boot 4.1 Micrometer Observation/Tracing + OpenTelemetry Java BOM 1.67.0 | ADR-0044; aligned API/SDK/exporters; GHSA-ccrj-gw8r-854m fixed |
 | Trace export protocol | OTLP | services -> approved internal Collector |
 | Logging | structured JSON stdout + ADR-0031 controls | allow-list/redaction/canary/runtime detection |
 | Backend test | JUnit 5 + Testcontainers | service locks |
@@ -85,7 +85,7 @@ Agents MUST NOT silently select a newer version because upstream published one.
 | WAF rules | OWASP CRS 4.25.1 LTS | no automatic rule updates |
 | Service mesh | Istio Ambient 1.30.5 | K8s support + single-server capacity benchmark |
 | Secrets sync | External Secrets Operator 2.12.0 | namespace-scoped stores preferred |
-| Non-deployable platform source-security candidate compiler | Go 1.26.9; x/net 0.60.0 and fixed transitive modules | `patched-platform-sources.json` binds official source archives and builder digest; preserves ESO/OpenBao/Istio product versions. Not an effective workload-image baseline; exact rebuilt scans, native compatibility, signed digest/admission adoption and recovery remain required before promotion. |
+| Non-deployable platform source-security candidate compiler | Go 1.26.9; x/net 0.60.0; go-jose v4.1.6 | `jose-platform-sources.json` binds official source archives, builder and checksum-bound CAP v0.14.0 / Okta SDK v2.20.0 migrations to v4; preserves ESO/OpenBao/Istio product versions. `patched-platform-sources.json` remains immutable evidence for previously published images, not the recipe for new builds. Not an effective workload-image baseline; exact rebuilt scans, native compatibility, signed digest/admission adoption and recovery remain required before promotion. |
 | Non-deployable cert-manager source-security candidates | cert-manager 1.20.3; Go 1.26.9; x/net 0.60.0; gRPC-Go 1.83.2 | `cert-manager-sources.json` pins source/archive/manifest/builder and three runtime bases; root/nested-module verification and complete unsuppressed scans required. Does not establish workload-image adoption or target TLS compatibility. |
 | Secret authority | OpenBao 2.6.4, official openbao-distroless (static nonroot) | ADR-0011 same-minor security patch/upstream flavor; verified-TLS native shell-free probes, recovery and exact-artifact scan gates; topology/authority unchanged |
 | Controlled VPS intermediate-key tooling | Existing Ubuntu OpenSSL/libssl3t64 3.5.5-1ubuntu3.7 | ADR-0002/0030 bounded commissioning only; encrypted PKCS#8 custody/public CSR handoff; no package upgrade or Root custody online |

@@ -317,8 +317,8 @@ jobs:
             -o "$RUNNER_TEMP/platform-tools/cert-manager.yaml"
           printf '%s  %s\n' 7ee74ba06845213e96d8ceaff3d20dd51e682765c1418eddda4e8780ba082261 \
             "$RUNNER_TEMP/platform-tools/cert-manager.yaml" | sha256sum --check --strict
-          gh run download 38409447796 --repo hasanjodatshandi/HooshiX \
-            --name cert-manager-publication-38409447796-1 --dir "$RUNNER_TEMP/cert-manager-publication"
+          gh run download 40782339939 --repo hasanjodatshandi/HooshiX \
+            --name cert-manager-publication-40782339939-1 --dir "$RUNNER_TEMP/cert-manager-publication"
           scripts/production/install_release_tools.sh "$RUNNER_TEMP/cert-manager-tools"
           export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
           python3 scripts/production/verify_published_cert_manager.py \

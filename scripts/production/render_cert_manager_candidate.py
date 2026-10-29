@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 import render_platform_admission as admission
-from build_cert_manager_candidates import recipe
+from build_cert_manager_candidates import CANDIDATE_RECIPE, recipe
 from publish_cert_manager_candidates import source_predicate
 from render_eso_candidate import network as eso_network
 from render_mesh_security_upgrade import provenance_expression
@@ -163,7 +163,8 @@ def policies(pods):
         p = admission.image_policy(NAMESPACE, [image], selected['repository_revision'])
         p['metadata']['name'] = 'hooshix-cert-manager-' + component + '-source'
         p['spec'].pop('credentials')  # Only the three approved public infrastructure packages.
-        expected = source_predicate(component, recipe(), selected['repository_revision'], selected['invocation_id'])
+        expected = source_predicate(component, recipe(CANDIDATE_RECIPE), selected['repository_revision'],
+                                    selected['invocation_id'], CANDIDATE_RECIPE)
         p['spec']['validations'][2] = admission.validation('cert-manager source identity rejected',
                                                          provenance_expression(expected))
         result.extend(admission.split_image_policy(p))

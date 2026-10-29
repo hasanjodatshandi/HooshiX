@@ -1,0 +1,139 @@
+--- a/go.mod
++++ b/go.mod
+@@ -4,8 +4,7 @@
+ 
+ require (
+ 	github.com/coreos/go-oidc/v3 v3.11.0
+-	github.com/go-jose/go-jose/v3 v3.0.5
+-	github.com/go-jose/go-jose/v4 v4.0.5
++	github.com/go-jose/go-jose/v4 v4.1.6
+ 	github.com/hashicorp/go-cleanhttp v0.5.2
+ 	github.com/hashicorp/go-hclog v1.6.3
+ 	github.com/hashicorp/go-multierror v1.1.1
+--- a/jwt/jwt.go
++++ b/jwt/jwt.go
+@@ -11,8 +11,8 @@
+ 	"strings"
+ 	"time"
+ 
+-	"github.com/go-jose/go-jose/v3"
+-	"github.com/go-jose/go-jose/v3/jwt"
++	"github.com/go-jose/go-jose/v4"
++	"github.com/go-jose/go-jose/v4/jwt"
+ )
+ 
+ // DefaultLeewaySeconds defines the amount of leeway that's used by default
+@@ -163,7 +163,7 @@
+ 	if v.keySearcher != nil {
+ 		// Use the KeySetSearcher callback to dynamically locate the appropriate KeySet based on the JWT's kid header
+ 		var jws *jose.JSONWebSignature
+-		jws, err = jose.ParseSigned(token)
++		jws, err = jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.EdDSA})
+ 		if err != nil {
+ 			return nil, fmt.Errorf("error parsing token: %w", err)
+ 		}
+@@ -365,7 +365,7 @@
+ 		return err
+ 	}
+ 
+-	jws, err := jose.ParseSigned(token)
++	jws, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.EdDSA})
+ 	if err != nil {
+ 		return err
+ 	}
+--- a/jwt/jwt_test.go
++++ b/jwt/jwt_test.go
+@@ -15,8 +15,8 @@
+ 	"testing"
+ 	"time"
+ 
+-	"github.com/go-jose/go-jose/v3"
+-	"github.com/go-jose/go-jose/v3/jwt"
++	"github.com/go-jose/go-jose/v4"
++	"github.com/go-jose/go-jose/v4/jwt"
+ 	"github.com/stretchr/testify/require"
+ 
+ 	"github.com/hashicorp/cap/oidc"
+@@ -824,7 +824,7 @@
+ 		token := oidc.TestSignJWT(t, priv, string(RS256), claims, []byte(testKeyID))
+ 
+ 		// Parse the token and duplicate its signature
+-		parsedJWS, err := jose.ParseSigned(token)
++		parsedJWS, err := jose.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.EdDSA})
+ 		require.NoError(t, err)
+ 
+ 		// Manually create a JSON with duplicate signatures
+--- a/jwt/keyset.go
++++ b/jwt/keyset.go
+@@ -20,7 +20,8 @@
+ 	"strings"
+ 
+ 	"github.com/coreos/go-oidc/v3/oidc"
+-	"github.com/go-jose/go-jose/v3/jwt"
++	"github.com/go-jose/go-jose/v4"
++	"github.com/go-jose/go-jose/v4/jwt"
+ 	"github.com/hashicorp/go-cleanhttp"
+ 	"golang.org/x/oauth2"
+ )
+@@ -154,7 +155,7 @@
+ // VerifySignature parses the given JWT, verifies its signature using local public keys, and
+ // returns the claims in its payload. The given JWT must be of the JWS compact serialization form.
+ func (ks *staticKeySet) VerifySignature(_ context.Context, token string) (map[string]interface{}, error) {
+-	parsedJWT, err := jwt.ParseSigned(token)
++	parsedJWT, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.EdDSA})
+ 	if err != nil {
+ 		return nil, err
+ 	}
+--- a/oidc/id_token.go
++++ b/oidc/id_token.go
+@@ -12,7 +12,7 @@
+ 	"fmt"
+ 	"hash"
+ 
+-	"github.com/go-jose/go-jose/v3"
++	"github.com/go-jose/go-jose/v4"
+ )
+ 
+ // IDToken is an oidc id_token.
+@@ -104,7 +104,7 @@
+ 		return false, nil
+ 	}
+ 
+-	jws, err := jose.ParseSigned(string(t))
++	jws, err := jose.ParseSigned(string(t), []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.ES256, jose.ES384, jose.ES512, jose.PS256, jose.PS384, jose.PS512, jose.EdDSA})
+ 	if err != nil {
+ 		return false, fmt.Errorf("%s: malformed jwt (%v): %w", op, err, ErrMalformedToken)
+ 	}
+--- a/oidc/testing.go
++++ b/oidc/testing.go
+@@ -22,8 +22,8 @@
+ 	"testing"
+ 	"time"
+ 
+-	"github.com/go-jose/go-jose/v3"
+-	"github.com/go-jose/go-jose/v3/jwt"
++	"github.com/go-jose/go-jose/v4"
++	"github.com/go-jose/go-jose/v4/jwt"
+ 	"github.com/stretchr/testify/assert"
+ 	"github.com/stretchr/testify/require"
+ )
+@@ -57,7 +57,7 @@
+ 
+ 	raw, err := jwt.Signed(sig).
+ 		Claims(claims).
+-		CompactSerialize()
++		Serialize()
+ 	require.NoError(err)
+ 	return raw
+ }
+--- a/oidc/testing_provider.go
++++ b/oidc/testing_provider.go
+@@ -32,7 +32,7 @@
+ 	"sync"
+ 	"time"
+ 
+-	"github.com/go-jose/go-jose/v3"
++	"github.com/go-jose/go-jose/v4"
+ 	cass "github.com/hashicorp/cap/oidc/clientassertion"
+ 	"github.com/hashicorp/go-cleanhttp"
+ 	"github.com/hashicorp/go-hclog"

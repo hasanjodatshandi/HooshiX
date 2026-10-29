@@ -1,5 +1,44 @@
 # راهنمای زندهٔ استقرار Production — Stage 10
 
+## مرز اصلاح امنیتی تصاویر زیرساخت
+
+انتشار محافظت‌شدهٔ `40677251011` از commit
+`46596901ccb9afeab021c7ed3f86ec31d5d82c6e` برای چهار تصویر اصلاح‌شده `Passed`
+است؛ امضا، provenance، SBOM و بازیابی disposable OpenBao نیز بررسی شده‌اند.
+پذیرش این digestها در staging مستقل از انتشار است. این رسید مجوز تعویض تصاویر
+روی VPS نیست و CA، کلیدها، PVCها و مرزهای بستهٔ فعلی را تغییر نمی‌دهد.
+
+وابستگی Java مربوط به پردازش `tracestate` نیز پیش از ساخت تصاویر برنامه باید
+نسخهٔ رفع‌شدهٔ OpenTelemetry را داشته باشد؛ این اصلاحِ build و lockfile مجوز
+نصب برنامه‌ها یا بازکردن دسترسی Production نیست.
+شش سرویس Java از BOM ثابت `io.opentelemetry:opentelemetry-bom:1.67.0`
+استفاده می‌کنند تا API، SDK و exporterها هماهنگ بمانند. lockfile و checksumهای
+Gradle هر سرویس باید همراه هم بررسی شوند و ساخت بعدی با verification سخت‌گیرانه
+اجرا شود. OkHttp `5.5.0` و Okio `3.18.1` وابستگی‌های حل‌شدهٔ همین exporter هستند.
+آزمون parser باید whitespace طولانی بدون کاما را در زمان محدود پردازش کند و
+هم‌زمان round-trip معتبر و رد parent نامعتبر را حفظ کند. شواهد جدید build/scan و
+امضای همان digest همچنان پیش‌نیاز staging و نصب هر تصویر برنامه هستند.
+
+اصلاح مستقل cert-manager نیز فقط در مسیر ساخت candidate انجام می‌شود؛
+recipe و provenance انتشار قبلی تا پذیرش digestهای جدید حفظ می‌شوند.
+این اصلاح مجوز نصب روی VPS یا تغییر Root/CA و کلیدها نیست.
+
+اصلاح وابستگی JOSE در مسیر ساخت candidate مستقل از تصاویر نصب‌شده انجام
+می‌شود. جایگزینی تصویر مقصد فقط پس از ساخت، اسکن، امضا، آزمون سازگاری و
+بازیابی، و پذیرش digest جدید مجاز است؛ اصلاح سورس به‌تنهایی شاهد رفع مشکل روی
+VPS نیست. کلیدها، CA، داده‌ها و مرز بستهٔ دسترسی مقصد تغییر نمی‌کنند.
+
+برای ساخت جدید از `jose-platform-sources.json` و مسیر فعلی
+`build_patched_platform.py` استفاده شود؛ recipe قبلی برای اعتبارسنجی provenance
+تصاویر موجود بدون تغییر باقی می‌ماند. candidate از JOSE v4.1.6 و patch دارای
+checksum برای مهاجرت CAP v0.14.0 و Okta SDK v2.20.0 در OpenBao استفاده می‌کند؛ وجود v3 در باینری
+یا v4 قدیمی پذیرفته نیست. آزمون‌های JWT/OIDC و احراز هویت Kubernetes پیش از
+ساخت باینری اجرا می‌شوند. تست‌های واحد SDK و امضا/رد امضای نامعتبر client assertion
+هم الزامی‌اند؛ گراف واقعی packageهای OpenBao باید پیش از build فاقد JOSE قدیمی
+باشد. سقف پیش‌فرض JWK/RSA برابر ۴۰۹۶ بیت حفظ می‌شود؛
+سازگاری provider خارجی با کلید بزرگ‌تر باید پیش از پذیرش تصویر بررسی شود.
+این مرحله هیچ فرمان تعویض سرویس، init، unseal یا تغییر کلید روی VPS ندارد.
+
 ## هدف و قاعدهٔ نگهداری
 
 این فایل راهنمای مرکزی فارسی برای آماده‌سازی سرور جدید و استقرار HooshiX است.
@@ -516,10 +555,10 @@ python3 scripts/production/render_eso_candidate.py --chart "$chart_dir/chart.tgz
 
 این گزینه تصویر دلخواه نمی‌گیرد؛ فقط `published_security_candidate` در
 `eso-image.json` را انتخاب می‌کند. digest انتخاب‌شده به انتشار موفق
-[38137708512](https://github.com/hasanjodatshandi/HooshiX/actions/runs/38137708512)
-روی revision `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` و recipe ثابت bind است.
+[40677251011](https://github.com/hasanjodatshandi/HooshiX/actions/runs/40677251011)
+روی revision `46596901ccb9afeab021c7ed3f86ec31d5d82c6e` و recipe اصلاح‌شدهٔ JOSE bind است.
 تصویر ESO و هر سه workload برابر
-`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:961e047189afbfcc2a5ce58468f7205fc94a14eab45bf5eacbfa8fa4b839e397`
+`ghcr.io/hasanjodatshandi/hooshix/platform-eso-v2-patched-private@sha256:e5d64b56dde56296057032a9ccab227f0d65df5498779cfca886e34cf8c51f8d`
 خواهد بود. بدون این گزینه، render تصویر upstream را برای بررسی پایه حفظ
 می‌کند؛ آن خروجی را با candidate اصلاح‌شده اشتباه نگیرید.
 
@@ -558,11 +597,14 @@ Ambient mTLS روی VPS همچنان مستقل و الزامی‌اند. اجر
 
 ### ساخت candidate امنیتی از سورس رسمی
 
-recipe ثابت `infrastructure/production/release/patched-platform-sources.json`
+recipe ساخت جدید `infrastructure/production/release/jose-platform-sources.json`
 برای ESO `2.12.0`، OpenBao `2.6.4` و Istio `1.30.5` است. نسخهٔ محصول و chart
 حفظ می‌شود؛ compiler برابر Go `1.26.9` با تصویر builder دارای digest ثابت است.
 `x/net=v0.60.0` و وابستگی‌های لازم آن (`x/crypto=v0.57.0`، `x/sys=v0.48.0`،
-`x/term=v0.46.0` و `x/text=v0.42.0`) ثابت‌اند. archive سورس رسمی هر پروژه به
+`x/term=v0.46.0` و `x/text=v0.42.0`) و JOSE `v4.1.6` ثابت‌اند.
+patchهای دارای checksum برای CAP و Okta در OpenBao اعمال می‌شوند؛ recipe قدیمی
+`patched-platform-sources.json` فقط برای provenance تصاویر قبلی حفظ می‌شود.
+archive سورس رسمی هر پروژه به
 commit و SHA-256 bind است؛ checksum، sumdb، `go mod verify` و build readonly
 خاموش نمی‌شوند. این مسیر ساخت جدید، تصویر رسمی upstream نیست.
 
@@ -650,19 +692,33 @@ CI مربوط به SHA دقیق جدید لازم است؛ پس از merge نی�
 انتخاب می‌شوند. این مسیر نصب اولیه نیست: ztunnel، CA، OpenBao و داده‌های آن،
 SSH، ایمیل و storage نباید تغییر کنند. اجرای دوبارهٔ `commission_platform.py`
 برای این ارتقا مجاز نیست. روی VPS اول، receipt مقصد با plan بررسی‌شدهٔ main
-`351802f1ba55aa11ca5c11740c038e575dc996bf` و digestهای همین pin، نتیجهٔ
+`351802f1ba55aa11ca5c11740c038e575dc996bf` و digestهای ثبت‌شده در همان plan، نتیجهٔ
 `mesh_security_upgrade=Passed` و `openbao_ca_ztunnel_storage=Preserved` دارد.
 این شاهد ارتقای همان مقصد است، نه آمادگی Production یا نصب ESO؛ روی سرور
 دیگر اجرای مستقل و receipt همان سرور لازم است. سبزشدن baseline به‌تنهایی
 شاهد تعویض تصویر VPS نیست.
 
 مرجع انتخاب candidate، `infrastructure/istio/security-upgrade.json` است؛
-این فایل pins upstream/chart را عوض نمی‌کند. publication شمارهٔ `38137708512`
-به revision دقیق `fa7fbbe3a20be6ba99459209cfb6087d2fecba24` متصل است. سازنده
+این فایل pins upstream/chart را عوض نمی‌کند. publication شمارهٔ `40677251011`
+به revision دقیق `46596901ccb9afeab021c7ed3f86ec31d5d82c6e` متصل است. سازنده
 پیش از تحویل بسته، اجرای موفق workflow انتشار روی main و scan تازهٔ همان
 digestها را کنترل می‌کند. هر تصویر، policy مستقل source-build با signer/issuer
 دقیق، provenance شامل recipe، سورس، Go، module locks و invocation، و SBOM
 امضاشده دارد. policy قدیمی ztunnel و OpenBao حفظ می‌شود.
+
+pin جدید فقط candidate آزمون staging است؛ receipt قبلی VPS به این digestها
+تعمیم داده نمی‌شود. تصویرهای prospective عبارت‌اند از:
+
+- istiod: `sha256:ebc39a486fe921508884af723dfebf2c61888dd13c5f75cdfe6e6d2164595af3`
+- CNI: `sha256:96012ab4ad137c1c40599f274a2a8ab14df8399410b210ef9613137c3d1fec4e`
+
+source predicate دقیق شامل JOSE `v4.1.6` و `source_patches: []` است؛ recipe
+یا JOSE قدیمی، hash ماژول متفاوت، signer اشتباه یا SBOM نامعتبر رد می‌شود.
+recipe آرشیوی برای provenance قبلی تغییر نمی‌کند. روی VPS موجود، بسته‌های
+bootstrap/mesh/ESO/cert-manager این بخش را با pin جدید دوباره اجرا نکنید: مهاجرت از تصاویر
+source-patched نصب‌شدهٔ قبلی به این مجموعه، بررسی و بستهٔ مستقل لازم دارد و
+هنوز **Not verified** است. این گام فقط staging disposable را پیش می‌برد؛
+تغییری روی CA، کلید، data، PVC، شبکه یا دسترسی برنامه/عمومی مقصد نمی‌دهد.
 
 ```bash
 python3 -m unittest discover -s scripts/production/tests -p test_mesh_security_upgrade.py
@@ -1114,11 +1170,11 @@ job، package دیگر، تصاویر محصول، اسرار یا بازکرد�
 این بخش فقط candidate انتشار می‌سازد، نه نصب TLS یا readiness تولید؛ نتیجهٔ
 نصب اجراشدهٔ VPS در بخش commissioning پایین ثبت شده است.
 
-انتشار محافظت‌شدهٔ کل سه تصویر در run `38409447796`، attempt `1`، از
-`main@c5dd3c0012139e7969606bc074f207adebd65d26` با **Passed** ثبت شده است.
+انتشار منتخبِ سه تصویر اصلاح‌شده در run `40782339939`، attempt `1`، از
+`main@624ad6a634c7d0c93627f3d5869a7eb883824e46` با **Passed** ثبت شده است.
 visibility واقعی فقط همین سه مقصد `public` است و در استثنای محدود بالا قرار دارد.
 SHA-256 فایل عمومی `publication.json`:
-`b4a7c34a6212ca564ac4ba09cc191b971dae4031da458331355b52f052deb2e8`.
+`1bccaa06d82490017e34c967d7090062375e66c954ae9041901487ec93409766`.
 این رسید انتشار، به‌تنهایی مجوز نصب یا شاهد TLS/admission/staging نیست.
 
 سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
@@ -1129,6 +1185,22 @@ runtime هر جزء در `infrastructure/production/data/cert-manager-sources.js
 جداگانهٔ هر `cmd` با checksum database و `go mod verify` بررسی می‌شوند؛
 `go mod tidy` در همان ماژول جزء، فایل‌های قفل را پیش از build readonly همگام می‌کند؛
 buildinfo و hash چهار فایل go.mod/go.sum در تصویر نهایی نگه داشته می‌شود.
+
+ساخت candidate جدید از `cert-manager-jose-sources.json` استفاده می‌کند و
+JOSE را در ماژول ریشه و هر سه `cmd` روی `v4.1.6` ثابت می‌کند. recipe اصلی
+`cert-manager-sources.json` با SHA-256
+`350941c06ad2bc5536ebc47b972643db4a56e8f831cef2617841e701cfdee4e9`
+فقط برای بازسازی provenance انتشار قبلی حفظ می‌شود؛ خوانندهٔ candidate فعلی
+و policy دقیق staging به recipe اصلاح‌شدهٔ JOSE و همین انتشار جدید متصل‌اند. Go، نسخهٔ
+cert-manager، manifest و runtime base تغییر نمی‌کنند. تست‌های upstream
+JOSE و آزمون‌های ACME در مسیر ساخت controller اجرا می‌شوند؛ محدودیت پیش‌فرض
+RSA دست‌کاری نمی‌شود. اسکن نهایی controller باید JOSE اصلاح‌شده را نشان دهد؛
+JOSE قدیمی در هر جزء رد می‌شود. خروجی help صرفاً smoke است و صدور گواهی یا
+ارتقای VPS را اثبات نمی‌کند. انتشار محافظت‌شده و پذیرش امضا/SBOM/admission
+برای digestهای جدید همچنان پیش‌نیاز مستقل staging و هر نصب بعدی هستند.
+fixture آزمون IPv6 upstream با patch دارای checksum در recipe اصلاح شده است:
+URL آدرس IPv6 بدون پورت نیز براکت استاندارد دارد؛ همان آزمون و assertionها
+اجرا می‌شوند و کد runtime تغییر نمی‌کند.
 
 برای ساخت و اسکن بدون credential روی میزبان توسعه، از checkout مربوط به
 تغییر و ابزارهای checksum-pinned پروژه استفاده کنید. پوشهٔ خروجی باید تازه و
@@ -1177,7 +1249,7 @@ provenance معتبر بماند. از داخل checkout پروژه، artifact �
 پوشهٔ تازهٔ خارج از Git دریافت و پذیرش مستقل را اجرا کنید:
 
 ```bash
-gh run download 38409447796 --name cert-manager-publication-38409447796-1 \
+gh run download 40782339939 --name cert-manager-publication-40782339939-1 \
   --dir /tmp/hooshix-cert-manager-published-evidence
 scripts/production/install_release_tools.sh /tmp/hooshix-cert-manager-verification-tools
 export PATH=/tmp/hooshix-cert-manager-verification-tools:$PATH
@@ -1199,10 +1271,10 @@ python3 scripts/production/verify_published_cert_manager.py \
 گزارش‌ها در `<output>/<component>/registry` و hash آن‌ها در
 `scan_evidence_sha256` باقی می‌مانند؛ publication و attestation اصلی دست‌نخورده‌اند.
 
-اجرای مستقل روی میزبان توسعه در `2026-10-13T14:36:06Z`، امضا/SLSA/SBOM،
+پذیرش مستقل انتشار اصلاح‌شدهٔ منتخب روی میزبان توسعه، امضا/SLSA/SBOM،
 رد signer غلط و smoke محدود هر سه digest را با **Passed** ثبت کرده است.
 SHA-256 رسید عمومی `acceptance.json`:
-`7855cf84fe2a8bbde40474ab872d91f0d83ed657b2b320f66768599b02dc8c8b`.
+`65bec34e504fa27bdefd08b41f0d6f917497f27bb0c6e7823c7d4ab53c9210e6`.
 این شاهد همان bytes منتشرشده است، نه صدور TLS یا نصب مقصد.
 
 خروجی موفق `CERT_MANAGER_PUBLISHED_ACCEPTANCE=Passed` و `acceptance.json` است؛

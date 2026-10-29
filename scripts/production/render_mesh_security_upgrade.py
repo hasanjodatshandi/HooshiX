@@ -25,7 +25,7 @@ def pin() -> dict:
             or not re.fullmatch(r'[1-9][0-9]{0,19}', value.get('publication_run', ''))
             or type(value.get('publication_attempt')) is not int
             or not 1 <= value['publication_attempt'] <= 1000
-            or value.get('recipe_sha256') != hashlib.sha256(build.RECIPE.read_bytes()).hexdigest()
+            or value.get('recipe_sha256') != hashlib.sha256(build.CANDIDATE_RECIPE.read_bytes()).hexdigest()
             or set(value.get('module_files_sha256', {})) != {'go.mod', 'go.sum'}
             or any(not re.fullmatch(r'[a-f0-9]{64}', h)
                    for h in value['module_files_sha256'].values())):
@@ -40,11 +40,12 @@ def pin() -> dict:
 def predicate(component: str) -> dict:
     if component not in COMPONENTS:
         raise ValueError('only istiod and CNI are authorized')
-    selected, identity = build.recipe(), pin()
+    selected, identity = build.recipe(build.CANDIDATE_RECIPE), pin()
     source = selected['sources']['istio']
     return {'buildDefinition': {'buildType': build.BUILD_TYPE, 'externalParameters': {
         'component': component, 'source': source, 'recipe_sha256': identity['recipe_sha256'],
         'modules': selected['modules'], 'module_files_sha256': identity['module_files_sha256'],
+        'source_patches': [],
         'builder': selected['builder'], 'runtime_base': build.base_image(component),
         'go_version': selected['go_version'], 'repository_revision': identity['repository_revision']},
         'internalParameters': {}, 'resolvedDependencies': [{
@@ -103,7 +104,8 @@ def validate_publication(directory: Path, now: datetime) -> dict:
                 or receipt.get('module_files_sha256') != identity['module_files_sha256']
                 or build.load(folder / 'source-provenance.json') != predicate(component)):
             raise ValueError('exact source recipe and module locks required')
-        evidence = build.validate_local(folder, component, receipt['image_config_digest'], now)
+        evidence = build.validate_local(folder, component, receipt['image_config_digest'], now,
+                                        build.CANDIDATE_RECIPE)
         if any(receipt.get(key) != value for key, value in evidence.items()):
             raise ValueError('source receipt differs from actual scanned image')
         image = identity['images'][component]

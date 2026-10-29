@@ -5,6 +5,9 @@ on:
       - '.github/workflows/patched-platform-source.yml'
       - '.github/workflows/production-release.yml'
       - 'infrastructure/production/release/patched-platform-sources.json'
+      - 'infrastructure/production/release/jose-platform-sources.json'
+      - 'infrastructure/production/release/cap-jose-v4.patch'
+      - 'infrastructure/production/release/okta-jose-v4.patch'
       - 'scripts/production/build_patched_platform.py'
       - 'scripts/production/tests/test_patched_platform.py'
   push:
@@ -12,6 +15,9 @@ on:
     paths:
       - '.github/workflows/patched-platform-source.yml'
       - 'infrastructure/production/release/patched-platform-sources.json'
+      - 'infrastructure/production/release/jose-platform-sources.json'
+      - 'infrastructure/production/release/cap-jose-v4.patch'
+      - 'infrastructure/production/release/okta-jose-v4.patch'
       - 'scripts/production/build_patched_platform.py'
 permissions:
   contents: read

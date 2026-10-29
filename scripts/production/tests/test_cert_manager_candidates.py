@@ -30,13 +30,59 @@ class CertManagerBuildTest(unittest.TestCase):
             {'name': 'stdlib', 'version': 'go1.26.9', 'locations': [{'path': '/app/cmd/controller/controller'}]},
             *[{'name': name, 'version': version} for name, version in build.MODULES.items()]]
 
-    def validate(self, evidence, component='controller', registry=False):
+    def validate(self, evidence, component='controller', registry=False, recipe_path=build.RECIPE):
         image = publish.repository(component) + '@sha256:' + 'd' * 64 if registry else self.engine
         original = build.load
         with patch.object(build, 'load', side_effect=lambda p:
-                self.selected if p == build.RECIPE else evidence[p.name] if p.name in evidence else original(p)):
+                self.selected if p == recipe_path else evidence[p.name] if p.name in evidence else original(p)):
             return build.validate_inventory(Path('evidence'), component, image, self.now,
-                                            self.engine if registry else None)
+                                            self.engine if registry else None, recipe_path)
+
+    def test_jose_candidate_preserves_archived_recipe_and_exact_fixed_modules(self):
+        self.assertEqual('350941c06ad2bc5536ebc47b972643db4a56e8f831cef2617841e701cfdee4e9',
+                         hashlib.sha256(build.RECIPE.read_bytes()).hexdigest())
+        self.selected = build.recipe(build.CANDIDATE_RECIPE)
+        self.assertEqual(build.recipe()['modules'] | {'github.com/go-jose/go-jose/v4': 'v4.1.6'},
+                         self.selected['modules'])
+        for component in build.COMPONENTS:
+            generated = build.dockerfile(component, self.selected, build.CANDIDATE_RECIPE)
+            self.assertEqual(2, generated.count('github.com/go-jose/go-jose/v4@v4.1.6'))
+            self.assertIn('go test ./...', generated)
+            self.assertNotIn('DefaultMaxRSAKeySize', generated)
+            self.assertIn(hashlib.sha256(build.CANDIDATE_RECIPE.read_bytes()).hexdigest(), generated)
+            self.assertEqual(component == 'controller', 'git apply --check' in generated)
+        with self.assertRaises(ValueError): build.recipe(Path('/unreviewed.json'))
+        original = build.load
+        for field, value in (('sha256', '0' * 64), ('path', '/unreviewed.patch')):
+            bad = copy.deepcopy(self.selected)
+            bad['test_patch'][field] = value
+            with patch.object(build, 'load', side_effect=lambda p:
+                    bad if p == build.CANDIDATE_RECIPE else original(p)), self.assertRaises(ValueError):
+                build.recipe(build.CANDIDATE_RECIPE)
+        self.selected['modules']['github.com/go-jose/go-jose/v4'] = 'v4.1.5'
+        with patch.object(build, 'load', side_effect=lambda p:
+                self.selected if p == build.CANDIDATE_RECIPE else original(p)), self.assertRaises(ValueError):
+            build.recipe(build.CANDIDATE_RECIPE)
+
+    def test_jose_candidate_rejects_legacy_or_missing_controller_linkage(self):
+        self.selected = build.recipe(build.CANDIDATE_RECIPE)
+        evidence = copy.deepcopy(self.evidence)
+        evidence['syft.json']['source']['metadata']['labels']['io.hooshix.recipe.sha256'] = \
+            hashlib.sha256(build.CANDIDATE_RECIPE.read_bytes()).hexdigest()
+        evidence['syft.json']['artifacts'].append(
+            {'name': 'github.com/go-jose/go-jose/v4', 'version': 'v4.1.6'})
+        self.validate(evidence, recipe_path=build.CANDIDATE_RECIPE)
+        for name, version in (('github.com/go-jose/go-jose/v4', 'v4.1.4'),
+                ('github.com/go-jose/go-jose/v3', 'v3.0.5'),
+                ('gopkg.in/square/go-jose.v2', 'v2.6.0')):
+            bad = copy.deepcopy(evidence)
+            bad['syft.json']['artifacts'].append({'name': name, 'version': version})
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                self.validate(bad, recipe_path=build.CANDIDATE_RECIPE)
+        evidence['syft.json']['artifacts'].pop()
+        with self.assertRaises(ValueError): self.validate(evidence, recipe_path=build.CANDIDATE_RECIPE)
+        evidence['syft.json']['artifacts'][0]['locations'][0]['path'] = '/app/cmd/webhook/webhook'
+        self.validate(evidence, component='webhook', recipe_path=build.CANDIDATE_RECIPE)
 
     def test_clean_scan_preserves_blocked_promotion_for_all_three(self):
         for component in build.COMPONENTS:
@@ -127,7 +173,7 @@ class CertManagerBuildTest(unittest.TestCase):
         for rejected in ('hash', 'build', 'native', 'scan'):
             with tempfile.TemporaryDirectory() as parent:
                 directory = Path(parent) / 'candidate'
-                selected = copy.deepcopy(self.selected)
+                selected = build.recipe(build.CANDIDATE_RECIPE)
                 selected['source']['archive_sha256'] = hashlib.sha256(b'fixture').hexdigest()
                 def native(argv, **kwargs):
                     if rejected == 'build': raise subprocess.CalledProcessError(1, argv)
@@ -145,6 +191,27 @@ class CertManagerBuildTest(unittest.TestCase):
         with patch.object(build.urllib.request, 'urlopen') as fetch, self.assertRaises(ValueError):
             build.build('controller', Path('unused'), docker_host='tcp://remote:2375')
         fetch.assert_not_called()
+
+    def test_build_failure_evidence_retains_public_test_locations_without_raw_output(self):
+        with tempfile.TemporaryDirectory() as parent:
+            directory = Path(parent) / 'failed'
+            selected = build.recipe(build.CANDIDATE_RECIPE)
+            selected['source']['archive_sha256'] = hashlib.sha256(b'fixture').hexdigest()
+            failure = subprocess.CalledProcessError(1, ['docker'], stderr=(
+                '--- FAIL: TestSynthetic/invalid_key (0.01s)\nissuer_test.go:42: '
+                'private-value-must-not-escape\npanic: private-value-must-not-escape'))
+            with patch.object(build, 'recipe', return_value=selected), \
+                    patch.object(build.urllib.request, 'urlopen') as fetch, \
+                    patch.object(build, 'run', side_effect=failure), self.assertRaises(subprocess.CalledProcessError):
+                fetch.return_value.__enter__.return_value.read.return_value = b'fixture'
+                build.build('controller', directory, docker_host='unix:///captured.sock')
+            text = (directory / 'build-failure.json').read_text()
+            self.assertNotIn('private-value-must-not-escape', text)
+            result = json.loads(text)
+            self.assertEqual(['TestSynthetic/invalid_key'], result['tests'])
+            self.assertEqual(['issuer_test.go:42'], result['locations'])
+            self.assertIn('panic:', result['phrases'])
+            self.assertFalse((directory / 'receipt.json').exists())
 
 
 class CertManagerPublicationTest(unittest.TestCase):
@@ -177,11 +244,14 @@ class CertManagerPublicationTest(unittest.TestCase):
         def scan(folder, image, source):
             scans.append(image)
             resolution(folder / 'syft.json')
-        def checked(folder, component, image, now, config):
+        def checked(folder, component, image, now, config, recipe_path):
+            self.assertEqual(build.CANDIDATE_RECIPE, recipe_path)
             if reject == 'scan': raise ValueError('scan')
             return {'scan': 'Passed'}
         def signed(folder, image, predicate):
             self.assertEqual(3, len(scans))
+            self.assertEqual('v4.1.6', predicate['buildDefinition']['externalParameters'][
+                'recipe']['modules']['github.com/go-jose/go-jose/v4'])
             signatures.append(image)
             if reject == 'signature': raise ValueError('signature')
         with patch.object(publish, 'run', side_effect=native), \

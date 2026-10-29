@@ -33,6 +33,8 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
             self.assertEqual(component, params['component'])
             self.assertEqual('1.26.9', params['go_version'])
             self.assertEqual('v0.60.0', params['modules']['golang.org/x/net'])
+            self.assertEqual('v4.1.6', params['modules']['github.com/go-jose/go-jose/v4'])
+            self.assertEqual([], params['source_patches'])
             self.assertEqual(renderer.pin()['repository_revision'], params['repository_revision'])
             self.assertEqual(renderer.build.base_image(component), params['runtime_base'])
             policy = renderer.source_policy(component)
@@ -285,7 +287,8 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
                 'module_files_sha256': selected['module_files_sha256']}
             image = selected['images'][component]
             labels = {'io.hooshix.provenance.kind': receipt['provenance_kind'],
-                'io.hooshix.source.revision': renderer.build.recipe()['sources']['istio']['revision'],
+                'io.hooshix.source.revision': renderer.build.recipe(
+                    renderer.build.CANDIDATE_RECIPE)['sources']['istio']['revision'],
                 'io.hooshix.recipe.sha256': selected['recipe_sha256']}
             files[component] = {'receipt.json': receipt, 'source-provenance.json': renderer.predicate(component),
                 'syft.json': {'source': {'type': 'image', 'metadata': {
@@ -293,7 +296,8 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
                     'os': 'linux', 'architecture': 'amd64', 'labels': labels}}, 'artifacts': [
                     {'name': 'stdlib', 'version': 'go1.26.9', 'locations': [
                         {'path': p} for p in renderer.build.BINARIES[component].values()]},
-                    {'name': 'golang.org/x/net', 'version': 'v0.60.0'}]},
+                    {'name': 'golang.org/x/net', 'version': 'v0.60.0'},
+                    {'name': 'github.com/go-jose/go-jose/v4', 'version': 'v4.1.6'}]},
                 'cyclonedx.json': {'bomFormat': 'CycloneDX', 'components': [{}]},
                 'grype.json': {'matches': []}, 'database.json': {'valid': True, 'error': None,
                     'schemaVersion': '6.0.0', 'built': now.isoformat()}}
@@ -310,7 +314,8 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
                             (root / name / filename).write_text(json.dumps(value))
             save()
             renderer.validate_publication(root, now)
-            for fault in ('component', 'old-toolchain', 'missing-binary', 'high', 'stale'):
+            for fault in ('component', 'old-toolchain', 'missing-binary', 'high', 'stale',
+                          'jose-v3', 'old-jose', 'old-recipe', 'missing-patches'):
                 files = copy.deepcopy(original)
                 part = files['cni']
                 if fault == 'component':
@@ -321,8 +326,18 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
                     part['syft.json']['artifacts'][0]['locations'].pop()
                 elif fault == 'high':
                     part['grype.json']['matches'] = [{'vulnerability': {'severity': 'High'}}]
-                else:
+                elif fault == 'stale':
                     part['database.json']['built'] = (now - timedelta(days=6)).isoformat()
+                elif fault == 'jose-v3':
+                    part['syft.json']['artifacts'].append(
+                        {'name': 'github.com/go-jose/go-jose/v3', 'version': 'v3.0.5'})
+                elif fault == 'old-jose':
+                    files['istiod']['syft.json']['artifacts'][-1]['version'] = 'v4.1.5'
+                elif fault == 'old-recipe':
+                    part['source-provenance.json']['buildDefinition']['externalParameters'][
+                        'recipe_sha256'] = 'a1980938b7e303ff72fba1d0f9f452ea7bce6c4a0642faa3ca2283bb606c8db1'
+                else:
+                    del part['source-provenance.json']['buildDefinition']['externalParameters']['source_patches']
                 save()
                 with self.subTest(fault=fault), self.assertRaises(ValueError):
                     renderer.validate_publication(root, now)

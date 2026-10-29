@@ -39,6 +39,9 @@ pitest {
 dependencies {
     implementation("com.sajtech.hooshix:protobuf-contracts:1.9.1")
   implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
+  implementation(platform("io.opentelemetry:opentelemetry-bom:1.67.0")) {
+    because("Align OpenTelemetry modules with the GHSA-ccrj-gw8r-854m tracestate fix")
+  }
   implementation(platform("org.springframework:spring-framework-bom:7.0.9")) {
     because("Align Spring Framework modules with the CVE-2026-47884 security fix")
   }

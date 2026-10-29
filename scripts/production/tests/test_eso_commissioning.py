@@ -172,11 +172,42 @@ class ESOCommissioningTest(unittest.TestCase):
 
     def test_signed_source_requires_exact_modules_and_verified_payload(self):
         expected = renderer.predicate()
+        self.assertEqual('v4.1.6', expected['buildDefinition']['externalParameters'][
+            'modules']['github.com/go-jose/go-jose/v4'])
+        self.assertEqual([], expected['buildDefinition']['externalParameters']['source_patches'])
         expression = renderer.source_policy()['spec']['validations'][2]['expression']
         self.assertEqual(renderer.mesh.provenance_expression(expected), expression)
         self.assertTrue(expression.startswith('variables.provenanceVerified && '))
         self.assertIn('["module_files_sha256"]["go.sum"]', expression)
         self.assertNotIn('messageExpression', renderer.source_policy()['spec']['validations'][2])
+
+    def test_publication_rejects_wrong_kind_component_and_module_locks(self):
+        selected = renderer.pin()['published_security_candidate']
+        files = {'publication.json': {'schema_version': 1, 'publication': 'Passed',
+            'provenance_kind': 'patched-upstream-source-build',
+            'repository_revision': selected['repository_revision'],
+            'images': {'eso': selected['image']}},
+            'receipt.json': {'component': 'eso', 'image_config_digest': 'sha256:' + 'a' * 64,
+                'module_files_sha256': selected['module_files_sha256']},
+            'source-provenance.json': renderer.predicate(), 'syft.json': {'source': {}}}
+        original = copy.deepcopy(files)
+        def validate():
+            with patch.object(renderer.build, 'load', side_effect=lambda p: files[p.name]), \
+                    patch.object(renderer, 'predicate', return_value=original['source-provenance.json']), \
+                    patch.object(renderer.build, 'validate_local', return_value={}), \
+                    patch.object(renderer.build, 'published_image', return_value=selected['image']), \
+                    patch.object(renderer.build, 'registry_scan'):
+                renderer.validate_publication(Path('/public-fixture'))
+        validate()
+        for filename, key, value in (
+                ('publication.json', 'schema_version', 2),
+                ('publication.json', 'provenance_kind', 'unchanged-upstream-import'),
+                ('receipt.json', 'component', 'openbao'),
+                ('receipt.json', 'module_files_sha256', {'go.mod': '0' * 64, 'go.sum': '1' * 64})):
+            files = copy.deepcopy(original)
+            files[filename][key] = value
+            with self.subTest(filename=filename, key=key), self.assertRaises(ValueError):
+                validate()
 
     def test_authenticated_staging_requires_combined_native_delivery_and_fresh_tree(self):
         revision = 'a' * 40
