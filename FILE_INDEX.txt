@@ -1746,6 +1746,7 @@ services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/Identity
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGatewaySurfaceCharacterizationTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/client/IdentityGrpcClientSupportTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/BffDependencyAdmissionInterceptorTest.java
+services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/observability/W3CTraceContextSecurityTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/OidcClockSafetyGuardTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/OidcHostTimeHealthTest.java
 services/web-bff/src/test/java/com/sajtech/webbff/infrastructure/quota/RedisOidcQuotaIntegrationTest.java
