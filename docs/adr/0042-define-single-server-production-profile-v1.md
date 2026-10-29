@@ -207,6 +207,25 @@ capacity, retained replay/dedup evidence, recovery and client network activation
 remain separate mandatory gates before application traffic; none is waived by
 creating empty topics or ACLs.
 
+The next closed commissioning step may apply the owner-selected low-load
+bandwidth profile to exactly those five authenticated user principals: producer
+65,536 bytes/s and consumer 262,144 bytes/s. This remains a commissioning limit,
+not validated Production capacity. Before writing, inspect all user, client,
+combined user/client and IP quotas; foreign/default/overriding/drifted values
+stop the operation without alteration. A create-only immutable journal binds
+the exact profile to the existing Kafka cluster, StatefulSet and Retain PVC.
+Only missing complete principal entries may resume under that journal; no
+mutation retry, deletion, overwrite, client-ID exception or quota broadening.
+The existing shared Kafka storage lock serializes repository owner operations;
+Kafka quota administration has no compare-and-swap primitive, so independent
+administrators must not mutate quotas concurrently. Recheck inventory before
+each write and detect concurrent drift without claiming cross-system atomicity.
+TLS, keys, topics/ACLs, image, storage and closed network/mesh boundaries remain
+unchanged. No test messages enter the VPS; actual throttling, denial, interrupted
+acknowledgement/reentry and preservation are verified only in disposable native
+fixtures before the supervised bundle is eligible. Recovery/capacity/application
+access and Production readiness remain independent gates.
+
 The profile formally accepts that Apache Kafka recommends separated/redundant controller/broker roles for critical deployments; the single combined process is a cost/operability trade-off and is not HA.
 
 Required settings/semantics include:

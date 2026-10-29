@@ -161,4 +161,6 @@ def rehearse(k, runtime_plan, api, root, ca, root_key, audiences, node):
                 ['data']['data'].items() if key not in installer.MARKERS} for service in contract.SERVICES}))
         result['kafka_topic_acl']['idempotent_reconciliation'] = 'Passed'
         result['kafka_topic_acl']['partial_recovery'] = 'Passed'
+        from rehearse_kafka_quotas import rehearse as quotas
+        result['kafka_quotas'] = quotas(kube, topic_plan)
     return result

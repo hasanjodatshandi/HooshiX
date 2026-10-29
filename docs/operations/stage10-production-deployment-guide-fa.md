@@ -3206,14 +3206,63 @@ python3 scripts/production/test_kafka_quota_native.py --disposable
 آزمون، فیلدهای `principal_quota_readback`، `produce_fetch_throttling`،
 `two_client_ids_per_principal` و `quota_mutation_denial` باید `Passed` باشند؛
 `target_installation=Not run` و `production_capacity=Not verified` باقی می‌مانند.
-تا ابزار مستقل، آزمون staging و اجرای نظارت‌شدهٔ مقصد آماده نشده، فرمان نصب
-quota روی سرور موجود نیست؛ دستور آزمایشی را جایگزین فرمان عملیاتی نکنید.
+دستور آزمایشی را جایگزین فرمان عملیاتی نکنید. ابزار مستقلِ مقصد در بخش بعد
+تعریف شده است؛ وجود آن به معنی اجرای موفق روی سرور نیست.
 آزمون محلیِ ایزوله در ۲۰۲۶-۱۰-۲۸ روی digest موجود `9fe8fcb3…` موفق شد: پنج
 هویت، throttle واقعی ارسال/دریافت، دو client ID برای هر principal و رد تغییر
 quota، همگی `Passed`. این شاهد محلی، نصب quota روی VPS نیست.
 
 مرجع رفتار quota و precedence هویت:
 [Kafka 4.2 quota operations](https://kafka.apache.org/42/operations/basic-kafka-operations/#setting-quotas).
+
+### اعمال quota روی Kafka بستهٔ موجود
+
+`install_kafka_quotas.py` فقط پنج quota از نوع user با همین اعداد را اضافه می‌کند.
+پیش‌نیازها: broker آماده، OpenBao unsealed، ESO و پنج گواهی معتبر و Ready، هر چهار
+guard سالم، volume موجود با هویت ثابت، شش topic و ۴۷ ACL دقیق و journal قبلی آن‌ها.
+اگر این شرایط برقرار نباشد، چیزی را reset، unseal یا بازنویسی نمی‌کند. همان مسیر
+موجود بازیابی مؤلفهٔ مربوط باید جداگانه طی شود؛ کلید تازه نسازید.
+
+پیش از ایجاد journal جدید، inventory تمام userها، clientها، ترکیب user/client و
+IPها بررسی می‌شود. quota بیگانه/default یا override، مقدار متفاوت، خروجی ناشناخته
+و وضعیت قبلی بدون journal معتبر رد می‌شود. journal غیرقابل‌تغییر، hash قرارداد
+را به cluster، StatefulSet و PVC موجود می‌بندد. پس از قطع ارتباط، همان bundle
+فقط principalهای هنوز غایب را تکمیل می‌کند؛ مقدار موجود را overwrite نمی‌کند.
+mutation به‌طور خودکار تکرار نمی‌شود و quota حذف نمی‌شود. CLIها heap و deadline
+محدود دارند و کل عملیات همان قفل storage Kafka و audit مسیر فعلی را استفاده می‌کند.
+Kafka برای این API قابلیت CAS ندارد؛ هم‌زمان با عملیات، هیچ administrator دیگری
+نباید quota را تغییر دهد. بررسی مجدد پیش از هر write، جای تضمین اتمی در برابر
+مدیر مستقل را نمی‌گیرد.
+
+پیش از ساخت bundle، همان revision باید آزمون واقعی quota/CLI و staging امضاشده
+را بگذراند: اعمال ناقص، acknowledgement ازدست‌رفته، ادامهٔ دقیق، اجرای مجدد بدون
+write، رد quota بیگانه و حفظ داده/TLS/topic/ACL/mesh. فایل‌های synthetic فقط در
+fixture دورریختنی‌اند؛ هیچ پیام آزمون روی VPS فرستاده نمی‌شود.
+
+ساخت بسته از checkout تمیزِ دقیق `main`، با chart/Helm ثابت قبلی و run موفق همان
+revision انجام می‌شود؛ `<...>` ورودی واقعیِ بررسی‌شده است و فرمان آمادهٔ سرور نیست:
+
+```bash
+python3 scripts/production/build_kafka_quota_bundle.py \
+  --output <NEW_PRIVATE_DOWNLOAD_DIRECTORY> --staging-run <SUCCESSFUL_EXACT_MAIN_RUN> \
+  --chart <PINNED_ESO_CHART> --helm <PINNED_HELM> --retained-database-quarantine
+```
+
+گزینهٔ retained فقط برای PostgreSQL خالیِ قبلی همین VPS است؛ روی نصب جدید یا
+دیتابیس تغییرکرده از آن استفاده نشود. بسته بیرون Git، در Downloads خصوصی ساخته
+می‌شود؛ شامل برنامه/plan عمومی با checksum است، نه رمز یا کلید. نصب فقط با VNC
+قابل ورود و نشست دوم private SSH، از checkout نظارت‌شدهٔ WSL انجام می‌شود:
+
+```powershell
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_kafka_quota_operator.py --bundle <EXACT_VALIDATED_BUNDLE_PATH> --rescue-and-second-session-ready
+```
+
+فقط `READY` و رمز sudo در همان پنجره لازم‌اند؛ custody، intermediate یا GHCR token
+لازم نیست. فایل receipt محلی پیش از SCP با دسترسی `0600` ساخته می‌شود. موفقیت فقط
+با `KAFKA_QUOTAS=Passed` و تطبیق plan/source/profile/readback پذیرفته می‌شود.
+TLS/کلیدها، تصویر، topic/ACL، storage، سرویس میزبان، شبکه و دسترسی برنامه/عمومی
+حفظ می‌شوند؛ restart ندارد. وضعیت اجرای مقصد این گام هنوز **Not run** است و
+`capacity` و `production_readiness` همچنان **Not verified** می‌مانند.
 
 پس از این گام هنوز quota، ظرفیت/بازیابی، endpoint داخلی قابل‌دسترسی و مجوز شبکهٔ
 هر برنامه دروازه‌های مستقل هستند؛ برنامه/اینترنت همچنان `CLOSED` می‌ماند و هیچ
