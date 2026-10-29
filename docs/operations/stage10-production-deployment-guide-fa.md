@@ -3248,13 +3248,25 @@ revision انجام می‌شود؛ `<...>` ورودی واقعیِ بررسی�
 ```bash
 python3 scripts/production/build_kafka_quota_bundle.py \
   --output <NEW_PRIVATE_DOWNLOAD_DIRECTORY> --staging-run <SUCCESSFUL_EXACT_MAIN_RUN> \
-  --chart <PINNED_ESO_CHART> --helm <PINNED_HELM> --retained-database-quarantine
+  --chart <PINNED_ESO_CHART> --helm <PINNED_HELM> --retained-database-quarantine --retained-eso-admission
 ```
 
-گزینهٔ retained فقط برای PostgreSQL خالیِ قبلی همین VPS است؛ روی نصب جدید یا
+گزینهٔ `--retained-database-quarantine` فقط برای PostgreSQL خالیِ قبلی همین VPS است؛ روی نصب جدید یا
 دیتابیس تغییرکرده از آن استفاده نشود. بسته بیرون Git، در Downloads خصوصی ساخته
-می‌شود؛ شامل برنامه/plan عمومی با checksum است، نه رمز یا کلید. نصب فقط با VNC
-قابل ورود و نشست دوم private SSH، از checkout نظارت‌شدهٔ WSL انجام می‌شود:
+می‌شود؛ شامل برنامه/plan عمومی با checksum است، نه رمز یا کلید.
+
+گزینهٔ مستقل `--retained-eso-admission` فقط برای همین نصب با ESO قبلی
+`platform-eso-v2-patched-private@sha256:961e047189afbfcc2a5ce58468f7205fc94a14eab45bf5eacbfa8fa4b839e397`
+است. این گزینه فقط **انتظارِ خواندنی plan** از همان یک literal تصویر در boundary
+را به قرارداد قبلی متصل می‌کند؛ policy، source policy، Deployment یا تصویر را
+نمی‌نویسد و تصویر قدیمی را برای promotion مجدد تأیید نمی‌کند. نصاب باید Deployment
+`platform-data/hooshix-postgresql-eso` را با همان digest، حساب اختصاصی و Ready بودن
+بیابد و کل specِ policy موجود را همچنان دقیق، بدون نادیده‌گرفتن فیلدها، تطبیق دهد.
+در نصب تازه با digest جدید این گزینه استفاده نشود؛ این حالت روی ESO جدید رد می‌شود.
+اصلاح/ارتقای امنیتی ESO همچنان یک گذار مستقل است و quota جای آن را نمی‌گیرد.
+
+نصب فقط با VNC قابل ورود و نشست دوم private SSH، از checkout نظارت‌شدهٔ WSL
+انجام می‌شود:
 
 ```powershell
 wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/bootstrap_kafka_quota_operator.py --bundle <EXACT_VALIDATED_BUNDLE_PATH> --rescue-and-second-session-ready

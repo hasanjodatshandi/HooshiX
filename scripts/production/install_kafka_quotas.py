@@ -34,6 +34,22 @@ def topic_state(kube, identity):
     return journal['metadata']['uid'], journal['data']
 
 
+def retained_eso(kube, plan):
+    mode = plan.get('retained_eso_admission', False)
+    require(type(mode) is bool, 'KAFKA_QUOTA_EXPLICIT_ADMISSION_MODE_REQUIRED')
+    if not mode:
+        return None
+    deployment = runtime.get(kube, 'deployment', 'hooshix-postgresql-eso', runtime.NS)
+    pod = (deployment or {}).get('spec', {}).get('template', {}).get('spec', {})
+    containers = pod.get('containers', [])
+    require(deployment and deployment['metadata'].get('uid')
+        and deployment.get('status', {}).get('availableReplicas') == 1
+        and pod.get('serviceAccountName') == 'hooshix-postgresql-eso'
+        and len(containers) == 1 and containers[0].get('image') == contract.RETAINED_ESO,
+        'KAFKA_QUOTA_RETAINED_ESO_REQUIRED')
+    return deployment['metadata']['uid'], deployment['spec']
+
+
 def _execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
     require(plan.get('schema_version') == 1 and plan.get('installation_id') == 'hooshix-production'
         and plan.get('kafka_quotas') is True
@@ -41,6 +57,7 @@ def _execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
         'KAFKA_QUOTA_CLOSED_PLAN_REQUIRED')
     desired = profile.quotas(plan['kafka_quota_profile'])
     units, epoch = guard(initialized=True), topics.broker_epoch(kube)
+    retained = retained_eso(kube, plan)
     before = topics.delivery.snapshot(kube, plan)
     credentials = topics.credential_snapshot(kube, plan['public_ca_sha256'])
     cluster = runtime.storage_identity(kube)[1]
@@ -73,6 +90,7 @@ def _execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
         and credentials == topics.credential_snapshot(kube, plan['public_ca_sha256'])
         and epoch == topics.broker_epoch(kube) and cluster == runtime.storage_identity(kube)[1]
         and existing_topics == topic_state(kube, topic_identity)
+        and retained == retained_eso(kube, plan)
         and guard(initialized=True) == units, 'KAFKA_QUOTA_EXISTING_STATE_CHANGED')
     return {**result, **identity, 'existing_state': 'Preserved',
         'contract_sha256': journal['data']['contract_sha256'],
@@ -90,6 +108,7 @@ def execute(plan, *, kube=runtime.host.kube, guard=runtime.volume.foundation):
             'KAFKA_QUOTA_UNOWNED_STATE_PRESERVED', 'KAFKA_QUOTA_CONCURRENT_CHANGE_PRESERVED',
             'KAFKA_QUOTA_READBACK_REQUIRED', 'KAFKA_CLIENT_READY_CLOSED_BROKER_REQUIRED',
             'KAFKA_CLIENT_CLOSED_BOUNDARY_REQUIRED', 'ESO_UNSEALED_BAO_REQUIRED',
+            'KAFKA_QUOTA_EXPLICIT_ADMISSION_MODE_REQUIRED', 'KAFKA_QUOTA_RETAINED_ESO_REQUIRED',
             'KAFKA_EXACT_ISOLATED_QUOTA_PROFILE_REQUIRED'}
         code = str(error) if str(error) in allowed else 'OTHER_PREFLIGHT_OR_NATIVE_FAILURE'
         print('KAFKA_QUOTA_FAILURE=' + code, file=sys.stderr, flush=True)

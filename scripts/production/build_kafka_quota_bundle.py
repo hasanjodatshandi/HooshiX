@@ -9,6 +9,7 @@ from pathlib import Path
 import build_kafka_topic_acl_bundle as topics
 import build_kafka_client_tls_bundle as previous
 import kafka_quota_profile as profile
+import kafka_quota_commissioning as contract
 
 SOURCES = (*topics.SOURCES, 'kafka_quota_profile.py', 'kafka_quota_commissioning.py', 'install_kafka_quotas.py')
 
@@ -19,14 +20,15 @@ def verify_proof(receipt):
     if (proof.get('schema_version') != 1 or proof.get('kafka_quotas') != 'Passed'
         or proof.get('credential_count') != 5 or proof.get('producer_byte_rate') != 65536
         or proof.get('consumer_byte_rate') != 262144
-        or any(proof.get(k) != 'Passed' for k in ('idempotent_reconciliation', 'partial_recovery'))
+        or any(proof.get(k) != 'Passed' for k in ('idempotent_reconciliation', 'partial_recovery',
+                                                'retained_current_digest_denied'))
         or proof.get('existing_state') != 'Preserved'
         or proof.get('application_ingress') != proof.get('public_access') or proof.get('public_access') != 'CLOSED'
         or proof.get('capacity') != proof.get('production_readiness') or proof.get('capacity') != 'Not verified'):
         raise ValueError('KAFKA_QUOTA_EXACT_NATIVE_EVIDENCE_REQUIRED')
 
 
-def build(output, run_id, chart, helm, retained_database_quarantine=False):
+def build(output, run_id, chart, helm, retained_database_quarantine=False, retained_eso_admission=False):
     staging = previous.previous.staging
     revision = staging.git('rev-parse', 'HEAD')
     if (staging.git('status', '--porcelain') or output.exists() or output.is_symlink()
@@ -40,9 +42,12 @@ def build(output, run_id, chart, helm, retained_database_quarantine=False):
         verify_proof(receipt)
         runtime = previous.previous.renderer.render(previous.previous.data_boundary(chart, helm, retained_database_quarantine))
         plan = {**previous.plan(runtime), 'kafka_quotas': True,
+            'retained_eso_admission': retained_eso_admission,
             'kafka_quota_profile': json.loads(profile.PATH.read_bytes()), 'repository_source_revision': revision,
             'staging': {'source_revision': revision, 'run_id': run_id,
                         'observed_at': receipt['observed_at'], 'result': 'Passed'}}
+        if retained_eso_admission:
+            plan['kafka_runtime']['boundary'] = contract.retained_boundary(plan['kafka_runtime']['boundary'])
         output.mkdir(mode=0o700)
         (output / 'plan.json').write_text(json.dumps(plan, sort_keys=True) + '\n')
         for name in SOURCES:
@@ -59,9 +64,10 @@ def main():
     p.add_argument('--chart', type=Path, required=True)
     p.add_argument('--helm', required=True)
     p.add_argument('--retained-database-quarantine', action='store_true')
+    p.add_argument('--retained-eso-admission', action='store_true')
     a = p.parse_args()
     try:
-        build(a.output, a.staging_run, a.chart, a.helm, a.retained_database_quarantine)
+        build(a.output, a.staging_run, a.chart, a.helm, a.retained_database_quarantine, a.retained_eso_admission)
     except (OSError, ValueError, KeyError, TypeError):
         p.exit(1, 'KAFKA_QUOTAS_BUNDLE=Failed; no target changes\n')
     print('KAFKA_QUOTAS_BUNDLE=Passed; public owner bundle only; target Not run')
