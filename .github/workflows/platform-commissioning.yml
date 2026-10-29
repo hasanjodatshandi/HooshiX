@@ -24,6 +24,11 @@ on:
       - scripts/production/tests/test_kafka_tls.py
       - scripts/production/*kafka*client*tls*.py
       - scripts/production/tests/test_kafka_client_tls.py
+      - infrastructure/production/kafka/quota-profile.json
+      - scripts/production/kafka_quota_profile.py
+      - scripts/production/test_kafka_quota_native.py
+      - scripts/production/fixtures/KafkaQuotaProbe.java
+      - scripts/production/tests/test_kafka_quota_profile.py
       - scripts/production/*kafka*topic*acl*.py
       - scripts/production/tests/test_kafka_topic_acl.py
       - scripts/production/upgrade_kafka_health.py
@@ -116,6 +121,44 @@ permissions:
   contents: read
 
 jobs:
+  kafka-quota-profile:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    name: Isolated Kafka principal bandwidth quotas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25.0.4'
+      - name: Pull exact existing private Kafka image and exercise disposable quotas
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          DOCKER_CONFIG: ${{ runner.temp }}/kafka-quota-docker
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$DOCKER_CONFIG"
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          unset GHCR_TOKEN
+          image=$(python3 -c 'import json; print(json.load(open("infrastructure/production/kafka/published-candidate.json"))["image"])')
+          docker pull "$image"
+          python3 scripts/production/test_kafka_quota_native.py --disposable \
+            | tee "$RUNNER_TEMP/kafka-quota-profile-receipt.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kafka-quota-profile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/kafka-quota-profile-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
   staging:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     name: Signed Calico Ambient Kyverno OpenBao staging
