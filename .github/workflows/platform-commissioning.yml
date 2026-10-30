@@ -352,8 +352,8 @@ jobs:
             -o "$RUNNER_TEMP/platform-tools/barman.yaml"
           printf '%s  %s\n' 8f377ff4a7d0d3f74fc64b0f7ac4f449fc38ca9e83a40107cca2f9315a9bd920 \
             "$RUNNER_TEMP/platform-tools/barman.yaml" | sha256sum --check --strict
-          gh run download 40333333697 --repo hasanjodatshandi/HooshiX \
-            --name postgresql-publication-40333333697-1 --dir "$RUNNER_TEMP/postgresql-publication"
+          gh run download 41044389252 --repo hasanjodatshandi/HooshiX \
+            --name postgresql-publication-41044389252-2 --dir "$RUNNER_TEMP/postgresql-publication"
           export PATH="$RUNNER_TEMP/cert-manager-tools:$PATH"
           python3 scripts/production/verify_published_postgresql.py \
             --evidence-dir "$RUNNER_TEMP/postgresql-publication" --output-dir "$RUNNER_TEMP/postgresql-acceptance"

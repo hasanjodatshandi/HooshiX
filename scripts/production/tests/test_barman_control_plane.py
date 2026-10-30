@@ -14,7 +14,7 @@ import render_barman_control_plane as renderer
 import install_barman_control_plane as installer
 import build_barman_control_plane_bundle as builder
 import test_cnpg_control_plane as cnpg_test
-from rehearse_barman_control_plane import TLS_PROBE
+from rehearse_barman_control_plane import TLS_PROBE, tls_boundary
 
 
 class BarmanControlPlaneTest(unittest.TestCase):
@@ -48,6 +48,17 @@ class BarmanControlPlaneTest(unittest.TestCase):
              patch.object(renderer.cnpg, 'pins', return_value=self.pins), \
              patch.object(renderer.cnpg.certificates, 'recipe', return_value=self.cnpg.cert_recipe):
             return renderer.render(self.manifest, self.cnpg.manifest, self.cnpg.cert_manifest, ['10.43.0.1'])
+
+    def test_tls_probe_uses_selected_sidecar_source_recipe(self):
+        plan = self.plan()
+        with patch.object(renderer, 'source_predicate', wraps=renderer.source_predicate) as predicate, \
+             patch('rehearse_barman_control_plane.replace_policy', side_effect=RuntimeError('stop before writes')):
+            with self.assertRaises(RuntimeError):
+                tls_boundary(lambda *a, **k: b'{}', None, None, plan)
+        args, kwargs = predicate.call_args
+        self.assertEqual('barman-sidecar', args[0])
+        self.assertEqual(renderer.recipe(renderer.CANDIDATE_RECIPE), args[1])
+        self.assertEqual(renderer.CANDIDATE_RECIPE, kwargs['recipe_path'])
 
     def test_exact_approved_cache_scope_and_tls(self):
         p = self.plan()

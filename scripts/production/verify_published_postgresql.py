@@ -10,7 +10,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from build_postgresql_candidates import (COMPONENTS, RECIPE, local_endpoint,
+from build_postgresql_candidates import (COMPONENTS, CANDIDATE_RECIPE, local_endpoint,
                                         native_entrypoint, provenance, recipe,
                                         validate_inventory)
 from build_patched_platform import published_image
@@ -27,7 +27,7 @@ def candidate():
     pins()  # Upstream catalog and blocked promotion remain independent authority.
     selected = load(PIN)['published_security_candidate']
     publication = selected['publication']
-    if (selected['recipe_sha256'] != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
+    if (selected['recipe_sha256'] != hashlib.sha256(CANDIDATE_RECIPE.read_bytes()).hexdigest()
             or not re.fullmatch(r'[a-f0-9]{64}', selected['publication_sha256'])
             or publication['schema_version'] != 1
             or not re.fullmatch(r'[a-f0-9]{40}', publication['repository_revision'])
@@ -73,7 +73,7 @@ def verify(directory, output):
         folder.mkdir(mode=0o700, parents=True)
         config = publication['image_config_digests'][component]
         scan_inventory(folder, image, 'registry')
-        validate_inventory(folder, component, image, datetime.now(timezone.utc), config)
+        validate_inventory(folder, component, image, datetime.now(timezone.utc), config, recipe_path=CANDIDATE_RECIPE)
         if published_image(repository(component), load(folder / 'syft.json')['source'], config) != image:
             raise ValueError('exact reviewed registry manifest/config required')
         scan_evidence[component] = {name: hashlib.sha256((folder / name).read_bytes()).hexdigest()
@@ -85,12 +85,12 @@ def verify(directory, output):
     cosign(['initialize', '--mirror', SIGSTORE_TUF_MIRROR], cache)
     flags = ['--certificate-identity', EXPECTED_CERTIFICATE_IDENTITY,
              '--certificate-oidc-issuer', EXPECTED_OIDC_ISSUER]
-    source = recipe()
+    source = recipe(CANDIDATE_RECIPE)
     for component, image in publication['images'].items():
         print('POSTGRESQL_ACCEPTANCE_STEP=' + component + '-signature', flush=True)
         cosign(['verify', *flags, image], cache)
         expected = source_predicate(component, source, publication['repository_revision'],
-                                    publication['invocation_id'])
+                                    publication['invocation_id'], recipe_path=CANDIDATE_RECIPE)
         for kind, uri, predicate in (
                 ('slsaprovenance1', 'https://slsa.dev/provenance/v1', expected),
                 ('cyclonedx', 'https://cyclonedx.org/bom',
@@ -122,7 +122,7 @@ def verify(directory, output):
                 or not re.fullmatch(r'sha256:[a-f0-9]{64}', inspected['Id'])):
             raise ValueError('exact pulled digest, platform and non-root entrypoint required')
         engines[component] = inspected['Id']
-        native_entrypoint(component, engines[component], endpoint)
+        native_entrypoint(component, engines[component], endpoint, recipe_path=CANDIDATE_RECIPE)
     exercise_candidate(engines['postgresql'], docker_host=endpoint)
     result = {'schema_version': 1, 'observed_at': datetime.now(timezone.utc).isoformat(),
         'scope': 'published signatures/provenance/SBOM and network-isolated native smoke only',

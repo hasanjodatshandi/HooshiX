@@ -1100,8 +1100,8 @@ digestها پیش از استفاده الزامی است؛
 مرجع: [انتشار امنیتی Brotli 1.2.1](https://github.com/google/brotli/releases/tag/v1.2.1)،
 [بسته و secfix رسمی Alpine 3.24](https://github.com/alpinelinux/aports/blob/3.24-stable/main/brotli/APKBUILD).
 
-اجرای محافظت‌شدهٔ `40333333697`، attempt `1` روی
-`main@c16176096b526897a5734ec1e3378cf8ccc3d9d5` انتشار هر چهار تصویر را با
+اجرای محافظت‌شدهٔ `41044389252`، attempt `2` روی
+`main@f6d21e76cdfbfdb5ce5a7359e8f700bda0287dbb` انتشار هر چهار تصویر را با
 `publication: Passed` و `signature_provenance: Passed` تکمیل کرده است. visibility
 واقعی هر چهار package، `public` است و در همان استثنای محدود مصوب قرار دارد.
 این نتیجه فقط انتشار مجموعه را ثابت می‌کند؛ نصب مقصد، admission، staging و
@@ -1115,7 +1115,7 @@ artifact همان اجرا را بیرون Git دانلود کنید و روی �
 Unix و ابزارهای integrity-pinned اجرا کنید؛ این فرمان VPS را متصل نمی‌کند:
 
 ```bash
-gh run download 40333333697 --name postgresql-publication-40333333697-1 --dir /path/outside-repo/postgresql-publication
+gh run download 41044389252 --name postgresql-publication-41044389252-2 --dir /path/outside-repo/postgresql-publication
 bash scripts/production/install_release_tools.sh /path/outside-repo/release-tools
 PATH=/path/outside-repo/release-tools:$PATH python3 scripts/production/verify_published_postgresql.py \
   --evidence-dir /path/outside-repo/postgresql-publication \

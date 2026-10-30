@@ -11,7 +11,7 @@ import yaml
 
 import render_cert_manager_candidate as certificates
 import render_platform_admission as admission
-from build_postgresql_candidates import recipe
+from build_postgresql_candidates import CANDIDATE_RECIPE, recipe
 from publish_postgresql_candidates import source_predicate
 from render_mesh_security_upgrade import provenance_expression
 from verify_published_postgresql import candidate, pins
@@ -103,7 +103,7 @@ def policies(pod, previous):
     p = admission.image_policy(NAMESPACE, [selected['images']['operator']], selected['repository_revision'])
     p['metadata']['name'] = 'hooshix-cnpg-controller-source'
     p['spec'].pop('credentials')
-    expected = source_predicate('operator', recipe(), selected['repository_revision'], selected['invocation_id'])
+    expected = source_predicate('operator', recipe(CANDIDATE_RECIPE), selected['repository_revision'], selected['invocation_id'], recipe_path=CANDIDATE_RECIPE)
     p['spec']['validations'][2] = admission.validation('CNPG source identity rejected', provenance_expression(expected))
     closed = admission.policy('ValidatingPolicy', 'hooshix-platform-data-closed', DATA_NAMESPACE,
         [admission.validation('data plane not commissioned', 'false')])
