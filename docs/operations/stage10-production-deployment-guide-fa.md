@@ -3391,7 +3391,17 @@ OpenBao ساخته می‌شوند؛ API نوشتن KV فراخوانی نمی�
 با منبع موجود برابر و cross-service/write/admin/wrong-SA/namespace/audience
 رد شوند. receipt باید source/plan/recipient/PVC موجود و `existing_state=Preserved`
 را bind کند. این گام اتصال به دیتابیس، RLS، شبکه، ظرفیت، backup یا آمادگی Production
-را تأیید نمی‌کند. **اجرای VPS این گام هنوز Not run است.**
+را تأیید نمی‌کند.
+
+رسید اجرای مالک برای سرور اول در ۲۰۲۶-۱۰-۳۰، تحویل هر ده credential و
+احراز هویت محدود را **Passed** ثبت کرده است. source برابر
+`4fa297df6f3b109d484da7675156dce247a4b418` و plan SHA-256 برابر
+`bcb34f167e446a0358a38b791180e2766d745c894db38a0c85bd8f99095703a6` است.
+رسید `~/.local/share/hooshix-application-postgresql/delivery-49f58f648a9d4cd9b1a8cbd8a9589093.json`
+با SHA-256 `e35c01d995f36fc9b675e8469254990fa754c6a296fa6c7c7e04455340d1d74c`
+به همان plan و تصویر ESO موجود bind شده است. منابع پیشین حفظ و برنامه‌ها و
+دسترسی عمومی بسته‌اند؛ نوشتن KV، تغییر دیتابیس و لغو root انجام نشده است.
+سرور دیگر به اجرای مستقل و رسید خودش نیاز دارد؛ آمادگی Production تأیید نشده است.
 
 منابع رفتار ESO: [Vault provider](https://external-secrets.io/latest/provider/hashicorp-vault/)،
 [ExternalSecret](https://external-secrets.io/latest/api/externalsecret/).

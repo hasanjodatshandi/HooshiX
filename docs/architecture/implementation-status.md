@@ -11,12 +11,16 @@ attempt 2 produced the fixed four-image candidate and its signed provenance. Fre
 acceptance, target adoption and recovery/Production readiness require independent
 evidence; selecting these digests does not change the deployed workloads.
 
-Application PostgreSQL credential projection tooling is prepared: ten namespace-local
+Application PostgreSQL credential projection on the first target is Passed: ten namespace-local
 configtree projections reuse the existing PostgreSQL KV-v2 values through ten exact
 read-only ESO identities in platform-apps. No KV write, credential rotation, database,
 workload or network activation is included. Exact-tree native ESO/authentication,
-source preservation and no-write reentry are mandatory bundle gates; VPS execution
-and application connectivity remain Not run/Not verified until a separate target receipt.
+source preservation and no-write reentry are mandatory bundle gates. Owner receipt
+`delivery-49f58f648a9d4cd9b1a8cbd8a9589093.json` binds source
+`4fa297df6f3b109d484da7675156dce247a4b418` and plan hash
+`bcb34f167e446a0358a38b791180e2766d745c894db38a0c85bd8f99095703a6`;
+existing state remains preserved and application/public ingress CLOSED. Database
+connectivity and production readiness remain Not verified.
 
 Current closed Kafka quota target evidence, validated 2026-10-30: the independently checked
 owner-local receipt `receipt-3e05f1b1d70c40c8810357cf55db81a8.json` reports
