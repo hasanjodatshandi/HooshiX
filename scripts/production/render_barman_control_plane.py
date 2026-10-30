@@ -9,7 +9,7 @@ import yaml
 
 import render_cnpg_control_plane as cnpg
 import render_platform_admission as admission
-from build_postgresql_candidates import recipe
+from build_postgresql_candidates import CANDIDATE_RECIPE, recipe
 from publish_postgresql_candidates import source_predicate
 from render_mesh_security_upgrade import provenance_expression
 from verify_published_postgresql import candidate, pins
@@ -91,7 +91,7 @@ def policies(pod, previous):
     p['metadata']['name'] = 'hooshix-barman-plugin-source'
     p['spec'].pop('credentials')
     p['spec']['validations'][2] = admission.validation('Barman source identity rejected', provenance_expression(
-        source_predicate('barman-plugin', recipe(), selected['repository_revision'], selected['invocation_id'])))
+        source_predicate('barman-plugin', recipe(CANDIDATE_RECIPE), selected['repository_revision'], selected['invocation_id'], recipe_path=CANDIDATE_RECIPE)))
     rbac = admission.policy('ValidatingPolicy', 'hooshix-barman-rbac-boundary', DATA_NAMESPACE,
         [admission.validation('Barman may mutate only its fixed PostgreSQL delegation',
             'request.userInfo.username != "system:serviceaccount:cnpg-system:plugin-barman-cloud" || '

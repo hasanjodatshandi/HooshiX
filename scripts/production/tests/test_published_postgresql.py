@@ -24,7 +24,7 @@ class PublishedPostgreSQLTest(unittest.TestCase):
         self.engine = 'sha256:' + 'e' * 64
 
     def test_reviewed_set_preserves_upstream_and_promotion_boundaries(self):
-        self.assertEqual('github:40333333697:1', self.publication['invocation_id'])
+        self.assertEqual('github:41044389252:2', self.publication['invocation_id'])
         self.assertEqual(set(target.COMPONENTS), set(self.publication['images']))
         self.assertEqual('Passed', self.publication['publication'])
         self.assertEqual('blocked-until-supply-chain-staging-and-recovery-evidence',
@@ -32,8 +32,8 @@ class PublishedPostgreSQLTest(unittest.TestCase):
         text = json.dumps(self.publication, indent=2) + '\n'
         self.assertEqual(self.selected['publication_sha256'], hashlib.sha256(text.encode()).hexdigest())
         workflow = (target.PIN.parents[3] / '.github/workflows/platform-commissioning.yml').read_text()
-        self.assertIn('gh run download 40333333697 --repo hasanjodatshandi/HooshiX', workflow)
-        self.assertIn('--name postgresql-publication-40333333697-1', workflow)
+        self.assertIn('gh run download 41044389252 --repo hasanjodatshandi/HooshiX', workflow)
+        self.assertIn('--name postgresql-publication-41044389252-2', workflow)
 
     def test_partial_untrusted_or_promoted_catalog_rejected(self):
         def image(p):
@@ -95,7 +95,8 @@ class PublishedPostgreSQLTest(unittest.TestCase):
             for name in ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json', 'scanner-config.json'):
                 (folder / name).write_text(json.dumps({'fresh': component, 'file': name}) + '\n')
             refreshed.append(component)
-        def scan(folder, component, image, now, config):
+        def scan(folder, component, image, now, config, *, recipe_path):
+            self.assertEqual(target.CANDIDATE_RECIPE, recipe_path)
             self.assertIn(component, refreshed)
             self.assertEqual(output / component / 'registry', folder)
             self.assertEqual(self.publication['images'][component], image)
@@ -122,8 +123,8 @@ class PublishedPostgreSQLTest(unittest.TestCase):
                 if argv[1] == 'verify': return ''
                 component = next(key for key, value in self.publication['images'].items() if value == argv[-1])
                 kind = argv[argv.index('--type') + 1]
-                predicate = (target.source_predicate(component, target.recipe(),
-                    self.publication['repository_revision'], self.publication['invocation_id'])
+                predicate = (target.source_predicate(component, target.recipe(target.CANDIDATE_RECIPE),
+                    self.publication['repository_revision'], self.publication['invocation_id'], recipe_path=target.CANDIDATE_RECIPE)
                     if kind == 'slsaprovenance1' else read(Path('cyclonedx.json')))
                 if reject == 'predicate': predicate = {'wrong': True}
                 statement = {'_type': 'https://in-toto.io/Statement/v0.1',
@@ -149,7 +150,8 @@ class PublishedPostgreSQLTest(unittest.TestCase):
             if reject == 'platform': inspected['Architecture'] = 'arm64'
             if reject == 'root': inspected['Config']['User'] = '0:0'
             return json.dumps(inspected)
-        def smoke(component, engine, endpoint):
+        def smoke(component, engine, endpoint, *, recipe_path):
+            self.assertEqual(target.CANDIDATE_RECIPE, recipe_path)
             self.assertEqual(self.engine, engine)  # Config and containerd engine ID are not conflated.
             smokes.append(component)
             if reject == 'smoke': raise RuntimeError('native failure')
