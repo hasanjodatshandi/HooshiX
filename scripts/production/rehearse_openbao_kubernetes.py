@@ -484,6 +484,8 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     from rehearse_postgresql_secrets import rehearse as postgresql_secrets
                     pg_secret_result = postgresql_secrets(k, wait, eso_chart, str(tools / 'helm'),
                         api, token, cert.read_text(), audiences, addresses)
+                    from rehearse_application_postgresql_delivery import rehearse as app_pg
+                    app_pg_result = app_pg(k, api, token, cert.read_text(), audiences)
                     if postgresql_quarantine:
                         from rehearse_postgresql_quarantine import rehearse as quarantine
                         pg_quarantine_result = quarantine(k, wait, run, eso_chart, str(tools / 'helm'), addresses, platform)
@@ -608,6 +610,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['scope'] = 'Disposable Calico/Ambient initialized-store Barman control plane'
             result['barman_control_plane'] = barman_result
             result['postgresql_secret_delivery'] = pg_secret_result
+            result['application_postgresql_delivery'] = app_pg_result
             result['redis_secret_delivery'] = redis_secret_result
             result['redis_tls_delivery'] = redis_tls_result
             if postgresql_quarantine:

@@ -119,7 +119,7 @@ def main(revision, *, commissioner=commission):
         print(json.dumps({'reason': str(error), 'state_preserved': True}), flush=True)
         return 1
     except ValueError as error:
-        code = str(error) if re.fullmatch(r'PG_SECRET_[A-Z0-9_]{1,80}', str(error)) else 'PG_SECRET_BOOTSTRAP_FAILED_STATE_PRESERVED'
+        code = str(error) if re.fullmatch(r'PG_(?:SECRET|APP)_[A-Z0-9_]{1,80}', str(error)) else 'PG_SECRET_BOOTSTRAP_FAILED_STATE_PRESERVED'
         print(json.dumps({'reason': code, 'state_preserved': True}), flush=True)
         return 1
     except (OSError, KeyError, TypeError, subprocess.SubprocessError):

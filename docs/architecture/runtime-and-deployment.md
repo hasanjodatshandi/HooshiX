@@ -77,6 +77,15 @@ by `render_postgresql_quarantine.py`, not application SQL or business data.
 Complete data commissioning and provider recovery gates still precede production
 data/traffic. Credential delivery alone grants no database or off-host backup readiness.
 
+Application containers consume namespace-local Opaque configtree projections of the same
+PostgreSQL KV-v2 credentials, through `application_postgresql_delivery.py` and the
+supervised projection-only installer. Ten new exact-leaf, namespace/audience-bound
+read-only identities use the existing `platform-apps/hooshix-eso` cache; that controller
+receives TokenRequest for only those ten accounts, not Secret API access to platform-data.
+The original basic-auth deliveries, credentials, six application roles, images and network
+boundaries remain unchanged. No database, migration, application workload or traffic is
+activated. Native exact-tree authentication/projection and target receipt are separate gates.
+
 The same data-namespace ESO also delivers the five independent Redis ACL credentials
 and the private hash-only server ACL under ADR-0011. Its existing namespace-wide
 Secret trust boundary is unchanged; six exact additional TokenRequest identities

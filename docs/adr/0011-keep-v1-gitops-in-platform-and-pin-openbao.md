@@ -277,3 +277,18 @@ Changing the image requires a separately reviewed import anchor and native tests
 ## Rollback Considerations
 
 GitOps changes use reviewed Git revert when the resulting application/database state remains backward compatible. OpenBao rollback/recovery follows tested snapshot/restore and secret-rotation procedures; unsafe loss of newer secret/key state is not accepted merely to restore an older binary/configuration.
+
+### Application PostgreSQL credential projection
+
+The existing ten KV-v2 PostgreSQL runtime/migration credentials may be projected by
+namespace-scoped ESO into `platform-apps` as separate Opaque configtree Secrets.
+Each new `eso-app-pg-<secret-name>` account has one exact existing KV leaf, a
+namespace/audience-bound five-minute role, TokenReview only, and no default policy.
+Only the existing application ESO controller receives TokenRequest for these ten
+exact names. Existing data-namespace deliveries and six application identities
+remain unchanged; no KV writes, credential generation/rotation, database/migration,
+workload, network permission, image or public traffic activation is part of this step.
+Whole-set ownership/source preflight, scoped auth negatives, unchanged source
+readback and no-write reentry in real signed ESO/OpenBao staging are required.
+Migration credentials remain absent from runtime container mounts. Native evidence
+is not target execution; target execution remains separately supervised and receipted.

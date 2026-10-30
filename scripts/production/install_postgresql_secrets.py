@@ -60,11 +60,11 @@ def credentials(api, root, *, delivery=contract):
     return values
 
 
-def verify_auth(api, root, token_request, audiences):
-    accounts = list(contract.ENTRIES)
+def verify_auth(api, root, token_request, audiences, *, delivery=contract, read_only_values=False):
+    accounts = list(delivery.ENTRIES)
     for index, name in enumerate(accounts):
-        item = contract.entry(name)
-        jwt = token_request(contract.NAMESPACE, item['account'], [*audiences, auth.AUDIENCE])
+        item = delivery.entry(name)
+        jwt = token_request(delivery.NAMESPACE, item['account'], [*audiences, auth.AUDIENCE])
         login = 'auth/' + auth.MOUNT + '/login'
         session = api.call(login, 'POST', {'role': item['account'], 'jwt': jwt})['auth']
         token = session['client_token']
@@ -75,13 +75,17 @@ def verify_auth(api, root, token_request, audiences):
             api.call(path, token=token)
             for other in accounts:
                 if other != name:
-                    api.call('hooshix/data/' + contract.entry(other)['key'], token=token, expected=403)
-            api.call(path, 'POST', {'data': {'value': 'denied'}}, token, 403)
+                    api.call('hooshix/data/' + delivery.entry(other)['key'], token=token, expected=403)
+            if read_only_values:
+                capabilities = api.call('sys/capabilities', 'POST', {'token': token, 'paths': [path]}, root)['data']
+                require(capabilities.get(path) == ['read'], 'PG_SECRET_READ_ONLY_CAPABILITY_REQUIRED')
+            else:
+                api.call(path, 'POST', {'data': {'value': 'denied'}}, token, 403)
             api.call('sys/mounts', token=token, expected=403)
             api.call('hooshix/data/production/identity-service/commissioning-probe', token=token, expected=403)
-            api.call(login, 'POST', {'role': contract.entry(accounts[(index + 1) % 10])['account'],
+            api.call(login, 'POST', {'role': delivery.entry(accounts[(index + 1) % 10])['account'],
                                      'jwt': jwt}, expected=403)
-            for namespace, account, requested in [(contract.NAMESPACE, item['account'], audiences),
+            for namespace, account, requested in [(delivery.NAMESPACE, item['account'], audiences),
                 ('default', 'default', [*audiences, auth.AUDIENCE])]:
                 wrong = token_request(namespace, account, requested)
                 api.call(login, 'POST', {'role': item['account'], 'jwt': wrong}, expected=403)
