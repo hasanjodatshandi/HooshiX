@@ -55,8 +55,9 @@ def tls_boundary(k, wait, adapter, plan):
     source['spec'].pop('credentials')
     source['metadata']['name'] = name
     source['spec']['validations'][2] = admission.validation('Barman source identity rejected', renderer.provenance_expression(
-        renderer.source_predicate('barman-sidecar', renderer.recipe(),
-            renderer.candidate()['publication']['repository_revision'], renderer.candidate()['publication']['invocation_id'])))
+        renderer.source_predicate('barman-sidecar', renderer.recipe(renderer.CANDIDATE_RECIPE),
+            renderer.candidate()['publication']['repository_revision'], renderer.candidate()['publication']['invocation_id'],
+            recipe_path=renderer.CANDIDATE_RECIPE)))
     sources = admission.split_image_policy(source)
     boundary = copy.deepcopy(plan['boundary'])
     boundary['spec']['validations'][0] = admission.hardening(ns, {**{
