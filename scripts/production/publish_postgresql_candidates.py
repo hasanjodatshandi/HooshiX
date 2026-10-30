@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from build_patched_platform import published_image
-from build_postgresql_candidates import (COMPONENTS, RECIPE, build, dockerfile,
+from build_postgresql_candidates import (COMPONENTS, RECIPE, CANDIDATE_RECIPE, build, dockerfile,
                                         local_endpoint, pins, provenance, recipe,
                                         source_key, validate_inventory)
 from publish_openbao_candidate import context, run, verify_payload
@@ -49,7 +49,7 @@ def package_visibility(component, *, allow_missing=False):
     return visibility
 
 
-def source_predicate(component, selected, revision, invocation):
+def source_predicate(component, selected, revision, invocation, recipe_path=RECIPE):
     source = selected['sources'][source_key(component)]
     runtime = (selected['postgresql_runtime'] if component == 'postgresql' else
                selected['sidecar_runtime'] if component == 'barman-sidecar' else
@@ -68,8 +68,8 @@ def source_predicate(component, selected, revision, invocation):
     return {'buildDefinition': {'buildType': BUILD_TYPE,
         'externalParameters': {'component': component, 'operation': provenance(component),
             'source': source, 'recipe': selected,
-            'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
-            'dockerfile_sha256': hashlib.sha256(dockerfile(component, selected).encode()).hexdigest(),
+            'recipe_sha256': hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
+            'dockerfile_sha256': hashlib.sha256(dockerfile(component, selected, recipe_path).encode()).hexdigest(),
             'runtime_base': runtime, 'platform': 'linux/amd64', 'repository_revision': revision},
         'internalParameters': {}, 'resolvedDependencies': dependencies},
         'runDetails': {'builder': {'id': EXPECTED_CERTIFICATE_IDENTITY},
@@ -106,13 +106,13 @@ def publish(directory, env):
         raise ValueError('exact protected PostgreSQL dispatch required')
     endpoint = local_endpoint()
     directory.mkdir(mode=0o700)  # Never reuse a stale publication/partial attempt.
-    selected = recipe()
+    selected = recipe(CANDIDATE_RECIPE)
     for component in COMPONENTS:
         package_visibility(component, allow_missing=True)
     built = {}
     for component in COMPONENTS:
         print('POSTGRESQL_PUBLICATION_STEP=' + component + '-build', flush=True)
-        built[component] = build(component, directory / component, docker_host=endpoint)
+        built[component] = build(component, directory / component, docker_host=endpoint, recipe_path=CANDIDATE_RECIPE)
     targets, receipts, visibilities = {}, {}, {}
     for component, receipt in built.items():
         print('POSTGRESQL_PUBLICATION_STEP=' + component + '-push-scan', flush=True)
@@ -134,14 +134,14 @@ def publish(directory, env):
                            receipt['image_config_digest']) != image:
             raise ValueError('immutable registry manifest changed')
         receipts[component] = validate_inventory(folder, component, image, datetime.now(timezone.utc),
-                                                 receipt['image_config_digest'])
+                                                 receipt['image_config_digest'], recipe_path=CANDIDATE_RECIPE)
         targets[component] = image
         (folder / 'receipt.json').write_text(json.dumps(receipts[component], indent=2) + '\n')
     # All final registry digests pass before ANY component is signed.
     for component, image in targets.items():
         print('POSTGRESQL_PUBLICATION_STEP=' + component + '-sign-verify', flush=True)
         sign_and_verify(directory / component / 'registry', image,
-                        source_predicate(component, selected, revision, invocation))
+                        source_predicate(component, selected, revision, invocation, CANDIDATE_RECIPE))
     for component in COMPONENTS:
         visibilities[component] = package_visibility(component)
     result = {'schema_version': 1, 'repository_revision': revision, 'invocation_id': invocation,

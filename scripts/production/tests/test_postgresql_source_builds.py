@@ -1,5 +1,7 @@
 """Fixed-source candidates retain every executable and the final vulnerability gate."""
 import copy
+import io
+from contextlib import redirect_stdout
 import hashlib
 import json
 import subprocess
@@ -55,6 +57,62 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
                 self.selected if p == target.RECIPE else evidence[p.name]):
             # pins have their own loader; no simulated mutation of reviewed catalog.
             return target.validate_local(Path('evidence'), component, self.image, self.now)
+
+    def test_fixed_python_recipe_preserves_original_signed_inputs(self):
+        self.assertEqual('84494b7f034e89f47a5f0a88aaf0d053cd7c587e98010923b389781b8f61c612',
+                         hashlib.sha256(target.RECIPE.read_bytes()).hexdigest())
+        selected = target.recipe(target.CANDIDATE_RECIPE)
+        self.assertEqual('3.14.10', selected['python_version'])
+        self.assertEqual('3.24.3', selected['sidecar_alpine_version'])
+        self.assertEqual('3.24.2', selected['alpine_version'])
+        changed = {key for key in set(selected) | set(self.selected)
+                   if selected.get(key) != self.selected.get(key)}
+        self.assertEqual({'python_version', 'sidecar_runtime', 'sidecar_alpine_version'}, changed)
+        with self.assertRaises(ValueError):
+            target.recipe(Path('/arbitrary-recipe.json'))
+        with self.assertRaises(ValueError):
+            target.dockerfile('barman-sidecar', selected)
+        dockerfile = target.dockerfile('barman-sidecar', selected, target.CANDIDATE_RECIPE)
+        self.assertIn(selected['sidecar_runtime'], dockerfile)
+        self.assertIn(hashlib.sha256(target.CANDIDATE_RECIPE.read_bytes()).hexdigest(), dockerfile)
+        self.assertIn('update-ca-certificates --fresh', dockerfile)
+
+    def test_public_cli_always_builds_fixed_candidate_without_an_optional_flag(self):
+        with patch.object(sys, 'argv', ['build', '--component', 'barman-sidecar', '--directory', 'public-evidence']), \
+                patch.object(target, 'build', return_value={'scan': 'Passed'}) as build, \
+                redirect_stdout(io.StringIO()):
+            target.main()
+        build.assert_called_once_with('barman-sidecar', Path('public-evidence'), False,
+                                      recipe_path=target.CANDIDATE_RECIPE)
+
+    def test_fixed_candidate_native_smoke_rejects_previous_python(self):
+        with patch.object(target, 'run', return_value='3.14.8'), self.assertRaises(ValueError):
+            target.native_entrypoint('barman-sidecar', self.image, 'unix:///captured.sock',
+                                     recipe_path=target.CANDIDATE_RECIPE)
+        with patch.object(target, 'run', return_value='3.14.10') as native:
+            target.native_entrypoint('barman-sidecar', self.image, 'unix:///captured.sock',
+                                     recipe_path=target.CANDIDATE_RECIPE)
+        self.assertTrue(any('barman-cloud-wal-restore' in ' '.join(c.args[0]) for c in native.call_args_list))
+
+    def test_fixed_candidate_inventory_rejects_missing_old_or_mixed_interpreters(self):
+        self.selected = target.recipe(target.CANDIDATE_RECIPE)
+        original = self.evidence('barman-sidecar')
+        original['syft.json']['source']['metadata']['labels']['io.hooshix.recipe.sha256'] = (
+            hashlib.sha256(target.CANDIDATE_RECIPE.read_bytes()).hexdigest())
+        original['syft.json']['distro']['versionID'] = '3.24.3'
+        for versions in (['3.14.10'], [], ['3.14.8'], ['3.14.10', '3.14.8']):
+            evidence = copy.deepcopy(original)
+            evidence['syft.json']['artifacts'] += [{'name': 'python', 'version': v, 'type': 'binary'}
+                                                   for v in versions]
+            with patch.object(target, 'load', side_effect=lambda path:
+                self.selected if path == target.CANDIDATE_RECIPE else evidence[path.name]):
+                if versions == ['3.14.10']:
+                    target.validate_local(Path('evidence'), 'barman-sidecar', self.image, self.now,
+                                          recipe_path=target.CANDIDATE_RECIPE)
+                else:
+                    with self.assertRaises(ValueError):
+                        target.validate_local(Path('evidence'), 'barman-sidecar', self.image, self.now,
+                                              recipe_path=target.CANDIDATE_RECIPE)
 
     def test_all_candidates_remain_blocked_after_clean_scan(self):
         for component in target.COMPONENTS:

@@ -18,6 +18,7 @@ from verify_postgresql_artifacts import (BLOCKED, pins, require_unsuppressed_sca
                                          require_complete_inventory, scan_inventory)
 
 RECIPE = ROOT / 'infrastructure/production/data/postgresql-source-builds.json'
+CANDIDATE_RECIPE = ROOT / 'infrastructure/production/data/postgresql-python-security-sources.json'
 COMPONENTS = ('operator', 'postgresql', 'barman-plugin', 'barman-sidecar')
 BINARIES = {'operator': {'amd64': '/operator/manager_amd64', 'arm64': '/operator/manager_arm64'},
             'barman-plugin': {'amd64': '/manager'}, 'barman-sidecar': {'amd64': '/manager'}}
@@ -118,8 +119,17 @@ def provenance(component):
     return 'patched-upstream-runtime-build' if component == 'postgresql' else 'patched-upstream-source-build'
 
 
-def recipe():
-    selected, catalog = load(RECIPE), pins()['components']
+def recipe(recipe_path=RECIPE):
+    if recipe_path not in (RECIPE, CANDIDATE_RECIPE):
+        raise ValueError('reviewed PostgreSQL recipe required')
+    selected, catalog = load(recipe_path), pins()['components']
+    runtime, python = (('docker.io/library/python@sha256:'
+        'eb2c62658b8d51bff0acc408504b76521d02030de56a8a3c1e830083e89b89d2', '3.14.10')
+        if recipe_path == CANDIDATE_RECIPE else ('docker.io/library/python@sha256:'
+        '7f2ec713f0436c59df2362d973b6a05af9e87ba78f0e94f5245c302984a7a1fd', '3.14.8'))
+    if selected.get('sidecar_alpine_version', selected['alpine_version']) != (
+            '3.24.3' if recipe_path == CANDIDATE_RECIPE else '3.24.2'):
+        raise ValueError('exact sidecar Alpine patch required')
     expected = {'operator': ('cloudnative-pg/cloudnative-pg', catalog['operator']['source_revision']),
                 'barman': ('cloudnative-pg/plugin-barman-cloud', catalog['barman-plugin']['upstream_tag_revision']),
                 'postgresql': ('docker-library/postgres', 'e00e1bd34ec5c8a8e7ad89b273b3d42efaf6d5bc')}
@@ -131,9 +141,8 @@ def recipe():
                'e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3'
             or selected['postgresql_runtime'] != 'docker.io/library/postgres@sha256:'
                'd8703cd7fba306b9fec9268ecedfa8a966846c053036a60e3635791957eb2f66'
-            or selected['sidecar_runtime'] != 'docker.io/library/python@sha256:'
-               '7f2ec713f0436c59df2362d973b6a05af9e87ba78f0e94f5245c302984a7a1fd'
-            or selected['python_version'] != '3.14.8' or selected['barman_version'] != '3.20.1'
+            or selected['sidecar_runtime'] != runtime
+            or selected['python_version'] != python or selected['barman_version'] != '3.20.1'
             or selected['alpine_version'] != '3.24.2'
             or selected['runtime_packages'] != RUNTIME_PACKAGES
             or selected['sidecar_packages'] != SIDECAR_PACKAGES
@@ -150,9 +159,11 @@ def recipe():
     return selected
 
 
-def dockerfile(component, selected):
+def dockerfile(component, selected, recipe_path=RECIPE):
     if component not in COMPONENTS:
         raise ValueError('known fixed-source component required')
+    if selected != recipe(recipe_path):
+        raise ValueError('exact recipe and Dockerfile binding required')
     source = selected['sources'][source_key(component)]
     runtime_packages = ' '.join(name + '=' + version for name, version in
         (selected['runtime_packages'] | {'brotli-libs': BROTLI_VERSION} |
@@ -165,7 +176,7 @@ def dockerfile(component, selected):
         lines += ['LABEL org.opencontainers.image.source="https://github.com/hasanjodatshandi/HooshiX"',
                   f'LABEL io.hooshix.provenance.kind="{provenance(component)}"',
                   f'LABEL io.hooshix.source.revision="{source["revision"]}"',
-                  f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(RECIPE.read_bytes()).hexdigest()}"']
+                  f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(recipe_path.read_bytes()).hexdigest()}"']
         return '\n'.join(lines) + '\n'
     modules = ' '.join(name + '@' + version for name, version in selected['modules'].items())
     lines = [f"FROM {selected['builder']} AS build", 'WORKDIR /src',
@@ -216,11 +227,11 @@ def dockerfile(component, selected):
         'LABEL org.opencontainers.image.source="https://github.com/hasanjodatshandi/HooshiX"',
         'LABEL io.hooshix.provenance.kind="patched-upstream-source-build"',
         f'LABEL io.hooshix.source.revision="{source["revision"]}"',
-        f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(RECIPE.read_bytes()).hexdigest()}"']
+        f'LABEL io.hooshix.recipe.sha256="{hashlib.sha256(recipe_path.read_bytes()).hexdigest()}"']
     return '\n'.join(lines) + '\n'
 
 
-def validate_inventory(directory, component, image_id, now, expected_config_digest=None):
+def validate_inventory(directory, component, image_id, now, expected_config_digest=None, *, recipe_path=RECIPE):
     if component not in COMPONENTS:
         raise ValueError('known component required')
     if expected_config_digest is None:
@@ -230,7 +241,7 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
                      and re.fullmatch(r'sha256:[a-f0-9]{64}', expected_config_digest))
     if not immutable:
         raise ValueError('known component and immutable identity required')
-    selected = recipe()
+    selected = recipe(recipe_path)
     source = selected['sources'][source_key(component)]
     syft, cdx, report, db = (load(directory / name) for name in
         ('syft.json', 'cyclonedx.json', 'grype.json', 'database.json'))
@@ -241,7 +252,7 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
             or metadata['os'] != 'linux' or metadata['architecture'] != 'amd64'
             or metadata['labels'].get('io.hooshix.provenance.kind') != provenance(component)
             or metadata['labels'].get('io.hooshix.source.revision') != source['revision']
-            or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(RECIPE.read_bytes()).hexdigest()
+            or metadata['labels'].get('io.hooshix.recipe.sha256') != hashlib.sha256(recipe_path.read_bytes()).hexdigest()
             or metadata['labels'].get('org.opencontainers.image.source') != 'https://github.com/hasanjodatshandi/HooshiX'
             or expected_config_digest is not None and metadata['imageID'] != expected_config_digest
             or report['source']['target']['imageID'] != metadata['imageID']
@@ -262,7 +273,8 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
             {'libcurl': LIBCURL_VERSION} if component == 'postgresql' else selected['sidecar_packages'])
         packages = [item for item in syft['artifacts'] if item.get('type') == 'apk'
                     and item['name'] in expected_packages]
-        if (syft['distro'].get('id') != 'alpine' or syft['distro'].get('versionID') != selected['alpine_version']
+        if (syft['distro'].get('id') != 'alpine' or syft['distro'].get('versionID') != (selected.get('sidecar_alpine_version', selected['alpine_version'])
+                    if component == 'barman-sidecar' else selected['alpine_version'])
                 or {item['name'] for item in packages} != set(expected_packages)
                 or any(item['version'] != expected_packages[item['name']] for item in packages)):
             raise ValueError('exact fixed Alpine runtime inventory required')
@@ -271,6 +283,10 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
         if not application or any(item['version'] != version for item in application):
             raise ValueError('exact complete operand/Barman inventory required')
         if component == 'barman-sidecar':
+            if recipe_path == CANDIDATE_RECIPE:
+                interpreters = [a for a in syft['artifacts'] if a['name'] == 'python']
+                if not interpreters or any(a['version'] != selected['python_version'] for a in interpreters):
+                    raise ValueError('complete fixed Python binary inventory required')
             certifi = [item for item in syft['artifacts'] if item['name'].lower() == 'certifi']
             if not certifi or any(item['version'] != CERTIFI_VERSION for item in certifi):
                 raise ValueError('every catalogued certifi package must be fixed')
@@ -285,13 +301,13 @@ def validate_inventory(directory, component, image_id, now, expected_config_dige
         'image_config_digest': metadata['imageID'],
         ('local_engine_digest' if expected_config_digest is None else 'registry_image'): image_id,
         'provenance_kind': provenance(component),
-        'recipe_sha256': hashlib.sha256(RECIPE.read_bytes()).hexdigest(),
+        'recipe_sha256': hashlib.sha256(recipe_path.read_bytes()).hexdigest(),
         'staging': 'Not verified', 'signature_provenance': 'Not verified',
         'deployment': 'Not verified', 'production_promotion': 'Not verified'}
 
 
-def validate_local(directory, component, image_id, now):
-    return validate_inventory(directory, component, image_id, now)
+def validate_local(directory, component, image_id, now, *, recipe_path=RECIPE):
+    return validate_inventory(directory, component, image_id, now, recipe_path=recipe_path)
 
 
 def local_endpoint():
@@ -301,7 +317,7 @@ def local_endpoint():
     return endpoint
 
 
-def native_entrypoint(component, image_id, endpoint):
+def native_entrypoint(component, image_id, endpoint, *, recipe_path=RECIPE):
     """Restricted smoke for the same immutable bytes built or pulled by the caller."""
     if (component not in COMPONENTS or not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id)
             or not endpoint.startswith('unix://')):
@@ -313,7 +329,7 @@ def native_entrypoint(component, image_id, endpoint):
     if component == 'barman-sidecar':
         version = run(runtime + ['--entrypoint', 'python3', image_id, '-c',
                                  'import platform; print(platform.python_version())'], timeout=30).strip()
-        if version != recipe()['python_version']:
+        if version != recipe(recipe_path)['python_version']:
             raise ValueError('exact fixed Python interpreter required')
         run(runtime + ['--entrypoint', '/venv/bin/pip', image_id, 'check'], timeout=30)
         run(runtime + ['--entrypoint', '/venv/bin/python', image_id, '-c', trust_material_check()], timeout=30)
@@ -322,10 +338,10 @@ def native_entrypoint(component, image_id, endpoint):
             run(runtime + ['--entrypoint', '/venv/bin/' + command, image_id, '--help'], timeout=30)
 
 
-def build(component, directory, export_image=False, *, docker_host=None):
+def build(component, directory, export_image=False, *, docker_host=None, recipe_path=RECIPE):
     if component not in COMPONENTS:
         raise ValueError('known component required')
-    selected = recipe()
+    selected = recipe(recipe_path)
     endpoint = local_endpoint() if docker_host is None else docker_host
     if not endpoint.startswith('unix://'):
         raise ValueError('captured local Unix-socket Docker required')
@@ -337,7 +353,7 @@ def build(component, directory, export_image=False, *, docker_host=None):
     if len(data) > 128 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != source['archive_sha256']:
         raise ValueError('bounded official source integrity required')
     (directory / 'source.tar.gz').write_bytes(data)
-    (directory / 'Dockerfile').write_text(dockerfile(component, selected))
+    (directory / 'Dockerfile').write_text(dockerfile(component, selected, recipe_path))
     (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n')
     tag = 'hooshix-postgresql-' + component + ':candidate'
     identity = directory / 'image-id.txt'
@@ -352,10 +368,10 @@ def build(component, directory, export_image=False, *, docker_host=None):
     if (config.get('User') != expected_user or config.get('Entrypoint') != entrypoint
             or component in ('postgresql', 'barman-sidecar') and config.get('Cmd') not in (None, [])):
         raise ValueError('non-root identity and native manager entrypoint required')
-    native_entrypoint(component, image_id, endpoint)
+    native_entrypoint(component, image_id, endpoint, recipe_path=recipe_path)
     # Entrypoint smoke is not Kubernetes reconciliation, backup or recovery evidence.
     scan_inventory(directory, image_id, 'docker', docker_host=endpoint)
-    receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc))
+    receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc), recipe_path=recipe_path)
     receipt['native_entrypoint'] = 'Passed'
     if component == 'postgresql':
         from test_postgresql_isolation_native import exercise_candidate
@@ -386,7 +402,8 @@ def main():
     parser.add_argument('--export-image', action='store_true', help='Export only the scanned local image for isolated compatibility tests')
     args = parser.parse_args()
     try:
-        receipt = build(args.component, args.directory, args.export_image)
+        receipt = build(args.component, args.directory, args.export_image,
+                        recipe_path=CANDIDATE_RECIPE)
     except (ValueError, KeyError, TypeError, OSError, RuntimeError, subprocess.SubprocessError):
         parser.exit(1, 'POSTGRESQL_SOURCE_CANDIDATE=Failed; state retained; no publication or installation\n')
     print(json.dumps(receipt, sort_keys=True, indent=2))

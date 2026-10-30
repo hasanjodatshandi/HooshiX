@@ -40,13 +40,14 @@ class PostgreSQLPublicationTest(unittest.TestCase):
             if argv[3] == 'tag': self.assertEqual(self.engine, argv[4])
             return ''
         def build(component, folder, **kwargs):
-            self.assertEqual({'docker_host': 'unix:///captured.sock'}, kwargs)
+            self.assertEqual({'docker_host': 'unix:///captured.sock', 'recipe_path': target.CANDIDATE_RECIPE}, kwargs)
             folder.mkdir()
             return {'image_config_digest': self.config, 'local_engine_digest': self.engine}
         def scan(folder, image, source):
             scans.append(image)
             self.write_resolution(folder / 'syft.json', reject)
-        def validate(folder, component, image, now, config):
+        def validate(folder, component, image, now, config, *, recipe_path):
+            self.assertEqual(target.CANDIDATE_RECIPE, recipe_path)
             if reject == 'scan' and component == 'barman-sidecar': raise ValueError('blocked')
             return {'image_config_digest': config, 'scan': 'Passed'}
         def sign(folder, image, predicate):

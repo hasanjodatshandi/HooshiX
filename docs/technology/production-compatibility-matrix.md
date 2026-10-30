@@ -31,7 +31,7 @@ This matrix records production technology combinations that must remain compatib
 | CloudNativePG | 1.30.1 | Kubernetes 1.35/PostgreSQL 18; one shared instance in single-server, dedicated clusters in HA; rebuilt artifact tests required |
 | PostgreSQL | 18.6 | candidate Alpine 3.24.2 runtime with brotli-libs 1.2.1-r0 and libcurl 8.23.0-r0; fresh publication/adoption and CNPG/locale/restore gates; distinct service DB/roles/Flyway/RLS; shared physical only in single-server; 18.4 fixture is not 18.6 evidence |
 | PostgreSQL JDBC | 42.7.13 | fixed security line; locks must not regress below 42.7.12 |
-| Barman Cloud plugin | 0.15.1 / Barman 3.20.1 | sidecar candidate Python 3.14.8/Alpine 3.24.2; hash-locked certifi 2026.10.19; compromised emSign G3 rejected by Requests, pip-vendored and system trust without removing unaffected roots; selected CNPG WAL/PITR integration; complete artifact and recovery gates required |
+| Barman Cloud plugin | 0.15.1 / Barman 3.20.1 | sidecar security candidate Python 3.14.10/Alpine 3.24.3; hash-locked certifi 2026.10.19; compromised emSign G3 rejected by Requests, pip-vendored and system trust without removing unaffected roots; selected CNPG WAL/PITR integration; complete artifact and recovery gates required |
 | cert-manager | 1.20.3 | compatible with Kubernetes 1.35 |
 | Kafka | 4.2.2 production candidate / Spring Kafka 4.1.0 / LZ4 Java 1.11.4 | single-server combined RF1/minISR1 and HA RF3/minISR2; candidate pins patched Alpine packages and checksum-verified Jackson 2.21.7/LZ4 1.11.4 overlays; client compatibility, native TLS/ACL, protected artifact publication, staging and recovery evidence remain required before deployment |
 | Redis | 8.2.8 | single-server TLS/ACL/noeviction/AOF; HA Sentinel; ADR-0024 common-clock/cardinality/exact-IP semantics |
@@ -125,3 +125,10 @@ An upgrade or initial profile approval is complete only after the affected set p
 - for single-server, simultaneous CPU/memory/IO/network/cardinality/storage evidence with >=30% validated headroom and no security/observability bypass.
 
 A newer release is not automatically preferred. Unsupported/EOL releases are not eligible merely because an old baseline named them.
+
+The Python security candidate uses the immutable recipe
+`infrastructure/production/data/postgresql-python-security-sources.json`.
+The original recipe remains byte-identical for existing signed provenance; current
+published digest selection is separate and is never relabeled as the fixed build.
+Fresh image scans, Python/trust/Barman native smoke, protected publication and
+exact-digest staging/adoption remain required. No VPS upgrade is implied.

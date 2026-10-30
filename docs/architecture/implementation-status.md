@@ -2,6 +2,16 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+The selected Barman source-security candidate uses Python 3.14.10 on immutable
+Alpine 3.24.3; PostgreSQL's Alpine 3.24.2 runtime and the four-component product
+versions stay unchanged. The original signed recipe is retained byte-identically;
+new recipe hashes are explicit through build, scans, native smoke and provenance;
+admission adoption is a separate reviewed gate. Source preparation does not replace published/deployed digests
+or prove recovery/Production readiness. Fixed publication and target adoption remain
+Not verified until independently executed receipts exist. The currently published
+sidecar is blocked by the fresh Critical CVE-2026-115557 Python match in protected
+run 41026276884; its original recipe is not a vulnerability waiver.
+
 Current closed Kafka quota target evidence, validated 2026-10-30: the independently checked
 owner-local receipt `receipt-3e05f1b1d70c40c8810357cf55db81a8.json` reports
 `KAFKA_QUOTAS=Passed` for five authenticated users, producer 65,536 B/s and
