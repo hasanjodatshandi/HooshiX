@@ -3276,15 +3276,32 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 لازم نیست. فایل receipt محلی پیش از SCP با دسترسی `0600` ساخته می‌شود. موفقیت فقط
 با `KAFKA_QUOTAS=Passed` و تطبیق plan/source/profile/readback پذیرفته می‌شود.
 TLS/کلیدها، تصویر، topic/ACL، storage، سرویس میزبان، شبکه و دسترسی برنامه/عمومی
-حفظ می‌شوند؛ restart ندارد. وضعیت اجرای مقصد این گام هنوز **Not run** است و
-`capacity` و `production_readiness` همچنان **Not verified** می‌مانند.
+حفظ می‌شوند؛ restart ندارد. وضعیت اجرای سرور اول در رسید زیر ثبت شده است؛
+سرور دیگر به اجرای مستقل نیاز دارد. `capacity` و `production_readiness` همچنان
+**Not verified** می‌مانند.
 
 ### رسید quota سرور اول
 
 رسید موفق این نصب فقط پروفایل کم‌بارِ بستهٔ همین سرور را پوشش می‌دهد؛
 سرور دیگر به اجرای مستقل و رسید خودش نیاز دارد. این رسید شاهد ظرفیت Production نیست.
 
-پس از این گام هنوز quota، ظرفیت/بازیابی، endpoint داخلی قابل‌دسترسی و مجوز شبکهٔ
+رسید اجرای مالک در ۲۰۲۶-۱۰-۳۰ با checkout/source زیر و حالت صریح ESO قبلی
+تطبیق داده شد و `KAFKA_QUOTAS=Passed` را تأیید کرد:
+
+- source: `57273de2fe70c41a9001d96722963c6114360c92`؛
+- plan SHA-256: `13588194333e1125894e8a9dcff232bbac266602cf1a8ceb5e5fb280b074d943`؛
+- قرارداد پنج principal: `48691cc777ef8f0f1cd76617007b91f10a9e5fd540975bb9950d6a00da6e7dec`؛
+- receipt: `~/.local/share/hooshix-kafka-quotas/receipt-3e05f1b1d70c40c8810357cf55db81a8.json`؛
+- receipt SHA-256: `de27962debbc4725dca1d6dfd177e8a3e479d404290d3e2fd2bc4ffcce3ee900`.
+
+هر پنج user quota با ارسال ۶۵۵۳۶ و دریافت ۲۶۲۱۴۴ بایت/ثانیه بازخوانی و تأیید شدند.
+`existing_state=Preserved` و `application_ingress=public_access=CLOSED` هستند.
+داده، TLS، topic/ACL، تصویر، مرزها و سرویس‌های میزبان در همین اجرا حفظ شدند؛
+quota جای ارتقای امنیتی ESO، آزمون ظرفیت، recovery یا اجازهٔ ترافیک برنامه را نمی‌گیرد.
+وضعیت `Not run` در رسید fixture ایزوله، مربوط به همان fixture است؛ این بخش
+شاهد جداگانهٔ اعمال پروفایل محدود روی سرور اول است، نه آمادگی Production.
+
+پس از این گام هنوز ظرفیت/بازیابی، endpoint داخلی قابل‌دسترسی و مجوز شبکهٔ
 هر برنامه دروازه‌های مستقل هستند؛ برنامه/اینترنت همچنان `CLOSED` می‌ماند و هیچ
 ترافیک واقعی یا ادعای Production مجاز نیست.
 

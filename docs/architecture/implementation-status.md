@@ -2,6 +2,18 @@
 
 This file is the canonical repository-level status view for architecture, implementation presence, runtime evidence, and production readiness.
 
+Current closed Kafka quota target evidence, validated 2026-10-30: the independently checked
+owner-local receipt `receipt-3e05f1b1d70c40c8810357cf55db81a8.json` reports
+`KAFKA_QUOTAS=Passed` for five authenticated users, producer 65,536 B/s and
+consumer 262,144 B/s each. It binds source
+`57273de2fe70c41a9001d96722963c6114360c92`, plan SHA256
+`13588194333e1125894e8a9dcff232bbac266602cf1a8ceb5e5fb280b074d943` and
+receipt SHA256 `de27962debbc4725dca1d6dfd177e8a3e479d404290d3e2fd2bc4ffcce3ee900`.
+The explicit retained-ESO admission binding was used; existing state is Preserved
+and application/public access remains CLOSED. This proves the limited profile
+readback on this target only, not predecessor image security remediation,
+Production capacity, recovery or traffic readiness.
+
 Current Stage10 target, 2026-10-12: the owner-run ESO receipt
 `hooshix-eso-commissioning-d6ca935be93a41cc915dcdd93267519b.json` binds reviewed
 `main@5fcaca8540875d742e4194ab215054610d872e9b` and plan SHA-256
@@ -1007,7 +1019,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Reproducible production operator tooling | DESIGNED | PARTIAL | Git-owned offline CA package builder, Persian installation/WireGuard lifecycle guides and allow-list read-only host inventory exist. Five inventory negative/privacy tests and local baseline/static checks passed; real-host non-privileged and manually authenticated read-only cluster inventory passed. This is tooling evidence, not approval of root custody, privileged access, deployment, provider delivery, restore or production readiness |
 | CloudNativePG/PostgreSQL | DESIGNED | CNPG/Barman control planes, guarded storage/bound Retain LocalPV, ten credential deliveries and one empty quarantined instance Passed on target | exact owner-local receipts above; application ingress CLOSED; five-service ownership/migrations, provider backup/PITR/restore, complete-stack capacity and production readiness Not verified |
 | Security Redis | DESIGNED | local staging Redis IMPLEMENTED; production candidate/publication, guarded LocalPV, scoped ACL/initial TLS delivery and closed-runtime commissioning tooling IMPLEMENTED; target closed runtime PASSED on 2026-10-20 | owner-run receipt reports `REDIS_RUNTIME=Passed`; existing exact Redis 8.2.8/Alpine 3.24.2 digest is freshly rescanned and signature/source/SBOM verified, never republished; tokenless non-root StatefulSet consumes only the reserved Retain PV and existing ESO TLS/ACL/health material; applications/public ingress remain CLOSED; automatic renewal/reload, application TLS compatibility, monitoring, capacity, backup/restore and Production readiness remain Not verified; product private-only boundary unchanged |
-| Kafka | DESIGNED | protected private 4.2.2 publication, guarded Retain volume, closed target broker and five client TLS identities Passed; target six topics/47 ACLs Passed under the 2026-10-28 receipt recorded in the Stage10 guide; isolated low-load quota profile/rehearsal and supervised closed quota installer IMPLEMENTED; local native five-principal bandwidth/denial and CLI interrupted-ack/reentry proofs Passed | bounded target receipt preserves state and application/public CLOSED boundaries; target quota installation remains Not run; isolated bandwidth profile is not CPU/disk/capacity or recovery evidence; clean rebuild/replay, capacity and production readiness remain Not verified |
+| Kafka | DESIGNED | protected private 4.2.2 publication, guarded Retain volume, closed target broker and five client TLS identities Passed; target six topics/47 ACLs Passed under the 2026-10-28 receipt recorded in the Stage10 guide; isolated low-load quota profile/rehearsal and supervised closed quota installer IMPLEMENTED; local native five-principal bandwidth/denial and CLI interrupted-ack/reentry proofs Passed | bounded target receipt preserves state and application/public CLOSED boundaries; five target low-load user quotas Passed under the 2026-10-30 receipt above; bandwidth limits are not CPU/disk/capacity or recovery evidence; clean rebuild/replay, capacity and production readiness remain Not verified |
 | OpenBao + External Secrets | DESIGNED | OpenBao 2.6.4 initialized/unsealed Shamir 3/2; ESO 2.12.0 installed with six SecretStores Ready under the exact owner-run receipt above | Target installation/TLS/PVC, custody recovery/unseal, operator-local isolated snapshot recovery and reported ESO installation Passed; custody distribution owner-attested; application secret materialization, cloud version/retention/hourly backup, JIT and root revocation Not verified |
 | GitOps/Argo CD | DESIGNED | NOT PRESENT | NOT VERIFIED |
 | Cross-service CI/security/supply-chain release gates | DESIGNED | Stage 10 seven-artifact source merged; protected head and merged-main CI PASSED | Semgrep/OSV/Gitleaks-capable service workflows plus frontend Semgrep/OSV/image/Helm gates are present; Syft/Grype/Cosign exact-digest release automation, two-hour deployed-digest rescanning, and stable Kyverno release-admission generation cover all seven application release components. PR #142 head runs `36155528078`/`36155527676` and merged-main runs `36156349257`/`36156348709` passed; real production release/rescan/admission execution remains NOT VERIFIED |
