@@ -383,6 +383,7 @@ infrastructure/production/data/cert-manager-jose-sources.json
 infrastructure/production/data/cert-manager-sources.json
 infrastructure/production/data/data-policy.json
 infrastructure/production/data/postgresql-images.json
+infrastructure/production/data/postgresql-python-security-sources.json
 infrastructure/production/data/postgresql-source-builds.json
 infrastructure/production/gitops/application.yaml
 infrastructure/production/host/access-policy.json

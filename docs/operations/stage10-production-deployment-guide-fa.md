@@ -872,9 +872,11 @@ backup در sidecar جداست و نباید در تصویر برنامه یا �
 هستند؛ تغییر هم‌زمان نسخه‌ها در profile، data-policy و platform-contracts کنترل
 می‌شود. fixture قدیمی 18.4 فقط آزمون SQL است و شاهد سازگاری 18.6 نیست.
 
-candidateهای نهایی operand و sidecar از پایهٔ Alpine 3.24.2 با نسخه‌های ثابت
-OpenSSL 3.5.9-r0 و zlib 1.3.2-r1 ساخته می‌شوند. operand همان PostgreSQL 18.6
-است؛ sidecar از Python 3.14.8 و Barman 3.20.1 استفاده می‌کند. نسخه و hash تمام
+candidate نهایی operand از Alpine 3.24.2 و sidecar امنیتی از Python 3.14.10
+روی Alpine 3.24.3 ساخته می‌شود؛ پایهٔ رسمی Python با digest ثابت
+`sha256:eb2c62658b8d51bff0acc408504b76521d02030de56a8a3c1e830083e89b89d2`
+pin شده است. OpenSSL 3.5.9-r0، zlib 1.3.2-r1، PostgreSQL 18.6 و Barman 3.20.1
+حفظ می‌شوند. نسخه و hash تمام
 dependencyهای Barman از lock رسمی همان source بررسی می‌شود.
 override محدود `certifi==2026.10.19` با SHA-256 ثابت wheel و sdist فقط همان
 بخش lock رسمی را جایگزین می‌کند؛ باقی نسخه‌ها و `--require-hashes` حفظ می‌شوند.
@@ -882,6 +884,10 @@ override محدود `certifi==2026.10.19` با SHA-256 ثابت wheel و sdist �
 منبع گواهی سیستم حذف می‌شود؛ `update-ca-certificates` bundle و لینک‌های hash
 سیستم را بازسازی می‌کند. bundleهای pip دقیقاً از بستهٔ رسمی اصلاح‌شده کپی
 می‌شوند، نه با دستکاری شمارهٔ نسخه. ریشه‌های سالم G1/C1/C3 باید باقی بمانند.
+اگر پایهٔ جدید ریشهٔ آسیب‌دیده را از قبل حذف کرده باشد، نبودن آن پذیرفته است؛
+وجود فایل تغییر‌یافته یا پیوند به جای گواهی مورد انتظار پذیرفته نمی‌شود.
+ریشه‌های سالم موردنیاز با fingerprint ثابت از بستهٔ certifi به سیستم منتقل
+می‌شوند و مسیر یا محتوای ناسازگار پذیرفته نمی‌شود.
 گیت inventory نبود نسخهٔ آسیب‌پذیر و آزمون native نبود fingerprint خطرناک در
 تمام مسیرهای فوق، botocore و مسیر پیش‌فرض Python/OpenSSL را کنترل می‌کند.
 نسخهٔ Python، `pip check` و چهار فرمان backup/WAL/restore Barman نیز آزموده
@@ -893,7 +899,7 @@ override محدود `certifi==2026.10.19` با SHA-256 ثابت wheel و sdist �
 روی VPS هنوز `Not verified` است. هیچ digestی صرفاً با تغییر پایه مجوز نصب نمی‌گیرد.
 
 ابزار `build_postgresql_candidates.py` سه جزء Go را از source رسمی دارای commit
-و checksum ثابت در `data/postgresql-source-builds.json`، با Go 1.26.9 و x/net
+و checksum ثابت در `data/postgresql-python-security-sources.json`، با Go 1.26.9 و x/net
 0.60.0 می‌سازد. هر دو manager داخل تصویر CNPG، حتی باینری arm64 همراه تصویر
 amd64، جایگزین می‌شوند. plugin استاتیک روی پایهٔ distroless ثابت و با همان UID
 65532 و entrypoint ساخته می‌شود. sidecar و operand حساب معتبر UID/GID 26 و
@@ -902,6 +908,11 @@ entrypoint صریح دارند؛ runtimeهای Python و PostgreSQL به digest 
 جدا ساخته می‌شوند؛ compiler و headerهای build وارد runtime نمی‌شوند.
 operand دارای provenance مجزای `patched-upstream-runtime-build` است، نه ادعای
 ساخت دوبارهٔ باینری PostgreSQL؛ سه جزء Go `patched-upstream-source-build` هستند.
+recipe اصلی `data/postgresql-source-builds.json` برای اعتبارسنجی provenance
+امضاشدهٔ موجود byte-identical می‌ماند؛ با recipe جدید بازنویسی یا دوباره برچسب‌گذاری
+نمی‌شود. ابزار انتشار محافظت‌شده فقط candidate امنیتی جدید را می‌سازد. catalog
+تصاویر منتشرشده صرفاً با رسید انتشار و آزمون مستقل digestها تغییر می‌کند.
+این گام هیچ image یا policy نصب‌شده‌ای را جایگزین نمی‌کند.
 امضا، reconcile و WAL/PITR روی مقصد واقعی و promotion هنوز `Not verified` است.
 
 برای هر ساخت جدید، scanner و smoke باید دوباره اجرا شوند. native fixture
