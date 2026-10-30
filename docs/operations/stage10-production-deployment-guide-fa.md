@@ -3320,6 +3320,82 @@ quota جای ارتقای امنیتی ESO، آزمون ظرفیت، recovery ی
 [Kafka authorization/ACL](https://kafka.apache.org/42/security/authorization-and-acls/)،
 [topic configuration](https://kafka.apache.org/42/configuration/topic-configs/).
 
+### تحویل رمزهای PostgreSQL به namespace برنامه‌ها
+
+رمزهای CNPG در `platform-data` از نوع `kubernetes.io/basic-auth` هستند. برنامه‌ها
+در `platform-apps` به Secret مستقلِ محلی با کلیدهای configtreeِ
+`spring.datasource.username` و `spring.datasource.password` نیاز دارند؛ mount
+مستقیم Secret یک namespace دیگر مجاز نیست. این گام **همان ده credential موجود**
+را از همان مسیر KV-v2 به قالب برنامه تحویل می‌دهد؛ هیچ رمز تازه، کپی تازه در KV،
+Database/Role دیتابیس، migration، workload یا مجوز شبکه ایجاد نمی‌کند.
+
+پیش‌نیاز: OpenBao موجود initialized/unsealed، ده ExternalSecret منبع Ready،
+ESO موجود `platform-apps/hooshix-eso` و CA فعلی. این ابزار OpenBao را init/unseal
+نمی‌کند و هیچ تصویر یا policy موجود را تعویض نمی‌کند. مرز Ambient/STRICT و
+شبکهٔ بسته حفظ می‌شود؛ مشکل پارس‌پک همچنان معوق و تأییدنشده است.
+
+ده هویت جدید `platform-apps/eso-app-pg-<نام-secret>` هرکدام فقط یک credential
+runtime یا migration را می‌خوانند؛ TTL حداکثر پنج دقیقه و بدون default policy.
+نام Secret همان `<service>-db-runtime` یا `<service>-db-migration` است، با همان
+نام‌های `authorization`، `conversation`، `identity`، `notification` و `web-bff`.
+SecretStoreها namespace-local هستند. فقط controller موجود اجازهٔ TokenRequest
+برای همین ده حساب را می‌گیرد؛ حساب‌ها فقط TokenReview دارند و هیچ Secret API
+یا دسترسی عمومی اضافه نمی‌شود. شش نقش قبلی برنامه و نقش‌های `platform-data`
+تغییر نمی‌کنند. رمز migration فقط در initContainer مربوط mount شود، نه container
+runtime؛ این ابزار هنوز هیچ Pod برنامه‌ای ایجاد نمی‌کند.
+
+ابتدا بستهٔ عمومی باید از checkout پاکِ **همان main تأییدشده** و اجرای موفق
+workflow `platform-commissioning.yml` با شاهد `application_postgresql_delivery`
+ساخته شود. ابزار صحت run، برابری tree، شاهد واقعی ESO/authentication و تازگی
+حداکثر پنج‌روزه را می‌سنجد؛ نتیجهٔ unit test جای شاهد native را نمی‌گیرد.
+
+```bash
+python3 scripts/production/build_application_postgresql_bundle.py \
+  --staging-run <PASSED_EXACT_TREE_RUN_ID> \
+  --existing-eso-image <EXACT_INSTALLED_ESO_DIGEST> \
+  --output <NEW_PUBLIC_BUNDLE_DIRECTORY>
+
+python3 scripts/production/bootstrap_application_postgresql_operator.py \
+  --bundle <NEW_PUBLIC_BUNDLE_DIRECTORY> --validate-only
+```
+
+تصویر ESO باید دقیقاً همان digest نصب‌شده باشد؛ builder فقط candidate فعلی یا
+تصویر retainedِ قبلاً ثبت‌شده را می‌پذیرد. mismatch پیش از هر نوشتن رد می‌شود؛
+این انتخاب شاهد رفع آسیب‌پذیری تصویر retained یا مجوز تعویض آن نیست.
+
+فرمان‌های بالا الگوی ساخت هستند؛ مقادیر داخل `<...>` باید از بستهٔ تأییدشدهٔ
+همین نصب جایگزین شوند. تا ساخت بسته، مسیر مقصد قابل‌اجرای آماده‌ای اعلام نمی‌شود.
+سپس با VNC قابل ورود و نشست دوم خصوصی SSH باز، اجرای owner-local از همان checkout:
+
+```bash
+python3 scripts/production/bootstrap_application_postgresql_operator.py \
+  --bundle <VERIFIED_PUBLIC_BUNDLE_DIRECTORY> \
+  --custody <EXISTING_PRIVATE_OPENBAO_CUSTODY_DIRECTORY> \
+  --rescue-and-second-session-ready
+```
+
+فقط رمز **موجود custodyِ OpenBao** و sudo در ورودی مخفی لازم است؛ نه رمز Root/CA،
+نه GHCR و نه فایل plaintext رمز. نتیجهٔ مورد انتظار:
+`APPLICATION_POSTGRESQL_DELIVERY=Passed` و receipt خصوصیِ بدون مقادیر credential در
+`~/.local/share/hooshix-application-postgresql/delivery-<id>.json`.
+
+تمام منابع و credentialها پیش از اولین نوشتن کنترل می‌شوند؛ مورد ناشناس یا
+تغییریافته پذیرفته یا overwrite نمی‌شود. فقط منابع جدید ESO/RBAC و نقش‌های دقیق
+OpenBao ساخته می‌شوند؛ API نوشتن KV فراخوانی نمی‌شود. اجرای مجددِ کامل منابع را
+بازنویسی نمی‌کند؛ اجرای نیمه‌تمام با همان قرارداد فقط پس از بررسی وضعیت قابل
+ادامه است. تغییر هم‌زمان رمز یا منابع توسط اپراتور دیگر در این پنجره مجاز نیست.
+در خطا init/reset/rotate یا حذف Secret نکنید؛ state حفظ می‌شود. هر بازگشت یا حذف
+منابع جدید به تغییر بررسی‌شدهٔ جدا و حفظ credentialهای منبع نیاز دارد.
+
+پس از اجرا، هر ده ExternalSecret و SecretStore باید Ready باشند، مقادیر configtree
+با منبع موجود برابر و cross-service/write/admin/wrong-SA/namespace/audience
+رد شوند. receipt باید source/plan/recipient/PVC موجود و `existing_state=Preserved`
+را bind کند. این گام اتصال به دیتابیس، RLS، شبکه، ظرفیت، backup یا آمادگی Production
+را تأیید نمی‌کند. **اجرای VPS این گام هنوز Not run است.**
+
+منابع رفتار ESO: [Vault provider](https://external-secrets.io/latest/provider/hashicorp-vault/)،
+[ExternalSecret](https://external-secrets.io/latest/api/externalsecret/).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

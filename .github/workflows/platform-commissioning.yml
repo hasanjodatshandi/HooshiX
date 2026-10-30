@@ -8,6 +8,8 @@ on:
       - scripts/production/rehearse_platform_admission.py
       - scripts/production/*postgresql*secrets*.py
       - scripts/production/postgresql_secret_delivery.py
+      - scripts/production/*application_postgresql*.py
+      - scripts/production/tests/test_application_postgresql_delivery.py
       - scripts/production/tests/test_postgresql_secrets.py
       - scripts/production/*redis*secrets*.py
       - scripts/production/redis_secret_delivery.py
