@@ -3320,6 +3320,9 @@ quota جای ارتقای امنیتی ESO، آزمون ظرفیت، recovery ی
 [Kafka authorization/ACL](https://kafka.apache.org/42/security/authorization-and-acls/)،
 [topic configuration](https://kafka.apache.org/42/configuration/topic-configs/).
 
+تحویل namespace-local رمزهای PostgreSQL به برنامه‌ها در حال آماده‌سازی است؛
+تا شاهد native و رسید مستقل مقصد، **Not run** است و هیچ دسترسی برنامه باز نمی‌شود.
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.
