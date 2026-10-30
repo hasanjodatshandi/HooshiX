@@ -40,7 +40,8 @@ def validate_bundle(directory, revision, *, sources=SOURCES):
     return content
 
 
-def main(*, sources=SOURCES, supervisor="bootstrap_postgresql_secrets", application_projection=False):
+def main(*, sources=SOURCES, supervisor="bootstrap_postgresql_secrets", application_projection=False,
+         application_redis=False):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--bundle', type=Path, required=True)
     p.add_argument('--custody', type=Path)
@@ -59,8 +60,12 @@ def main(*, sources=SOURCES, supervisor="bootstrap_postgresql_secrets", applicat
         if application_projection:
             host.require(json.loads(content).get("application_postgresql_delivery") is True,
                          "PG_APP_EXACT_PROJECTION_PLAN_REQUIRED")
+        if application_redis:
+            host.require(json.loads(content).get('application_redis_delivery') is True,
+                         'REDIS_APP_EXACT_PROJECTION_PLAN_REQUIRED')
         if a.validate_only:
-            print(('APPLICATION_POSTGRESQL_BUNDLE_VALIDATION' if application_projection else 'PG_SECRETS_BUNDLE_VALIDATION')
+            print(('APPLICATION_REDIS_BUNDLE_VALIDATION' if application_redis else
+                   'APPLICATION_POSTGRESQL_BUNDLE_VALIDATION' if application_projection else 'PG_SECRETS_BUNDLE_VALIDATION')
                   + '=Passed; no VPS or custody access')
             return 0
         host.require(a.rescue_and_second_session_ready and a.custody is not None
@@ -73,6 +78,8 @@ def main(*, sources=SOURCES, supervisor="bootstrap_postgresql_secrets", applicat
                      'PG_SECRET_RESCUE_REQUIRED')
         if application_projection:
             print('Project ONLY ten existing PostgreSQL credentials into platform-apps via scoped ESO. No password rotation, database, network, workload, CA or root changes.')
+        if application_redis:
+            print('Project ONLY three existing Redis credentials into platform-apps via existing scoped ESO. No password rotation, Redis, network, workload, CA or root changes.')
         password = getpass.getpass('EXISTING OpenBao custody passphrase (not Root/CA/sudo): ')
         host.require(20 <= len(password) <= 128 and not any(c in password for c in '\r\n\x00'),
                      'PG_SECRET_CUSTODY_PASSPHRASE_REJECTED')
@@ -86,30 +93,37 @@ def main(*, sources=SOURCES, supervisor="bootstrap_postgresql_secrets", applicat
             'recipients': recipients, 'plan': base64.b64encode(zlib.compress(content)).decode(),
             'plan_sha256': hashlib.sha256(content).hexdigest()}, supervisor=supervisor)
         del root
-        host.require(result.get('application_postgresql_delivery' if application_projection else 'delivery') == 'Passed' and result.get('credential_count') == 10
+        result_key = 'application_redis_delivery' if application_redis else (
+            'application_postgresql_delivery' if application_projection else 'delivery')
+        host.require(result.get(result_key) == 'Passed' and result.get('credential_count') == (3 if application_redis else 10)
             and result.get('recipient_sha256') == digest and result.get('database') == 'Not run',
             'PG_SECRET_TARGET_RECEIPT_REJECTED')
-        if application_projection:
+        if application_projection or application_redis:
             host.require(result.get('existing_state') == 'Preserved' and result.get('kv_writes') == 'Not run'
                 and result.get('application_ingress') == result.get('public_access') == 'CLOSED',
                 'PG_APP_PRESERVED_RECEIPT_REQUIRED')
-        directory = operator.BASE.parent / ('hooshix-application-postgresql' if application_projection else 'hooshix-postgresql-secrets')
+        directory = operator.BASE.parent / ('hooshix-application-redis' if application_redis else
+            'hooshix-application-postgresql' if application_projection else 'hooshix-postgresql-secrets')
         directory.mkdir(mode=0o700, exist_ok=True)
         operator.custody_directory(directory)
         path = directory / ('delivery-' + uuid.uuid4().hex + '.json')
         operator.create(path, json.dumps(result).encode())
-        if application_projection:
+        if application_redis:
+            print('APPLICATION_REDIS_DELIVERY=Passed; three existing credentials; applications CLOSED; no Redis or KV writes')
+        elif application_projection:
             print('APPLICATION_POSTGRESQL_DELIVERY=Passed; ten existing credentials; applications CLOSED; no database or KV writes')
         else:
             print('POSTGRESQL_SECRET_DELIVERY=Passed; ten distinct basic-auth Secrets; database/provider Not run; root preserved')
         print('PUBLIC_RECEIPT=' + str(path))
         return 0
     except host.custody.BootstrapFailed as error:
-        print(('APPLICATION_POSTGRESQL_DELIVERY' if application_projection else 'POSTGRESQL_SECRET_DELIVERY')
+        print(('APPLICATION_REDIS_DELIVERY' if application_redis else
+               'APPLICATION_POSTGRESQL_DELIVERY' if application_projection else 'POSTGRESQL_SECRET_DELIVERY')
               + '=Failed; reason=' + str(error) + '; state preserved; no automatic retry')
         return 1
     except (OSError, ValueError, KeyError, TypeError, EOFError, subprocess.SubprocessError, getpass.GetPassWarning):
-        print(('APPLICATION_POSTGRESQL_DELIVERY' if application_projection else 'POSTGRESQL_SECRET_DELIVERY')
+        print(('APPLICATION_REDIS_DELIVERY' if application_redis else
+               'APPLICATION_POSTGRESQL_DELIVERY' if application_projection else 'POSTGRESQL_SECRET_DELIVERY')
               + '=Failed; reason=PG_SECRET_LOCAL_FAILED_STATE_PRESERVED')
         return 1
 

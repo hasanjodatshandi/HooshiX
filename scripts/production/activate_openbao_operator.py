@@ -152,7 +152,8 @@ def decrypt(directory, index, password, encrypted):
 def bootstrap(remote, revision, sources, supervisor='activate_openbao_host'):
     host.require(supervisor in ('activate_openbao_host', 'bootstrap_openbao_auth', 'bootstrap_postgresql_secrets',
                                'bootstrap_redis_secrets', 'bootstrap_redis_tls', 'bootstrap_kafka_tls',
-                               'bootstrap_kafka_client_tls', 'bootstrap_application_postgresql_delivery'),
+                               'bootstrap_kafka_client_tls', 'bootstrap_application_postgresql_delivery',
+                               'bootstrap_application_redis_delivery'),
                  'REVIEWED_SUPERVISOR_REQUIRED')
     # Short public command avoids the Windows command-line size failure.
     return f"""import os,stat,hashlib,sys,types
@@ -176,6 +177,7 @@ def rpc(remote, revision, sources, password, body, *, supervisor='activate_openb
                    'bootstrap_kafka_tls': b'PG_SECRET_RPC_READY',
                    'bootstrap_kafka_client_tls': b'PG_SECRET_RPC_READY',
                    'bootstrap_application_postgresql_delivery': b'PG_SECRET_RPC_READY',
+                   'bootstrap_application_redis_delivery': b'PG_SECRET_RPC_READY',
                    'activate_openbao_host': b'ACTIVATION_RPC_READY'}[supervisor]
     argv = [SSH, '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', 'hooshix-server',
             'sudo -k -S -p "" /usr/bin/python3 -I -c ' + shlex.quote(payload)]
@@ -192,7 +194,8 @@ def rpc(remote, revision, sources, password, body, *, supervisor='activate_openb
         output, _ = process.communicate(json.dumps(body).encode() + b'\n',
                                        timeout=610 if supervisor in ('bootstrap_openbao_auth', 'bootstrap_postgresql_secrets',
                                                                     'bootstrap_redis_secrets', 'bootstrap_redis_tls', 'bootstrap_kafka_tls',
-                                                                    'bootstrap_kafka_client_tls', 'bootstrap_application_postgresql_delivery')
+                                                                    'bootstrap_kafka_client_tls', 'bootstrap_application_postgresql_delivery',
+                                                                    'bootstrap_application_redis_delivery')
                                        else 310 if body.get('action') == 'recover' else 190)
         host.require(len(output) <= host.BOUND, 'RPC_OUTPUT_BOUND_EXCEEDED')
         result = json.loads(output)

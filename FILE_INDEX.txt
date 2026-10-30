@@ -538,11 +538,14 @@ scripts/platform/waf_image_smoke.py
 scripts/production/activate_openbao_host.py
 scripts/production/activate_openbao_operator.py
 scripts/production/application_postgresql_delivery.py
+scripts/production/application_redis_delivery.py
 scripts/production/apply_human_sshd_candidate.sh
 scripts/production/backup_openbao_host.py
 scripts/production/backup_openbao_operator.py
 scripts/production/bootstrap_application_postgresql_delivery.py
 scripts/production/bootstrap_application_postgresql_operator.py
+scripts/production/bootstrap_application_redis_delivery.py
+scripts/production/bootstrap_application_redis_operator.py
 scripts/production/bootstrap_intermediate_csr.py
 scripts/production/bootstrap_kafka_client_tls.py
 scripts/production/bootstrap_kafka_client_tls_operator.py
@@ -558,6 +561,7 @@ scripts/production/bootstrap_redis_secrets.py
 scripts/production/bootstrap_redis_secrets_operator.py
 scripts/production/bootstrap_redis_tls.py
 scripts/production/build_application_postgresql_bundle.py
+scripts/production/build_application_redis_bundle.py
 scripts/production/build_barman_control_plane_bundle.py
 scripts/production/build_cert_manager_candidates.py
 scripts/production/build_cert_manager_commissioning_bundle.py
@@ -591,6 +595,7 @@ scripts/production/fixtures/KafkaQuotaProbe.java
 scripts/production/import_intermediate_ca.py
 scripts/production/inspect_host.py
 scripts/production/install_application_postgresql_delivery.py
+scripts/production/install_application_redis_delivery.py
 scripts/production/install_audit_prerequisite.py
 scripts/production/install_barman_control_plane.py
 scripts/production/install_cert_manager.py
@@ -654,6 +659,7 @@ scripts/production/redis_secret_delivery.py
 scripts/production/redis_tls_material.py
 scripts/production/rehearsal_probes.py
 scripts/production/rehearse_application_postgresql_delivery.py
+scripts/production/rehearse_application_redis_delivery.py
 scripts/production/rehearse_barman_control_plane.py
 scripts/production/rehearse_cert_manager.py
 scripts/production/rehearse_cnpg_control_plane.py
@@ -729,6 +735,7 @@ scripts/production/test_kafka_topic_acl_native.py
 scripts/production/test_postgresql_isolation_native.py
 scripts/production/test_redis_security_native.py
 scripts/production/tests/test_application_postgresql_delivery.py
+scripts/production/tests/test_application_redis_delivery.py
 scripts/production/tests/test_barman_control_plane.py
 scripts/production/tests/test_cert_manager_candidates.py
 scripts/production/tests/test_cert_manager_commissioning.py
