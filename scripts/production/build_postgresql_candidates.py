@@ -8,6 +8,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -91,23 +92,50 @@ if requests.certs.where() != certifi.where():
 '''
 
 
-def trust_material_patch():
+def trust_material_patch(*, allow_missing_anchor=False):
     # Pip has two vendored stores; system regeneration must also remove the hashed G3 route.
+    if allow_missing_anchor:
+        anchor_check = f'''if anchor.is_symlink() or (anchor.exists() and (not anchor.is_file() or hashlib.sha256(
+        ssl.PEM_cert_to_DER_cert(anchor.read_text())).hexdigest() != {COMPROMISED_ROOT!r})):
+    raise SystemExit("reviewed compromised system anchor required")'''
+        anchor_remove = 'if anchor.is_file():\n    anchor.unlink()'
+    else:
+        anchor_check = f'''if anchor.is_symlink() or not anchor.is_file() or hashlib.sha256(
+        ssl.PEM_cert_to_DER_cert(anchor.read_text())).hexdigest() != {COMPROMISED_ROOT!r}:
+    raise SystemExit("reviewed compromised system anchor required")'''
+        anchor_remove = 'anchor.unlink()'
     return f'''import certifi, hashlib, shutil, ssl, sys
 from pathlib import Path
 source = Path(certifi.where())
 if certifi.__version__ != {CERTIFI_VERSION!r}:
     raise SystemExit("fixed certifi required")
 anchor = Path('/usr/share/ca-certificates/mozilla/emSign_ECC_Root_CA_-_G3.crt')
-if anchor.is_symlink() or not anchor.is_file() or hashlib.sha256(
-        ssl.PEM_cert_to_DER_cert(anchor.read_text())).hexdigest() != {COMPROMISED_ROOT!r}:
-    raise SystemExit("reviewed compromised system anchor required")
+{anchor_check}
 for prefix in (sys.prefix, sys.base_prefix):
     target = Path(prefix + '/lib/python3.14/site-packages/pip/_vendor/certifi/cacert.pem')
     if target.is_symlink() or not target.is_file():
         raise SystemExit("reviewed pip trust store required")
     shutil.copyfile(source, target)
-anchor.unlink()
+{anchor_remove}
+'''
+
+
+def retain_system_roots():
+    return f'''import certifi, hashlib, re, ssl
+from pathlib import Path
+required = set({RETAINED_ROOTS!r})
+found = {{}}
+for block in re.findall(br'-----BEGIN CERTIFICATE-----[\\s\\S]+?-----END CERTIFICATE-----', Path(certifi.where()).read_bytes()):
+    fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(block.decode('ascii'))).hexdigest()
+    if fingerprint in required:
+        found[fingerprint] = block + b'\\n'
+if set(found) != required:
+    raise SystemExit("reviewed retained roots required")
+for fingerprint, pem in found.items():
+    path = Path('/usr/local/share/ca-certificates/hooshix-retained-' + fingerprint + '.crt')
+    if path.is_symlink() or (path.exists() and (not path.is_file() or path.read_bytes() != pem)):
+        raise SystemExit("reviewed retained root path required")
+    path.write_bytes(pem)
 '''
 
 
@@ -211,7 +239,10 @@ def dockerfile(component, selected, recipe_path=RECIPE):
                   'adduser -D -H -u 26 -G tape -s /sbin/nologin cnpg',
                   'COPY --from=pythonbuild /venv /venv', 'ENV PATH="/venv/bin:$PATH"',
                   'ENV PYTHONDONTWRITEBYTECODE=1',
-                  'RUN /venv/bin/python -c ' + shlex.quote('exec(' + repr(trust_material_patch()) + ')')
+                  'RUN /venv/bin/python -c ' + shlex.quote('exec(' + repr(
+                      trust_material_patch(allow_missing_anchor=recipe_path == CANDIDATE_RECIPE)) + ')')
+                  + (' && /venv/bin/python -c ' + shlex.quote('exec(' + repr(retain_system_roots()) + ')')
+                     if recipe_path == CANDIDATE_RECIPE else '')
                   + ' && update-ca-certificates --fresh && /venv/bin/python -c '
                   + shlex.quote('exec(' + repr(trust_material_check()) + ')'),
                   'USER 26:26', 'ENTRYPOINT ["/manager"]', 'CMD []']
@@ -317,6 +348,21 @@ def local_endpoint():
     return endpoint
 
 
+def build_failure_class(error):
+    # Only fixed categories are emitted; build output may contain registry credentials.
+    output = ((error.stderr or '') + (error.stdout or ''))[:1024 * 1024]
+    for phrase, code in (('reviewed compromised system anchor required', 'SYSTEM_ANCHOR'),
+                         ('reviewed pip trust store required', 'PIP_TRUST_STORE'),
+                         ('compromised or incomplete trust store', 'TRUST_VALIDATION'),
+                         ('DNS: transient error', 'NETWORK_DNS'),
+                         ('ERROR: unable to select packages', 'ALPINE_PACKAGE'),
+                         ('No matching distribution found', 'PIP_RESOLUTION'),
+                         ('THESE PACKAGES DO NOT MATCH THE HASHES', 'PIP_HASH')):
+        if re.search(r'(?m)^(?:#\d+\s+)?\d+(?:\.\d+)?\s+' + re.escape(phrase) + r'\s*$', output):
+            return code
+    return 'OTHER'
+
+
 def native_entrypoint(component, image_id, endpoint, *, recipe_path=RECIPE):
     """Restricted smoke for the same immutable bytes built or pulled by the caller."""
     if (component not in COMPONENTS or not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id)
@@ -357,8 +403,12 @@ def build(component, directory, export_image=False, *, docker_host=None, recipe_
     (directory / '.dockerignore').write_text('*\n!source.tar.gz\n!Dockerfile\n')
     tag = 'hooshix-postgresql-' + component + ':candidate'
     identity = directory / 'image-id.txt'
-    run(['docker', '--host', endpoint, 'build', '--platform', 'linux/amd64', '--tag', tag,
-         '--iidfile', str(identity), str(directory)], timeout=2700)
+    try:
+        run(['docker', '--host', endpoint, 'build', '--platform', 'linux/amd64', '--tag', tag,
+             '--iidfile', str(identity), str(directory)], timeout=2700)
+    except subprocess.CalledProcessError as error:
+        print('POSTGRESQL_CANDIDATE_BUILD_FAILURE=' + build_failure_class(error), file=sys.stderr)
+        raise
     image_id = identity.read_text().strip()
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image_id):
         raise ValueError('immutable local image configuration required')

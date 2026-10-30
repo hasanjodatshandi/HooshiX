@@ -9,6 +9,9 @@ import sys
 import tempfile
 import unittest
 import warnings
+import pathlib
+import ssl
+import types
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -84,6 +87,88 @@ class PostgreSQLSourceBuildTest(unittest.TestCase):
             target.main()
         build.assert_called_once_with('barman-sidecar', Path('public-evidence'), False,
                                       recipe_path=target.CANDIDATE_RECIPE)
+
+    def test_trust_patch_accepts_absent_anchor_only_for_fixed_base(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            source = folder / 'certifi.pem'; source.write_bytes(b'safe bundle')
+            anchor = folder / 'anchor.crt'
+            first = folder / 'venv-pip.pem'; first.write_bytes(b'old venv')
+            second = folder / 'base-pip.pem'; second.write_bytes(b'old base')
+            def scoped(path):
+                mapping = {'source': source, '/usr/share/ca-certificates/mozilla/emSign_ECC_Root_CA_-_G3.crt': anchor,
+                           '/fixture-venv/lib/python3.14/site-packages/pip/_vendor/certifi/cacert.pem': first,
+                           '/fixture-base/lib/python3.14/site-packages/pip/_vendor/certifi/cacert.pem': second}
+                return mapping[str(path)]
+            certifi = types.SimpleNamespace(__version__=target.CERTIFI_VERSION, where=lambda: 'source')
+            known = hashlib.sha256(b'known-der').hexdigest()
+            def execute(fixed):
+                code = target.trust_material_patch(allow_missing_anchor=fixed)
+                with patch.object(pathlib, 'Path', side_effect=scoped), \
+                     patch.object(sys, 'prefix', '/fixture-venv'), patch.object(sys, 'base_prefix', '/fixture-base'), \
+                     patch.dict(sys.modules, {'certifi': certifi}), \
+                     patch.object(ssl, 'PEM_cert_to_DER_cert', return_value=b'known-der'):
+                    exec(code, {})
+            with patch.object(target, 'COMPROMISED_ROOT', known):
+                with self.assertRaises(SystemExit): execute(False)
+                execute(True)
+                self.assertEqual(b'safe bundle', first.read_bytes())
+                self.assertEqual(b'safe bundle', second.read_bytes())
+                anchor.write_text('known')
+                execute(True)
+                self.assertFalse(anchor.exists())
+                anchor.symlink_to(folder / 'missing-target')
+                with self.assertRaises(SystemExit): execute(True)
+                anchor.unlink()
+                anchor.mkdir()
+                with self.assertRaises(SystemExit): execute(True)
+                anchor.rmdir()
+                anchor.write_text('unexpected')
+                with patch.object(ssl, 'PEM_cert_to_DER_cert', return_value=b'unexpected-der'):
+                    code = target.trust_material_patch(allow_missing_anchor=True)
+                    with patch.object(pathlib, 'Path', side_effect=scoped), patch.object(sys, 'prefix', '/fixture-venv'), \
+                         patch.object(sys, 'base_prefix', '/fixture-base'), patch.dict(sys.modules, {'certifi': certifi}):
+                        with self.assertRaises(SystemExit): exec(code, {})
+                self.assertTrue(anchor.exists())
+
+    def test_candidate_retains_only_reviewed_system_roots(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            blocks = [b'-----BEGIN CERTIFICATE-----\n' + bytes([65 + i]) + b'\n-----END CERTIFICATE-----' for i in range(3)]
+            source = folder / 'source.pem'
+            source.write_bytes(b'\n'.join(blocks))
+            fingerprints = tuple(hashlib.sha256(block).hexdigest() for block in blocks)
+            certifi = types.SimpleNamespace(where=lambda: str(source))
+            def scoped(path):
+                if str(path) == str(source):
+                    return source
+                return folder / str(path).rsplit('/', 1)[-1]
+            def execute():
+                with patch.object(target, 'RETAINED_ROOTS', fingerprints), patch.object(pathlib, 'Path', side_effect=scoped), \
+                     patch.dict(sys.modules, {'certifi': certifi}), \
+                     patch.object(ssl, 'PEM_cert_to_DER_cert', side_effect=lambda pem: pem.encode()):
+                    exec(target.retain_system_roots(), {})
+            execute()
+            for fingerprint, block in zip(fingerprints, blocks):
+                self.assertEqual(block + b'\n', (folder / ('hooshix-retained-' + fingerprint + '.crt')).read_bytes())
+            (folder / ('hooshix-retained-' + fingerprints[0] + '.crt')).write_bytes(b'unexpected')
+            with self.assertRaises(SystemExit): execute()
+            source.write_bytes(blocks[0])
+            with self.assertRaises(SystemExit): execute()
+
+    def test_legacy_dockerfile_bytes_and_sanitized_failure_class_are_preserved(self):
+        expected = {'operator': '6c8d9d15727c56b674eeb8072948b085cadcd2b8fc97832518fc5134483e9782',
+            'postgresql': 'b2b6c08be9019582826e5fea29c1a5b829a75fe7c98cd4b5a3df79e624a38f91',
+            'barman-plugin': 'e067032b24131c6d3791c0e89e732fe3ec8ed1d45eb48e0000bbe03e6b48f8ce',
+            'barman-sidecar': '42971d439e2a6ff11f135fe4d514514d69dfd75edbead438f3eb3f3be290ca45'}
+        for component, digest in expected.items():
+            self.assertEqual(digest, hashlib.sha256(target.dockerfile(component, self.selected).encode()).hexdigest())
+        error = subprocess.CalledProcessError(1, ['docker'], stderr='private-sentinel\n#12 0.5 reviewed compromised system anchor required\n')
+        self.assertEqual('SYSTEM_ANCHOR', target.build_failure_class(error))
+        self.assertNotIn('private-sentinel', target.build_failure_class(error))
+        self.assertEqual('OTHER', target.build_failure_class(subprocess.CalledProcessError(
+            1, ['docker'], stderr='RUN python -c "reviewed compromised system anchor required"')))
+        self.assertEqual('OTHER', target.build_failure_class(subprocess.CalledProcessError(1, ['docker'])))
 
     def test_fixed_candidate_native_smoke_rejects_previous_python(self):
         with patch.object(target, 'run', return_value='3.14.8'), self.assertRaises(ValueError):
