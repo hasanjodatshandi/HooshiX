@@ -89,8 +89,10 @@ Compromised Password این وابستگی را ندارد. lockfile، checksum 
 این SHA مرجع این ویرایش است، نه الزام استفادهٔ دائمی از نسخهٔ قدیمی.
 سرور اول OpenBao نصب‌شده، initialized و unsealed دارد؛ recovery ایزولهٔ محلی
 با سهم‌های اصلی `Passed` است. نصب ESO و Ready بودن شش SecretStore روی مقصد
-`Passed` است. تأیید نسخه/retention مقصد backup، scheduler ساعتی، تحویل اسرار واقعی،
-JIT کامل، داده‌ها و برنامه‌های Production هنوز کامل نشده‌اند.
+`Passed` است. snapshot رمزدار OpenBao به باکت `c456170`، readback نسخهٔ دقیق و
+تطبیق decrypt نیز `Passed` است. Versioning مقصد `Enabled` است، اما Object Lock
+با `AccessDenied` رد شده؛ retention تغییرناپذیر، restore مقصد، scheduler ساعتی،
+JIT کامل، داده‌ها و برنامه‌های Production هنوز `Not verified` هستند.
 Stage10 و Production readiness همچنان `Not verified` هستند.
 
 تحویل TLS کافکا در ۲۰۲۶-۱۰-۲۳ با `KAFKA_TLS_DELIVERY=Passed` پایان یافت؛ اجرا
@@ -388,15 +390,19 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 مقصد انتخاب‌شده برای این سرور باکت `c456170` پارس‌پک با prefix
 `openbao-backups/` است. کلیدهای این مقصد در ورودی مخفی owner وارد می‌شوند؛
 بررسی فقط‌خواندنی مالک برای این باکت، نسخه‌سازی را `Enabled` نشان داد؛ دسترسی
-به تنظیم Object Lock با `AccessDenied` رد شد. بنابراین retention، ارسال و
-بازیابی مقصد جدید همچنان **Not verified** هستند.
+به تنظیم Object Lock با `AccessDenied` رد شد. اجرای owner-local در ۲۰۲۶-۱۰-۳۱
+`OPENBAO_OFF_HOST_SNAPSHOT=Passed` گزارش کرد: ciphertext با نسخهٔ یکتا بارگذاری
+شد، همان نسخه بازخوانی شد و decrypt/hash تطبیق یافت. رسید عمومی خارج Git در
+`~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/backup-receipt.json`
+است. این شاهد ارسال و readback نسخهٔ دقیق را ثابت می‌کند، نه قفل نگهداری،
+restore مقصد یا بازیابی VPS.
 
-اگر ارائه‌دهنده فعلاً API نسخه‌سازی یا قفل را پشتیبانی نمی‌کند، این بخش
-`Not verified` باقی می‌ماند؛ probe/upload دوره‌ای یا ارسال مجدد همان key انجام
-نشود. نسخهٔ رمزدار محلی و custody حفظ شوند. آماده‌سازی مستقل ESO و منابع
-استقرار می‌تواند ادامه پیدا کند، اما این تعویق مجوز بازکردن ترافیک Production،
-لغو root یا صدور JIT بدون ممیزی امن نیست. پس از اعلام رفع مشکل ارائه‌دهنده،
-مسیر نسخه/retention و readback مستقل دوباره تأیید شود.
+Object Lock/retention تغییرناپذیر، آزمون restore از مقصد و زمان‌بندی ساعتی
+همچنان `Not verified` هستند؛ receipt نیز `TARGET_RESTORE=Not run` و
+`HOURLY_SCHEDULE=Not run` دارد. snapshot رمزدار محلی و custody حفظ شوند؛ همان
+object/key را کورکورانه دوباره ارسال نکنید. این موفقیت دروازهٔ بازکردن ترافیک
+Production، لغو root یا صدور JIT بدون ممیزی امن نیست. Stage10 و آمادگی Production
+بسته به تکمیل همین بازیابی و سایر گیت‌های مستقل همچنان `Not verified` هستند.
 
 ## ۱۳. رسیدن به نقطهٔ فعلی و مراحل بعد
 
