@@ -493,6 +493,8 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
                     from rehearse_redis_secrets import rehearse as redis_secrets
                     redis_secret_result = redis_secrets(k, eso_chart, str(tools / 'helm'),
                         api, token, cert.read_text(), audiences, addresses, name + '-control-plane')
+                    from rehearse_application_redis_delivery import rehearse as app_redis
+                    app_redis_result = app_redis(k, api, token, cert.read_text(), audiences)
                     step('redis-tls-delivery')
                     from rehearse_redis_tls import rehearse as redis_tls
                     from install_redis_tls import render as tls_plan
@@ -612,6 +614,7 @@ def rehearse(tools: Path, receipt: Path, platform_directory: Path | None = None,
             result['postgresql_secret_delivery'] = pg_secret_result
             result['application_postgresql_delivery'] = app_pg_result
             result['redis_secret_delivery'] = redis_secret_result
+            result['application_redis_delivery'] = app_redis_result
             result['redis_tls_delivery'] = redis_tls_result
             if postgresql_quarantine:
                 result['scope'] = 'Disposable Calico/Ambient initialized-store closed Kafka runtime'

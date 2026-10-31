@@ -22,6 +22,11 @@ source preservation and no-write reentry are mandatory bundle gates. Owner recei
 existing state remains preserved and application/public ingress CLOSED. Database
 connectivity and production readiness remain Not verified.
 
+Three application Redis connection projections are implemented using existing scoped
+service stores and credentials. The intended endpoints require TLS; no Redis access,
+KV write, credential rotation or application workload is authorized. Native staging,
+target delivery, Java trust, connectivity and production readiness remain Not verified.
+
 Current closed Kafka quota target evidence, validated 2026-10-30: the independently checked
 owner-local receipt `receipt-3e05f1b1d70c40c8810357cf55db81a8.json` reports
 `KAFKA_QUOTAS=Passed` for five authenticated users, producer 65,536 B/s and

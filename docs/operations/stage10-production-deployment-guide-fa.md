@@ -3406,6 +3406,41 @@ OpenBao ساخته می‌شوند؛ API نوشتن KV فراخوانی نمی�
 منابع رفتار ESO: [Vault provider](https://external-secrets.io/latest/provider/hashicorp-vault/)،
 [ExternalSecret](https://external-secrets.io/latest/api/externalsecret/).
 
+### تحویل تنظیم اتصال Redis به برنامه‌ها
+
+سه Secret محلی `authorization-quota-redis`، `identity-quota-redis` و
+`web-bff-redis` از credentialهای موجود همان سرویس‌ها و SecretStoreهای محدود
+فعلی ساخته می‌شوند. ESO قالب configtree همان سرویس را با نشانی `rediss://` و
+نام گواهی `security-redis.platform-data.svc.cluster.local:6379` تولید می‌کند؛
+credential تازه، تغییر KV، تنظیم ACL، اتصال برنامه یا بازشدن شبکه انجام نمی‌شود.
+Secret ناشناس، مسیر provider متفاوت یا منبع تغییریافته باعث توقف با حفظ state است.
+
+فقط پس از staging موفق همان tree شامل `application_redis_delivery`، بستهٔ عمومی
+خارج مخزن را با source تمیز main و تصویر دقیق ESO موجود بسازید و اعتبارسنجی کنید:
+
+```bash
+python3 scripts/production/build_application_redis_bundle.py \
+  --staging-run <PASSED_EXACT_TREE_RUN_ID> --existing-eso-image <EXACT_INSTALLED_ESO_DIGEST> \
+  --output <NEW_PUBLIC_BUNDLE_DIRECTORY>
+python3 scripts/production/bootstrap_application_redis_operator.py \
+  --bundle <NEW_PUBLIC_BUNDLE_DIRECTORY> --validate-only
+```
+
+سپس با VNC و نشست دوم SSH فعال، همان checkout را با custody موجود اجرا کنید:
+
+```bash
+python3 scripts/production/bootstrap_application_redis_operator.py \
+  --bundle <VERIFIED_PUBLIC_BUNDLE_DIRECTORY> --custody <EXISTING_PRIVATE_OPENBAO_CUSTODY_DIRECTORY> \
+  --rescue-and-second-session-ready
+```
+
+رمز موجود custody و sudo فقط در ورودی مخفی لازم‌اند. نتیجهٔ مورد انتظار
+`APPLICATION_REDIS_DELIVERY=Passed` است. اجرای مقصد این گام هنوز **Not run**
+است؛ بررسی trust ریشهٔ TLS در کلاینت‌های Java، اتصال، ACL، تمدید گواهی، ظرفیت و
+Production جداگانه **Not verified** هستند و این گام مجوز ترافیک برنامه نیست.
+در خطا credential، Secret منبع یا دادهٔ Redis را حذف یا بازتولید نکنید.
+مرجع قالب: [ESO advanced templating](https://external-secrets.io/latest/guides/templating/).
+
 پس از آن ادامهٔ مشترک:
 
 1. ESO نصب‌شده؛ تحویل اسرار واقعی مستقل هر سرویس و آزمون مصرف‌کننده باقی است.

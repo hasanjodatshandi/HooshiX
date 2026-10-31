@@ -10,6 +10,8 @@ on:
       - scripts/production/postgresql_secret_delivery.py
       - scripts/production/*application_postgresql*.py
       - scripts/production/tests/test_application_postgresql_delivery.py
+      - scripts/production/*application_redis*.py
+      - scripts/production/tests/test_application_redis_delivery.py
       - scripts/production/tests/test_postgresql_secrets.py
       - scripts/production/*redis*secrets*.py
       - scripts/production/redis_secret_delivery.py
