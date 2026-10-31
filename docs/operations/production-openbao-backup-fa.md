@@ -5,8 +5,9 @@
 مالک مقصد `c456170` در `https://c456170.parspack.net` را برای snapshot
 با مسیر مستقل `openbao-backups/` انتخاب کرده است. کلیدهای مخصوص backup فقط
 در prompt مخفی operator وارد می‌شوند و در فایل یا Git ذخیره نمی‌شوند؛
-credential حساب audit تغییر نمی‌کند. نسخه‌سازی و retention مقصد جدید باید جداگانه
-با شواهد همان باکت بررسی شوند.
+credential حساب audit تغییر نمی‌کند. Versioning باکت `Enabled` و readback نسخهٔ
+دقیق snapshot `Passed` است. درخواست وضعیت Object Lock با `AccessDenied` رد شد؛
+retention تغییرناپذیر مقصد `Not verified` است.
 
 بستهٔ جاری، snapshot تحت نظارت، encryption با recipientهای موجود، دریافت
 نسخهٔ مشخص و آزمون decrypt را پیاده می‌کند. نصب موفق OpenBao یا init/unseal
@@ -22,13 +23,13 @@ operator بازیابی می‌شود؛ در argv، environment، log، فایل
 envelope را در OpenBao آزمایشی جدا restore می‌کند؛ این شاهد restore هدف
 Production نیست.
 
-## اجرای اولین snapshot
+## اجرای snapshot تحت نظارت
 
 از checkout تمیز، merge‌شده و CI موفق، با VNC کارا و نشست دوم خصوصی SSH،
 در PowerShell بدون transcript/ضبط صفحه اجرا کنید:
 
 ```powershell
-wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --exec python3 scripts/production/backup_openbao_operator.py --rescue-and-second-session-ready --custody /home/coder/.local/share/hooshix-openbao-custody/7509bb067d814468982cc84fa50cb4d4
+wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-openbao-backup-c456170 --exec python3 scripts/production/backup_openbao_operator.py --rescue-and-second-session-ready --custody /home/coder/.local/share/hooshix-openbao-custody/7509bb067d814468982cc84fa50cb4d4
 ```
 
 1. `READY` را فقط با مسیر نجات کارا وارد کنید.
@@ -48,11 +49,14 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 7. نسخهٔ بازخوانی‌شده با private export قبلی فقط در حافظهٔ WSL decrypt و
    hash snapshot اصلی تطبیق داده می‌شود. هیچ restore روی VPS انجام نمی‌شود.
 
-نتیجهٔ موفق `OPENBAO_OFF_HOST_SNAPSHOT=Passed` و `PUBLIC_RECEIPT` است.
-receipt عمومی را می‌توان فرستاد؛ credentials، private export، token، رمز و
-bytes snapshot را نفرستید. فایل‌های backup در زیرپوشهٔ UUID خارج Git، در
-`/home/coder/.local/share/hooshix-openbao-backup/` می‌مانند؛ export رمزدار
-VPS هم تا cleanup جدا و بازبینی‌شده حفظ می‌شود.
+اجرای مقصد `c456170` در ۲۰۲۶-۱۰-۳۱ با
+`OPENBAO_OFF_HOST_SNAPSHOT=Passed` پایان یافت؛ ciphertext با نسخهٔ مشخص
+بازخوانی و decrypt/hash آن با snapshot اصلی تطبیق داده شد. رسید عمومی در
+`/home/coder/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/backup-receipt.json`
+است. receipt عمومی را می‌توان فرستاد؛ credentials، private export، token، رمز و
+bytes snapshot را نفرستید. ciphertext محلی در زیرپوشهٔ UUID خارج Git و export
+رمزدار VPS تا cleanup جدا و بازبینی‌شده حفظ می‌شوند. Restore از مقصد و
+زمان‌بندی ساعتی `Not run`؛ آمادگی Production `Not verified` است.
 
 ## شکست و ادامه
 

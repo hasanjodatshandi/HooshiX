@@ -166,8 +166,14 @@ The owner's read-only target inventory records 15986 MiB RAM, 11942 MiB availabl
 8GiB PV/PVC; no PostgreSQL allocation/storage class is present. This is planning
 input, not complete-stack headroom evidence. Live exact published-digest CNPG
 staging/admission, physical recovery and target installation remain `Not verified`
-until their separate executed evidence exists. The ParsPack
-off-host backup/audit deferral remains `Not verified` and is not retried here.
+until their separate executed evidence exists. OpenBao's ParsPack off-host
+snapshot to bucket `c456170` is now `Passed` for ciphertext
+upload, exact-version readback and decrypt/hash verification. The owner-local
+receipt is outside Git at
+`~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/backup-receipt.json`.
+Bucket Versioning is `Enabled`; Object Lock returned `AccessDenied`, so immutable
+retention remains `Not verified`. This does not verify the separate ParsPack audit
+sink, target restore or hourly scheduling; those remain `Not verified`.
 
 Cert-manager 1.20.3 candidate preparation pins the official source archive,
 release manifest and three amd64 runtime inputs in `cert-manager-sources.json`.
