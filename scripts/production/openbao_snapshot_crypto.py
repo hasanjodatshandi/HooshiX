@@ -11,11 +11,22 @@ import tempfile
 import time
 from pathlib import Path
 
-import activate_openbao_host as host
+import openbao_snapshot_errors as errors
 
 MAX_SNAPSHOT = 32 * 1024 * 1024
 MAX_CIPHERTEXT = MAX_SNAPSHOT + 1024 * 1024
 ENV = {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'}
+
+
+def public_keys(keys):
+    errors.require(isinstance(keys, list) and len(keys) == 3 and len(set(keys)) == 3,
+                  'THREE_DISTINCT_PUBLIC_RECIPIENTS_REQUIRED')
+    for key in keys:
+        errors.require(isinstance(key, str) and 256 <= len(key) <= 8192,
+                      'PUBLIC_RECIPIENT_REJECTED')
+        content = base64.b64decode(key, validate=True)
+        tag = content[0] & 63 if content[0] & 64 else (content[0] >> 2) & 15
+        errors.require(content[0] & 128 and tag == 6, 'PUBLIC_RECIPIENT_REJECTED')
 
 
 def run(home, args, data=b'', *, password=None, bound=MAX_CIPHERTEXT):
@@ -25,7 +36,7 @@ def run(home, args, data=b'', *, password=None, bound=MAX_CIPHERTEXT):
     descriptor, process = None, None
     try:
         if password is not None:
-            host.require(isinstance(password, str) and 20 <= len(password) <= 128
+            errors.require(isinstance(password, str) and 20 <= len(password) <= 128
                          and not any(c in password for c in '\r\n\x00'), 'SNAPSHOT_PASSPHRASE_REJECTED')
             descriptor, writer = os.pipe()
             try:
@@ -48,17 +59,17 @@ def run(home, args, data=b'', *, password=None, bound=MAX_CIPHERTEXT):
             while True:
                 remaining = deadline - time.monotonic()
                 ready, _, _ = select.select([process.stdout], [], [], max(0, remaining))
-                host.require(remaining > 0 and ready, 'SNAPSHOT_CRYPTO_TIMEOUT')
+                errors.require(remaining > 0 and ready, 'SNAPSHOT_CRYPTO_TIMEOUT')
                 chunk = os.read(process.stdout.fileno(), min(65536, bound + 1 - len(output)))
                 if not chunk:
                     break
                 output.extend(chunk)
-                host.require(len(output) <= bound, 'SNAPSHOT_CRYPTO_OUTPUT_BOUND')
+                errors.require(len(output) <= bound, 'SNAPSHOT_CRYPTO_OUTPUT_BOUND')
             process.wait(timeout=max(0.1, deadline - time.monotonic()))
-            host.require(process.returncode == 0, 'SNAPSHOT_CRYPTO_FAILED')
+            errors.require(process.returncode == 0, 'SNAPSHOT_CRYPTO_FAILED')
             return bytes(output)
     except (OSError, subprocess.SubprocessError):
-        raise host.custody.BootstrapFailed('SNAPSHOT_CRYPTO_FAILED') from None
+        raise errors.SnapshotFailed('SNAPSHOT_CRYPTO_FAILED') from None
     finally:
         if process is not None and process.poll() is None:
             os.killpg(process.pid, signal.SIGKILL)
@@ -75,22 +86,22 @@ def stop_agent(home):
         result = subprocess.run(['/usr/bin/gpgconf', '--homedir', str(home), '--kill', 'gpg-agent'],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             timeout=5, check=False, env=ENV)
-        host.require(result.returncode == 0, 'SNAPSHOT_AGENT_TEARDOWN_FAILED')
+        errors.require(result.returncode == 0, 'SNAPSHOT_AGENT_TEARDOWN_FAILED')
     except (OSError, subprocess.SubprocessError):
-        raise host.custody.BootstrapFailed('SNAPSHOT_AGENT_TEARDOWN_FAILED') from None
+        raise errors.SnapshotFailed('SNAPSHOT_AGENT_TEARDOWN_FAILED') from None
 
 
 def validate_ciphertext(value):
-    host.require(isinstance(value, bytes) and 192 <= len(value) <= MAX_CIPHERTEXT,
+    errors.require(isinstance(value, bytes) and 192 <= len(value) <= MAX_CIPHERTEXT,
                  'SNAPSHOT_CIPHERTEXT_REQUIRED')
     tag = value[0] & 63 if value[0] & 64 else (value[0] >> 2) & 15
-    host.require(value[0] & 128 and tag == 1, 'SNAPSHOT_CIPHERTEXT_REQUIRED')
+    errors.require(value[0] & 128 and tag == 1, 'SNAPSHOT_CIPHERTEXT_REQUIRED')
 
 
 def seal(snapshot, recipients):
-    host.require(isinstance(snapshot, bytes) and 1 <= len(snapshot) <= MAX_SNAPSHOT,
+    errors.require(isinstance(snapshot, bytes) and 1 <= len(snapshot) <= MAX_SNAPSHOT,
                  'SNAPSHOT_SIZE_BOUND')
-    host.public_keys(recipients)
+    public_keys(recipients)
     with tempfile.TemporaryDirectory(prefix='hooshix-snapshot-pub-') as temporary:
         home = Path(temporary)
         home.chmod(0o700)
@@ -100,7 +111,7 @@ def seal(snapshot, recipients):
             listing = run(home, ['--with-colons', '--list-keys'], bound=32768)
             fingerprints = [line.split(b':')[9].decode('ascii') for line in listing.splitlines()
                             if line.startswith(b'fpr:')]
-            host.require(len(fingerprints) == 3 and len(set(fingerprints)) == 3,
+            errors.require(len(fingerprints) == 3 and len(set(fingerprints)) == 3,
                          'SNAPSHOT_PUBLIC_RECIPIENT_MISMATCH')
             args = ['--trust-model', 'always', '--compress-algo', 'none', '--cipher-algo', 'AES256']
             for fingerprint in fingerprints:
@@ -115,7 +126,7 @@ def seal(snapshot, recipients):
 def recover(encrypted, secret_export, password):
     """Owner process only; never writes decrypted snapshot or shares to disk."""
     validate_ciphertext(encrypted)
-    host.require(isinstance(secret_export, bytes) and 0 < len(secret_export) <= 32768,
+    errors.require(isinstance(secret_export, bytes) and 0 < len(secret_export) <= 32768,
                  'SNAPSHOT_PRIVATE_EXPORT_REJECTED')
     with tempfile.TemporaryDirectory(prefix='hooshix-snapshot-proof-') as temporary:
         home = Path(temporary)

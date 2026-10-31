@@ -16,6 +16,7 @@ on:
           - cert-manager-candidate
           - redis-candidate
           - kafka-candidate
+          - openbao-snapshot-candidate
       release_manifest_path:
         description: Tracked reviewed production release manifest under deploy/releases/production
         required: false
@@ -154,10 +155,10 @@ jobs:
           rm -f -- "$RUNNER_TEMP/docker-config/config.json"
 
   openbao-candidate:
-    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate' || inputs.release_kind == 'redis-candidate' || inputs.release_kind == 'kafka-candidate')
+    if: github.ref == 'refs/heads/main' && (inputs.release_kind == 'openbao-candidate' || inputs.release_kind == 'mesh-candidate' || inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate' || inputs.release_kind == 'redis-candidate' || inputs.release_kind == 'kafka-candidate' || inputs.release_kind == 'openbao-snapshot-candidate')
     runs-on: ubuntu-24.04
     environment: production-release
-    timeout-minutes: ${{ (inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate' || inputs.release_kind == 'kafka-candidate') && 180 || 35 }}
+    timeout-minutes: ${{ (inputs.release_kind == 'patched-platform-candidate' || inputs.release_kind == 'postgresql-candidate' || inputs.release_kind == 'cert-manager-candidate' || inputs.release_kind == 'kafka-candidate' || inputs.release_kind == 'openbao-snapshot-candidate') && 180 || 35 }}
     permissions:
       contents: read
       actions: read
@@ -229,6 +230,10 @@ jobs:
               python3 scripts/production/publish_kafka_candidate.py \
                 --directory "$RUNNER_TEMP/kafka-release-evidence"
               ;;
+            openbao-snapshot-candidate)
+              python3 scripts/production/publish_openbao_snapshot_candidate.py \
+                --directory "$RUNNER_TEMP/openbao-snapshot-release-evidence"
+              ;;
             *) exit 1 ;;
           esac
       - name: Remove temporary registry authentication
@@ -241,9 +246,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ inputs.release_kind == 'kafka-candidate' && 'kafka' || inputs.release_kind == 'redis-candidate' && 'redis' || inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ inputs.release_kind == 'openbao-snapshot-candidate' && 'openbao-snapshot' || inputs.release_kind == 'kafka-candidate' && 'kafka' || inputs.release_kind == 'redis-candidate' && 'redis' || inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-publication-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/${{ inputs.release_kind == 'kafka-candidate' && 'kafka' || inputs.release_kind == 'redis-candidate' && 'redis' || inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
+            ${{ runner.temp }}/${{ inputs.release_kind == 'openbao-snapshot-candidate' && 'openbao-snapshot' || inputs.release_kind == 'kafka-candidate' && 'kafka' || inputs.release_kind == 'redis-candidate' && 'redis' || inputs.release_kind == 'cert-manager-candidate' && 'cert-manager' || inputs.release_kind == 'postgresql-candidate' && 'postgresql' || inputs.release_kind == 'patched-platform-candidate' && 'patched' || inputs.release_kind == 'mesh-candidate' && 'mesh' || 'openbao' }}-release-evidence/
             !${{ runner.temp }}/patched-release-evidence/**/source.tar.gz
             !${{ runner.temp }}/postgresql-release-evidence/**/source.tar.gz
             !${{ runner.temp }}/cert-manager-release-evidence/**/source.tar.gz

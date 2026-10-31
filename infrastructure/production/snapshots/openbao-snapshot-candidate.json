@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "component": "openbao-snapshot",
+  "version": "1",
+  "platform": "linux/amd64",
+  "runtime_base": "docker.io/library/python@sha256:eb2c62658b8d51bff0acc408504b76521d02030de56a8a3c1e830083e89b89d2",
+  "python_version": "3.14.10",
+  "alpine_version": "3.24.3",
+  "packages": {
+    "ca-certificates-bundle": "20261020-r0",
+    "curl": "8.23.0-r0",
+    "gpg": "2.4.9-r1",
+    "gpg-agent": "2.4.9-r1",
+    "gnupg-gpgconf": "2.4.9-r1",
+    "libcrypto3": "3.5.9-r0",
+    "libssl3": "3.5.9-r0"
+  },
+  "production_promotion": "blocked-until-protected-publication-gitops-reconciliation-and-target-restore"
+}

@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!openbao_snapshot_agent.py
+!openbao_snapshot_crypto.py
+!openbao_snapshot_errors.py
+!parspack_snapshot_transport.py
