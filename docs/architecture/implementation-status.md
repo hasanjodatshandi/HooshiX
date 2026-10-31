@@ -171,9 +171,11 @@ snapshot to bucket `c456170` is now `Passed` for ciphertext
 upload, exact-version readback and decrypt/hash verification. The owner-local
 receipt is outside Git at
 `~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/backup-receipt.json`.
-Bucket Versioning is `Enabled`; Object Lock returned `AccessDenied`, so immutable
-retention remains `Not verified`. This does not verify the separate ParsPack audit
-sink, target restore or hourly scheduling; those remain `Not verified`.
+Bucket Versioning is `Enabled`; Object Lock is outside the owner's current scope.
+An isolated local recovery of this exact snapshot is now `Passed` in the owner
+receipt `~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/isolated-restore-81eaf185f87c43bab1388756ac7ddb3d.json`.
+This does not verify the separate ParsPack audit sink, restore on the VPS or hourly
+scheduling; those remain `Not verified`.
 
 Cert-manager 1.20.3 candidate preparation pins the official source archive,
 release manifest and three amd64 runtime inputs in `cert-manager-sources.json`.

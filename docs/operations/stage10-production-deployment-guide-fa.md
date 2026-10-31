@@ -90,9 +90,11 @@ Compromised Password این وابستگی را ندارد. lockfile، checksum 
 سرور اول OpenBao نصب‌شده، initialized و unsealed دارد؛ recovery ایزولهٔ محلی
 با سهم‌های اصلی `Passed` است. نصب ESO و Ready بودن شش SecretStore روی مقصد
 `Passed` است. snapshot رمزدار OpenBao به باکت `c456170`، readback نسخهٔ دقیق و
-تطبیق decrypt نیز `Passed` است. Versioning مقصد `Enabled` است، اما Object Lock
-با `AccessDenied` رد شده؛ retention تغییرناپذیر، restore مقصد، scheduler ساعتی،
-JIT کامل، داده‌ها و برنامه‌های Production هنوز `Not verified` هستند.
+تطبیق decrypt نیز `Passed` است. Versioning مقصد `Enabled` است. بازیابی ایزولهٔ
+همین snapshot در ۲۰۲۶-۱۰-۳۱ نیز `Passed` شد؛ receipt خارج Git در
+`~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/isolated-restore-81eaf185f87c43bab1388756ac7ddb3d.json`
+است. Object Lock بنا به تصمیم مالک خارج از محدودهٔ فعلی است. زمان‌بندی ساعتی،
+restore روی VPS، JIT کامل، داده‌ها و برنامه‌های Production هنوز `Not verified` هستند.
 Stage10 و Production readiness همچنان `Not verified` هستند.
 
 تحویل TLS کافکا در ۲۰۲۶-۱۰-۲۳ با `KAFKA_TLS_DELIVERY=Passed` پایان یافت؛ اجرا
@@ -112,8 +114,8 @@ Production readiness همچنان `Not verified` هستند.
 | CA/intermediate | CSR، امضا و import Passed | intermediate و binding مستقل |
 | Kyverno/Istio/OpenBao | نصب هدف Passed | بستهٔ اختصاصی مقصد |
 | OpenBao custody/init/unseal | Passed؛ توزیع custody تأیید مالک | custody و سهم‌های تازه |
-| snapshot | ciphertext/hash Passed؛ نسخهٔ باکت Not verified | مقصد و شواهد مستقل |
-| recovery ایزوله | Passed؛ بازیابی VPS Not run | آزمون backup همان نصب |
+| snapshot | ciphertext، نسخهٔ دقیق و decrypt Passed؛ زمان‌بندی ساعتی Not run | مقصد و شواهد مستقل |
+| recovery ایزوله | clone محلی Passed؛ بازیابی روی VPS Not run | آزمون backup همان نصب |
 | scoped auth OpenBao | اجرای مالک Passed؛ شش هویت فقط‌خواندنی، root محفوظ | بسته و آزمون مستقل مقصد |
 | ESO و شش SecretStore | نصب مقصد Passed؛ اسرار واقعی Not verified | نصب و آزمون مستقل مقصد |
 | Kafka بسته | broker داخلی، TLS پنج هویت و رسید ۶ topic/۴۷ ACL با مهاجرت health موجود Passed؛ دسترسی برنامه/عمومی CLOSED | بستهٔ اختصاصی، staging همان revision و رسید مستقل مقصد؛ ظرفیت/بازیابی همچنان لازم است |
@@ -389,20 +391,23 @@ VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حت�
 
 مقصد انتخاب‌شده برای این سرور باکت `c456170` پارس‌پک با prefix
 `openbao-backups/` است. کلیدهای این مقصد در ورودی مخفی owner وارد می‌شوند؛
-بررسی فقط‌خواندنی مالک برای این باکت، نسخه‌سازی را `Enabled` نشان داد؛ دسترسی
-به تنظیم Object Lock با `AccessDenied` رد شد. اجرای owner-local در ۲۰۲۶-۱۰-۳۱
+بررسی فقط‌خواندنی مالک برای این باکت، نسخه‌سازی را `Enabled` نشان داد؛ Object
+Lock بنا به تصمیم مالک در این مرحله پیگیری نمی‌شود. اجرای owner-local در ۲۰۲۶-۱۰-۳۱
 `OPENBAO_OFF_HOST_SNAPSHOT=Passed` گزارش کرد: ciphertext با نسخهٔ یکتا بارگذاری
 شد، همان نسخه بازخوانی شد و decrypt/hash تطبیق یافت. رسید عمومی خارج Git در
 `~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/backup-receipt.json`
-است. این شاهد ارسال و readback نسخهٔ دقیق را ثابت می‌کند، نه قفل نگهداری،
-restore مقصد یا بازیابی VPS.
+است. بازیابی owner-local از همین snapshot در clone محلی RAM-backed با
+`OPENBAO_ISOLATED_RECOVERY=Passed` پایان یافت؛ receipt در
+`~/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/isolated-restore-81eaf185f87c43bab1388756ac7ddb3d.json`
+است. این شواهد Versioning/readback و recovery ایزوله را ثابت می‌کنند، نه
+زمان‌بندی ساعتی یا restore روی VPS.
 
-Object Lock/retention تغییرناپذیر، آزمون restore از مقصد و زمان‌بندی ساعتی
-همچنان `Not verified` هستند؛ receipt نیز `TARGET_RESTORE=Not run` و
+آزمون restore روی VPS و زمان‌بندی ساعتی همچنان `Not verified` هستند؛ receipt
+نصب نیز `TARGET_RESTORE=Not run` و
 `HOURLY_SCHEDULE=Not run` دارد. snapshot رمزدار محلی و custody حفظ شوند؛ همان
 object/key را کورکورانه دوباره ارسال نکنید. این موفقیت دروازهٔ بازکردن ترافیک
-Production، لغو root یا صدور JIT بدون ممیزی امن نیست. Stage10 و آمادگی Production
-بسته به تکمیل همین بازیابی و سایر گیت‌های مستقل همچنان `Not verified` هستند.
+Production، لغو root یا صدور JIT بدون ممیزی امن نیست. زمان‌بندی ساعتی مرحلهٔ بعد
+است و Stage10 و آمادگی Production با گیت‌های مستقل باقی‌مانده `Not verified` هستند.
 
 ## ۱۳. رسیدن به نقطهٔ فعلی و مراحل بعد
 
