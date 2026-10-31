@@ -3,7 +3,6 @@ name: Platform commissioning staging
 on:
   pull_request:
     paths:
-      - .github/workflows/platform-commissioning.yml
       - scripts/production/rehearse_openbao_kubernetes.py
       - scripts/production/rehearse_platform_admission.py
       - scripts/production/*postgresql*secrets*.py
@@ -56,36 +55,41 @@ on:
       - scripts/production/install_postgresql_local_volume.py
       - scripts/production/rehearsal_probes.py
       - scripts/production/tests/test_rehearsal_probes.py
-      - scripts/production/render_mesh_candidate.py
       - scripts/production/render_platform_admission.py
-      - scripts/production/render_mesh_security_upgrade.py
       - scripts/production/upgrade_mesh_security.py
       - scripts/production/build_mesh_security_upgrade_bundle.py
       - scripts/production/run-mesh-security-upgrade.ps1
       - scripts/production/verify_mesh_security_publication.py
-      - scripts/production/tests/test_mesh_security_upgrade.py
       - scripts/production/verify_platform_publication_run.py
       - scripts/production/commission_platform.py
-      - scripts/production/*eso*.py
+      - scripts/production/build_eso_commissioning_bundle.py
+      - scripts/production/install_eso.py
+      - scripts/production/render_eso_candidate.py
+      - scripts/production/render_eso_commissioning.py
+      - scripts/production/rehearse_eso_commissioning.py
+      - scripts/production/rehearse_eso_delivery.py
+      - scripts/production/verify_eso_artifact.py
       - scripts/production/run-eso-commissioning.ps1
       - scripts/production/run-cert-manager-commissioning.ps1
-      - scripts/production/tests/test_eso*.py
-      - scripts/production/*cert_manager*.py
+      - scripts/production/build_cert_manager_candidates.py
+      - scripts/production/build_cert_manager_commissioning_bundle.py
+      - scripts/production/install_cert_manager.py
+      - scripts/production/publish_cert_manager_candidates.py
+      - scripts/production/render_cert_manager_candidate.py
+      - scripts/production/rehearse_cert_manager.py
+      - scripts/production/verify_published_cert_manager.py
       - scripts/production/*cnpg*.py
       - scripts/production/*barman*.py
       - scripts/production/run-barman-control-plane.ps1
       - scripts/production/tests/test_barman_control_plane.py
       - scripts/production/run-cnpg-control-plane.ps1
       - scripts/production/tests/test_cnpg_control_plane.py
-      - scripts/production/tests/test_cert_manager_commissioning.py
       - infrastructure/production/data/cert-manager*.json
       - scripts/production/platform_image_egress.py
       - scripts/production/upgrade_kyverno.py
       - scripts/production/build_platform_commissioning_bundle.py
       - scripts/production/run-platform-commissioning.ps1
       - scripts/production/tests/test_platform_commissioning.py
-      - infrastructure/istio/**
-      - infrastructure/kyverno/**
       - infrastructure/production/secrets/**
   workflow_dispatch:
     inputs:

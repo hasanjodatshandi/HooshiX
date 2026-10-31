@@ -22,6 +22,12 @@ import rehearse_openbao_kubernetes as fixture
 
 
 class ESOCommissioningTest(unittest.TestCase):
+    def setUp(self):
+        self.mesh_pin = patch.object(renderer.mesh, 'pin',
+                                     return_value=json.loads(renderer.mesh.PIN.read_text()))
+        self.mesh_pin.start()
+        self.addCleanup(self.mesh_pin.stop)
+
     def test_drift_diagnostic_reports_path_not_values(self):
         self.assertEqual('spec.args.0', target.mismatched_path(
             {'spec': {'args': ['private-value']}}, {'spec': {'args': ['public-desired']}}))

@@ -246,10 +246,14 @@ sudo اولیه تا commissioning واقعی JIT و recovery حفظ می‌شو
 نسخهٔ package سرور اول روی OS متفاوت تحمیل نمی‌شود. فایل‌ها دسترسی محدود دارند؛
 log خام/رمز/کلید را در chat یا CI نگذارید. audit محلی، تأیید off-host audit نیست.
 
+## وضعیت نسخهٔ mesh برای ادامهٔ Stage 10
+
+Baseline تأییدشدهٔ مخزن Istio `1.30.7` است؛ این patch نسخهٔ رسمی CA bundle را از گواهی ریشهٔ eMudhra آسیب‌پذیر پاک می‌کند و Go را به `1.26.10` می‌رساند. VPS فعلی هنوز روی `1.30.5` است. هیچ‌کدام از این تغییرات، استقرار روی VPS را انجام نمی‌دهند؛ rollout امضاشده، آزمون native و receipt مقصد پیش از اعلام تکمیل لازم‌اند.
+
 ## ۶. K3s، Calico و Kubernetes audit
 
 نسخه‌های منتخب این ویرایش: K3s `v1.35.6+k3s1`، Calico `3.32.1`، Kyverno
-`1.19.1`، Istio Ambient `1.30.5` و OpenBao `2.6.4`. هنگام ساخت بسته با pins
+`1.19.1`، Istio Ambient `1.30.7` و OpenBao `2.6.4`. هنگام ساخت بسته با pins
 جاری، digest، معماری و شواهد امنیتی تطبیق دهید؛ از `latest` استفاده نکنید.
 
 پایهٔ config از `infrastructure/production/k3s/config.yaml`:
@@ -597,9 +601,15 @@ Ambient mTLS روی VPS همچنان مستقل و الزامی‌اند. اجر
 
 ### ساخت candidate امنیتی از سورس رسمی
 
-recipe ساخت جدید `infrastructure/production/release/jose-platform-sources.json`
-برای ESO `2.12.0`، OpenBao `2.6.4` و Istio `1.30.5` است. نسخهٔ محصول و chart
-حفظ می‌شود؛ compiler برابر Go `1.26.9` با تصویر builder دارای digest ثابت است.
+recipe موجود `infrastructure/production/release/jose-platform-sources.json`
+برای ESO `2.12.0`، OpenBao `2.6.4` و Istio `1.30.5` است؛ compiler آن Go
+`1.26.9` است. این source candidate با baseline فعلی `1.30.7` منطبق نیست و
+ساخت/انتشار آن تا refresh و اسکن کامل مسدود است. یادداشت انتشار رسمی
+[Istio 1.30.7](https://istio.io/latest/news/releases/1.30.x/announcing-1.30.7/)
+حذف ریشهٔ eMudhra از CA bundle و ارتقای Go را ثبت می‌کند؛ جزئیات Go در
+[یادداشت‌های انتشار Go 1.26.10](https://go.dev/doc/devel/release#go1.26.10)
+است. این تغییر baseline هنوز چیزی روی VPS نصب نکرده؛ receipt قبلی target فقط
+نسخهٔ نصب‌شدهٔ VPS یعنی 1.30.5 را ثابت می‌کند.
 `x/net=v0.60.0` و وابستگی‌های لازم آن (`x/crypto=v0.57.0`، `x/sys=v0.48.0`،
 `x/term=v0.46.0` و `x/text=v0.42.0`) و JOSE `v4.1.6` ثابت‌اند.
 patchهای دارای checksum برای CAP و Okta در OpenBao اعمال می‌شوند؛ recipe قدیمی
@@ -627,6 +637,11 @@ python3 -m unittest discover -s scripts/production/tests -p test_patched_platfor
 SBOM، اسکن، recipe تولیدشده، graph ماژول‌ها، hashهای `go.mod/go.sum` و buildinfo
 است؛ هیچ image در PR push یا امضا نمی‌شود. موفقیت این چهار job به‌تنهایی
 سازگاری runtime، آماده‌بودن Production یا موفقیت سایر گیت‌ها نیست.
+
+برای تغییر baseline شبکه، recipe جداگانهٔ
+`infrastructure/production/release/istio-mesh-sources.json` فقط source build
+دو تصویر Istio را برای scanner محلی تعریف می‌کند. این مسیر full-platform recipe
+قدیمی را حفظ می‌کند و اجازهٔ انتشار image، پذیرش admission یا نصب VPS نمی‌دهد.
 
 انتشار بعدی فقط پس از merge بازبینی‌شده و baseline موفق همان main، از workflow
 موجود `production-release.yml` با `release_kind=patched-platform-candidate`
@@ -688,8 +703,9 @@ CI مربوط به SHA دقیق جدید لازم است؛ پس از merge نی�
 ### ارتقای محدود امنیتی mesh موجود
 
 ارتقای `istiod` و `istio-cni-node` با تأیید مالک آماده می‌شود. نسخهٔ Istio
-همان `1.30.5` می‌ماند؛ فقط دو تصویر source-patched امضاشده پس از آزمون native
-انتخاب می‌شوند. این مسیر نصب اولیه نیست: ztunnel، CA، OpenBao و داده‌های آن،
+baseline مخزن برابر `1.30.7` است؛ تصاویر source-patched قبلی برای `1.30.5`
+candidate تازه یا مجوز rollout نیستند و rollout این baseline جداست. این مسیر نصب اولیه نیست:
+ztunnel، CA، OpenBao و داده‌های آن،
 SSH، ایمیل و storage نباید تغییر کنند. اجرای دوبارهٔ `commission_platform.py`
 برای این ارتقا مجاز نیست. روی VPS اول، receipt مقصد با plan بررسی‌شدهٔ main
 `351802f1ba55aa11ca5c11740c038e575dc996bf` و digestهای ثبت‌شده در همان plan، نتیجهٔ
@@ -899,7 +915,7 @@ override محدود `certifi==2026.10.19` با SHA-256 ثابت wheel و sdist �
 روی VPS هنوز `Not verified` است. هیچ digestی صرفاً با تغییر پایه مجوز نصب نمی‌گیرد.
 
 ابزار `build_postgresql_candidates.py` سه جزء Go را از source رسمی دارای commit
-و checksum ثابت در `data/postgresql-python-security-sources.json`، با Go 1.26.9 و x/net
+و checksum ثابت در `data/postgresql-python-security-sources.json`، با Go 1.26.10 و x/net
 0.60.0 می‌سازد. هر دو manager داخل تصویر CNPG، حتی باینری arm64 همراه تصویر
 amd64، جایگزین می‌شوند. plugin استاتیک روی پایهٔ distroless ثابت و با همان UID
 65532 و entrypoint ساخته می‌شود. sidecar و operand حساب معتبر UID/GID 26 و
@@ -1190,7 +1206,7 @@ SHA-256 فایل عمومی `publication.json`:
 
 سورس رسمی نسخهٔ `1.20.3`، commit و SHA-256 آرشیو، manifest رسمی و digest
 runtime هر جزء در `infrastructure/production/data/cert-manager-sources.json`
-ثابت‌اند. باینری هر سه جزء از همان سورس، با `Go 1.26.9`، `x/net 0.60.0` و
+ثابت‌اند. باینری هر سه جزء از همان سورس، با `Go 1.26.10`، `x/net 0.60.0` و
 `gRPC-Go 1.83.2` بازسازی می‌شود؛ نسخهٔ محصول تغییر نمی‌کند. provenance آن
 `patched-upstream-source-build` است، نه import بدون تغییر. ماژول ریشه و ماژول
 جداگانهٔ هر `cmd` با checksum database و `go mod verify` بررسی می‌شوند؛

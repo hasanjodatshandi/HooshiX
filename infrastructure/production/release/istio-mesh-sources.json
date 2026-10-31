@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "go_version": "1.26.10",
+  "builder": "docker.io/library/golang@sha256:2bba1f6b063d0e09c5297fbd0a7b9664c4931afc4476a779d7c9a3062704f949",
+  "modules": {
+    "golang.org/x/net": "v0.60.0",
+    "golang.org/x/crypto": "v0.57.0",
+    "golang.org/x/sys": "v0.48.0",
+    "golang.org/x/term": "v0.46.0",
+    "golang.org/x/text": "v0.42.0",
+    "github.com/go-jose/go-jose/v4": "v4.1.6"
+  },
+  "sources": {
+    "istio": {
+      "repository": "istio/istio",
+      "revision": "7209fe474ce6229c303170be35e76d21619e302a",
+      "archive_sha256": "7b39781f940b0251b40140bad99ff628cc9363375e34bb9b29362dbaefd8742e",
+      "version": "1.30.7"
+    }
+  },
+  "production_promotion": "blocked-until-signed-digest-admission-native-and-recovery-evidence"
+}

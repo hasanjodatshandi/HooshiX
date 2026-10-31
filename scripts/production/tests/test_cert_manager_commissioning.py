@@ -47,6 +47,9 @@ def upstream():
 
 class CertManagerCommissioningTest(unittest.TestCase):
     def setUp(self):
+        self.mesh_pin = patch.object(eso.mesh, 'pin', return_value=json.loads(eso.mesh.PIN.read_text()))
+        self.mesh_pin.start()
+        self.addCleanup(self.mesh_pin.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / 'manifest.yaml'

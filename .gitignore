@@ -72,6 +72,7 @@ secrets/
 !infrastructure/traefik/chart/41.2.0/traefik-41.2.0.tgz
 
 !infrastructure/istio/chart/1.30.3/*.tgz
+!infrastructure/istio/chart/1.30.7/*.tgz
 
 # HooshiX local integrated runtime state and generated credentials
 .local-runtime/

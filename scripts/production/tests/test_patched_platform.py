@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -160,6 +161,22 @@ class PatchedPlatformTest(unittest.TestCase):
             target.recipe(target.CANDIDATE_RECIPE)
         with self.assertRaises(ValueError):
             target.recipe(Path('/tmp/unreviewed.json'))
+
+    def test_stale_source_candidate_is_blocked_before_build_side_effects(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'candidate'
+            with patch.object(target, 'recipe', return_value=self.candidate), \
+                    self.assertRaisesRegex(ValueError, 'stale platform source candidate'):
+                target.build('istiod', output)
+            self.assertFalse(output.exists())
+
+    def test_mesh_only_security_recipe_tracks_the_current_upstream_source(self):
+        selected = target.recipe(target.MESH_CANDIDATE_RECIPE)
+        self.assertEqual('1.26.10', selected['go_version'])
+        self.assertEqual('1.30.7', selected['sources']['istio']['version'])
+        self.assertEqual('7209fe474ce6229c303170be35e76d21619e302a',
+                         selected['sources']['istio']['revision'])
+        self.assertEqual({'istio'}, set(selected['sources']))
         for key in ('cap_patch', 'okta_patch'):
             for field, value in (('sha256', 'a' * 64), ('version', 'v0.13.0'),
                                  ('path', '/tmp/untrusted.patch')):
@@ -205,7 +222,9 @@ class PatchedPlatformTest(unittest.TestCase):
 
         receipt = {'image_config_digest': self.digest, 'recipe_sha256': 'd' * 64,
                    'module_files_sha256': {'go.mod': 'e' * 64, 'go.sum': 'f' * 64}}
+        legacy_pins = {**target.pins(), 'ISTIO_VERSION': '1.30.5'}
         with patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                patch.object(target, 'pins', return_value=legacy_pins), \
                 patch.object(target, 'recipe', return_value=self.candidate), \
                 patch.object(target, 'base_image', return_value='base@sha256:' + 'a' * 64), \
                 patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
@@ -233,8 +252,10 @@ class PatchedPlatformTest(unittest.TestCase):
             def fake_run(argv, **kwargs):
                 commands.append(argv)
                 return 'b' * 40 if argv[0] == 'git' else visibility
+            legacy_pins = {**target.pins(), 'ISTIO_VERSION': '1.30.5'}
             with self.subTest(visibility=visibility), \
                     patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                    patch.object(target, 'pins', return_value=legacy_pins), \
                     patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
                     patch.object(Path, 'write_text'), patch.object(target, 'build',
                         return_value=('tag', {'image_config_digest': self.digest})), \
@@ -259,8 +280,10 @@ class PatchedPlatformTest(unittest.TestCase):
                 image = 'ghcr.io/hasanjodatshandi/hooshix/platform-' + name + '-patched-private@sha256:' + 'c' * 64
                 return {'source': {'type': 'image', 'metadata': {'manifestDigest': 'sha256:' + 'c' * 64,
                     'imageID': self.digest, 'repoDigests': [image], 'os': 'linux', 'architecture': 'amd64'}}}
+            legacy_pins = {**target.pins(), 'ISTIO_VERSION': '1.30.5'}
             with self.subTest(component=rejected), \
                     patch.object(target, 'COMPONENTS', (*target.COMPONENTS, rejected)), \
+                    patch.object(target, 'pins', return_value=legacy_pins), \
                     patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
                     patch.object(target, 'recipe', return_value=self.selected), \
                     patch.object(target, 'run', side_effect=fake_run), patch.object(Path, 'mkdir'), \
@@ -278,7 +301,9 @@ class PatchedPlatformTest(unittest.TestCase):
         def fake_run(argv, **kwargs):
             commands.append(argv)
             return 'b' * 40
+        legacy_pins = {**target.pins(), 'ISTIO_VERSION': '1.30.5'}
         with patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                patch.object(target, 'pins', return_value=legacy_pins), \
                 patch.object(target, 'run', side_effect=fake_run), \
                 patch.object(Path, 'mkdir'), patch.object(target, 'build', side_effect=ValueError), \
                 self.assertRaises(ValueError):
@@ -293,7 +318,9 @@ class PatchedPlatformTest(unittest.TestCase):
             if argv[0] == 'git':
                 return 'b' * 40
             raise target.subprocess.CalledProcessError(1, argv)
+        legacy_pins = {**target.pins(), 'ISTIO_VERSION': '1.30.5'}
         with patch.object(target, 'context', return_value=('b' * 40, 'github:1:1')), \
+                patch.object(target, 'pins', return_value=legacy_pins), \
                 patch.object(target, 'run', side_effect=fake_run), \
                 patch.object(Path, 'mkdir'), \
                 patch.object(target, 'build', return_value=('candidate', {'image_config_digest': digest})) as builder, \

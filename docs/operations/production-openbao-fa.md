@@ -30,7 +30,7 @@ GitOps، init/unseal با custody سهم‌ها، snapshot/restore واقعی، 
 ### آماده‌سازی خودکار manifest شبکهٔ سرویس
 
 در PR جاری، `Repository baseline` با Helm دقیق 4.2.4 و chartهای vendored
-دارای checksum، manifest عمومی Istio 1.30.5 را برای K3s 1.35.6 می‌سازد.
+دارای checksum، manifest عمومی Istio 1.30.7 را برای K3s 1.35.6 می‌سازد.
 artifact با نام `mesh-commissioning-candidate-<run_id>-<attempt>` هفت روز
 نگهداری می‌شود. این job به VPS یا کلیدهای شما دسترسی ندارد و نصب انجام نمی‌دهد.
 ابزار محلی معادل `python3 scripts/production/render_mesh_candidate.py` است؛
@@ -86,7 +86,7 @@ provenance و SBOM هیچ‌کدام حذف نمی‌شوند. OpenBao، تصا�
 و دسترسی VPS در این تأیید نیستند و الزام خصوصی‌بودن قبلی آن‌ها تغییر نمی‌کند.
 
 در workflow موجود **Production release evidence**، حالت `mesh-candidate`
-سه digest Linux/amd64 مربوط به Istio 1.30.5 در `infrastructure/istio/pins.env`
+سه digest Linux/amd64 مربوط به Istio 1.30.7 در `infrastructure/istio/pins.env`
 را بدون rebuild به این سه بستهٔ ثابت منتقل می‌کند:
 
 - `hooshix/platform-istio-istiod-private`
@@ -333,7 +333,7 @@ restart نمی‌کند؛ replacement باید پس از snapshot، پنجرهٔ
 
 ## gateهای پیش از نصب
 
-- خروجی روی API هدف Kubernetes 1.35.6 و CRDهای Istio 1.30.5 اعتبارسنجی شود؛
+- خروجی روی API هدف Kubernetes 1.35.6 و CRDهای Istio 1.30.7 اعتبارسنجی شود؛
   fsGroup/CSI، TLS خواندنی برای UID 10001، PVC پس از restart و وضعیت sealed
   در staging واقعی آزموده شوند. unit test جای این آزمون نیست.
 - digest موجود باید SBOM، تصمیم vulnerability و signature/provenance مورد قبول
@@ -542,14 +542,15 @@ recovery واقعی نیاز دارد؛ SSH، پورت MCP و sudo تغییری 
 بازاجرای همان SBOM با Grype 0.117.0 و همان دیتابیس ۲۰۲۶-۱۰-۰۵، خروجی 2
 و ۱۲ یافتهٔ High داد. اصلاح جاری شامل ارتقای patch رسمی و حفظ گزارش شکست
 اسکن است؛ تا receipt موفق انتشار، نصب و آمادگی Production تأیید نشده‌اند.
-pin جاری 1.30.5 از همان minor رسمی است. job جدید `Istio pinned artifact security`
+pin جاری 1.30.7 از همان minor رسمی است؛ نسخهٔ نصب‌شدهٔ فعلی VPS تا اجرای rollout جداگانه 1.30.5 باقی می‌ماند. job جدید `Istio pinned artifact security`
 در baseline هر سه digest عمومی upstream را بدون credential، انتشار یا نصب
 اسکن می‌کند و نتیجهٔ آن blocking است. artifact با نام `mesh-artifact-<run_id>-<attempt>`
 شامل گزارش‌هاست. خروجی 2 اسکنر همچنان شکست است، اما JSON محدود آن باقی می‌ماند؛
 stderr خام یا خروجی غیر JSON منتشر نمی‌شود. موفقیت این job فقط اسکن است، نه
 امضای mirror، staging یا نصب VPS. chartهای قدیمی در Git برای provenance باقی‌اند؛
 rollback به نسخهٔ دارای یافتهٔ High بدون رفع یا تصمیم دقیق مجاز نیست.
-اسکن اول 1.30.5 دو یافتهٔ GO-2026-6354/6355 در x/crypto 0.55.0 داشت؛
+baseline جاری 1.30.7 روی Go 1.26.10 ساخته می‌شود؛ تصاویر 1.30.5 موجود روی VPS
+تا اجرای rollout جداگانه باقی می‌مانند و هنوز با این candidate جایگزین نشده‌اند.
 نسخهٔ رسمی 1.31.1 نیز همین وابستگی را دارد. Syft 1.51.0 اکنون با
 `SYFT_GOLANG_CAPTURE_SYMBOLS=all` فهرست واقعی توابع binary را ثبت می‌کند؛
 Grype 0.117.0 طبق matcher رسمی خود، تطابق توابع آسیب‌پذیر را بررسی می‌کند.

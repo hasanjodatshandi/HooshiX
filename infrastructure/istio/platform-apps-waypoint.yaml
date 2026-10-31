@@ -10,14 +10,14 @@ data:
       template:
         metadata:
           annotations:
-            sidecar.istio.io/proxyImage: docker.io/istio/proxyv2@sha256:2f59eaf91e15213e50d91c7951c81073695872d6b17b82e146773695f24b1c6e
+            sidecar.istio.io/proxyImage: docker.io/istio/proxyv2@sha256:775ded17b9127cf9d4d31ba3d162f4f80b443a717264dab2965179586f0dbe2e
         spec:
           securityContext:
             seccompProfile:
               type: RuntimeDefault
           containers:
             - name: istio-proxy
-              image: docker.io/istio/proxyv2@sha256:2f59eaf91e15213e50d91c7951c81073695872d6b17b82e146773695f24b1c6e
+              image: docker.io/istio/proxyv2@sha256:775ded17b9127cf9d4d31ba3d162f4f80b443a717264dab2965179586f0dbe2e
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
