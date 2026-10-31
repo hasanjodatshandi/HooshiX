@@ -14,7 +14,7 @@
     "istio": {
       "repository": "istio/istio",
       "revision": "7209fe474ce6229c303170be35e76d21619e302a",
-      "archive_sha256": "538c17dc7bcfe8d381be589ca6f6cf8aa7e2437cfaed7c6ce49bfc2e555e6c44",
+      "archive_sha256": "7b39781f940b0251b40140bad99ff628cc9363375e34bb9b29362dbaefd8742e",
       "version": "1.30.7"
     }
   },
