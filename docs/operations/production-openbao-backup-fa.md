@@ -6,8 +6,8 @@
 با مسیر مستقل `openbao-backups/` انتخاب کرده است. کلیدهای مخصوص backup فقط
 در prompt مخفی operator وارد می‌شوند و در فایل یا Git ذخیره نمی‌شوند؛
 credential حساب audit تغییر نمی‌کند. Versioning باکت `Enabled` و readback نسخهٔ
-دقیق snapshot `Passed` است. درخواست وضعیت Object Lock با `AccessDenied` رد شد؛
-retention تغییرناپذیر مقصد `Not verified` است.
+دقیق snapshot `Passed` است. Object Lock بنا به تصمیم مالک خارج از محدودهٔ فعلی
+است.
 
 بستهٔ جاری، snapshot تحت نظارت، encryption با recipientهای موجود، دریافت
 نسخهٔ مشخص و آزمون decrypt را پیاده می‌کند. نصب موفق OpenBao یا init/unseal
@@ -53,9 +53,12 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-openbao-backup-c456170 --ex
 `OPENBAO_OFF_HOST_SNAPSHOT=Passed` پایان یافت؛ ciphertext با نسخهٔ مشخص
 بازخوانی و decrypt/hash آن با snapshot اصلی تطبیق داده شد. رسید عمومی در
 `/home/coder/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/backup-receipt.json`
+است. بازیابی ایزولهٔ همین snapshot در همان روز با
+`OPENBAO_ISOLATED_RECOVERY=Passed` پایان یافت؛ receipt عمومی آن در
+`/home/coder/.local/share/hooshix-openbao-backup/47705d6020d2499db44c617992db389a/isolated-restore-81eaf185f87c43bab1388756ac7ddb3d.json`
 است. receipt عمومی را می‌توان فرستاد؛ credentials، private export، token، رمز و
 bytes snapshot را نفرستید. ciphertext محلی در زیرپوشهٔ UUID خارج Git و export
-رمزدار VPS تا cleanup جدا و بازبینی‌شده حفظ می‌شوند. Restore از مقصد و
+رمزدار VPS تا cleanup جدا و بازبینی‌شده حفظ می‌شوند. restore روی VPS و
 زمان‌بندی ساعتی `Not run`؛ آمادگی Production `Not verified` است.
 
 ## شکست و ادامه
