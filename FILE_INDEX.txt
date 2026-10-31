@@ -424,6 +424,9 @@ infrastructure/production/secrets/eso-image.json
 infrastructure/production/secrets/openbao-image.json
 infrastructure/production/secrets/openbao-server.json
 infrastructure/production/secrets/secrets-policy.json
+infrastructure/production/snapshots/.dockerignore
+infrastructure/production/snapshots/Dockerfile
+infrastructure/production/snapshots/openbao-snapshot-candidate.json
 infrastructure/registry/pins.env
 infrastructure/staging/authorizationpolicy.yaml
 infrastructure/staging/compromised-password-hibp-pv.yaml
@@ -559,6 +562,8 @@ scripts/production/bootstrap_kafka_tls_operator.py
 scripts/production/bootstrap_kafka_topic_acl_operator.py
 scripts/production/bootstrap_openbao_auth.py
 scripts/production/bootstrap_openbao_auth_operator.py
+scripts/production/bootstrap_openbao_snapshot.py
+scripts/production/bootstrap_openbao_snapshot_operator.py
 scripts/production/bootstrap_postgresql_secrets.py
 scripts/production/bootstrap_postgresql_secrets_operator.py
 scripts/production/bootstrap_redis_secrets.py
@@ -579,6 +584,7 @@ scripts/production/build_kafka_storage_bundle.py
 scripts/production/build_kafka_tls_bundle.py
 scripts/production/build_kafka_topic_acl_bundle.py
 scripts/production/build_mesh_security_upgrade_bundle.py
+scripts/production/build_openbao_snapshot_candidate.py
 scripts/production/build_patched_platform.py
 scripts/production/build_platform_commissioning_bundle.py
 scripts/production/build_postgresql_candidates.py
@@ -638,7 +644,9 @@ scripts/production/offline-ca/run-verify.cmd
 scripts/production/offline-ca/tools.lock.json
 scripts/production/openbao_activation_transport.py
 scripts/production/openbao_scoped_auth.py
+scripts/production/openbao_snapshot_agent.py
 scripts/production/openbao_snapshot_crypto.py
+scripts/production/openbao_snapshot_errors.py
 scripts/production/parspack_audit_transport.py
 scripts/production/parspack_snapshot_transport.py
 scripts/production/platform_image_egress.py
@@ -653,6 +661,7 @@ scripts/production/publish_cert_manager_candidates.py
 scripts/production/publish_kafka_candidate.py
 scripts/production/publish_mesh_candidate.py
 scripts/production/publish_openbao_candidate.py
+scripts/production/publish_openbao_snapshot_candidate.py
 scripts/production/publish_postgresql_candidates.py
 scripts/production/publish_redis_candidate.py
 scripts/production/readiness.py
@@ -695,6 +704,7 @@ scripts/production/render_mesh_candidate.py
 scripts/production/render_mesh_security_upgrade.py
 scripts/production/render_openbao_candidate.py
 scripts/production/render_openbao_local_storage.py
+scripts/production/render_openbao_snapshot.py
 scripts/production/render_platform_admission.py
 scripts/production/render_postgresql_ownership.py
 scripts/production/render_postgresql_quarantine.py
@@ -779,6 +789,7 @@ scripts/production/tests/test_openbao_publication.py
 scripts/production/tests/test_openbao_recovery.py
 scripts/production/tests/test_openbao_scoped_auth.py
 scripts/production/tests/test_openbao_snapshot.py
+scripts/production/tests/test_openbao_snapshot_schedule.py
 scripts/production/tests/test_openbao_storage.py
 scripts/production/tests/test_openbao_storage_guard.py
 scripts/production/tests/test_parspack_audit_transport.py

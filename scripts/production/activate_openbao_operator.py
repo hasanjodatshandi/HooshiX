@@ -150,7 +150,7 @@ def decrypt(directory, index, password, encrypted):
 
 
 def bootstrap(remote, revision, sources, supervisor='activate_openbao_host'):
-    host.require(supervisor in ('activate_openbao_host', 'bootstrap_openbao_auth', 'bootstrap_postgresql_secrets',
+    host.require(supervisor in ('activate_openbao_host', 'bootstrap_openbao_auth', 'bootstrap_openbao_snapshot', 'bootstrap_postgresql_secrets',
                                'bootstrap_redis_secrets', 'bootstrap_redis_tls', 'bootstrap_kafka_tls',
                                'bootstrap_kafka_client_tls', 'bootstrap_application_postgresql_delivery'),
                  'REVIEWED_SUPERVISOR_REQUIRED')
@@ -170,6 +170,7 @@ raise SystemExit(sys.modules[{supervisor!r}].main({revision!r}))
 def rpc(remote, revision, sources, password, body, *, supervisor='activate_openbao_host'):
     payload = bootstrap(remote, revision, sources, supervisor)
     ready_label = {'bootstrap_openbao_auth': b'AUTH_RPC_READY',
+                   'bootstrap_openbao_snapshot': b'SNAPSHOT_BOOTSTRAP_RPC_READY',
                    'bootstrap_postgresql_secrets': b'PG_SECRET_RPC_READY',
                    'bootstrap_redis_secrets': b'PG_SECRET_RPC_READY',
                    'bootstrap_redis_tls': b'PG_SECRET_RPC_READY',
@@ -190,7 +191,7 @@ def rpc(remote, revision, sources, password, body, *, supervisor='activate_openb
         host.require(ready and process.stdout.readline(128).strip() == ready_label,
                      'LOCAL_SUDO_OR_REVIEWED_SUPERVISOR_FAILED')
         output, _ = process.communicate(json.dumps(body).encode() + b'\n',
-                                       timeout=610 if supervisor in ('bootstrap_openbao_auth', 'bootstrap_postgresql_secrets',
+                                       timeout=610 if supervisor in ('bootstrap_openbao_auth', 'bootstrap_openbao_snapshot', 'bootstrap_postgresql_secrets',
                                                                     'bootstrap_redis_secrets', 'bootstrap_redis_tls', 'bootstrap_kafka_tls',
                                                                     'bootstrap_kafka_client_tls', 'bootstrap_application_postgresql_delivery')
                                        else 310 if body.get('action') == 'recover' else 190)

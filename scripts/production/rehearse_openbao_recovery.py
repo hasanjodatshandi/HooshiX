@@ -296,7 +296,7 @@ def rehearse(image_config_digest=None):
                 try:
                     snapshot_crypto.recover(candidate,
                         operator.read_private(custody / 'recipient-1.secret.pgp'), passphrase)
-                except activation.custody.BootstrapFailed:
+                except (activation.custody.BootstrapFailed, snapshot_crypto.errors.SnapshotFailed):
                     pass
                 else:
                     raise RehearsalFailed('fixture envelope negative bypass')

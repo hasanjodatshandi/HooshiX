@@ -387,7 +387,7 @@ authentication/audit → حذف clone و شبکهٔ متعلق به همان آ�
 نتیجهٔ لازم `OPENBAO_ISOLATED_RECOVERY=Passed`؛ این restore روی VPS اصلی نیست.
 VersionId نامعتبر/null یعنی نسخه/retention `Not verified`، حتی اگر ciphertext/hash
 و recovery Passed باشند. کلید قبلی دوباره PUT نمی‌شود. backup/custody سرور اول
-برای init نصب دوم استفاده نمی‌شوند. scheduler ساعتی هنوز مرحلهٔ بعد است.
+برای init نصب دوم استفاده نمی‌شوند.
 
 مقصد انتخاب‌شده برای این سرور باکت `c456170` پارس‌پک با prefix
 `openbao-backups/` است. کلیدهای این مقصد در ورودی مخفی owner وارد می‌شوند؛
@@ -408,6 +408,38 @@ Lock بنا به تصمیم مالک در این مرحله پیگیری نمی�
 object/key را کورکورانه دوباره ارسال نکنید. این موفقیت دروازهٔ بازکردن ترافیک
 Production، لغو root یا صدور JIT بدون ممیزی امن نیست. زمان‌بندی ساعتی مرحلهٔ بعد
 است و Stage10 و آمادگی Production با گیت‌های مستقل باقی‌مانده `Not verified` هستند.
+
+### زمان‌بندی ساعتی رمزگذاری‌شده؛ مسیر commissioning
+
+کار زمان‌بندی باید از image خصوصیِ ساخته‌شده، اسکن‌شده، امضاشده و دارای provenance/SBOM
+روی digest ثابت استفاده کند؛ انتشار candidate به‌تنهایی deployment نیست. پس از merge
+و CI موفق، workflow محافظت‌شدهٔ `production-release` با ورودی
+`openbao-snapshot-candidate` تصویر را منتشر می‌کند. digest منتشرشده سپس در PR جداگانهٔ
+GitOps برای Argo CD ثبت می‌شود؛ اجرای مستقیم `kubectl apply` جایگزین این مسیر نیست.
+
+پس از merge کد و روی checkout پاک `main`، ابزار bootstrap فقط کلیدهای bucket و
+recipientهای عمومی recovery را با CAS در KV-v2 فعلی OpenBao ثبت می‌کند. Access/Secret
+فقط در prompt مخفی همان رایانه وارد شوند؛ هیچ فایل موقت/manifest/receipt نباید مقدارشان
+را داشته باشد. اجرای ابزار:
+
+```bash
+python3 scripts/production/bootstrap_openbao_snapshot_operator.py \
+  --custody /home/coder/.local/share/hooshix-openbao-custody/<existing-custody-id> \
+  --rescue-and-second-session-ready
+```
+
+CronJob فقط ServiceAccount کوتاه‌عمر با audience اختصاصی OpenBao می‌گیرد؛ token
+محدود پس از خواندن snapshot از OpenBao revoke می‌شود. ciphertext با سه recipient همان
+نصب رمز می‌شود، به object key یکتا PUT می‌شود و همان VersionId با تطبیق بایت بازخوانی
+می‌شود. Cron هر ساعت UTC اجرا می‌شود، هم‌زمانی را منع می‌کند، retry خودکار ندارد و
+فایل snapshot روی PVC نمی‌نویسد. خطای مبهم upload را کورکورانه replay نکنید؛ receipt
+عمومی Job و نسخهٔ یکتای bucket را بررسی کنید.
+
+Versioning باکت `Enabled` است. Object Lock بنا به تصمیم مالک خارج از scope است؛ در نتیجه
+Versioning به‌تنهایی شاهد جلوگیری از حذف نسخه‌ها نیست. پس از Argo reconciliation، اجرای
+ساعتی، readback نسخهٔ دقیق، restore روی مقصد ایزولهٔ VPS و آزمون دوره‌ای recovery باید
+مستقل ثبت شوند. تا آن زمان `HOURLY_SCHEDULE`، `TARGET_RESTORE` و Production readiness
+`Not verified` باقی می‌مانند.
 
 ## ۱۳. رسیدن به نقطهٔ فعلی و مراحل بعد
 

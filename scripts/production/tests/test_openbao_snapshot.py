@@ -19,7 +19,7 @@ import parspack_snapshot_transport as cloud
 
 IDENTIFIER = '74f8c0cd-1f8b-4a0f-9561-8f047e7206fb'
 CIPHER = b'\xc1' + b'synthetic-ciphertext' * 20
-DENIED = (ValueError, activation.custody.BootstrapFailed)
+DENIED = (ValueError, activation.custody.BootstrapFailed, crypto.errors.SnapshotFailed)
 
 
 def response(version=b'fixture+/=', body=b'', status=b'200 OK', extra=b''):
@@ -73,9 +73,17 @@ class SnapshotTransportTest(unittest.TestCase):
     def test_response_bounds_and_redirects(self):
         for raw in [response(status=b'302 Found'), response(extra=b'X: ' + b'x' * 8192 + b'\r\n')]:
             with self.assertRaises(ValueError):
-                cloud.response(raw)
+                cloud.response(raw, maximum=cloud.crypto.MAX_CIPHERTEXT)
         with patch.object(crypto, 'MAX_CIPHERTEXT', 192), self.assertRaises(ValueError):
-            cloud.response(response(body=b'a' * 193))
+            cloud.response(response(body=b'a' * 193), maximum=192)
+
+    def test_large_snapshot_response_uses_ciphertext_bound_not_audit_payload_bound(self):
+        body = CIPHER + b'x' * 9000
+        version, fetched = cloud.response(response(body=body), maximum=len(body))
+        self.assertEqual(b'fixture+/=', version)
+        self.assertEqual(body, fetched)
+        with self.assertRaises(ValueError):
+            cloud.response(response(body=body), maximum=8192)
 
     def test_native_curl_rejects_file_protocol_without_network_or_raw_errors(self):
         with cloud.tempfile.TemporaryFile() as source:
@@ -235,22 +243,22 @@ class SnapshotCryptoTest(unittest.TestCase):
     def test_invalid_size_or_plaintext_fails_without_gpg(self):
         with patch.object(crypto.subprocess, 'Popen') as spawn:
             for value in [b'', b'not-a-pgp-ciphertext' * 20]:
-                with self.assertRaises(activation.custody.BootstrapFailed):
+                with self.assertRaises((activation.custody.BootstrapFailed, crypto.errors.SnapshotFailed)):
                     crypto.recover(value, b'fixture', 'fixture password at least 20 characters')
-            with self.assertRaises(activation.custody.BootstrapFailed):
+            with self.assertRaises(crypto.errors.SnapshotFailed):
                 crypto.seal(b'', [])
             spawn.assert_not_called()
 
     def test_oversized_envelope_denied(self):
-        with patch.object(crypto, 'MAX_CIPHERTEXT', 200), self.assertRaises(activation.custody.BootstrapFailed):
+        with patch.object(crypto, 'MAX_CIPHERTEXT', 200), self.assertRaises(crypto.errors.SnapshotFailed):
             crypto.validate_ciphertext(CIPHER)
 
     def test_native_crypto_output_bound_and_invalid_import_are_sanitized(self):
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
-            with self.assertRaisesRegex(activation.custody.BootstrapFailed, '^SNAPSHOT_CRYPTO_FAILED$'):
+            with self.assertRaisesRegex(crypto.errors.SnapshotFailed, '^SNAPSHOT_CRYPTO_FAILED$'):
                 crypto.run(home, ['--import'], b'fixture-not-a-key', bound=32768)
-            with self.assertRaisesRegex(activation.custody.BootstrapFailed, '^SNAPSHOT_CRYPTO_OUTPUT_BOUND$'):
+            with self.assertRaisesRegex(crypto.errors.SnapshotFailed, '^SNAPSHOT_CRYPTO_OUTPUT_BOUND$'):
                 crypto.run(home, ['--version'], bound=10)
 
 
