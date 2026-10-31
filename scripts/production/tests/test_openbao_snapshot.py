@@ -32,12 +32,12 @@ class SnapshotTransportTest(unittest.TestCase):
             receipt, fetched = cloud.deliver(CIPHER, 'fixture-access', 'fixture-secret', IDENTIFIER)
         self.assertEqual(CIPHER, fetched)
         self.assertEqual(hashlib.sha256(CIPHER).hexdigest(), receipt['ciphertext_sha256'])
-        self.assertEqual('c892683', receipt['bucket'])
+        self.assertEqual('c456170', receipt['bucket'])
         self.assertEqual('openbao-backups/' + IDENTIFIER + '.snap.pgp', receipt['object_key'])
         put, get = [call.args[0].decode() for call in transfer.call_args_list]
         self.assertIn('header = "If-None-Match: *"', put)
         self.assertIn('versionId=fixture%2B%2F%3D', get)
-        self.assertIn('https://c892683.parspack.net/c892683/openbao-backups/', put)
+        self.assertIn('https://c456170.parspack.net/c456170/openbao-backups/', put)
         self.assertIn(base64.b64encode(hashlib.sha256(CIPHER).digest()).decode(), put)
         self.assertEqual(transfer.call_args_list[0].args[2], transfer.call_args_list[1].args[2])
         with self.assertRaises(OSError):
