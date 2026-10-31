@@ -10,6 +10,8 @@ if ! command -v openapi-typescript >/dev/null 2>&1; then
   exit 1
 fi
 
+node "${ROOT_DIR}/apps/web-frontend/scripts/check-redocly-globs.cjs"
+
 CHECK_DIR=$(mktemp -d)
 trap 'rm -rf "${CHECK_DIR}"' EXIT
 

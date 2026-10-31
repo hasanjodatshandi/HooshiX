@@ -60,6 +60,7 @@ Implemented:
   privacy/resilience, onboarding, and authenticated account/Tenant behavior
 - exact reviewed npm versions with React/ReactDOM 19.2.7 runtime alignment
 - pinned OSV-Scanner lockfile advisory and immutable-image Semgrep JS/TS policy gates
+- a hash-bound Redocly compatibility patch for minimatch 11, removed when upstream supports it
 - a digest-pinned Caddy runtime image that runs as UID/GID 10001 with a read-only filesystem,
   no Linux capabilities, a separate health port, and SPA-route fallback
 - inclusion in the seven-component Production Syft/Grype/Cosign/Kyverno release-evidence contract

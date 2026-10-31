@@ -67,7 +67,9 @@ apps/web-frontend/package-lock.json
 apps/web-frontend/package.json
 apps/web-frontend/playwright.config.ts
 apps/web-frontend/scripts/check-openapi-client.sh
+apps/web-frontend/scripts/check-redocly-globs.cjs
 apps/web-frontend/scripts/generate-openapi-client.sh
+apps/web-frontend/scripts/patch-redocly-minimatch.cjs
 apps/web-frontend/src/api/bffClient.test.ts
 apps/web-frontend/src/api/bffClient.ts
 apps/web-frontend/src/api/generated/schema.ts
