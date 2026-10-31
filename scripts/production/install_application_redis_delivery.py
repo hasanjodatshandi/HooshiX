@@ -5,7 +5,7 @@ import re
 
 import application_redis_delivery as contract
 import install_application_postgresql_delivery as pg
-from install_eso import desired_fields_match
+from install_eso import MANAGER as ESO_MANAGER, desired_fields_match
 
 require = pg.require
 
@@ -74,12 +74,14 @@ def execute(plan, *, kube, api, root, ca, audiences, token_request):
     for name, (service, _, prop) in contract.ENTRIES.items():
         store = pg.get(kube, 'secretstore', 'hooshix-' + service, contract.NAMESPACE)
         expected_store = contract.auth.store(service, audiences)
-        require(store and pg.ready(store) and desired_fields_match(store, expected_store)
-                and store['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by')
-                    == contract.auth.LABELS['app.kubernetes.io/managed-by']
-                and set(store.get('spec', {}).get('provider', {})) == {'vault'}
+        expected_store['metadata']['labels']['app.kubernetes.io/managed-by'] = ESO_MANAGER
+        require(store and pg.ready(store), 'REDIS_APP_SERVICE_STORE_NOT_READY')
+        require(store['metadata'].get('labels', {}).get('app.kubernetes.io/managed-by') == ESO_MANAGER
+                and not store['metadata'].get('deletionTimestamp'), 'REDIS_APP_SERVICE_STORE_OWNERSHIP')
+        require(desired_fields_match(store, expected_store), 'REDIS_APP_SERVICE_STORE_CONTRACT')
+        require(set(store.get('spec', {}).get('provider', {})) == {'vault'}
                 and set(store['spec']['provider']['vault'].get('auth', {})) == {'kubernetes'},
-                'REDIS_APP_EXISTING_SERVICE_STORE_REQUIRED')
+                'REDIS_APP_SERVICE_STORE_PROVIDER')
         vault, desired = store['spec']['provider']['vault'], expected_store['spec']['provider']['vault']
         require(all(key in desired or key in ('readYourWrites', 'forwardInconsistent') and value is False
                     for key, value in vault.items())

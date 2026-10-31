@@ -34,6 +34,7 @@ class Fixture(PostgreSQLFixture):
             secret['metadata']['ownerReferences'] = installer.pg.owner(external)
         for service, _, _ in contract.ENTRIES.values():
             store = contract.auth.store(service, ['api'])
+            store['metadata']['labels']['app.kubernetes.io/managed-by'] = installer.ESO_MANAGER
             store['metadata']['uid'] = 'store-' + service
             store['status'] = {'conditions': [{'type': 'Ready', 'status': 'True'}]}
             self.objects[('secretstore', contract.NAMESPACE, 'hooshix-' + service)] = store
@@ -108,12 +109,14 @@ class ApplicationRedisDeliveryTest(unittest.TestCase):
         self.assertEqual([], fixture.writes)
 
     def test_foreign_secret_or_drift_stops_before_any_create(self):
-        for mode in ('foreign-secret', 'store-drift', 'source-drift', 'auth-drift'):
+        for mode in ('foreign-secret', 'store-drift', 'store-owner', 'source-drift', 'auth-drift'):
             fixture = Fixture()
             if mode == 'foreign-secret':
                 fixture.put('Secret', 'web-bff-redis', contract.NAMESPACE)
             elif mode == 'store-drift':
                 fixture.objects[('secretstore', contract.NAMESPACE, 'hooshix-identity-service')]['spec']['provider']['vault']['server'] = 'https://wrong.invalid'
+            elif mode == 'store-owner':
+                fixture.objects[('secretstore', contract.NAMESPACE, 'hooshix-identity-service')]['metadata']['labels']['app.kubernetes.io/managed-by'] = contract.auth.LABELS['app.kubernetes.io/managed-by']
             elif mode == 'source-drift':
                 fixture.objects[('secret', contract.source.NAMESPACE, 'security-redis-identity')]['data']['username'] = base64.b64encode(b'wrong').decode()
             else:
