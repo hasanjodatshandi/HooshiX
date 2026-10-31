@@ -24,7 +24,7 @@ BUILD_TYPE = 'https://github.com/hasanjodatshandi/HooshiX/istio-upstream-import/
 
 def targets():
     pin = pins()
-    if pin['ISTIO_VERSION'] != '1.30.5':
+    if pin['ISTIO_VERSION'] != '1.30.7':
         raise ValueError('reviewed mesh baseline required')
     return {component: {'upstream': values(component, pin)['image'],
                         'image': REPOSITORIES[component] + '@' +
@@ -108,7 +108,7 @@ def scan(directory):
 
 def provenance(component, target, revision, invocation):
     return {'buildDefinition': {'buildType': BUILD_TYPE, 'externalParameters': {
-        'component': component, 'version': '1.30.5', 'gitRevision': revision,
+        'component': component, 'version': '1.30.7', 'gitRevision': revision,
         'image': target['image'], 'upstreamImage': target['upstream'],
         'platform': 'linux/amd64', 'operation': 'unchanged-upstream-import'},
         'internalParameters': {}, 'resolvedDependencies': [
@@ -185,7 +185,7 @@ def publish(directory: Path, env: dict):
                                    'upstream_image': target['upstream']})
         results[component]['sha256'][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     return {'schema_version': 1, 'component': 'mesh', 'owner': 'platform',
-            'version': '1.30.5', 'repository_revision': revision,
+            'version': '1.30.7', 'repository_revision': revision,
             'observed_at': datetime.now(timezone.utc).isoformat(), 'publication': 'Passed',
             'signer': EXPECTED_CERTIFICATE_IDENTITY, 'issuer': EXPECTED_OIDC_ISSUER,
             'components': results, 'provenance_kind': 'unchanged-upstream-import',

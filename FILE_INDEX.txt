@@ -357,6 +357,10 @@ infrastructure/istio/chart/1.30.5/base-1.30.5.tgz
 infrastructure/istio/chart/1.30.5/cni-1.30.5.tgz
 infrastructure/istio/chart/1.30.5/istiod-1.30.5.tgz
 infrastructure/istio/chart/1.30.5/ztunnel-1.30.5.tgz
+infrastructure/istio/chart/1.30.7/base-1.30.7.tgz
+infrastructure/istio/chart/1.30.7/cni-1.30.7.tgz
+infrastructure/istio/chart/1.30.7/istiod-1.30.7.tgz
+infrastructure/istio/chart/1.30.7/ztunnel-1.30.7.tgz
 infrastructure/istio/namespaces.yaml
 infrastructure/istio/pins.env
 infrastructure/istio/platform-apps-waypoint-networkpolicy.yaml
@@ -411,6 +415,7 @@ infrastructure/production/redis/runtime.json
 infrastructure/production/release-manifest.schema.json
 infrastructure/production/release-tools.env
 infrastructure/production/release/cap-jose-v4.patch
+infrastructure/production/release/istio-mesh-sources.json
 infrastructure/production/release/jose-platform-sources.json
 infrastructure/production/release/okta-jose-v4.patch
 infrastructure/production/release/patched-platform-sources.json

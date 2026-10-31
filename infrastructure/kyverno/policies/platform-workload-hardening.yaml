@@ -23,11 +23,11 @@ spec:
       jsonPatch:
         expression: |
           object.spec.containers.map(c,
-            c.name == 'istio-proxy' && c.image == 'docker.io/istio/proxyv2:1.30.5-distroless' ?
+            c.name == 'istio-proxy' && c.image == 'docker.io/istio/proxyv2:1.30.7-distroless' ?
             JSONPatch{
               op: "replace",
               path: "/spec/containers/" + string(object.spec.containers.indexOf(c)) + "/image",
-              value: "docker.io/istio/proxyv2@sha256:2f59eaf91e15213e50d91c7951c81073695872d6b17b82e146773695f24b1c6e"
+              value: "docker.io/istio/proxyv2@sha256:775ded17b9127cf9d4d31ba3d162f4f80b443a717264dab2965179586f0dbe2e"
             } : null
           ).filter(p, p != null)
 ---

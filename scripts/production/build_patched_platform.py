@@ -22,6 +22,7 @@ COMPONENTS = ('eso', 'openbao', 'istiod', 'cni')
 BUILD_TYPE = 'https://github.com/hasanjodatshandi/HooshiX/platform-security-source-build/v1'
 RECIPE = ROOT / 'infrastructure/production/release/patched-platform-sources.json'
 CANDIDATE_RECIPE = ROOT / 'infrastructure/production/release/jose-platform-sources.json'
+MESH_CANDIDATE_RECIPE = ROOT / 'infrastructure/production/release/istio-mesh-sources.json'
 SOURCE = {'eso': 'eso', 'openbao': 'openbao', 'istiod': 'istio', 'cni': 'istio'}
 BINARIES = {'eso': {'main.go': '/usr/bin/external-secrets'}, 'openbao': {'.': '/usr/bin/bao'},
     'istiod': {'./pilot/cmd/pilot-discovery': '/usr/local/bin/pilot-discovery'},
@@ -30,14 +31,16 @@ BINARIES = {'eso': {'main.go': '/usr/bin/external-secrets'}, 'openbao': {'.': '/
 
 
 def recipe(path=RECIPE):
-    if path not in (RECIPE, CANDIDATE_RECIPE):
+    if path not in (RECIPE, CANDIDATE_RECIPE, MESH_CANDIDATE_RECIPE):
         raise ValueError('reviewed recipe path required')
     selected = load(path)
+    mesh_candidate = path == MESH_CANDIDATE_RECIPE
     modules = {'golang.org/x/net': 'v0.60.0', 'golang.org/x/crypto': 'v0.57.0',
         'golang.org/x/sys': 'v0.48.0', 'golang.org/x/term': 'v0.46.0',
         'golang.org/x/text': 'v0.42.0'}
-    if path == CANDIDATE_RECIPE:
+    if path in (CANDIDATE_RECIPE, MESH_CANDIDATE_RECIPE):
         modules['github.com/go-jose/go-jose/v4'] = 'v4.1.6'
+    if path == CANDIDATE_RECIPE:
         overlays = {'cap_patch': {'module': 'github.com/hashicorp/cap', 'version': 'v0.14.0',
                 'module_sum': 'h1:IPWX/ewgw8tQPl0qpnCuNf6BFXOCz7ijSM5ikX27cNg=',
                 'path': 'infrastructure/production/release/cap-jose-v4.patch',
@@ -52,16 +55,23 @@ def recipe(path=RECIPE):
                     or hashlib.sha256((ROOT / overlay['path']).read_bytes()).hexdigest()
                     != overlay['sha256']):
                 raise ValueError('exact reviewed JOSE consumer migration required')
-    if (selected['schema_version'] != 1 or selected['go_version'] != '1.26.9'
-            or selected['builder'] != 'docker.io/library/golang@sha256:'
-               'bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff'
+    go_version = '1.26.10' if mesh_candidate else '1.26.9'
+    builder = ('docker.io/library/golang@sha256:'
+        '2bba1f6b063d0e09c5297fbd0a7b9664c4931afc4476a779d7c9a3062704f949' if mesh_candidate else
+        'docker.io/library/golang@sha256:'
+        'bcef992b77b1e2031aaaa51da75cebc32da8e9c182e12e633ea79023c79d9eff')
+    if (selected['schema_version'] != 1 or selected['go_version'] != go_version
+            or selected['builder'] != builder
             or selected['modules'] != modules
             or selected['production_promotion'] !=
                'blocked-until-signed-digest-admission-native-and-recovery-evidence'):
         raise ValueError('reviewed blocked security build required')
-    expected = {'eso': ('external-secrets/external-secrets', eso_pin()['upstream_tag_revision'], '2.12.0'),
+    istio = ('istio/istio', '7209fe474ce6229c303170be35e76d21619e302a', '1.30.7') if mesh_candidate else (
+        'istio/istio', '55b832fad2bc55f47e658b68cd1a7abf9540dbc9', '1.30.5')
+    expected = ({'istio': istio} if mesh_candidate else {
+        'eso': ('external-secrets/external-secrets', eso_pin()['upstream_tag_revision'], '2.12.0'),
         'openbao': ('openbao/openbao', load(ROOT / 'infrastructure/production/secrets/openbao-image.json')['source_revision'], '2.6.4'),
-        'istio': ('istio/istio', '55b832fad2bc55f47e658b68cd1a7abf9540dbc9', pins()['ISTIO_VERSION'])}
+        'istio': istio})
     if set(selected['sources']) != set(expected):
         raise ValueError('exact source inventory required')
     for name, (repository, revision, version) in expected.items():
@@ -93,8 +103,8 @@ def dockerfile(component, selected, recipe_path=RECIPE):
         ldflags += ' -X github.com/openbao/openbao/version.fullVersion=2.6.4'
         ldflags += ' -X github.com/openbao/openbao/version.GitCommit=' + source['revision']
     if component in ('istiod', 'cni'):
-        for key, value in {'buildVersion': '1.30.5', 'buildGitRevision': source['revision'],
-                'buildStatus': 'Modified', 'buildTag': '1.30.5', 'buildHub': 'docker.io/istio',
+        for key, value in {'buildVersion': source['version'], 'buildGitRevision': source['revision'],
+                'buildStatus': 'Modified', 'buildTag': source['version'], 'buildHub': 'docker.io/istio',
                 'buildOS': 'linux', 'buildArch': 'amd64'}.items():
             ldflags += ' -X istio.io/istio/pkg/version.' + key + '=' + value
     modules = ' '.join(name + '@' + version for name, version in selected['modules'].items())
@@ -120,7 +130,7 @@ def dockerfile(component, selected, recipe_path=RECIPE):
             'cd /okta && OKTA_CLIENT_ORGURL=https://testing.oktapreview.com '
             'OKTA_CLIENT_TOKEN=fixture go test -mod=mod -p 2 -timeout 5m ./okta ./tests/unit']
     lines += [f"RUN test \"$(go env GOVERSION)\" = go{selected['go_version']} && go get {modules} && go mod download && go mod verify"]
-    if recipe_path == CANDIDATE_RECIPE:
+    if recipe_path in (CANDIDATE_RECIPE, MESH_CANDIDATE_RECIPE):
         lines += ['RUN go test -mod=mod -p 2 -timeout 5m github.com/go-jose/go-jose/v4 github.com/go-jose/go-jose/v4/jwt']
         if component == 'openbao':
             lines += ['RUN go list -deps . > /tmp/runtime-packages && '
@@ -171,7 +181,7 @@ def validate_local(directory, component, image_id, now, recipe_path=RECIPE):
     net = [artifact for artifact in artifacts if artifact['name'] == 'golang.org/x/net']
     if not net or any(item['version'] != selected['modules']['golang.org/x/net'] for item in net):
         raise ValueError('fixed network dependency required')
-    if recipe_path == CANDIDATE_RECIPE:
+    if recipe_path in (CANDIDATE_RECIPE, MESH_CANDIDATE_RECIPE):
         jose = [item for item in artifacts if item['name'] == 'github.com/go-jose/go-jose/v4']
         if (any(item['name'] == 'github.com/go-jose/go-jose/v3' for item in artifacts)
                 or (component != 'cni' and not jose)
@@ -183,7 +193,11 @@ def validate_local(directory, component, image_id, now, recipe_path=RECIPE):
 
 
 def build(component, directory):
-    selected = recipe(CANDIDATE_RECIPE)
+    recipe_path = MESH_CANDIDATE_RECIPE if component in ('istiod', 'cni') else CANDIDATE_RECIPE
+    selected = recipe(recipe_path)
+    if (component in ('istiod', 'cni')
+            and selected['sources']['istio']['version'] != pins()['ISTIO_VERSION']):
+        raise ValueError('stale platform source candidate cannot be rebuilt')
     source = selected['sources'][SOURCE[component]]
     directory.mkdir(mode=0o700)
     url = f"https://codeload.github.com/{source['repository']}/tar.gz/{source['revision']}"
@@ -192,8 +206,8 @@ def build(component, directory):
     if len(data) > 128 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != source['archive_sha256']:
         raise ValueError('bounded official source integrity required')
     (directory / 'source.tar.gz').write_bytes(data)
-    (directory / 'Dockerfile').write_text(dockerfile(component, selected, CANDIDATE_RECIPE))
-    if component == 'openbao':
+    (directory / 'Dockerfile').write_text(dockerfile(component, selected, recipe_path))
+    if component == 'openbao' and recipe_path == CANDIDATE_RECIPE:
         for key in ('cap_patch', 'okta_patch'):
             source_patch = ROOT / selected[key]['path']
             (directory / source_patch.name).write_bytes(source_patch.read_bytes())
@@ -216,7 +230,7 @@ def build(component, directory):
         '-o', 'syft-json=' + str(directory / 'syft.json'),
         '-o', 'cyclonedx-json=' + str(directory / 'cyclonedx.json')], timeout=300)
     scan(directory)
-    receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc), CANDIDATE_RECIPE)
+    receipt = validate_local(directory, component, image_id, datetime.now(timezone.utc), recipe_path)
     module_files = directory / 'module-evidence/module-files.sha256'
     locks = module_files.read_text().splitlines()
     if len(locks) != 2 or not all(re.fullmatch(r'[a-f0-9]{64}  go\.(mod|sum)', line) for line in locks):
@@ -244,6 +258,8 @@ def publish(directory, env):
     revision, invocation = context(env)
     if run(['git', 'rev-parse', 'HEAD']).strip() != revision:
         raise ValueError('exact protected checkout required')
+    if recipe(CANDIDATE_RECIPE)['sources']['istio']['version'] != pins()['ISTIO_VERSION']:
+        raise ValueError('full platform source recipe does not match the current mesh baseline')
     directory.mkdir(mode=0o700)
     built = {component: build(component, directory / component) for component in COMPONENTS}
     run([sys.executable, str(ROOT / 'scripts/production/rehearse_openbao_recovery.py'), '--ci',

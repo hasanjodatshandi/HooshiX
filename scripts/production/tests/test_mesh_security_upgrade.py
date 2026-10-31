@@ -1,5 +1,6 @@
 """Limited source upgrade preserves initialized-store and original bootstrap contracts."""
 import copy
+import hashlib
 import io
 import json
 import shutil
@@ -22,7 +23,20 @@ import upgrade_mesh_security as target
 class MeshSecurityUpgradeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.original_pin = staticmethod(renderer.pin)
+        cls.publication = json.loads(renderer.PIN.read_text())
+        cls.publication['recipe_sha256'] = hashlib.sha256(
+            renderer.build.MESH_CANDIDATE_RECIPE.read_bytes()).hexdigest()
+        renderer.pin = lambda: copy.deepcopy(cls.publication)
         cls.plan = renderer.render()
+
+    @classmethod
+    def tearDownClass(cls):
+        renderer.pin = cls.original_pin
+
+    def test_previous_publication_is_rejected_after_mesh_baseline_change(self):
+        with self.assertRaises(ValueError):
+            self.original_pin()
 
     def test_exact_two_component_source_lineage_and_preserved_ztunnel(self):
         self.assertEqual(['istiod', 'cni'], [c['component'] for c in self.plan['changes']])
@@ -31,7 +45,7 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
             expected = renderer.predicate(component)
             params = expected['buildDefinition']['externalParameters']
             self.assertEqual(component, params['component'])
-            self.assertEqual('1.26.9', params['go_version'])
+            self.assertEqual('1.26.10', params['go_version'])
             self.assertEqual('v0.60.0', params['modules']['golang.org/x/net'])
             self.assertEqual('v4.1.6', params['modules']['github.com/go-jose/go-jose/v4'])
             self.assertEqual([], params['source_patches'])
@@ -288,13 +302,13 @@ class MeshSecurityUpgradeTest(unittest.TestCase):
             image = selected['images'][component]
             labels = {'io.hooshix.provenance.kind': receipt['provenance_kind'],
                 'io.hooshix.source.revision': renderer.build.recipe(
-                    renderer.build.CANDIDATE_RECIPE)['sources']['istio']['revision'],
+                    renderer.build.MESH_CANDIDATE_RECIPE)['sources']['istio']['revision'],
                 'io.hooshix.recipe.sha256': selected['recipe_sha256']}
             files[component] = {'receipt.json': receipt, 'source-provenance.json': renderer.predicate(component),
                 'syft.json': {'source': {'type': 'image', 'metadata': {
                     'imageID': digest, 'manifestDigest': image.split('@')[1], 'repoDigests': [image],
                     'os': 'linux', 'architecture': 'amd64', 'labels': labels}}, 'artifacts': [
-                    {'name': 'stdlib', 'version': 'go1.26.9', 'locations': [
+                    {'name': 'stdlib', 'version': 'go1.26.10', 'locations': [
                         {'path': p} for p in renderer.build.BINARIES[component].values()]},
                     {'name': 'golang.org/x/net', 'version': 'v0.60.0'},
                     {'name': 'github.com/go-jose/go-jose/v4', 'version': 'v4.1.6'}]},

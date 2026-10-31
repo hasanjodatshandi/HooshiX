@@ -115,7 +115,7 @@ Kyverno ۱٫۱۸ webhook مشترک می‌سازد؛ شرط CEL هر policy ف�
 
 خطای واقعی candidate قبلی نیز اصلاح شد: chart ztunnel از
 `multiCluster.clusterName` استفاده می‌کند، نه `clusterName` در سطح بالای values.
-نام کلاستر اکنون با istiod یکسان است. مرجع، chart vendored 1.30.5 و
+نام کلاستر اکنون با istiod یکسان است. مرجع، chart vendored 1.30.7 و
 [راهنمای رسمی Helm Ambient](https://istio.io/latest/docs/ambient/install/multicluster/multi-primary_multi-network/) است.
 
 ## نصب واقعی روی VPS

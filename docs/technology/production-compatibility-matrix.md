@@ -26,7 +26,7 @@ This matrix records production technology combinations that must remain compatib
 | Kubernetes API/minor | 1.35.6 | selected Istio 1.30.x, CloudNativePG 1.30.x, cert-manager 1.20.x, Kyverno 1.19.x, Calico 3.32.x |
 | `production-single-server` Kubernetes | K3s `v1.35.6+k3s1` | one server/workload node; embedded SQLite; custom Calico; bundled Flannel/policy-controller/Traefik/ServiceLB disabled |
 | `production-ha` Kubernetes | kubeadm-compatible 1.35.6 | current HA control-plane/worker topology |
-| Istio | 1.30.5 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |
+| Istio | 1.30.7 | Kubernetes 1.35 support; Ambient/STRICT mTLS; single-server capacity evidence |
 | Calico | 3.32.1 | Kubernetes 1.35; K3s custom CNI; HBONE/health policy tests |
 | CloudNativePG | 1.30.1 | Kubernetes 1.35/PostgreSQL 18; one shared instance in single-server, dedicated clusters in HA; rebuilt artifact tests required |
 | PostgreSQL | 18.6 | candidate Alpine 3.24.2 runtime with brotli-libs 1.2.1-r0 and libcurl 8.23.0-r0; fresh publication/adoption and CNPG/locale/restore gates; distinct service DB/roles/Flyway/RLS; shared physical only in single-server; 18.4 fixture is not 18.6 evidence |
@@ -65,10 +65,10 @@ Trivy and OWASP Dependency-Check are not current baseline components. Under ADR-
 
 The owner-approved source-security candidate recipe preserves ESO 2.12.0,
 OpenBao 2.6.4 and Istio 1.30.5 while rebuilding the affected Go executables
-with Go 1.26.9 and fixed x/net 0.60.0 dependencies. It does not change the
-effective image pins or claim compatibility: rebuilt-image scans, native tests,
-distinct source-build provenance and signed digest/admission adoption remain
-required. Both CNI binaries are rebuilt; ztunnel and waypoint are unchanged.
+with Go 1.26.9 and fixed x/net 0.60.0 dependencies. That recipe is stale for
+the current Istio 1.30.7 baseline; source rebuild and rollout are blocked until
+its source, toolchain, images and evidence are refreshed together. The active
+VPS still runs Istio 1.30.5 and requires a separate signed target rollout.
 
 New source candidates use `jose-platform-sources.json` with go-jose v4.1.6 for
 [GHSA-mgcc-cww5-fp2q](https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q).
@@ -89,7 +89,7 @@ Fresh registry scans, signatures, native recovery and reviewed exact-digest
 adoption remain separate gates; these candidates do not replace VPS workloads.
 
 Cert-manager 1.20.3 has a separate three-component source candidate recipe with
-Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.2. Product version, source commit,
+Go 1.26.10, x/net 0.60.0 and gRPC-Go 1.83.2. Product version, source commit,
 archive checksum, nested binary modules and official runtime bases remain explicit.
 Help-only smoke is not API/controller compatibility evidence; final signatures,
 signed SBOM, live admission and internal certificate issuance with Barman 0.15.1

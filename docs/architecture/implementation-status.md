@@ -99,7 +99,7 @@ CNPG operator 1.30.1, CNPG-compatible minimal PostgreSQL 18.6, and Barman Cloud
 digest-bound SBOM/fresh Grype gate and checks image labels and current data-policy
 versions. Credential-free PR/push/manual CI scans all four final candidates without
 publishing or installing. The three Go components use the checksum-pinned
-`build_postgresql_candidates.py` source recipe with Go 1.26.9 and x/net 0.60.0.
+`build_postgresql_candidates.py` source recipe with Go 1.26.10 and x/net 0.60.0.
 Both operator manager architectures are replaced, and the static Barman plugin
 uses the pinned non-root distroless base. The final operand/sidecar candidates
 use Alpine 3.24.2 with exact fixed OpenSSL/zlib packages; the sidecar rebuilds
@@ -172,7 +172,7 @@ off-host backup/audit deferral remains `Not verified` and is not retried here.
 Cert-manager 1.20.3 candidate preparation pins the official source archive,
 release manifest and three amd64 runtime inputs in `cert-manager-sources.json`.
 `build_cert_manager_candidates.py` rebuilds the root/nested component modules
-with Go 1.26.9, x/net 0.60.0 and gRPC-Go 1.83.2, preserving product version and
+with Go 1.26.10, x/net 0.60.0 and gRPC-Go 1.83.2, preserving product version and
 honest patched-source provenance. Credential-free candidate CI requires complete
 fresh unsuppressed final-image scans and a restricted help-only entrypoint smoke.
 The protected `cert-manager-candidate` dispatcher publishes only controller,
@@ -315,7 +315,9 @@ combined staging/target receipts; application secret materialization remains
 
 Owner-approved source-security candidates retain ESO 2.12.0, OpenBao 2.6.4
 and Istio 1.30.5 product versions while rebuilding their Go executables with
-Go 1.26.9, x/net 0.60.0 and JOSE v4.1.6. Checksum-bound CAP v0.14.0 and
+Go 1.26.9, x/net 0.60.0 and JOSE v4.1.6. These candidates are stale for the
+current Istio 1.30.7 baseline; rebuild and promotion remain blocked until their
+source/toolchain evidence is refreshed. Checksum-bound CAP v0.14.0 and
 Okta SDK v2.20.0 source migrations remove the two direct JOSE v3 consumers
 from OpenBao; its runtime package graph and final SBOM reject old JOSE.
 The `jose-platform-sources.json` recipe drives new builds; the original
@@ -420,13 +422,13 @@ never automatic reinit. The new write adapter separates bounded init/unseal
 timeouts from the unchanged 3s probes and fsyncs ciphertext before teardown.
 This source repair and its CI are not target activation evidence.
 
-Istio target pins/charts now select the same-minor 1.30.5 patch after the 1.30.3
+Istio target pins/charts now select security-fixed 1.30.7 after the 1.30.5
 istiod publication scan failed (run `37360607172`; reproduction: 12 High findings).
 The baseline includes blocking credential-free final-artifact scans of rebuilt
 istiod/CNI and unchanged ztunnel; scheduled runs scan all three upstream pins.
 It retains threshold-failure JSON and never signs or deploys from PR CI.
 Historical local 1.30.3 runtime evidence below does not validate 1.30.5 runtime.
-The exact 1.30.5 target installation is now `Passed` in the receipt above;
+The existing 1.30.5 target installation receipt is `Passed`; the current 1.30.7 baseline candidate still needs separate signed rollout and native verification.
 historical local evidence does not establish complete target mesh security,
 application staging/promotion or Production readiness.
 
@@ -1032,7 +1034,7 @@ Authorization and Web BFF application services are implemented as current reposi
 | Kyverno production release admission | DESIGNED under ADR-0017/0045 | IMPLEMENTED as stable CEL release-policy generation | repository render/static verification PASSED; production cluster enforcement NOT VERIFIED |
 | Trivy / OWASP Dependency-Check | NOT SELECTED under ADR-0045 | NOT APPLICABLE | NOT APPLICABLE |
 | Production K3s/Kubernetes/Calico | DESIGNED | PARTIAL host-specific bootstrap | 2026-09-30 read-only root inventory again passed API readiness and found all seven Calico/CoreDNS/Kyverno pods ready with zero restarts; the previously observed K3s version was `v1.35.6+k3s1`. Admission/network negative tests, reproducible production provisioning, backup/recovery and complete readiness remain NOT VERIFIED by this inventory. Local kind evidence does not replace them |
-| Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.30.5 installation Passed | current target installation receipt above; historical local 1.30.3 STRICT mTLS/workload-identity positives/negatives do not replace complete target/application mesh verification, still Not verified |
+| Istio Ambient runtime | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.30.5 installation Passed; 1.30.7 candidate not yet rolled out | current target installation receipt above; historical local 1.30.3 STRICT mTLS/workload-identity positives/negatives do not replace complete target/application mesh verification, still Not verified |
 | Kyverno CEL policy/admission set | DESIGNED | LOCAL IMPLEMENTED; bounded target 1.19.1 upgrade Passed | current target installation receipt above; historical local 1.18.2 hardening evidence remains revision-specific; complete production application signature/provenance/SBOM admission remains Not verified |
 | Traefik + Caddy/Coraza edge | DESIGNED | LOCAL IMPLEMENTED; production deployment NOT VERIFIED | local exact-pinned route, direct-bypass denial, workload identity, WAF, and secret-canary verification PASSED; upstream production L4/DDoS/client-address environment evidence NOT VERIFIED |
 | WireGuard management overlay | DESIGNED | PARTIAL host-specific bootstrap, persistent SSH ingress guard and scoped human forwarding hardening | 2026-09-30 post-reboot evidence passed for the host guard restricting human SSH ports 22/22022 to `wg-hooshix`; fresh private SSH passed and public 22/22022 were denied from the operator device. On 2026-10-01 the human-only forwarding policy was applied and fresh private login/remote-forward denial passed; rollback timer cancellation and installed config hash were independently confirmed. Separate TCP/2222 service/listener remained active and unchanged; public MCP execution is not claimed. Protected OS audit, SSH bind/key policy, peer revocation, JIT, off-host audit, provider firewall, recovery and full Production readiness remain NOT VERIFIED |

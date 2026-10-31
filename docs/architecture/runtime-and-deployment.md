@@ -125,7 +125,7 @@ closed until separate complete data commissioning; no database/PVC is created.
 ### Narrow network-node exception
 
 For HooshiX Stage 10, the security-owner explicitly approved this scope on 2026-10-05;
-implementation remains reviewed through PR #176. Only Istio 1.30.5's `istio-cni`
+implementation remains reviewed through PR #176. Only Istio 1.30.7's `istio-cni`
 and `ztunnel` DaemonSets in `istio-system` may use the following node privileges:
 
 - `istio-cni` ServiceAccount, single `install-cni` container: UID/GID 0, drop ALL,

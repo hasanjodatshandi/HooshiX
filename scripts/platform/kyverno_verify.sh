@@ -22,7 +22,7 @@ done
 [[ "$(k get mutatingpolicy pin-istio-waypoint-image -o jsonpath='{.apiVersion}')" == policies.kyverno.io/v1 ]] || fail "waypoint image pin is not stable MutatingPolicy v1"
 waypoint_image=$(k get pod -n platform-apps -l gateway.networking.k8s.io/gateway-name=platform-apps-waypoint -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null || true)
 if [[ -n "$waypoint_image" ]]; then
-  [[ "$waypoint_image" == 'docker.io/istio/proxyv2@sha256:2f59eaf91e15213e50d91c7951c81073695872d6b17b82e146773695f24b1c6e' ]] || fail "waypoint pod image is not immutable: $waypoint_image"
+  [[ "$waypoint_image" == 'docker.io/istio/proxyv2@sha256:775ded17b9127cf9d4d31ba3d162f4f80b443a717264dab2965179586f0dbe2e' ]] || fail "waypoint pod image is not immutable: $waypoint_image"
 fi
 cat >/tmp/kyverno-positive.yaml <<'POD'
 apiVersion: v1
