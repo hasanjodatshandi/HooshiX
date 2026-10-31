@@ -2,11 +2,11 @@
 
 ## محدودهٔ بسته
 
-مالک مقصد فعلی `c892683` در `https://c892683.parspack.net` را برای snapshot
-با مسیر مستقل `openbao-backups/` انتخاب کرده است. تنظیمات باکت تأییدشده توسط
-مالک دوباره probe نمی‌شوند. credential مخصوص backup از فایل محلی خصوصی
-`/home/coder/.local/share/hooshix-openbao-backup/credentials.json` دریافت می‌شود؛
-credential حساب audit تغییر نمی‌کند.
+مالک مقصد `c456170` در `https://c456170.parspack.net` را برای snapshot
+با مسیر مستقل `openbao-backups/` انتخاب کرده است. کلیدهای مخصوص backup فقط
+در prompt مخفی operator وارد می‌شوند و در فایل یا Git ذخیره نمی‌شوند؛
+credential حساب audit تغییر نمی‌کند. نسخه‌سازی و retention مقصد جدید باید جداگانه
+با شواهد همان باکت بررسی شوند.
 
 بستهٔ جاری، snapshot تحت نظارت، encryption با recipientهای موجود، دریافت
 نسخهٔ مشخص و آزمون decrypt را پیاده می‌کند. نصب موفق OpenBao یا init/unseal
@@ -32,19 +32,20 @@ wsl.exe -d Ubuntu --cd /home/coder/workspace/Hooshix-platform-commissioning --ex
 ```
 
 1. `READY` را فقط با مسیر نجات کارا وارد کنید.
-2. **همان رمز قبلی custody OpenBao** را یک بار وارد کنید؛ رمز Root، CA، sudo
+2. کلیدهای Access و Secret مقصد جدید را فقط در prompt مخفی وارد کنید.
+3. **همان رمز قبلی custody OpenBao** را یک بار وارد کنید؛ رمز Root، CA، sudo
    یا GHCR نیست. کلید یا custody تازه ساخته نمی‌شود.
-3. رمز sudo VPS را در prompt مخفی محلی وارد کنید. دستور عمومی hash-bound
+4. رمز sudo VPS را در prompt مخفی محلی وارد کنید. دستور عمومی hash-bound
    تنها snapshot مخزن موجود را می‌خواند و آن را با سه public recipient موجود
    رمز می‌کند. token فقط در header درخواست TLS و stdin رمزدار SSH می‌رود.
-4. ابزار ciphertext را با حد ۳۳MiB/۹۰ ثانیه دانلود و با mode `0600` خارج
+5. ابزار ciphertext را با حد ۳۳MiB/۹۰ ثانیه دانلود و با mode `0600` خارج
    پروژه ذخیره می‌کند. snapshot خام حداکثر ۳۲MiB است؛ عبور از این حد، خطاست،
    نه مجوز افزایش خودکار حد یا ارسال ناقص.
-5. یک PUT با UUID مستقل، شرط `If-None-Match: *` و checksum ارسال می‌شود؛
+6. یک PUT با UUID مستقل، شرط `If-None-Match: *` و checksum ارسال می‌شود؛
    فقط همان version با GET خوانده و byte/hash آن تطبیق داده می‌شود. TLS
    معتبر، بدون proxy/redirect و بدون retry خودکار است. version ناموجود/null،
    timeout یا پاسخ ناسازگار success نیست.
-6. نسخهٔ بازخوانی‌شده با private export قبلی فقط در حافظهٔ WSL decrypt و
+7. نسخهٔ بازخوانی‌شده با private export قبلی فقط در حافظهٔ WSL decrypt و
    hash snapshot اصلی تطبیق داده می‌شود. هیچ restore روی VPS انجام نمی‌شود.
 
 نتیجهٔ موفق `OPENBAO_OFF_HOST_SNAPSHOT=Passed` و `PUBLIC_RECEIPT` است.
@@ -54,18 +55,6 @@ bytes snapshot را نفرستید. فایل‌های backup در زیرپوشه
 VPS هم تا cleanup جدا و بازبینی‌شده حفظ می‌شود.
 
 ## شکست و ادامه
-
-### اختلال فعلی ارائه‌دهنده، ۲۰۲۶-۱۰-۰۹
-
-GET فایل اولین snapshot با HTTP 200 و hash برابر نسخهٔ محلی موفق شد؛
-پاسخ فاقد `x-amz-version-id` بود و ListObjectVersions برای همان key مقدار
-`VersionId=null` برگرداند. مالک گزارش کرده پشتیبانی پارس‌پک این را اختلال
-موقت و قابل‌رفع طی چند روز دانسته است. این گزارش، تأیید API نسخه یا قفل
-همین object نیست: ارسال/hash `Passed`، تأیید نسخه `Not verified` می‌ماند.
-upload همان key تکرار نمی‌شود؛ باکت/کلید/custody/init تغییر نمی‌کند.
-
-کار مستقل بعدی آزمون recovery همان envelope در یک محیط خصوصی جداست؛
-آزمون مستقل، تأیید نسخهٔ باکت یا دروازهٔ Production را جایگزین نمی‌کند.
 
 ### آزمون بازیابی بک‌آپ موجود، بدون اتصال به VPS
 

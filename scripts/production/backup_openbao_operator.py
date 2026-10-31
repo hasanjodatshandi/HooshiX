@@ -143,11 +143,14 @@ def main():
                      and re.fullmatch(r'[a-f0-9]{32}', args.custody.name), 'SNAPSHOT_CUSTODY_PATH_REJECTED')
         operator.custody_directory(args.custody)
         operator.custody_directory(BASE)
-        # Only the OWNER process reads credentials. Never echo their values or provider errors.
-        access, secret = credentials.load_private_credentials(str(BASE / 'credentials.json'),
-                                                               'https://c892683.parspack.net')
         host.require(input('Working rescue VNC and second private SSH session: type READY: ') == 'READY',
                      'SNAPSHOT_RESCUE_REQUIRED')
+        # Credentials exist only in the owner process and the authenticated transport.
+        access = getpass.getpass('New backup bucket Access Key (hidden; never chat): ')
+        secret = getpass.getpass('New backup bucket Secret Key (hidden; never chat): ')
+        credentials.curl_quoted(access)
+        credentials.curl_quoted(secret)
+        host.require(':' not in access, 'SNAPSHOT_CREDENTIAL_FORMAT_REJECTED')
         password = getpass.getpass('EXISTING OpenBao custody passphrase (not Root/CA/sudo): ')
         recipients = json.loads(operator.read_private(args.custody / 'recipients.json'))
         recipient_hash = host.public_keys(recipients)
@@ -167,7 +170,7 @@ def main():
         print('ENCRYPTED_SNAPSHOT_DOWNLOAD=Passed', flush=True)
         # Durable intent before the one conditional PUT; ambiguous delivery is never replayed.
         operator.create(directory / 'delivery-intent.json', json.dumps({'snapshot_id': snapshot_id,
-            'ciphertext_sha256': receipt['ciphertext_sha256'], 'bucket': 'c892683'}).encode())
+            'ciphertext_sha256': receipt['ciphertext_sha256'], 'bucket': cloud.BUCKET}).encode())
         delivery, fetched = cloud.deliver(encrypted, access, secret, snapshot_id)
         del access, secret
         operator.create(directory / 'cloud-receipt.json', json.dumps(delivery).encode())

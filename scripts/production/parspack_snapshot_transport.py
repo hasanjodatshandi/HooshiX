@@ -16,7 +16,8 @@ from urllib.parse import quote
 import openbao_snapshot_crypto as crypto
 import parspack_audit_transport as audit
 
-ENDPOINT = 'https://c892683.parspack.net/c892683/openbao-backups/'
+BUCKET = 'c456170'
+ENDPOINT = f'https://{BUCKET}.parspack.net/{BUCKET}/openbao-backups/'
 ENV = {'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'}
 MAX_RESPONSE = crypto.MAX_CIPHERTEXT + 8192
 
@@ -100,4 +101,4 @@ def deliver(encrypted, access_key, secret_key, snapshot_id):
     if fetched_version != version or fetched != encrypted:
         raise audit.DeliveryDenied('snapshot version-specific readback mismatch')
     return {'ciphertext_sha256': digest, 'version_id': version.decode('ascii'),
-            'bucket': 'c892683', 'object_key': 'openbao-backups/' + snapshot_id + '.snap.pgp'}, fetched
+            'bucket': BUCKET, 'object_key': 'openbao-backups/' + snapshot_id + '.snap.pgp'}, fetched
