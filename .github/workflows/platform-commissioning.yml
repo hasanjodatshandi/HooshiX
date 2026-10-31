@@ -62,18 +62,28 @@ on:
       - scripts/production/verify_mesh_security_publication.py
       - scripts/production/verify_platform_publication_run.py
       - scripts/production/commission_platform.py
-      - scripts/production/*eso*.py
+      - scripts/production/build_eso_commissioning_bundle.py
+      - scripts/production/install_eso.py
+      - scripts/production/render_eso_candidate.py
+      - scripts/production/render_eso_commissioning.py
+      - scripts/production/rehearse_eso_commissioning.py
+      - scripts/production/rehearse_eso_delivery.py
+      - scripts/production/verify_eso_artifact.py
       - scripts/production/run-eso-commissioning.ps1
       - scripts/production/run-cert-manager-commissioning.ps1
-      - scripts/production/tests/test_eso*.py
-      - scripts/production/*cert_manager*.py
+      - scripts/production/build_cert_manager_candidates.py
+      - scripts/production/build_cert_manager_commissioning_bundle.py
+      - scripts/production/install_cert_manager.py
+      - scripts/production/publish_cert_manager_candidates.py
+      - scripts/production/render_cert_manager_candidate.py
+      - scripts/production/rehearse_cert_manager.py
+      - scripts/production/verify_published_cert_manager.py
       - scripts/production/*cnpg*.py
       - scripts/production/*barman*.py
       - scripts/production/run-barman-control-plane.ps1
       - scripts/production/tests/test_barman_control_plane.py
       - scripts/production/run-cnpg-control-plane.ps1
       - scripts/production/tests/test_cnpg_control_plane.py
-      - scripts/production/tests/test_cert_manager_commissioning.py
       - infrastructure/production/data/cert-manager*.json
       - scripts/production/platform_image_egress.py
       - scripts/production/upgrade_kyverno.py
